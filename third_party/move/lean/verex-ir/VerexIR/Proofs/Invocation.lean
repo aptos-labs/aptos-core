@@ -98,7 +98,7 @@ theorem Denote.Encodes.plain {unit : ValidatedUnit} {memory : Denote.Memory unit
   split at found
   · obtain ⟨value, -, encoded⟩ := Option.map_eq_some_iff.mp found.symm
     rw [← encoded]
-    exact Denote.ResourceType.encode_plain _ value
+    exact Denote.ResourceType.erase_plain _ value
   · cases found
 
 /-- A function value that runs on arguments of `parameters` and returns
@@ -169,13 +169,13 @@ theorem ResultShape.lend_refFree_loans : (shape : ResultShape) → shape.row.ref
       | nil => rfl
       | cons _ _ => simp at lent
 
-/-- Arguments without references lend as their encodings, under no loan. -/
-theorem lendArguments_refFree {σs : NRow} (free : σs.refFree = true) {args : HList σs}
+/-- Arguments lending as their encodings lend so, under no loan. -/
+theorem lendArguments_lendsEncoded {σs : NRow} (free : σs.lendsEncoded = true) {args : HList σs}
     {loans : List Nat} {supplied : Array RuntimeValue}
     (lent : lendArguments σs args loans = some supplied) :
     loans = [] ∧ supplied = (HList.encode args).toArray := by
   unfold lendArguments at lent
-  rw [NRow.lend_refFree σs free false args loans] at lent
+  rw [NRow.lend_lendsEncoded σs free false args loans] at lent
   cases loans with
   | nil => simp only [Option.some.injEq] at lent; exact ⟨rfl, lent.symm⟩
   | cons _ _ => simp at lent
@@ -184,20 +184,21 @@ theorem lendArguments_refFree {σs : NRow} (free : σs.refFree = true) {args : H
 initial state, on the encoded arguments, returning the encoded result. -/
 theorem closureMeaning_ok_ensuresOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {closure : ClosureValue}
-    {σs : NRow} {shape : ResultShape} {args : HList σs} (free : σs.refFree = true)
-    (shapeFree : shape.row.refFree = true) {initial final : Memory unit}
+    {σs : NRow} {shape : ResultShape} {args : HList σs} (free : σs.lendsEncoded = true)
+    (shapeFree : shape.row.lendsEncoded = true) {initial final : Memory unit}
     {result : shape.carrier}
     (run : (closureMeaning executable closure σs shape args).ok initial result final) :
     ∃ values, shape.lend false result [] = some values ∧
       EnsuresOf executable closure.encode (HList.encode args) values initial final := by
   obtain ⟨start, loans, supplied, arguments, results, exit, returnedLoans, prophecyRow,
     globals_eq, admissible, lend_eq, compose_eq, step, lend_false, lend_true, -, encoded, agree⟩ := run
-  obtain ⟨rfl, rfl⟩ := lendArguments_refFree free lend_eq
-  cases ResultShape.lend_refFree_loans shape shapeFree lend_false
-  rw [ResultShape.lend_refFree_view shape shapeFree, lend_false] at lend_true
+  obtain ⟨rfl, rfl⟩ := lendArguments_lendsEncoded free lend_eq
+  cases ResultShape.lend_refFree_loans shape (NRow.refFree_of_lendsEncoded shapeFree) lend_false
+  rw [ResultShape.lend_refFree_view shape (NRow.refFree_of_lendsEncoded shapeFree), lend_false] at lend_true
   have sameRow : prophecyRow = results := (Option.some.inj lend_true).symm
   subst prophecyRow
-  refine ⟨results, lend_false, start, exit, ⟨globals_eq, admissible⟩, ?_, encoded, agree⟩
+  refine ⟨results, lend_false, start, exit, ⟨globals_eq.stores, admissible⟩, ?_, encoded.stores,
+    agree⟩
   simp only [ClosureValue.encode, invocationSpec]
   simp only at compose_eq
   rw [compose_eq]
@@ -206,14 +207,14 @@ theorem closureMeaning_ok_ensuresOf {unit : ValidatedUnit} {executable : Executa
 /-- An abort of an invocation is one `aborts_of` states. -/
 theorem closureMeaning_aborts_abortsOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {closure : ClosureValue}
-    {σs : NRow} {shape : ResultShape} {args : HList σs} (free : σs.refFree = true)
+    {σs : NRow} {shape : ResultShape} {args : HList σs} (free : σs.lendsEncoded = true)
     {initial : Memory unit} {error : Failure}
     (aborted : (closureMeaning executable closure σs shape args).aborts initial error) :
     AbortsOf executable closure.encode (HList.encode args) initial := by
   obtain ⟨start, loans, supplied, arguments, globals_eq, admissible, lend_eq, compose_eq,
     step⟩ := aborted
-  obtain ⟨rfl, rfl⟩ := lendArguments_refFree free lend_eq
-  refine ⟨start, error, ⟨globals_eq, admissible⟩, ?_⟩
+  obtain ⟨rfl, rfl⟩ := lendArguments_lendsEncoded free lend_eq
+  refine ⟨start, error, ⟨globals_eq.stores, admissible⟩, ?_⟩
   simp only [ClosureValue.encode, invocationSpec]
   simp only at compose_eq
   rw [compose_eq]
@@ -225,7 +226,7 @@ that decode at the invocation's type. -/
 theorem closureMeaning_defined {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
     (closure : ClosureValue) {σs : NRow} {shape : ResultShape} (args : HList σs)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     {parameters results : List SemTy}
     (typed : ClosureTyped unit closure.function closure.mask closure.typeInstantiation
       closure.captures parameters results)
@@ -237,11 +238,11 @@ theorem closureMeaning_defined {unit : ValidatedUnit} (executable : ExecutableUn
     run, undecoded⟩
   have lent : lendArguments σs args [] = some (HList.encode args).toArray := by
     unfold lendArguments
-    rw [NRow.lend_refFree σs free false args []]
+    rw [NRow.lend_lendsEncoded σs free false args []]
   cases loans with
   | cons _ _ =>
       unfold lendArguments at lend_eq
-      rw [NRow.lend_refFree σs free false args _] at lend_eq
+      rw [NRow.lend_lendsEncoded σs free false args _] at lend_eq
       simp at lend_eq
   | nil =>
   rw [lent, Option.some.injEq] at lend_eq
@@ -252,7 +253,7 @@ theorem closureMeaning_defined {unit : ValidatedUnit} (executable : ExecutableUn
     (by rw [signatureTypes?_length signature_eq]; exact mask_bound) captures_typed
     (by simpa using argumentsTyped) compose_eq
   have startTyped : TypedState unit (fun _ => none) start.pending.size start :=
-    { globals := globals start globals_eq.globals
+    { globals := globals start globals_eq.stores.globals
       inert_le := Nat.le_refl _
       pending := fun _ member => by simp at member
       bounded := fun _ _ none_eq => by simp at none_eq }
@@ -261,16 +262,21 @@ theorem closureMeaning_defined {unit : ValidatedUnit} (executable : ExecutableUn
     (by simpa using composed) startTyped
   obtain ⟨result, lend_result⟩ :=
     decodes loans' values (returned values rfl) (EvalFunction_holeFree run)
-  exact undecoded ⟨result, [], args, lend_result,
-    (ResultShape.lend_refFree shape shapeFree result).trans lend_result, lent,
-    argumentsResolve_refFree σs free args values _⟩
+  refine undecoded ⟨result, [], args, lend_result,
+    (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans lend_result,
+    lent, ?_, argumentsResolve_refFree σs (NRow.refFree_of_lendsEncoded free) args values _, ?_⟩
+  · rw [HList.tables_eq_nil false σs (NRow.tableFree_of_lendsEncoded free)]
+    exact TableMemory.TablesIn.nil _
+  · rw [HList.tables_eq_nil true σs (NRow.tableFree_of_lendsEncoded free),
+      ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
+    exact TableMemory.TablesIn.nil _
 
 /-- The weakest precondition of such an invocation: what its runs and aborts
 establish. -/
 theorem wp_closureMeaning_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
     (closure : ClosureValue) {σs : NRow} {shape : ResultShape} (args : HList σs)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     {parameters results : List SemTy}
     (typed : ClosureTyped unit closure.function closure.mask closure.typeInstantiation
       closure.captures parameters results)
@@ -409,7 +415,7 @@ theorem not_abortsOf_of_ok {unit : ValidatedUnit} {executable : ExecutableUnit u
   obtain ⟨_, threw⟩ := aborted
   obtain ⟨_, _, -, -, renamed, -⟩ := evalFunction_agree_plain natives
     (starts₂.1.unique starts.1).1 (starts₂.1.unique starts.1).2
-    starts.1.globals.plain starts.1.tables.1.plain starts.2 starts₂.2 composed_plain ok threw
+    starts.1.globals.plain starts.1.tables.plain starts.2 starts₂.2 composed_plain ok threw
   simp [Outcome.rename_returned, Outcome.rename_threw] at renamed
 
 /-- `result_of` is the result of every run from a start at `state` that
@@ -436,7 +442,7 @@ theorem resultOf_eq_of_ok {unit : ValidatedUnit} {executable : ExecutableUnit un
   rw [spec_eq] at ok ok₂
   obtain ⟨ρ, ρ₂, -, injective₂, renamed, -⟩ := evalFunction_agree_plain natives
     (starts₂.1.unique starts.1).1 (starts₂.1.unique starts.1).2
-    starts.1.globals.plain starts.1.tables.1.plain starts.2 starts₂.2 composed_plain ok ok₂
+    starts.1.globals.plain starts.1.tables.plain starts.2 starts₂.2 composed_plain ok ok₂
   simp only [Outcome.rename_returned, Outcome.returned.injEq,
     Array.map_rename_of_plain ρ results_plain] at renamed
   refine (Array.map_inj_right fun _ _ => RuntimeValue.rename_injective injective₂).1 ?_
@@ -458,21 +464,40 @@ private theorem memory_eq_of_encodes {unit : ValidatedUnit}
   · obtain ⟨namespaceId, typeId, named⟩ := globalNamed
     have encoded := leftEncoded.globals.2 namespaceId typeId key
     rw [same.1, rightEncoded.globals.2, named] at encoded
-    exact Option.map_injective
-      (Denote.ResourceType.encode_injective resource) encoded.symm
-  by_cases tableNamed : ∃ namespaceId typeId,
-      Denote.TableMemory.runtimeResourceOf unit namespaceId typeId = some resource
-  · obtain ⟨namespaceId, typeId, named⟩ := tableNamed
-    have encoded := leftEncoded.tables.1.2 namespaceId typeId key
-    rw [same.2, rightEncoded.tables.1.2, named] at encoded
-    exact Option.map_injective
-      (Denote.ResourceType.encode_injective resource) encoded.symm
+    simp only at encoded
+    have ordinary := Denote.runtimeResourceOf_kind named
+    have free := Denote.runtimeResourceOf_refFree named
+    -- The physical values agree, and the tables both values hold are held at
+    -- the same slots of the same storage: the values agree.
+    rcases resource with ⟨type, arguments, kind⟩
+    cases kind
+    · cases foundLeft : left ⟨type, arguments, .value⟩ key with
+      | none =>
+          cases foundRight : right ⟨type, arguments, .value⟩ key with
+          | none => rfl
+          | some _ => rw [foundLeft, foundRight] at encoded; simp at encoded
+      | some leftValue =>
+          cases foundRight : right ⟨type, arguments, .value⟩ key with
+          | none => rw [foundLeft, foundRight] at encoded; simp at encoded
+          | some rightValue =>
+              rw [foundLeft, foundRight] at encoded
+              simp only [Option.map_some, Option.some.injEq] at encoded
+              congr 1
+              refine @Denote.NTy.eq_of_erase_eq (Denote.Carriers.runtime unit)
+                (Denote.tableSlot? unit) leftState.tables.contents.lookup false type free leftValue
+                rightValue encoded.symm
+                (fun table member => leftEncoded.tables.held table
+                  ⟨namespaceId, typeId, _, key, leftValue, named, foundLeft, member⟩)
+                (fun table member => ?_)
+              rw [same.2]
+              exact rightEncoded.tables.held table
+                ⟨namespaceId, typeId, _, key, rightValue, named, foundRight, member⟩
+    · cases ordinary
   by_cases allocation : resource = Denote.TableMemory.allocationResource
   · subst resource
-    rw [leftEncoded.tables.2, rightEncoded.tables.2, same.2]
+    rw [leftEncoded.tables.allocated, rightEncoded.tables.allocated, same.2]
   have unnamed : Denote.Unnamed unit resource :=
-    ⟨fun ns ty named => globalNamed ⟨ns, ty, named⟩,
-     fun ns ty named => tableNamed ⟨ns, ty, named⟩, allocation⟩
+    ⟨fun ns ty named => globalNamed ⟨ns, ty, named⟩, allocation⟩
   exact congrFun ((leftAgree resource unnamed).trans (rightAgree resource unnamed).symm) key
 
 /-- Successful invocations determine their labeled post-state independently
@@ -501,16 +526,16 @@ theorem stateOf_eq_of_ensuresOf {unit : ValidatedUnit} {executable : ExecutableU
   rw [spec_eq] at ok ok₂
   obtain ⟨ρ, ρ₂, injective, injective₂, renamed, globals, tables⟩ := evalFunction_agree_plain
     natives (starts₂.1.unique starts.1).1 (starts₂.1.unique starts.1).2
-    starts.1.globals.plain starts.1.tables.1.plain starts.2 starts₂.2 composed_plain ok ok₂
+    starts.1.globals.plain starts.1.tables.plain starts.2 starts₂.2 composed_plain ok ok₂
   simp only [Outcome.rename_returned, Outcome.returned.injEq] at renamed
   have resolved := RuntimeState.resolveReturned_rename injective (state' := { exit with
     globals := exit.globals.rename ρ, tables := exit.tables.rename ρ }) rfl rfl results
   have resolved₂ := RuntimeState.resolveReturned_rename injective₂ (state' := { exit₂ with
     globals := exit₂.globals.rename ρ₂, tables := exit₂.tables.rename ρ₂ }) rfl rfl returns.choose
   rw [GlobalMap.rename_of_plain _ encoded.globals.plain,
-    NativeTableStorage.rename_of_plain _ encoded.tables.1.plain] at resolved
+    NativeTableStorage.rename_of_plain _ encoded.tables.plain] at resolved
   rw [GlobalMap.rename_of_plain _ encoded₂.globals.plain,
-    NativeTableStorage.rename_of_plain _ encoded₂.tables.1.plain] at resolved₂
+    NativeTableStorage.rename_of_plain _ encoded₂.tables.plain] at resolved₂
   rw [← resolved.1, ← resolved₂.1, ← resolved.2, ← resolved₂.2]
   simp only [RuntimeState.resolveReturned, renamed, globals, tables, and_self]
 
@@ -714,7 +739,7 @@ private theorem lentRuns_agree {unit : ValidatedUnit} {executable : ExecutableUn
     simp only [Option.map_some, Option.some.injEq] at mapped₂
     simp only [List.map_toArray, mapped₂]
   exact evalFunction_agree natives (encodes₂.unique encodes).1 (encodes₂.unique encodes).2
-    encodes.globals.plain encodes.tables.1.plain admissible admissible₂ length_eq
+    encodes.globals.plain encodes.tables.plain admissible admissible₂ length_eq
     (within _ lends composes) (within _ lends₂ composes₂) arguments_eq run run₂
 
 /-- An invocation lending mutable references that returns from a start at
@@ -804,7 +829,7 @@ theorem ResultShape.lend_plain : (shape : ResultShape) → shape.row.refFree = t
       intro value member
       simp only [List.mem_toArray, List.mem_singleton] at member
       subst member
-      exact NTy.encode_plain τ result
+      exact NTy.erase_plain τ result
 
 /-- An invocation of a typed closure a proof cannot see, on typed arguments
 from typed global memory, has the weakest precondition its behavioral
@@ -814,7 +839,7 @@ does not hold, and the results are `result_of`; an abort is one
 theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
     (shifts : NativesShift executable) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
-    (args : HList σs) (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (args : HList σs) (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     {parameters results : List SemTy}
     (typed : ClosureTyped unit closure.function closure.mask closure.typeInstantiation
       closure.captures parameters results)
@@ -840,7 +865,7 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : Executable
   exact returns result final values lent ensuresOf
     (not_abortsOf_of_ok shifts callable_plain arguments_plain starts ok)
     (resultOf_eq_of_ok shifts callable_plain arguments_plain starts ok encoded agree
-      (ResultShape.lend_plain shape shapeFree lent))
+      (ResultShape.lend_plain shape (NRow.refFree_of_lendsEncoded shapeFree) lent))
     (stateOf_eq_of_ensuresOf shifts callable_plain arguments_plain ensuresOf)
 
 end Rule
@@ -859,7 +884,7 @@ def Denote.NTy.scalarType? : NTy → Option SemTy
   | .signer => some .signer
   | .string => some .string
   | .bytes => some .bytes
-  | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .ref _ | .param _
+  | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .table _ _ | .ref _ | .param _
   | .function .. => none
 
 theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
@@ -882,8 +907,9 @@ theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [Skolems unit] {loans :
   | .bytes, _, scalar, value => by
       simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar; exact .bytes value
   | .unit, _, scalar, _ | .tuple _, _, scalar, _ | .struct .., _, scalar, _
-  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .ref _, _, scalar, _
-  | .param _, _, scalar, _ | .function .., _, scalar, _ => by simp [NTy.scalarType?] at scalar
+  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .table _ _, _, scalar, _
+  | .ref _, _, scalar, _ | .param _, _, scalar, _ | .function .., _, scalar, _ => by
+      simp [NTy.scalarType?] at scalar
 
 theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
     (τ : NTy) → {type : SemTy} → τ.scalarType? = some type → {value : RuntimeValue} →
@@ -922,8 +948,8 @@ theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [Skolems unit] {loan
       | bytes value => exact ⟨value, rfl⟩
       | hole => simp [RuntimeValue.holeFree?] at *
   | .unit, _, scalar, _, _, _ | .tuple _, _, scalar, _, _, _ | .struct .., _, scalar, _, _, _
-  | .enum .., _, scalar, _, _, _ | .vector _, _, scalar, _, _, _ | .ref _, _, scalar, _, _, _
-  | .param _, _, scalar, _, _, _ | .function .., _, scalar, _, _, _ => by
+  | .enum .., _, scalar, _, _, _ | .vector _, _, scalar, _, _, _ | .table _ _, _, scalar, _, _, _
+  | .ref _, _, scalar, _, _, _ | .param _, _, scalar, _, _, _ | .function .., _, scalar, _, _, _ => by
       simp [NTy.scalarType?] at scalar
 
 /-- A scalar result decodes at its native type. -/
@@ -939,10 +965,10 @@ theorem RowDecodes.scalar {unit : ValidatedUnit} [Skolems unit] {τ : NTy} {type
           simp only [Outcome.holeFree, List.all_toArray, List.all_cons, List.all_nil,
             Bool.and_true] at holeFree
           obtain ⟨decoded, encoded⟩ := NTy.decode_of_hasType τ scalar head holeFree
-          have free : τ.refFree = true := by
-            cases τ <;> simp_all [NTy.scalarType?, NTy.refFree]
+          have free : τ.lendsEncoded = true := by
+            cases τ <;> simp_all [NTy.scalarType?, NTy.lendsEncoded, NTy.refFree, NTy.tableFree]
           refine ⟨decoded, ?_⟩
-          simp only [ResultShape.lend, NTy.lend_refFree τ free false decoded [], encoded]
+          simp only [ResultShape.lend, NTy.lend_lendsEncoded τ free false decoded [], encoded]
 
 /-- The semantic types of a row of scalar native types. -/
 def Denote.NRow.scalarTypes? : NRow → Option (List SemTy)
@@ -1031,15 +1057,16 @@ def ClosureTypedAt (unit : ValidatedUnit) [Skolems unit] (parameters results : N
       ∀ shape : ResultShape, shape.row = results → RowDecodes unit shape resultTypes
 
 omit [Skolems unit] in
-/-- A row of scalar types holds no reference. -/
-theorem Denote.NRow.refFree_of_scalarTypes : (row : NRow) → {types : List SemTy} →
-    row.scalarTypes? = some types → row.refFree = true
+/-- A row of scalar types lends as its encodings. -/
+theorem Denote.NRow.lendsEncoded_of_scalarTypes : (row : NRow) → {types : List SemTy} →
+    row.scalarTypes? = some types → row.lendsEncoded = true
   | .nil, _, _ => rfl
   | .cons τ rest, _, scalar => by
       simp only [NRow.scalarTypes?, Option.bind_eq_bind, Option.bind_eq_some_iff] at scalar
       obtain ⟨type, head, types, tail, -⟩ := scalar
-      simp only [NRow.refFree, NRow.refFree_of_scalarTypes rest tail, Bool.and_true]
-      cases τ <;> simp_all [NTy.scalarType?, NTy.refFree]
+      rw [NRow.lendsEncoded_cons]
+      refine ⟨?_, NRow.lendsEncoded_of_scalarTypes rest tail⟩
+      cases τ <;> simp_all [NTy.scalarType?, NTy.lendsEncoded, NTy.refFree, NTy.tableFree]
 
 /-- Results of a scalar row decode at their result shape. -/
 theorem RowDecodes.ofScalar {unit : ValidatedUnit} [Skolems unit] :
@@ -1059,10 +1086,10 @@ theorem RowDecodes.ofScalar {unit : ValidatedUnit} [Skolems unit] :
       cases tail
       exact RowDecodes.scalar head
 
-/-- Results of a reference-free shape whose row the frame resolves to
-scalars decode at their semantic types. -/
+/-- Results of a shape lending as its encodings whose row the frame resolves
+to scalars decode at their semantic types. -/
 theorem RowDecodes.ofResolved {unit : ValidatedUnit} [Skolems unit] :
-    (shape : ResultShape) → {types : List SemTy} → shape.row.refFree = true →
+    (shape : ResultShape) → {types : List SemTy} → shape.row.lendsEncoded = true →
       shape.row.resolved.scalarTypes? = some types → RowDecodes unit shape types
   | .none, _, _, scalar => by
       simp only [ResultShape.row, NRow.resolved, NRow.scalarTypes?, Option.some.injEq] at scalar
@@ -1076,7 +1103,7 @@ theorem RowDecodes.ofResolved {unit : ValidatedUnit} [Skolems unit] :
         Option.bind_eq_some_iff, Option.some.injEq] at scalar
       obtain ⟨type, head, _, tail, rfl⟩ := scalar
       cases tail
-      have τFree : τ.refFree = true := by simpa [NRow.refFree] using free
+      have τFree : τ.lendsEncoded = true := (NRow.lendsEncoded_singleton τ).mp free
       intro loans values typed holeFree
       obtain ⟨list⟩ := values
       cases typed with
@@ -1089,7 +1116,7 @@ theorem RowDecodes.ofResolved {unit : ValidatedUnit} [Skolems unit] :
               obtain ⟨decoded, encoded⟩ := @NTy.decode_of_hasType unit (Skolems.runtime unit) loans
                 (Skolems.resolve τ) type head value headTyped holeFree
               refine ⟨Skolems.ofRuntime τ decoded, ?_⟩
-              simp only [ResultShape.lend, NTy.lend_refFree τ τFree false _ []]
+              simp only [ResultShape.lend, NTy.lend_lendsEncoded τ τFree false _ []]
               rw [← Skolems.encode_toRuntime, Skolems.toRuntime_ofRuntime]
               exact congrArg (fun raw => some #[raw]) encoded
 
@@ -1099,13 +1126,14 @@ theorem RowDecodes.ofResolved {unit : ValidatedUnit} [Skolems unit] :
 @[vir_denote_norm] theorem Denote.resultCodec_one_encode (τ : NTy) (result : τ.carrier) :
     (resultCodec (.one τ)).encode result = #[τ.encode result] := rfl
 
-/-- A reference-free result lends as its encoding. -/
-theorem Denote.ResultShape.lend_encode : (shape : ResultShape) → shape.row.refFree = true →
+/-- A result lending as its encoding lends so. -/
+theorem Denote.ResultShape.lend_encode : (shape : ResultShape) → shape.row.lendsEncoded = true →
     (result : shape.carrier) → shape.lend false result [] = some ((resultCodec shape).encode result)
   | .none, _, _ => rfl
   | .one τ, free, result => by
-      simp only [NRow.refFree, Bool.and_true] at free
-      simp only [ResultShape.lend, NTy.lend_refFree τ free false result [], resultCodec_one_encode]
+      have plain := (NRow.lendsEncoded_singleton τ).mp free
+      simp only [ResultShape.lend, NTy.lend_lendsEncoded τ plain false result [],
+        resultCodec_one_encode]
 
 @[vir_denote_norm] theorem Denote.ResultShape.row_none : ResultShape.none.row = .nil := rfl
 @[vir_denote_norm] theorem Denote.ResultShape.row_one (τ : NTy) :
@@ -1117,7 +1145,7 @@ abort of the function value naming the target, and is the result
 theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
     (shifts : NativesShift executable)
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
-    {shape : ResultShape} (fullFree : full.refFree = true) (shapeFree : shape.row.refFree = true)
+    {shape : ResultShape} (fullFree : full.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     {initial : Memory unit}
     (named : wp (propheticMeaning executable typeInstantiation handle full shape args)
@@ -1150,7 +1178,7 @@ theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
   ⟨fun result final execution => by
       have ensuresOf := ensuresOf_of_run fullFree shapeFree execution
       obtain ⟨start, exit, starts, ok, encoded, agree⟩ := id ensuresOf
-      have resultsPlain := ResultShape.lend_plain shape shapeFree
+      have resultsPlain := ResultShape.lend_plain shape (NRow.refFree_of_lendsEncoded shapeFree)
         (ResultShape.lend_encode shape shapeFree result)
       exact named.1 result final execution ensuresOf
         (not_abortsOf_of_ok shifts callablePlain argumentsPlain starts ok)
@@ -1214,7 +1242,7 @@ theorem wp_named_mut_typed {unit : ValidatedUnit} (executable : ExecutableUnit u
         obtain ⟨lentRow, lends, rfl⟩ := lendArguments_lentFlat fullFlat lent
         obtain ⟨-, invocation⟩ := invocationSpec_closureOf_lent (Weave.supplying full) rfl fullFlat
           typeInstantiation () args (executable := executable) (handle := handle) lends
-        refine not_abortsOfMut_of_ok shifts callablePlain entriesPlain globals admissible lends
+        refine not_abortsOfMut_of_ok shifts callablePlain entriesPlain globals.stores admissible lends
           (returned := results) (exit := exit) ?_
         rw [invocation, HList.encode_nil, Weave.composeList_supplying]
         exact ran
@@ -1232,7 +1260,7 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : Executa
     [Skolems unit] (natives : NativesTyped executable)
     (shifts : NativesShift executable) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     (typed : ClosureTypedAt unit σs shape.row closure)
     {initial : Memory unit} (globals : MemoryTyped unit initial)
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -1264,7 +1292,7 @@ theorem wp_closureMeaning_unseen_native {unit : ValidatedUnit} (executable : Exe
     (shifts : NativesShift executable) {parameters : NRow} {shared : List Bool} {results : NRow}
     (function : (NTy.function parameters shared results).carrier) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     (typed : ClosureTypedAt unit σs shape.row function.val)
     {initial : Memory unit} (globals : MemoryTyped unit initial)
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -1291,7 +1319,7 @@ closure on typed arguments from typed global memory returns or aborts. -/
 def TerminatingAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit] : Prop :=
   ∀ (closure : ClosureValue) (σs : NRow) (shape : ResultShape) (args : HList σs)
     (parameters results : List SemTy) (initial : Memory unit),
-    σs.refFree = true → shape.row.refFree = true →
+    σs.lendsEncoded = true → shape.row.lendsEncoded = true →
     ClosureTyped unit closure.function closure.mask closure.typeInstantiation closure.captures
       parameters results →
     HasTypes unit (fun _ => none) (HList.encode args) parameters →
@@ -1313,7 +1341,7 @@ theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUn
     [Skolems unit] (terminating : Terminating executable)
     (shifts : NativesShift executable) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     (typed : ClosureTypedAt unit σs shape.row closure)
     {initial : Memory unit} (globals : MemoryTyped unit initial)
     (unaborted : ¬AbortsOf executable (ClosureValue.encode closure)
@@ -1336,7 +1364,7 @@ theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUn
   · obtain ⟨values, lent, ensuresOf⟩ := closureMeaning_ok_ensuresOf free shapeFree run
     obtain ⟨_, _, starts, ok, encoded, agree⟩ := id ensuresOf
     have resulted := resultOf_eq_of_ok shifts callable_plain arguments_plain starts ok encoded
-      agree (ResultShape.lend_plain shape shapeFree lent)
+      agree (ResultShape.lend_plain shape (NRow.refFree_of_lendsEncoded shapeFree) lent)
     rw [ResultShape.lend_encode shape shapeFree result, Option.some.injEq] at lent
     subst lent
     exact ⟨result, final, ensuresOf, resulted,
@@ -1393,7 +1421,7 @@ theorem ClosureTypedAt.ofClosureOf {unit : ValidatedUnit} [Skolems unit] {parame
     (capturedScalar : (@NRow.resolved _ Θc capturedRow).scalarTypes? = some capturedTypes)
     (parametersScalar : parameters.resolved.scalarTypes? = some parameterTypes)
     (resultsScalar : results.resolved.scalarTypes? = some resultTypes)
-    (resultsFree : results.refFree = true)
+    (resultsFree : results.lendsEncoded = true)
     (types : (closureTypes? unit handle mask).map
       (fun (captured, targetTypes, results) => (captured, targetTypes.map observedType, results)) =
       some (capturedTypes, parameterTypes, resultTypes)) :
@@ -1412,11 +1440,11 @@ theorem ClosureTypedAt.ofClosureOf {unit : ValidatedUnit} [Skolems unit] {parame
 /-- A function value whose runs on arguments of `parameters` from typed
 global memory keep a frame: what a function-typed parameter's `modifies_of`
 permits an invocation to change, at its arguments. Vacuous at rows with
-references. -/
+references or map contents. -/
 def FramedAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
     (parameters : NRow)
     (frame : HList parameters → Memory unit → Memory unit → Prop) (closure : ClosureValue) : Prop :=
-  parameters.refFree = true →
+  parameters.lendsEncoded = true →
     ∀ (args : HList parameters) (results : Array RuntimeValue) (pre post : Memory unit),
       MemoryTyped unit pre →
         EnsuresOf executable closure.encode (HList.encode args) results pre post → frame args pre post
@@ -1491,11 +1519,11 @@ theorem FramedAt.mono {unit : ValidatedUnit} {executable : ExecutableUnit unit} 
   fun free args results pre post typed ensures =>
     within args pre post (framed free args results pre post typed ensures)
 
-theorem FramedAt.of_refFree_false {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+theorem FramedAt.of_lendsEncoded_false {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {parameters : NRow}
     {frame : HList parameters → Memory unit → Memory unit → Prop} {closure : ClosureValue}
-    (references : parameters.refFree = false) : FramedAt executable parameters frame closure :=
-  fun free => by simp [references] at free
+    (held : parameters.lendsEncoded = false) : FramedAt executable parameters frame closure :=
+  fun plain => by simp [held] at plain
 
 /-- A run of a closure whose target, weave, and captures a proof sees, at
 reference-free arguments and results: a run of the target's prophetic
@@ -1503,8 +1531,8 @@ meaning, or, where its results do not decode, an undefined outcome of it. -/
 theorem ok_or_undefined_of_ensuresOf_closureOf {unit : ValidatedUnit}
     {executable : ExecutableUnit unit} [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFree : supplied.lendsEncoded = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) {results : Array RuntimeValue}
@@ -1518,16 +1546,21 @@ theorem ok_or_undefined_of_ensuresOf_closureOf {unit : ValidatedUnit}
   obtain ⟨start, exit, ⟨globals, admissible⟩, runs, encoded, agree⟩ := ensures
   rw [invocationSpec_closureOf] at runs
   have lent := lendArguments_weave weave capturedFree suppliedFree captures args
+  have none := weave.tables_nil capturedFree suppliedFree
   by_cases decodes : ∃ result, shape.lend false result [] = some results
   · obtain ⟨result, resultLent⟩ := decodes
-    refine .inl ⟨result, coherent, start, [], _, results, exit, [], results, globals, admissible,
-      lent, runs, resultLent, (ResultShape.lend_refFree shape shapeFree result).trans resultLent,
-      ?_, encoded, agree⟩
-    exact (weave.argumentsResolve_compose capturedFree captures args [] _ _).mpr
-      (argumentsResolve_refFree supplied suppliedFree args _ _)
-  · refine .inr ⟨coherent, start, [], _, results, exit, globals, admissible, lent, runs, ?_⟩
-    rintro ⟨result, returnedLoans, -, resultLent, -, -, -⟩
-    obtain rfl := ResultShape.lend_refFree_loans shape shapeFree resultLent
+    refine .inl ⟨result, coherent, start, [], _, results, exit, [], results,
+      Encloses.of_nil globals (none false captures args), admissible,
+      lent, runs, resultLent, (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans resultLent,
+      ?_, ReturnedEncloses.of_nil encoded (by
+        rw [none, ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
+        rfl), agree⟩
+    exact (weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded capturedFree) captures args [] _ _).mpr
+      (argumentsResolve_refFree supplied (NRow.refFree_of_lendsEncoded suppliedFree) args _ _)
+  · refine .inr ⟨coherent, start, [], _, results, exit, Encloses.of_nil globals (none false captures args),
+      admissible, lent, runs, ?_⟩
+    rintro ⟨result, returnedLoans, -, resultLent, -, -, -, -, -⟩
+    obtain rfl := ResultShape.lend_refFree_loans shape (NRow.refFree_of_lendsEncoded shapeFree) resultLent
     exact decodes ⟨result, resultLent⟩
 
 /-- `ensures_of` of a closure whose target, weave, and captures a proof sees,
@@ -1536,8 +1569,8 @@ target's prophetic meaning. -/
 theorem ensuresOf_closureOf_shape {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFree : supplied.lendsEncoded = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) (result : shape.carrier)
@@ -1549,11 +1582,15 @@ theorem ensuresOf_closureOf_shape {unit : ValidatedUnit} {executable : Executabl
   obtain ⟨start, exit, ⟨globals, admissible⟩, runs, encoded, agree⟩ := ensures
   rw [invocationSpec_closureOf] at runs
   have lent := ResultShape.lend_encode shape shapeFree result
-  refine ⟨coherent, start, [], _, _, exit, [], _, globals, admissible,
-    lendArguments_weave weave capturedFree suppliedFree captures args, runs, lent,
-    (ResultShape.lend_refFree shape shapeFree result).trans lent, ?_, encoded, agree⟩
-  exact (weave.argumentsResolve_compose capturedFree captures args [] _ _).mpr
-    (argumentsResolve_refFree supplied suppliedFree args _ _)
+  have none := weave.tables_nil capturedFree suppliedFree
+  refine ⟨coherent, start, [], _, _, exit, [], _, Encloses.of_nil globals (none false captures args),
+    admissible, lendArguments_weave weave capturedFree suppliedFree captures args, runs, lent,
+    (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans lent, ?_,
+    ReturnedEncloses.of_nil encoded (by
+      rw [none, ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
+      rfl), agree⟩
+  exact (weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded capturedFree) captures args [] _ _).mpr
+    (argumentsResolve_refFree supplied (NRow.refFree_of_lendsEncoded suppliedFree) args _ _)
 
 /-- `ensures_of` of a closure whose target is verified, at results of any
 shape: where what the target's theorem assumes and its precondition hold,
@@ -1562,8 +1599,8 @@ under which it must abort held. -/
 theorem ensuresOf_closureOf_verified_shape {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFree : supplied.lendsEncoded = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) (result : shape.carrier)
@@ -1588,8 +1625,8 @@ and final values. -/
 theorem ensuresOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) (result : shape.carrier)
@@ -1601,7 +1638,7 @@ theorem ensuresOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUn
       (weave.compose captures args)).ok pre result post := by
   obtain ⟨start, loans, lent, returned, exit, globals, admissible, lends, runs, read, resolves,
     encoded, agree⟩ := ensures
-  simp only [readResults_of_all_false (NRow.mutable_refFree _ shapeFree), Array.toArray_toList]
+  simp only [readResults_of_all_false (NRow.mutable_refFree _ (NRow.refFree_of_lendsEncoded shapeFree)), Array.toArray_toList]
     at read
   subst read
   obtain ⟨lentArguments, invocation⟩ :=
@@ -1609,11 +1646,15 @@ theorem ensuresOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUn
       (executable := executable) (handle := handle) lends
   rw [invocation] at runs
   have resultLent := ResultShape.lend_encode shape shapeFree result
-  refine ⟨coherent, start, loans, _, _, exit, [], _, globals, admissible, lentArguments, runs,
-    resultLent, (ResultShape.lend_refFree shape shapeFree result).trans resultLent, ?_, encoded,
-    agree⟩
-  exact (weave.argumentsResolve_compose capturedFree captures args loans _ _).mpr
-    ((argumentsResolve_finals supplied args loans _ _).mpr resolves)
+  have none := weave.tables_nil_of_lentFlat capturedFree suppliedFlat
+  refine ⟨coherent, start, loans, _, _, exit, [], _, Encloses.of_nil globals (none false captures args),
+    admissible, lentArguments, runs, resultLent,
+    (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans resultLent, ?_,
+    ReturnedEncloses.of_nil encoded (by
+      rw [none, ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
+      rfl), agree⟩
+  exact (weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded capturedFree) captures args loans _ _).mpr
+    ((argumentsResolve_finals supplied suppliedFlat args loans _ _).mpr resolves)
 
 /-- `aborts_of` of a closure whose target, weave, and captures a proof sees,
 at arguments lending mutable references, is an abort of the target's
@@ -1622,7 +1663,7 @@ values. -/
 theorem abortsOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFlat : supplied.lentFlat = true)
     (shape : ResultShape) (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) {state : Memory unit}
@@ -1635,7 +1676,9 @@ theorem abortsOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUni
     invocationSpec_closureOf_lent weave capturedFree suppliedFlat typeInstantiation captures args
       (executable := executable) (handle := handle) lends
   rw [invocation] at runs
-  exact ⟨failure, coherent, start, loans, _, globals, admissible, lentArguments, runs⟩
+  exact ⟨failure, coherent, start, loans, _,
+    Encloses.of_nil globals (weave.tables_nil_of_lentFlat capturedFree suppliedFlat false captures args),
+    admissible, lentArguments, runs⟩
 
 /-- `ensures_of` of a closure taking mutable references whose target is
 verified: where what the target's theorem assumes and its precondition
@@ -1644,8 +1687,8 @@ condition under which it must abort held. -/
 theorem ensuresOfMut_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) (result : shape.carrier)
@@ -1670,7 +1713,7 @@ hold, a failure its contract permits. -/
 theorem abortsOfMut_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFlat : supplied.lentFlat = true)
     {shape : ResultShape} (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) {state : Memory unit}
@@ -1691,8 +1734,8 @@ frame. -/
 theorem frame_of_ensuresOf_closureOf_verified {unit : ValidatedUnit}
     {executable : ExecutableUnit unit} [Skolems unit] {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFree : supplied.lendsEncoded = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation)
     (captures : HList captured) (args : HList supplied) {results : Array RuntimeValue}
@@ -1715,8 +1758,8 @@ whatever its precondition. -/
 theorem FramedAt.ofBody {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
     {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFree : supplied.lendsEncoded = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
@@ -1736,8 +1779,8 @@ theorem applies at every typed memory and its frame lies within it. -/
 theorem FramedAt.ofVerified {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
     {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (capturedFree : captured.lendsEncoded = true) (suppliedFree : supplied.lendsEncoded = true)
+    {shape : ResultShape} (shapeFree : shape.row.lendsEncoded = true)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
     {contract : Contract (Memory unit) Failure (HList full) shape.carrier}

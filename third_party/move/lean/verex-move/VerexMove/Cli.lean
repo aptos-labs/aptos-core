@@ -7,9 +7,10 @@ import VerexMove.SourceVerify
 # The `verex-move` command
 
 `verex-move verify <source>` exports a Move file or package directory
-through compiler-v2, renders its modules as VerexSL beside it
-(`<source>.lean`, or `--output`), verifies every specified function, and
-reports each message at its position in the Move sources.
+through compiler-v2, renders its modules as VerexSL where its proof files
+find them (`.verex/<file>.lean` beside a file, `build/verex-verify.lean` of a
+package, or `--output`), verifies every specified function, and reports each
+message at its position in the Move sources.
 -/
 
 namespace VerexMove.Cli
@@ -76,8 +77,10 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
   if options.dev && options.exported.isSome then
     fail "--dev compiles the package itself; drop --export"
   let start ← IO.monoNanosNow
-  let output := options.output.getD (source.addExtension "lean")
-  let environment ← VerexSL.Perf.withPhase .load importVerexSL
+  let output ← match options.output with
+    | some output => pure output
+    | none => VerexMove.SourceVerify.renderingOf source
+  let environment ← VerexSL.Perf.withPhase .load VerexMove.SourceVerify.importEnvironment
   let reports ← VerexMove.SourceVerify.verifySource environment source output
     options.exported options.filter options.renderOnly options.heartbeats options.modules
     options.dev options.ignoreProofs

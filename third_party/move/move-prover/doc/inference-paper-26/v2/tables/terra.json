@@ -17,6 +17,7 @@
       "mean_cost": 0.2024,
       "mean_input_k": 367.2,
       "mean_output_k": 3.9,
+      "io_k": "367/3.9",
       "mean_wall_s": 152.9,
       "first_check_accepted": 38,
       "rejected_checks": 117
@@ -35,6 +36,7 @@
       "mean_cost": 0.1607,
       "mean_input_k": 289.0,
       "mean_output_k": 3.08,
+      "io_k": "289/3.1",
       "mean_wall_s": 148.0,
       "first_check_accepted": 65,
       "rejected_checks": 82,
@@ -105,6 +107,7 @@
       "mean_cost": 0.1807,
       "mean_input_k": 334.5,
       "mean_output_k": 3.38,
+      "io_k": "335/3.4",
       "mean_wall_s": 143.1,
       "first_check_accepted": 68,
       "rejected_checks": 66,

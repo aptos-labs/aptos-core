@@ -192,16 +192,24 @@ loopHypothesis✝ :
                   (env.snd.snd.fst.elim False fun v_1 =>
                       env.snd.snd.snd.fst.elim False fun i =>
                         env.snd.snd.snd.snd.fst.elim False fun n =>
-                          VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13617 13623
-                              (i.val ≤ n.val) ∧
-                            VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13640 13688
-                                (↑v_1.fst.values.size = ↑v.values.size) ∧
-                              VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13705 13718
-                                  (n.val = ↑v_1.fst.values.size) ∧
-                                VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13735 13739 True ∧
-                                  VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13756 13760
-                                      True ∧
-                                    VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13777 13836
+                          VerexIR.Proofs.Obligation
+                              "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13617
+                              13623 (i.val ≤ n.val) ∧
+                            VerexIR.Proofs.Obligation
+                                "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13640
+                                13688 (↑v_1.fst.values.size = ↑v.values.size) ∧
+                              VerexIR.Proofs.Obligation
+                                  "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13705
+                                  13718 (n.val = ↑v_1.fst.values.size) ∧
+                                VerexIR.Proofs.Obligation
+                                    "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+                                    13735 13739 True ∧
+                                  VerexIR.Proofs.Obligation
+                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+                                      13756 13760 True ∧
+                                    VerexIR.Proofs.Obligation
+                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+                                      13777 13836
                                       (∀ (j : Int),
                                         i.val ≤ j →
                                           j < n.val →
@@ -209,7 +217,9 @@ loopHypothesis✝ :
                                               (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
                     VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
                       (fun failure =>
-                        VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False)
+                        VerexIR.Proofs.Obligation
+                          "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972 13987
+                          False)
                       state
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
@@ -319,7 +329,8 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final =>
-        VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13992 14066
+        VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13992
+            14066
             (∀ (i : Int),
               0 ≤ i →
                 i < ↑(fst✝, fst✝).snd.values.size →
@@ -337,7 +348,10 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                                 (VerexIR.StorageKey.address a))).getD
                           VerexIR.RuntimeValue.unit).asInt) ∧
           final = initialState✝)
-      (fun failure => VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False) state
+      (fun failure =>
+        VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972
+          13987 False)
+      state
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -358,7 +372,10 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
         (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
           (VerexIR.Proofs.Denote.Term.lit ()) env)
         verexContinuation✝²
-        (fun failure => VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False) state
+        (fun failure =>
+          VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+            13972 13987 False)
+        state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
       verexContinuation✝² (VerexIR.Proofs.Denote.Flow.return_ result env) state
     | VerexIR.Proofs.Denote.Flow.break_ nest env =>
@@ -404,16 +421,24 @@ loopHypothesis✝ :
                   (env.snd.snd.fst.elim False fun v_1 =>
                       env.snd.snd.snd.fst.elim False fun i =>
                         env.snd.snd.snd.snd.fst.elim False fun n =>
-                          VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13617 13623
-                              (i.val ≤ n.val) ∧
-                            VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13640 13688
-                                (↑v_1.fst.values.size = ↑v.values.size) ∧
-                              VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13705 13718
-                                  (n.val = ↑v_1.fst.values.size) ∧
-                                VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13735 13739 True ∧
-                                  VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13756 13760
-                                      True ∧
-                                    VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13777 13836
+                          VerexIR.Proofs.Obligation
+                              "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13617
+                              13623 (i.val ≤ n.val) ∧
+                            VerexIR.Proofs.Obligation
+                                "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13640
+                                13688 (↑v_1.fst.values.size = ↑v.values.size) ∧
+                              VerexIR.Proofs.Obligation
+                                  "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13705
+                                  13718 (n.val = ↑v_1.fst.values.size) ∧
+                                VerexIR.Proofs.Obligation
+                                    "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+                                    13735 13739 True ∧
+                                  VerexIR.Proofs.Obligation
+                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+                                      13756 13760 True ∧
+                                    VerexIR.Proofs.Obligation
+                                      "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean"
+                                      13777 13836
                                       (∀ (j : Int),
                                         i.val ≤ j →
                                           j < n.val →
@@ -421,7 +446,9 @@ loopHypothesis✝ :
                                               (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
                     VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
                       (fun failure =>
-                        VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False)
+                        VerexIR.Proofs.Obligation
+                          "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972 13987
+                          False)
                       state
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
@@ -438,7 +465,10 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
-      (fun failure => VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False) state
+      (fun failure =>
+        VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972
+          13987 False)
+      state
 x✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
 reference✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
 x : reference✝.fst = reference✝.snd

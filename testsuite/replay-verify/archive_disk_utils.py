@@ -507,7 +507,7 @@ def create_repair_disk_and_its_snapshot(
     # Execute tasks in parallel
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [executor.submit(create_final_snapshot, *task) for task in tasks]
-        for future in concurrent.futures.as_completed(futures, timeout=3600):
+        for future in concurrent.futures.as_completed(futures, timeout=14400):
             try:
                 result = future.result()
                 logger.info(f"Task result: {result}")

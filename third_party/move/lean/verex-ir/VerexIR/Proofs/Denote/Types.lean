@@ -48,6 +48,12 @@ inductive NTy where
       (distinct : names.Nodup)
   /-- A growable vector of one element type. -/
   | vector (element : NTy)
+  /-- The entries of a handle-backed intrinsic map, a value of their own
+  beside the handle: the hidden last field of the map's owner
+  (`designs/intrinsic-maps.md`, "Owned Table values"). The runtime keeps them
+  in native storage, the denotation in the value; a declared field never has
+  this type. -/
+  | table (key value : NTy)
   /-- A mutable reference: its loan and the current value it owns. -/
   | ref (referent : NTy)
   /-- A type parameter of a generic function: its skolem family's carrier. -/
@@ -76,8 +82,15 @@ instance : Inhabited NRow := ⟨.nil⟩
 /-- Whether a type is a scalar: one whose values a clause compares directly. -/
 def NTy.isScalar : NTy → Bool
   | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes => true
-  | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .vector _ | .ref _ | .param _
+  | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .vector _ | .table _ _ | .ref _ | .param _
   | .function _ _ _ => false
+
+/-- Whether a type is a map's contents: the hidden last field of its owner. -/
+def NTy.isTable : NTy → Bool
+  | .table _ _ => true
+  | _ => false
+
+@[simp] theorem NTy.isTable_table (key value : NTy) : (NTy.table key value).isTable = true := rfl
 
 def NRow.length : NRow → Nat
   | .nil => 0
@@ -220,6 +233,7 @@ mutual
   | .enum source arguments names rows distinct =>
       .enum source (NRow.subst θ arguments) names (rows.subst θ) distinct
   | .vector element => .vector (element.subst θ)
+  | .table key value => .table (key.subst θ) (value.subst θ)
   | .ref referent => .ref (referent.subst θ)
   | .param index => θ.getD index (.param index)
   | .function parameters shared results =>
@@ -252,6 +266,7 @@ def NTy.substWith (types : Nat → NTy) : NTy → NTy
   | .enum source arguments names rows distinct =>
       .enum source (NRow.substWith types arguments) names (NRows.substWith types rows) distinct
   | .vector element => .vector (element.substWith types)
+  | .table key value => .table (key.substWith types) (value.substWith types)
   | .ref referent => .ref (referent.substWith types)
   | .param index => types index
   | .function parameters shared results =>
@@ -276,6 +291,7 @@ def NTy.paramsAll (allowed : Nat → Bool) : NTy → Bool
   | .enum _ arguments _ rows _ =>
       NRow.paramsAll allowed arguments && NRows.paramsAll allowed rows
   | .vector element => NTy.paramsAll allowed element
+  | .table key value => NTy.paramsAll allowed key && NTy.paramsAll allowed value
   | .ref referent => NTy.paramsAll allowed referent
   | .function parameters _ results =>
       NRow.paramsAll allowed parameters && NRow.paramsAll allowed results
@@ -311,6 +327,10 @@ theorem NTy.substWith_congr {allowed : Nat → Bool} {left right : Nat → NTy}
   | .vector element, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.substWith_congr agree element mentioned]
+  | .table key value, mentioned => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
+      simp only [NTy.substWith, NTy.substWith_congr agree key mentioned.1,
+        NTy.substWith_congr agree value mentioned.2]
   | .ref referent, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.substWith_congr agree referent mentioned]
@@ -358,6 +378,7 @@ def NTy.refFree : NTy → Bool
   | .struct _ _ fields => fields.refFree
   | .enum _ _ _ rows _ => rows.refFree
   | .vector element => element.refFree
+  | .table key value => key.refFree && value.refFree
   -- A closure's captures hold no loan, whatever its parameters take.
   | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .param _
   | .function _ _ _ => true
@@ -431,8 +452,28 @@ def ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
             (arguments.toList.map (sharedReference types namespaceId)) (NRow.ofList results))
       | _ => none
 
+/-- Whether a declaration owns a handle-backed intrinsic map: the registry
+binds it to the map model, it has a key and a value parameter, and its
+fields are its handle, with a cached length in the registry's variant, and
+no entries vector (`designs/intrinsic-maps.md`, "Views"). Its native type
+holds the entries as a hidden last field. -/
+def tableOwner (unit : ValidatedUnit) (handle : StructHandle) : Bool :=
+  match unit.namespaces[handle.namespaceId.index]? with
+  | none => false
+  | some ns => match ns.structs[handle.structId]? with
+    | none => false
+    | some declaration =>
+        ns.intrinsics.any (fun intrinsic =>
+          intrinsic.model == "map" && intrinsic.owner == declaration.name) &&
+        declaration.variants.isEmpty && declaration.generics.size == 2 &&
+        match (declaration.fields.toList.mapM fun field =>
+            unit.tables.types[field.type.typeId.index]? : Option (List Ty)) with
+        | some [] | some [.address] | some [.address, .integer (.bits 64) false] => true
+        | _ => false
+
 /-- The native type of a nominal declaration: its field row, or its named
-variant rows. -/
+variant rows. The owner of a handle-backed map holds its entries as a hidden
+last field at its key and value parameters. -/
 def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) : Nat → StructHandle → Option NTy
   | 0, _ => none
   | fuel + 1, handle => do
@@ -442,7 +483,12 @@ def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) : Nat → StructHa
         NRow.ofList <$> fields.toList.mapM fun field =>
           ntyOfFuel types unit fuel handle.namespaceId field.type.typeId
       let arguments := NRow.ofList ((List.range declaration.generics.size).map .param)
-      if declaration.variants.isEmpty then .struct handle arguments <$> row declaration.fields
+      if declaration.variants.isEmpty then
+        let fields ← row declaration.fields
+        let fields := if tableOwner unit handle then
+            fields ++ .cons (.table (.param 0) (.param 1)) .nil
+          else fields
+        some (.struct handle arguments fields)
       else
         let names ← declaration.variants.toList.mapM fun variant =>
           (targetNs.tables.names[variant.name.index]?).map (·.name)
@@ -479,6 +525,7 @@ def NTy.paramFree : NTy → Bool
   | .struct _ arguments fields => arguments.paramFree && fields.paramFree
   | .enum _ arguments _ rows _ => arguments.paramFree && rows.paramFree
   | .vector element => element.paramFree
+  | .table key value => key.paramFree && value.paramFree
   | .ref referent => referent.paramFree
   | .function parameters _ results => parameters.paramFree && results.paramFree
   | _ => true
@@ -591,13 +638,15 @@ def NTy.typedAsCore (unit : ValidatedUnit) : NTy → SemTy → Bool
   | .bytes, type => type == .bytes
   | .tuple elements, .tuple types => NRow.typedAsCheck unit elements types
   | .vector element, .vector type none => NTy.typedAsCore unit element type
+  -- The declared fields read as the declaration's; a hidden contents field
+  -- is at the owner's key and value types.
   | .struct source nativeArguments fields, .nominal name arguments =>
       SemanticOperations.structName? unit source == some name &&
         declarationArity? unit source == some arguments.length &&
         NRow.argumentsCheck unit nativeArguments arguments &&
         match SemanticOperations.handleFields? unit source none with
         | some (declaringNs, declared) => match declaredTypes? declaringNs arguments declared with
-          | some fieldTypes => NRow.typedAsCheck unit fields fieldTypes
+          | some fieldTypes => NRow.fieldsCheck unit nativeArguments fields fieldTypes
           | none => false
         | none => false
   | .enum source nativeArguments names rows _, .nominal name arguments =>
@@ -619,6 +668,20 @@ def NRow.typedAsCheck (unit : ValidatedUnit) : NRow → List SemTy → Bool
   | .nil, [] => true
   | .cons τ rest, type :: types =>
       NTy.typedAsCore unit τ type && NRow.typedAsCheck unit rest types
+  | _, _ => false
+
+/-- Whether a struct's field row reads as its declared field types: the
+declared fields in order, then a hidden contents field, if any, at the
+owner's key and value arguments. -/
+def NRow.fieldsCheck (unit : ValidatedUnit) (arguments : NRow) : NRow → List SemTy → Bool
+  | .nil, [] => true
+  | .cons τ .nil, [] =>
+      match τ with
+      | .table key value => arguments == .cons key (.cons value .nil)
+      | _ => false
+  | .cons τ .nil, [type] => NTy.typedAsCore unit τ type
+  | .cons τ (.cons σ rest), type :: types =>
+      NTy.typedAsCore unit τ type && NRow.fieldsCheck unit arguments (.cons σ rest) types
   | _, _ => false
 
 /-- Whether a row of native types reads as type arguments. -/
@@ -805,12 +868,13 @@ def NTy.admits (unit : ValidatedUnit) : NTy → RuntimeValue → Bool
   | .bytes, .bytes _ => true
   | .tuple elements, .tuple values => NRow.admits unit elements values.toList
   | .struct source _ fields, .nominal actual none values =>
-      actual == source && NRow.admits unit fields values.toList
+      actual == source && NRow.admitsFields unit fields values.toList
   | .enum source _ names rows _, .nominal actual (some name) values =>
       actual == source && match NRows.variant? names rows name with
         | some row => NRow.admits unit row values.toList
         | none => false
   | .vector element, .vector values => NTy.admitsEach unit element values.toList
+  | .table key value, .vector entries => NTy.admitsEntries unit key value entries.toList
   | .ref referent, .tuple values => NTy.admitsPair unit referent values.toList
   | .param _, _ => true
   | .function parameters shared results, .closure function mask typeInstantiation captures =>
@@ -835,6 +899,17 @@ def NRow.admits (unit : ValidatedUnit) : NRow → List RuntimeValue → Bool
   | _, _ => false
 termination_by _ values => sizeOf values
 
+/-- Whether runtime values are a struct's fields: the declared fields' values
+in order, and none for a hidden contents field, which native storage holds. -/
+def NRow.admitsFields (unit : ValidatedUnit) : NRow → List RuntimeValue → Bool
+  | .nil, [] => true
+  | .cons τ .nil, [] => τ.isTable
+  | .cons τ .nil, [value] => !τ.isTable && NTy.admits unit τ value
+  | .cons τ (.cons σ rest), value :: values =>
+      NTy.admits unit τ value && NRow.admitsFields unit (.cons σ rest) values
+  | _, _ => false
+termination_by _ values => sizeOf values
+
 /-- Whether runtime values each encode a value of one type. -/
 def NTy.admitsEach (unit : ValidatedUnit) (τ : NTy) : List RuntimeValue → Bool
   | [] => true
@@ -844,6 +919,25 @@ termination_by values => sizeOf values
 /-- Whether runtime values are a reference's current value and prophecy. -/
 def NTy.admitsPair (unit : ValidatedUnit) (τ : NTy) : List RuntimeValue → Bool
   | [current, prophecy] => NTy.admits unit τ current && NTy.admits unit τ prophecy
+  | _ => false
+termination_by values => sizeOf values
+
+/-- Whether runtime values are the entries of a map: each a key and a value. -/
+def NTy.admitsEntries (unit : ValidatedUnit) (key value : NTy) : List RuntimeValue → Bool
+  | [] => true
+  | .tuple entry :: entries =>
+      NTy.admitsEntry unit key value entry.toList && NTy.admitsEntries unit key value entries
+  | _ :: _ => false
+termination_by entries => sizeOf entries
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | omega
+    | (have := sizeOf_toList_lt ‹Array RuntimeValue›; omega)
+
+/-- Whether runtime values are an entry: a key and a value. -/
+def NTy.admitsEntry (unit : ValidatedUnit) (key value : NTy) : List RuntimeValue → Bool
+  | [k, v] => NTy.admits unit key k && NTy.admits unit value v
   | _ => false
 termination_by values => sizeOf values
 end
@@ -922,6 +1016,7 @@ mutual
   | .struct _ _ fields => HList fields
   | .enum _ _ names rows _ => variantCarrier names rows
   | .vector element => SpecVector element.carrier
+  | .table key value => List (key.carrier × value.carrier)
   | .ref referent => referent.carrier × referent.carrier
   | .param index => Carriers.carrier index
   | .function parameters shared results =>
@@ -960,6 +1055,8 @@ def NTy.ofGround : (τ : NTy) → τ.groundCarrier → τ.carrier
   | .enum _ _ names rows _, value => variantCarrier.ofGround names rows value
   | .vector element, vector =>
       ⟨vector.values.map element.ofGround, by simpa using vector.bounded⟩
+  | .table key value, entries =>
+      entries.map fun entry => (key.ofGround entry.1, value.ofGround entry.2)
   | .ref referent, value => (referent.ofGround value.1, referent.ofGround value.2)
   | .param _, _ => default
   | .function _ _ _, value => value.property.elim
@@ -1017,6 +1114,7 @@ def NTy.decEq : (τ : NTy) → DecidableEq τ.carrier
   | .struct _ _ fields => HList.decEq fields
   | .enum _ _ names rows _ => variantCarrier.decEq names rows
   | .vector element => @instDecidableEqSpecVector _ element.decEq
+  | .table key value => @instDecidableEqList _ (@instDecidableEqProd _ _ key.decEq value.decEq)
   | .ref referent => @instDecidableEqProd _ _ referent.decEq referent.decEq
   | .param index => Carriers.decEq index
   | .function parameters shared results =>
@@ -1050,6 +1148,20 @@ def Codec.nominalRow (source : StructHandle) (variant : Option String)
     intro value
     simp [row.decode_encode]
 
+/-- Decode one entry of a map: a tuple of a key and a value. -/
+def Codec.decodeEntry? (key : Codec Key RuntimeValue) (value : Codec Value RuntimeValue) :
+    RuntimeValue → Option (Key × Value)
+  | .tuple pair => match pair.toList with
+    | [k, v] => (key.decode? k).bind fun k => (value.decode? v).map fun v => (k, v)
+    | _ => none
+  | _ => none
+
+omit [Carriers] in
+@[simp] theorem Codec.decodeEntry?_encode (key : Codec Key RuntimeValue)
+    (value : Codec Value RuntimeValue) (k : Key) (v : Value) :
+    Codec.decodeEntry? key value (.tuple #[key.encode k, value.encode v]) = some (k, v) := by
+  simp [Codec.decodeEntry?, key.decode_encode, value.decode_encode]
+
 /-- A mutable reference's carrier, its current value and its prophecy, as a
 pair. The runtime has no value for a reference apart from a loan: the
 agreement lends each argument reference under a loan it assigns
@@ -1068,6 +1180,24 @@ def Codec.prophecyPair (codec : Codec Native RuntimeValue) :
   decode_encode := by
     intro value
     simp [codec.decode_encode]
+
+/-- The entries of a map: a runtime vector of key–value tuples. -/
+def Codec.entries (key : Codec Key RuntimeValue) (value : Codec Value RuntimeValue) :
+    Codec (List (Key × Value)) RuntimeValue where
+  encode := fun entries =>
+    .vector (entries.map fun entry => .tuple #[key.encode entry.1, value.encode entry.2]).toArray
+  decode?
+    | .vector entries => entries.toList.mapM (Codec.decodeEntry? key value)
+    | _ => none
+  decode_encode := by
+    intro entries
+    show (entries.map _).toArray.toList.mapM _ = some entries
+    rw [List.toList_toArray, List.mapM_map]
+    induction entries with
+    | nil => rfl
+    | cons entry rest ih =>
+        rw [List.mapM_cons, ih]
+        simp [Codec.decodeEntry?, key.decode_encode, value.decode_encode]
 
 /-- The row codecs of an enum's variants. -/
 @[reducible] def RowCodecs : NRows → Type
@@ -1152,6 +1282,7 @@ def NTy.codec : (τ : NTy) → Codec τ.carrier RuntimeValue
   | .struct source _ fields => Codec.nominalRow source none (rowCodec fields)
   | .enum source _ names rows distinct => variantCodec source names rows (rowCodecs rows) distinct
   | .vector element => Codec.boundedVector element.codec
+  | .table key value => Codec.entries key.codec value.codec
   | .ref referent => Codec.prophecyPair referent.codec
   | .param index => Carriers.codec index
   | .function parameters shared results =>
@@ -1193,6 +1324,10 @@ theorem NTy.encode_cast {τ τ' : NTy} (same : τ = τ') (value : τ.carrier) :
   rfl
 @[simp] theorem NTy.encode_vector (element : NTy) (value : SpecVector element.carrier) :
     NTy.encode (.vector element) value = .vector (value.values.map element.codec.encode) := rfl
+@[simp] theorem NTy.encode_table (key value : NTy) (entries : List (key.carrier × value.carrier)) :
+    NTy.encode (.table key value) entries =
+      .vector (entries.map fun entry => .tuple #[key.encode entry.1, value.encode entry.2]).toArray :=
+  rfl
 
 /-- The runtime row a row of values denotes. -/
 def HList.encode {Γ : NRow} (values : HList Γ) : List RuntimeValue := (rowCodec Γ).encode values
@@ -1224,6 +1359,768 @@ def HList.encode {Γ : NRow} (values : HList Γ) : List RuntimeValue := (rowCode
 theorem NTy.encode_injective (τ : NTy) {left right : τ.carrier}
     (equal : τ.encode left = τ.encode right) : left = right :=
   τ.codec.encode_injective equal
+
+/-! ## The physical value
+
+The runtime keeps a map owner's entries in native storage, not in the
+owner's value: the physical value of a native value is its encoding without
+the hidden contents fields it holds, and the tables it holds are what the
+runtime stores beside it (`designs/intrinsic-maps.md`, "Owned Table
+values"). A function value's captures are runtime values already and stay as
+they are. -/
+
+mutual
+/-- Whether a type holds no map contents: its physical value is its encoding. -/
+def NTy.tableFree : NTy → Bool
+  | .table _ _ => false
+  | .tuple elements => elements.tableFree
+  | .struct _ _ fields => fields.tableFree
+  | .enum _ _ _ rows _ => rows.tableFree
+  | .vector element => element.tableFree
+  | .ref referent => referent.tableFree
+  -- A type argument holds no map contents (`TypeArgs`).
+  | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .param _
+  | .function _ _ _ => true
+
+def NRow.tableFree : NRow → Bool
+  | .nil => true
+  | .cons τ rest => τ.tableFree && rest.tableFree
+
+def NRows.tableFree : NRows → Bool
+  | .nil => true
+  | .cons fields rest => fields.tableFree && rest.tableFree
+end
+
+/-- Whether a type's values lend as their encodings: the type holds no
+reference, so lending takes no loan, and no map contents, so its physical
+values are its encodings. Behavioral predicates and named calls read
+arguments and results of such types. -/
+def NTy.lendsEncoded (τ : NTy) : Bool := τ.refFree && τ.tableFree
+
+def NRow.lendsEncoded (row : NRow) : Bool := row.refFree && row.tableFree
+
+omit [Carriers] in
+theorem NTy.refFree_of_lendsEncoded {τ : NTy} (plain : τ.lendsEncoded = true) : τ.refFree = true :=
+  (Bool.and_eq_true_iff.mp plain).1
+
+omit [Carriers] in
+theorem NTy.tableFree_of_lendsEncoded {τ : NTy} (plain : τ.lendsEncoded = true) :
+    τ.tableFree = true :=
+  (Bool.and_eq_true_iff.mp plain).2
+
+omit [Carriers] in
+theorem NRow.refFree_of_lendsEncoded {row : NRow} (plain : row.lendsEncoded = true) :
+    row.refFree = true :=
+  (Bool.and_eq_true_iff.mp plain).1
+
+omit [Carriers] in
+theorem NRow.tableFree_of_lendsEncoded {row : NRow} (plain : row.lendsEncoded = true) :
+    row.tableFree = true :=
+  (Bool.and_eq_true_iff.mp plain).2
+
+omit [Carriers] in
+theorem NRow.lendsEncoded_nil : NRow.nil.lendsEncoded = true := rfl
+
+omit [Carriers] in
+theorem NRow.lendsEncoded_cons (τ : NTy) (rest : NRow) :
+    (NRow.cons τ rest).lendsEncoded = true ↔ τ.lendsEncoded = true ∧ rest.lendsEncoded = true := by
+  simp only [NRow.lendsEncoded, NTy.lendsEncoded, NRow.refFree, NRow.tableFree, Bool.and_eq_true]
+  constructor
+  · rintro ⟨⟨a, b⟩, c, d⟩; exact ⟨⟨a, c⟩, b, d⟩
+  · rintro ⟨⟨a, c⟩, b, d⟩; exact ⟨⟨a, b⟩, c, d⟩
+
+omit [Carriers] in
+theorem NRow.lendsEncoded_singleton (τ : NTy) :
+    (NRow.cons τ .nil).lendsEncoded = true ↔ τ.lendsEncoded = true := by
+  simp [NRow.lendsEncoded_cons, NRow.lendsEncoded_nil]
+
+mutual
+/-- The physical runtime value of a native value: its encoding, the hidden
+contents fields dropped and a map's entries themselves physical. -/
+def NTy.erase : (τ : NTy) → τ.carrier → RuntimeValue
+  | .tuple elements, values => .tuple (HList.erase elements values).toArray
+  | .struct source _ fields, values => .nominal source none (HList.eraseFields fields values).toArray
+  | .enum source _ names rows _, value => variantCarrier.erase source names rows value
+  | .vector element, vector => .vector (vector.values.map element.erase)
+  | .table key value, entries =>
+      .vector (entries.map fun entry => .tuple #[key.erase entry.1, value.erase entry.2]).toArray
+  | .ref referent, value => .tuple #[referent.erase value.1, referent.erase value.2]
+  | .unit, value => NTy.encode .unit value
+  | .bool, value => NTy.encode .bool value
+  | .int width signed, value => NTy.encode (.int width signed) value
+  | .address, value => NTy.encode .address value
+  | .signer, value => NTy.encode .signer value
+  | .string, value => NTy.encode .string value
+  | .bytes, value => NTy.encode .bytes value
+  -- A type argument holds no map contents (`TypeArgs`), so a parameter's
+  -- values are their encodings.
+  | .param index, value => NTy.encode (.param index) value
+  | .function parameters shared results, value =>
+      NTy.encode (.function parameters shared results) value
+
+/-- The physical values of a row of arguments, results, or tuple components,
+one per value. -/
+def HList.erase : (row : NRow) → HList row → List RuntimeValue
+  | .nil, _ => []
+  | .cons τ rest, values => τ.erase values.1 :: HList.erase rest values.2
+
+/-- The physical values of a struct's fields: a trailing contents field is
+dropped. -/
+def HList.eraseFields : (row : NRow) → HList row → List RuntimeValue
+  | .nil, _ => []
+  | .cons τ .nil, values => if τ.isTable then [] else [τ.erase values.1]
+  | .cons τ (.cons σ rest), values => τ.erase values.1 :: HList.eraseFields (.cons σ rest) values.2
+
+def variantCarrier.erase (source : StructHandle) : (names : List String) → (rows : NRows) →
+    variantCarrier names rows → RuntimeValue
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  -- An enum's variant has no hidden field: only a struct owns map contents.
+  | name :: _, .cons fields _, .inl values =>
+      .nominal source (some name) (HList.erase fields values).toArray
+  | _ :: names, .cons _ rest, .inr value => variantCarrier.erase source names rest value
+end
+
+@[simp] theorem HList.erase_nil (values : HList .nil) : HList.erase .nil values = [] := rfl
+@[simp] theorem HList.erase_cons (τ : NTy) (rest : NRow) (values : HList (.cons τ rest)) :
+    HList.erase (.cons τ rest) values = τ.erase values.1 :: HList.erase rest values.2 := rfl
+
+/-- Whether a row ends in a hidden contents field, a map owner's. -/
+def NRow.holdsContents : NRow → Bool
+  | .cons (.table _ _) .nil => true
+  | .cons _ (.cons σ rest) => NRow.holdsContents (.cons σ rest)
+  | _ => false
+
+omit [Carriers] in
+@[simp, vir_denote_norm] theorem NRow.holdsContents_single (key value : NTy) :
+    NRow.holdsContents (.cons (.table key value) .nil) = true := by
+  simp [NRow.holdsContents]
+omit [Carriers] in
+@[simp, vir_denote_norm] theorem NRow.holdsContents_cons (τ σ : NTy) (rest : NRow) :
+    NRow.holdsContents (.cons τ (.cons σ rest)) = NRow.holdsContents (.cons σ rest) := by
+  simp [NRow.holdsContents]
+
+/-- The entries a row's hidden contents field holds, physical. -/
+def HList.hidden : (row : NRow) → HList row → Option RuntimeValue
+  | .nil, _ => none
+  | .cons τ .nil, values => if τ.isTable then some (τ.erase values.1) else none
+  | .cons _ (.cons σ rest), values => HList.hidden (.cons σ rest) values.2
+
+mutual
+/-- The physical value of a runtime value admitted at a type: the hidden
+contents fields of the map owners it holds dropped, as `NTy.erase` drops them
+from the encoding (`eraseRuntime_encode`). A value the type does not admit is
+left as it is. -/
+def NTy.eraseRuntime : NTy → RuntimeValue → RuntimeValue
+  | .tuple elements, .tuple values => .tuple (NRow.eraseRuntimeAll elements values.toList).toArray
+  | .struct _ _ fields, .nominal actual variant values =>
+      .nominal actual variant (NRow.eraseRuntime fields values.toList).toArray
+  | .enum _ _ names rows _, .nominal actual (some name) values =>
+      match NRows.variant? names rows name with
+      | some row => .nominal actual (some name) (NRow.eraseRuntimeAll row values.toList).toArray
+      | none => .nominal actual (some name) values
+  | .vector element, .vector values => .vector (NTy.eraseRuntimeEach element values.toList).toArray
+  | .table key value, .vector entries =>
+      .vector (NTy.eraseRuntimeEntries key value entries.toList).toArray
+  | .ref referent, .tuple values => .tuple (NTy.eraseRuntimeEach referent values.toList).toArray
+  | _, value => value
+termination_by _ value => sizeOf value
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | omega
+    | (have := sizeOf_toList_lt ‹Array RuntimeValue›; omega)
+
+/-- The physical values of a row's runtime values: a trailing contents
+field's is dropped. -/
+def NRow.eraseRuntime : NRow → List RuntimeValue → List RuntimeValue
+  | .cons τ .nil, [value] => if τ.isTable then [] else [NTy.eraseRuntime τ value]
+  | .cons τ (.cons σ rest), value :: values =>
+      NTy.eraseRuntime τ value :: NRow.eraseRuntime (.cons σ rest) values
+  | _, values => values
+termination_by _ values => sizeOf values
+
+def NTy.eraseRuntimeEach (τ : NTy) : List RuntimeValue → List RuntimeValue
+  | [] => []
+  | value :: values => NTy.eraseRuntime τ value :: NTy.eraseRuntimeEach τ values
+termination_by values => sizeOf values
+
+/-- The physical values of a row's runtime values, one per value. -/
+def NRow.eraseRuntimeAll : NRow → List RuntimeValue → List RuntimeValue
+  | .cons τ rest, value :: values => NTy.eraseRuntime τ value :: NRow.eraseRuntimeAll rest values
+  | _, values => values
+termination_by _ values => sizeOf values
+
+/-- The physical entries of a map's runtime entries. -/
+def NTy.eraseRuntimeEntries (key value : NTy) : List RuntimeValue → List RuntimeValue
+  | [] => []
+  | .tuple entry :: entries =>
+      .tuple (NTy.eraseRuntimePair key value entry.toList).toArray ::
+        NTy.eraseRuntimeEntries key value entries
+  | entry :: entries => entry :: NTy.eraseRuntimeEntries key value entries
+termination_by entries => sizeOf entries
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | omega
+    | (have := sizeOf_toList_lt ‹Array RuntimeValue›; omega)
+
+/-- The physical key and value of a map's runtime entry. -/
+def NTy.eraseRuntimePair (key value : NTy) : List RuntimeValue → List RuntimeValue
+  | [k, v] => [NTy.eraseRuntime key k, NTy.eraseRuntime value v]
+  | values => values
+termination_by values => sizeOf values
+end
+
+mutual
+/-- The identity a specification's equality compares values of a type holding
+map contents by: a table owner with a handle is its handle alone, allocation
+identity (`designs/intrinsic-maps.md`, "Equality and order"); any other value
+is read field by field, a table without a handle by its entries. -/
+def NTy.identityRuntime : NTy → RuntimeValue → RuntimeValue
+  | .struct _ _ fields, .nominal actual variant values =>
+      match fields with
+      | .cons .address rest =>
+          if rest.holdsContents then .nominal actual variant #[values[0]?.getD .unit]
+          else .nominal actual variant (NRow.identityRuntimeAll fields values.toList).toArray
+      | _ => .nominal actual variant (NRow.identityRuntimeAll fields values.toList).toArray
+  | .tuple elements, .tuple values =>
+      .tuple (NRow.identityRuntimeAll elements values.toList).toArray
+  | .enum _ _ names rows _, .nominal actual (some name) values =>
+      match NRows.variant? names rows name with
+      | some row => .nominal actual (some name) (NRow.identityRuntimeAll row values.toList).toArray
+      | none => .nominal actual (some name) values
+  | .vector element, .vector values =>
+      .vector (NTy.identityRuntimeEach element values.toList).toArray
+  | .table key value, .vector entries =>
+      .vector (NTy.identityRuntimeEntries key value entries.toList).toArray
+  | .ref referent, .tuple values => .tuple (NTy.identityRuntimeEach referent values.toList).toArray
+  | _, value => value
+termination_by _ value => sizeOf value
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | omega
+    | (have := sizeOf_toList_lt ‹Array RuntimeValue›; omega)
+
+def NRow.identityRuntimeAll : NRow → List RuntimeValue → List RuntimeValue
+  | .cons τ rest, value :: values =>
+      NTy.identityRuntime τ value :: NRow.identityRuntimeAll rest values
+  | _, values => values
+termination_by _ values => sizeOf values
+
+def NTy.identityRuntimeEach (τ : NTy) : List RuntimeValue → List RuntimeValue
+  | [] => []
+  | value :: values => NTy.identityRuntime τ value :: NTy.identityRuntimeEach τ values
+termination_by values => sizeOf values
+
+def NTy.identityRuntimeEntries (key value : NTy) : List RuntimeValue → List RuntimeValue
+  | [] => []
+  | .tuple entry :: entries =>
+      .tuple (NTy.identityRuntimePair key value entry.toList).toArray ::
+        NTy.identityRuntimeEntries key value entries
+  | entry :: entries => entry :: NTy.identityRuntimeEntries key value entries
+termination_by entries => sizeOf entries
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | omega
+    | (have := sizeOf_toList_lt ‹Array RuntimeValue›; omega)
+
+def NTy.identityRuntimePair (key value : NTy) : List RuntimeValue → List RuntimeValue
+  | [k, v] => [NTy.identityRuntime key k, NTy.identityRuntime value v]
+  | values => values
+termination_by values => sizeOf values
+end
+
+omit [Carriers] in
+/-- A table owner with a handle is identified by its handle, the first field. -/
+@[simp, vir_denote_norm] theorem NTy.identityRuntime_handle (source : StructHandle)
+    (arguments rest : NRow) (hidden : rest.holdsContents = true) (actual : StructHandle)
+    (variant : Option String) (values : Array RuntimeValue) :
+    NTy.identityRuntime (.struct source arguments (.cons .address rest))
+        (.nominal actual variant values) =
+      .nominal actual variant #[(RuntimeValue.nominal actual variant values).field 0] := by
+  rw [NTy.identityRuntime]
+  simp [hidden, RuntimeValue.field]
+
+mutual
+/-- The tables a native value holds, each its owner's type, its handle, and
+its physical entries: what the runtime keeps in native storage beside the
+physical value. A reference's are those of its current value, or of its
+prophecy with `prophecies`. -/
+def NTy.tables (prophecies : Bool) : (τ : NTy) → τ.carrier →
+    List (NTy × String × RuntimeValue)
+  | .struct source arguments fields, values =>
+      (match HList.hidden fields values with
+        | some entries =>
+            [(.struct source arguments fields,
+              ((HList.eraseFields fields values).head?.getD .unit).asString, entries)]
+        | none => []) ++ HList.tables prophecies fields values
+  | .tuple elements, values => HList.tables prophecies elements values
+  | .enum _ _ names rows _, value => variantCarrier.tables prophecies names rows value
+  | .vector element, vector => vector.values.toList.flatMap (element.tables prophecies)
+  | .table key value, entries =>
+      entries.flatMap fun entry => key.tables prophecies entry.1 ++ value.tables prophecies entry.2
+  | .ref referent, value => referent.tables prophecies (if prophecies then value.2 else value.1)
+  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _
+  | .param _, _ | .function _ _ _, _ => []
+
+def HList.tables (prophecies : Bool) : (row : NRow) → HList row →
+    List (NTy × String × RuntimeValue)
+  | .nil, _ => []
+  | .cons τ rest, values => τ.tables prophecies values.1 ++ HList.tables prophecies rest values.2
+
+def variantCarrier.tables (prophecies : Bool) : (names : List String) → (rows : NRows) →
+    variantCarrier names rows → List (NTy × String × RuntimeValue)
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons fields _, .inl values => HList.tables prophecies fields values
+  | _ :: names, .cons _ rest, .inr value => variantCarrier.tables prophecies names rest value
+end
+
+/-- A row without map contents has no hidden field. -/
+theorem HList.hidden_eq_none : (row : NRow) → row.tableFree = true → (values : HList row) →
+    HList.hidden row values = none
+  | .nil, _, _ => rfl
+  | .cons τ .nil, free, values => by
+      simp only [NRow.tableFree, Bool.and_true] at free
+      simp only [HList.hidden]
+      cases τ <;> simp [NTy.isTable, NTy.tableFree] at free ⊢
+  | .cons τ (.cons σ rest), free, values => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [HList.hidden]
+      exact HList.hidden_eq_none (.cons σ rest)
+        (by simp only [NRow.tableFree, Bool.and_eq_true]; exact free.2) values.2
+
+mutual
+/-- A value of a type without map contents holds no table. -/
+theorem NTy.tables_eq_nil (prophecies : Bool) : (τ : NTy) → τ.tableFree = true →
+    (value : τ.carrier) → τ.tables prophecies value = []
+  | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .address, _, _ | .signer, _, _ | .string, _, _
+  | .bytes, _, _ | .param _, _, _ | .function _ _ _, _, _ => by simp [NTy.tables]
+  | .table _ _, free, _ => by simp [NTy.tableFree] at free
+  | .tuple elements, free, values => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.tables, HList.tables_eq_nil prophecies elements free values]
+  | .struct source arguments fields, free, values => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.tables, HList.tables_eq_nil prophecies fields free values,
+        HList.hidden_eq_none fields free values, List.append_nil]
+  | .enum source arguments names rows distinct, free, value => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.tables, variantCarrier.tables_eq_nil prophecies names rows free value]
+  | .vector element, free, vector => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.tables]
+      exact List.flatMap_eq_nil_iff.mpr fun value _ =>
+        NTy.tables_eq_nil prophecies element free value
+  | .ref referent, free, value => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.tables, NTy.tables_eq_nil prophecies referent free]
+
+theorem HList.tables_eq_nil (prophecies : Bool) : (row : NRow) → row.tableFree = true →
+    (values : HList row) → HList.tables prophecies row values = []
+  | .nil, _, _ => by simp [HList.tables]
+  | .cons τ rest, free, values => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [HList.tables, NTy.tables_eq_nil prophecies τ free.1 values.1,
+        HList.tables_eq_nil prophecies rest free.2 values.2, List.append_nil]
+
+theorem variantCarrier.tables_eq_nil (prophecies : Bool) : (names : List String) → (rows : NRows) →
+    rows.tableFree = true → (value : variantCarrier names rows) →
+    variantCarrier.tables prophecies names rows value = []
+  | _, .nil, _, value => nomatch value
+  | [], .cons _ _, _, value => nomatch value
+  | _ :: _, .cons fields _, free, .inl values => by
+      simp only [NRows.tableFree, Bool.and_eq_true] at free
+      simp only [variantCarrier.tables, HList.tables_eq_nil prophecies fields free.1 values]
+  | _ :: names, .cons _ rest, free, .inr value => by
+      simp only [NRows.tableFree, Bool.and_eq_true] at free
+      simp only [variantCarrier.tables, variantCarrier.tables_eq_nil prophecies names rest free.2 value]
+end
+
+/-- The runtime storage slot of a table: its owner's declaring namespace, the
+first identifier of that namespace's type table denoting the owner's type,
+and the table's handle. A table whose owner's type is open or which no
+identifier denotes has none. -/
+def tableSlot? (unit : Validation.ValidatedUnit) (owner : NTy) (handle : String) :
+    Option GlobalKey := do
+  let .struct source _ _ := owner | none
+  guard owner.paramFree
+  let ns ← unit.namespaces[source.namespaceId.index]?
+  let index ← (List.range ns.tables.types.size).find? fun index =>
+    ntyOf unit source.namespaceId ⟨index⟩ == some owner
+  some ⟨source.namespaceId, ⟨index⟩, .address handle⟩
+
+/-- Tables each held at a slot: the slot `slot` gives the table's owner type
+and handle holds its entries under `held`. -/
+def TablesAt (slot : NTy → String → Option GlobalKey) (held : GlobalKey → Option RuntimeValue)
+    (tables : List (NTy × String × RuntimeValue)) : Prop :=
+  ∀ table ∈ tables, ∃ key, slot table.1 table.2.1 = some key ∧ held key = some table.2.2
+
+omit [Carriers] in
+theorem TablesAt.append_left {slot : NTy → String → Option GlobalKey}
+    {held : GlobalKey → Option RuntimeValue} {left right : List (NTy × String × RuntimeValue)}
+    (at_ : TablesAt slot held (left ++ right)) : TablesAt slot held left :=
+  fun table member => at_ table (List.mem_append_left _ member)
+
+omit [Carriers] in
+theorem TablesAt.append_right {slot : NTy → String → Option GlobalKey}
+    {held : GlobalKey → Option RuntimeValue} {left right : List (NTy × String × RuntimeValue)}
+    (at_ : TablesAt slot held (left ++ right)) : TablesAt slot held right :=
+  fun table member => at_ table (List.mem_append_right _ member)
+
+omit [Carriers] in
+theorem TablesAt.flatMap {α : Type} {slot : NTy → String → Option GlobalKey}
+    {held : GlobalKey → Option RuntimeValue} {f : α → List (NTy × String × RuntimeValue)}
+    {list : List α} (at_ : TablesAt slot held (list.flatMap f)) {x : α} (member : x ∈ list) :
+    TablesAt slot held (f x) :=
+  fun table inner => at_ table (List.mem_flatMap.mpr ⟨x, member, inner⟩)
+
+omit [Carriers] in
+theorem listEqOfMapEq {α β : Type} (f : α → β) : (left right : List α) →
+    left.map f = right.map f → (∀ x ∈ left, ∀ y ∈ right, f x = f y → x = y) → left = right
+  | [], [], _, _ => rfl
+  | [], _ :: _, same, _ | _ :: _, [], same, _ => by simp at same
+  | x :: xs, y :: ys, same, inj => by
+      simp only [List.map_cons, List.cons.injEq] at same
+      rw [inj x List.mem_cons_self y List.mem_cons_self same.1,
+        listEqOfMapEq f xs ys same.2 fun a ha b hb =>
+          inj a (List.mem_cons_of_mem _ ha) b (List.mem_cons_of_mem _ hb)]
+
+/-- The variant an enum value's physical value names is one of the enum's. -/
+theorem variantCarrier.erase_variant (source : StructHandle) : (names : List String) →
+    (rows : NRows) → (value : variantCarrier names rows) →
+    ∃ name ∈ names, ∃ fields, variantCarrier.erase source names rows value =
+      .nominal source (some name) fields
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | name :: _, .cons fields _, .inl values =>
+      ⟨name, List.mem_cons_self, (HList.erase fields values).toArray, by simp [variantCarrier.erase]⟩
+  | _ :: names, .cons _ rest, .inr value => by
+      obtain ⟨name, member, fields, erased⟩ := variantCarrier.erase_variant source names rest value
+      exact ⟨name, List.mem_cons_of_mem _ member, fields, by simp [variantCarrier.erase, erased]⟩
+
+mutual
+/-- Two values of a type without references with the same physical value,
+whose tables are held at their slots, are equal: the physical value and the
+held tables determine a value. -/
+theorem NTy.eq_of_erase_eq (slot : NTy → String → Option GlobalKey)
+    (held : GlobalKey → Option RuntimeValue) (prophecies : Bool) :
+    (τ : NTy) → τ.refFree = true → (left right : τ.carrier) → τ.erase left = τ.erase right →
+    TablesAt slot held (τ.tables prophecies left) →
+    TablesAt slot held (τ.tables prophecies right) → left = right
+  | .unit, _, _, _, _, _, _ => rfl
+  | .bool, _, _, _, same, _, _ | .int _ _, _, _, _, same, _, _
+  | .address, _, _, _, same, _, _ | .signer, _, _, _, same, _, _ | .string, _, _, _, same, _, _
+  | .bytes, _, _, _, same, _, _ | .param _, _, _, _, same, _, _
+  | .function _ _ _, _, _, _, same, _, _ => by
+      simp only [NTy.erase] at same
+      exact NTy.encode_injective _ same
+  | .ref _, free, _, _, _, _, _ => by simp [NTy.refFree] at free
+  | .tuple elements, free, left, right, same, leftHeld, rightHeld => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.erase, RuntimeValue.tuple.injEq] at same
+      simp only [NTy.tables] at leftHeld rightHeld
+      exact HList.eq_of_erase_eq slot held prophecies elements free left right
+        (List.toArray_inj same) leftHeld rightHeld
+  | .struct source arguments fields, free, left, right, same, leftHeld, rightHeld => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.erase, RuntimeValue.nominal.injEq, true_and] at same
+      have same := List.toArray_inj same
+      simp only [NTy.tables] at leftHeld rightHeld
+      refine HList.eq_of_eraseFields_eq slot held prophecies fields free left right same ?_
+        leftHeld.append_right rightHeld.append_right
+      intro leftEntries rightEntries leftHidden rightHidden
+      rw [leftHidden] at leftHeld
+      rw [rightHidden, ← same] at rightHeld
+      obtain ⟨key, slotted, heldLeft⟩ := leftHeld.append_left _ List.mem_cons_self
+      obtain ⟨key', slotted', heldRight⟩ := rightHeld.append_left _ List.mem_cons_self
+      rw [slotted] at slotted'
+      cases slotted'
+      rw [heldLeft] at heldRight
+      exact Option.some.inj heldRight
+  | .enum source arguments names rows distinct, free, left, right, same, leftHeld, rightHeld => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.tables] at leftHeld rightHeld
+      exact variantCarrier.eq_of_erase_eq slot held prophecies source names rows distinct free
+        left right same leftHeld rightHeld
+  | .vector element, free, left, right, same, leftHeld, rightHeld => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.erase, RuntimeValue.vector.injEq] at same
+      simp only [NTy.tables] at leftHeld rightHeld
+      apply SpecVector.ext
+      apply Array.toList_inj.mp
+      refine listEqOfMapEq element.erase _ _ ?_ fun x memberX y memberY equal =>
+        NTy.eq_of_erase_eq slot held prophecies element free x y equal
+          (leftHeld.flatMap memberX) (rightHeld.flatMap memberY)
+      simpa only [Array.toList_map] using congrArg Array.toList same
+  | .table key value, free, left, right, same, leftHeld, rightHeld => by
+      simp only [NTy.refFree, Bool.and_eq_true] at free
+      simp only [NTy.erase, RuntimeValue.vector.injEq] at same
+      have same := List.toArray_inj same
+      simp only [NTy.tables] at leftHeld rightHeld
+      refine listEqOfMapEq _ _ _ same fun x memberX y memberY equal => ?_
+      simp only [RuntimeValue.tuple.injEq, Array.mk.injEq, List.cons.injEq, and_true] at equal
+      have atX := leftHeld.flatMap memberX
+      have atY := rightHeld.flatMap memberY
+      exact Prod.ext
+        (NTy.eq_of_erase_eq slot held prophecies key free.1 x.1 y.1 equal.1 atX.append_left
+          atY.append_left)
+        (NTy.eq_of_erase_eq slot held prophecies value free.2 x.2 y.2 equal.2 atX.append_right
+          atY.append_right)
+
+theorem HList.eq_of_erase_eq (slot : NTy → String → Option GlobalKey)
+    (held : GlobalKey → Option RuntimeValue) (prophecies : Bool) :
+    (row : NRow) → row.refFree = true → (left right : HList row) →
+    HList.erase row left = HList.erase row right →
+    TablesAt slot held (HList.tables prophecies row left) →
+    TablesAt slot held (HList.tables prophecies row right) → left = right
+  | .nil, _, _, _, _, _, _ => rfl
+  | .cons τ rest, free, left, right, same, leftHeld, rightHeld => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      simp only [HList.erase, List.cons.injEq] at same
+      simp only [HList.tables] at leftHeld rightHeld
+      exact Prod.ext
+        (NTy.eq_of_erase_eq slot held prophecies τ free.1 left.1 right.1 same.1
+          leftHeld.append_left rightHeld.append_left)
+        (HList.eq_of_erase_eq slot held prophecies rest free.2 left.2 right.2 same.2
+          leftHeld.append_right rightHeld.append_right)
+
+/-- Two field rows with the same physical values, the same hidden entries where
+both have them, and their tables held, are equal. -/
+theorem HList.eq_of_eraseFields_eq (slot : NTy → String → Option GlobalKey)
+    (held : GlobalKey → Option RuntimeValue) (prophecies : Bool) :
+    (row : NRow) → row.refFree = true → (left right : HList row) →
+    HList.eraseFields row left = HList.eraseFields row right →
+    (∀ leftEntries rightEntries, HList.hidden row left = some leftEntries →
+      HList.hidden row right = some rightEntries → leftEntries = rightEntries) →
+    TablesAt slot held (HList.tables prophecies row left) →
+    TablesAt slot held (HList.tables prophecies row right) → left = right
+  | .nil, _, _, _, _, _, _, _ => rfl
+  | .cons τ .nil, free, left, right, same, hidden, leftHeld, rightHeld => by
+      simp only [NRow.refFree, Bool.and_true] at free
+      simp only [HList.tables, List.append_nil] at leftHeld rightHeld
+      refine Prod.ext ?_ rfl
+      by_cases table : τ.isTable = true
+      · simp only [HList.hidden, table, ite_true] at hidden
+        exact NTy.eq_of_erase_eq slot held prophecies τ free left.1 right.1 (hidden _ _ rfl rfl)
+          leftHeld rightHeld
+      · simp only [HList.eraseFields, table, Bool.false_eq_true, ite_false, List.cons.injEq,
+          and_true] at same
+        exact NTy.eq_of_erase_eq slot held prophecies τ free left.1 right.1 same leftHeld rightHeld
+  | .cons τ (.cons σ rest), free, left, right, same, hidden, leftHeld, rightHeld => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      simp only [HList.eraseFields, List.cons.injEq] at same
+      simp only [HList.hidden] at hidden
+      simp only [HList.tables] at leftHeld rightHeld
+      exact Prod.ext
+        (NTy.eq_of_erase_eq slot held prophecies τ free.1 left.1 right.1 same.1
+          leftHeld.append_left rightHeld.append_left)
+        (HList.eq_of_eraseFields_eq slot held prophecies (.cons σ rest)
+          (by simp only [NRow.refFree, Bool.and_eq_true]; exact free.2) left.2 right.2 same.2
+          hidden leftHeld.append_right rightHeld.append_right)
+
+theorem variantCarrier.eq_of_erase_eq (slot : NTy → String → Option GlobalKey)
+    (held : GlobalKey → Option RuntimeValue) (prophecies : Bool) (source : StructHandle) :
+    (names : List String) → (rows : NRows) → names.Nodup → rows.refFree = true →
+    (left right : variantCarrier names rows) →
+    variantCarrier.erase source names rows left = variantCarrier.erase source names rows right →
+    TablesAt slot held (variantCarrier.tables prophecies names rows left) →
+    TablesAt slot held (variantCarrier.tables prophecies names rows right) → left = right
+  | _, .nil, _, _, left, _, _, _, _ => nomatch left
+  | [], .cons _ _, _, _, left, _, _, _, _ => nomatch left
+  | name :: names, .cons fields rest, _, free, .inl left, .inl right, same, leftHeld, rightHeld => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      simp only [variantCarrier.erase, RuntimeValue.nominal.injEq, true_and] at same
+      simp only [variantCarrier.tables] at leftHeld rightHeld
+      rw [HList.eq_of_erase_eq slot held prophecies fields free.1 left right (List.toArray_inj same)
+        leftHeld rightHeld]
+  | name :: names, .cons fields rest, distinct, _, .inl _, .inr right, same, _, _ => by
+      obtain ⟨other, member, _, erased⟩ := variantCarrier.erase_variant source names rest right
+      simp only [variantCarrier.erase, erased, RuntimeValue.nominal.injEq, Option.some.injEq,
+        true_and] at same
+      exact absurd (same.1 ▸ member) (List.nodup_cons.mp distinct).1
+  | name :: names, .cons fields rest, distinct, _, .inr left, .inl _, same, _, _ => by
+      obtain ⟨other, member, _, erased⟩ := variantCarrier.erase_variant source names rest left
+      simp only [variantCarrier.erase, erased, RuntimeValue.nominal.injEq, Option.some.injEq,
+        true_and] at same
+      exact absurd (same.1 ▸ member) (List.nodup_cons.mp distinct).1
+  | name :: names, .cons fields rest, distinct, free, .inr left, .inr right, same, leftHeld,
+      rightHeld => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      simp only [variantCarrier.erase] at same
+      simp only [variantCarrier.tables] at leftHeld rightHeld
+      rw [variantCarrier.eq_of_erase_eq slot held prophecies source names rest
+        (List.nodup_cons.mp distinct).2 free.2 left right same leftHeld rightHeld]
+end
+
+mutual
+/-- A value of a type without map contents is physically its encoding. -/
+theorem NTy.erase_eq_encode : (τ : NTy) → τ.tableFree = true → (value : τ.carrier) →
+    τ.erase value = τ.encode value
+  | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .address, _, _ | .signer, _, _ | .string, _, _
+  | .bytes, _, _ | .param _, _, _ | .function _ _ _, _, _ => rfl
+  | .table _ _, free, _ => by simp [NTy.tableFree] at free
+  | .tuple elements, free, values => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.erase, NTy.encode_tuple, HList.erase_eq_encode elements free values]
+  | .struct source arguments fields, free, values => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.erase, NTy.encode_struct, HList.eraseFields_eq_encode fields free values]
+  | .enum source arguments names rows distinct, free, value => by
+      simp only [NTy.tableFree] at free
+      exact variantCarrier.erase_eq_encode source names rows distinct free value
+  | .vector element, free, vector => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.erase, NTy.encode_vector]
+      congr 1
+      apply Array.map_congr_left
+      intro value _
+      exact NTy.erase_eq_encode element free value
+  | .ref referent, free, value => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.erase, NTy.encode_ref, NTy.erase_eq_encode referent free]
+
+theorem HList.erase_eq_encode : (row : NRow) → row.tableFree = true → (values : HList row) →
+    HList.erase row values = HList.encode values
+  | .nil, _, _ => rfl
+  | .cons τ rest, free, values => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [HList.erase, HList.encode_cons, NTy.erase_eq_encode τ free.1,
+        HList.erase_eq_encode rest free.2]
+
+theorem HList.eraseFields_eq_encode : (row : NRow) → row.tableFree = true → (values : HList row) →
+    HList.eraseFields row values = HList.encode values
+  | .nil, _, _ => rfl
+  | .cons τ .nil, free, values => by
+      simp only [NRow.tableFree, Bool.and_eq_true, Bool.and_true] at free
+      have notTable : τ.isTable = false := by
+        cases τ <;> simp [NTy.tableFree, NTy.isTable] at free ⊢
+      simp only [HList.eraseFields, notTable, Bool.false_eq_true, ↓reduceIte, HList.encode_cons,
+        HList.encode_nil, NTy.erase_eq_encode τ free]
+  | .cons τ (.cons σ rest), free, values => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [HList.eraseFields, HList.encode_cons, NTy.erase_eq_encode τ free.1,
+        HList.eraseFields_eq_encode (.cons σ rest) (by simp [NRow.tableFree, free.2]) values.2]
+
+theorem variantCarrier.erase_eq_encode (source : StructHandle) : (names : List String) →
+    (rows : NRows) → (distinct : names.Nodup) → rows.tableFree = true →
+    (value : variantCarrier names rows) →
+    variantCarrier.erase source names rows value =
+      NTy.encode (.enum source arguments names rows distinct) value
+  | _, .nil, _, _, value => nomatch value
+  | [], .cons _ _, _, _, value => nomatch value
+  | name :: names, .cons fields rest, distinct, free, .inl values => by
+      simp only [NRows.tableFree, Bool.and_eq_true] at free
+      simp only [variantCarrier.erase, NTy.encode_enum_inl, HList.erase_eq_encode fields free.1]
+  | name :: names, .cons fields rest, distinct, free, .inr value => by
+      simp only [NRows.tableFree, Bool.and_eq_true] at free
+      simp only [variantCarrier.erase, NTy.encode_enum_inr]
+      exact variantCarrier.erase_eq_encode source names rest (List.nodup_cons.mp distinct).2
+        free.2 value
+end
+
+theorem NTy.eraseRuntimeEach_map (τ : NTy) (f : α → RuntimeValue) (values : List α) :
+    NTy.eraseRuntimeEach τ (values.map f) = values.map fun value => NTy.eraseRuntime τ (f value) := by
+  induction values with
+  | nil => simp [NTy.eraseRuntimeEach]
+  | cons value values ih => simp only [List.map_cons, NTy.eraseRuntimeEach, ih]
+
+mutual
+/-- Erasing a value's encoding at its type is its physical value. -/
+theorem NTy.eraseRuntime_encode : (τ : NTy) → (value : τ.carrier) →
+    NTy.eraseRuntime τ (τ.encode value) = τ.erase value
+  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => by
+      simp [NTy.eraseRuntime, NTy.erase]
+  | .param index, value => by
+      -- A parameter's value is its encoding; erasure at a parameter leaves it.
+      simp only [NTy.erase]
+      generalize NTy.encode (.param index) value = raw
+      cases raw <;> simp [NTy.eraseRuntime]
+  | .function _ _ _, _ => by simp [NTy.eraseRuntime, NTy.erase]
+  | .tuple elements, values => by
+      simp only [NTy.encode_tuple, NTy.eraseRuntime, NTy.erase,
+        NRow.eraseRuntimeAll_encode elements values]
+  | .struct source arguments fields, values => by
+      simp only [NTy.encode_struct, NTy.eraseRuntime, NTy.erase,
+        NRow.eraseRuntime_encode fields values]
+  | .enum source arguments names rows distinct, value =>
+      variantCarrier.eraseRuntime_encode source arguments names rows distinct value
+  | .vector element, vector => by
+      simp only [NTy.encode_vector, NTy.eraseRuntime, NTy.erase, Array.toList_map,
+        NTy.eraseRuntimeEach_map]
+      congr 1
+      apply Array.toList_inj.mp
+      simp only [List.toList_toArray, Array.toList_map]
+      apply List.map_congr_left
+      intro value _
+      exact NTy.eraseRuntime_encode element value
+  | .table key value, entries => by
+      simp only [NTy.encode_table, NTy.eraseRuntime, NTy.erase, List.toList_toArray]
+      congr 2
+      induction entries with
+      | nil => simp [NTy.eraseRuntimeEntries]
+      | cons entry rest ih =>
+          simp only [List.map_cons, NTy.eraseRuntimeEntries, List.toList_toArray,
+            NTy.eraseRuntimePair, NTy.eraseRuntime_encode key entry.1,
+            NTy.eraseRuntime_encode value entry.2, ih]
+  | .ref referent, value => by
+      simp only [NTy.encode_ref, NTy.eraseRuntime, NTy.erase, List.toList_toArray,
+        NTy.eraseRuntimeEach, NTy.eraseRuntime_encode referent value.1,
+        NTy.eraseRuntime_encode referent value.2]
+
+theorem NRow.eraseRuntimeAll_encode : (row : NRow) →
+    (values : HList row) →
+    NRow.eraseRuntimeAll row (HList.encode values) = HList.erase row values
+  | .nil, _ => by simp [NRow.eraseRuntimeAll, HList.erase]
+  | .cons τ rest, values => by
+      simp only [HList.encode_cons, NRow.eraseRuntimeAll, HList.erase_cons,
+        NTy.eraseRuntime_encode τ values.1, NRow.eraseRuntimeAll_encode rest values.2]
+
+theorem NRow.eraseRuntime_encode : (row : NRow) →
+    (values : HList row) →
+    NRow.eraseRuntime row (HList.encode values) = HList.eraseFields row values
+  | .nil, _ => by simp [NRow.eraseRuntime, HList.eraseFields]
+  | .cons τ .nil, values => by
+      simp only [HList.encode_cons, HList.encode_nil, NRow.eraseRuntime, HList.eraseFields,
+        NTy.eraseRuntime_encode τ values.1]
+  | .cons τ (.cons σ rest), values => by
+      simp only [HList.encode_cons, NRow.eraseRuntime, HList.eraseFields,
+        NTy.eraseRuntime_encode τ values.1]
+      rw [← HList.encode_cons, NRow.eraseRuntime_encode (.cons σ rest) values.2]
+
+theorem variantCarrier.eraseRuntime_encode (source : StructHandle) (arguments : NRow) :
+    (names : List String) → (rows : NRows) → (distinct : names.Nodup) →
+    (value : variantCarrier names rows) →
+    NTy.eraseRuntime (.enum source arguments names rows distinct)
+        (NTy.encode (.enum source arguments names rows distinct) value) =
+      variantCarrier.erase source names rows value
+  | _, .nil, _, value => nomatch value
+  | [], .cons _ _, _, value => nomatch value
+  | name :: names, .cons fields rest, distinct, .inl values => by
+      simp only [NTy.encode_enum_inl, NTy.eraseRuntime, NRows.variant?, beq_self_eq_true,
+        ↓reduceIte, variantCarrier.erase, List.toList_toArray,
+        NRow.eraseRuntimeAll_encode fields values]
+  | first :: names, .cons fields rest, distinct, .inr value => by
+      have later := variantCarrier.eraseRuntime_encode source arguments names rest
+        (List.nodup_cons.mp distinct).2 value
+      rw [NTy.encode_enum_inr]
+      obtain ⟨name, encodedFields, encoded, member⟩ :=
+        variantEncode_shape source names rest (rowCodecs rest) value
+      have different : (first == name) = false := by
+        simp only [beq_eq_false_iff_ne]
+        rintro rfl
+        exact (List.nodup_cons.mp distinct).1 member
+      change NTy.eraseRuntime _ (variantEncode source names rest (rowCodecs rest) value) = _
+      change NTy.eraseRuntime _ (variantEncode source names rest (rowCodecs rest) value) = _ at later
+      rw [encoded] at later ⊢
+      simp only [NTy.eraseRuntime, NRows.variant?, different, variantCarrier.erase] at later ⊢
+      exact later
+end
+
+
 
 @[simp] theorem NTy.decode_encode (τ : NTy) (value : τ.carrier) :
     τ.codec.decode? (τ.encode value) = some value :=
@@ -1292,6 +2189,9 @@ def NTy.eqb : (τ : NTy) → τ.carrier → τ.carrier → Bool
   | .vector element, left, right =>
       left.values.size == right.values.size &&
         (left.values.toList.zip right.values.toList).all fun pair => element.eqb pair.1 pair.2
+  | .table key value, left, right =>
+      left.length == right.length &&
+        (left.zip right).all fun pair => key.eqb pair.1.1 pair.2.1 && value.eqb pair.1.2 pair.2.2
   | .ref _, _, _ => false
   | .param index, left, right => @decide (left = right) (Carriers.decEq index left right)
   | .function parameters shared results, left, right =>
@@ -1544,6 +2444,20 @@ transparency only. -/
   | .none => .nil
   | .one τ => .cons τ .nil
 
+/-- The tables a result holds (`NTy.tables`). -/
+def ResultShape.tables (prophecies : Bool) : (shape : ResultShape) → shape.carrier →
+    List (NTy × String × RuntimeValue)
+  | .none, _ => []
+  | .one τ, value => τ.tables prophecies value
+
+/-- A result of a shape without map contents holds no table. -/
+theorem ResultShape.tables_eq_nil (prophecies : Bool) : (shape : ResultShape) →
+    shape.row.tableFree = true → (result : shape.carrier) → shape.tables prophecies result = []
+  | .none, _, _ => rfl
+  | .one τ, plain, result => by
+      simp only [ResultShape.row, NRow.tableFree, Bool.and_true] at plain
+      exact NTy.tables_eq_nil prophecies τ plain result
+
 /-- The result-row codec of a function. -/
 def resultCodec : (shape : ResultShape) → Codec shape.carrier (Array RuntimeValue)
   | .none => {
@@ -1629,6 +2543,22 @@ theorem ResourceType.encode_injective (resource : ResourceType) :
       have mapped := RuntimeValue.vector.inj equal
       exact (Array.map_inj_right fun _ _ =>
         @NTy.encode_injective (Carriers.runtime unit) type _ _).mp mapped
+
+/-- The physical runtime value of a typed storage slot: the stored value
+without the map contents it holds, which native storage keeps beside it
+(`NTy.erase`). -/
+@[reducible] noncomputable def ResourceType.erase (resource : ResourceType)
+    (value : resource.carrier unit) : RuntimeValue :=
+  match resource with
+  | ⟨type, _, .value⟩ => @NTy.erase (Carriers.runtime unit) type value
+  | ⟨type, _, .collection⟩ => .vector (value.map (@NTy.erase (Carriers.runtime unit) type))
+
+/-- The tables a stored value holds (`NTy.tables`). -/
+noncomputable def ResourceType.tables (resource : ResourceType) (value : resource.carrier unit) :
+    List (NTy × String × RuntimeValue) :=
+  match resource with
+  | ⟨type, _, .value⟩ => @NTy.tables (Carriers.runtime unit) false type value
+  | ⟨type, _, .collection⟩ => value.toList.flatMap (@NTy.tables (Carriers.runtime unit) false type)
 
 /-- Global memory: per resource type, the value stored under each key. -/
 def Memory (unit : Validation.ValidatedUnit) : Type :=
@@ -1785,11 +2715,11 @@ theorem integerBounds?_of_nonzero {width : Nat} (signed : Bool) (nonzero : width
         else (0, (2 : Int) ^ width - 1)) := by
   cases signed <;> simp [Ty.integerBounds?, nonzero]
 
-theorem IntegerValueFits_unsigned_succ (n : Nat) (value : Int) :
+@[vir_denote_side] theorem IntegerValueFits_unsigned_succ (n : Nat) (value : Int) :
     IntegerValueFits (.bits (n + 1)) false value ↔ 0 ≤ value ∧ value ≤ 2 ^ (n + 1) - 1 := by
   simp [IntegerValueFits, Ty.integerValueFits?, Ty.integerBounds?]
 
-theorem IntegerValueFits_signed_succ (n : Nat) (value : Int) :
+@[vir_denote_side] theorem IntegerValueFits_signed_succ (n : Nat) (value : Int) :
     IntegerValueFits (.bits (n + 1)) true value ↔
       -(2 : Int) ^ n ≤ value ∧ value ≤ 2 ^ n - 1 := by
   simp [IntegerValueFits, Ty.integerValueFits?, Ty.integerBounds?]
@@ -3484,6 +4414,47 @@ theorem decodeElements?_tight {Native : Type} {codec : Codec Native RuntimeValue
       obtain ⟨head, hh, tail, ht, rfl⟩ := h
       simp only [List.map_cons, tight _ _ hh, ih tail ht]
 
+/-- Decoding an entry tightly: the decoded entry encodes to the runtime entry. -/
+theorem decodeEntry?_tight {Key Value : Type} {key : Codec Key RuntimeValue}
+    {value : Codec Value RuntimeValue} (keyTight : key.Tight) (valueTight : value.Tight)
+    (raw : RuntimeValue) (entry : Key × Value)
+    (decoded : Codec.decodeEntry? key value raw = some entry) :
+    RuntimeValue.tuple #[key.encode entry.1, value.encode entry.2] = raw := by
+  cases raw <;> simp only [Codec.decodeEntry?, reduceCtorEq] at decoded
+  case tuple pair =>
+    split at decoded
+    · next k v pairList =>
+        simp only [Option.bind_eq_some_iff, Option.map_eq_some_iff] at decoded
+        obtain ⟨dk, hk, dv, hv, rfl⟩ := decoded
+        have pairEq : pair = #[k, v] := by
+          rw [← (Array.toArray_toList : pair.toList.toArray = pair), pairList]
+        subst pairEq
+        simp only [keyTight k dk hk, valueTight v dv hv]
+    · cases decoded
+
+theorem entries_tight {Key Value : Type} {key : Codec Key RuntimeValue}
+    {value : Codec Value RuntimeValue} (keyTight : key.Tight) (valueTight : value.Tight) :
+    (Codec.entries key value).Tight := by
+  intro raw entries h
+  cases raw <;> simp only [Codec.entries, reduceCtorEq] at h
+  case vector values =>
+    suffices decoded : ∀ (raws : List RuntimeValue) (entries : List (Key × Value)),
+        raws.mapM (Codec.decodeEntry? key value) = some entries →
+        entries.map (fun entry => RuntimeValue.tuple #[key.encode entry.1, value.encode entry.2]) =
+          raws by
+      simp only [Codec.entries, decoded values.toList entries h, Array.toArray_toList]
+    intro raws
+    induction raws with
+    | nil => intro entries h; cases h; rfl
+    | cons first rest ih =>
+        intro entries h
+        rw [List.mapM_cons] at h
+        simp only [Option.bind_eq_bind, Option.bind_eq_some_iff, Option.pure_def,
+          Option.some.injEq] at h
+        obtain ⟨entry, hd, decoded, hrest, rfl⟩ := h
+        simp only [List.map_cons, decodeEntry?_tight keyTight valueTight first entry hd,
+          ih decoded hrest]
+
 theorem boundedVector_tight {Native : Type} {codec : Codec Native RuntimeValue} (tight : codec.Tight) :
     (Codec.boundedVector codec).Tight := by
   intro raw value h
@@ -3541,6 +4512,7 @@ theorem NTy.codec_tight [Carriers] : (τ : NTy) → τ.codec.Tight
   | .enum source _ names rows _ => fun raw value h =>
       variantDecode?_tight source names rows (rowCodecs rows) (rowCodecs_tight rows) raw value h
   | .vector element => boundedVector_tight (NTy.codec_tight element)
+  | .table key value => entries_tight (NTy.codec_tight key) (NTy.codec_tight value)
   | .ref referent => prophecyPair_tight (NTy.codec_tight referent)
   | .param index => Carriers.tight index
   | .function parameters shared results =>
@@ -3684,6 +4656,7 @@ def NTy.carriesInvariant (declares : StructHandle → Bool) : NTy → Bool
   | .struct source _ fields => declares source || fields.carriesInvariant declares
   | .enum source _ _ rows _ => declares source || rows.carriesInvariant declares
   | .vector element => element.carriesInvariant declares
+  | .table key value => key.carriesInvariant declares || value.carriesInvariant declares
   | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .param _ | .ref _
   | .function _ _ _ => false
 
@@ -3737,6 +4710,14 @@ theorem NTy.eqb_iff : (τ : NTy) → τ.refFree = true → ∀ l r : τ.carrier,
       · rintro rfl
         simpa only [Array.length_toList] using
           (eqb_zip_iff element.eqb sound l.values.toList l.values.toList).mpr rfl
+  | .table key value, free, l, r => by
+      simp only [NTy.refFree, Bool.and_eq_true] at free
+      show (l.length == r.length && (l.zip r).all fun pair =>
+        key.eqb pair.1.1 pair.2.1 && value.eqb pair.1.2 pair.2.2) = true ↔ l = r
+      refine eqb_zip_iff (fun a b => key.eqb a.1 b.1 && value.eqb a.2 b.2) ?_ l r
+      intro a b
+      rw [Bool.and_eq_true, NTy.eqb_iff key free.1, NTy.eqb_iff value free.2]
+      exact ⟨fun ⟨k, v⟩ => Prod.ext k v, fun equal => by cases equal; exact ⟨rfl, rfl⟩⟩
   | .ref _, free, _, _ => by simp [NTy.refFree] at free
   | .param _, _, l, r => by simp [NTy.eqb]
   | .function _ _ _, _, l, r => by simp [NTy.eqb]
@@ -3809,6 +4790,8 @@ theorem NTy.substWith_param : (τ : NTy) → τ.substWith (fun index => .param i
   | .enum source arguments names rows distinct => by
       simp only [NTy.substWith, NRow.substWith_param arguments, NRows.substWith_param rows]
   | .vector element => congrArg NTy.vector (NTy.substWith_param element)
+  | .table key value => by
+      simp only [NTy.substWith, NTy.substWith_param key, NTy.substWith_param value]
   | .ref referent => congrArg NTy.ref (NTy.substWith_param referent)
   | .function parameters shared results => by
       simp only [NTy.substWith, NRow.substWith_param parameters, NRow.substWith_param results]
@@ -3844,6 +4827,10 @@ theorem NTy.substWith_paramFree (types : Nat → NTy) :
   | .vector element, free => by
       simp only [NTy.paramFree] at free
       simp only [NTy.substWith, NTy.substWith_paramFree types element free]
+  | .table key value, free => by
+      simp only [NTy.paramFree, Bool.and_eq_true] at free
+      simp only [NTy.substWith, NTy.substWith_paramFree types key free.1,
+        NTy.substWith_paramFree types value free.2]
   | .ref referent, free => by
       simp only [NTy.paramFree] at free
       simp only [NTy.substWith, NTy.substWith_paramFree types referent free]
@@ -3901,6 +4888,13 @@ theorem NTy.encode_plain : (τ : NTy) → (value : τ.carrier) → Plain (τ.cod
   | .vector element, value => .vector _ fun encoded member => by
       obtain ⟨item, _, rfl⟩ := Array.mem_map.mp member
       exact NTy.encode_plain element item
+  | .table key value, entries => .vector _ fun encoded member => by
+      obtain ⟨entry, _, rfl⟩ := List.mem_map.mp (List.mem_toArray.mp member)
+      exact .tuple _ fun component member => by
+        simp only [List.mem_toArray, List.mem_cons, List.not_mem_nil, or_false] at member
+        rcases member with rfl | rfl
+        · exact NTy.encode_plain key entry.1
+        · exact NTy.encode_plain value entry.2
   | .ref referent, value => .tuple _ fun encoded member => by
       simp only [List.mem_toArray, List.mem_cons, List.not_mem_nil, or_false] at member
       rcases member with rfl | rfl
@@ -3940,6 +4934,165 @@ theorem ResourceType.encode_plain (resource : ResourceType) (value : resource.ca
       obtain ⟨element, _, rfl⟩ := Array.mem_map.mp member
       exact @NTy.encode_plain (Carriers.runtime unit) type element
 
+section ErasePlain
+variable [Carriers]
+
+mutual
+/-- Every physical value is loan-free, as every encoding is. -/
+theorem NTy.erase_plain : (τ : NTy) → (value : τ.carrier) → Plain (τ.erase value)
+  | .unit, value | .bool, value | .int _ _, value | .address, value | .signer, value
+  | .string, value | .bytes, value | .param _, value | .function _ _ _, value =>
+      NTy.encode_plain _ value
+  | .tuple elements, values => .tuple _ fun element member =>
+      HList.erase_plain elements values element (by simpa using member)
+  | .struct source arguments fields, values => .nominal source none _ fun field member =>
+      HList.eraseFields_plain fields values field (by simpa using member)
+  | .enum source arguments names rows _, value => variantCarrier.erase_plain source names rows value
+  | .vector element, value => .vector _ fun encoded member => by
+      obtain ⟨item, _, rfl⟩ := Array.mem_map.mp member
+      exact NTy.erase_plain element item
+  | .table key value, entries => .vector _ fun encoded member => by
+      obtain ⟨entry, _, rfl⟩ := List.mem_map.mp (List.mem_toArray.mp member)
+      exact .tuple _ fun component member => by
+        simp only [List.mem_toArray, List.mem_cons, List.not_mem_nil, or_false] at member
+        rcases member with rfl | rfl
+        · exact NTy.erase_plain key entry.1
+        · exact NTy.erase_plain value entry.2
+  | .ref referent, value => .tuple _ fun encoded member => by
+      simp only [List.mem_toArray, List.mem_cons, List.not_mem_nil, or_false] at member
+      rcases member with rfl | rfl
+      · exact NTy.erase_plain referent value.1
+      · exact NTy.erase_plain referent value.2
+
+theorem HList.eraseFields_plain : (row : NRow) → (values : HList row) →
+    ∀ erased ∈ HList.eraseFields row values, Plain erased
+  | .nil, _, _, member => nomatch member
+  | .cons τ .nil, values, erased, member => by
+      simp only [HList.eraseFields] at member
+      split at member
+      · exact absurd member List.not_mem_nil
+      · simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+        exact member ▸ NTy.erase_plain τ values.1
+  | .cons τ (.cons σ rest), values, erased, member => by
+      rcases List.mem_cons.mp member with rfl | later
+      · exact NTy.erase_plain τ values.1
+      · exact HList.eraseFields_plain (.cons σ rest) values.2 erased later
+
+theorem variantCarrier.erase_plain (source : StructHandle) : (names : List String) →
+    (rows : NRows) → (value : variantCarrier names rows) →
+    Plain (variantCarrier.erase source names rows value)
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | name :: _, .cons fields _, .inl values => .nominal source (some name) _ fun field member =>
+      HList.erase_plain fields values field (by simpa using member)
+  | _ :: names, .cons _ rest, .inr value => variantCarrier.erase_plain source names rest value
+
+theorem HList.erase_plain : (row : NRow) → (values : HList row) →
+    ∀ erased ∈ HList.erase row values, Plain erased
+  | .nil, _, _, member => nomatch member
+  | .cons τ rest, values, erased, member => by
+    rcases List.mem_cons.mp member with rfl | later
+    · exact NTy.erase_plain τ values.1
+    · exact HList.erase_plain rest values.2 erased later
+end
+
+/-- A row's hidden entries are physical. -/
+theorem HList.hidden_plain : (row : NRow) → (values : HList row) → {entries : RuntimeValue} →
+    HList.hidden row values = some entries → Plain entries
+  | .nil, _, _, hidden => by simp [HList.hidden] at hidden
+  | .cons τ .nil, values, entries, hidden => by
+      simp only [HList.hidden] at hidden
+      split at hidden
+      · cases hidden; exact NTy.erase_plain τ values.1
+      · cases hidden
+  | .cons _ (.cons σ rest), values, entries, hidden => by
+      simp only [HList.hidden] at hidden
+      exact HList.hidden_plain (.cons σ rest) values.2 hidden
+
+mutual
+/-- The entries of the tables a value holds are physical. -/
+theorem NTy.tables_plain (prophecies : Bool) : (τ : NTy) → (value : τ.carrier) →
+    ∀ table ∈ τ.tables prophecies value, Plain table.2.2
+  | .unit, _, _, member | .bool, _, _, member | .int _ _, _, _, member | .address, _, _, member
+  | .signer, _, _, member | .string, _, _, member | .bytes, _, _, member | .param _, _, _, member
+  | .function _ _ _, _, _, member => by simp [NTy.tables] at member
+  | .tuple elements, values, table, member => by
+      simp only [NTy.tables] at member
+      exact HList.tables_plain prophecies elements values table member
+  | .struct source arguments fields, values, table, member => by
+      simp only [NTy.tables, List.mem_append] at member
+      rcases member with hidden | nested
+      · split at hidden
+        · next entries found =>
+            simp only [List.mem_singleton] at hidden
+            subst hidden
+            exact HList.hidden_plain fields values found
+        · simp at hidden
+      · exact HList.tables_plain prophecies fields values table nested
+  | .enum source arguments names rows distinct, value, table, member => by
+      simp only [NTy.tables] at member
+      exact variantCarrier.tables_plain prophecies names rows value table member
+  | .vector element, vector, table, member => by
+      simp only [NTy.tables, List.mem_flatMap] at member
+      obtain ⟨value, -, member⟩ := member
+      exact NTy.tables_plain prophecies element value table member
+  | .table key value, entries, table, member => by
+      simp only [NTy.tables, List.mem_flatMap, List.mem_append] at member
+      obtain ⟨entry, -, inKey | inValue⟩ := member
+      · exact NTy.tables_plain prophecies key entry.1 table inKey
+      · exact NTy.tables_plain prophecies value entry.2 table inValue
+  | .ref referent, value, table, member => by
+      simp only [NTy.tables] at member
+      exact NTy.tables_plain prophecies referent _ table member
+
+theorem HList.tables_plain (prophecies : Bool) : (row : NRow) → (values : HList row) →
+    ∀ table ∈ HList.tables prophecies row values, Plain table.2.2
+  | .nil, _, _, member => by simp [HList.tables] at member
+  | .cons τ rest, values, table, member => by
+      simp only [HList.tables, List.mem_append] at member
+      rcases member with head | tail
+      · exact NTy.tables_plain prophecies τ values.1 table head
+      · exact HList.tables_plain prophecies rest values.2 table tail
+
+theorem variantCarrier.tables_plain (prophecies : Bool) : (names : List String) → (rows : NRows) →
+    (value : variantCarrier names rows) →
+    ∀ table ∈ variantCarrier.tables prophecies names rows value, Plain table.2.2
+  | _, .nil, value, _, _ => nomatch value
+  | [], .cons _ _, value, _, _ => nomatch value
+  | _ :: _, .cons fields _, .inl values, table, member => by
+      simp only [variantCarrier.tables] at member
+      exact HList.tables_plain prophecies fields values table member
+  | _ :: names, .cons _ rest, .inr value, table, member => by
+      simp only [variantCarrier.tables] at member
+      exact variantCarrier.tables_plain prophecies names rest value table member
+end
+
+omit [Carriers] in
+theorem ResourceType.erase_plain (resource : ResourceType) (value : resource.carrier unit) :
+    Plain (resource.erase value) := by
+  rcases resource with ⟨type, arguments, kind⟩
+  cases kind with
+  | value => exact @NTy.erase_plain (Carriers.runtime unit) type value
+  | collection =>
+      refine .vector _ fun erased member => ?_
+      obtain ⟨element, _, rfl⟩ := Array.mem_map.mp member
+      exact @NTy.erase_plain (Carriers.runtime unit) type element
+
+omit [Carriers] in
+theorem ResourceType.tables_plain (resource : ResourceType) (value : resource.carrier unit) :
+    ∀ table ∈ resource.tables value, Plain table.2.2 := by
+  rcases resource with ⟨type, arguments, kind⟩
+  cases kind with
+  | value => exact @NTy.tables_plain (Carriers.runtime unit) false type value
+  | collection =>
+      intro table member
+      simp only [ResourceType.tables, List.mem_flatMap] at member
+      obtain ⟨element, -, member⟩ := member
+      exact @NTy.tables_plain (Carriers.runtime unit) false type element table member
+
+end ErasePlain
+
+
 section Admits
 
 variable (unit : Validation.ValidatedUnit)
@@ -3953,71 +5106,95 @@ theorem NTy.admitsEach_of_forall {τ : NTy} : (values : List RuntimeValue) →
         admitted other (List.mem_cons_of_mem _ member)
 
 mutual
-/-- The runtime family's encoding of a value admits its type. -/
-theorem NTy.admits_encode : (τ : NTy) → (value : @NTy.carrier (Carriers.runtime unit) τ) →
-    NTy.admits unit τ ((@NTy.codec (Carriers.runtime unit) τ).encode value) = true
-  | .unit, _ => by simp [NTy.codec, Codec.unit, NTy.admits]
-  | .bool, _ => by simp [NTy.codec, Codec.bool, NTy.admits]
+/-- The physical value of a value of the runtime family is admitted at its
+type. -/
+theorem NTy.admits_erase : (τ : NTy) → (value : @NTy.carrier (Carriers.runtime unit) τ) →
+    NTy.admits unit τ (@NTy.erase (Carriers.runtime unit) τ value) = true
+  | .unit, _ => by simp [NTy.erase, NTy.encode, NTy.codec, Codec.unit, NTy.admits]
+  | .bool, _ => by simp [NTy.erase, NTy.encode, NTy.codec, Codec.bool, NTy.admits]
   | .int width signed, value => by
-      simp [NTy.codec, Codec.specInt, NTy.admits, decodeInt?_val]
-  | .address, _ => by simp [NTy.codec, Codec.address, NTy.admits]
-  | .signer, _ => by simp [NTy.codec, Codec.signer, NTy.admits]
-  | .string, _ => by simp [NTy.codec, Codec.string, NTy.admits]
-  | .bytes, _ => by simp [NTy.codec, Codec.bytes, NTy.admits]
+      simp [NTy.erase, NTy.encode, NTy.codec, Codec.specInt, NTy.admits, decodeInt?_val]
+  | .address, _ => by simp [NTy.erase, NTy.encode, NTy.codec, Codec.address, NTy.admits]
+  | .signer, _ => by simp [NTy.erase, NTy.encode, NTy.codec, Codec.signer, NTy.admits]
+  | .string, _ => by simp [NTy.erase, NTy.encode, NTy.codec, Codec.string, NTy.admits]
+  | .bytes, _ => by simp [NTy.erase, NTy.encode, NTy.codec, Codec.bytes, NTy.admits]
   | .tuple elements, values => by
-      simp only [NTy.codec, Codec.tuple, NTy.admits]
-      exact NRow.admits_encode elements values
+      simp only [NTy.erase, NTy.admits, List.toList_toArray]
+      exact NRow.admits_erase elements values
   | .struct source arguments fields, values => by
-      simp only [NTy.codec, Codec.nominalRow, NTy.admits, beq_self_eq_true, Bool.true_and]
-      exact NRow.admits_encode fields values
+      simp only [NTy.erase, NTy.admits, beq_self_eq_true, Bool.true_and, List.toList_toArray]
+      exact NRow.admitsFields_eraseFields fields values
   | .enum source arguments names rows distinct, value => by
-      have admitted := variantEncode_admits source names rows distinct value
-      simp only [NTy.codec, variantCodec]
+      have admitted := variantCarrier.erase_admits source names rows distinct value
+      simp only [NTy.erase]
       split at admitted
-      · next actual name fields encoded =>
-          rw [encoded]
+      · next actual name fields erased =>
+          rw [erased]
           obtain ⟨rfl, -, row, selected, rowAdmitted⟩ := admitted
           simp only [NTy.admits, beq_self_eq_true, selected, rowAdmitted, Bool.true_and]
       · exact admitted.elim
   | .vector element, value => by
-      simp only [NTy.codec, Codec.boundedVector, NTy.admits, Array.toList_map]
-      exact NTy.admitsEach_of_forall unit _ fun encoded member => by
+      simp only [NTy.erase, NTy.admits, Array.toList_map]
+      exact NTy.admitsEach_of_forall unit _ fun erased member => by
         obtain ⟨item, _, rfl⟩ := List.mem_map.mp member
-        exact NTy.admits_encode element item
+        exact NTy.admits_erase element item
+  | .table key value, entries => by
+      simp only [NTy.erase, NTy.admits, List.toList_toArray]
+      induction entries with
+      | nil => simp [NTy.admitsEntries]
+      | cons entry rest ih =>
+          simp only [List.map_cons, NTy.admitsEntries, NTy.admitsEntry, ih, Bool.and_true,
+            Bool.and_eq_true, List.toList_toArray]
+          exact ⟨NTy.admits_erase key entry.1, NTy.admits_erase value entry.2⟩
   | .ref referent, value => by
-      simp only [NTy.codec, Codec.prophecyPair, NTy.admits, NTy.admitsPair,
-        NTy.admits_encode referent value.1, NTy.admits_encode referent value.2, Bool.and_self]
+      simp only [NTy.erase, NTy.admits, NTy.admitsPair, List.toList_toArray,
+        NTy.admits_erase referent value.1, NTy.admits_erase referent value.2, Bool.and_self]
   | .param _, _ => by simp [NTy.admits]
-  | .function _ _ _, value => value.property
+  | .function _ _ _, value => by
+      simp only [NTy.erase, NTy.encode_function]
+      exact value.property
 
-/-- The runtime family's encoding of a row admits it. -/
-theorem NRow.admits_encode : (row : NRow) → (values : @HList (Carriers.runtime unit) row) →
-    NRow.admits unit row ((@rowCodec (Carriers.runtime unit) row).encode values) = true
-  | .nil, _ => by simp [rowCodec, Codec.tupleNil, NRow.admits]
+/-- The physical values of a row of the runtime family are admitted at it. -/
+theorem NRow.admits_erase : (row : NRow) → (values : @HList (Carriers.runtime unit) row) →
+    NRow.admits unit row (@HList.erase (Carriers.runtime unit) row values) = true
+  | .nil, _ => by simp [HList.erase, NRow.admits]
   | .cons τ rest, values => by
-      simp only [rowCodec, Codec.tupleCons, NRow.admits, NTy.admits_encode τ values.1,
-        NRow.admits_encode rest values.2, Bool.and_self]
+      simp only [HList.erase, NRow.admits, NTy.admits_erase τ values.1,
+        NRow.admits_erase rest values.2, Bool.and_self]
 
-/-- The runtime family's encoding of an enum value is a variant the enum's
-names select, whose fields admit its row. -/
-theorem variantEncode_admits (source : StructHandle) : (names : List String) → (rows : NRows) →
+/-- The physical fields of a struct's field row of the runtime family are
+admitted at it. -/
+theorem NRow.admitsFields_eraseFields : (row : NRow) → (values : @HList (Carriers.runtime unit) row) →
+    NRow.admitsFields unit row (@HList.eraseFields (Carriers.runtime unit) row values) = true
+  | .nil, _ => by simp [HList.eraseFields, NRow.admitsFields]
+  | .cons τ .nil, values => by
+      by_cases table : τ.isTable = true
+      · simp [HList.eraseFields, NRow.admitsFields, table]
+      · simp [HList.eraseFields, NRow.admitsFields, table, NTy.admits_erase τ values.1]
+  | .cons τ (.cons σ rest), values => by
+      simp only [HList.eraseFields, NRow.admitsFields, NTy.admits_erase τ values.1, Bool.true_and]
+      exact NRow.admitsFields_eraseFields (.cons σ rest) values.2
+
+/-- The physical value of an enum value of the runtime family is a variant the
+enum's names select, whose fields admit its row. -/
+theorem variantCarrier.erase_admits (source : StructHandle) : (names : List String) → (rows : NRows) →
     names.Nodup → (value : @variantCarrier (Carriers.runtime unit) names rows) →
-    match (@variantEncode (Carriers.runtime unit) source names rows
-        (@rowCodecs (Carriers.runtime unit) rows) value : RuntimeValue) with
+    match @variantCarrier.erase (Carriers.runtime unit) source names rows value with
     | RuntimeValue.nominal actual (some name) fields => actual = source ∧ name ∈ names ∧
         ∃ row, NRows.variant? names rows name = some row ∧ NRow.admits unit row fields.toList = true
     | _ => False
   | _, .nil, _, value => nomatch value
   | [], .cons _ _, _, value => nomatch value
   | name :: names, .cons fields rest, _, .inl values => by
-      simp only [variantEncode, Codec.nominalRow, List.mem_cons, true_or,
-        NRows.variant?, beq_self_eq_true, if_true, Option.some.injEq, exists_eq_left', true_and]
-      exact NRow.admits_encode fields values
+      simp only [variantCarrier.erase, List.mem_cons, true_or, NRows.variant?, beq_self_eq_true,
+        if_true, Option.some.injEq, exists_eq_left', true_and, List.toList_toArray]
+      exact NRow.admits_erase fields values
   | first :: names, .cons fields rest, distinct, .inr later => by
-      have admitted := variantEncode_admits source names rest (List.nodup_cons.mp distinct).2 later
-      simp only [variantEncode, rowCodecs]
+      have admitted := variantCarrier.erase_admits source names rest (List.nodup_cons.mp distinct).2
+        later
+      simp only [variantCarrier.erase]
       split at admitted
-      · next actual name values encoded =>
+      · next actual name values erased =>
           obtain ⟨rfl, member, row, selected, rowAdmitted⟩ := admitted
           have different : (first == name) = false := by
             simp only [beq_eq_false_iff_ne]
@@ -4054,8 +5231,150 @@ def NRows.firstInhabitable : List String → NRows → Bool
   | _, _ => false
 end
 
-/-- Type arguments of a call: a row whose types have values. -/
-abbrev TypeArgs : Type := { row : NRow // row.inhabitable = true }
+/-- Whether a row names no map contents at its top: a type argument is a
+language type, and a map's contents are a value's hidden field only. -/
+def NRow.argumentRow : NRow → Bool
+  | .nil => true
+  | .cons τ rest => !τ.isTable && rest.argumentRow
+
+/-- Whether a row may be the type arguments of a call: its types have values
+and hold no map contents, whose owners are passed to the runtime without them
+(`NTy.erase`) and whose values a type parameter therefore never stands for. A
+call at a type argument holding them is not carried. -/
+def NRow.typeArguments (row : NRow) : Bool := row.inhabitable && row.tableFree
+
+/-- Type arguments of a call. -/
+abbrev TypeArgs : Type := { row : NRow // row.typeArguments = true }
+
+theorem TypeArgs.inhabitable (θ : TypeArgs) : θ.1.inhabitable = true :=
+  (Bool.and_eq_true_iff.mp θ.2).1
+
+theorem TypeArgs.tableFree (θ : TypeArgs) : θ.1.tableFree = true :=
+  (Bool.and_eq_true_iff.mp θ.2).2
+
+theorem NRow.getD_tableFree : (row : NRow) → row.tableFree = true → (index : Nat) →
+    (default : NTy) → default.tableFree = true → (row.getD index default).tableFree = true
+  | .nil, _, _, _, plain => plain
+  | .cons τ rest, free, 0, _, _ => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      exact free.1
+  | .cons τ rest, free, index + 1, default, plain => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      exact NRow.getD_tableFree rest free.2 index default plain
+
+/-- A row holding no map contents holds none at its top level. -/
+theorem NRow.argumentRow_of_tableFree : (row : NRow) → row.tableFree = true →
+    row.argumentRow = true
+  | .nil, _ => rfl
+  | .cons τ rest, free => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [NRow.argumentRow, Bool.and_eq_true, Bool.not_eq_true',
+        NRow.argumentRow_of_tableFree rest free.2, and_true]
+      cases τ <;> simp [NTy.isTable, NTy.tableFree] at free ⊢
+
+theorem TypeArgs.argumentRow (θ : TypeArgs) : θ.1.argumentRow = true :=
+  NRow.argumentRow_of_tableFree θ.1 θ.tableFree
+
+theorem NRow.getD_argumentRow : (row : NRow) → row.argumentRow = true → (index : Nat) →
+    (default : NTy) → default.isTable = false → (row.getD index default).isTable = false
+  | .nil, _, _, _, plain => plain
+  | .cons τ rest, arguments, 0, _, _ => by
+      simp only [NRow.argumentRow, Bool.and_eq_true, Bool.not_eq_true'] at arguments
+      exact arguments.1
+  | .cons τ rest, arguments, index + 1, default, plain => by
+      simp only [NRow.argumentRow, Bool.and_eq_true] at arguments
+      exact NRow.getD_argumentRow rest arguments.2 index default plain
+
+mutual
+/-- A type without map contents has none with its parameters replaced by
+types without. -/
+theorem NTy.tableFree_substWith (types : Nat → NTy) (plain : ∀ index, (types index).tableFree = true) :
+    (τ : NTy) → τ.tableFree = true → (τ.substWith types).tableFree = true
+  | .param index, _ => plain index
+  | .table _ _, free => by simp [NTy.tableFree] at free
+  | .tuple elements, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.substWith, NTy.tableFree, NRow.tableFree_substWith types plain elements free]
+  | .struct _ _ fields, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.substWith, NTy.tableFree, NRow.tableFree_substWith types plain fields free]
+  | .enum _ _ _ rows _, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.substWith, NTy.tableFree, NRows.tableFree_substWith types plain rows free]
+  | .vector element, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.substWith, NTy.tableFree, NTy.tableFree_substWith types plain element free]
+  | .ref referent, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.substWith, NTy.tableFree, NTy.tableFree_substWith types plain referent free]
+  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => rfl
+  | .function _ _ _, _ => by simp [NTy.substWith, NTy.tableFree]
+
+theorem NRow.tableFree_substWith (types : Nat → NTy) (plain : ∀ index, (types index).tableFree = true) :
+    (row : NRow) → row.tableFree = true → (NRow.substWith types row).tableFree = true
+  | .nil, _ => rfl
+  | .cons τ rest, free => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [NRow.substWith, NRow.tableFree, NTy.tableFree_substWith types plain τ free.1,
+        NRow.tableFree_substWith types plain rest free.2, Bool.and_self]
+
+theorem NRows.tableFree_substWith (types : Nat → NTy) (plain : ∀ index, (types index).tableFree = true) :
+    (rows : NRows) → rows.tableFree = true → (NRows.substWith types rows).tableFree = true
+  | .nil, _ => rfl
+  | .cons fields rest, free => by
+      simp only [NRows.tableFree, Bool.and_eq_true] at free
+      simp only [NRows.substWith, NRows.tableFree, NRow.tableFree_substWith types plain fields free.1,
+        NRows.tableFree_substWith types plain rest free.2, Bool.and_self]
+end
+
+mutual
+/-- A type without map contents has none at type arguments. -/
+theorem NTy.tableFree_subst (θ : TypeArgs) : (τ : NTy) → τ.tableFree = true →
+    (τ.subst θ.1).tableFree = true
+  | .param index, _ => NRow.getD_tableFree θ.1 θ.tableFree index _ rfl
+  | .table _ _, free => by simp [NTy.tableFree] at free
+  | .tuple elements, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.subst, NTy.tableFree, NRow.tableFree_subst θ elements free]
+  | .struct _ _ fields, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.subst, NTy.tableFree, NRow.tableFree_subst θ fields free]
+  | .enum _ _ _ rows _, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.subst, NTy.tableFree, NRows.tableFree_subst θ rows free]
+  | .vector element, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.subst, NTy.tableFree, NTy.tableFree_subst θ element free]
+  | .ref referent, free => by
+      simp only [NTy.tableFree] at free
+      simp only [NTy.subst, NTy.tableFree, NTy.tableFree_subst θ referent free]
+  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _
+  | .function _ _ _, _ => rfl
+
+theorem NRow.tableFree_subst (θ : TypeArgs) : (row : NRow) → row.tableFree = true →
+    (NRow.subst θ.1 row).tableFree = true
+  | .nil, _ => rfl
+  | .cons τ rest, free => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at free
+      simp only [NRow.subst, NRow.tableFree, NTy.tableFree_subst θ τ free.1,
+        NRow.tableFree_subst θ rest free.2, Bool.and_self]
+
+theorem NRows.tableFree_subst (θ : TypeArgs) : (rows : NRows) → rows.tableFree = true →
+    (NRows.subst θ.1 rows).tableFree = true
+  | .nil, _ => rfl
+  | .cons fields rest, free => by
+      simp only [NRows.tableFree, Bool.and_eq_true] at free
+      simp only [NRows.subst, NRows.tableFree, NRow.tableFree_subst θ fields free.1,
+        NRows.tableFree_subst θ rest free.2, Bool.and_self]
+end
+
+/-- A type argument substituted for a parameter is no map's contents. -/
+theorem NTy.isTable_subst (θ : TypeArgs) : (τ : NTy) → (τ.subst θ.1).isTable = τ.isTable
+  | .param index => by
+      simp only [NTy.subst, NTy.isTable]
+      exact NRow.getD_argumentRow θ.1 θ.argumentRow index (.param index) rfl
+  | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .tuple _ | .struct _ _ _
+  | .enum _ _ _ _ _ | .vector _ | .table _ _ | .ref _ | .function _ _ _ => rfl
 
 theorem NRow.getD_inhabitable : (row : NRow) → row.inhabitable = true → (index : Nat) →
     (default : NTy) → default.inhabitable = true → (row.getD index default).inhabitable = true
@@ -4088,6 +5407,7 @@ def NTy.inhabitant : (τ : NTy) → τ.inhabitable = true → τ.carrier
   | .enum _ _ names rows _, inhabitable =>
       variantCarrier.inhabitant names rows (by simpa [NTy.inhabitable] using inhabitable)
   | .vector _, _ => default
+  | .table _ _, _ => []
   | .ref referent, inhabitable =>
       let value := referent.inhabitant (by simpa [NTy.inhabitable] using inhabitable)
       (value, value)
@@ -4117,7 +5437,7 @@ carried as the `i`-th argument at the caller's family. -/
   decEq := fun index => @NTy.decEq outer ((NTy.param index).subst θ.1)
   inhabited := fun index =>
     ⟨@NTy.inhabitant outer ((NTy.param index).subst θ.1)
-      (NRow.getD_inhabitable θ.1 θ.2 index (.param index) rfl)⟩
+      (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl)⟩
   tight := fun index => @NTy.codec_tight outer ((NTy.param index).subst θ.1)
   plain := fun index => @NTy.encode_plain outer ((NTy.param index).subst θ.1)
   closureTyped := fun parameters shared results =>
@@ -4145,6 +5465,8 @@ def NTy.toSkolem (θ : TypeArgs) : (τ : NTy) → (τ.subst θ.1).carrier →
   | .enum _ _ names rows _, value => variantCarrier.toSkolem θ names rows value
   | .vector element, vector =>
       ⟨vector.values.map (NTy.toSkolem θ element), by simpa using vector.bounded⟩
+  | .table key value, entries =>
+      entries.map fun entry => (NTy.toSkolem θ key entry.1, NTy.toSkolem θ value entry.2)
   | .ref referent, value => (NTy.toSkolem θ referent value.1, NTy.toSkolem θ referent value.2)
   | .param _, value => value
   | .function _ _ _, value => value
@@ -4178,6 +5500,8 @@ def NTy.ofSkolem (θ : TypeArgs) : (τ : NTy) → @NTy.carrier (Carriers.instant
   | .enum _ _ names rows _, value => variantCarrier.ofSkolem θ names rows value
   | .vector element, vector =>
       ⟨vector.values.map (NTy.ofSkolem θ element), by simpa using vector.bounded⟩
+  | .table key value, entries =>
+      entries.map fun entry => (NTy.ofSkolem θ key entry.1, NTy.ofSkolem θ value entry.2)
   | .ref referent, value => (NTy.ofSkolem θ referent value.1, NTy.ofSkolem θ referent value.2)
   | .param _, value => value
   | .function _ _ _, value => value
@@ -4216,7 +5540,7 @@ value, the one a twin of the argument's type defaults to. -/
 theorem Carriers.default_instantiate (θ : TypeArgs) (index : Nat) :
     (default : (Carriers.instantiate θ Θ).carrier index) =
       NTy.inhabitant ((NTy.param index).subst θ.1)
-        (NRow.getD_inhabitable θ.1 θ.2 index (.param index) rfl) := rfl
+        (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl) := rfl
 
 /-- A type parameter's codec is its family's. -/
 theorem NTy.codec_param (index : Nat) : (NTy.param index).codec = Carriers.codec index := rfl
@@ -4274,6 +5598,45 @@ theorem NTy.ofSkolem_ref (θ : TypeArgs) (referent : NTy)
     (value : @NTy.carrier (Carriers.instantiate θ Θ) (.ref referent)) :
     NTy.ofSkolem θ (.ref referent) value =
       (NTy.ofSkolem θ referent value.1, NTy.ofSkolem θ referent value.2) := rfl
+/-! A callee's transport unapplied, as a vector maps it over its elements:
+the function a constructor's transport is, so that a mapped transport of
+scalars is the identity and one of rows is the rows'. A table's transport
+stays folded (`encodeTransport`). -/
+
+@[vir_denote] theorem NTy.ofSkolem_unit_fun (θ : TypeArgs) :
+    @NTy.ofSkolem Θ θ .unit = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_bool_fun (θ : TypeArgs) :
+    @NTy.ofSkolem Θ θ .bool = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_int_fun (θ : TypeArgs) (width : Nat) (signed : Bool) :
+    @NTy.ofSkolem Θ θ (.int width signed) = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_address_fun (θ : TypeArgs) :
+    @NTy.ofSkolem Θ θ .address = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_signer_fun (θ : TypeArgs) :
+    @NTy.ofSkolem Θ θ .signer = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_string_fun (θ : TypeArgs) :
+    @NTy.ofSkolem Θ θ .string = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_bytes_fun (θ : TypeArgs) :
+    @NTy.ofSkolem Θ θ .bytes = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_param_fun (θ : TypeArgs) (index : Nat) :
+    @NTy.ofSkolem Θ θ (.param index) = fun value => value := rfl
+@[vir_denote] theorem NTy.ofSkolem_tuple_fun (θ : TypeArgs) (elements : NRow) :
+    @NTy.ofSkolem Θ θ (.tuple elements) = fun values => HList.ofSkolem θ elements values := rfl
+@[vir_denote] theorem NTy.ofSkolem_struct_fun (θ : TypeArgs) (source : StructHandle)
+    (fields : NRow) :
+    @NTy.ofSkolem Θ θ (.struct source arguments fields) =
+      fun values => HList.ofSkolem θ fields values := rfl
+@[vir_denote] theorem NTy.ofSkolem_enum_fun (θ : TypeArgs) (source : StructHandle)
+    (names : List String) (rows : NRows) (distinct : names.Nodup) :
+    @NTy.ofSkolem Θ θ (.enum source arguments names rows distinct) =
+      fun value => variantCarrier.ofSkolem θ names rows value := rfl
+@[vir_denote] theorem NTy.ofSkolem_vector_fun (θ : TypeArgs) (element : NTy) :
+    @NTy.ofSkolem Θ θ (.vector element) =
+      fun vector => ⟨vector.values.map (NTy.ofSkolem θ element), by simpa using vector.bounded⟩ :=
+  rfl
+@[vir_denote] theorem NTy.ofSkolem_ref_fun (θ : TypeArgs) (referent : NTy) :
+    @NTy.ofSkolem Θ θ (.ref referent) =
+      fun value => (NTy.ofSkolem θ referent value.1, NTy.ofSkolem θ referent value.2) := rfl
+
 theorem HList.ofSkolem_nil (θ : TypeArgs) (values : @HList (Carriers.instantiate θ Θ) .nil) :
     HList.ofSkolem θ .nil values = () := rfl
 theorem HList.ofSkolem_cons (θ : TypeArgs) (τ : NTy) (rest : NRow)
@@ -4327,6 +5690,15 @@ theorem NTy.encode_ofSkolem (θ : TypeArgs) : (τ : NTy) →
       apply Array.map_congr_left
       intro x _
       exact NTy.encode_ofSkolem θ element x
+  | .table key value, entries => by
+      show NTy.encode (.table (key.subst θ.1) (value.subst θ.1)) _ = _
+      rw [NTy.encode_table, @NTy.encode_table (Carriers.instantiate θ Θ)]
+      simp only [NTy.ofSkolem, List.map_map]
+      congr 2
+      apply List.map_congr_left
+      intro entry _
+      simp only [Function.comp_apply, NTy.encode_ofSkolem θ key entry.1,
+        NTy.encode_ofSkolem θ value entry.2]
   | .ref referent, value => by
       show NTy.encode (.ref (referent.subst θ.1)) _ = _
       rw [NTy.encode_ref, @NTy.encode_ref (Carriers.instantiate θ Θ)]
@@ -4400,6 +5772,17 @@ theorem NTy.encode_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst 
       apply Array.map_congr_left
       intro x _
       exact NTy.encode_toSkolem θ element x
+  | .table key value, entries => by
+      show @NTy.encode (Carriers.instantiate θ Θ) (.table key value)
+          (NTy.toSkolem θ (.table key value) entries) =
+        NTy.encode (.table (key.subst θ.1) (value.subst θ.1)) entries
+      rw [@NTy.encode_table (Carriers.instantiate θ Θ), NTy.encode_table]
+      simp only [NTy.toSkolem, List.map_map]
+      congr 2
+      apply List.map_congr_left
+      intro entry _
+      simp only [Function.comp_apply, NTy.encode_toSkolem θ key entry.1,
+        NTy.encode_toSkolem θ value entry.2]
   | .ref referent, value => by
       show @NTy.encode (Carriers.instantiate θ Θ) (.ref referent)
           (NTy.toSkolem θ (.ref referent) value) = NTy.encode (.ref (referent.subst θ.1)) value
@@ -4520,6 +5903,198 @@ variable (θ : TypeArgs)
 
 end LazyTransport
 
+/-! Transport keeps a value's physical value, as it keeps its encoding. -/
+
+mutual
+theorem NTy.erase_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst θ.1).carrier) →
+    @NTy.erase (Carriers.instantiate θ Θ) τ (NTy.toSkolem θ τ value) =
+      NTy.erase (τ.subst θ.1) value
+  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => rfl
+  | .param index, value => by
+      -- The parameter's type argument holds no map contents.
+      simp only [NTy.erase]
+      rw [NTy.encode_toSkolem θ (.param index) value]
+      exact (NTy.erase_eq_encode ((NTy.param index).subst θ.1)
+        (NRow.getD_tableFree θ.1 θ.tableFree index _ rfl) value).symm
+  | .function parameters shared results, value =>
+      NTy.encode_toSkolem θ (.function parameters shared results) value
+  | .tuple elements, values => by
+      show @NTy.erase (Carriers.instantiate θ Θ) (.tuple elements) (HList.toSkolem θ elements values) =
+        NTy.erase (.tuple (NRow.subst θ.1 elements)) values
+      simp only [NTy.erase, HList.erase_toSkolem θ elements values]
+  | .struct source arguments fields, values => by
+      show @NTy.erase (Carriers.instantiate θ Θ) (.struct source arguments fields)
+          (HList.toSkolem θ fields values) =
+        NTy.erase (.struct source (NRow.subst θ.1 arguments) (NRow.subst θ.1 fields)) values
+      simp only [NTy.erase, HList.eraseFields_toSkolem θ fields values]
+  | .enum source arguments names rows distinct, value =>
+      variantCarrier.erase_toSkolem θ source names rows value
+  | .vector element, vector => by
+      show @NTy.erase (Carriers.instantiate θ Θ) (.vector element)
+          (NTy.toSkolem θ (.vector element) vector) = NTy.erase (.vector (element.subst θ.1)) vector
+      simp only [NTy.erase, NTy.toSkolem, Array.map_map]
+      congr 1
+      apply Array.map_congr_left
+      intro value _
+      exact NTy.erase_toSkolem θ element value
+  | .table key value, entries => by
+      show @NTy.erase (Carriers.instantiate θ Θ) (.table key value)
+          (NTy.toSkolem θ (.table key value) entries) =
+        NTy.erase (.table (key.subst θ.1) (value.subst θ.1)) entries
+      simp only [NTy.erase, NTy.toSkolem, List.map_map]
+      congr 2
+      apply List.map_congr_left
+      intro entry _
+      simp only [Function.comp_apply, NTy.erase_toSkolem θ key entry.1,
+        NTy.erase_toSkolem θ value entry.2]
+  | .ref referent, value => by
+      show @NTy.erase (Carriers.instantiate θ Θ) (.ref referent)
+          (NTy.toSkolem θ (.ref referent) value) = NTy.erase (.ref (referent.subst θ.1)) value
+      simp only [NTy.erase, NTy.toSkolem, NTy.erase_toSkolem θ referent]
+
+theorem HList.erase_toSkolem (θ : TypeArgs) : (row : NRow) → (values : HList (NRow.subst θ.1 row)) →
+    @HList.erase (Carriers.instantiate θ Θ) row (HList.toSkolem θ row values) =
+      HList.erase (NRow.subst θ.1 row) values
+  | .nil, _ => rfl
+  | .cons τ rest, values => by
+      show @HList.erase (Carriers.instantiate θ Θ) (.cons τ rest)
+          (NTy.toSkolem θ τ values.1, HList.toSkolem θ rest values.2) =
+        HList.erase (.cons (τ.subst θ.1) (NRow.subst θ.1 rest)) values
+      simp only [HList.erase, NTy.erase_toSkolem θ τ values.1, HList.erase_toSkolem θ rest values.2]
+
+theorem HList.eraseFields_toSkolem (θ : TypeArgs) : (row : NRow) →
+    (values : HList (NRow.subst θ.1 row)) →
+    @HList.eraseFields (Carriers.instantiate θ Θ) row (HList.toSkolem θ row values) =
+      HList.eraseFields (NRow.subst θ.1 row) values
+  | .nil, _ => rfl
+  | .cons τ .nil, values => by
+      show @HList.eraseFields (Carriers.instantiate θ Θ) (.cons τ .nil)
+          (NTy.toSkolem θ τ values.1, ()) =
+        HList.eraseFields (.cons (τ.subst θ.1) .nil) values
+      simp only [HList.eraseFields, NTy.isTable_subst θ τ, NTy.erase_toSkolem θ τ values.1]
+  | .cons τ (.cons σ rest), values => by
+      show @HList.eraseFields (Carriers.instantiate θ Θ) (.cons τ (.cons σ rest))
+          (NTy.toSkolem θ τ values.1, HList.toSkolem θ (.cons σ rest) values.2) =
+        HList.eraseFields (.cons (τ.subst θ.1) (.cons (σ.subst θ.1) (NRow.subst θ.1 rest))) values
+      simp only [HList.eraseFields, NTy.erase_toSkolem θ τ values.1]
+      exact congrArg _ (HList.eraseFields_toSkolem θ (.cons σ rest) values.2)
+
+theorem variantCarrier.erase_toSkolem (θ : TypeArgs) (source : StructHandle) :
+    (names : List String) → (rows : NRows) →
+    (value : variantCarrier names (NRows.subst θ.1 rows)) →
+    @variantCarrier.erase (Carriers.instantiate θ Θ) source names rows
+        (variantCarrier.toSkolem θ names rows value) =
+      variantCarrier.erase source names (NRows.subst θ.1 rows) value
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons fields _, .inl values => by
+      simp only [variantCarrier.toSkolem, variantCarrier.erase,
+        HList.erase_toSkolem θ fields values]
+  | _ :: names, .cons _ rest, .inr value => by
+      simp only [variantCarrier.toSkolem, variantCarrier.erase]
+      exact variantCarrier.erase_toSkolem θ source names rest value
+end
+
+theorem HList.hidden_toSkolem (θ : TypeArgs) : (row : NRow) → (values : HList (NRow.subst θ.1 row)) →
+    @HList.hidden (Carriers.instantiate θ Θ) row (HList.toSkolem θ row values) =
+      HList.hidden (NRow.subst θ.1 row) values
+  | .nil, _ => rfl
+  | .cons τ .nil, values => by
+      show @HList.hidden (Carriers.instantiate θ Θ) (.cons τ .nil) (NTy.toSkolem θ τ values.1, ()) =
+        HList.hidden (.cons (τ.subst θ.1) .nil) values
+      simp only [HList.hidden, NTy.isTable_subst θ τ, NTy.erase_toSkolem θ τ values.1]
+  | .cons τ (.cons σ rest), values => by
+      show @HList.hidden (Carriers.instantiate θ Θ) (.cons τ (.cons σ rest))
+          (NTy.toSkolem θ τ values.1, HList.toSkolem θ (.cons σ rest) values.2) =
+        HList.hidden (.cons (τ.subst θ.1) (.cons (σ.subst θ.1) (NRow.subst θ.1 rest))) values
+      simp only [HList.hidden]
+      exact HList.hidden_toSkolem θ (.cons σ rest) values.2
+
+/-- The owner of a table in the caller's view: the callee's owner type at the
+type arguments. -/
+def tableSubst (θ : TypeArgs) (table : NTy × String × RuntimeValue) : NTy × String × RuntimeValue :=
+  (table.1.subst θ.1, table.2)
+
+mutual
+/-- Transport keeps a value's tables, their owners read at the type arguments. -/
+theorem NTy.tables_toSkolem (θ : TypeArgs) (prophecies : Bool) : (τ : NTy) →
+    (value : (τ.subst θ.1).carrier) →
+    (@NTy.tables (Carriers.instantiate θ Θ) prophecies τ (NTy.toSkolem θ τ value)).map (tableSubst θ) =
+      NTy.tables prophecies (τ.subst θ.1) value
+  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _
+  | .function _ _ _, _ => by simp [NTy.tables]
+  | .param index, value => by
+      simp only [NTy.tables, List.map_nil]
+      exact (NTy.tables_eq_nil prophecies _ (NRow.getD_tableFree θ.1 θ.tableFree index _ rfl)
+        value).symm
+  | .tuple elements, values => by
+      show (@NTy.tables (Carriers.instantiate θ Θ) prophecies (.tuple elements)
+          (HList.toSkolem θ elements values)).map (tableSubst θ) =
+        NTy.tables prophecies (.tuple (NRow.subst θ.1 elements)) values
+      simp only [NTy.tables, HList.tables_toSkolem θ prophecies elements values]
+  | .struct source arguments fields, values => by
+      show (@NTy.tables (Carriers.instantiate θ Θ) prophecies (.struct source arguments fields)
+          (HList.toSkolem θ fields values)).map (tableSubst θ) =
+        NTy.tables prophecies (.struct source (NRow.subst θ.1 arguments) (NRow.subst θ.1 fields))
+          values
+      simp only [NTy.tables, List.map_append, HList.tables_toSkolem θ prophecies fields values,
+        HList.hidden_toSkolem θ fields values, HList.eraseFields_toSkolem θ fields values]
+      cases HList.hidden (NRow.subst θ.1 fields) values <;> simp [tableSubst, NTy.subst]
+  | .enum source arguments names rows distinct, value => by
+      show (@NTy.tables (Carriers.instantiate θ Θ) prophecies
+          (.enum source arguments names rows distinct)
+          (variantCarrier.toSkolem θ names rows value)).map (tableSubst θ) =
+        NTy.tables prophecies (.enum source (NRow.subst θ.1 arguments) names (NRows.subst θ.1 rows)
+          distinct) value
+      simp only [NTy.tables, variantCarrier.tables_toSkolem θ prophecies names rows value]
+  | .vector element, vector => by
+      show (@NTy.tables (Carriers.instantiate θ Θ) prophecies (.vector element)
+          (NTy.toSkolem θ (.vector element) vector)).map (tableSubst θ) =
+        NTy.tables prophecies (.vector (element.subst θ.1)) vector
+      simp only [NTy.tables, NTy.toSkolem_vector_values, Array.toList_map, List.map_flatMap,
+        List.flatMap_map, NTy.tables_toSkolem θ prophecies element]
+  | .table key value, entries => by
+      show (@NTy.tables (Carriers.instantiate θ Θ) prophecies (.table key value)
+          (NTy.toSkolem θ (.table key value) entries)).map (tableSubst θ) =
+        NTy.tables prophecies (.table (key.subst θ.1) (value.subst θ.1)) entries
+      simp only [NTy.tables, NTy.toSkolem, List.map_flatMap, List.flatMap_map, List.map_append,
+        NTy.tables_toSkolem θ prophecies key, NTy.tables_toSkolem θ prophecies value]
+  | .ref referent, value => by
+      show (@NTy.tables (Carriers.instantiate θ Θ) prophecies (.ref referent)
+          (NTy.toSkolem θ (.ref referent) value)).map (tableSubst θ) =
+        NTy.tables prophecies (.ref (referent.subst θ.1)) value
+      cases prophecies <;>
+        simp only [NTy.tables, NTy.toSkolem, Bool.false_eq_true, ite_false, ite_true,
+          NTy.tables_toSkolem θ _ referent]
+
+theorem HList.tables_toSkolem (θ : TypeArgs) (prophecies : Bool) : (row : NRow) →
+    (values : HList (NRow.subst θ.1 row)) →
+    (@HList.tables (Carriers.instantiate θ Θ) prophecies row (HList.toSkolem θ row values)).map
+        (tableSubst θ) =
+      HList.tables prophecies (NRow.subst θ.1 row) values
+  | .nil, _ => by simp [HList.tables]
+  | .cons τ rest, values => by
+      show (@HList.tables (Carriers.instantiate θ Θ) prophecies (.cons τ rest)
+          (NTy.toSkolem θ τ values.1, HList.toSkolem θ rest values.2)).map (tableSubst θ) =
+        HList.tables prophecies (.cons (τ.subst θ.1) (NRow.subst θ.1 rest)) values
+      simp only [HList.tables, List.map_append, NTy.tables_toSkolem θ prophecies τ values.1,
+        HList.tables_toSkolem θ prophecies rest values.2]
+
+theorem variantCarrier.tables_toSkolem (θ : TypeArgs) (prophecies : Bool) : (names : List String) →
+    (rows : NRows) → (value : variantCarrier names (NRows.subst θ.1 rows)) →
+    (@variantCarrier.tables (Carriers.instantiate θ Θ) prophecies names rows
+        (variantCarrier.toSkolem θ names rows value)).map (tableSubst θ) =
+      variantCarrier.tables prophecies names (NRows.subst θ.1 rows) value
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons fields _, .inl values => by
+      simp only [variantCarrier.toSkolem, variantCarrier.tables,
+        HList.tables_toSkolem θ prophecies fields values]
+  | _ :: names, .cons _ rest, .inr value => by
+      simp only [variantCarrier.toSkolem, variantCarrier.tables]
+      exact variantCarrier.tables_toSkolem θ prophecies names rest value
+end
+
 mutual
 theorem NTy.ofSkolem_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst θ.1).carrier) →
     NTy.ofSkolem θ τ (NTy.toSkolem θ τ value) = value
@@ -4535,6 +6110,13 @@ theorem NTy.ofSkolem_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subs
       apply Array.map_congr_left
       intro value _
       exact NTy.ofSkolem_toSkolem θ element value
+  | .table key value, entries => by
+      simp only [NTy.toSkolem, NTy.ofSkolem, List.map_map]
+      conv => rhs; rw [← List.map_id entries]
+      apply List.map_congr_left
+      intro entry _
+      simp only [Function.comp_apply, NTy.ofSkolem_toSkolem θ key, NTy.ofSkolem_toSkolem θ value,
+        id_eq]
   | .ref referent, value => by
       simp only [NTy.toSkolem, NTy.ofSkolem, NTy.ofSkolem_toSkolem θ referent]
 
@@ -4574,6 +6156,13 @@ theorem NTy.toSkolem_ofSkolem (θ : TypeArgs) : (τ : NTy) →
       apply Array.map_congr_left
       intro value _
       exact NTy.toSkolem_ofSkolem θ element value
+  | .table key value, entries => by
+      simp only [NTy.toSkolem, NTy.ofSkolem, List.map_map]
+      conv => rhs; rw [← List.map_id entries]
+      apply List.map_congr_left
+      intro entry _
+      simp only [Function.comp_apply, NTy.toSkolem_ofSkolem θ key, NTy.toSkolem_ofSkolem θ value,
+        id_eq]
   | .ref referent, value => by
       simp only [NTy.toSkolem, NTy.ofSkolem, NTy.toSkolem_ofSkolem θ referent]
 
@@ -4663,6 +6252,9 @@ theorem NTy.substWith_subst (θ : NRow) (types : Nat → NTy) : (τ : NTy) →
       simp only [NTy.subst, NTy.substWith, NRow.substWith_subst θ types arguments,
         NRows.substWith_subst θ types rows]
   | .vector element => congrArg NTy.vector (NTy.substWith_subst θ types element)
+  | .table key value => by
+      simp only [NTy.subst, NTy.substWith, NTy.substWith_subst θ types key,
+        NTy.substWith_subst θ types value]
   | .ref referent => congrArg NTy.ref (NTy.substWith_subst θ types referent)
   | .function parameters shared results => by
       simp only [NTy.subst, NTy.substWith, NRow.substWith_subst θ types parameters,
@@ -4699,8 +6291,17 @@ class Skolems (unit : outParam Validation.ValidatedUnit) extends Carriers where
   toRuntime_ofRuntime : ∀ τ value, toRuntime τ (ofRuntime τ value) = value
   encode_toRuntime : ∀ τ value,
     @NTy.encode (Carriers.runtime unit) (resolve τ) (toRuntime τ value) = @NTy.encode toCarriers τ value
+  /-- A parameter resolves to a type without map contents, as a type argument
+  is one (`TypeArgs`). -/
+  type_tableFree : ∀ index, (resolve (.param index)).tableFree = true
 
 variable {unit : Validation.ValidatedUnit}
+
+/-- A type without map contents resolves to one. -/
+theorem Skolems.resolve_tableFree (Θ : Skolems unit) {τ : NTy} (plain : τ.tableFree = true) :
+    (Θ.resolve τ).tableFree = true := by
+  rw [Θ.resolve_eq]
+  exact NTy.tableFree_substWith _ Θ.type_tableFree τ plain
 
 /-- The type parameter `index` of a frame at the runtime family.  It names
 the type arguments of an opaque specification function, which nothing else
@@ -4718,6 +6319,7 @@ parameters: the runtime family itself. -/
   ofRuntime_toRuntime := fun _ _ => rfl
   toRuntime_ofRuntime := fun _ _ => rfl
   encode_toRuntime := fun _ _ => rfl
+  type_tableFree := fun _ => rfl
 
 /-- The frame a generic call's type arguments induce: its carriers are the
 arguments' at the caller's family, and its types resolve through the
@@ -4740,6 +6342,8 @@ caller's. -/
     simp only [@NTy.ofSkolem_toSkolem outer.toCarriers θ τ, outer.toRuntime_ofRuntime]
   encode_toRuntime := fun τ value => by
     simp only [outer.encode_toRuntime, @NTy.encode_ofSkolem outer.toCarriers θ τ value]
+  type_tableFree := fun index =>
+    outer.resolve_tableFree (NRow.getD_tableFree θ.1 θ.tableFree index _ rfl)
 
 attribute [vir_denote, vir_denote_norm] Skolems.ofRuntime_toRuntime Skolems.toRuntime_ofRuntime
 
@@ -4770,6 +6374,16 @@ theorem Skolems.type_instantiate (θ : TypeArgs) (Θ : Skolems unit) (index : Na
   Θ.resolve_eq _
 
 theorem Skolems.type_runtime (index : Nat) : (Skolems.runtime unit).type index = .param index := rfl
+
+/-- A frame resolves a constructor's type through its parameters, without
+unfolding a parameter the frame leaves opaque. -/
+@[vir_denote_norm] theorem Skolems.resolve_int (frame : Skolems unit) (width : Nat) (signed : Bool) :
+    frame.resolve (.int width signed) = .int width signed := frame.resolve_eq _
+@[vir_denote_norm] theorem Skolems.resolve_struct (frame : Skolems unit) (owner : StructHandle)
+    (arguments fields : NRow) :
+    frame.resolve (.struct owner arguments fields) =
+      .struct owner (NRow.substWith frame.type arguments) (NRow.substWith frame.type fields) :=
+  frame.resolve_eq _
 
 /-- A frame resolves a type without parameters to itself. -/
 theorem Skolems.resolve_paramFree [Θ : Skolems unit] {τ : NTy} (free : τ.paramFree = true) :
@@ -4805,8 +6419,13 @@ caller's frame at the type's substitution. -/
 attribute [vir_denote] NTy.inhabitant HList.inhabitant variantCarrier.inhabitant
   Carriers.default_instantiate
 -- A variant's transport unfolds: an enum value is taken apart by its
--- variants anyway, and a match reads the variant it holds.
-attribute [vir_denote] variantCarrier.toSkolem NTy.ofSkolem
+-- variants anyway, and a match reads the variant it holds. A table's
+-- transport stays folded, so that the encoding of a transported table meets
+-- the callee's encoding of it (`encodeTransport`), as a vector's does.
+attribute [vir_denote] variantCarrier.toSkolem NTy.ofSkolem_unit NTy.ofSkolem_bool
+  NTy.ofSkolem_int NTy.ofSkolem_address NTy.ofSkolem_signer NTy.ofSkolem_string
+  NTy.ofSkolem_bytes NTy.ofSkolem_param NTy.ofSkolem_tuple NTy.ofSkolem_struct
+  NTy.ofSkolem_enum NTy.ofSkolem_vector NTy.ofSkolem_ref
   HList.ofSkolem variantCarrier.ofSkolem ResultShape.ofSkolem NTy.codec_param NTy.encode_param
   Carriers.codec_instantiate
 
@@ -4834,6 +6453,15 @@ theorem HList.encode_toRuntime : (row : NRow) → (values : HList row) →
           @HList.encode (Carriers.runtime unit) rest.resolved (HList.toRuntime rest values.2) =
         τ.encode values.1 :: HList.encode values.2
       rw [Skolems.encode_toRuntime, HList.encode_toRuntime rest values.2]
+
+/-- A row without map contents resolves to one. -/
+theorem NRow.resolved_tableFree : (row : NRow) → row.tableFree = true →
+    row.resolved.tableFree = true
+  | .nil, _ => rfl
+  | .cons τ rest, plain => by
+      simp only [NRow.tableFree, Bool.and_eq_true] at plain
+      simp only [NRow.resolved, NRow.tableFree, Skolems.resolve_tableFree _ plain.1,
+        NRow.resolved_tableFree rest plain.2, Bool.and_self]
 
 /-- A row without type parameters is its own resolution. -/
 theorem NRow.resolved_paramFree : (row : NRow) → row.paramFree = true → row.resolved = row

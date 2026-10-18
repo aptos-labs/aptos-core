@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "nonlinear_arithm.move"
+verex proofs where
+
 -- Five increasing unsigned integers have product zero, or at least
 -- 1 * 2 * 3 * 4 * 5 = 120. In either case their product cannot be 72.
 verify mul5 by

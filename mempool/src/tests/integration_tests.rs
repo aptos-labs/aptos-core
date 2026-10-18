@@ -18,7 +18,12 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_types::transaction::ReplayProtector;
+use aptos_types::{
+    test_helpers::encrypted_transactions::{
+        encrypted_transaction, non_valid_encrypted_transactions,
+    },
+    transaction::{ReplayProtector, SignedTransaction},
+};
 use once_cell::sync::Lazy;
 use std::time::Duration;
 
@@ -27,6 +32,34 @@ static ALL_TXNS: Lazy<Vec<TestTransaction>> =
     Lazy::new(|| vec![test_transaction(0), test_transaction(1)]);
 static TXN_1: Lazy<Vec<TestTransaction>> = Lazy::new(|| vec![test_transaction(0)]);
 static TXN_2: Lazy<Vec<TestTransaction>> = Lazy::new(|| vec![test_transaction(1)]);
+
+#[tokio::test]
+async fn test_gossip_rejects_non_encrypted_states() {
+    for txn in non_valid_encrypted_transactions() {
+        assert_gossip_rejects(txn).await;
+    }
+}
+
+async fn assert_gossip_rejects(poisoned: SignedTransaction) {
+    let mut node = MempoolTestFrameworkBuilder::single_validator();
+    let (peer, metadata) = vfn_validator_mock_connection(ConnectionOrigin::Inbound, &ALL_PROTOCOLS);
+    node.connect_self(peer.network_id(), metadata);
+    let poisoned_hash = poisoned.committed_hash();
+    // Keep a valid encrypted control in the same gossip message. Rejection
+    // must be per transaction, not a blanket rejection of encrypted gossip.
+    let honest = encrypted_transaction(0, false);
+    node.receive_signed_transactions(ProtocolId::MempoolDirectSend, peer, vec![
+        poisoned,
+        honest.clone(),
+    ])
+    .await;
+    let pool = node.mempool.lock();
+    assert!(
+        pool.get_by_hash(poisoned_hash).is_none(),
+        "Gossip admitted an unsigned decryption state into the validator mempool"
+    );
+    assert!(pool.get_by_hash(honest.committed_hash()).is_some());
+}
 
 fn inbound_node_combinations() -> [(MempoolNode, (PeerNetworkId, ConnectionMetadata)); 6] {
     [

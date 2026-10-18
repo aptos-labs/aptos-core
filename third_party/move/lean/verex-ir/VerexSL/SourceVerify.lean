@@ -3,39 +3,58 @@
 
 import Lean
 import VerexSL
+import VerexSL.Proofs
 
 /-!
 # Verifying a source through its VerexSL rendering
 
-A frontend's validated unit is rendered as VerexSL, written out for
-inspection, and elaborated in this process, which verifies every specified
-function. VerexSL items authored beside a source — a Rust file's
-specifications in its `.spec.lean`, a Move file's proofs in its `.proof.lean`
-— are spliced into the rendered namespace of that source, whose `proof_file`
-pragma names the file.
+A frontend's validated unit is rendered as VerexSL, written out, and
+elaborated in this process, which verifies every specified function. The
+rendering records the sources it was made from (`verex sources at`). Files
+authored beside a source accompany the namespace rendered from it, whose
+`proof_file` pragma names the file:
+
+- a Rust file's specifications, its `.spec.lean`, are VerexSL items of the
+  namespace, spliced into its rendering;
+- a Move file's proofs, its `.proof.lean`, are a Lean file of their own
+  (`VerexSL.Proofs`). The namespace is registered with its verification
+  deferred, and the proof file, elaborated over what its command left,
+  verifies it with the file's items, as the editor elaborates the file.
 
 Every message is reported in the coordinates of the file it came from. A
-position in the spliced items maps line by line to their file.
-Any other position maps through the correspondence between the source's unit
-and the unit elaborated from the rendering: the two are aligned declaration by
-declaration and then node by node while their shapes agree, and a position
-takes the source range of the innermost aligned node around it. A position
-outside every aligned node stays in the generated file.
+message in a proof file is at its own position. A position in spliced items
+maps line by line to their file. Any other position in the rendering maps
+through the correspondence between the source's unit and the unit elaborated
+from the rendering: the two are aligned declaration by declaration and then
+node by node while their shapes agree, and a position takes the source range
+of the innermost aligned node around it. A position outside every aligned node
+stays in the generated file.
 -/
 
 namespace VerexSL.SourceVerify
 
 open Lean VerexIR VerexIR.Validation
 
-/-- The VerexSL items authored beside a source, spliced into the
-namespace rendered from it: its specifications (Rust) or proofs (Move). The
-frontend names the file on the namespace's `proof_file` pragma whether or
-not it exists, so a message asking for a proof can say where to write it. -/
+/-- How a file authored beside a source accompanies its namespace. -/
+inductive CompanionRole where
+  /-- VerexSL items of the namespace, spliced into its rendering: a Rust
+  file's specifications. -/
+  | spliced
+  /-- A proof file verifying the namespace after its registration: a Move
+  file's proofs. -/
+  | proofs
+  deriving BEq
+
+/-- A file authored beside a source, accompanying the namespace rendered from
+it. The frontend names the file on the namespace's `proof_file` pragma
+whether or not it exists, so a message asking for a proof can say where to
+write it. -/
 structure Companion where
   path : System.FilePath
   namespaceId : NamespaceId
-  /-- The file's items; `none` when the file does not exist. -/
+  /-- The file's text; `none` when the file does not exist. -/
   text : Option String := none
+  role : CompanionRole := .spliced
 
 structure Request where
   unit : ValidatedUnit
@@ -304,9 +323,27 @@ private def indentItems (text : String) : String :=
   "\n".intercalate <| (text.splitOn "\n").map fun line =>
     if line.trimAscii.isEmpty then "" else "".pushn ' ' spliceIndent ++ line
 
-/-- The generated file: the prelude, then each namespace followed by the
-items of its companions, with every splice's lines recorded. -/
-private def compose (prelude : String) (order : Array NamespaceId)
+/-- The sources of a unit, each the path its namespaces' tables name. -/
+private def sourceFiles (unit : ValidatedUnit) : Array String :=
+  unit.namespaces.foldl (init := #[]) fun found ns =>
+    ns.tables.files.foldl (init := found) fun found file =>
+      if found.contains file.name then found else found.push file.name
+
+/-- The `verex sources at` command recording the sources a rendering is made
+from, relative to the current directory, with the hashes of their content. -/
+private def sourcesCommand (unit : ValidatedUnit) : IO String := do
+  let directory ← IO.currentDir
+  let mut lines := #[s!"verex sources at {(toString directory).quote}"]
+  for file in sourceFiles unit do
+    let hash ← try some <$> VerexSL.Proofs.contentHash file catch _ => pure none
+    if let some hash := hash then lines := lines.push s!"  {file.quote} {hash}"
+  return "\n".intercalate lines.toList ++ "\n"
+
+/-- The generated file: the prelude, each namespace followed by the items of
+its spliced companions, with every splice's lines recorded, and last the
+record of its sources, which leaves the positions before it as they are
+wherever the rendering is made. -/
+private def compose (prelude sources : String) (order : Array NamespaceId)
     (namespaces : Array String) (companions : Array Companion) : String × Array Splice :=
   Id.run do
     let mut generated := prelude
@@ -315,7 +352,7 @@ private def compose (prelude : String) (order : Array NamespaceId)
       while !generated.endsWith "\n\n" do generated := generated ++ "\n"
       generated := generated ++ rendered ++ "\n"
       for companion in companions do
-        if companion.namespaceId != identity then continue
+        if companion.namespaceId != identity || companion.role != .spliced then continue
         let some text := companion.text | continue
         let items := (indentItems text).trimAsciiEnd.toString
         generated := generated ++ "\n"
@@ -323,33 +360,92 @@ private def compose (prelude : String) (order : Array NamespaceId)
         generated := generated ++ items ++ "\n"
         let lastLine := firstLine + (items.splitOn "\n").length - 1
         splices := splices.push { path := companion.path, firstLine, lastLine }
-    (generated, splices)
+    while !generated.endsWith "\n\n" do generated := generated ++ "\n"
+    (generated ++ sources, splices)
 
-/-- Import `VerexSL` into this process. The executable links the library,
-so its elaborators run natively. -/
-unsafe def importVerexSLUnsafe : IO Environment := do
+/-- Import `modules` into this process, whose executable links them, so
+their elaborators run natively. -/
+unsafe def importModulesUnsafe (modules : Array Name) : IO Environment := do
   enableInitializersExecution
   initSearchPath (← findSysroot)
-  importModules #[{ module := `VerexSL }] {} (trustLevel := 1024) (loadExts := true)
+  importModules (modules.map ({ module := · })) {} (trustLevel := 1024) (loadExts := true)
 
-@[implemented_by importVerexSLUnsafe]
-opaque importVerexSL : IO Environment
+@[implemented_by importModulesUnsafe]
+opaque importLibraries (modules : Array Name) : IO Environment
+
+/-- Import `VerexSL` into this process. -/
+def importVerexSL : IO Environment := importLibraries #[`VerexSL]
+
+/-- An elaborated command: its syntax, its messages, and the state after it. -/
+private structure Elaborated where
+  stx : Syntax
+  messages : Array Message
+  state : Elab.Command.State
+
+/-- Elaborate the commands of an input after its header, as the language
+server does, each with its messages and the state after it. -/
+private partial def elaborateCommands (inputCtx : Parser.InputContext)
+    (parserState : Parser.ModuleParserState) (commandState : Elab.Command.State) :
+    IO (Array Elaborated) := do
+  let first ← Language.Lean.processCommands inputCtx parserState commandState
+  let rec walk (snapshot : Language.Lean.CommandParsedSnapshot) (found : Array Elaborated) :
+      Array Elaborated :=
+    let messages := (Language.toSnapshotTree snapshot.elabSnap).getAll.foldl
+      (fun log node => log ++ node.diagnostics.msgLog) snapshot.diagnostics.msgLog
+    let found := found.push { stx := snapshot.stx, messages := messages.toArray
+                              state := snapshot.elabSnap.resultSnap.get.cmdState }
+    match snapshot.nextCmdSnap? with
+    | some next => walk next.task.get found
+    | none => found
+  return walk first.get #[]
+
+/-- The options both the rendering and its proof files are elaborated with. -/
+private def driverOptions (options : Options) : Options :=
+  -- The driver verifies, as the command line does; only the language server
+  -- skips by default. It reports every message in its own file.
+  let options := if (options.find? `verex.skip_verify).isSome then options
+    else options.setBool `verex.skip_verify false
+  verex.relocateMessages.set options false
 
 /-- Elaborate a rendering whose header imports exactly `VerexSL`, over an
-environment that has imported it. -/
-private def elaborate (environment : Environment) (input fileName : String)
-    (options : Options) : IO (Environment × MessageLog) := do
-  -- The driver verifies, as the command line does; only the language server
-  -- skips by default.
-  let options := if (options.find `verex.skip_verify).isSome then options
-    else options.setBool `verex.skip_verify false
+environment that has imported it: its commands. -/
+private def elaborateRendering (environment : Environment) (input fileName : String)
+    (options : Options) : IO (Array Message × Array Elaborated) := do
   let inputCtx := Parser.mkInputContext input fileName
   let (header, parserState, messages) ← Parser.parseHeader inputCtx
   unless (Elab.headerToImports header (includeInit := false)).map (·.module) == #[`VerexSL] do
     throw <| IO.userError "a VerexSL rendering imports exactly `VerexSL`"
-  let state ← Elab.IO.processCommands inputCtx parserState
-    (Elab.Command.mkState environment messages options)
-  pure (state.commandState.env, state.commandState.messages)
+  let commands ← elaborateCommands inputCtx parserState
+    (Elab.Command.mkState environment {} (driverOptions options))
+  pure (messages.toArray, commands)
+
+/-- Elaborate a proof file over the state its module's command left: its
+messages. Its imports must be loaded already, and it holds its header and
+`verex proofs where`, which verifies the module. -/
+private def elaborateProofFile (state : Elab.Command.State) (companion : Companion) (text : String)
+    (module : Name) (options : Options) : IO (Array Message) := do
+  let fileName := companion.path.toString
+  let inputCtx := Parser.mkInputContext text fileName
+  let (header, parserState, messages) ← Parser.parseHeader inputCtx
+  let atStart (data : MessageData) : Message :=
+    { fileName, pos := ⟨1, 0⟩, severity := .error, data }
+  for import_ in Elab.headerToImports header (includeInit := false) do
+    if (state.env.getModuleIdx? import_.module).isNone then
+      return messages.toArray.push <| atStart m!"a proof file imports only what the \
+        verification of its source loads, which `{import_.module}` is not"
+  let commands ← elaborateCommands inputCtx parserState
+    (Elab.Command.mkState state.env {} (driverOptions options))
+  let messages := commands.foldl (init := messages.toArray) (· ++ ·.messages)
+  let items := commands.filter (!Parser.isTerminalCommand ·.stx)
+  unless items.size == 2 && (items[1]?.any (·.stx.isOfKind ``VerexSL.Proofs.verexProofsCommand)) do
+    return messages.push <| atStart m!"a proof file holds its header, then `verex proofs where` \
+      and the items it verifies"
+  -- `verex proofs where` verifies the module, or reports why it does not.
+  let verified := commands.back?.any fun last =>
+    ((VerexSL.Verify.deferredModules last.state.env).find? module).any (·.verified)
+  unless verified || messages.any (·.severity == .error) do
+    return messages.push <| atStart m!"`verex proofs where` does not verify `{module}`"
+  return messages
 
 /-- The unit's owned namespaces, each after the owned namespaces it uses. -/
 private def dependencyOrder (unit : ValidatedUnit) : Except String (Array NamespaceId) := do
@@ -397,7 +493,8 @@ private def environmentOptions (options : Options) : IO Options := do
     | _ => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` is not a Bool, Nat, or String option"
 
 /-- Render, write, and elaborate a unit, and report every message in the
-coordinates of its source. -/
+coordinates of its source. The environment has imported `VerexSL` and what
+the proof files import. -/
 def run (environment : Environment) (request : Request) : IO (Array Report) := do
   let cache ← IO.mkRef ({} : Std.HashMap String (Option FileMap))
   let rendered ← Perf.withPhase .render do
@@ -406,7 +503,9 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
       | .error message => throw <| IO.userError message
     match Print.renderNamespaceParts environment request.unit order with
     | .ok (prelude, namespaces) =>
-        let (generated, splices) := compose prelude order namespaces request.companions
+        let (generated, splices) :=
+          compose prelude (← sourcesCommand request.unit) order namespaces request.companions
+        if let some parent := request.output.parent then IO.FS.createDirAll parent
         IO.FS.writeFile request.output generated
         pure (Except.ok (generated, splices))
     | .error error => pure (Except.error error)
@@ -429,7 +528,23 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
     | none => {}
   let options := if request.ignoreProofs then verex.ignoreProofs.set options true else options
   let options ← environmentOptions options
-  let (elaborated, messages) ← elaborate environment generated generatedName options
+  -- A namespace with a proof file is verified by it.
+  let proofFiles := request.companions.filter fun companion =>
+    companion.role == .proofs && companion.text.isSome
+  let environment := VerexSL.Verify.setDeferral environment
+    (.proofFiles (proofFiles.map (·.path.toString)))
+  let (headerMessages, commands) ← elaborateRendering environment generated generatedName options
+  let mut messages := headerMessages
+  let mut deferred : NameSet := {}
+  for command in commands do
+    messages := messages ++ command.messages
+    for (name, module) in (VerexSL.Verify.deferredModules command.state.env).toList do
+      if deferred.contains name then continue
+      deferred := deferred.insert name
+      let some companion := proofFiles.find? (some ·.path.toString == module.proofFile) | continue
+      let some text := companion.text | continue
+      messages := messages ++ (← elaborateProofFile command.state companion text name options)
+  let elaborated := commands.back?.map (·.state.env) |>.getD environment
   -- Each elaborated namespace aligns with the source namespace at its path.
   let entries := (moduleUnits elaborated).toArray.flatMap fun (_, unit) =>
     unit.namespaces.flatMap fun generatedNs =>
@@ -438,9 +553,15 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
       | none => #[]
   let generatedMap := FileMap.ofString generated
   let mut reports := #[]
-  for message in messages.toList do
+  for message in messages do
     if message.isSilent then continue
     let text ← message.data.toString
+    -- A message in another file, a proof file, is at its own position.
+    if message.fileName != generatedName then
+      reports := reports.push {
+        file := message.fileName, line := message.pos.line, column := message.pos.column + 1
+        severity := message.severity, text }
+      continue
     let spliced := splices.find? fun splice =>
       splice.firstLine ≤ message.pos.line && message.pos.line ≤ splice.lastLine
     let report ← match spliced with

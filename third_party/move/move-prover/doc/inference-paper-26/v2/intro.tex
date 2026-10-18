@@ -2,35 +2,47 @@
 \Section{Introduction}
 \label{sec:intro}
 
-A roadblock to the adoption of program verification is the \emph{cost of specification}.
-The properties developers care about are high-level --- a call chain aborts only under stated preconditions, an entrypoint satisfies its postconditions, stored data respects an invariant --- but to prove any of them, the supporting functions need contracts of their own, and those are often boilerplate, as they restate what the code does.
-\emph{Specification inference} derives such contracts from the program, so that effort can go to the properties worth stating by hand.
-The classical engine for mechanical inference is Dijkstra's weakest-precondition transformation (\WP)~\cite{dijkstra1975wp}: propagated backward through a function, it yields the exact abort condition and the exact postcondition. However, it depends on loop invariants to provide an induction hypothesis~\cite{BL05}, and despite a long history of research~\cite{CousotHalbwachs78}, there is no complete technique for synthesizing them.
+A roadblock to the adoption of program verification is the \emph{cost of manual specification}.
+Developers care about high-level properties, e.g., that a call chain aborts only under stated preconditions, an entrypoint satisfies its postconditions, stored data respects an invariant.
+But to prove any of them, the supporting functions need their own contracts, which are often boilerplate, as they restate what the code does.
+\emph{Specification inference} derives such contracts from the program automatically, so that developers instead spend effort on the properties worth stating manually.
+The classical engine for mechanical inference is Dijkstra's weakest-precondition analysis (\WP)~\cite{dijkstra1975wp}: propagated backward through a function, it yields the exact abort condition and the exact postcondition. However, it depends on loop invariants to provide an induction hypothesis~\cite{BL05}, and despite a long history of research~\cite{CousotHalbwachs78}, there is no complete technique for synthesizing them.
 
-This paper describes a novel combination of agentic specification inference, as studied, e.g., in~\cite{VeriStruct26,MSG25}, and weakest-precondition transformation.
-The agent conducts the inference, supplies loop invariants, and calls \WP and the verifier as tools.
-The approach is implemented for the Move smart contract language, which is similar to Rust. Move has strong verification support through the Move Prover (\MVP)~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
-Move shares its reference semantics with safe Rust and is therefore amenable to reference elimination, which the Move Prover has applied since its beginning~\cite{DillGPQXZ22}.
-On reference-eliminated Move bytecode, we run classical \WP and map Move's references into the predicate calculus of the specification language.
-Moreover, \emph{behavioral predicates}~\cite{GrieskampEtAl26HO}, which let a specification refer to the contract of another function as a black box, make \WP fully modular.
+This paper describes a novel combination of agentic specification inference and mechanical weakest-precondition analysis.
+An LLM agent conducts the inference, supplies loop invariants, and calls \WP and the verifier as tools.
+The approach is implemented for the Move smart contract language, which is similar to safe Rust, especially in its reference semantics.
+Move has strong verification support through the Move Prover (\MVP)~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
+Due to Move's reference semantics, \MVP can eliminate references~\cite{DillGPQXZ22}.
+We run classical \WP on the reference-eliminated Move bytecode and restate its result in the predicate calculus of the specification language, over the original references.
+\WP is fully modular because of \emph{behavioral predicates}~\cite{GrieskampEtAl26HO}, which let a specification refer to the contract of another function as a black box.
 
-We evaluate the combination on a corpus of 26 inference problems.
-Twenty-four of them are extracted from public Move code of the Aptos framework that has no specification: a model may have seen the code during training, but it cannot recall a specification that was never written.
-We compare three tactics, one without the \WP tool and two with it, under two models of one family, the frontier model Sol~5.6 and the mid-tier model Terra~5.6, and check completeness with withheld mutants.
-Without the \WP tool, the agent already does well: it completes 99\% of its runs under the frontier model and 93\% under the mid-tier model.
-With \WP, the cost drops by 11--21\% at about the same completeness.
-The saving comes from the targets without loops, where \WP derives the complete contract and the hybrid tactics cost 36--60\% of the agent alone; on loop targets, where the agent still has to find the invariant, they cost 9--22\% more.
-The mid-tier model costs 53--59\% of the frontier model, close to the ratio of their prices, and falls behind it mainly on the one target whose contract needs a permutation argument proved with lemmas; with \WP, it completes 97 of 104 runs at 46\% of what the frontier model spends without it.
+We evaluate our combination on a corpus of 26 inference targets.
+Twenty-four of these targets are extracted from public Move code of the Aptos framework.
+These have no prior specifications: a model may have seen this code during training, but it cannot recall a specification that did not exist.
+We compare three tactics:
+\textit{agent-only}, in which the agent works without the \WP tool;
+\textit{hybrid-guided}, in which it follows a prescribed workflow that starts with \WP;
+and \textit{hybrid-flexible}, in which it decides itself whether and when to call \WP.
+We run each tactic under two models of one family, the frontier model Sol~5.6 and the mid-tier model Terra~5.6.
+Completeness is checked with withheld mutants.
+
+Agent-only already does well: it completes 99\% of its runs under the frontier model and 93\% under the mid-tier model.
+The two hybrid tactics reach about the same completeness at 11--21\% lower cost.
+The saving comes from the targets without loops, where \WP derives the complete contract, and thus the hybrids cost 36--60\% of agent-only.
+On the loop targets, the agent still has to find the invariants, and the quantified \WP output adds to the context it re-reads on every turn, so the hybrids cost 9--22\% more on average.
+The mid-tier model costs 53--59\% as much as the frontier model.
+It falls behind mainly on one target, whose contract needs a permutation argument proved with lemmas.
+Under hybrid-guided, the mid-tier model completes 97 of 104 runs; the frontier model under agent-only completes 103 but costs more than twice as much.
 
 \Paragraph{Contributions}
-The paper makes the following contributions.
+Our paper makes the following contributions:
 \begin{Itemize}
-\item A \WP analysis over reference-eliminated bytecode, whose derived conditions are carried back to the references and global resources of the source, with state labels naming the intermediate memories of a function (Sec.~\ref{sec:wp}).
-\item Diagnostics designed for an agent rather than a solver: loop-invariant evidence from bounded unrolling, and markers for conditions that are hard to satisfy or incomplete because of a callee (Sec.~\ref{sec:diagnostics}).
-\item The combination of this analysis with a coding agent, as a plugin of skills, hooks, and tools in which the agent supplies what \WP cannot (Secs.~\ref{sec:example} and~\ref{sec:skills}).
-\item An evaluation on 26 targets from real-world code, whose completeness is scored with withheld mutants rather than by the agent or the authors, under three tactics and two models (Sec.~\ref{sec:evaluation}).
+\item A \WP analysis over reference-eliminated Move bytecode, whose derived conditions are carried back to the references and global resources of the source, with state labels naming the intermediate memories of a function (\S~\ref{sec:wp}).
+\item \WP output designed to be read by an agent rather than passed to a solver: loop-invariant evidence from bounded unrolling, and markers for conditions that are expensive for the solver or incomplete because a callee lacks a contract (\S~\ref{sec:diagnostics}).
+\item The combination of the \WP analysis with a coding agent, delivered as a plugin of skills, hooks, and tools, in which the agent supplies what \WP cannot (\S\S~\ref{sec:example} and~\ref{sec:skills}).
+\item An evaluation on 26 targets, mostly from real-world code, under three tactics and two models, in which an inferred contract counts as complete only if it kills every withheld mutant (\S~\ref{sec:evaluation}).
 \end{Itemize}
 
-The Move Prover was developed for the Diem project and has \Anon{been maintained by Aptos Labs since 2022}{since been maintained by a blockchain company}; it has verified Diem's payment system and critical components of \Anon{the Aptos blockchain}{a public blockchain}~\cite{ParkZGXGCLC24,AptosFrameworkBook}.
+The Move Prover was developed for the Diem project\Anon{ and has been maintained by Aptos Labs since 2022; it}{ and} has verified Diem's payment system and critical components of the Aptos blockchain~\cite{ParkZGXGCLC24,AptosFrameworkBook}.
 
 \endinput

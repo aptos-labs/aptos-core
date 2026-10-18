@@ -3,9 +3,10 @@
 
 import VerexE2ETests.CheckSupport
 
-/-! Read-only Table roles are explicit intrinsic-contract assumptions. Their
-contents come from the selected memory, including nested Tables and caller-side
-contracts; no synthetic entry field is added to the physical Table. -/
+/-! Read-only Table roles are explicit intrinsic-contract assumptions over a
+table's owned contents, including through caller-side contracts. A nested
+table is read through a role at a table-bearing type argument, which the
+denotation does not carry (`designs/intrinsic-maps.md`, "Stages"). -/
 
 verex module 0x42::table_reads where
   @[intrinsic_map]
@@ -55,11 +56,11 @@ verex module 0x42::table_reads where
   public fun nested(t : &Table<u64, Table<u64, u64> >, outer : u64, inner : u64) -> u64 :=
     *borrow(borrow(t, outer), inner)
   spec nested where
+    pragma verify = false
     requires has(t, outer)
     requires has(get(t, outer), inner)
     aborts_if false
     ensures result == get(get(t, outer), inner)
-  verify nested
 
   struct Transaction has Copy, Drop, Store where
     payload : Vector<Vector<u8> >
@@ -89,6 +90,12 @@ verex module 0x42::table_reads where
     requires has(t, k)
     aborts_if false
     ensures result != get(t, k)
+
+/--
+error: no denotation for `nested`: a type argument holding a map's contents is not carried by the denotation
+-/
+#guard_msgs in
+verify 0x42::table_reads::nested
 
 /--
 error: the specification clause `ensures result != get(t, k)` is not established

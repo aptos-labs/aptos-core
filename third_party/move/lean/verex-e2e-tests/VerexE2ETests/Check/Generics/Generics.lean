@@ -221,15 +221,17 @@ example {unit : Validation.ValidatedUnit} (executable : Validation.ExecutableUni
     Admissible, lendArguments, NRow.subst, NTy.subst, NRow.getD, NRow.lend, NTy.lend, NTy.encode,
     NTy.codec]
   constructor
-  · rintro ⟨⟨loans, ⟨raw, _⟩, ⟨-, -, fresh⟩, lent⟩, encoded, -⟩
+  · rintro ⟨⟨memory, loans, ⟨raw, _⟩, ⟨-, -, fresh⟩, lent, ⟨stores, -⟩⟩, -⟩
     cases loans with
     | nil =>
         simp at lent
-        exact ⟨fresh, lent ▸ raw.property, encoded⟩
+        exact ⟨fresh, lent ▸ raw.property, memory, stores⟩
     | cons => simp at lent
-  · rintro ⟨fresh, plain, encoded⟩
-    exact ⟨⟨[], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, rfl⟩, encoded,
+  · rintro ⟨fresh, plain, memory, encoded⟩
+    refine ⟨⟨memory, [], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, rfl, ?_⟩,
       fun _ _ _ _ _ => trivial⟩
+    refine @Encloses.mk _ ?_ _ _ _ encoded fun table member => ?_
+    simp [HList.tables, NTy.tables] at member
 
 -- A generic function's public theorem holds of its runs at the instantiation a
 -- call at type arguments gives it, coherent by evaluation with the frame

@@ -49,6 +49,18 @@ relative to `tests/sources`.
 
 ## Summary
 
+Tables as owned values (2026-10-13): a table owner's value holds its
+entries, and every executable and specification role is available for table
+layouts ([`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table values").
+`bitwise_table` and `bitwise_table_mixed_instances` verify; `verify_table`
+and `data_invariant_in_map` fail the functions the Prover fails;
+`vector_theory_*::f2` reaches its clauses, where the Prover's run is
+rejected by Boogie. `mut_ref::call_return_ref_different_path_vec2`
+verifies, as appends of literal vectors are folded; a cut's hypothesis is
+normalized again after the substitutions that fix its values, so
+`call_return_ref_different_path_vec2_incorrect` fails at the mutation end
+only, as in the Prover.
+
 Budget (2026-10-12): the registry runs with the verifier's default budget,
 1000 thousand `maxHeartbeats` (about thirty seconds), instead of 25
 thousand. Nineteen functions that exhausted the old budget verify, and five
@@ -1118,11 +1130,10 @@ Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/clo
 
 ### V6. Construct not carried by the denotation
 
-7 tests, 11 messages.
+5 tests, 7 messages.
 
 Messages:
 
-- 4 × `` no denotation for the callee `…`: reference operation is not carried by the denotation ``
 - 1 × `` no denotation for `…`: a literal of this type is not carried by the denotation ``
 - 2 × `` no denotation for `…`: a closure whose rows are not its target's is not carried by the denotation ``
 - 4 × `` no denotation for `…`: a type argument without values is not carried by the denotation ``
@@ -1142,7 +1153,7 @@ Example (`functional/type_reflection.move:71`):
 no denotation for `test_type_info_symbolic`: a literal of this type is not carried by the denotation
 ```
 
-Tests: `functional/bitwise_table.move`, `functional/verify_table.move`, `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `functional/type_reflection.move`, `regression/fun_type_arity_injectivity.move`.
+Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `functional/type_reflection.move`, `regression/fun_type_arity_injectivity.move`.
 
 ### V7. Intrinsic map representation not carried
 
@@ -1202,16 +1213,7 @@ Tests: `functional/closures/behavioral_results.move`, `functional/closures/inlin
 
 ### V16. Native without specification or prelude model
 
-11 tests, 50 messages.
-
-In `bitwise_table`, `bitwise_table_mixed_instances` and `verify_table` the
-natives are those behind `extensions::table`, the test driver's
-`move-table-extension` dependency (`Table.spec.move` declares the map and its
-roles, and the export carries them). A handle-backed table carries only its
-read roles, `map_borrow` and `map_has_key` (`Contract.mapRoleOf?`); its
-allocating and mutating roles (`new`, `add`, `remove`, `length`) are disabled
-until stage 2 of [`intrinsic-maps.md`](intrinsic-maps.md), so a caller enters
-their bodies and meets the natives.
+5 tests, 31 messages.
 
 Example (`functional/type_reflection.move:80`):
 
@@ -1219,7 +1221,7 @@ Example (`functional/type_reflection.move:80`):
 `test_type_info_ignores_type_param` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
 ```
 
-Tests: `functional/bitwise_table.move`, `functional/bitwise_table_mixed_instances.move`, `functional/closures/inline/bp_invariant_weakening_scope.move`, `functional/data_invariant_in_map.move`, `functional/intrinsic_map_insertion_order.move`, `functional/type_reflection.move`, `functional/type_reflection_ext.move`, `functional/verify_table.move`, `regression/type_reflection_runtime_names.move`, `regression/vector_theory_boogie_array_intern.move`, `regression/vector_theory_smt_seq.move`.
+Tests: `functional/closures/inline/bp_invariant_weakening_scope.move`, `functional/intrinsic_map_insertion_order.move`, `functional/type_reflection.move`, `functional/type_reflection_ext.move`, `regression/type_reflection_runtime_names.move`.
 
 ### V18. Recursion through an unspecified function
 
@@ -1402,15 +1404,14 @@ with the same type or prophecy value would be unsound.
 | `functional/inline_fun.move` | `test_filter` |
 | `functional/math8.move` | `pow`, `floor_log2`, `sqrt` (budget) |
 | `functional/math_fixed8.move` | `pow_raw` (budget), `exp_raw` |
-| `functional/mut_ref.move` | `call_return_ref_different_path_vec2` |
 | `functional/specs_in_fun_ref.move` | `simple7` |
 | `functional/state_labels/unmodified_memory_at_label.move` | `swap` (a read after removal; Boogie retains absent resource contents) |
 | `functional/verify_vector.move` | `verify_reverse`, `verify_reverse_with_unroll`, `verify_append`, `verify_append_with_unroll`, `verify_index_of_with_unroll`, `verify_contains_with_unroll`, `verify_remove`, `verify_remove_with_unroll` |
 | `regression/behavior_axiom_target_field.move` | `same_type_quantified`, `fun_inst` (unsupported quantified field-validity domain; V25) |
 | `regression/generic_aliasing_all_partitions.move` | `true_in_every_case`, `never_alias` |
 | `regression/performance_200511.move` | `fresh_guid`, `new_event_handle_impl` |
-| `regression/vector_theory_boogie_array_intern.move` | `f1` |
-| `regression/vector_theory_smt_seq.move` | `f1` |
+| `regression/vector_theory_boogie_array_intern.move` | `f1`, `f2` |
+| `regression/vector_theory_smt_seq.move` | `f1`, `f2` |
 
 The functions are marked as follows:
 

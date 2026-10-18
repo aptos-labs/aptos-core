@@ -2,10 +2,10 @@
 \Section{Evaluation}
 \label{sec:evaluation}
 
-The evaluation asks what the mechanical component adds to an agent, in completeness and in cost, and whether it changes which model is needed.
-\emph{Arm against arm} (Sec.~\ref{sec:eval-arms}) holds the model fixed and varies the tactic: \textit{agent-only}, \textit{hybrid-guided}, and \textit{hybrid-flexible}, run under the same conditions.
-\emph{Model against model} (Sec.~\ref{sec:eval-models}) repeats the design under a frontier model and a mid-tier model of the same family and asks whether, with \WP, the cheaper model reaches the results of the frontier model.
-Both rounds share the corpus, the protocol, the scoring, and the cost accounting described first.
+The evaluation addresses three research questions: does adding \WP to an agent change the completeness of the inferred contracts (RQ1), does it lower the cost of inference, and on which targets (RQ2), and with \WP, does a cheaper mid-tier model match the results of a frontier model (RQ3)?
+\S~\ref{sec:eval-arms} answers RQ1 and RQ2 by holding the model fixed and comparing the three tactics, \textit{agent-only}, \textit{hybrid-guided}, and \textit{hybrid-flexible}, under the same conditions.
+\S~\ref{sec:eval-models} answers RQ3 by repeating the comparison under a frontier model and a mid-tier model of the same family.
+Both comparisons share the corpus, the protocol, the scoring, and the cost accounting described next.
 
 \SubSection{Setup}
 \label{sec:eval-setup}
@@ -17,17 +17,19 @@ The other two are written for the corpus.
 Function bodies are copied unchanged except for a few reductions documented in the module headers, and the package includes everything the targets depend on.
 No target has a specification upstream.
 Thirteen targets have a loop that needs an invariant.
-Each target has a hand-written reference specification that verifies within 20 seconds, and six \emph{mutants} in two disjoint sets of three: patches to the implementation, one per obligation the contract has to pin, each shown to be killed by the reference.
-A task starts from the package with the reference contracts of every function the target calls; the contracts of the target and of all other functions are withheld, since a caller's contract can restate what the target does.
-With 3 arms and 4 replicates, a model round has \textbf{312 cells}.
+Each target has a hand-written reference specification that verifies within 20 seconds, and six \emph{mutants}: patches to the implementation, each violating one obligation the contract must capture, and each shown to be killed by the reference.
+Each inference run starts from the package with the reference contracts of every function the target calls; the contracts of the target and of all other functions are withheld, since a caller's contract can restate what the target does.
 
-\Paragraph{Arms and models}
-The three tactics of Sec.~\ref{sec:skills} run as arms that differ only in the rendered plugin: the reference material is byte-identical, and in agent-only the \WP tool is absent rather than discouraged.
-Two rounds use two models of one family through the same runtime, the Codex CLI at high effort: Sol~5.6, the frontier model, and Terra~5.6, the mid-tier model, priced at about half of Sol's list price.
+\Paragraph{Tactics, models, and cells}
+The three tactics of \S~\ref{sec:skills} differ only in the rendered plugin: the reference material is byte-identical, and in agent-only the \WP tool is absent rather than discouraged.
+We run them under two models of one family through the same runtime, the Codex CLI at high effort: Sol~5.6, the frontier model, and Terra~5.6, the mid-tier model, priced at about half of Sol's list price.
+A \emph{cell} is one run of one tactic on one target; a \emph{round} is the set of cells of one model.
+With 26 targets, 3 tactics, and 4 replicates, each round has 312 cells.
 Each session has a budget of 100k output tokens, one hour of wall time, and 40 seconds of solver time per verification condition.
 
 \Paragraph{Scoring}
-A cell reaches \emph{operational success} when a judge outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present (|pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions), the bytecode is unchanged, and the required contract categories are present.
+A cell reaches \emph{operational success} when a fresh checker process outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present (|pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions), the bytecode is unchanged, edits stay within the allowed scope, and the required contract categories are present.
+The agent can run the same check on a candidate contract during the session (a \emph{candidate check}); a check is rejected when one of these criteria fails.
 The agent's own claim is never a score, and the agent receives only this acceptance feedback: the mutants are withheld until generation has ended, and a contract is never handed back for strengthening.
 Operational success is necessary but weak: a vaguer contract passes it more easily.
 Completeness, postconditions as strong as the behavior, has no deductive check in general; \WP guarantees it only given complete loop invariants and callee contracts.
@@ -39,17 +41,17 @@ All 624 cells reached operational success, so the outcome of a cell is decided b
 Costs are in US dollars at each model's published list prices, computed from the recorded token counters of every model request; startup requests that do no task work are excluded.
 Per million tokens, Sol~5.6 is \$4 uncached input, \$0.40 cached input, and \$20 output; Terra~5.6 is \$2, \$0.20, and \$12.
 Thinking counts as output for both.
-Means are task-weighted, and the 95\% intervals are percentile bootstraps over the 26 tasks (10,000 resamples).
-Differences in completeness are tested with the preregistered blocked randomization tests of the round analysis, Holm-adjusted.
+Means are taken first over the four replicates of a target and then over targets, and the 95\% intervals are percentile bootstraps over the 26 targets (10,000 resamples).
+Differences in completeness are tested for two preregistered contrasts, hybrid-flexible against agent-only and hybrid-guided against hybrid-flexible, with randomization tests blocked by target and replicate and Holm-adjusted across the two.
 
-\SubSection{Arm against Arm}
+\SubSection{Comparison of Tactics (RQ1, RQ2)}
 \label{sec:eval-arms}
 
 Table~\ref{tab:summary} summarizes both rounds, Fig.~\ref{fig:cells} shows every cell, and Tables~\ref{tab:sol} and~\ref{tab:terra} in the appendix give every target.
 
 \begin{table}[t]
 \centering
-\caption{Both rounds, per arm: mean cost in US dollars per cell, the hybrid/agent-only cost ratio with its 95\% bootstrap interval, complete, failed, and unmeasured cells, the share of cells whose first candidate check was accepted, mean input/output tokens in thousands, and mean wall time per cell in seconds.}
+\caption{Both rounds, per tactic: mean cost in US dollars per cell, the hybrid/agent-only cost ratio with its 95\% bootstrap interval, complete, failed, and unmeasured cells, the share of cells whose first candidate check was accepted, mean input/output tokens in thousands, and mean wall time per cell in seconds.}
 \label{tab:summary}
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}
@@ -97,25 +99,25 @@ Table~\ref{tab:summary} summarizes both rounds, Fig.~\ref{fig:cells} shows every
 \label{fig:cells}
 \end{figure}
 
-\Paragraph{Cost}
-Under both models the hybrids cost less than agent-only: 0.86$\times$ and 0.87$\times$ under Sol~5.6 and 0.79$\times$ and 0.89$\times$ under Terra~5.6 (hybrid-guided, hybrid-flexible).
-Over all targets, only the interval of Sol's hybrid-flexible excludes parity, but the targets split into two clear groups.
-On the 13 targets without a loop that needs an invariant, \WP derives the complete contract and the agent only has to check it: the hybrids cost 0.36--0.60$\times$ agent-only, and every interval lies below 0.75.
-On the 13 loop targets they cost 1.09--1.22$\times$: the agent still has to find the invariant, and the quantified \WP output adds to the context it re-reads on every turn --- on these targets the hybrids read 1.2--1.4$\times$ the input of agent-only (415--513k against 357--385k tokens per cell), on the loop-free ones 0.25--0.45$\times$.
-Overall the hybrids read less input than agent-only (288k and 280k against 333k tokens per cell under Sol~5.6, 289k and 335k against 367k under Terra~5.6) and write less output.
-
-\Paragraph{Completeness}
+\Paragraph{RQ1: Completeness}
 Measured completeness is about the same under all three tactics: agent-only completes 103 of 104 cells under Sol~5.6 and 97 under Terra~5.6, the hybrids 98 and 98, and 97 and 98, and under both models both preregistered contrasts have Holm $p = 1.00$.
 This is what one would expect: the loop invariants and specification helpers that decide the hard targets have to be found by the agent under every tactic.
 All failures but one Terra~5.6 agent-only cell occur on three loop targets.
-|partition|, an in-place partition, is the one target whose contract needs a permutation argument proved with lemmas; it fails in every arm, and in every failure a mutant that overwrites an element instead of swapping it survives: the contract does not state that the result is a rearrangement of the input.
+|partition|, an in-place partition, is the one target whose contract needs a permutation argument proved with lemmas; it fails under every tactic, and in every failure a mutant that overwrites an element instead of swapping it survives: the contract does not state that the result is a rearrangement of the input.
 On the two scans |upsert_provider_jwks| and |cancel_at_price_level|, which leave the loop early, only hybrid cells fail (5 under Sol~5.6, 6 under Terra~5.6): the agent added invariants for the scanned prefix, accepted the quantified contract that \WP derived from them once it verified, and a withheld mutant on the exit path survived.
 The hybrids do improve the first attempt: the share of cells whose first candidate check is accepted rises from 62\% to 68--71\% under Sol~5.6 and from 37\% to 63--65\% under Terra~5.6, and rejected checks drop from 66 to 40--60 and from 117 to 66--82.
 
-\SubSection{Model against Model}
+\Paragraph{RQ2: Cost}
+Under both models the hybrids cost less than agent-only: 0.86$\times$ and 0.87$\times$ under Sol~5.6 and 0.79$\times$ and 0.89$\times$ under Terra~5.6 (hybrid-guided, hybrid-flexible).
+Over all targets, only the interval of Sol's hybrid-flexible excludes parity, but the targets split into two clear groups.
+On the 13 targets without a loop that needs an invariant, \WP derives the complete contract and the agent only has to check it: the hybrids cost 0.36--0.60$\times$ agent-only, and every interval lies below 0.75.
+On the 13 loop targets they cost 1.09--1.22$\times$: the agent still has to find the invariant, and the quantified \WP output adds to the context it re-reads on every turn --- on these targets the hybrids read 1.2--1.4$\times$ the input of agent-only (415--513k against 357--385k tokens per cell), on the loop-free ones 0.24--0.47$\times$.
+Overall the hybrids read less input than agent-only (288k and 280k against 333k tokens per cell under Sol~5.6, 289k and 335k against 367k under Terra~5.6) and write less output.
+
+\SubSection{Comparison of Models (RQ3)}
 \label{sec:eval-models}
 
-Terra~5.6 costs 0.57$\times$ Sol~5.6 under agent-only and 0.53$\times$ and 0.59$\times$ under the hybrids, with all intervals within [0.45, 0.65], and it is cheaper on 25 or 26 of the 26 targets in every arm.
+Terra~5.6 costs 0.57$\times$ Sol~5.6 under agent-only and 0.53$\times$ and 0.59$\times$ under the hybrids, with all intervals within [0.45, 0.65], and it is cheaper on 25 or 26 of the 26 targets under every tactic.
 These ratios are close to the price ratio of 0.5 for input and 0.6 for output: the two models spend about the same number of tokens per cell, Terra~5.6 up to a fifth more input, and Terra~5.6 is slower (143--153 against 115--126 seconds).
 Completeness differs on one target.
 Outside |partition|, Terra~5.6 fails one agent-only cell and, under the hybrids, the same two scans as Sol~5.6; on the partition it fails 10 of 12 cells, Sol~5.6 3 of 12.

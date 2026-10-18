@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "amm_example.move"
+verex proofs where
+
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
 verify constant_product by

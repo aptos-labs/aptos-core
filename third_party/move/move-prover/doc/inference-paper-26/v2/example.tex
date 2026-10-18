@@ -2,12 +2,15 @@
 \Section{Hybrid Inference by Example}
 \label{sec:example}
 
-Hybrid inference combines two sources of specifications: the mechanical \WP analysis of Sec.~\ref{sec:wp}, which derives exact contracts but needs loop invariants to do so, and a coding agent, which supplies the loop invariants and whatever else the analysis cannot derive, and repairs the specification based on verifier feedback.
-The prover is connected to the agent through a Model Context Protocol (MCP) service that offers a tool for verification and a tool for \WP inference, and the agent carries a set of skills describing the language, the tools, and the workflow (Sec.~\ref{sec:skills}).
-We walk through one session; the example is written in Move but should be readable without knowing the language~\cite{MoveOnAptosBook}.
+Hybrid inference combines two sources of specifications.
+The mechanical \WP analysis (\S~\ref{sec:wp}) derives exact contracts but needs loop invariants for code with loops.
+The coding agent supplies those invariants and anything else the analysis cannot derive, and it repairs the specification based on verifier feedback.
+The prover is connected to the agent through a Model Context Protocol (MCP) service that offers a tool for verification and a tool for \WP inference. 
+The agent carries a set of skills describing the Move language, the tools, and the workflow (\S~\ref{sec:skills}).
+We walk through one session; the example is written in Move~\cite{MoveOnAptosBook}.
 
 \label{sec:pow}
-The example computes the power $\mathit{base}^{\mathit{exp}}$ iteratively:
+The example function below computes the power $\mathit{base}^{\mathit{exp}}$ iteratively:
 
 \begin{MoveBoxUser}
   fun pow(base: u64, exp: u64): u64 {
@@ -66,7 +69,7 @@ It then calls the verification tool to check whether the invariant verifies:
 In the next turn the agent runs the \WP tool again.
 With the loop invariant present, \WP derives the complete specification.
 However, it marks the abort condition as |sathard|. The marker is set when a derived condition is exact but its satisfiability is expected to be hard for the solver --- here because of the existential quantifier, which states that the computation aborts if the multiplication overflows in some iteration |y|.
-The specification language of the Move Prover uses unbounded integers, |num|, which makes it possible to state overflow of the program's |u64| values:
+The specification language of the Move Prover uses unbounded integers (|num|), so it can express the overflow of the program's |u64| values:
 
 \begin{MoveBoxTool}{wp}
   spec pow { // post and aborts condition for pow
@@ -79,7 +82,8 @@ The specification language of the Move Prover uses unbounded integers, |num|, wh
   }
 \end{MoveBoxTool}
 
-The agent tries to verify this specification, but verification times out with the following diagnosis (the walkthrough runs with a solver timeout of 5 seconds, shorter than the 40 seconds of the evaluation):
+This walkthrough uses a solver timeout of 5 seconds, shorter than the 40 seconds of the evaluation.
+When the agent tries to verify the specification, verification times out with the following diagnosis:
 
 \begin{MoveBoxTool}{verify}
   verification failed:
@@ -92,7 +96,9 @@ The agent tries to verify this specification, but verification times out with th
          -- 55,793+ observed instantiations
 \end{MoveBoxTool}
 
-The quantifier the diagnosis points to is the recursive definition of the helper function |math_pow|, which the solver keeps unfolding while it tries to prove the |sathard| abort condition. In the next turn, the agent introduces lemmas that bound every partial product by the last one, which lets it restate the abort condition without a quantifier:
+The diagnosis points to a quantifier: the recursive definition of the helper |math_pow|, which the solver keeps unfolding while trying to prove the quantified |sathard| abort condition.
+In the next turn, the agent adds lemmas that bound every partial product by the last one.
+With these lemmas, it can restate the abort condition without a quantifier, as an overflow of the last product alone:
 
 \begin{MoveBoxAgent}
   spec pow {

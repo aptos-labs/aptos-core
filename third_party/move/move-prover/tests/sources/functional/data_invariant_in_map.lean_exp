@@ -1,2 +1,3 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/data_invariant_in_map.move:15:5: error: `no_violation` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/data_invariant_in_map.move:8:9: error: the data invariant `invariant value != 0` does not hold for a value written to memory
+tests/sources/functional/data_invariant_in_map.move:20:5: error: verex verification failed: the automatic verification of `violation_1` failed; provide a proof: `verify violation_1 by …` in `tests/sources/functional/data_invariant_in_map.proof.lean` (`verify violation_1 by verex_obligations` lists its obligations)

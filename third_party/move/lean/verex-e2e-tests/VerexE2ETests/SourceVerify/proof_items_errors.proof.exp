@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/proof_items_errors.proof.lean:10:1: error: a proof file holds `verify` items, theorems, and `open` items; this item belongs to the module

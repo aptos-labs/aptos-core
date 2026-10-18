@@ -128,20 +128,16 @@ rely on.
 
 ## Contracts
 
-Table extension in progress (2026-10-06;
-[`intrinsic-maps.md`](intrinsic-maps.md)): runtime state now contains a separate
-native contents heap and allocation history. Their typed-memory encoding is
-defined and proved unique in `Denote/TableMemory.lean`. `StorageEncodes` includes
-both stores in `propheticRun`, call agreement, and behavioral predicates.
-Unnamed-resource preservation excludes native contents and allocation history.
-Loan independence now shifts Table contents while preserving identities, and
-labeled post-state uniqueness covers both stores. Entry-loan reconciliation,
-native operation contracts, and ownership frames remain open before Table roles
-can be enabled. The Table fields stay
-physical handles/metadata; contents are separate typed slots. `ResourceType`
-distinguishes ordinary values from unbounded native collections, preserving
-that distinction through type substitution. Table entries and allocation history
-use the latter; ordinary Move vector values keep their size bounds.
+Tables (2026-10-13; [`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table
+values"): a table owner's type has a hidden last field holding its entries,
+so a memory holds tables as values. The runtime keeps them in native storage
+beside the physical values, with a persistent allocation history;
+`StorageEncodes` relates a memory to a runtime state by the erased values
+(`Encodes`) and the tables at their owner's slot (`TablesEncode`,
+`tableSlot?`), and a call's start and exit states enclose the tables its
+arguments and results hold (`Encloses`, `ReturnedEncloses`). `ResourceType`
+distinguishes ordinary values from unbounded native collections, which the
+allocation history uses.
 
 An escaping reference leaves a heap hole. At a successful call boundary,
 `StorageEncodesReturned` observes globals and Table contents by resolving

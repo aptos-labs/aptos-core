@@ -20,7 +20,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final => final = initialState✝ ∧ x.val ≤ 815)
       (fun failure =>
-        VerexIR.Proofs.Obligation "bv_aborts.lean" 1939 2099
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/bv_aborts.move.lean" 1939 2099
           (815 < x.val ∧
             match failure with
             | (VerexIR.ThrowKind.abort, payload) =>
