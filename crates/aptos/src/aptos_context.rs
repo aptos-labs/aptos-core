@@ -127,13 +127,17 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
         options: &TransactionOptions,
         payloads: Vec<TransactionPayload>,
     ) -> Vec<CliTypedResult<TransactionSummary>> {
-        // Only a chain has sequence numbers that can be assigned ahead of the transactions, and
-        // gains from not waiting for each of them. Everything else executes one at a time.
+        // A hardware wallet can take longer than a transaction's expiry to confirm multiple
+        // signatures. Sign, submit and wait one at a time rather than pre-signing a whole group.
         let sends_to_chain = options.session.is_none()
             && !options.profile_gas
             && !options.benchmark
             && !options.local;
-        if sends_to_chain && payloads.len() > 1 {
+        let account_type = match options.get_transaction_account_type() {
+            Ok(account_type) => account_type,
+            Err(error) => return vec![Err(error)],
+        };
+        if should_submit_in_parallel(sends_to_chain, payloads.len(), account_type) {
             submit_many_to_chain(options, payloads)
                 .await
                 .unwrap_or_else(|error| vec![Err(error)])
@@ -490,6 +494,16 @@ impl GroupChain for ChainSender<'_> {
             .map_err(|err| CliError::ApiError(err.to_string()))?;
         Ok(TransactionSummary::from(response.into_inner()))
     }
+}
+
+/// Pre-sign groups only with a local key; device confirmation can outlast the first signature's
+/// expiration when a hardware wallet is asked to approve a whole window.
+fn should_submit_in_parallel(
+    sends_to_chain: bool,
+    count: usize,
+    account_type: AccountType,
+) -> bool {
+    sends_to_chain && count > 1 && matches!(account_type, AccountType::Local)
 }
 
 /// The time at which a transaction that is built now expires. Warns if the local clock is behind the
@@ -990,6 +1004,18 @@ mod tests {
                     .and_then(|summary| summary.sequence_number)
             })
             .collect()
+    }
+
+    #[test]
+    fn hardware_wallets_do_not_pre_sign_a_transaction_group() {
+        assert!(!should_submit_in_parallel(
+            true,
+            10,
+            AccountType::HardwareWallet
+        ));
+        assert!(should_submit_in_parallel(true, 10, AccountType::Local));
+        assert!(!should_submit_in_parallel(false, 10, AccountType::Local));
+        assert!(!should_submit_in_parallel(true, 1, AccountType::Local));
     }
 
     #[tokio::test]
