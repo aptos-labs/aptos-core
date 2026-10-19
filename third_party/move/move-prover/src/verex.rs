@@ -13,15 +13,14 @@ use move_model_exchange::{
     ast::{Pragma, PragmaValue, Value, XastModule},
     dump_ast_module, module_closure,
 };
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
+use sha2::{digest, Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     io::Write,
     path::{Path, PathBuf},
     process::Command,
-    time::{Instant, SystemTime},
+    time::Instant,
 };
 
 const VEREX_MOVE_EXE_ENV: &str = "VEREX_MOVE_EXE";
@@ -198,17 +197,12 @@ pub fn snapshot(package: &Path, into: &Path) -> Result<Snapshot> {
     bail!("Verex sources or build artifacts kept changing while taking the verifier snapshot; retry after the concurrent build finishes")
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct FileStamp {
-    length: u64,
-    modified: SystemTime,
-    // Replacement and in-place writes can preserve mtime and length.
-    #[cfg(unix)]
-    identity: (u64, u64, i64, i64),
-}
+/// The content digest of each inventoried file. Metadata cannot replace it: a
+/// same-length rewrite within one timestamp tick keeps size, inode and times.
+type Inventory = BTreeMap<PathBuf, digest::Output<Sha256>>;
 
-fn snapshot_inventory(roots: &BTreeSet<PathBuf>) -> Result<BTreeMap<PathBuf, FileStamp>> {
-    fn visit(dir: &Path, found: &mut BTreeMap<PathBuf, FileStamp>) -> Result<()> {
+fn snapshot_inventory(roots: &BTreeSet<PathBuf>) -> Result<Inventory> {
+    fn visit(dir: &Path, found: &mut Inventory) -> Result<()> {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -237,20 +231,8 @@ fn snapshot_inventory(roots: &BTreeSet<PathBuf>) -> Result<BTreeMap<PathBuf, Fil
                 {
                     continue;
                 }
-                let metadata = entry.metadata()?;
-                #[cfg(unix)]
-                let identity = (
-                    metadata.dev(),
-                    metadata.ino(),
-                    metadata.ctime(),
-                    metadata.ctime_nsec(),
-                );
-                found.insert(path, FileStamp {
-                    length: metadata.len(),
-                    modified: metadata.modified()?,
-                    #[cfg(unix)]
-                    identity,
-                });
+                let digest = Sha256::digest(&std::fs::read(&path)?);
+                found.insert(path, digest);
             }
         }
         Ok(())
