@@ -82,6 +82,16 @@ pub static SYSTEM_TRANSACTIONS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static BLOCK_EPILOGUE_READ_ONLY_PROMOTIONS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_vm_block_epilogue_read_only_promotions",
+        "Number of keys read but not written by the block epilogue itself that it promotes to \
+         hot state, on top of the ones in its payload",
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 12).unwrap(),
+    )
+    .unwrap()
+});
+
 const NUM_BLOCK_TRANSACTIONS_BUCKETS: [f64; 24] = [
     5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
     4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,

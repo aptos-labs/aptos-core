@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
+use crate::{
+    aptos_vm::AptosVM, block_executor::AptosTransactionOutput,
+    counters::BLOCK_EPILOGUE_READ_ONLY_PROMOTIONS,
+};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -75,7 +78,7 @@ impl ExecutorTask for AptosExecutorTask {
             &log_context,
             auxiliary_info,
         ) {
-            Ok((vm_status, vm_output)) => {
+            Ok((vm_status, mut vm_output)) => {
                 // Discarded transactions commit no state changes, so their reads must not feed
                 // hot-state promotion. Only carry the read set for outputs that can commit.
                 let read_set = if vm_output.status().is_discarded() {
@@ -90,6 +93,13 @@ impl ExecutorTask for AptosExecutorTask {
                         code_storage.into_recorded_reads(),
                     )
                 };
+                if let SignatureVerifiedTransaction::Valid(Transaction::BlockEpilogue(_)) = txn {
+                    // The payload is generated before the epilogue runs, so it cannot cover the
+                    // epilogue's own reads. They only depend on the epilogue's execution, so
+                    // re-execution during state sync reproduces them.
+                    let num_added = vm_output.add_read_only_hotness(read_set.iter());
+                    BLOCK_EPILOGUE_READ_ONLY_PROMOTIONS.observe(num_added as f64);
+                }
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     Ok(ExecutionStatus::SpeculativeFailure)
                 } else if vm_status.status_code()
