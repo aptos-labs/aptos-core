@@ -2,9 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup::backup_handler::BackupHandler, db::aptosdb_native_position::PositionBundle,
-    event_store::EventStore, ledger_db::LedgerDb, position_db::PositionDb,
-    position_merkle_db::PositionMerkleDb, pruner::LedgerPrunerManager,
+    backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
+    position_db::PositionDb, position_merkle_db::PositionMerkleDb, pruner::LedgerPrunerManager,
     rocksdb_property_reporter::RocksdbPropertyReporter, state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb, state_store::StateStore, transaction_store::TransactionStore,
 };
@@ -50,6 +49,7 @@ mod aptosdb_internal;
 // Native-position subsystem: `PositionBundle` + `impl AptosDB` for
 // `position()` / `native_state_committer()` / `init_native_position()`.
 mod aptosdb_native_position;
+pub(crate) use aptosdb_native_position::PositionBundle;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 mod aptosdb_testonly;
@@ -202,7 +202,11 @@ impl AptosDB {
 
     /// Gets an instance of `BackupHandler` for data backup purpose.
     pub fn get_backup_handler(&self) -> BackupHandler {
-        BackupHandler::new(Arc::clone(&self.state_store), Arc::clone(&self.ledger_db))
+        BackupHandler::new(
+            Arc::clone(&self.state_store),
+            Arc::clone(&self.ledger_db),
+            self.position.clone(),
+        )
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
