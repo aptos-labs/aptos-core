@@ -12,6 +12,7 @@ mod index_test;
 mod invalid_post_request_test;
 mod modules;
 mod multisig_transactions_test;
+mod nested_values_test;
 mod objects;
 mod option_test;
 mod public_struct_enum_negative_test;
