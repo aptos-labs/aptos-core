@@ -6,19 +6,24 @@
 //! This module defines the transfer functions for verifying type safety of a procedure body.
 //! It does not utilize control flow, but does check each block independently
 
-use crate::meter::{Meter, Scope};
+use crate::{
+    meter::{Meter, Scope},
+    VerifierConfig,
+};
 use move_binary_format::{
+    access::ModuleAccess,
     binary_views::{BinaryIndexedView, FunctionView},
     control_flow_graph::ControlFlowGraph,
-    errors::{PartialVMError, PartialVMResult},
+    errors::{verification_error, PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionAttribute, FunctionDefinitionIndex, FunctionHandle,
-        FunctionHandleIndex, LocalIndex, Signature, SignatureToken, SignatureToken as ST,
-        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
-        VariantIndex,
+        Bytecode, CodeOffset, CompiledModule, FunctionAttribute, FunctionDefinitionIndex,
+        FunctionHandle, FunctionHandleIndex, LocalIndex, Signature, SignatureToken,
+        SignatureToken as ST, StructDefinition, StructDefinitionIndex, StructFieldInformation,
+        StructHandleIndex, TableIndex, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
+    IndexKind,
 };
 use move_core_types::{ability::AbilitySet, function::ClosureMask, vm_status::StatusCode};
 
@@ -54,16 +59,24 @@ struct TypeSafetyChecker<'a> {
     function_view: &'a FunctionView<'a>,
     locals: Locals<'a>,
     stack: Vec<SignatureToken>,
+    /// If set, each variant field handle has been verified to select the same
+    /// declared field type across all listed variants, before instantiation.
+    uniform_variant_field_handles: bool,
 }
 
 impl<'a> TypeSafetyChecker<'a> {
-    fn new(resolver: &'a BinaryIndexedView<'a>, function_view: &'a FunctionView<'a>) -> Self {
+    fn new(
+        resolver: &'a BinaryIndexedView<'a>,
+        function_view: &'a FunctionView<'a>,
+        uniform_variant_field_handles: bool,
+    ) -> Self {
         let locals = Locals::new(function_view.parameters(), function_view.locals());
         Self {
             resolver,
             function_view,
             locals,
             stack: vec![],
+            uniform_variant_field_handles,
         }
     }
 
@@ -111,12 +124,43 @@ impl<'a> TypeSafetyChecker<'a> {
     }
 }
 
+/// Verifies that each variant field handle selects the same declared field type across all
+/// listed variants. Any listed variant can therefore provide the handle's field type,
+/// both before and after instantiation.
+pub(crate) fn verify_variant_field_handles(module: &CompiledModule) -> PartialVMResult<()> {
+    for (idx, handle) in module.variant_field_handles().iter().enumerate() {
+        let field_information = &module.struct_def_at(handle.struct_index).field_information;
+        // Bounds checking guarantees a non-empty list whose variants all have the field.
+        let field_ty = |variant: VariantIndex| -> PartialVMResult<&SignatureToken> {
+            let field = field_information.field(Some(variant), handle.field as usize);
+            Ok(&safe_unwrap!(field).signature.0)
+        };
+        let (first_variant, other_variants) = safe_unwrap!(handle.variants.split_first());
+        let first_ty = field_ty(*first_variant)?;
+        for variant in other_variants {
+            if field_ty(*variant)? != first_ty {
+                return Err(verification_error(
+                    StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR,
+                    IndexKind::VariantFieldHandle,
+                    idx as TableIndex,
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn verify<'a>(
+    verifier_config: &VerifierConfig,
     resolver: &'a BinaryIndexedView<'a>,
     function_view: &'a FunctionView<'a>,
-    meter: &mut impl Meter, // currently unused
+    meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
-    let verifier = &mut TypeSafetyChecker::new(resolver, function_view);
+    let verifier = &mut TypeSafetyChecker::new(
+        resolver,
+        function_view,
+        verifier_config.uniform_variant_field_handles,
+    );
 
     for block_id in function_view.cfg().blocks() {
         for offset in function_view.cfg().instr_indexes(block_id) {
@@ -155,7 +199,7 @@ fn borrow_field(
             let field_handle = verifier.resolver.variant_field_handle_at(idx)?;
             (
                 field_handle.struct_index,
-                Some(field_handle.variants.clone()),
+                Some(field_handle.variants.as_slice()),
                 field_handle.field as usize,
             )
         },
@@ -175,13 +219,19 @@ fn borrow_field(
             // determine the type.
             return Err(verifier.error(StatusCode::ZERO_VARIANTS_ERROR, offset));
         }
+        // A uniform handle declares the same field type in all variants, so the first one
+        // determines it.
+        let variants = if verifier.uniform_variant_field_handles {
+            &variants[..1]
+        } else {
+            variants
+        };
         // For all provided variants, the field type must be the same.
         let mut field_ty = None;
         for variant in variants {
             if let Some(field_def) = struct_def
                 .field_information
-                .fields(Some(variant))
-                .get(field_idx)
+                .field(Some(*variant), field_idx)
             {
                 let ty = instantiate(&field_def.signature.0, type_args);
                 if let Some(field_ty) = &field_ty {
@@ -204,8 +254,7 @@ fn borrow_field(
     } else {
         struct_def
             .field_information
-            .fields(None)
-            .get(field_idx)
+            .field(None, field_idx)
             .map(|field_def| instantiate(&field_def.signature.0, type_args))
     };
     if let Some(field_ty) = field_ty {
