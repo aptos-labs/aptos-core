@@ -20,17 +20,27 @@ struct TestConfig {
     /// Path substrings for tests to exclude (applied after the include filter).
     /// If empty, no additional tests are excluded.
     exclude: &'static [&'static str],
+    uniform_variant_field_handles: bool,
 }
 
 /// Note that any config which has different output for a test directory *must* be added to the
 /// [SEPARATE_BASELINE] array below, so that a special output file `test.foo.exp` will be used for
 /// outputs comparison when running `test.move` or `test.masm` for config "foo".
 static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
-    vec![TestConfig {
-        name: "baseline",
-        include: &[],
-        exclude: &[],
-    }]
+    vec![
+        TestConfig {
+            name: "baseline",
+            include: &[],
+            exclude: &[],
+            uniform_variant_field_handles: true,
+        },
+        TestConfig {
+            name: "no-uniform-variant-field-handles",
+            include: &["variant_field_handles"],
+            exclude: &[],
+            uniform_variant_field_handles: false,
+        },
+    ]
 });
 
 /// Test files which must use separate baselines because their result is different.
@@ -39,7 +49,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
 /// `test.masm`) to the same baseline file `test.exp` *unless* there is an entry in this array
 /// matching the path of `test.move` or `test.masm`. If there is such an entry, then each config
 /// "foo" will have a separate baseline output file `test.foo.exp`.
-const SEPARATE_BASELINE: &[&str] = &[];
+const SEPARATE_BASELINE: &[&str] = &["variant_field_handles"];
 
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
@@ -56,8 +66,12 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     } else {
         None
     };
-    let config = TestRunConfig::default();
-    vm_test_harness::run_test_with_config_and_exp_suffix(config, path, &exp_suffix)
+    let mut run_config = TestRunConfig::default();
+    run_config
+        .vm_config
+        .verifier_config
+        .uniform_variant_field_handles = config.uniform_variant_field_handles;
+    vm_test_harness::run_test_with_config_and_exp_suffix(run_config, path, &exp_suffix)
 }
 
 fn main() {

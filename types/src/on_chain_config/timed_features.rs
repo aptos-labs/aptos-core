@@ -75,6 +75,10 @@ pub enum TimedFeatureFlag {
     /// Charge closure packing per abstract value unit of the captured values,
     /// which the closure depth check traverses.
     MeterPackClosureCapturedValues,
+
+    /// Requires variant field handles to list distinct variants that declare the field with
+    /// the same type, so the verifier checks each borrow against one variant.
+    UniformVariantFieldHandles,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -104,6 +108,8 @@ impl TimedFeatureOverride {
             // Add overrides for replay here.
             (Replay, _LimitTypeTagSize) => Some(true),
             (Replay, _ModuleComplexityCheck) => Some(true),
+            // TODO: we may want to remove this before merging, but keep it for replay run.
+            (Replay, UniformVariantFieldHandles) => Some(true),
             // Add overrides for testing here.
             (Testing, EntryCompatibility) => Some(true),
             // Exhaustive over flags so adding a new flag forces a decision.
@@ -127,7 +133,8 @@ impl TimedFeatureOverride {
                 | MeterBcsByValueSize
                 | MeterValueNodesOnDeserialize
                 | MeterClosureTypeArguments
-                | MeterPackClosureCapturedValues,
+                | MeterPackClosureCapturedValues
+                | UniformVariantFieldHandles,
             ) => None,
         }
     }
@@ -340,6 +347,16 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (MeterPackClosureCapturedValues, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 11, 4, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // TODO: set actual dates instead of the following dummy ones.
+            (UniformVariantFieldHandles, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 12, 31, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (UniformVariantFieldHandles, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 12, 31, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

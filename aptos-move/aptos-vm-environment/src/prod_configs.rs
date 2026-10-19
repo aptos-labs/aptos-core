@@ -178,6 +178,8 @@ pub fn aptos_prod_verifier_config(
 
     let strict_bounds = timed_features.is_enabled(TimedFeatureFlag::EnableStrictBoundsInProdConfig);
     let revised_bounds = timed_features.is_enabled(TimedFeatureFlag::RevisedBoundsInProdConfig);
+    let uniform_variant_field_handles =
+        timed_features.is_enabled(TimedFeatureFlag::UniformVariantFieldHandles);
 
     VerifierConfig {
         scope: VerificationScope::Everything,
@@ -233,6 +235,7 @@ pub fn aptos_prod_verifier_config(
         } else {
             None
         },
+        uniform_variant_field_handles,
     }
 }
 
