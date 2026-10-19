@@ -58,6 +58,8 @@ mod state_sync_utils;
 #[cfg(test)]
 mod storage;
 #[cfg(test)]
+mod storage_native_position;
+#[cfg(test)]
 mod sui_derivable_account;
 #[cfg(test)]
 mod test_smoke_tests;

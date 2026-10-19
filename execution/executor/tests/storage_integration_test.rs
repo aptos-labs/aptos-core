@@ -266,7 +266,10 @@ fn test_epilogue_hotness_survives_state_sync() {
             .unwrap()
             .unwrap();
         let hotness: BTreeSet<_> = write_set.hotness_keys().cloned().collect();
-        assert_eq!(payload.try_get_keys_to_make_hot(), Some(&hotness));
+        let to_make_hot = payload.try_get_keys_to_make_hot().unwrap();
+        // On top of the payload, the epilogue promotes what only it reads.
+        assert!(hotness.is_superset(to_make_hot));
+        assert!(hotness.len() > to_make_hot.len());
         hotness
     };
     let expected = epilogue_hotness(&db);
