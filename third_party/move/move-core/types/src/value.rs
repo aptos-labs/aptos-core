@@ -24,6 +24,7 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
     convert::TryInto,
     fmt::{self, Debug},
@@ -280,6 +281,10 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "i256", deserialize = "i256"))]
     I256,
 }
+
+/// Maximum nesting depth of a value accepted by [`MoveValue::simple_deserialize`]. Equals the
+/// VM's limit on value depth, so every value the VM serializes can be decoded.
+pub const MAX_VALUE_NEST_DEPTH: u64 = 128;
 
 /// Limit on the number of nodes a [`MoveTypeLayout`] may unfold to when serialized.
 pub const MAX_LAYOUT_NODES: u64 = 4096;
@@ -544,8 +549,18 @@ fn variant_layout_eq(
 }
 
 impl MoveValue {
+    /// Deserializes a value, rejecting values nested deeper than [`MAX_VALUE_NEST_DEPTH`].
     pub fn simple_deserialize(blob: &[u8], ty: &MoveTypeLayout) -> AResult<Self> {
-        Ok(bcs::from_bytes_seed(ty, blob)?)
+        Self::simple_deserialize_with_max_depth(blob, ty, MAX_VALUE_NEST_DEPTH)
+    }
+
+    /// Deserializes a value, rejecting values nested deeper than `max_depth`.
+    pub fn simple_deserialize_with_max_depth(
+        blob: &[u8],
+        ty: &MoveTypeLayout,
+        max_depth: u64,
+    ) -> AResult<Self> {
+        Ok(bcs::from_bytes_seed(ValueSeed::root(ty, max_depth), blob)?)
     }
 
     pub fn simple_serialize(&self) -> Option<Vec<u8>> {
@@ -638,6 +653,7 @@ impl MoveStruct {
         }
     }
 
+    /// Deserializes a struct, rejecting values nested deeper than [`MAX_VALUE_NEST_DEPTH`].
     pub fn simple_deserialize(blob: &[u8], ty: &MoveStructLayout) -> AResult<Self> {
         Ok(bcs::from_bytes_seed(ty, blob)?)
     }
@@ -787,6 +803,51 @@ impl MoveStructLayout {
     }
 }
 
+/// Nesting depth of a value during deserialization. The root value has depth 1. Elements of
+/// a vector, fields of a struct or variant, and captured values of a closure are one level
+/// deeper than their container. A container starting deeper than `max` is rejected.
+#[derive(Clone, Copy)]
+pub(crate) struct ValueDepth {
+    current: u64,
+    max: u64,
+}
+
+impl ValueDepth {
+    fn root(max: u64) -> Self {
+        Self { current: 1, max }
+    }
+
+    /// Checks that a container may start at this depth, returning the depth of its contents.
+    pub(crate) fn enter<E: DeError>(self) -> Result<Self, E> {
+        if self.current > self.max {
+            return Err(E::custom(format!(
+                "value exceeds maximum nesting depth of {}",
+                self.max
+            )));
+        }
+        Ok(Self {
+            current: self.current.saturating_add(1),
+            max: self.max,
+        })
+    }
+}
+
+/// Deserialization seed for a value with the given layout at the given depth.
+pub(crate) struct ValueSeed<'a, L> {
+    pub(crate) layout: &'a L,
+    pub(crate) depth: ValueDepth,
+}
+
+impl<'a, L> ValueSeed<'a, L> {
+    /// Seed for a root value, rejecting values nested deeper than `max_depth`.
+    fn root(layout: &'a L, max_depth: u64) -> Self {
+        Self {
+            layout,
+            depth: ValueDepth::root(max_depth),
+        }
+    }
+}
+
 impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
     type Value = MoveValue;
 
@@ -794,7 +855,19 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
         self,
         deserializer: D,
     ) -> Result<Self::Value, D::Error> {
-        match self {
+        ValueSeed::root(self, MAX_VALUE_NEST_DEPTH).deserialize(deserializer)
+    }
+}
+
+impl<'d> serde::de::DeserializeSeed<'d> for ValueSeed<'_, MoveTypeLayout> {
+    type Value = MoveValue;
+
+    fn deserialize<D: serde::de::Deserializer<'d>>(
+        self,
+        deserializer: D,
+    ) -> Result<Self::Value, D::Error> {
+        let depth = self.depth;
+        match self.layout {
             MoveTypeLayout::Bool => bool::deserialize(deserializer).map(MoveValue::Bool),
             MoveTypeLayout::U8 => u8::deserialize(deserializer).map(MoveValue::U8),
             MoveTypeLayout::U16 => u16::deserialize(deserializer).map(MoveValue::U16),
@@ -812,15 +885,23 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
             MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
-            MoveTypeLayout::Struct(ty) => {
-                Ok(MoveValue::Struct(ty.as_ref().deserialize(deserializer)?))
-            },
-            MoveTypeLayout::Function => Ok(MoveValue::Closure(Box::new(
-                deserializer.deserialize_seq(ClosureVisitor)?,
-            ))),
-            MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
-                deserializer.deserialize_seq(VectorElementVisitor(layout))?,
+            // Depth is not entered here: the struct seed enters it for its fields.
+            MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(
+                ValueSeed {
+                    layout: ty.as_ref(),
+                    depth,
+                }
+                .deserialize(deserializer)?,
             )),
+            MoveTypeLayout::Function => Ok(MoveValue::Closure(Box::new(
+                deserializer.deserialize_seq(ClosureVisitor(depth.enter()?))?,
+            ))),
+            MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(deserializer.deserialize_seq(
+                VectorElementVisitor {
+                    layout,
+                    depth: depth.enter()?,
+                },
+            )?)),
 
             // This layout is only used by MoveVM, so we do not expect to see it here.
             MoveTypeLayout::Native(..) => {
@@ -830,7 +911,10 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
     }
 }
 
-struct VectorElementVisitor<'a>(&'a MoveTypeLayout);
+struct VectorElementVisitor<'a> {
+    layout: &'a MoveTypeLayout,
+    depth: ValueDepth,
+}
 
 impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
     type Value = Vec<MoveValue>;
@@ -844,14 +928,20 @@ impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
         A: serde::de::SeqAccess<'d>,
     {
         let mut vals = Vec::new();
-        while let Some(elem) = seq.next_element_seed(self.0)? {
+        while let Some(elem) = seq.next_element_seed(ValueSeed {
+            layout: self.layout,
+            depth: self.depth,
+        })? {
             vals.push(elem)
         }
         Ok(vals)
     }
 }
 
-struct DecoratedStructFieldVisitor<'a>(&'a [MoveFieldLayout]);
+struct DecoratedStructFieldVisitor<'a> {
+    fields: &'a [MoveFieldLayout],
+    depth: ValueDepth,
+}
 
 impl<'d> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'_> {
     type Value = Vec<(Identifier, MoveValue)>;
@@ -865,8 +955,11 @@ impl<'d> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'_> {
         A: serde::de::SeqAccess<'d>,
     {
         let mut vals = Vec::new();
-        for (i, layout) in self.0.iter().enumerate() {
-            match seq.next_element_seed(layout)? {
+        for (i, layout) in self.fields.iter().enumerate() {
+            match seq.next_element_seed(ValueSeed {
+                layout,
+                depth: self.depth,
+            })? {
                 Some(elem) => vals.push(elem),
                 None => return Err(A::Error::invalid_length(i, &self)),
             }
@@ -875,9 +968,12 @@ impl<'d> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'_> {
     }
 }
 
-struct StructFieldVisitor<'a>(&'a [MoveTypeLayout]);
+struct StructFieldVisitor<'a, L> {
+    fields: &'a [L],
+    depth: ValueDepth,
+}
 
-impl<'d> serde::de::Visitor<'d> for StructFieldVisitor<'_> {
+impl<'d, L: Borrow<MoveTypeLayout>> serde::de::Visitor<'d> for StructFieldVisitor<'_, L> {
     type Value = Vec<MoveValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -889,8 +985,12 @@ impl<'d> serde::de::Visitor<'d> for StructFieldVisitor<'_> {
         A: serde::de::SeqAccess<'d>,
     {
         let mut val = Vec::new();
-        for (i, field_type) in self.0.iter().enumerate() {
-            match seq.next_element_seed(field_type)? {
+        for (i, field_type) in self.fields.iter().enumerate() {
+            let layout: &MoveTypeLayout = field_type.borrow();
+            match seq.next_element_seed(ValueSeed {
+                layout,
+                depth: self.depth,
+            })? {
                 Some(elem) => val.push(elem),
                 None => return Err(A::Error::invalid_length(i, &self)),
             }
@@ -899,9 +999,12 @@ impl<'d> serde::de::Visitor<'d> for StructFieldVisitor<'_> {
     }
 }
 
-struct StructVariantVisitor<'a>(&'a [Vec<MoveTypeLayout>]);
+struct StructVariantVisitor<'a, L> {
+    variants: &'a [Vec<L>],
+    depth: ValueDepth,
+}
 
-impl<'d> serde::de::Visitor<'d> for StructVariantVisitor<'_> {
+impl<'d, L: Borrow<MoveTypeLayout>> serde::de::Visitor<'d> for StructVariantVisitor<'_, L> {
     type Value = (u16, Vec<MoveValue>);
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -913,21 +1016,28 @@ impl<'d> serde::de::Visitor<'d> for StructVariantVisitor<'_> {
         A: EnumAccess<'d>,
     {
         let (tag, rest) = data.variant()?;
-        if tag as usize >= self.0.len() {
+        if tag as usize >= self.variants.len() {
             Err(A::Error::invalid_length(0, &self))
         } else {
-            let fields = &self.0[tag as usize];
+            let fields = &self.variants[tag as usize];
             match fields.len() {
                 0 => {
                     rest.unit_variant()?;
                     Ok((tag, vec![]))
                 },
                 1 => {
-                    let value = rest.newtype_variant_seed(&fields[0])?;
+                    let layout: &MoveTypeLayout = fields[0].borrow();
+                    let value = rest.newtype_variant_seed(ValueSeed {
+                        layout,
+                        depth: self.depth,
+                    })?;
                     Ok((tag, vec![value]))
                 },
                 _ => {
-                    let values = rest.tuple_variant(fields.len(), StructFieldVisitor(fields))?;
+                    let values = rest.tuple_variant(fields.len(), StructFieldVisitor {
+                        fields,
+                        depth: self.depth,
+                    })?;
                     Ok((tag, values))
                 },
             }
@@ -942,7 +1052,23 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveFieldLayout {
         self,
         deserializer: D,
     ) -> Result<Self::Value, D::Error> {
-        Ok((self.name.clone(), self.layout.deserialize(deserializer)?))
+        ValueSeed::root(self, MAX_VALUE_NEST_DEPTH).deserialize(deserializer)
+    }
+}
+
+impl<'d> serde::de::DeserializeSeed<'d> for ValueSeed<'_, MoveFieldLayout> {
+    type Value = (Identifier, MoveValue);
+
+    fn deserialize<D: serde::de::Deserializer<'d>>(
+        self,
+        deserializer: D,
+    ) -> Result<Self::Value, D::Error> {
+        let value = ValueSeed {
+            layout: &self.layout.layout,
+            depth: self.depth,
+        }
+        .deserialize(deserializer)?;
+        Ok((self.layout.name.clone(), value))
     }
 }
 
@@ -953,10 +1079,24 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
         self,
         deserializer: D,
     ) -> Result<Self::Value, D::Error> {
-        match self {
+        ValueSeed::root(self, MAX_VALUE_NEST_DEPTH).deserialize(deserializer)
+    }
+}
+
+impl<'d> serde::de::DeserializeSeed<'d> for ValueSeed<'_, MoveStructLayout> {
+    type Value = MoveStruct;
+
+    fn deserialize<D: serde::de::Deserializer<'d>>(
+        self,
+        deserializer: D,
+    ) -> Result<Self::Value, D::Error> {
+        let depth = self.depth.enter()?;
+        match self.layout {
             MoveStructLayout::Runtime(layout) => {
-                let fields =
-                    deserializer.deserialize_tuple(layout.len(), StructFieldVisitor(layout))?;
+                let fields = deserializer.deserialize_tuple(layout.len(), StructFieldVisitor {
+                    fields: layout,
+                    depth,
+                })?;
                 Ok(MoveStruct::Runtime(fields))
             },
             MoveStructLayout::RuntimeVariants(variants) => {
@@ -968,21 +1108,27 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
-                    StructVariantVisitor(variants),
+                    StructVariantVisitor { variants, depth },
                 )?;
                 Ok(MoveStruct::RuntimeVariant(tag, fields))
             },
             MoveStructLayout::WithFields(layout) => {
-                let fields = deserializer
-                    .deserialize_tuple(layout.len(), DecoratedStructFieldVisitor(layout))?;
+                let fields =
+                    deserializer.deserialize_tuple(layout.len(), DecoratedStructFieldVisitor {
+                        fields: layout,
+                        depth,
+                    })?;
                 Ok(MoveStruct::WithFields(fields))
             },
             MoveStructLayout::WithTypes {
                 type_,
                 fields: layout,
             } => {
-                let fields = deserializer
-                    .deserialize_tuple(layout.len(), DecoratedStructFieldVisitor(layout))?;
+                let fields =
+                    deserializer.deserialize_tuple(layout.len(), DecoratedStructFieldVisitor {
+                        fields: layout,
+                        depth,
+                    })?;
                 Ok(MoveStruct::WithTypes {
                     _type_: type_.clone(),
                     _fields: fields,
@@ -992,22 +1138,24 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                 variants: decorated_variants,
                 ..
             } => {
-                // Downgrade the decorated variants to simple layouts to deserialize the fields.
+                // Deserialize the fields under the field layouts of the decorated variants.
                 let variant_names = variant_name_placeholder(decorated_variants.len())
                     .map_err(|e| D::Error::custom(format!("{}", e)))?;
+                let field_layouts: Vec<Vec<&MoveTypeLayout>> = decorated_variants
+                    .iter()
+                    .map(|v| v.fields.iter().map(|f| &f.layout).collect())
+                    .collect();
                 let (tag, fields) = deserializer.deserialize_enum(
                     MOVE_ENUM_NAME,
                     variant_names,
-                    StructVariantVisitor(
-                        &decorated_variants
-                            .iter()
-                            .map(|v| v.fields.iter().map(|f| f.layout.clone()).collect())
-                            .collect::<Vec<_>>(),
-                    ),
+                    StructVariantVisitor {
+                        variants: &field_layouts,
+                        depth,
+                    },
                 )?;
                 // Now decorate the raw value. This is not optimally efficient but
                 // decorated values should not be in the execution path.
-                Ok(MoveStruct::RuntimeVariant(tag, fields).decorate(self))
+                Ok(MoveStruct::RuntimeVariant(tag, fields).decorate(self.layout))
             },
         }
     }
