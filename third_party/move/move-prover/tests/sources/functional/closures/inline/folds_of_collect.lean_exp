@@ -2,6 +2,18 @@ Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/folds_of_collect.move:50:9: error: the specification clause `ensures «spec_fold$lambda$0»(v, vec::<u64>(), n) == v[0 .. n]` is not established
 tests/sources/functional/closures/inline/folds_of_collect.move:48:10: error: verex verification failed: the lemma `fold_is_prefix` is not established
 tests/sources/functional/closures/inline/folds_of_collect.move:41:9: error: the specification clause `ensures result == v` is not established
-tests/sources/functional/closures/inline/folds_of_collect.move:39:5: error: verex verification failed: the automatic verification of `collect` failed; provide a proof: `verify collect by …` in `tests/sources/functional/closures/inline/folds_of_collect.proof.lean` (`verify collect by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_collect.move:39:5: error: verex verification failed: the automatic verification of `collect` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_collect.proof.lean`:
+  verify collect by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_collect.move:66:9: error: the specification clause `ensures result.length == v.length + 1` is not established
-tests/sources/functional/closures/inline/folds_of_collect.move:64:5: error: verex verification failed: the automatic verification of `collect_wrong` failed; provide a proof: `verify collect_wrong by …` in `tests/sources/functional/closures/inline/folds_of_collect.proof.lean` (`verify collect_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_collect.move:64:5: error: verex verification failed: the automatic verification of `collect_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_collect.proof.lean`:
+  verify collect_wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

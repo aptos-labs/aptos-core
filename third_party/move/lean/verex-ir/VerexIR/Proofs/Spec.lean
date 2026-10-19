@@ -78,6 +78,20 @@ def bottom : Spec σ ε α where
   ok := fun _ _ _ => False
   aborts := fun _ _ => False
 
+/-- The computation with no outcome, undefined everywhere: what nothing
+gives a meaning to, which a proof must rule out. -/
+def stuck : Spec σ ε α where
+  ok := fun _ _ _ => False
+  aborts := fun _ _ => False
+  undefined := fun _ => True
+
+@[simp] theorem stuck_ok (initial : σ) (result : α) (final : σ) :
+    (stuck : Spec σ ε α).ok initial result final ↔ False := Iff.rfl
+@[simp] theorem stuck_aborts (initial : σ) (error : ε) :
+    (stuck : Spec σ ε α).aborts initial error ↔ False := Iff.rfl
+@[simp] theorem stuck_undefined (initial : σ) : (stuck : Spec σ ε α).undefined initial ↔ True :=
+  Iff.rfl
+
 def pure (value : α) : Spec σ ε α where
   ok := fun initial result final => result = value ∧ final = initial
   aborts := fun _ _ => False

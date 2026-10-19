@@ -89,10 +89,12 @@ convention. It is expected that only errors for functions with this suffix appea
 ## Verex Verifier Tests
 
 `MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite` verifies each test with the Verex verifier
-(`third_party/move/lean/verex-move`, built with `lake build verex-move` in that directory; without it, the tests are
-skipped). Its messages differ from Boogie's, so its baselines are `.lean_exp` files.
+(`third_party/move/lean/verex-move`). Inside a checkout the gate builds and snapshots the verifier; a missing
+Lean toolchain or failed build fails the requested gate. Listing tests or selecting no tests needs no verifier.
+Its messages differ from Boogie's, so its baselines are `.lean_exp` files.
+`MVP_TEST_FILTERS=part1,part2` selects several fixtures in one process, sharing one snapshot.
 
-- Each function's verification has a tight budget of 25 thousand `maxHeartbeats` (`--heartbeats=25`). A function that
+- Automatic verification uses the verifier's default heartbeat cap. A function that
   verifies but needs more raises its own budget with `pragma heartbeats = N;` in its spec block.
   `MVP_TEST_FLAGS=--heartbeats=N` runs with another default budget.
 - A function the automatic verification does not prove, e.g. where Boogie relies on a Move `proof` block or on

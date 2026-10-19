@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/proof/let_binding.move:72:14: error: the assertion `old(x + 3) == _result` does not hold
-tests/sources/functional/proof/let_binding.move:67:5: error: verex verification failed: the automatic verification of `offset_by_two` failed; provide a proof: `verify offset_by_two by …` in `tests/sources/functional/proof/let_binding.proof.lean` (`verify offset_by_two by verex_obligations` lists its obligations)
+tests/sources/functional/proof/let_binding.move:67:5: error: verex verification failed: the automatic verification of `offset_by_two` failed; provide a proof in `tests/sources/functional/proof/let_binding.proof.lean`:
+  verify offset_by_two by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

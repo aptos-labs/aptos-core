@@ -40,11 +40,17 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       Denote.NTy.TypedAs unit (.tuple elements) (.tuple types)
   | vector {element : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit element type) :
       Denote.NTy.TypedAs unit (.vector element) (.vector type none)
+  /-- A table owner's hidden contents: its entries, pairs of a key and a value. -/
+  | table {key value : NTy} {keyType valueType : SemTy}
+      (typedKey : Denote.NTy.TypedAs unit key keyType)
+      (typedValue : Denote.NTy.TypedAs unit value valueType) :
+      Denote.NTy.TypedAs unit (.table key value) (.vector (.tuple [keyType, valueType]) none)
   /-- A structure at the types its declaration's fields resolve to under its
-  arguments. -/
+  arguments, a table owner's hidden contents at its entries' type. -/
   | struct {source : StructHandle} {nativeArguments fields : NRow} {name : QualifiedName}
       {arguments : List SemArg}
-      {declaringNs : ValidatedNamespace} {declared : Array FieldDecl} {fieldTypes : List SemTy}
+      {declaringNs : ValidatedNamespace} {declared : Array FieldDecl}
+      {fieldTypes ghostTypes : List SemTy}
       (name_eq : SemanticOperations.structName? unit source = some name)
       (arity : declarationArity? unit source = some arguments.length)
       (typedArguments : Denote.NRow.ArgumentsTypedAs unit nativeArguments arguments)
@@ -52,8 +58,29 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
         (declared.toList.map (·.type.typeId)) fieldTypes)
-      (typed : Denote.NRow.FieldsTypedAs unit nativeArguments fields fieldTypes) :
+      (ghostsResolve : ResolvesAll declaringNs.tables arguments.toArray
+        (ghostTypeIds unit source) ghostTypes)
+      (typed : Denote.NRow.TypedAs unit fields
+        (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source none arguments))) :
       Denote.NTy.TypedAs unit (.struct source nativeArguments fields) (.nominal name arguments)
+  /-- An intrinsic map owner at its key and value arguments: the fields of
+  its abstract value, its leading fields, its ghost slots, and its entries
+  (`OwnerLayout.canonicalTypes`; `designs/intrinsic-maps.md`, "Abstract
+  representation"). -/
+  | abstract {source : StructHandle} {nativeArguments fields : NRow} {name : QualifiedName}
+      {key value : SemTy} {layout : OwnerLayout} {declaringNs : ValidatedNamespace}
+      {ghostTypes : List SemTy}
+      (name_eq : SemanticOperations.structName? unit source = some name)
+      (arity : declarationArity? unit source = some 2)
+      (typedArguments : Denote.NRow.ArgumentsTypedAs unit nativeArguments
+        [.type key, .type value])
+      (layout_eq : abstractLayout? unit source.namespaceId source.structId = some layout)
+      (namespace_eq : unit.namespaces[source.namespaceId.index]? = some declaringNs)
+      (ghostsResolve : ResolvesAll declaringNs.tables #[.type key, .type value]
+        (ghostTypeIds unit source) ghostTypes)
+      (typed : Denote.NRow.TypedAs unit fields (layout.canonicalTypes ghostTypes key value)) :
+      Denote.NTy.TypedAs unit (.struct source nativeArguments fields)
+        (.nominal name [.type key, .type value])
   /-- An enum whose every variant's row reads as that variant's fields. -/
   | enum {source : StructHandle} {nativeArguments : NRow} {names : List String} {rows : NRows}
       {distinct : names.Nodup} {name : QualifiedName} {arguments : List SemArg}
@@ -67,6 +94,9 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
         (.nominal name arguments)
   | ref {referent : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit referent type) :
       Denote.NTy.TypedAs unit (.ref referent) (.reference .mutable type)
+  /-- A ghost field's slot reads as a slot of its type (`designs/ghost-fields.md`). -/
+  | ghost {slot : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit slot type) :
+      Denote.NTy.TypedAs unit (.ghost slot) (.ghost type)
   | param (index : Nat) : Denote.NTy.TypedAs unit (.param index) (.param index)
   /-- A function type at its rows, each parameter a shared reference where it
   is marked so, the results packed as the checker packs them. -/
@@ -84,17 +114,6 @@ inductive Denote.NRow.TypedAs (unit : ValidatedUnit) : NRow → List SemTy → P
   | cons {τ : NTy} {rest : NRow} {type : SemTy} {types : List SemTy} :
       Denote.NTy.TypedAs unit τ type → Denote.NRow.TypedAs unit rest types →
         Denote.NRow.TypedAs unit (.cons τ rest) (type :: types)
-
-/-- A struct's field row reading as its declared field types: the declared
-fields in order, then a hidden contents field, if any, at the owner's key
-and value arguments. -/
-inductive Denote.NRow.FieldsTypedAs (unit : ValidatedUnit) : NRow → NRow → List SemTy → Prop
-  | nil {arguments : NRow} : Denote.NRow.FieldsTypedAs unit arguments .nil []
-  | hidden {key value : NTy} :
-      Denote.NRow.FieldsTypedAs unit (.cons key (.cons value .nil)) (.cons (.table key value) .nil) []
-  | cons {arguments : NRow} {τ : NTy} {rest : NRow} {type : SemTy} {types : List SemTy} :
-      Denote.NTy.TypedAs unit τ type → Denote.NRow.FieldsTypedAs unit arguments rest types →
-        Denote.NRow.FieldsTypedAs unit arguments (.cons τ rest) (type :: types)
 
 /-- A row of native types reading as type arguments. -/
 inductive Denote.NRow.ArgumentsTypedAs (unit : ValidatedUnit) : NRow → List SemArg → Prop
@@ -127,12 +146,15 @@ inductive Denote.NRows.VariantsTypedAs (unit : ValidatedUnit) :
       Denote.NRows.VariantsTypedAs unit source arguments [] .nil
   | cons {source : StructHandle} {arguments : List SemArg} {name : String} {names : List String}
       {fields : NRow} {rest : NRows}
-      {declaringNs : ValidatedNamespace} {declared : Array FieldDecl} {fieldTypes : List SemTy}
+      {declaringNs : ValidatedNamespace} {declared : Array FieldDecl}
+      {fieldTypes ghostTypes : List SemTy}
       (declaration_eq : SemanticOperations.handleFields? unit source (some name) =
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
         (declared.toList.map (·.type.typeId)) fieldTypes)
-      (typed : Denote.NRow.TypedAs unit fields fieldTypes)
+      (ghostsResolve : ResolvesAll declaringNs.tables arguments.toArray
+        (ghostTypeIds unit source) ghostTypes)
+      (typed : Denote.NRow.TypedAs unit fields (fieldTypes ++ ghostTypes.map .ghost))
       (later : Denote.NRows.VariantsTypedAs unit source arguments names rest) :
       Denote.NRows.VariantsTypedAs unit source arguments (name :: names) (.cons fields rest)
 end
@@ -163,6 +185,9 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
   | .int width signed, type, checked => by
       simp only [NTy.typedAsCore, beq_iff_eq] at checked
       subst checked; exact .scalar rfl
+  | .num, type, checked => by
+      simp only [NTy.typedAsCore, beq_iff_eq] at checked
+      subst checked; exact .scalar rfl
   | .address, type, checked => by
       simp only [NTy.typedAsCore, beq_iff_eq] at checked
       subst checked; exact .scalar rfl
@@ -178,6 +203,9 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
   | .tuple elements, type, checked => by
       cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       exact .tuple (NRow.typedAs_of_check elements _ checked)
+  | .ghost slot, type, checked => by
+      cases type <;> simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+      exact .ghost (NTy.typedAs_of_core slot _ checked)
   | .vector element, type, checked => by
       cases type with
       | vector type length =>
@@ -187,20 +215,51 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
               exact .vector (NTy.typedAs_of_core element _ checked)
           | some _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
+  | .table key value, type, checked => by
+      cases type with
+      | vector element length =>
+          cases length with
+          | none =>
+              cases element with
+              | tuple types =>
+                  match types, checked with
+                  | [keyType, valueType], checked =>
+                      simp only [NTy.typedAsCore, Bool.and_eq_true] at checked
+                      exact .table (NTy.typedAs_of_core key _ checked.1)
+                        (NTy.typedAs_of_core value _ checked.2)
+                  | [], checked | [_], checked | _ :: _ :: _ :: _, checked =>
+                      simp [NTy.typedAsCore] at checked
+              | _ => simp [NTy.typedAsCore] at checked
+          | some _ => simp [NTy.typedAsCore] at checked
+      | _ => simp [NTy.typedAsCore] at checked
   | .struct source nativeArguments fields, type, checked => by
       cases type with
       | nominal name arguments =>
           simp only [NTy.typedAsCore, Bool.and_eq_true, beq_iff_eq] at checked
           obtain ⟨⟨⟨name_eq, arity⟩, typedArguments⟩, checked⟩ := checked
           split at checked
+          · next layout layout_eq =>
+              split at checked
+              · next key value declaringNs namespace_eq =>
+                  split at checked
+                  · next ghostTypes ghostsResolved =>
+                      exact .abstract name_eq arity
+                        (NRow.argumentsTypedAs_of_check nativeArguments _ typedArguments) layout_eq
+                        namespace_eq (ResolvesAll.of_mapM ghostsResolved)
+                        (NRow.typedAs_of_check fields _ checked)
+                  · cases checked
+              · cases checked
+          · next layout_eq =>
+          split at checked
           · next declaringNs declared declaration_eq =>
               split at checked
-              · next fieldTypes resolved =>
+              · next fieldTypes ghostTypes resolved ghostsResolved =>
                   exact .struct name_eq arity
                     (NRow.argumentsTypedAs_of_check nativeArguments arguments typedArguments)
                     declaration_eq
                     (declaredTypes?_resolves resolved)
-                    (NRow.fieldsTypedAs_of_check nativeArguments fields fieldTypes checked)
+                    (ResolvesAll.of_mapM ghostsResolved)
+                    (NRow.typedAs_of_check fields _ checked)
               · cases checked
           · cases checked
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
@@ -251,28 +310,6 @@ theorem Denote.NRow.typedAs_of_check {unit : ValidatedUnit} :
   | .nil, _ :: _, checked | .cons _ _, [], checked => by
       simp only [NRow.typedAsCheck, Bool.false_eq_true] at checked
 
-theorem Denote.NRow.fieldsTypedAs_of_check {unit : ValidatedUnit} (arguments : NRow) :
-    (row : NRow) → (types : List SemTy) → NRow.fieldsCheck unit arguments row types = true →
-      NRow.FieldsTypedAs unit arguments row types
-  | .nil, [], _ => .nil
-  | .cons τ .nil, [], checked => by
-      simp only [NRow.fieldsCheck] at checked
-      split at checked
-      · next key value =>
-          simp only [beq_iff_eq] at checked
-          subst checked
-          exact .hidden
-      · cases checked
-  | .cons τ .nil, [type], checked => by
-      simp only [NRow.fieldsCheck] at checked
-      exact .cons (NTy.typedAs_of_core τ _ checked) .nil
-  | .cons τ (.cons σ rest), type :: types, checked => by
-      simp only [NRow.fieldsCheck, Bool.and_eq_true] at checked
-      exact .cons (NTy.typedAs_of_core τ _ checked.1)
-        (NRow.fieldsTypedAs_of_check arguments (.cons σ rest) types checked.2)
-  | .nil, _ :: _, checked | .cons _ (.cons _ _), [], checked | .cons _ .nil, _ :: _ :: _, checked => by
-      simp only [NRow.fieldsCheck, Bool.false_eq_true] at checked
-
 theorem Denote.NRow.argumentsTypedAs_of_check {unit : ValidatedUnit} :
     (row : NRow) → (arguments : List SemArg) → row.argumentsCheck unit arguments = true →
       row.ArgumentsTypedAs unit arguments
@@ -320,9 +357,10 @@ theorem Denote.NRows.variantsTypedAs_of_check {unit : ValidatedUnit} (source : S
       split at variant
       · next declaringNs declared declaration_eq =>
           split at variant
-          · next fieldTypes resolved =>
+          · next fieldTypes ghostTypes resolved ghostsResolved =>
               exact .cons declaration_eq (declaredTypes?_resolves resolved)
-                (NRow.typedAs_of_check fields fieldTypes variant)
+                (ResolvesAll.of_mapM ghostsResolved)
+                (NRow.typedAs_of_check fields (fieldTypes ++ ghostTypes.map .ghost) variant)
                 (NRows.variantsTypedAs_of_check source arguments names rest later)
           · cases variant
       · cases variant
@@ -343,7 +381,13 @@ theorem _root_.VerexIR.SemTy.sizeOf_unshared_le : (type : SemTy) →
       omega
   | .reference .mutable _ | .unit | .never | .bool | .character | .string | .bytes | .address
   | .signer | .integer _ _ | .tuple _ | .vector _ _ | .nominal _ _ | .function _ _ | .profile _
-  | .param _ => Nat.le_refl _
+  | .param _ | .ghost _ => Nat.le_refl _
+
+/-- Ghost slot types substitute through their slots. -/
+theorem _root_.VerexIR.SemTy.ghosts_subst (types : List SemTy) (arguments : Array SemArg) :
+    (types.map SemTy.ghost).map (·.subst arguments) =
+      (types.map (·.subst arguments)).map SemTy.ghost := by
+  simp [SemTy.subst]
 
 theorem ResolvesAll.subst {tables : Tables} {env : Array SemArg} (arguments : Array SemArg) :
     {typeIds : List TypeId} → {types : List SemTy} → ResolvesAll tables env typeIds types →
@@ -386,7 +430,7 @@ theorem _root_.VerexIR.SemTy.unshared_subst {arguments : Array SemArg} :
   | .reference .mutable _, _, _ | .unit, _, _ | .never, _, _ | .bool, _, _ | .character, _, _
   | .string, _, _ | .bytes, _, _ | .address, _, _ | .signer, _, _ | .integer _ _, _, _
   | .tuple _, _, _ | .vector _ _, _, _ | .nominal _ _, _, _ | .function _ _, _, _
-  | .profile _, _, _ => rfl
+  | .profile _, _, _ | .ghost _, _, _ => rfl
 
 /-- A type parameter is read only as itself. -/
 theorem Denote.NTy.TypedAs.param_of {unit : ValidatedUnit} {τ : NTy} {index : Nat}
@@ -413,6 +457,20 @@ theorem _root_.VerexIR.SemTy.unshared_subst_typed {unit : ValidatedUnit}
     exact unshared
   · exact SemTy.unshared_subst _ observed fun index same => isParam ⟨index, same⟩
 
+/-- An owner's canonical field types substitute through their key, value, and
+ghost types; its leading fields are closed. -/
+theorem _root_.VerexIR.Validation.OwnerLayout.canonicalTypes_subst (layout : OwnerLayout)
+    (ghostTypes : List SemTy) (key value : SemTy) (arguments : Array SemArg) :
+    (layout.canonicalTypes ghostTypes key value).map (·.subst arguments) =
+      layout.canonicalTypes (ghostTypes.map (·.subst arguments)) (key.subst arguments)
+        (value.subst arguments) := by
+  simp only [OwnerLayout.canonicalTypes, OwnerLayout.leadingTypes, List.map_append,
+    SemTy.ghosts_subst]
+  congr 1
+  by_cases handle : layout.canonical.handle = true <;>
+    by_cases dummy : layout.canonical.dummy = true <;>
+    by_cases length : layout.canonical.length = true <;> simp [handle, dummy, length, SemTy.subst]
+
 mutual
 /-- A native type reads, under a substitution, as its reading under the
 arguments it agrees with. -/
@@ -421,7 +479,7 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
     (agree : ArgumentsAgree unit allowed types arguments) :
     {τ : NTy} → {type : SemTy} → τ.TypedAs unit type → τ.paramsAll allowed = true →
       (τ.substWith types).TypedAs unit (type.subst arguments)
-  | .bool, _, .scalar scalar, _ | .int _ _, _, .scalar scalar, _ | .address, _, .scalar scalar, _
+  | .bool, _, .scalar scalar, _ | .int _ _, _, .scalar scalar, _ | .num, _, .scalar scalar, _ | .address, _, .scalar scalar, _
   | .signer, _, .scalar scalar, _ | .string, _, .scalar scalar, _
   | .bytes, _, .scalar scalar, _ => by
       simp only [NTy.scalarType?, Option.some.injEq] at scalar
@@ -430,6 +488,7 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
   | .unit, _, .scalar scalar, _ | .tuple _, _, .scalar scalar, _
   | .struct _ _ _, _, .scalar scalar, _
   | .enum _ _ _ _ _, _, .scalar scalar, _ | .vector _, _, .scalar scalar, _
+  | .table _ _, _, .scalar scalar, _ | .ghost _, _, .scalar scalar, _
   | .ref _, _, .scalar scalar, _ | .param _, _, .scalar scalar, _
   | .function _ _ _, _, .scalar scalar, _ => by simp [NTy.scalarType?] at scalar
   | _, _, .unit, _ => .unit
@@ -440,13 +499,33 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
   | _, _, .vector typed, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       exact .vector (NTy.TypedAs.subst agree typed mentioned)
-  | _, _, .struct name_eq arity typedArguments declaration_eq resolve typed, mentioned => by
+  | _, _, .table typedKey typedValue, mentioned => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
+      simp only [NTy.substWith, SemTy.subst, SemTy.substList]
+      exact .table (NTy.TypedAs.subst agree typedKey mentioned.1)
+        (NTy.TypedAs.subst agree typedValue mentioned.2)
+  | _, _, .struct name_eq arity typedArguments declaration_eq resolve ghostsResolve typed,
+      mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, SemTy.subst]
+      have typedSubst := NRow.TypedAs.subst agree typed mentioned.2
+      rw [List.map_append, List.map_append, SemTy.ghosts_subst, ← contentsTypes_substList]
+        at typedSubst
       refine .struct name_eq ?_ (NRow.ArgumentsTypedAs.subst agree typedArguments mentioned.1)
-        declaration_eq ?_ (NRow.FieldsTypedAs.subst agree typed mentioned.2)
+        declaration_eq ?_ ?_ typedSubst
       · rw [SemArg.substList_eq_map, List.length_map]; exact arity
       · rw [← SemArg.toArray_substList]; exact ResolvesAll.subst arguments resolve
+      · rw [← SemArg.toArray_substList]; exact ResolvesAll.subst arguments ghostsResolve
+  | _, _, .abstract name_eq arity typedArguments layout_eq namespace_eq ghostsResolve typed,
+      mentioned => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
+      simp only [NTy.substWith, SemTy.subst, SemArg.substList, SemArg.subst]
+      have typedSubst := NRow.TypedAs.subst agree typed mentioned.2
+      rw [OwnerLayout.canonicalTypes_subst] at typedSubst
+      refine .abstract name_eq arity ?_ layout_eq namespace_eq ?_ typedSubst
+      · simpa [SemArg.substList, SemArg.subst] using
+          NRow.ArgumentsTypedAs.subst agree typedArguments mentioned.1
+      · simpa [SemArg.subst] using ResolvesAll.subst arguments ghostsResolve
   | _, _, .enum name_eq arity typedArguments nonempty names_eq variants, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, SemTy.subst]
@@ -456,6 +535,10 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
   | _, _, .ref typed, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       exact .ref (NTy.TypedAs.subst agree typed mentioned)
+  | _, _, .ghost typed, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, SemTy.subst]
+      exact .ghost (NTy.TypedAs.subst agree typed mentioned)
   | _, _, .param index, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       obtain ⟨type, argument, typed, _⟩ := agree index mentioned
@@ -479,20 +562,6 @@ theorem Denote.NRow.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool
       simp only [NRow.paramsAll, Bool.and_eq_true] at mentioned
       exact .cons (NTy.TypedAs.subst agree head mentioned.1)
         (NRow.TypedAs.subst agree tail mentioned.2)
-
-theorem Denote.NRow.FieldsTypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
-    {types : Nat → NTy} {arguments : Array SemArg}
-    (agree : ArgumentsAgree unit allowed types arguments) :
-    {nativeArguments row : NRow} → {semTypes : List SemTy} →
-      NRow.FieldsTypedAs unit nativeArguments row semTypes → row.paramsAll allowed = true →
-      NRow.FieldsTypedAs unit (nativeArguments.substWith types) (row.substWith types)
-        (semTypes.map (·.subst arguments))
-  | _, _, _, .nil, _ => .nil
-  | _, _, _, .hidden, _ => .hidden
-  | _, _, _, .cons head tail, mentioned => by
-      simp only [NRow.paramsAll, Bool.and_eq_true] at mentioned
-      exact .cons (NTy.TypedAs.subst agree head mentioned.1)
-        (NRow.FieldsTypedAs.subst agree tail mentioned.2)
 
 theorem Denote.NRow.ArgumentsTypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
     {types : Nat → NTy} {arguments : Array SemArg}
@@ -534,11 +603,14 @@ theorem Denote.NRows.VariantsTypedAs.subst {unit : ValidatedUnit} {allowed : Nat
       NRows.VariantsTypedAs unit source (SemArg.substList arguments semArguments) names
         (rows.substWith types)
   | _, _, _, _, .nil, _ => .nil
-  | _, _, _, _, .cons declaration_eq resolve typed later, mentioned => by
+  | _, _, _, _, .cons declaration_eq resolve ghostsResolve typed later, mentioned => by
       simp only [NRows.paramsAll, Bool.and_eq_true] at mentioned
-      refine .cons declaration_eq ?_ (NRow.TypedAs.subst agree typed mentioned.1)
+      have typedSubst := NRow.TypedAs.subst agree typed mentioned.1
+      rw [List.map_append, SemTy.ghosts_subst] at typedSubst
+      refine .cons declaration_eq ?_ ?_ typedSubst
         (NRows.VariantsTypedAs.subst agree later mentioned.2)
-      rw [← SemArg.toArray_substList]; exact ResolvesAll.subst arguments resolve
+      · rw [← SemArg.toArray_substList]; exact ResolvesAll.subst arguments resolve
+      · rw [← SemArg.toArray_substList]; exact ResolvesAll.subst arguments ghostsResolve
 end
 
 mutual
@@ -554,6 +626,7 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
         | unit => rfl
   | .bool, _, _, .scalar leftScalar, .scalar rightScalar
   | .int _ _, _, _, .scalar leftScalar, .scalar rightScalar
+  | .num, _, _, .scalar leftScalar, .scalar rightScalar
   | .address, _, _, .scalar leftScalar, .scalar rightScalar
   | .signer, _, _, .scalar leftScalar, .scalar rightScalar
   | .string, _, _, .scalar leftScalar, .scalar rightScalar
@@ -571,12 +644,25 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
       | vector leftElement => cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | vector rightElement => rw [NTy.readsUnique element leftElement rightElement]
+  | .table key value, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | table leftKey leftValue => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | table rightKey rightValue =>
+            rw [NTy.readsUnique key leftKey rightKey, NTy.readsUnique value leftValue rightValue]
   | .ref referent, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
       | ref leftReferent => cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | ref rightReferent => rw [NTy.readsUnique referent leftReferent rightReferent]
+  | .ghost slot, _, _, leftTyped, rightTyped => by
+      cases leftTyped with
+      | scalar scalar => simp [NTy.scalarType?] at scalar
+      | ghost leftSlot => cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | ghost rightSlot => rw [NTy.readsUnique slot leftSlot rightSlot]
   | .param _, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
@@ -598,6 +684,18 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
         cases rightTyped with
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | struct rightName _ rightArguments _ _ _ =>
+            rw [leftName, Option.some.injEq] at rightName
+            rw [rightName, NRow.argumentsUnique nativeArguments leftArguments rightArguments]
+        | abstract rightName _ rightArguments _ _ _ _ =>
+            rw [leftName, Option.some.injEq] at rightName
+            rw [rightName, NRow.argumentsUnique nativeArguments leftArguments rightArguments]
+      | abstract leftName _ leftArguments _ _ _ _ =>
+        cases rightTyped with
+        | scalar scalar => simp [NTy.scalarType?] at scalar
+        | struct rightName _ rightArguments _ _ _ =>
+            rw [leftName, Option.some.injEq] at rightName
+            rw [rightName, NRow.argumentsUnique nativeArguments leftArguments rightArguments]
+        | abstract rightName _ rightArguments _ _ _ _ =>
             rw [leftName, Option.some.injEq] at rightName
             rw [rightName, NRow.argumentsUnique nativeArguments leftArguments rightArguments]
   | .enum _ nativeArguments _ _ _, _, _, leftTyped, rightTyped => by
@@ -739,7 +837,8 @@ def Denote.NTy.closureFree : NTy → Bool
   | .vector element => Denote.NTy.closureFree element
   | .table key value => Denote.NTy.closureFree key && Denote.NTy.closureFree value
   | .ref referent => Denote.NTy.closureFree referent
-  | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .param _ => true
+  | .ghost slot => Denote.NTy.closureFree slot
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .param _ => true
 
 def Denote.NRow.closureFree : NRow → Bool
   | .nil => true
@@ -839,123 +938,44 @@ theorem holdsAt_val (pointerWidth : Option Nat) {width : Nat} {signed : Bool}
   simp only [IntegerValueFits] at fits
   simp [StaticTyping.holdsAt, StaticTyping.targetWidth, fits]
 
-/-- A type that reads as a semantic type is no map's contents. -/
-theorem Denote.NTy.TypedAs.not_table {unit : ValidatedUnit} {τ : NTy} {type : SemTy}
-    (typed : τ.TypedAs unit type) : τ.isTable = false := by
-  cases typed with
-  | scalar scalar => cases τ <;> simp_all [NTy.scalarType?, NTy.isTable]
-  | _ => rfl
-
-/-- A scalar type holds no map contents. -/
-theorem Denote.NTy.tableFree_of_scalarType {τ : NTy} {type : SemTy}
-    (scalar : τ.scalarType? = some type) : τ.tableFree = true := by
-  cases τ <;> simp_all [NTy.scalarType?, NTy.tableFree]
-
 section
 variable {unit : Validation.ValidatedUnit} [Skolems unit]
 
-mutual
-/-- A native value's physical value inhabits the semantic type its type reads
-as, where the type is closed, holds no reference, and states no function
-type. -/
-theorem Denote.NTy.TypedAs.erase {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
-    {τ : NTy} → {type : SemTy} → τ.TypedAs unit type → τ.paramFree = true →
-      τ.refFree = true → τ.closureFree = true → (value : τ.carrier) →
-      HasType unit loans (τ.erase value) type
-  | _, _, .scalar scalar, _, _, _, value => by
-      rw [NTy.erase_eq_encode _ (NTy.tableFree_of_scalarType scalar)]
-      exact NTy.encode_hasType _ scalar value
-  | _, _, .unit, _, _, _, _ => by
-      simp only [NTy.erase, NTy.encode_unit]
-      exact .unit
-  | _, _, .tuple typed, closed, plain, closureFree, values => by
-      simp only [NTy.paramFree, NTy.refFree, NTy.closureFree] at closed plain closureFree
-      simp only [NTy.erase]
-      exact .tuple _ _ (by simpa using NRow.TypedAs.erase typed closed plain closureFree values)
-  | _, _, .vector typed, closed, plain, closureFree, values => by
-      simp only [NTy.paramFree, NTy.refFree, NTy.closureFree] at closed plain closureFree
-      simp only [NTy.erase]
-      refine .vector _ _ none trivial (HasTypeEach.of_forall _ fun value member => ?_)
-      simp only [Array.toList_map, List.mem_map] at member
-      obtain ⟨element, -, rfl⟩ := member
-      exact NTy.TypedAs.erase typed closed plain closureFree element
-  | _, _, .struct name_eq _ _ declaration_eq resolve typed, closed, plain, closureFree, values => by
-      simp only [NTy.paramFree, Bool.and_eq_true] at closed
-      simp only [NTy.refFree, NTy.closureFree] at plain closureFree
-      simp only [NTy.erase]
-      exact .nominal _ none _ _ _ _ _ _ name_eq declaration_eq resolve
-        (by simpa using NRow.FieldsTypedAs.erase typed closed.2 plain closureFree values)
-  | _, _, .enum name_eq _ _ _ _ variants, closed, plain, closureFree, value => by
-      simp only [NTy.paramFree, Bool.and_eq_true] at closed
-      simp only [NTy.refFree, NTy.closureFree] at plain closureFree
-      simp only [NTy.erase]
-      exact NRows.VariantsTypedAs.erase name_eq variants closed.2 plain closureFree value
-  | _, _, .ref _, _, plain, _, _ => by simp [NTy.refFree] at plain
-  | _, _, .param _, closed, _, _, _ => by simp [NTy.paramFree] at closed
-  | _, _, .function _ _ _, _, _, closureFree, _ => by simp [NTy.closureFree] at closureFree
+/-- Every runtime value a closed native type holding no reference admits
+(`NTy.admits`) has a typed runtime representation: a runtime value
+normalizing to it (`SemanticOperations.normalize`), typed at the semantic
+type the native type reads as, a function type only in a unit whose readings
+agree. A value of an intrinsic map owner is abstract, and its representation
+is a value of the owner's Move type holding its entries, slots, and handle;
+this is assumed of a unit as its natives' contracts are
+(`designs/intrinsic-maps.md`, "Abstract representation"). -/
+def OwnersRepresentable (unit : ValidatedUnit) : Prop :=
+  ∀ (τ : NTy) (type : SemTy) (value : RuntimeValue), τ.TypedAs unit type → τ.paramFree = true →
+    τ.refFree = true → (τ.closureFree = true ∨ TypesAgree unit) → NTy.admits unit τ value = true →
+    ∃ representation, SemanticOperations.normalize unit representation = value ∧
+      HasType unit (fun _ => none) representation type
 
-/-- A row of native values' physical values inhabit the row's semantic types. -/
-theorem Denote.NRow.TypedAs.erase {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
-    {row : NRow} → {types : List SemTy} → row.TypedAs unit types → row.paramFree = true →
-      row.refFree = true → row.closureFree = true → (values : HList row) →
-      HasTypes unit loans (HList.erase row values) types
-  | _, _, .nil, _, _, _, _ => by
-      simp only [HList.erase]
-      exact .nil
-  | _, _, .cons head tail, closed, plain, closureFree, values => by
+/-- `OwnersRepresentable` along a row. -/
+theorem NRow.represented_of_admits {unit : ValidatedUnit} (representable : OwnersRepresentable unit)
+    (agree : TypesAgree unit) :
+    (values : List RuntimeValue) → (row : NRow) → {types : List SemTy} →
+      NRow.admits unit row values = true → row.TypedAs unit types → row.paramFree = true →
+      row.refFree = true →
+      ∃ represented : List RuntimeValue, represented.map (SemanticOperations.normalize unit) = values ∧
+        HasTypes unit (fun _ => none) represented types
+  | [], .nil, _, _, .nil, _, _ => ⟨[], rfl, .nil⟩
+  | value :: values, .cons τ rest, _, admitted, .cons head tail, closed, plain => by
+      simp only [NRow.admits, Bool.and_eq_true] at admitted
       simp only [NRow.paramFree, Bool.and_eq_true] at closed
-      simp only [NRow.refFree, NRow.closureFree, Bool.and_eq_true] at plain closureFree
-      simp only [HList.erase]
-      exact .cons (NTy.TypedAs.erase head closed.1 plain.1 closureFree.1 values.1)
-        (NRow.TypedAs.erase tail closed.2 plain.2 closureFree.2 values.2)
-
-/-- A struct's physical fields inhabit its declared field types: a hidden
-contents field is dropped. -/
-theorem Denote.NRow.FieldsTypedAs.erase {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
-    {arguments row : NRow} → {types : List SemTy} → NRow.FieldsTypedAs unit arguments row types →
-      row.paramFree = true → row.refFree = true → row.closureFree = true → (values : HList row) →
-      HasTypes unit loans (HList.eraseFields row values) types
-  | _, _, _, .nil, _, _, _, _ => by
-      simp only [HList.eraseFields]
-      exact .nil
-  | _, _, _, .hidden, _, _, _, _ => by
-      simp only [HList.eraseFields, NTy.isTable, ite_true]
-      exact .nil
-  | _, _, _, .cons (rest := rest) head tail, closed, plain, closureFree, values => by
-      simp only [NRow.paramFree, Bool.and_eq_true] at closed
-      simp only [NRow.refFree, NRow.closureFree, Bool.and_eq_true] at plain closureFree
-      cases rest with
-      | nil =>
-          cases tail
-          simp only [HList.eraseFields, head.not_table, Bool.false_eq_true, ite_false]
-          exact .cons (NTy.TypedAs.erase head closed.1 plain.1 closureFree.1 values.1) .nil
-      | cons σ rest =>
-          simp only [HList.eraseFields]
-          exact .cons (NTy.TypedAs.erase head closed.1 plain.1 closureFree.1 values.1)
-            (NRow.FieldsTypedAs.erase tail closed.2 plain.2 closureFree.2 values.2)
-
-/-- An enum value's physical value inhabits its nominal type, its variant's
-fields at that variant's declared types. -/
-theorem Denote.NRows.VariantsTypedAs.erase {unit : ValidatedUnit} [Skolems unit]
-    {loans : LoanTypes} {source : StructHandle} {name : QualifiedName}
-    {arguments : List SemArg} (name_eq : SemanticOperations.structName? unit source = some name) :
-    {names : List String} → {rows : NRows} →
-      NRows.VariantsTypedAs unit source arguments names rows → rows.paramFree = true →
-      rows.refFree = true → rows.closureFree = true → (value : variantCarrier names rows) →
-      HasType unit loans (variantCarrier.erase source names rows value) (.nominal name arguments)
-  | _, _, .nil, _, _, _, value => nomatch value
-  | _, _, .cons declaration_eq resolve typed _, closed, plain, closureFree, .inl values => by
-      simp only [NRows.paramFree, Bool.and_eq_true] at closed
-      simp only [NRows.refFree, NRows.closureFree, Bool.and_eq_true] at plain closureFree
-      simp only [variantCarrier.erase]
-      exact .nominal _ _ _ _ _ _ _ _ name_eq declaration_eq resolve
-        (by simpa using NRow.TypedAs.erase typed closed.1 plain.1 closureFree.1 values)
-  | _, _, .cons _ _ _ later, closed, plain, closureFree, .inr value => by
-      simp only [NRows.paramFree, Bool.and_eq_true] at closed
-      simp only [NRows.refFree, NRows.closureFree, Bool.and_eq_true] at plain closureFree
-      simp only [variantCarrier.erase]
-      exact NRows.VariantsTypedAs.erase name_eq later closed.2 plain.2 closureFree.2 value
-end
+      simp only [NRow.refFree, Bool.and_eq_true] at plain
+      obtain ⟨representation, normalized, typed⟩ :=
+        representable τ _ value head closed.1 plain.1 (.inr agree) admitted.1
+      obtain ⟨represented, normalizedRest, typedRest⟩ :=
+        NRow.represented_of_admits representable agree values rest admitted.2 tail closed.2 plain.2
+      exact ⟨representation :: represented, by simp [normalized, normalizedRest],
+        .cons typed typedRest⟩
+  | [], .cons _ _, _, admitted, _, _, _ | _ :: _, .nil, _, admitted, _, _, _ => by
+      simp [NRow.admits] at admitted
 
 end
 

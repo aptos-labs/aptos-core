@@ -231,6 +231,9 @@ verex module aptos_framework::big_ordered_map where
     | End
     | Some (node_index : u64, child_iter : ordered_map::IteratorPtr, key : K)
 
+  spec IteratorPtr where
+    ghost _validity : Int
+
   struct IteratorPtrWithPath {K} has Copy, Drop where
     iterator : IteratorPtr<K>
     path : Vector<u64>
@@ -250,6 +253,7 @@ verex module aptos_framework::big_ordered_map where
 
   spec BigOrderedMap where
     pragma intrinsic = map
+    ghost _validity : Int
 
   -- ======================= Constructors && Destructors ====================
   /--
@@ -1404,6 +1408,9 @@ verex module aptos_framework::big_ordered_map where
   enum LeafNodeIteratorPtr has Copy, Drop where
     | NodeIndex (node_index : u64)
 
+  spec LeafNodeIteratorPtr where
+    ghost _validity : Int
+
   public fun internal_leaf_new_begin_iter {K has Store} {V has Store}(
     self : &BigOrderedMap<K, V>
   ) -> LeafNodeIteratorPtr :=
@@ -1799,7 +1806,7 @@ verex module aptos_framework::big_ordered_map where
             EINTERNAL_INVARIANT_BROKEN
           )
         )
-        let new_root_node := new_node::<K, V>(false)
+        let mut new_root_node := new_node::<K, V>(false)
         let (replacement_node_slot, replacement_node_reserved_slot) :=
           reserve_slot(&mut self.nodes)
         let max_key :=
@@ -1838,7 +1845,7 @@ verex module aptos_framework::big_ordered_map where
         == 0), invalid_state(EINTERNAL_INVARIANT_BROKEN)
     )
     let right_node_reserved_slot := reserved_slot
-    let left_node := node
+    let mut left_node := node
     let is_leaf := left_node.is_leaf
     let left_children := &mut left_node.children
     let right_node_index := reserved_to_index(&right_node_reserved_slot)

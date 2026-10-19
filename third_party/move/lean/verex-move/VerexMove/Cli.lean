@@ -92,10 +92,17 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
   unless reports.any (·.severity == .error) do
     IO.eprintln s!"verex-move: generated {output}"
   IO.eprintln s!"verex-move: {← VerexSL.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
+  -- A completed diagnostic run is distinct from an import failure or crash.
+  IO.eprintln "verex-move: verification complete"
   pure <| if reports.any (·.severity == .error) then 1 else 0
 
 def run (arguments : List String) : IO UInt32 := do
   match arguments with
+  | ["snapshot-modules"] => do
+      let environment ← VerexMove.SourceVerify.importEnvironment
+      for name in environment.header.moduleNames do
+        IO.println (← Lean.findOLean name)
+      return 0
   | "verify" :: source :: rest => verifySource source (← parseOptions rest {})
   | _ => fail "expected a command"
 

@@ -2246,6 +2246,7 @@ module aptos_framework::big_ordered_map {
 
     spec ground_enum_123 {
         pragma verify = true;
+        pragma opaque;
         requires spec_len(map) == 3;
         requires spec_contains_key(map, 1);
         requires spec_contains_key(map, 2);

@@ -1,2 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bitwise_error_2.move:1:1: error: a storage clause names a type that is not a resource
+tests/sources/functional/bitwise_error_2.move:20:9: error: the specification clause `ensures s.s
+        == (old(s.s) << global<«Ghost$x»>(@0x0).v)
+          % 340282366920938463463374607431768211456` is not established
+tests/sources/functional/bitwise_error_2.move:19:5: error: verex verification failed: the automatic verification of `shift` failed; provide a proof in `tests/sources/functional/bitwise_error_2.proof.lean`:
+  verify shift by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

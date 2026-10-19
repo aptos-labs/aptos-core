@@ -1776,9 +1776,47 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                   all_goals simp at checked
                 all_goals simp at checked
       case borrow kind =>
-          rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
-            (.reference (.borrow kind)) values.toArray frame state = none from rfl] at evaluate_eq
-          cases evaluate_eq
+          cases kind
+          case immutable =>
+            simp only [Context.checkOperation] at checked
+            -- Only a borrow of one value evaluates.
+            have typedValues := valuesTyped
+            cases operands_eq : operands.toList with
+            | nil =>
+              rw [operands_eq] at typedValues
+              cases values with
+              | nil => cases evaluate_eq
+              | cons _ _ => simp [ValuesTyped] at typedValues
+            | cons operand rest =>
+              cases rest with
+              | cons _ _ =>
+                rw [operands_eq] at typedValues
+                rcases values with _ | ⟨_, _ | ⟨_, _⟩⟩
+                · simp [ValuesTyped] at typedValues
+                · simp [ValuesTyped] at typedValues
+                · cases evaluate_eq
+              | nil =>
+                rw [operands_eq] at checked
+                simp only at checked
+                obtain ⟨argument, rfl, -, argumentType, argumentType_eq, typed⟩ :=
+                  valuesTyped.single operands_eq
+                rw [argumentType_eq] at checked
+                simp only [beq_iff_eq] at checked
+                subst checked
+                rw [evaluatePlaceOperation?_sharedBorrow] at evaluate_eq
+                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
+                obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+                exact ⟨loans, .refl _, running, stateTyped, .shared _ _ typed⟩
+          case mutable =>
+            rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
+              (.reference (.borrow .mutable)) values.toArray frame state = none from rfl]
+              at evaluate_eq
+            cases evaluate_eq
+          case profile value =>
+            rw [show evaluatePlaceOperation? unit context.ns expression.typeId exprId
+              (.reference (.borrow (.profile value))) values.toArray frame state = none from rfl]
+              at evaluate_eq
+            cases evaluate_eq
   | data dataOperation =>
       rw [evaluatePlaceOperation?_data] at evaluate_eq
       obtain ⟨result, eval_eq, evaluate_eq⟩ := Option.bind_eq_some_iff.mp evaluate_eq
@@ -1815,6 +1853,7 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                       eval_eq
                   · cases checked
                 · cases checked
+      case selectGhost reference field => simp [Context.checkData] at checked
       case selectVariants reference fields =>
           simp only [Context.checkData, placed.unit_eq] at checked
           cases target : structTarget? unit context.ns reference with
@@ -2800,10 +2839,10 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
         | some semantic =>
           simp only [target, resolved] at nodeChecked
           split at nodeChecked
-          · rename_i fieldTypes fieldTypes_eq
+          · rename_i fieldTypes ghostTypes fieldTypes_eq ghostTypes_eq
             simp only [Bool.and_eq_true, beq_iff_eq] at nodeChecked
             obtain ⟨⟨size_eq, flows⟩, rfl⟩ := nodeChecked
-            exact constructNominal_typed placed.namespace_eq target fieldTypes_eq
+            exact constructNominal_typed placed.namespace_eq target fieldTypes_eq ghostTypes_eq
               (by simpa using valuesTyped.flows (by simpa using size_eq) flows) construct_eq
           · cases nodeChecked
   case destructorValue =>
@@ -2958,12 +2997,12 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     | throw_ kind arguments => trivial
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
     exact natives handle typeInstantiation initialState arguments finalState outcome native_eq
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq body_eq
-      body_step outcome_eq hole_free finalize_eq ih
+      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
+      body_eq body_step outcome_eq hole_free finalize_eq ih
     intro loans inert ns' declaration' semantic parameters results namespace_eq' declaration_eq'
       faithful signature_eq argumentsTyped stateTyped
     rw [namespace_eq, Option.some.injEq] at namespace_eq'

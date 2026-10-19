@@ -69,6 +69,11 @@ def loopSite (namespaceIndex expressionIndex : Nat) : Nat :=
   (namespaceIndex + expressionIndex) * (namespaceIndex + expressionIndex + 1) / 2 +
     expressionIndex
 
+/-- The site of the initializer of a pack's `k`-th ghost field, apart from
+every other pack's and ghost field's. -/
+def ghostInitSite (namespaceIndex expressionIndex k : Nat) : Nat :=
+  loopSite (loopSite namespaceIndex expressionIndex) k
+
 /-- The rejection of a construct. -/
 def notCarried (what : String) : Except String α :=
   .error s!"{what} is not carried by the denotation"
@@ -288,6 +293,7 @@ def literalValue : (τ : NTy) → ConstValue → Except String τ.groundCarrier
   | .int width signed, .integer value =>
       if fits : IntegerValueFits (.bits width) signed value then .ok ⟨value, fits⟩
       else .error "an integer literal is out of range"
+  | .num, .integer value => .ok ⟨value, rfl⟩
   | .bool, .bool value => .ok value
   | .unit, .unit => .ok ()
   | .address, .address value => .ok value
@@ -319,6 +325,7 @@ def Proj.append : {τ σ υ : NTy} → Proj τ σ → Proj σ υ → Proj τ υ
   | _, _, _, .field x path, rest => .field x (path.append rest)
   | _, _, _, .index position path, rest => .index position (path.append rest)
   | _, _, _, .variant choices path, rest => .variant choices (path.append rest)
+  | _, _, _, .ghost path, rest => .ghost (path.append rest)
 
 /-- The number of variants a selection chooses a field of. -/
 def Choices.length {names : List String} {rows : NRows} {τ : NTy} :
@@ -334,7 +341,8 @@ def Choices.partial {names : List String} {rows : NRows} {τ : NTy}
 /-- Whether a path steps into a field some variant lacks. -/
 def Proj.mayMismatch : {τ σ : NTy} → Proj τ σ → Bool
   | _, _, .nil => false
-  | _, _, .deref path | _, _, .field _ path | _, _, .index _ path => path.mayMismatch
+  | _, _, .deref path | _, _, .field _ path | _, _, .index _ path | _, _, .ghost path =>
+      path.mayMismatch
   | _, _, .variant choices path => choices.partial || path.mayMismatch
 
 /-- The throw an access along a path makes where a variant lacks the field:
@@ -342,6 +350,11 @@ the profile's mismatch throw, for a path that may meet one. -/
 def CompileNamespace.mismatchOn (ns : CompileNamespace) {τ σ : NTy} (path : Proj τ σ) :
     Option Failure :=
   if path.mayMismatch then patternMismatchThrow? ns.source.profile else none
+
+/-- The slot of a named ghost field in each listed variant of a declaration. -/
+def ghostChoices? (unit : ValidatedUnit) (handle : StructHandle) (variants : List String)
+    (field : String) : Option (List (String × Nat)) :=
+  variants.mapM fun variant => (handleGhostIndex? unit handle (some variant) field).map (variant, ·)
 
 /-- The typed place a place names. -/
 def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
@@ -400,6 +413,51 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
               let choices ← Choices.ofList names rows σ choices.toList
               .ok ⟨root, σ, x, path.append (.variant choices .nil)⟩
           | _, _ => notCarried "a field place on a non-struct"
+      | .ghostField base owner field =>
+          -- A ghost field below a downcast is the named variant's slot.
+          let (base, variant?) := match ns.place? base with
+            | some (.downcast inner variant) => (inner, some variant)
+            | _ => (base, none)
+          let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
+          let some handle := resolveStruct? unit ns.source.identity owner
+            | .error "a ghost field place does not resolve"
+          let some name := sourceFieldName? ns.source field
+            | .error "a ghost field place has no name"
+          match component, path with
+          | .struct source _ fields, path =>
+              unless handle = source do
+                .error "a ghost field place's declaration differs from its type"
+              let some index := handleGhostIndex? unit handle none name
+                | .error "a ghost field place names an unknown ghost field"
+              let some ⟨σ, position⟩ := Var.ofIndex fields index
+                | .error "a ghost field place is out of range"
+              match σ, position with
+              | .ghost slot, position =>
+                  .ok ⟨root, slot, x, path.append (.field position (.ghost .nil))⟩
+              | _, _ => .error "a ghost field place is not a ghost slot"
+          | .enum source _ names rows _, path =>
+              unless handle = source do
+                .error "a ghost field place's declaration differs from its type"
+              let listed ← match variant? with
+                | none => .ok names
+                | some variant => do
+                    let some variantName := sourceFieldName? ns.source variant
+                      | .error "a downcast place has no variant name"
+                    .ok [variantName]
+              let some choices := ghostChoices? unit handle listed name
+                | .error "a ghost field place names an unknown ghost field"
+              let (firstVariant, firstIndex) :: _ := choices
+                | .error "a ghost field place names no variant"
+              let some ⟨σs, _⟩ := Which.ofName names rows firstVariant
+                | .error "a ghost field place names an unknown variant"
+              let some ⟨σ, _⟩ := Var.ofIndex σs firstIndex
+                | .error "a ghost field place is out of range"
+              match σ with
+              | .ghost slot => do
+                  let choices ← Choices.ofList names rows (.ghost slot) choices
+                  .ok ⟨root, slot, x, path.append (.variant choices (.ghost .nil))⟩
+              | _ => .error "a ghost field place is not a ghost slot"
+          | _, _ => notCarried "a ghost field place on a non-nominal value"
       | .index base indexExpr =>
           let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
           let some form := placeIndexForm? ns.source indexExpr
@@ -488,6 +546,18 @@ def withDeaths (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (id :
   | some effect => .ok (node.map fun _ term => .drop effect term)
   | none => .ok node
 
+/-- Whether a unit declares a ghost field or a spec variable's memory, which
+belong to the verification model (`designs/ghost-fields.md`). -/
+def declaresGhosts (unit : ValidatedUnit) : Bool :=
+  unit.namespaces.any fun ns => ns.structs.any fun declaration =>
+    !declaration.ghosts.isEmpty || declaration.isGhostMemory
+
+/-- Whether `==` at a type compares the values' runtime encodings with
+ghost contents dropped: in a unit declaring ghosts, at a type mentioning a
+type parameter (`designs/ghost-fields.md`). -/
+def comparesErased (unit : ValidatedUnit) (τ : NTy) : Bool :=
+  declaresGhosts unit && !τ.paramsAll (fun _ => false)
+
 /-- The literal of a constant at its declared type. -/
 def compileLiteral {ρ : ResultShape} {Γ : NRow} (τ : NTy) (literal : ConstValue) :
     Except String (Term unit ρ Γ τ) :=
@@ -545,6 +615,10 @@ def compilePatterns (Γ : NRow) (ns : CompileNamespace) :
     Nat → List PatternId → (σs : NRow) → Except String (Pats Γ σs)
   | 0, _, _ => .error "the compiler ran out of fuel"
   | _ + 1, [], .nil => .ok .nil
+  -- A constructor pattern binds the declared fields; the ghost slots after
+  -- them match anything.
+  | fuel + 1, [], .cons (.ghost _) σs => do
+      .ok (.cons .wildcard (← compilePatterns Γ ns fuel [] σs))
   | fuel + 1, pattern :: patterns, .cons σ σs => do
       let head ← compilePattern Γ ns fuel pattern σ
       .ok (.cons head (← compilePatterns Γ ns fuel patterns σs))
@@ -652,9 +726,8 @@ mutual
                 | notCarried "the type of a type argument"
               let θ := NRow.ofList θ
               unless θ.refFree do notCarried "a reference type argument"
-              unless θ.tableFree do notCarried "a type argument holding a map's contents"
-              let some (θ : TypeArgs) := if arguments : θ.typeArguments = true then
-                  some ⟨θ, arguments⟩ else none
+              let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
+                  some ⟨θ, inhabitable⟩ else none
                 | notCarried "a type argument without values"
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 (NRow.subst θ.1 parameters)
@@ -688,13 +761,11 @@ mutual
                 if closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true
                 then
                 if faithful : closureFaithful unit handle #[] = true then
-                if plain : captured.tableFree = true then
                   let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
                     captures.toList captured
                   let value : Term unit ρ Γ (.function supplied shared results) :=
-                    .closure handle weave results shared rows sharing closed faithful plain captures
+                    .closure handle weave results shared rows sharing closed faithful captures
                   .ok (.at τ (← Compiled.at? τ (.at (.function supplied shared results) value)))
-                else notCarried "a captured value holding a map's contents"
                 else notCarried "a closure whose empty instantiation is not faithful to its target"
                 else notCarried "a closure without type arguments over type parameters"
                 else notCarried "a closure whose shared parameters are not its target's"
@@ -708,9 +779,8 @@ mutual
                 | notCarried "the type of a type argument"
               let θ := NRow.ofList θ
               unless θ.refFree do notCarried "a reference type argument"
-              unless θ.tableFree do notCarried "a type argument holding a map's contents"
-              let some (θ : TypeArgs) := if arguments : θ.typeArguments = true then
-                  some ⟨θ, arguments⟩ else none
+              let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
+                  some ⟨θ, inhabitable⟩ else none
                 | notCarried "a type argument without values"
               let shape ← match target.signature.results.toList with
                 | [] => .ok ResultShape.none
@@ -725,17 +795,15 @@ mutual
               then
                 if sharing : closureShared unit handle weave.mask = shared then
                 if below : closureSignatureBelow unit handle = true then
-                if plain : captured.tableFree = true then
                   let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
                     captures.toList (NRow.subst θ.1 captured)
                   let value : Term unit ρ Γ
                       (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row) :=
                     .closureGeneric handle weave typeArgs.toArray θ shape shared rows sharing below
-                      plain captures
+                      captures
                   .ok (.at τ (← Compiled.at? τ
                     (.at (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
                       value)))
-                else notCarried "a captured value holding a map's contents"
                 else notCarried "a closure target whose signature names foreign type parameters"
                 else notCarried "a closure whose shared parameters are not its target's"
               else notCarried "a closure whose rows are not its target's"
@@ -808,8 +876,21 @@ mutual
             match τ, variant with
             | .struct source nominalArguments σs, none =>
                 unless handle = source do .error "a constructor's declaration differs from its type"
-                let fields ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList σs
-                let packed := Term.pack source nominalArguments fields
+                let fields ← compilePackArgs unit loanFacts ρ Γ ns namespaceId fuel
+                  arguments.toList σs
+                -- Each initialized ghost slot takes its initializer's value
+                -- (`designs/ghost-fields.md`), before the invariants are owed.
+                let ghosts := nominalGhosts unit handle
+                let packed ← (List.range ghosts.size).foldlM
+                    (init := Term.pack source nominalArguments fields) fun term k => do
+                  unless (ghosts[k]?.bind (·.initializer)).isSome do return term
+                  let some ⟨σ, x⟩ := Var.ofIndex σs (arguments.size + k)
+                    | .error "a ghost slot is out of range"
+                  match σ, x with
+                  | .ghost _, x =>
+                      pure (Term.ghostInit (ghostInitSite namespaceId.index id.index k)
+                        (.field x .nil) term)
+                  | _, _ => .error "a ghost field's position holds no ghost slot"
                 .ok (.at (.struct source nominalArguments σs)
                   (if ns.carriesInvariant (.struct source nominalArguments σs) then
                     .constructed (loopSite namespaceId.index id.index) packed else packed))
@@ -817,8 +898,22 @@ mutual
                 unless handle = source do .error "a constructor's declaration differs from its type"
                 let some ⟨σs, choice⟩ := Which.ofName names rows name
                   | .error "a constructor names an unknown variant"
-                let fields ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList σs
-                let packed := Term.variant source nominalArguments distinct choice fields
+                let fields ← compilePackArgs unit loanFacts ρ Γ ns namespaceId fuel
+                  arguments.toList σs
+                let ghosts := nominalGhosts unit handle
+                let packed ← (List.range ghosts.size).foldlM
+                    (init := Term.variant source nominalArguments distinct choice fields)
+                    fun term k => do
+                  unless (ghosts[k]?.bind (·.initializer)).isSome do return term
+                  let some ⟨σ, _⟩ := Var.ofIndex σs (arguments.size + k)
+                    | .error "a ghost slot is out of range"
+                  match σ with
+                  | .ghost slot => do
+                      let choices ← Choices.ofList names rows (.ghost slot)
+                        [(name, arguments.size + k)]
+                      pure (Term.ghostInit (ghostInitSite namespaceId.index id.index k)
+                        (.variant choices .nil) term)
+                  | _ => .error "a ghost field's position holds no ghost slot"
                 .ok (.at (.enum source nominalArguments names rows distinct)
                   (if ns.carriesInvariant (.enum source nominalArguments names rows distinct) then
                     .constructed (loopSite namespaceId.index id.index) packed else packed))
@@ -924,7 +1019,13 @@ mutual
                 else .ok (.at .unit (.writePlace (ns.mismatchOn path) x path value))
         | .loop _ body => do
             let body ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel body).at? .unit
-            .ok (.at .unit (.loop (loopSite namespaceId.index id.index) body))
+            let loop := Term.loop (loopSite namespaceId.index id.index) body
+            match τ? with
+            | none | some .unit | some (.tuple .nil) => .ok (.at .unit loop)
+            -- A loop of another type completes only by a break with a value,
+            -- which is not carried, so it never completes: what follows it
+            -- is unreachable.
+            | some τ => .ok (.at τ (.drop loop (.throw0 .panic)))
         | .break_ nest none => .ok (.never fun _ => .break_ nest)
         | .continue_ nest => .ok (.never fun _ => .continue_ nest)
         -- An anchor records the state a later assertion reads, and the
@@ -950,7 +1051,51 @@ mutual
             -- proved there and what it gives assumed after.
             let isAssertion := fun (condition : Condition) =>
               condition.kind matches .assertion | .apply | .split
-            let conditions := block.conditions.toList
+            -- An update writes the ghost field it names the value the
+            -- meanings give its site (`designs/ghost-fields.md`), before or
+            -- after the block's other conditions.
+            let isUpdate := fun (condition : Condition) => condition.kind == .update
+            let all := block.conditions.toList
+            let updatesFirst := (all.dropWhile isUpdate).all (!isUpdate ·)
+            let updatesLast := (all.dropWhile (!isUpdate ·)).all isUpdate
+            if !updatesFirst && !updatesLast then
+              notCarried "a specification block interleaving updates and other conditions"
+            else
+            let writes ← (all.filter isUpdate).mapM fun condition => do
+              let some (_, target) := condition.auxiliary.find? (·.1 == "updateTarget")
+                | .error "an update has no target"
+              let site := loopSite namespaceId.index condition.expression.index
+              match ns.expressions.get? target.index with
+              | some { kind := .operation (.read place) _ _ _, .. } =>
+                  unless ns.place? place matches some (.ghostField ..) do
+                    notCarried "an update whose target is not a ghost field"
+                  let ⟨_, _, x, path⟩ ← compilePlace unit Γ ns fuel place
+                  pure (Term.writePlace (ns.mismatchOn path) x path (.ghostValue site) :
+                    Term unit ρ Γ .unit)
+              -- A spec variable's write: its memory's resource, repacked with
+              -- the value, which only the model's memory holds.
+              | some { kind := .operation (.data (.select reference _)) _ #[base] _, .. } =>
+                  let some baseExpression := ns.expressions.get? base.index
+                    | .error "an update's target is out of range"
+                  let .operation (.specification (.global none)) #[.typeArg resource] #[key] _ :=
+                      baseExpression.kind
+                    | notCarried "an update whose target is not a ghost field or a spec variable"
+                  let some handle := resolveStruct? unit namespaceId reference
+                    | .error "an update's resource does not resolve"
+                  let ghostMemory := ((unit.namespaces[handle.namespaceId.index]?).bind
+                    (·.structs[handle.structId]?)).any (·.isGhostMemory)
+                  unless ghostMemory do
+                    notCarried "an update of memory other than a spec variable's"
+                  let some (native, typeArguments) := ns.resource unit namespaceId resource.typeId
+                    | notCarried "a spec variable's memory without a native resource type"
+                  let .struct source arguments (.cons τ .nil) := native
+                    | notCarried "a spec variable's memory with other than one field"
+                  let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
+                  let value : Term unit ρ Γ (.struct source arguments (.cons τ .nil)) :=
+                    .pack source arguments (.cons (.ghostValue site) .nil)
+                  pure (.seqAfter (.ghostStore site typeArguments key value) (.memoryWritten site))
+              | _ => notCarried "an update whose target is not a place"
+            let conditions := all.filter (!isUpdate ·)
             let assumedAfter := (conditions.dropWhile (!isAssertion ·)).any isAssumption
             let assertedAfter := (conditions.dropWhile (!isAssumption ·)).any isAssertion
             if assumedAfter && assertedAfter then
@@ -962,6 +1107,7 @@ mutual
                 if conditions.any isAssertion then [.assertion site] else []
               let steps := (if conditions.any isSave then [.anchor site] else []) ++
                 if assumedAfter then assertion ++ assumption else assumption ++ assertion
+              let steps := if updatesFirst then writes ++ steps else steps ++ writes
               match steps with
               | [] => .ok (.at .unit (.lit ()))
               | first :: rest => .ok (.at .unit (rest.foldl .seqAfter first))
@@ -995,6 +1141,23 @@ mutual
         let tail ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments σs
         .ok (.cons head tail)
     | _ + 1, _, _ => .error "an argument row's arity differs from its declaration's"
+
+  /-- A constructor's fields, then each ghost slot of its row: any value of
+  its type, the model's value for a ghost field the runtime does not hold
+  (`designs/ghost-fields.md`). -/
+  def compilePackArgs (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
+      Nat → List ExprId → (σs : NRow) → Except String (Args unit ρ Γ σs)
+    | 0, _, _ => .error "the compiler ran out of fuel"
+    | _ + 1, [], .nil => .ok .nil
+    | fuel + 1, [], .cons (.ghost _) σs => do
+        .ok (.cons (.ghostSlot .arbitrary)
+          (← compilePackArgs unit loanFacts ρ Γ ns namespaceId fuel [] σs))
+    | fuel + 1, argument :: arguments, .cons σ σs => do
+        let head ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel argument).at? σ
+        let tail ← compilePackArgs unit loanFacts ρ Γ ns namespaceId fuel arguments σs
+        .ok (.cons head tail)
+    | _ + 1, _, _ => .error "a constructor's arity differs from its declaration's"
 
   /-- Bind a value to a pattern around a body. -/
   def compileBinding {unit : ValidatedUnit} {ρ : ResultShape} (Γ : NRow) (ns : CompileNamespace) :
@@ -1125,6 +1288,24 @@ mutual
             let x ← Var.at? σs index τ
             .ok (.at τ (.field x operand))
         | _, _ => notCarried "a field selection on a non-struct"
+    -- A ghost field reads as its slot's contents (`designs/ghost-fields.md`).
+    | fuel + 1, τ, .data (.selectGhost reference field), [operand] => do
+        let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
+        let some handle := resolveStruct? unit namespaceId reference
+          | .error "a ghost field selection does not resolve"
+        match σ, operand with
+        | .struct _ _ σs, operand => do
+            let some index := handleGhostIndex? unit handle none field
+              | .error "a ghost field selection names an unknown ghost field"
+            let x ← Var.at? σs index (.ghost τ)
+            .ok (.at τ (.ghostRead (.field x operand)))
+        | .enum source _ names rows _, operand => do
+            unless handle = source do .error "a ghost field selection's declaration differs"
+            let some choices := ghostChoices? unit handle names field
+              | .error "a ghost field selection names an unknown ghost field"
+            let choices ← Choices.ofList names rows (.ghost τ) choices
+            .ok (.at τ (.ghostRead (.payload none choices operand)))
+        | _, _ => notCarried "a ghost field selection on a non-nominal value"
     | fuel + 1, .bool, .data (.testVariants _ variants), [operand] => do
         let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
@@ -1197,12 +1378,14 @@ mutual
         -- than carry an equality the execution does not agree with.
         unless σ.refFree do notCarried "an equality of a value holding a reference"
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? σ
-        .ok (.at .bool (.equal false left right))
+        .ok (.at .bool (if comparesErased unit σ then .equalErased false left right
+          else .equal false left right))
     | fuel + 1, .bool, .notEqual, [left, right] => do
         let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         unless σ.refFree do notCarried "an inequality of a value holding a reference"
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? σ
-        .ok (.at .bool (.equal true left right))
+        .ok (.at .bool (if comparesErased unit σ then .equalErased true left right
+          else .equal true left right))
     | fuel + 1, .bool, .logicalNot, [operand] => do
         let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? .bool
         .ok (.at .bool (.not operand))
@@ -1483,17 +1666,31 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
   let mutables ← mutableSlots (params ++ locals) 0 allLocals.length
   .ok { params, locals, result, body, mutables }
 
-/-- The compiled function a handle names, or the construct that stops it. -/
+/-- The compiled function a handle names, or the construct that stops it:
+its denotation, which agrees with its runtime meaning. A unit declaring
+ghost fields has none: its model holds ghost state the runtime does
+not, and is verified through the model (`designs/ghost-fields.md`). -/
 def compileFunction (unit : ValidatedUnit)
+    (handle : FunctionHandle) : Except String (Function unit) :=
+  if declaresGhosts unit then .error "a unit declaring ghost fields is verified through its model"
+  else match compileNamespaceAt? unit handle.namespaceId with
+  | none => .error "a namespace is out of range"
+  | some view => compileFunctionIn unit view handle
+
+/-- A function's model in a unit declaring ghost fields: its denotation with
+the ghost state the runtime does not hold, which the unit's verification
+reads instead of its runtime meaning (`designs/ghost-fields.md`). -/
+def compileModelFunction (unit : ValidatedUnit)
     (handle : FunctionHandle) : Except String (Function unit) :=
   match compileNamespaceAt? unit handle.namespaceId with
   | none => .error "a namespace is out of range"
   | some view => compileFunctionIn unit view handle
 
 theorem compileFunction_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
-    {view : CompileNamespace} (viewed : compileNamespaceAt? unit handle.namespaceId = some view) :
+    {view : CompileNamespace} (noGhosts : declaresGhosts unit = false)
+    (viewed : compileNamespaceAt? unit handle.namespaceId = some view) :
     compileFunction unit handle = compileFunctionIn unit view handle := by
-  simp [compileFunction, viewed]
+  simp [compileFunction, noGhosts, viewed]
 
 /-- `frameInstantiation` read through a namespace's view: its types indexed,
 iterated as the list they are. -/

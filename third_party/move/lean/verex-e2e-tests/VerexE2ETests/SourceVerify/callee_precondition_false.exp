@@ -1,6 +1,24 @@
 VerexE2ETests/SourceVerify/callee_precondition_false.move:12:9: error: the precondition `requires x % 2 == 0` of `half` does not hold at this call
-VerexE2ETests/SourceVerify/callee_precondition_false.move:45:5: error: verex verification failed: the automatic verification of `unguarded` failed; provide a proof: `verify unguarded by …` in `VerexE2ETests/SourceVerify/callee_precondition_false.proof.lean` (`verify unguarded by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/callee_precondition_false.move:45:5: error: verex verification failed: the automatic verification of `unguarded` failed; provide a proof in `VerexE2ETests/SourceVerify/callee_precondition_false.proof.lean`:
+  verify unguarded by
+    verex_obligations
+    verex_on
+    | requires_of_half => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/callee_precondition_false.move:52:5: error: the precondition of `opaque_half` is not established
-VerexE2ETests/SourceVerify/callee_precondition_false.move:52:5: error: verex verification failed: the automatic verification of `unguarded_opaque` failed; provide a proof: `verify unguarded_opaque by …` in `VerexE2ETests/SourceVerify/callee_precondition_false.proof.lean` (`verify unguarded_opaque by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/callee_precondition_false.move:52:5: error: verex verification failed: the automatic verification of `unguarded_opaque` failed; provide a proof in `VerexE2ETests/SourceVerify/callee_precondition_false.proof.lean`:
+  verify unguarded_opaque by
+    verex_obligations
+    verex_on
+    | requires_of_opaque_half => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/callee_precondition_false.move:12:9: error: the precondition `requires x % 2 == 0` of `half` does not hold at this call
-VerexE2ETests/SourceVerify/callee_precondition_false.move:31:5: error: verex verification failed: the automatic verification of `odd_half` failed; provide a proof: `verify odd_half by …` in `VerexE2ETests/SourceVerify/callee_precondition_false.proof.lean` (`verify odd_half by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/callee_precondition_false.move:31:5: error: verex verification failed: the automatic verification of `odd_half` failed; provide a proof in `VerexE2ETests/SourceVerify/callee_precondition_false.proof.lean`:
+  verify odd_half by
+    verex_obligations
+    verex_on
+    | requires_of_half => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

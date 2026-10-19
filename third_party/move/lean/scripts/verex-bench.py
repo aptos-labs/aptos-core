@@ -9,8 +9,8 @@
     report   render the history, with a local run appended
     compare  compare two runs of one machine
 
-Wall time is the main measure; heartbeats compare across machines. Uses only
-the standard library and the `gh` CLI (for the history).
+HTML reports lead with heartbeats; wall time follows in collapsed sections.
+Uses only the standard library and the `gh` CLI (for the history).
 
 A series of local runs on a branch: `run --only <names>` after each change,
 keeping the names. It builds `verex-bench`, measures, records the run, and
@@ -965,24 +965,24 @@ def expensive_targets_section(point):
         for rank, (problem, target) in enumerate(targets, 1))
     scope = "latest partial run" if point.get("subset") else "latest run"
     return (
-        '<section id="expensive-targets"><h2>Most expensive targets</h2>'
+        '<section id="expensive-targets"><details><summary>Most expensive targets</summary>'
         f'<p class="meta">Top {len(targets)} by heartbeats across the {scope}, '
         'including rejections and timeouts.</p>'
         '<table><tr><th>Rank</th><th>Problem</th><th>Target</th>'
-        f'<th>Heartbeats</th><th>Status</th></tr>{rows}</table></section>')
+        f'<th>Heartbeats</th><th>Status</th></tr>{rows}</table></details></section>')
 
 
 def problem_section(points, name):
     labels = [page_label_of(point) for point in points]
     results = [result_of(point, name) for point in points]
     notes = annotations(points, name)
-    walls = [group_values(result, "wall_ms") for result in results]
     beats = [group_values(result, "heartbeats") for result in results]
-    wall_series = [(title, [None if value[key] is None else value[key] / 1000 for value in walls])
-                   for key, title in GROUPS]
     divisor, suffix = beat_unit(max((value["overall"] for value in beats
                                      if value["overall"] is not None), default=0))
     beat_series = [(title, [None if value[key] is None else value[key] / divisor for value in beats])
+                   for key, title in GROUPS]
+    walls = [group_values(result, "wall_ms") for result in results]
+    wall_series = [(title, [None if value[key] is None else value[key] / 1000 for value in walls])
                    for key, title in GROUPS]
     band = [(min(result["repeats"]["wall_ms"]) / 1000, max(result["repeats"]["wall_ms"]) / 1000)
             if result and result.get("repeats") else (None, None) for result in results]
@@ -995,46 +995,51 @@ def problem_section(points, name):
         f"<td>{html.escape(target_status(latest, target['target']))}</td></tr>" for target in targets)
     errors = "".join(f"<li>{html.escape(message)}</li>"
                      for message in (latest or {}).get("error_messages", []))
-    rows = [(f"{title} s", [seconds(value[key]) for value in walls]) for key, title in GROUPS]
-    rows += [("Heartbeats", [beat_count(value["overall"]) for value in beats]),
-             ("Status", [result["status"] if result else "–" for result in results])]
+    rows = [(f"{title} heartbeats", [beat_count(value[key]) for value in beats])
+            for key, title in GROUPS]
+    rows += [("Status", [result["status"] if result else "–" for result in results])]
+    wall_rows = [(f"{title} s", [seconds(value[key]) for value in walls]) for key, title in GROUPS]
     return (
         f'<section id="{anchor(name)}"><h3>{html.escape(name)}'
         f'<span class="status">{html.escape(status)}</span></h3>'
         f'<div class="charts">'
-        f'{chart(name, "Wall time (s)", " s", labels, wall_series, notes, band if any(b[1] for b in band) else None)}'
         f'{chart(name, f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, beat_series, notes)}</div>'
-        + (f"<details open><summary>Most expensive targets, latest run</summary><table>"
+        + (f"<details><summary>Most expensive targets, latest run</summary><table>"
            f"<tr><th>Target</th><th>Heartbeats</th><th>Seconds</th><th>Status</th></tr>{target_rows}"
            f"</table></details>" if targets else "")
         + (f"<details open><summary>Diagnostics, latest run</summary><ul>{errors}</ul></details>"
            if errors else "")
-        + value_table(labels, rows) + "</section>")
+        + value_table(labels, rows)
+        + '<details class="wall-time"><summary>Wall time</summary><div class="charts">'
+        + chart(name, "Wall time (s)", " s", labels, wall_series, notes,
+                band if any(b[1] for b in band) else None)
+        + "</div>" + value_table(labels, wall_rows) + "</details></section>")
 
 
 def suite_section(points):
     labels = [page_label_of(point) for point in points]
-    def scaled(measure, unit):
-        return [None if value is None else value / unit
-                for value in (suite_value(point, measure) for point in points)]
-    wall = scaled("wall_ms", 1000)
-    divisor, suffix = beat_unit(max((value for value in scaled("heartbeats", 1)
-                                     if value is not None), default=0))
-    beats = scaled("heartbeats", divisor)
+    totals = [suite_value(point, "heartbeats") for point in points]
+    divisor, suffix = beat_unit(max((value for value in totals if value is not None), default=0))
+    beats = [None if value is None else value / divisor for value in totals]
+    wall_totals = [suite_value(point, "wall_ms") for point in points]
+    wall = [None if value is None else value / 1000 for value in wall_totals]
     measurements = [f'{sum("heartbeats" in problem for problem in point["problems"])}'
                     f'/{len(point["problems"])}' for point in points]
-    rows = [("Heartbeats", [beat_count(suite_value(point, "heartbeats")) for point in points]),
+    rows = [("Heartbeats", [beat_count(value) for value in totals]),
             ("Heartbeat measurements", measurements)]
-    if all(value is None for value in wall):
+    if all(value is None for value in totals + wall_totals):
         return ('<section id="suite"><h2>Suite</h2><p class="meta">No full run in this '
                 "window: the suite total compares full runs only.</p></section>")
     return (
         '<section id="suite"><h2>Suite<span class="status">all measured work, including rejections, '
         'full runs</span></h2>'
         '<div class="charts">'
-        f'{chart("Suite", "Wall time (s)", " s", labels, [("Overall", wall)], {})}'
         f'{chart("Suite", f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, [("Overall", beats)], {})}'
-        "</div>" + value_table(labels, rows) + "</section>")
+        "</div>" + value_table(labels, rows)
+        + '<details class="wall-time"><summary>Wall time</summary><div class="charts">'
+        + chart("Suite", "Wall time (s)", " s", labels, [("Overall", wall)], {})
+        + "</div>" + value_table(labels, [("Overall s", [seconds(value) for value in wall_totals])])
+        + "</details></section>")
 
 
 def anchor(name, prefix="problem"):
@@ -1138,15 +1143,21 @@ def local_html(base, rows):
         return ""
     body = "".join(
         f"<tr><td>{html.escape(name)}</td><td>{beat_count(before)}</td><td>{beat_count(after)}</td>"
-        f"<td>{percent(change(after, before))}</td><td>{share_before * 100:.1f} %</td>"
-        f"<td>{share_after * 100:.1f} %</td><td>{html.escape(status_before)} → "
+        f"<td>{percent(change(after, before))}</td><td>{html.escape(status_before)} → "
         f"{html.escape(status_after)}</td></tr>"
-        for name, before, after, share_before, share_after, status_before, status_after in rows)
+        for name, before, after, _, _, status_before, status_after in rows)
+    wall_body = "".join(
+        f"<tr><td>{html.escape(name)}</td><td>{share_before * 100:.1f} %</td>"
+        f"<td>{share_after * 100:.1f} %</td></tr>"
+        for name, _, _, share_before, share_after, _, _ in rows)
     return (f"<section id=\"local\"><h2>Local run against CI run {base['run']['id']}"
             f'<span class="status">{html.escape(base["commit"][:10])}, at or before the merge '
             "base</span></h2><table><tr><th>Problem</th><th>Heartbeats CI</th><th>Local</th>"
-            "<th>Change</th><th>Time share CI</th><th>Local</th><th>Status CI → local</th></tr>"
-            f"{body}</table></section>")
+            "<th>Change</th><th>Status CI → local</th></tr>"
+            f"{body}</table>"
+            '<details class="wall-time"><summary>Wall-time shares</summary>'
+            '<table><tr><th>Problem</th><th>Time share CI</th><th>Local</th></tr>'
+            f"{wall_body}</table></details></section>")
 
 
 def report(args):

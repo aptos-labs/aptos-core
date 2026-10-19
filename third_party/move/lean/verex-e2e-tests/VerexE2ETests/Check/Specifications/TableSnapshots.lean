@@ -81,7 +81,8 @@ run_cmd do
       unless reference.kind == .shared do continue
       let some referent := VerexIR.Proofs.Denote.ntyOf unit ⟨n⟩ reference.referent | continue
       let .struct source _ _ := referent | continue
-      unless VerexIR.Proofs.Denote.tableOwner unit source && referent.paramFree do continue
+      unless (VerexIR.Validation.abstractLayout? unit source.namespaceId source.structId).isSome &&
+          referent.paramFree do continue
       checked := true
       unless VerexIR.Proofs.Denote.ntyOf unit ⟨n⟩ ⟨i⟩ == some referent do
         throwError "a shared Table reference denotes another type than its referent"

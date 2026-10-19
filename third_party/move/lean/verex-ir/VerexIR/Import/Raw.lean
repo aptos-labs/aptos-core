@@ -19,7 +19,7 @@ version. A decoder must validate this value before constructing `RawUnit`.
 The defaults are the current version, which the codec and validation read. -/
 structure Version where
   major : Nat := 1
-  minor : Nat := 5
+  minor : Nat := 6
   deriving Repr, BEq, Inhabited
 
 /-- MIR unwind behavior detached from compiler-local block identities. -/

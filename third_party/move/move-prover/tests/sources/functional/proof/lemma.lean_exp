@@ -31,4 +31,10 @@ tests/sources/functional/proof/lemma.move:183:9: error: verex verification faile
 tests/sources/functional/proof/lemma.move:208:13: error: the specification clause `ensures x >= 1` is not established
 tests/sources/functional/proof/lemma.move:206:9: error: verex verification failed: the lemma `strong_claim` is not established
 tests/sources/functional/proof/lemma.move:174:9: error: the requirement of the lemma applied at `needs_positive(x)` does not hold
-tests/sources/functional/proof/lemma.move:171:5: error: verex verification failed: the automatic verification of `might_be_zero` failed; provide a proof: `verify might_be_zero by …` in `tests/sources/functional/proof/lemma.proof.lean` (`verify might_be_zero by verex_obligations` lists its obligations)
+tests/sources/functional/proof/lemma.move:171:5: error: verex verification failed: the automatic verification of `might_be_zero` failed; provide a proof in `tests/sources/functional/proof/lemma.proof.lean`:
+  verify might_be_zero by
+    verex_obligations
+    verex_on
+    | apply_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

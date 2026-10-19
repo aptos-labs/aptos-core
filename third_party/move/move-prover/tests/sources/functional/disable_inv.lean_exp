@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/disable_inv.move:64:9: error: the module invariant `invariant [suspendable] ∀ (a : Address), exists<R1>(a) ==> exists<R2>(a)` does not hold after a write of memory it reads
-tests/sources/functional/disable_inv.move:18:5: error: verex verification failed: the automatic verification of `f1_incorrect` failed; provide a proof: `verify f1_incorrect by …` in `tests/sources/functional/disable_inv.proof.lean` (`verify f1_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/disable_inv.move:18:5: error: verex verification failed: the automatic verification of `f1_incorrect` failed; provide a proof in `tests/sources/functional/disable_inv.proof.lean`:
+  verify f1_incorrect by
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

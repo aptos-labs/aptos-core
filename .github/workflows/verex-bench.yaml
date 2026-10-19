@@ -27,6 +27,9 @@ on:
 permissions:
   contents: read
 
+env:
+  REPORT_PATH: ${{ github.event_name == 'pull_request' && format('verex-bench/{0}', github.event.pull_request.number) || 'verex-bench' }}
+
 # Every nightly produces a point; never cancel one for another.
 concurrency:
   group: verex-bench-${{ github.ref }}
@@ -40,6 +43,7 @@ jobs:
       github.event_name != 'pull_request' ||
       (
         contains(github.event.pull_request.labels.*.name, 'CICD:run-verex-bench') &&
+        (github.event.action != 'labeled' || github.event.label.name == 'CICD:run-verex-bench') &&
         github.event.pull_request.head.repo.full_name == github.repository
       )
     # The dedicated runner of the execution performance test, in its queue,
@@ -102,6 +106,8 @@ jobs:
   report:
     needs: bench
     runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      page_url: ${{ steps.render.outputs.page_url }}
     permissions:
       contents: read
       actions: read # the results of earlier runs
@@ -121,11 +127,12 @@ jobs:
           path: ${{ runner.temp }}/current
 
       - name: Render the report
+        id: render
         env:
           GH_TOKEN: ${{ github.token }}
           VEREX_BENCH_CACHE: ${{ runner.temp }}/cache
           WINDOW: ${{ inputs.WINDOW || '30' }}
-          PAGE_URL: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && format('https://{0}.github.io/{1}/verex-bench/', github.repository_owner, github.event.repository.name) || '' }}
+          PAGE_URL: ${{ (github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) && format('https://{0}.github.io/{1}/{2}/', github.repository_owner, github.event.repository.name, env.REPORT_PATH) || '' }}
         run: |
           mkdir -p "$RUNNER_TEMP/report"
           python3 third_party/move/lean/scripts/verex-bench.py report \
@@ -134,6 +141,7 @@ jobs:
             --html "$RUNNER_TEMP/report/index.html" \
             --markdown "$RUNNER_TEMP/summary.md"
           cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          printf 'page_url=%s\n' "$PAGE_URL" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -142,13 +150,16 @@ jobs:
           retention-days: 90
 
   publish:
-    # Publish only main's latest report at the stable Pages URL. The charts
-    # contain the run history, so no per-run HTML pages are kept.
+    # Main and each PR have separate pages; update only this run's destination.
     needs: report
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: write # the gh-pages branch
+      pages: write # explicitly build the site after a GITHUB_TOKEN push
+      pull-requests: write # the completed report's link
     steps:
       - uses: actions/checkout@v4
         with:
@@ -164,20 +175,61 @@ jobs:
 
       - name: Publish the report
         env:
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           cd pages
-          git rm -rq --ignore-unmatch verex-bench/runs
-          mkdir -p verex-bench
-          cp "$RUNNER_TEMP/report/index.html" verex-bench/index.html
-          git add verex-bench
+          mkdir -p "$REPORT_PATH"
+          cp "$RUNNER_TEMP/report/index.html" "$REPORT_PATH/index.html"
+          git add -- "$REPORT_PATH/index.html"
           git diff --cached --quiet && exit 0
-          git -c user.name="github-actions[bot]" \
-            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -qm "verex-bench: run $GITHUB_RUN_ID of $COMMIT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qm "verex-bench: run $GITHUB_RUN_ID of $COMMIT"
           # A concurrent deploy to gh-pages moves the branch: rebase and retry.
           for attempt in 1 2 3; do
             git push -q origin HEAD:gh-pages && exit 0
             git pull -q --rebase origin gh-pages
           done
           exit 1
+
+      - name: Build the Pages site
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # GITHUB_TOKEN pushes do not trigger branch-based Pages builds.
+          published_commit="$(git -C pages rev-parse HEAD)"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds" --silent
+          for attempt in {1..60}; do
+            build="$(gh api "repos/$GITHUB_REPOSITORY/pages/builds/latest")"
+            status="$(jq -r '.status' <<< "$build")"
+            build_commit="$(jq -r '.commit' <<< "$build")"
+            if [[ "$status" == built || "$status" == errored ]]; then
+              # Another publisher may have queued a newer build; it must
+              # include our commit before we announce the report.
+              relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$published_commit...$build_commit" --jq '.status')"
+              if [[ "$relation" == identical || "$relation" == ahead ]]; then
+                if [[ "$status" == built ]]; then
+                  exit 0
+                fi
+                jq -r '"::error::GitHub Pages build failed: " + (.error.message // "unknown error")' <<< "$build"
+                exit 1
+              fi
+            fi
+            sleep 10
+          done
+          echo "::error::Timed out waiting for GitHub Pages to publish the report."
+          exit 1
+
+      - name: Comment on the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PAGE_URL: ${{ needs.report.outputs.page_url }}
+          RUN_URL: ${{ format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+        run: |
+          printf 'Verex benchmark finished: [Charts](%s) · [Workflow run](%s)\n' \
+            "$PAGE_URL" "$RUN_URL" > "$RUNNER_TEMP/benchmark-comment.md"
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --body-file "$RUNNER_TEMP/benchmark-comment.md"

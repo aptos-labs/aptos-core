@@ -540,4 +540,22 @@ example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
   apply successfulRunHasDerivation
   native_decide
 
+-- Only erased ghost memory can carry a mathematical integer in execution.
+-- Unused ordinary struct and variant fields still go through capability checks.
+private def logicalFieldFixture (ghost variant : Bool) : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  let field : FieldDecl := { loc := ⟨5⟩, name := ⟨2⟩, type := typeUse 3 5 }
+  let declaration : StructDecl := {
+    loc := ⟨5⟩, name := ⟨2⟩
+    fields := if variant then #[] else #[field]
+    variants := if variant then #[{ loc := ⟨6⟩, name := ⟨0⟩, fields := #[field] }] else #[]
+    contract := { pragmas := if ghost then #[.assign "ghost_memory" (.constant (.bool true))] else #[] } }
+  { fixture with
+    tables := { fixture.tables with types := fixture.tables.types.push (.integer .unbounded true) }
+    namespaces := #[{ ns with structs := #[declaration] }] }
+
+#guard preparationHasDiagnosticAt (logicalFieldFixture false false) "VIR-EXEC-UNSUPPORTED" ⟨5⟩
+#guard preparationHasDiagnosticAt (logicalFieldFixture false true) "VIR-EXEC-UNSUPPORTED" ⟨5⟩
+#guard (prepare? (logicalFieldFixture true false)).isSome
+
 end VerexIR.Tests.Declarations

@@ -305,6 +305,7 @@ theorem resolvePlaceFuel?_rename (unit : Validation.ValidatedUnit) (ns : Validat
                     cases readRuntimePlace? frame state basePlace with
                     | none => rfl
                     | some value => cases value <;> simp
+            | ghostField base owner field => rfl
             | index base indexExpression =>
                 simp only [places, indices]
                 cases resolvePlaceFuel? unit ns frame state fuel base with
@@ -404,6 +405,7 @@ theorem placeVariantMismatchFuel?_rename (unit : Validation.ValidatedUnit)
                       rename_i source actual values
                       cases actual <;> cases sourceFieldName? ns variant <;> rfl
           | deref base => simp only [resolve, ih]
+          | ghostField base _ _ => simp only [resolve, ih]
           | index base _ => simp only [resolve, ih]
           | subslice base _ _ _ => simp only [resolve, ih]
 
@@ -531,7 +533,7 @@ theorem bindPatternFuel_rename (injective : Function.Injective ρ) (unit : Valid
                 RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
                 RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
-                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
+                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
               case tuple values =>
                 simp only [Array.size_map]
                 split
@@ -551,24 +553,25 @@ theorem bindPatternFuel_rename (injective : Function.Injective ρ) (unit : Valid
                 RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
                 RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
-                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
+                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
               all_goals (repeat' split) <;> simp_all
           case constructor name spelled variant fields =>
               cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
                 RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
                 RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
                 RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
-                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
+                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
               case nominal source actualVariant values =>
                 cases resolveNominal? unit ns name with
                 | none => rfl
                 | some expected =>
                     simp only [Option.bind_some, Array.size_map]
                     by_cases mismatch : (expected != source || variant != actualVariant ||
-                        fields.size != values.size) = true
+                        values.size != fields.size + (nominalGhosts unit expected).size) = true
                     · simp only [mismatch, if_true, Option.map_none]
-                    · simp only [mismatch, Bool.false_eq_true, if_false, Array.toList_map]
-                      exact row fields.toList values.toList frame
+                    · simp only [mismatch, Bool.false_eq_true, if_false, Array.toList_map,
+                        ← List.map_take]
+                      exact row fields.toList (values.toList.take fields.size) frame
 
 theorem bindPattern_rename (injective : Function.Injective ρ) (unit : Validation.ValidatedUnit)
     (ns : Validation.ValidatedNamespace)
@@ -686,82 +689,82 @@ section Registry
 
 variable {inside : Nat → Prop}
 
-theorem storageLoanTargetIn?_append (first second : List (Nat × LoanTarget)) (loan : Nat) :
-    storageLoanTargetIn? (first ++ second) loan =
-      (storageLoanTargetIn? first loan).or (storageLoanTargetIn? second loan) := by
-  unfold storageLoanTargetIn?
+theorem globalLoanKeyIn?_append (first second : List (Nat × GlobalKey)) (loan : Nat) :
+    globalLoanKeyIn? (first ++ second) loan =
+      (globalLoanKeyIn? first loan).or (globalLoanKeyIn? second loan) := by
+  unfold globalLoanKeyIn?
   rw [List.find?_append]
   cases first.find? (·.1 == loan) <;> rfl
 
-theorem storageLoanTargetIn?_outside {junk : List (Nat × LoanTarget)} {loan : Nat}
+theorem globalLoanKeyIn?_outside {junk : List (Nat × GlobalKey)} {loan : Nat}
     (outside : ∀ entry ∈ junk, entry.1 ≠ loan) :
-    storageLoanTargetIn? junk loan = none := by
-  unfold storageLoanTargetIn?
+    globalLoanKeyIn? junk loan = none := by
+  unfold globalLoanKeyIn?
   rw [Option.map_eq_none_iff, List.find?_eq_none]
   intro entry member
   simpa only [beq_iff_eq] using outside entry member
 
-theorem storageLoanTargetIn?_map_rename (injective : Function.Injective ρ)
-    (held : List (Nat × LoanTarget)) (loan : Nat) :
-    storageLoanTargetIn? (held.map (renameEntry ρ)) (ρ loan) =
-      storageLoanTargetIn? held loan := by
-  unfold storageLoanTargetIn?
+theorem globalLoanKeyIn?_map_rename (injective : Function.Injective ρ)
+    (held : List (Nat × GlobalKey)) (loan : Nat) :
+    globalLoanKeyIn? (held.map (renameEntry ρ)) (ρ loan) =
+      globalLoanKeyIn? held loan := by
+  unfold globalLoanKeyIn?
   rw [List.find?_map, Option.map_map]
-  have same : ((fun entry : Nat × LoanTarget => entry.1 == ρ loan) ∘ renameEntry ρ) =
+  have same : ((fun entry : Nat × GlobalKey => entry.1 == ρ loan) ∘ renameEntry ρ) =
       fun entry => entry.1 == loan := by
     funext entry; simp [injective.beq_eq]
   rw [same]
   rfl
 
 /-- The junk of a first run's registry holds no loan the run holds. -/
-theorem RegistryRenamed.junk_free {junk : List (Nat × LoanTarget)}
+theorem RegistryRenamed.junk_free {junk : List (Nat × GlobalKey)}
     (outside : ∀ entry ∈ junk, ¬inside entry.1) {loan : Nat} (within : inside loan) :
-    storageLoanTargetIn? junk loan = none :=
-  storageLoanTargetIn?_outside fun entry member same => outside entry member (same ▸ within)
+    globalLoanKeyIn? junk loan = none :=
+  globalLoanKeyIn?_outside fun entry member same => outside entry member (same ▸ within)
 
 /-- The junk of a second run's registry holds no renaming of a loan the
 first holds. -/
-theorem RegistryRenamed.junk_free' {junk' : List (Nat × LoanTarget)}
+theorem RegistryRenamed.junk_free' {junk' : List (Nat × GlobalKey)}
     (outside : ∀ entry ∈ junk', ∀ loan, inside loan → ρ loan ≠ entry.1) {loan : Nat}
-    (within : inside loan) : storageLoanTargetIn? junk' (ρ loan) = none :=
-  storageLoanTargetIn?_outside fun entry member same => outside entry member loan within same.symm
+    (within : inside loan) : globalLoanKeyIn? junk' (ρ loan) = none :=
+  globalLoanKeyIn?_outside fun entry member same => outside entry member loan within same.symm
 
 theorem RegistryRenamed.lookup (injective : Function.Injective ρ)
-    {registry registry' : List (Nat × LoanTarget)}
+    {registry registry' : List (Nat × GlobalKey)}
     (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
     (within : inside loan) :
-    storageLoanTargetIn? registry' (ρ loan) = storageLoanTargetIn? registry loan := by
+    globalLoanKeyIn? registry' (ρ loan) = globalLoanKeyIn? registry loan := by
   obtain ⟨held, junk, junk', rfl, rfl, -, outside, outside'⟩ := shifted
-  rw [storageLoanTargetIn?_append, storageLoanTargetIn?_append,
-    storageLoanTargetIn?_map_rename injective, RegistryRenamed.junk_free outside within,
+  rw [globalLoanKeyIn?_append, globalLoanKeyIn?_append,
+    globalLoanKeyIn?_map_rename injective, RegistryRenamed.junk_free outside within,
     RegistryRenamed.junk_free' outside' within]
 
-theorem removeStorageLoan_append_free (held junk : List (Nat × LoanTarget)) {loan : Nat}
-    (free : storageLoanTargetIn? junk loan = none) :
-    removeStorageLoan (held ++ junk) loan = removeStorageLoan held loan ++ junk := by
+theorem removeGlobalLoan_append_free (held junk : List (Nat × GlobalKey)) {loan : Nat}
+    (free : globalLoanKeyIn? junk loan = none) :
+    removeGlobalLoan (held ++ junk) loan = removeGlobalLoan held loan ++ junk := by
   induction held with
-  | nil => simp [removeStorageLoan_of_free junk loan free, removeStorageLoan]
+  | nil => simp [removeGlobalLoan_of_free junk loan free, removeGlobalLoan]
   | cons entry rest ih =>
-      simp only [List.cons_append, removeStorageLoan]
+      simp only [List.cons_append, removeGlobalLoan]
       split <;> simp [ih]
 
-theorem removeStorageLoan_map_rename (injective : Function.Injective ρ)
-    (held : List (Nat × LoanTarget)) (loan : Nat) :
-    removeStorageLoan (held.map (renameEntry ρ)) (ρ loan) =
-      (removeStorageLoan held loan).map (renameEntry ρ) := by
+theorem removeGlobalLoan_map_rename (injective : Function.Injective ρ)
+    (held : List (Nat × GlobalKey)) (loan : Nat) :
+    removeGlobalLoan (held.map (renameEntry ρ)) (ρ loan) =
+      (removeGlobalLoan held loan).map (renameEntry ρ) := by
   induction held with
   | nil => rfl
   | cons entry rest ih =>
-      simp only [List.map_cons, removeStorageLoan, renameEntry, injective.beq_eq]
+      simp only [List.map_cons, removeGlobalLoan, renameEntry, injective.beq_eq]
       split <;> simp [ih, renameEntry]
 
-theorem removeStorageLoan_sublist (registry : List (Nat × LoanTarget)) (loan : Nat) :
-    ∀ entry ∈ removeStorageLoan registry loan, entry ∈ registry := by
+theorem removeGlobalLoan_sublist (registry : List (Nat × GlobalKey)) (loan : Nat) :
+    ∀ entry ∈ removeGlobalLoan registry loan, entry ∈ registry := by
   induction registry with
-  | nil => simp [removeStorageLoan]
+  | nil => simp [removeGlobalLoan]
   | cons head rest ih =>
       intro entry member
-      simp only [removeStorageLoan] at member
+      simp only [removeGlobalLoan] at member
       split at member
       · exact List.mem_cons_of_mem _ member
       · rcases List.mem_cons.mp member with rfl | member
@@ -769,22 +772,22 @@ theorem removeStorageLoan_sublist (registry : List (Nat × LoanTarget)) (loan : 
         · exact List.mem_cons_of_mem _ (ih entry member)
 
 theorem RegistryRenamed.remove (injective : Function.Injective ρ)
-    {registry registry' : List (Nat × LoanTarget)}
+    {registry registry' : List (Nat × GlobalKey)}
     (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
     (within : inside loan) :
-    RegistryRenamed ρ inside (removeStorageLoan registry loan)
-      (removeStorageLoan registry' (ρ loan)) := by
+    RegistryRenamed ρ inside (removeGlobalLoan registry loan)
+      (removeGlobalLoan registry' (ρ loan)) := by
   obtain ⟨held, junk, junk', rfl, rfl, held_within, outside, outside'⟩ := shifted
-  refine ⟨removeStorageLoan held loan, junk, junk',
-    removeStorageLoan_append_free held junk (RegistryRenamed.junk_free outside within),
-    ?_, fun entry member => held_within entry (removeStorageLoan_sublist held loan entry member),
+  refine ⟨removeGlobalLoan held loan, junk, junk',
+    removeGlobalLoan_append_free held junk (RegistryRenamed.junk_free outside within),
+    ?_, fun entry member => held_within entry (removeGlobalLoan_sublist held loan entry member),
     outside, outside'⟩
-  rw [removeStorageLoan_append_free _ junk' (RegistryRenamed.junk_free' outside' within),
-    removeStorageLoan_map_rename injective]
+  rw [removeGlobalLoan_append_free _ junk' (RegistryRenamed.junk_free' outside' within),
+    removeGlobalLoan_map_rename injective]
 
-theorem RegistryRenamed.cons {registry registry' : List (Nat × LoanTarget)}
+theorem RegistryRenamed.cons {registry registry' : List (Nat × GlobalKey)}
     (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
-    (within : inside loan) (key : LoanTarget) :
+    (within : inside loan) (key : GlobalKey) :
     RegistryRenamed ρ inside ((loan, key) :: registry) ((ρ loan, key) :: registry') := by
   obtain ⟨held, junk, junk', rfl, rfl, held_within, outside, outside'⟩ := shifted
   refine ⟨(loan, key) :: held, junk, junk', rfl, rfl, ?_, outside, outside'⟩
@@ -812,13 +815,13 @@ theorem fillHole?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
   exact base.within original
 
 theorem RegistryRenamed.transfer (injective : Function.Injective ρ) {β γ : Nat → Nat}
-    (base : LoanBase β γ inside) {registry registry' : List (Nat × LoanTarget)}
+    (base : LoanBase β γ inside) {registry registry' : List (Nat × GlobalKey)}
     (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
-    (within : inside loan) (key : LoanTarget) {replacement : RuntimeValue}
+    (within : inside loan) (key : GlobalKey) {replacement : RuntimeValue}
     (replacement_within : replacement.Within inside) :
-    RegistryRenamed ρ inside (transferStorageLoan registry loan key replacement)
-      (transferStorageLoan registry' (ρ loan) key (replacement.rename ρ)) := by
-  unfold transferStorageLoan
+    RegistryRenamed ρ inside (transferGlobalLoan registry loan key replacement)
+      (transferGlobalLoan registry' (ρ loan) key (replacement.rename ρ)) := by
+  unfold transferGlobalLoan
   simp only [transferredLoan?_rename]
   cases found : transferredLoan? replacement with
   | none => exact shifted.remove injective within
@@ -890,10 +893,10 @@ theorem StateRenamed.withGlobals (shifted : StateRenamed ρ offset frontier insi
   { shifted with globals := rfl, globalsWithin := above }
 
 theorem StateRenamed.withRegistry (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
-    {registry registry' : List (Nat × LoanTarget)}
+    {registry registry' : List (Nat × GlobalKey)}
     (related : RegistryRenamed ρ inside registry registry') :
-    StateRenamed ρ offset frontier inside inert inert' { state with storageLoans := registry }
-      { state₂ with storageLoans := registry' } :=
+    StateRenamed ρ offset frontier inside inert inert' { state with globalLoans := registry }
+      { state₂ with globalLoans := registry' } :=
   { shifted with registry := related }
 
 theorem StateRenamed.push (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
@@ -904,7 +907,7 @@ theorem StateRenamed.push (shifted : StateRenamed ρ offset frontier inside iner
       { state₂ with pending := state₂.pending.push (ρ loan, value.rename ρ) } where
   renames := shifted.renames
   globals := shifted.globals
-  tables := shifted.tables
+  tableHandles := shifted.tableHandles
   nextLoan := shifted.nextLoan
   frontier_le := shifted.frontier_le
   inert_le := by simp only [Array.size_push]; exact Nat.le_succ_of_le shifted.inert_le
@@ -915,7 +918,6 @@ theorem StateRenamed.push (shifted : StateRenamed ρ offset frontier inside iner
       shifted.pending, Array.map_push]
   registry := shifted.registry
   globalsWithin := shifted.globalsWithin
-  tablesWithin := shifted.tablesWithin
   pendingWithin := by
     simp only
     rw [Array.extract_push_size _ _ shifted.inert_le]
@@ -926,7 +928,7 @@ theorem StateRenamed.push (shifted : StateRenamed ρ offset frontier inside iner
 
 theorem StateRenamed.lookup (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
     {loan : Nat} (within : inside loan) :
-    storageLoanTarget? state₂ (ρ loan) = storageLoanTarget? state loan :=
+    globalLoanKey? state₂ (ρ loan) = globalLoanKey? state loan :=
   shifted.registry.lookup shifted.renames.injective within
 
 theorem StateRenamed.slot_within (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
@@ -945,41 +947,20 @@ theorem GlobalMap.insert_within {globals : GlobalMap} {key : GlobalKey} {value :
   · exact above slot member
   · exact value_within
 
-theorem StateRenamed.loanValue (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
-    (target : LoanTarget) :
-    state₂.loanValue? target = (state.loanValue? target).map (·.rename ρ) := by
-  cases target with
-  | global key => simp [shifted.globals, GlobalMap.lookup_rename]
-  | table key => simp [shifted.tables, NativeTableStorage.rename, GlobalMap.lookup_rename]
+theorem StateRenamed.globalValue (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (key : GlobalKey) :
+    state₂.globals.lookup key = (state.globals.lookup key).map (·.rename ρ) := by
+  simp [shifted.globals, GlobalMap.lookup_rename]
 
-theorem StateRenamed.loanValue_within
+theorem StateRenamed.insertGlobal
     (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
-    {target : LoanTarget} {value : RuntimeValue}
-    (found : state.loanValue? target = some value) : value.Within inside := by
-  cases target with
-  | global key => exact shifted.slot_within found
-  | table key =>
-      change state.tables.contents.lookup key = some value at found
-      unfold GlobalMap.lookup at found
-      obtain ⟨slot, located, rfl⟩ := Option.map_eq_some_iff.mp found
-      exact shifted.tablesWithin slot (Array.mem_of_find?_eq_some located)
-
-theorem StateRenamed.writeLoanValue
-    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
-    (target : LoanTarget) {value : RuntimeValue} (value_within : value.Within inside) :
-    StateRenamed ρ offset frontier inside inert inert' (state.writeLoanValue target value)
-      (state₂.writeLoanValue target (value.rename ρ)) := by
-  cases target with
-  | global key =>
-      simp only [RuntimeState.writeLoanValue_global]
-      exact { shifted with
-        globals := by simp [shifted.globals, GlobalMap.insert_rename]
-        globalsWithin := GlobalMap.insert_within shifted.globalsWithin value_within }
-  | table key =>
-      simp only [RuntimeState.writeLoanValue_table]
-      exact { shifted with
-        tables := by simp [shifted.tables, NativeTableStorage.rename, GlobalMap.insert_rename]
-        tablesWithin := GlobalMap.insert_within shifted.tablesWithin value_within }
+    (key : GlobalKey) {value : RuntimeValue} (value_within : value.Within inside) :
+    StateRenamed ρ offset frontier inside inert inert'
+      { state with globals := state.globals.insert key value }
+      { state₂ with globals := state₂.globals.insert key (value.rename ρ) } :=
+  { shifted with
+    globals := by simp [shifted.globals, GlobalMap.insert_rename]
+    globalsWithin := GlobalMap.insert_within shifted.globalsWithin value_within }
 
 theorem RuntimeFrame.Within.setLocal {frame : RuntimeFrame} (above : frame.Within inside)
     (index : Nat) {value : RuntimeValue} (value_within : value.Within inside) :
@@ -1040,23 +1021,24 @@ theorem fillVisibleHole_rename {frame : RuntimeFrame}
                         fill_eq)⟩
                     simp [RuntimeFrame.rename, Array.map_setIfInBounds]
   · rw [shifted.lookup within]
-    cases storageLoanTarget? state loan with
+    cases globalLoanKey? state loan with
     | none => exact ⟨state₂, rfl, shifted, frame_within⟩
     | some key =>
-        simp only [shifted.loanValue key]
-        cases lookup_eq : state.loanValue? key with
+        simp only [shifted.globalValue key]
+        cases lookup_eq : state.globals.lookup key with
         | none => exact ⟨state₂, rfl, shifted, frame_within⟩
         | some value =>
             simp only [Option.map_some, Option.bind_some, fillHole?_rename injective]
             cases fill_eq : fillHole? loan replacement value with
             | none => exact ⟨state₂, rfl, shifted, frame_within⟩
             | some filled =>
-                refine ⟨{ state₂.writeLoanValue key (filled.rename ρ) with
-                    storageLoans := transferStorageLoan state₂.storageLoans (ρ loan) key
+                refine ⟨{ state₂ with
+                    globals := state₂.globals.insert key (filled.rename ρ)
+                    globalLoans := transferGlobalLoan state₂.globalLoans (ρ loan) key
                       (replacement.rename ρ) }, rfl, ?_, frame_within⟩
-                exact (shifted.writeLoanValue key
+                exact (shifted.insertGlobal key
                   (fillHole?_within base within replacement_within
-                    (shifted.loanValue_within lookup_eq) fill_eq)).withRegistry
+                    (shifted.slot_within lookup_eq) fill_eq)).withRegistry
                   (shifted.registry.transfer injective base within key replacement_within)
 
 theorem applyWriteBack_rename {frame : RuntimeFrame}
@@ -1431,7 +1413,7 @@ theorem StateRenamed.restart {state state₂ arguments arguments₂ : RuntimeSta
       { state₂ with pending := arguments₂.pending } where
   renames := final.renames
   globals := final.globals
-  tables := final.tables
+  tableHandles := final.tableHandles
   nextLoan := final.nextLoan
   frontier_le := final.frontier_le
   inert_le := calling.inert_le
@@ -1439,7 +1421,6 @@ theorem StateRenamed.restart {state state₂ arguments arguments₂ : RuntimeSta
   pending := calling.pending
   registry := final.registry
   globalsWithin := final.globalsWithin
-  tablesWithin := final.tablesWithin
   pendingWithin := calling.pendingWithin
 
 theorem applyPendingWriteBack_mirror {first second : RuntimeFrame × RuntimeState}
@@ -1616,7 +1597,7 @@ theorem constructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamesp
       | none => rfl
       | some expected =>
           simp only [Option.bind_some]
-          split <;> simp [pure]
+          split <;> simp [pure, Array.map_append, Array.map_map, Function.comp_def]
 
 theorem destructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) (variant : Option String) (value : RuntimeValue) :
@@ -1628,7 +1609,7 @@ theorem destructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamespa
     RuntimeValue.rename_bool, RuntimeValue.rename_character, RuntimeValue.rename_integer,
     RuntimeValue.rename_address, RuntimeValue.rename_signer, RuntimeValue.rename_string,
     RuntimeValue.rename_bytes, RuntimeValue.rename_vector, RuntimeValue.rename_nominal,
-    RuntimeValue.rename_closure, RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
+    RuntimeValue.rename_closure, RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole, RuntimeValue.rename_ghost] <;> try rfl
   case nominal source actualVariant fields =>
     simp only [Option.bind_eq_bind, Array.size_map]
     cases resolveStruct? unit sourceNamespace reference with
@@ -1638,8 +1619,8 @@ theorem destructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamespa
         cases constructorFields? unit handle variant with
         | none => rfl
         | some expected =>
-            simp only [Option.bind_some]
-            split <;> rfl
+            simp only [Option.bind_some, Array.size_map]
+            split <;> simp [← Array.map_extract]
 
 theorem ClosureMask.compose_go_map {α β : Type} (f : α → β) :
     ∀ (fuel mask : Nat) (captures supplied : List α),
@@ -1708,7 +1689,7 @@ theorem toConst?_rename :
           rw [RuntimeValue.rename_tuple]
           simp only [RuntimeValue.toConst?]
           rw [elements values (by simp at small; omega)]
-      | nominal | closure | borrow | loanHole => simp [RuntimeValue.toConst?]
+      | nominal | closure | borrow | loanHole | ghost => simp [RuntimeValue.toConst?]
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp [RuntimeValue.toConst?]
 

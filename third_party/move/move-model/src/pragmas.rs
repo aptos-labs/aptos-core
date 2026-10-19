@@ -207,6 +207,10 @@ pub const INTRINSIC_FUN_MAP_HAS_KEY: &str = "map_has_key";
 /// `[move] fun map_destroy_empty<K, V>(m: Map<K, V>)`
 pub const INTRINSIC_FUN_MAP_DESTROY_EMPTY: &str = "map_destroy_empty";
 
+/// Consumes the map without checking emptiness; never aborts.
+/// `[move] fun map_destroy_unchecked<K, V>(m: Map<K, V>)`
+pub const INTRINSIC_FUN_MAP_DESTROY_UNCHECKED: &str = "map_destroy_unchecked";
+
 /// Add a new entry to the map, aborts if the key already exists
 /// `[move] fun map_add_no_override<K, V>(m: &mut Map<K, V>, k: K, v: V)`
 pub const INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE: &str = "map_add_no_override";
@@ -511,6 +515,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (
                 INTRINSIC_FUN_MAP_DESTROY_EMPTY,
                 IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_DESTROY_UNCHECKED,
+                IntrinsicFunDef::move_fun(None, None),
             ),
             (
                 INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,

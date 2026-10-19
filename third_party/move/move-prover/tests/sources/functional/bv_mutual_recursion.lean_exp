@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bv_mutual_recursion.move:40:9: error: the specification clause `ensures result == x & 1085102592571150095` is not established
-tests/sources/functional/bv_mutual_recursion.move:35:5: error: verex verification failed: the automatic verification of `bv_mask_b` failed; provide a proof: `verify bv_mask_b by …` in `tests/sources/functional/bv_mutual_recursion.proof.lean` (`verify bv_mask_b by verex_obligations` lists its obligations)
+tests/sources/functional/bv_mutual_recursion.move:35:5: error: verex verification failed: the automatic verification of `bv_mask_b` failed; provide a proof in `tests/sources/functional/bv_mutual_recursion.proof.lean`:
+  verify bv_mask_b by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

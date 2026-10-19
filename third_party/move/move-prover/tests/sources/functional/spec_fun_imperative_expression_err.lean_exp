@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/spec_fun_imperative_expression_err.move:22:13: error: the assertion `_z == sequential()` does not hold
-tests/sources/functional/spec_fun_imperative_expression_err.move:19:5: error: verex verification failed: the automatic verification of `m` failed; provide a proof: `verify m by …` in `tests/sources/functional/spec_fun_imperative_expression_err.proof.lean` (`verify m by verex_obligations` lists its obligations)
+tests/sources/functional/spec_fun_imperative_expression_err.move:19:5: error: verex verification failed: the automatic verification of `m` failed; provide a proof in `tests/sources/functional/spec_fun_imperative_expression_err.proof.lean`:
+  verify m by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -3,6 +3,7 @@
 
 import VerexIR.Semantics.BigStep
 import VerexIR.Semantics.LoanRenamingFunctions
+import VerexIR.Semantics.TableRoleShifts
 import VerexIR.Semantics.LoanRenamingPrimitives
 
 /-!
@@ -154,18 +155,19 @@ theorem NodeShifts.ofOperandsControl {unit : ValidatedUnit} {executable : Execut
     ih ρ offset frontier inside inert inert' state₂ shifted frame_within
   exact ⟨finalState₂, finalShifted, final_within, control_within, build operands₂⟩
 
-/-- The natives mirror their runs: the runtime provides them, and
-`nativeCall` is opaque. -/
+/-- The host's natives mirror their runs: the host provides them, and
+`hostCall` is opaque. The table roles, which the runtime provides, mirror
+theirs (`tableRoleCall_shifts`). -/
 def NativesShift {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
   ∀ handle instantiation state arguments state' outcome,
-    nativeCall executable handle instantiation state arguments = some (state', outcome) →
+    hostCall executable handle instantiation state arguments = some (state', outcome) →
     ∀ (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat → Prop) (inert inert' : Nat)
     (state₂ : RuntimeState),
       StateRenamed ρ offset frontier inside inert inert' state state₂ →
       (∀ argument ∈ arguments, argument.Within inside) →
       ∃ state₂', StateRenamed ρ offset frontier inside inert inert' state' state₂' ∧
         outcome.Within inside ∧
-        nativeCall executable handle instantiation state₂ (arguments.map (·.rename ρ)) =
+        hostCall executable handle instantiation state₂ (arguments.map (·.rename ρ)) =
           some (state₂', outcome.rename ρ)
 
 theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
@@ -1116,8 +1118,8 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
       operands₂ (variantMismatch?_evaluate_none mismatch₂) mismatch₂ mismatch_eq
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq body_eq
-      body_step outcome_eq hole_free finalize_eq ih_body
+      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
+      body_eq body_step outcome_eq hole_free finalize_eq ih_body
     intro ρ offset frontier inside inert inert' state₂ shifted arguments_within
     obtain ⟨β, γ, base⟩ := shifted.renames.base
     have frame_within := initialFrame?_within base arguments_within frame_eq
@@ -1129,19 +1131,27 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     · rw [← finalize_eq]
       exact finalizeFunctionState_mirror shifted evaluatedShifted executable declaration.profile
         final_within outcome
-    · exact .body _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq declaration_eq
+    · exact .body _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq declaration_eq provided_eq
         (by rw [initialFrame?_rename, frame_eq]; rfl) body_eq body₂
         (by rw [finishControl?_rename, outcome_eq]; rfl)
         (by rw [Outcome.holeFree_rename]; exact hole_free) rfl
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
     intro ρ offset frontier inside inert inert' state₂ shifted arguments_within
-    obtain ⟨finalState₂, finalShifted, outcome_within, native₂⟩ :=
-      natives _ _ _ _ _ _ native_eq ρ offset frontier inside inert inert' state₂ shifted arguments_within
+    obtain ⟨finalState₂, finalShifted, outcome_within, native₂⟩ :
+        ∃ state₂', StateRenamed ρ offset frontier inside inert inert' finalState state₂' ∧
+          outcome.Within inside ∧
+          nativeCall executable handle typeInstantiation state₂ (arguments.map (·.rename ρ)) =
+            some (state₂', outcome.rename ρ) := by
+      unfold nativeCall at native_eq ⊢
+      split at native_eq
+      · exact tableRoleCall_shifts native_eq shifted arguments_within
+      · exact natives _ _ _ _ _ _ native_eq ρ offset frontier inside inert inert' state₂ shifted
+          arguments_within
     exact ⟨finalState₂, finalShifted, outcome_within,
       .native _ _ _ _ _ _ _ _ namespace_eq declaration_eq (by rw [Array.size_map]; exact arity_eq)
-        body_eq native₂ (by rw [Outcome.holeFree_rename]; exact hole_free)⟩
+        provided_eq native₂ (by rw [Outcome.holeFree_rename]; exact hole_free)⟩
 
 theorem Array.map_rename_of_plain {values : Array RuntimeValue} (ρ : Nat → Nat)
     (plain : ∀ value ∈ values, Plain value) : values.map (·.rename ρ) = values := by
@@ -1156,27 +1166,20 @@ theorem GlobalMap.rename_of_plain {globals : GlobalMap} (ρ : Nat → Nat)
   exact Array.map_congr_left fun slot member => by
     simp [RuntimeValue.rename_of_plain ρ (plain slot member)]
 
-theorem SemanticOperations.FreshStorageLoanIds.below {state : RuntimeState} (fresh : FreshStorageLoanIds state) :
-    ∀ entry ∈ state.storageLoans, entry.1 < state.nextLoan := by
+theorem SemanticOperations.FreshGlobalLoanIds.below {state : RuntimeState} (fresh : FreshGlobalLoanIds state) :
+    ∀ entry ∈ state.globalLoans, entry.1 < state.nextLoan := by
   intro entry member
   refine Nat.lt_of_not_le fun beyond => ?_
   have absent := fresh entry.1 beyond
-  simp only [storageLoanTargetIn?, Option.map_eq_none_iff, List.find?_eq_none] at absent
+  simp only [globalLoanKeyIn?, Option.map_eq_none_iff, List.find?_eq_none] at absent
   exact absent entry member (by simp)
 
 /-- An unregistered loan has no registry entry. -/
-theorem SemanticOperations.storageLoanTargetIn?_none {registry : List (Nat × LoanTarget)} {loan : Nat}
-    (absent : storageLoanTargetIn? registry loan = none) : ∀ entry ∈ registry, entry.1 ≠ loan := by
+theorem SemanticOperations.globalLoanKeyIn?_none {registry : List (Nat × GlobalKey)} {loan : Nat}
+    (absent : globalLoanKeyIn? registry loan = none) : ∀ entry ∈ registry, entry.1 ≠ loan := by
   intro entry member same
-  simp only [storageLoanTargetIn?, Option.map_eq_none_iff, List.find?_eq_none] at absent
+  simp only [globalLoanKeyIn?, Option.map_eq_none_iff, List.find?_eq_none] at absent
   exact absent entry member (by simp [same])
-
-/-- Renaming loans leaves loan-free Table storage unchanged. -/
-theorem NativeTableStorage.rename_of_plain (ρ : Nat → Nat) {storage : NativeTableStorage}
-    (plain : ∀ slot ∈ storage.contents.entries, Plain slot.value) :
-    storage.rename ρ = storage := by
-  cases storage
-  simp only [NativeTableStorage.rename, GlobalMap.rename_of_plain ρ plain]
 
 /-! ## Lent starts
 
@@ -1301,14 +1304,13 @@ memory holding no loan, mirrors onto one with that memory whose frontier is
 references under consecutive loans from `target`. -/
 theorem StateRenamed.ofLent {start start₂ : RuntimeState}
     (globals_eq : start₂.globals = start.globals)
-    (tables_eq : start₂.tables = start.tables)
+    (tableHandles_eq : start₂.tableHandles = start.tableHandles)
     (plain : ∀ slot ∈ start.globals.entries, Plain slot.value)
-    (tables_plain : ∀ slot ∈ start.tables.contents.entries, Plain slot.value)
     (nodup : loans.Nodup) (below : ∀ loan ∈ loans, loan < start.nextLoan)
-    (unregistered : ∀ loan ∈ loans, storageLoanTargetIn? start.storageLoans loan = none)
-    (fresh : FreshStorageLoanIds start)
+    (unregistered : ∀ loan ∈ loans, globalLoanKeyIn? start.globalLoans loan = none)
+    (fresh : FreshGlobalLoanIds start)
     (le : start.nextLoan ≤ target) (next : start₂.nextLoan = target + loans.length)
-    (registered : ∀ entry ∈ start₂.storageLoans, entry.1 < target) :
+    (registered : ∀ entry ∈ start₂.globalLoans, entry.1 < target) :
     StateRenamed (lentRenaming loans start.nextLoan target)
       (target + loans.length - start.nextLoan) start.nextLoan (lentInside loans start.nextLoan)
       start.pending.size start₂.pending.size start start₂ where
@@ -1318,18 +1320,18 @@ theorem StateRenamed.ofLent {start start₂ : RuntimeState}
     covers := fun _ beyond => .inl beyond
     base := ⟨_, _, lentInside_base nodup below⟩ }
   globals := by rw [globals_eq, GlobalMap.rename_of_plain _ plain]
-  tables := by rw [tables_eq, NativeTableStorage.rename_of_plain _ tables_plain]
+  tableHandles := tableHandles_eq
   nextLoan := by omega
   frontier_le := Nat.le_refl _
   inert_le := Nat.le_refl _
   inert_le' := Nat.le_refl _
   pending := by simp
-  registry := ⟨[], start.storageLoans, start₂.storageLoans, rfl, rfl, by simp,
+  registry := ⟨[], start.globalLoans, start₂.globalLoans, rfl, rfl, by simp,
     fun entry member inside => by
       have := fresh.below entry member
       rcases inside with beyond | lent
       · omega
-      · exact SemanticOperations.storageLoanTargetIn?_none (unregistered _ lent) entry member rfl,
+      · exact SemanticOperations.globalLoanKeyIn?_none (unregistered _ lent) entry member rfl,
     fun entry member loan inside => by
       have := registered entry member
       unfold lentRenaming
@@ -1337,13 +1339,12 @@ theorem StateRenamed.ofLent {start start₂ : RuntimeState}
       · rw [if_neg (by omega)]; omega
       · rw [if_pos (below _ lent), if_pos lent]; omega⟩
   globalsWithin := fun slot member => RuntimeValue.within_of_plain _ (plain slot member)
-  tablesWithin := fun slot member => RuntimeValue.within_of_plain _ (tables_plain slot member)
   pendingWithin := by simp
 
 end Lent
 
 /-- Loan independence: a run from a start lending distinct unregistered
-loans, whose global and Table storage hold no loan, on arguments holding
+loans, whose global memory holds no loan, on arguments holding
 only lent loans, is mirrored from a start with that memory lending them in
 order from a frontier no lower and minting beyond them, with its loans
 renamed. -/
@@ -1354,24 +1355,23 @@ theorem runs_mirror {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {loans : List Nat} {target : Nat}
     (run : EvalFunction executable handle instantiation start arguments final outcome)
     (globals_eq : start₂.globals = start.globals)
-    (tables_eq : start₂.tables = start.tables)
+    (tableHandles_eq : start₂.tableHandles = start.tableHandles)
     (plain : ∀ slot ∈ start.globals.entries, Plain slot.value)
-    (tables_plain : ∀ slot ∈ start.tables.contents.entries, Plain slot.value)
     (nodup : loans.Nodup) (below : ∀ loan ∈ loans, loan < start.nextLoan)
-    (unregistered : ∀ loan ∈ loans, storageLoanTargetIn? start.storageLoans loan = none)
-    (fresh : FreshStorageLoanIds start)
+    (unregistered : ∀ loan ∈ loans, globalLoanKeyIn? start.globalLoans loan = none)
+    (fresh : FreshGlobalLoanIds start)
     (le : start.nextLoan ≤ target) (next : start₂.nextLoan = target + loans.length)
-    (registered : ∀ entry ∈ start₂.storageLoans, entry.1 < target)
+    (registered : ∀ entry ∈ start₂.globalLoans, entry.1 < target)
     (arguments_within : ∀ argument ∈ arguments, argument.Within (lentInside loans start.nextLoan)) :
     ∃ final₂, EvalFunction executable handle instantiation start₂
         (arguments.map (·.rename (lentRenaming loans start.nextLoan target))) final₂
         (outcome.rename (lentRenaming loans start.nextLoan target)) ∧
       final₂.globals = final.globals.rename (lentRenaming loans start.nextLoan target) ∧
-      final₂.tables = final.tables.rename (lentRenaming loans start.nextLoan target) := by
+      final₂.tableHandles = final.tableHandles := by
   obtain ⟨final₂, finalShifted, -, run₂⟩ :=
     shifts natives run _ _ _ _ _ _ start₂
-      (StateRenamed.ofLent globals_eq tables_eq plain tables_plain nodup below unregistered fresh
+      (StateRenamed.ofLent globals_eq tableHandles_eq plain nodup below unregistered fresh
         le next registered) arguments_within
-  exact ⟨final₂, run₂, finalShifted.globals, finalShifted.tables⟩
+  exact ⟨final₂, run₂, finalShifted.globals, finalShifted.tableHandles⟩
 
 end VerexIR

@@ -322,6 +322,21 @@ continuation under what the contract guarantees. -/
       · exact undefined.elim
       · exact defined undefined
 
+/-- A certified state: the predicate is owed, and what follows may assume it. -/
+@[simp] theorem wp_certifyState (invariant : σ → Prop) (ensures : Unit → σ → Prop)
+    (aborts : ε → Prop) (initial : σ) :
+    wp (Spec.certifyState invariant : Spec σ ε Unit) ensures aborts initial ↔
+      invariant initial ∧ ensures () initial := by
+  simp only [wp, Spec.certifyState]
+  constructor
+  · rintro ⟨normal, _, defined⟩
+    have holds := Classical.not_not.mp defined
+    exact ⟨holds, normal () initial ⟨holds, trivial, rfl⟩⟩
+  · rintro ⟨holds, continues⟩
+    refine ⟨?_, fun _ failure => failure.elim, fun failed => failed holds⟩
+    rintro ⟨⟩ _ ⟨_, _, rfl⟩
+    exact continues
+
 theorem wp_bind (action : Spec σ ε α) (next : α → Spec σ ε β)
     (ensures : β → σ → Prop) (aborts : ε → Prop) (initial : σ) :
     wp (Spec.bind action next) ensures aborts initial ↔

@@ -7,8 +7,8 @@ namespace VerexIR.Tests.ReturnedStorage
 
 open SemanticOperations Proofs
 
--- A native entry loan resolves its value only; another entry and another
--- Table allocation remain unaffected. The physical Table is still just a handle.
+-- An entry loan of a table a global holds resolves that entry's value only;
+-- another entry remains unaffected.
 example :
     let key : GlobalKey := ⟨⟨0⟩, ⟨0⟩, .address "table-a"⟩
     let heap : GlobalMap := ⟨#[⟨key,
@@ -19,7 +19,7 @@ example :
     outermostBorrows, collectPruned, borrowEntry?, fillHole?, rewriteFirst, rewriteFirstList]
 
 example (state : RuntimeState) (results : Array RuntimeValue) :
-    (state.resolveReturned results).tables.allocated = state.tables.allocated := rfl
+    (state.resolveReturned results).tableHandles = state.tableHandles := rfl
 
 -- Even when failure conditions excuse ensures, the frame must constrain the
 -- actual returned value. An unrelated result cannot satisfy it existentially.
@@ -43,91 +43,5 @@ example : ¬ Satisfies (fun _ => Spec.pure 0) nextContract := by
   have wrong := (satisfies () 0 trivial trivial).1 0 0 ⟨rfl, rfl⟩
   have impossible : (0 : Nat) = 1 := wrong.2.1.2
   omega
-
-end VerexIR.Tests.ReturnedStorage
-
-namespace VerexIR.Tests.ReturnedStorage
-
-open SemanticOperations
-
--- The same key in the two stores names different owners. Returning the
--- native entry must preserve a live global loan and allocation history.
-private def collisionKey : GlobalKey := ⟨⟨0⟩, ⟨0⟩, .address "table-a"⟩
-private def collisionState : RuntimeState := {
-  globals := ⟨#[⟨collisionKey, .loanHole 1⟩]⟩
-  tables := {
-    contents := ⟨#[⟨collisionKey, .vector #[.tuple #[.integer 7, .loanHole 0], .tuple #[.integer 8, .integer 17]]⟩]⟩
-    allocated := #["destroyed-table", "table-a"] }
-  storageLoans := [(0, .table collisionKey), (1, .global collisionKey)]
-  nextLoan := 2 }
-
--- Observing a returned row resolves the global loan, but cannot overwrite
--- a Table slot already replaced by a plain value, even if that row still
--- contains the Table's former loan. Observation also cannot resurrect an
--- erased slot. Both checks use the same physical key in the two stores.
-#guard
-  let written := { collisionState with tables.contents :=
-    (collisionState.tables.contents.insert collisionKey
-      (.vector #[.tuple #[.integer 7, .integer 23]])) }
-  let observed := written.resolveReturned #[.borrow 0 (.integer 9), .borrow 1 (.integer 11)]
-  observed.tables.contents.lookup collisionKey ==
-      some (.vector #[.tuple #[.integer 7, .integer 23]]) &&
-    observed.globals.lookup collisionKey == some (.integer 11) &&
-    observed.tables.allocated == collisionState.tables.allocated
-
-#guard
-  let erased := { collisionState with tables.contents :=
-    collisionState.tables.contents.erase collisionKey }
-  let observed := erased.resolveReturned #[.borrow 0 (.integer 9), .borrow 1 (.integer 11)]
-  (observed.tables.contents.lookup collisionKey).isNone &&
-    observed.globals.lookup collisionKey == some (.integer 11) &&
-    observed.tables.allocated == collisionState.tables.allocated
-
-example :
-    exportFrameLoans { locals := #[some (.borrow 0 (.integer 9))] } collisionState =
-      { collisionState with
-        tables.contents := ⟨#[⟨collisionKey, .vector #[.tuple #[.integer 7, .integer 9], .tuple #[.integer 8, .integer 17]]⟩]⟩
-        storageLoans := [(1, .global collisionKey)] } := by
-  simp [collisionState, exportFrameLoans, exportSettledLoans, frameBorrows,
-    outermostBorrows, borrowEntry?, collectPruned,
-    holeInFrame, holeWithin, findFirst, applyWriteBack,
-    fillVisibleHole, storageLoanTarget?, storageLoanTargetIn?,
-    RuntimeState.loanValue?, RuntimeState.writeLoanValue, GlobalMap.lookup,
-    GlobalMap.insert, GlobalMap.erase, GlobalMap.insertSlot,
-    transferStorageLoan, removeStorageLoan, transferredLoan?, fillHole?,
-    rewriteFirst, rewriteFirstList]
-
-example :
-    let afterTable := exportFrameLoans { locals := #[some (.borrow 0 (.integer 9))] }
-      collisionState
-    exportFrameLoans { locals := #[some (.borrow 1 (.integer 11))] } afterTable =
-      { collisionState with
-        globals := ⟨#[⟨collisionKey, .integer 11⟩]⟩
-        tables.contents := ⟨#[⟨collisionKey, .vector #[.tuple #[.integer 7, .integer 9], .tuple #[.integer 8, .integer 17]]⟩]⟩
-        storageLoans := [] } := by
-  simp [collisionState, exportFrameLoans, exportSettledLoans, frameBorrows,
-    outermostBorrows, borrowEntry?, collectPruned,
-    holeInFrame, holeWithin, findFirst, applyWriteBack,
-    fillVisibleHole, storageLoanTarget?, storageLoanTargetIn?,
-    RuntimeState.loanValue?, RuntimeState.writeLoanValue, GlobalMap.lookup,
-    GlobalMap.insert, GlobalMap.erase, GlobalMap.insertSlot,
-    transferStorageLoan, removeStorageLoan, transferredLoan?, fillHole?,
-    rewriteFirst, rewriteFirstList]
-
--- A returned subloan keeps the native owner, including its storage domain.
-example :
-    let initial := { collisionState with nextLoan := 3 }
-    let transferred := (applyWriteBack {} initial 0 (.tuple #[.loanHole 2])).2
-    (applyWriteBack {} transferred 2 (.integer 13)).2 =
-      { initial with
-        tables.contents := ⟨#[⟨collisionKey,
-          .vector #[.tuple #[.integer 7, .tuple #[.integer 13]], .tuple #[.integer 8, .integer 17]]⟩]⟩
-        storageLoans := [(1, .global collisionKey)] } := by
-  simp [collisionState, holeInFrame, findFirst, findFirstList, applyWriteBack,
-    fillVisibleHole, storageLoanTarget?, storageLoanTargetIn?,
-    RuntimeState.loanValue?, RuntimeState.writeLoanValue, GlobalMap.lookup,
-    GlobalMap.insert, GlobalMap.erase, GlobalMap.insertSlot,
-    transferStorageLoan, removeStorageLoan, transferredLoan?, fillHole?,
-    rewriteFirst, rewriteFirstList]
 
 end VerexIR.Tests.ReturnedStorage

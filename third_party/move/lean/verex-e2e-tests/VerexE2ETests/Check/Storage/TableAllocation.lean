@@ -93,7 +93,55 @@ verex module 0x42::table_allocation where
 /--
 error: the specification clause `ensures get(result, 1u8) == 4` is not established
 ---
-error: verex verification failed: the automatic verification of `wrong_value` failed; provide a proof: `verify wrong_value by …` in the module (`verify wrong_value by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `wrong_value` failed; provide a proof in the module:
+  verify wrong_value by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::table_allocation::wrong_value
+
+-- The roles run in the interpreter: the runtime provides them on the table's
+-- value, allocating at a fresh handle and keeping the entries in the owner's
+-- last field (`designs/intrinsic-maps.md`, "Tables in the runtime
+-- semantics").
+open Lean Elab Command VerexIR VerexE2ETests.CheckSupport in
+run_cmd do
+  let some unit := VerexSL.registeredUnit? (← getEnv) `«0x42».table_allocation
+    | throwError "missing table allocation module"
+  let executable ← match Validation.prepareExecution #[VerexIR.Move.semantics] unit with
+    | .ok executable => pure executable
+    | .error diagnostics => throwError "preparation failed: {repr diagnostics}"
+  let run (function : String) (arguments : Array RuntimeValue) :
+      CommandElabM (RuntimeState × Outcome) := do
+    let some (namespaceIndex, _, index, _) := VerexSL.Contract.findFunction? unit function
+      | throwError "missing function {function}"
+    match Interpreter.run executable 256 ⟨⟨namespaceIndex⟩, ⟨index⟩⟩ arguments {} with
+    | .error failure => throwError "{function} failed: {repr failure}"
+    | .ok (state, outcome) => pure (state, outcome.value)
+  let table (handle : String) (entries : Array RuntimeValue) : RuntimeValue :=
+    .nominal ⟨⟨0⟩, 0⟩ none #[.address handle, .vector entries]
+  let entry (key value : RuntimeValue) : RuntimeValue := .tuple #[key, value]
+  let check (function : String) (arguments : Array RuntimeValue) (expected : Outcome)
+      (allocated : Array String := #["table-0"]) : CommandElabM Unit := do
+    let (final, outcome) ← run function arguments
+    unless outcome == expected do
+      throwError "{function}: expected {repr expected}, got {repr outcome}"
+    unless final.tableHandles == allocated do
+      throwError "{function}: handles {repr final.tableHandles}"
+  check "filled" #[] (.returned
+    #[table "table-0" #[entry (.integer 1) (.integer 3), entry (.integer 2) (.integer 4)]])
+  check "removed" #[] (.returned #[table "table-0" #[entry (.integer 2) (.integer 4)]])
+  check "duplicate" #[.integer 1, .integer 2] (.returned
+    #[table "table-0" #[entry (.integer 1) (.integer 2), entry (.integer 2) (.integer 3)]])
+  -- An abort rolls the state back, the allocation included.
+  check "duplicate" #[.integer 1, .integer 1] (.threw .abort #[.integer 25607]) #[]
+  check "nested_values" #[.integer 3] (.returned
+    #[table "table-0" #[entry (.integer 1) (.vector #[.integer 1])]])
+  check "held" #[] (.returned #[.nominal ⟨⟨0⟩, 2⟩ none
+    #[table "table-0" #[entry (.nominal ⟨⟨0⟩, 1⟩ none #[.vector #[.integer 1, .integer 2]])
+      (.integer 22)]]])
+  check "wrong_value" #[] (.returned #[table "table-0" #[entry (.integer 1) (.integer 3)]])

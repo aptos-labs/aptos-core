@@ -1,2 +1,8 @@
 VerexE2ETests/SourceVerify/reference_spec_cast.move:23:9: error: the specification clause `ensures x == old(x)` is not established
-VerexE2ETests/SourceVerify/reference_spec_cast.move:19:5: error: verex verification failed: the automatic verification of `false_increment` failed; provide a proof: `verify false_increment by …` in `VerexE2ETests/SourceVerify/reference_spec_cast.proof.lean` (`verify false_increment by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/reference_spec_cast.move:19:5: error: verex verification failed: the automatic verification of `false_increment` failed; provide a proof in `VerexE2ETests/SourceVerify/reference_spec_cast.proof.lean`:
+  verify false_increment by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

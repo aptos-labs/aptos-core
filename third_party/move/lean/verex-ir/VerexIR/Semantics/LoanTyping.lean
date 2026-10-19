@@ -188,12 +188,12 @@ theorem rewriteChildren_typed :
       obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
       refine .vector _ _ _ ?_ (by simpa using rewriteFirstList_each elements rewritten_eq)
       simpa [rewriteFirstList_length rewritten_eq] using length_matches
-  | _, _, _, .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq
-      resolved fields_typed, inside => by
+  | _, _, _, .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+      resolved ghostsResolved fields_typed, inside => by
       simp only [rewriteChildren, Option.map_eq_some_iff] at inside
       obtain ⟨rewritten, rewritten_eq, rfl⟩ := inside
-      exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq
-        resolved (by simpa using rewriteFirstList_types fields_typed rewritten_eq)
+      exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+        resolved ghostsResolved (by simpa using rewriteFirstList_types fields_typed rewritten_eq)
   | _, _, _, .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
       namespace_eq declaration_eq signature_eq faithful mask_bound captures_typed
       parameters_eq packs, inside => by
@@ -335,7 +335,7 @@ theorem findChildren_typed :
       findChildren f value = some found → P found
   | _, _, _, .tuple _ _ elements, query => findFirstList_types elements query
   | _, _, _, .vector _ _ _ _ elements, query => findFirstList_each elements query
-  | _, _, _, .nominal _ _ _ _ _ _ _ _ _ _ _ fields_typed, query =>
+  | _, _, _, .nominal _ _ _ _ _ _ _ _ _ _ _ _ _ fields_typed, query =>
       findFirstList_types fields_typed query
   | _, _, _, .closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ captures_typed _ _, query =>
       findFirstList_types captures_typed query
@@ -390,7 +390,7 @@ theorem collectChildren_typed :
       found ∈ collectChildren f value → P found
   | _, _, _, .tuple _ _ elements, member => collectPrunedList_types elements member
   | _, _, _, .vector _ _ _ _ elements, member => collectPrunedList_each elements member
-  | _, _, _, .nominal _ _ _ _ _ _ _ _ _ _ _ fields_typed, member =>
+  | _, _, _, .nominal _ _ _ _ _ _ _ _ _ _ _ _ _ fields_typed, member =>
       collectPrunedList_types fields_typed member
   | _, _, _, .closure _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ captures_typed _ _, member =>
       collectPrunedList_types captures_typed member
@@ -634,9 +634,10 @@ private theorem field_subsumes {unit : ValidatedUnit} {loans : LoanTypes} {sourc
 where
   go : ∀ {type : SemTy}, HasType unit loans (.nominal source variant fields) type →
       HasType unit loans (.nominal source variant (fields.set! index part')) type
-    | _, .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq resolved
-        typed =>
-        .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq resolved
+    | _, .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+        resolved ghostsResolved typed =>
+        .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+          resolved ghostsResolved
           (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
             typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, .shared _ _ inner => .shared _ _ (go inner)
@@ -907,17 +908,14 @@ theorem fillVisibleHole_typed {unit : ValidatedUnit} {loans : LoanTypes}
       exact ⟨frameTyped, stateTyped⟩
   · split at fill
     · split at fill
-      · rename_i key _ _ filled filled_eq
+      · rename_i key _ filled filled_eq
         simp only [Prod.mk.injEq] at fill
         obtain ⟨rfl, rfl, -⟩ := fill
         simp only [Option.bind_eq_some_iff] at filled_eq
         obtain ⟨value, lookup_eq, filled_eq⟩ := filled_eq
         refine ⟨frameTyped, ?_⟩
-        cases key with
-        | global key =>
-            exact (stateTyped.subsume lookup_eq (fillHole?_subsumes loan_eq typed filled_eq)).of_eq
-              rfl rfl rfl
-        | table key => exact stateTyped.of_eq rfl rfl rfl
+        exact (stateTyped.subsume lookup_eq (fillHole?_subsumes loan_eq typed filled_eq)).of_eq
+          rfl rfl rfl
       · simp only [Prod.mk.injEq] at fill
         obtain ⟨rfl, rfl, -⟩ := fill
         exact ⟨frameTyped, stateTyped⟩
@@ -1276,11 +1274,11 @@ theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
       unfold maskReturnedBorrows
       refine .vector _ _ _ ?_ (by simpa using maskReturnedBorrowList_each elements)
       simpa [maskReturnedBorrowList_length] using length_matches
-  | _, _, .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq
-      resolved fields_typed => by
+  | _, _, .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+      resolved ghostsResolved fields_typed => by
       unfold maskReturnedBorrows
-      exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq
-        resolved (by simpa using maskReturnedBorrowList_types fields_typed)
+      exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+        resolved ghostsResolved (by simpa using maskReturnedBorrowList_types fields_typed)
   | _, _, .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
       namespace_eq declaration_eq signature_eq faithful mask_bound captures_typed
       parameters_eq packs => by
@@ -1288,6 +1286,9 @@ theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
       exact .closure _ _ _ _ _ _ targetNs declaration arguments allParameters results
         namespace_eq declaration_eq signature_eq faithful mask_bound
         (by simpa using maskReturnedBorrowList_types captures_typed) parameters_eq packs
+  | _, _, .ghost _ _ plain => by
+      unfold maskReturnedBorrows
+      exact .ghost _ _ (by rw [plain.maskReturnedBorrows_eq_self]; exact plain)
   | _, _, .borrow _ _ referent loan_eq current_typed => by
       unfold maskReturnedBorrows
       split
@@ -1988,19 +1989,32 @@ theorem bindPatternFuel_typed {unit : ValidatedUnit} {loans : LoanTypes}
               · cases bind
               rename_i matched
               simp only [Bool.or_eq_true, bne_iff_ne, ne_eq, not_or, Decidable.not_not] at matched
-              obtain ⟨⟨rfl, rfl⟩, -⟩ := matched
+              obtain ⟨⟨rfl, rfl⟩, sizes⟩ := matched
               rw [unit_eq] at target
               obtain ⟨namespace_eq, declaration_eq, -⟩ :=
                 nominalTarget_resolveNominal target expected_eq
               obtain ⟨declared, declared_eq, resolved⟩ := fieldTypes_resolve types_eq
-              obtain ⟨_, declared', fieldTypes, -, handle_eq, resolved', fieldsTyped⟩ :=
-                typed.nominal_fields
+              obtain ⟨_, declared', fieldTypes, ghostTypes, -, handle_eq, resolved', ghostsResolved,
+                fieldsTyped⟩ := typed.nominal_fields
               rw [fieldsOf_handleFields namespace_eq declaration_eq declared_eq] at handle_eq
               simp only [Option.some.injEq, Prod.mk.injEq] at handle_eq
               obtain ⟨rfl, rfl⟩ := handle_eq
               rw [← ResolvesAll.unique resolved resolved'] at fieldsTyped
-              exact row fields.toList types values.toList frame frame' frameTyped all
-                (by simpa using length) fieldsTyped bind
+              -- A pattern binds the declared fields, which the ghost slots follow: a
+              -- table owner, whose value holds its entries beside them, matches no
+              -- constructor pattern.
+              have sameLength : fields.size = types.length := by simpa using length
+              have contentsEmpty : contentsTypes unit expected variant arguments.toList = [] := by
+                have typedLength := HasTypes.length_eq fieldsTyped
+                have ghostLength := ResolvesAll.length_eq ghostsResolved
+                simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+                simp only [Array.length_toList, List.length_append, List.length_map] at typedLength
+                exact List.eq_nil_of_length_eq_zero (by omega)
+              rw [contentsEmpty, List.append_nil] at fieldsTyped
+              have taken : HasTypes unit loans (values.toList.take fields.size) types := by
+                rw [sameLength]; exact HasTypes.take_append fieldsTyped
+              exact row fields.toList types (values.toList.take fields.size) frame frame'
+                frameTyped all (by simpa using length) taken bind
           | _ => simp at bind
         · cases static
       · cases static

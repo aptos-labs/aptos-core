@@ -97,7 +97,7 @@ verex module 0x42::ordered_map where
     intro lt
     exact atMiddle (Std.TransCmp.lt_trans (sorted middle i h0 (by omega) hsize) lt)
 
-  verify lower_bound_loop by
+  verify! lower_bound_loop by
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case requires_of_lower_bound_loop_1 =>

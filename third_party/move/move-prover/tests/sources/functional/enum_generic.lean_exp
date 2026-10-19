@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/enum_generic.move:27:13: error: the assertion `_common_vector_1.x != _common_vector_2.x` does not hold
-tests/sources/functional/enum_generic.move:13:5: error: verex verification failed: the automatic verification of `test_enum_vector` failed; provide a proof: `verify test_enum_vector by …` in `tests/sources/functional/enum_generic.proof.lean` (`verify test_enum_vector by verex_obligations` lists its obligations)
+tests/sources/functional/enum_generic.move:13:5: error: verex verification failed: the automatic verification of `test_enum_vector` failed; provide a proof in `tests/sources/functional/enum_generic.proof.lean`:
+  verify test_enum_vector by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

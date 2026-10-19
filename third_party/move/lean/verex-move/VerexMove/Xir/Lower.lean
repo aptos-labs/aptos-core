@@ -78,21 +78,30 @@ private def nominalDecl? (name : NameId) : M (Option StructDecl) := do
       dependency.structs.find? (·.name == name)
     else none
 
+/-- The structs a module compiles: a spec variable's memory, which only
+verification holds, has no bytecode form (`designs/ghost-fields.md`). -/
+private def compiledStructs (ns : ValidatedNamespace) : Array StructDecl :=
+  ns.structs.filter (!·.isGhostMemory)
+
 /-- The XIR struct id of a nominal name, and whether it is an enum. -/
 private def structIdOf (loc : Option LocId) (name : NameId) : M (Nat × Bool) := do
   let context ← read
   let some qualified := context.ns.tables.names[name.index]?
     | fail loc s!"name {name.index} is out of range"
-  let isEnum := ((← nominalDecl? name).map (!·.variants.isEmpty)).getD false
+  let declaration ← nominalDecl? name
+  if declaration.any (·.isGhostMemory) then
+    fail loc s!"`{qualified.name}` is a spec variable's memory, which has no Move bytecode form"
+  let isEnum := (declaration.map (!·.variants.isEmpty)).getD false
   if qualified.namespaceId == context.namespaceId then
     let some typeId := context.unit.resolution.nominal? name
       | fail loc s!"`{qualified.name}` is not a declared type"
-    return (typeId.index, isEnum)
+    -- Its position among the compiled structs.
+    return (((context.ns.structs.extract 0 typeId.index).filter (!·.isGhostMemory)).size, isEnum)
   let (address, module) ← moduleOf loc qualified.namespaceId
   let state ← get
   let (entries, index) := external state.externalStructs { address, module, name := qualified.name }
   set { state with externalStructs := entries }
-  return (context.ns.structs.size + index, isEnum)
+  return ((compiledStructs context.ns).size + index, isEnum)
 
 /-- The XIR function id a call's target denotes. -/
 private def functionIdOf (loc : Option LocId) (reference : QualifiedRef) : M Nat := do
@@ -379,7 +388,8 @@ private partial def storesInto (target : LocalId) (id : PlaceId) : BodyM Bool :=
   match ← place id with
   | .localVar localId => pure (localId == target)
   | .deref _ => pure false
-  | .field base .. | .index base _ | .subslice base .. | .downcast base _ => storesInto target base
+  | .field base .. | .ghostField base .. | .index base _ | .subslice base .. | .downcast base _ =>
+      storesInto target base
 
 private partial def patternBinds (target : LocalId) (id : PatternId) : BodyM Bool := do
   match (← pattern id).kind with
@@ -586,6 +596,7 @@ mutual
         let some slot ← localOf localId | failHere "a unit local has no place"
         localType slot
     | .deref base => referent (← placeType base)
+    | .ghostField .. => failHere "a ghost field has no Move bytecode form"
     | .field base owner field => do
         let (_, arguments) ← nominalOf (← get).loc (← placeType base)
         let variant ← match ← place base with
@@ -615,6 +626,7 @@ mutual
             let some slot ← localOf localId | failHere "a unit local has no place"
             coerceRef slot mutable
         | _ => coerceRef (← readPlace base) mutable
+    | .ghostField .. => failHere "a ghost field has no Move bytecode form"
     | .field base owner field => do
         let fieldType ← placeType id
         let (_, arguments) ← nominalOf (← get).loc (← placeType base)
@@ -925,6 +937,7 @@ mutual
         emit (.call #[] .writeRef #[reference, ← single (← nth operands 1 "the operation")])
         pure #[updated]
     | .data (.discriminant _) => failHere "a variant discriminant has no Move bytecode form"
+    | .data (.selectGhost ..) => failHere "a ghost field has no Move bytecode form"
     | .primitive primitive => lowerPrimitive expression primitive arguments call
     | .assert => failHere "an assertion without an abort code has no Move bytecode form"
     | .specification _ => failHere "a specification operation is not executable"
@@ -1172,7 +1185,7 @@ def lowerModule (unit : ValidatedUnit) (namespaceId : NamespaceId) : Except Fail
     unless ns.profile == some .move do
       fail (some ns.loc) "only a Move namespace compiles to Move bytecode"
     let (address, name) ← moduleOf (some ns.loc) ns.identity
-    let structs ← ns.structs.mapM lowerStruct
+    let structs ← (compiledStructs ns).mapM lowerStruct
     let functions ← ns.functions.mapM lowerFunction
     let state ← get
     pure {

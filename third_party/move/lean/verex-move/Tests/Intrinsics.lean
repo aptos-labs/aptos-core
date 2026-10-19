@@ -107,21 +107,21 @@ private def hasCode (unit : RawUnit) (code : String) : Bool :=
   (diagnostics unit).any (fun diagnostic => diagnostic.code == code)
 
 #guard registryComplete
-#guard roleSchemas.size == 64
-#guard roleSchemas.countP (fun role => role.kind == .executable) == 37
-#guard roleSchemas.countP (fun role => role.kind == .specification) == 27
-#guard signaturePatterns .specAbortsNewWithConfig == #[{
+#guard roleSchemas.size == 66
+#guard roleSchemas.countP (fun role => role.kind == .executable) == 38
+#guard roleSchemas.countP (fun role => role.kind == .specification) == 28
+#guard signaturePatterns (.specification .abortsNewWithConfig) == #[{
   parameters := #[.num, .num, .bool]
   result := .bool }]
-#guard signaturePatterns .specAbortsTrim == #[{
+#guard signaturePatterns (.specification .abortsTrim) == #[{
   parameters := #[.owner, .num]
   result := .bool }]
-#guard (roleSchema? "map_spec_insertion_key_at").map (·.role) == some .specInsertionKeyAt
-#guard (roleSchema? "map_spec_insertion_rank").map (·.role) == some .specInsertionRank
-#guard signaturePatterns .specInsertionKeyAt == #[{
+#guard (roleSchema? "map_spec_insertion_key_at").map (·.role) == some (.specification .insertionKeyAt)
+#guard (roleSchema? "map_spec_insertion_rank").map (·.role) == some (.specification .insertionRank)
+#guard signaturePatterns (.specification .insertionKeyAt) == #[{
   parameters := #[.owner, .num]
   result := .key }]
-#guard signaturePatterns .specInsertionRank == #[{
+#guard signaturePatterns (.specification .insertionRank) == #[{
   parameters := #[.owner, .key]
   result := .num }]
 #guard (validate fixture).isOk
@@ -183,5 +183,45 @@ private def badSignature : RawUnit :=
   { fixture with namespaces := #[{ ns with specFunctions }] }
 
 #guard hasCode badSignature "VIR-MOVE-INTRINSIC-SIGNATURE"
+
+-- A configured table is a table the runtime builds.
+private def configuredTable : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  let signature := mapSignature #[5, 5, 4] 3
+  { fixture with
+    tables := { fixture.tables with types := fixture.tables.types.push (.integer (.bits 16) false) }
+    namespaces := #[{ ns with
+      functions := #[{ ns.functions[0]! with signature, locals := (specFunction 5 signature).locals }]
+      intrinsics := #[{ ns.intrinsics[0]! with executableBindings := #[{
+        loc := ⟨6⟩, role := "map_new_with_config", target := ownRef 5 }] }] }] }
+
+#guard match validate configuredTable with
+  | .error _ => false
+  | .ok unit => (prepareExecution #[semantics] unit) matches .ok _
+
+-- A frontend may recognize a role the shared vocabulary does not name. Its
+-- schema accepts the same signature as new_with_config; preparation must
+-- still reject it, as the runtime has no step for it.
+private def futureTable : RawUnit :=
+  let ns := configuredTable.namespaces[0]!
+  let intrinsic := ns.intrinsics[0]!
+  { configuredTable with namespaces := #[{ ns with intrinsics := #[{
+      intrinsic with executableBindings := #[{
+        intrinsic.executableBindings[0]! with role := "map_future_role" }] }] }] }
+
+private def futureFrontendSchema : ProfileSchema := {
+  schema with checkIntrinsic := fun unit ns intrinsic =>
+    schema.checkIntrinsic unit ns { intrinsic with
+      executableBindings := intrinsic.executableBindings.map fun binding =>
+        if binding.role == "map_future_role" then { binding with role := "map_new_with_config" }
+        else binding } }
+
+#guard match Validation.validate #[futureFrontendSchema] futureTable with
+  | .error _ => false
+  | .ok unit => match prepareExecution #[semantics] unit with
+      | .ok _ => false
+      | .error diagnostics => diagnostics.any fun diagnostic =>
+          diagnostic.code == "VIR-EXEC-UNSUPPORTED" &&
+            diagnostic.message.endsWith "`map_future_role` is not an executable map role"
 
 end VerexIR.Move.Tests.Intrinsics

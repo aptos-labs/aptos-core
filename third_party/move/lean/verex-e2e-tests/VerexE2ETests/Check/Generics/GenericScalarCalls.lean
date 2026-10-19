@@ -67,6 +67,18 @@ verex module 0x42::generic_scalar_calls where
     pragma aborts_if_is_strict
     ensures result == value
 
+  -- A callee's result at an integer instance carries the type's range, with
+  -- no clause relating it to an argument.
+  fun unrelated {T}(value : T) -> T := value
+  spec unrelated where
+    pragma opaque
+    aborts_if false
+
+  fun widened(value : u128) -> u256 := (core.call unrelated::<u128>(value)) as u256 + 1
+  spec widened where
+    aborts_if false
+    ensures result <= 340282366920938463463374607431768211456
+
 -- Each concrete caller's proof reuses its generic callee's theorem instead of
 -- re-proving the callee at the concrete type.
 open Lean Elab Command in
