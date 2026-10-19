@@ -5,7 +5,7 @@ use crate::{
     ability::AbilitySet,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::{MoveTypeLayout, MoveValue},
+    value::{MoveTypeLayout, MoveValue, ValueDepth, ValueSeed},
 };
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
@@ -274,7 +274,8 @@ pub struct MoveClosure {
     pub captured: Vec<(MoveTypeLayout, MoveValue)>,
 }
 
-pub(crate) struct ClosureVisitor;
+/// Visitor for a closure whose captured values are at the given depth.
+pub(crate) struct ClosureVisitor(pub(crate) ValueDepth);
 
 impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
     type Value = MoveClosure;
@@ -301,7 +302,10 @@ impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
         let mut captured = vec![];
         for _ in 0..mask.captured_count() {
             let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
-            match seq.next_element_seed(&layout)? {
+            match seq.next_element_seed(ValueSeed {
+                layout: &layout,
+                depth: self.0,
+            })? {
                 Some(v) => captured.push((layout, v)),
                 None => return Err(A::Error::invalid_length(captured.len(), &self)),
             }

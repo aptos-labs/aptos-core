@@ -25,6 +25,7 @@ use move_core_types::{
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
+        MAX_VALUE_NEST_DEPTH,
     },
     vm_status::{
         sub_status::{
@@ -54,7 +55,7 @@ use triomphe::Arc as TriompheArc;
 ///
 /// IMPORTANT: When changing this constant, make sure it is in-sync with one in VM config (it is
 /// used there now).
-pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
+pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = MAX_VALUE_NEST_DEPTH;
 
 /***************************************************************************************
  *
