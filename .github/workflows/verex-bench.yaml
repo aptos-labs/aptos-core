@@ -158,7 +158,7 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: write # the gh-pages branch
-      pages: write # explicitly build the site after a GITHUB_TOKEN push
+      pages: read # the site build of the pushed report
       pull-requests: write # the completed report's link
     steps:
       - uses: actions/checkout@v4
@@ -192,30 +192,28 @@ jobs:
           done
           exit 1
 
-      - name: Build the Pages site
+      - name: Wait for the Pages site
         timeout-minutes: 12
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # GITHUB_TOKEN pushes do not trigger branch-based Pages builds.
+          # The gh-pages push starts a Pages build. A later push cancels a
+          # running build, which the API then reports as errored, so judge
+          # the newest build that includes our commit.
           published_commit="$(git -C pages rev-parse HEAD)"
-          gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds" --silent
           for attempt in {1..60}; do
-            build="$(gh api "repos/$GITHUB_REPOSITORY/pages/builds/latest")"
-            status="$(jq -r '.status' <<< "$build")"
-            build_commit="$(jq -r '.commit' <<< "$build")"
-            if [[ "$status" == built || "$status" == errored ]]; then
-              # Another publisher may have queued a newer build; it must
-              # include our commit before we announce the report.
-              relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$published_commit...$build_commit" --jq '.status')"
-              if [[ "$relation" == identical || "$relation" == ahead ]]; then
-                if [[ "$status" == built ]]; then
-                  exit 0
-                fi
-                jq -r '"::error::GitHub Pages build failed: " + (.error.message // "unknown error")' <<< "$build"
-                exit 1
-              fi
-            fi
+            while IFS=$'\t' read -r status build_commit message; do
+              relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$published_commit...$build_commit" --jq '.status' || true)"
+              [[ "$relation" == identical || "$relation" == ahead ]] || continue
+              case "$status" in
+                built) exit 0 ;;
+                errored)
+                  echo "::error::GitHub Pages build failed: ${message:-unknown error}"
+                  exit 1 ;;
+              esac
+              break
+            done < <(gh api "repos/$GITHUB_REPOSITORY/pages/builds?per_page=10" \
+              --jq 'sort_by(.created_at) | reverse | .[] | [.status, .commit, (.error.message // "")] | @tsv')
             sleep 10
           done
           echo "::error::Timed out waiting for GitHub Pages to publish the report."
