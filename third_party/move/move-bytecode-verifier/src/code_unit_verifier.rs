@@ -49,6 +49,11 @@ impl<'a> CodeUnitVerifier<'a> {
         verifier_config: &VerifierConfig,
         module: &'a CompiledModule,
     ) -> PartialVMResult<()> {
+        // Must run before any function is type checked: with the flag on, `borrow_field` takes a
+        // variant field handle's type from its first listed variant.
+        if verifier_config.uniform_variant_field_handles {
+            type_safety::verify_variant_field_handles(module)?;
+        }
         let mut meter = BoundMeter::new(verifier_config);
         let mut name_def_map = HashMap::new();
         for (idx, func_def) in module.function_defs().iter().enumerate() {
@@ -214,7 +219,7 @@ impl<'a> CodeUnitVerifier<'a> {
         meter: &mut impl Meter,
     ) -> PartialVMResult<()> {
         StackUsageVerifier::verify(verifier_config, &self.resolver, &self.function_view, meter)?;
-        type_safety::verify(&self.resolver, &self.function_view, meter)?;
+        type_safety::verify(verifier_config, &self.resolver, &self.function_view, meter)?;
         locals_safety::verify(&self.resolver, &self.function_view, meter)?;
         reference_safety::verify(
             &self.resolver,
