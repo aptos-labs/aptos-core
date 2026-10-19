@@ -26,6 +26,7 @@ aptos move publish --named-addresses example=0x42 --included-artifacts sparse
 | `--override-size-check` | Skip the local size pre-check. Doesn't bypass on-chain size limits. |
 | `--chunked-publish` | Publish in chunks via the `large_packages` framework module. Use for packages exceeding the single-transaction size limit. |
 | `--chunk-size <BYTES>` | Override chunk size for chunked publishing. |
+| `--chunk-parallelism <N>` | With a `large_packages` module that stages chunks by position, how many of the transactions that stage chunks are sent at the same time (default 10, at most 100). Use 1 to send them one at a time. |
 
 Re-publishing this command upgrades the package in place, subject to the [package upgrade rules](./modules-and-packages.md).
 
@@ -44,7 +45,7 @@ aptos move deploy-object \
 | Flag | Meaning |
 |---|---|
 | `--address-name <NAME>` | The named address in `Move.toml` whose binding will be set to the new object's address. |
-| `--included-artifacts`, `--override-size-check`, `--chunked-publish`, `--chunk-size` | Same as `publish`. |
+| `--included-artifacts`, `--override-size-check`, `--chunked-publish`, `--chunk-size`, `--chunk-parallelism` | Same as `publish`. |
 
 _See also: [Object Code Deployment](https://aptos.dev/build/smart-contracts/deployment), [Package Upgrades](./modules-and-packages.md)._
 
@@ -63,7 +64,7 @@ aptos move upgrade-object \
 |---|---|
 | `--address-name <NAME>` | Same named address used at deploy time. |
 | `--object-address <ADDR>` | Address of the existing code object. |
-| `--included-artifacts`, `--override-size-check`, `--chunked-publish`, `--chunk-size` | Same as `publish`. |
+| `--included-artifacts`, `--override-size-check`, `--chunked-publish`, `--chunk-size`, `--chunk-parallelism` | Same as `publish`. |
 
 _See also: [Object Code Deployment](https://aptos.dev/build/smart-contracts/deployment), [Package Upgrades](./modules-and-packages.md)._
 
@@ -101,7 +102,7 @@ The resulting JSON can be submitted later with `aptos governance` or signed offl
 
 ## `aptos move clear-staging-area`
 
-Remove the staging-area resource left on-chain by an aborted chunked publish. Run this when a `--chunked-publish` flow fails partway and you want to start over.
+Remove the staging-area resource left on-chain by an incomplete chunked publish. A new `--chunked-publish` run does not need this: it continues with the chunks that are already staged if they belong to the same package, and offers to remove them otherwise. So you only need this to clean up without publishing again.
 
 ```shellscript filename="Terminal"
 aptos move clear-staging-area --profile devnet

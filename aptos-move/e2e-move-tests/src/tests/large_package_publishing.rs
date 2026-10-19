@@ -4,7 +4,7 @@
 use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::{
     chunked_publish::{
-        chunk_package_and_create_payloads, PublishType, CHUNK_SIZE_IN_BYTES,
+        chunk_package_and_create_payloads, LargePackagesAbi, PublishType, CHUNK_SIZE_IN_BYTES,
         LARGE_PACKAGES_DEV_MODULE_ADDRESS,
     },
     natives::{
@@ -44,6 +44,7 @@ struct LargePackageTestContext {
     harness: MoveHarness,
     account: Account, // used for testing account code deployment for large packages
     object_address: AccountAddress, // used for testing object code deployment for large packages
+    abi: LargePackagesAbi, // entry functions of `large_packages.move` to stage through
 }
 
 impl LargePackageTestContext {
@@ -61,7 +62,60 @@ impl LargePackageTestContext {
             harness,
             account,
             object_address,
+            abi: LargePackagesAbi::Append,
         }
+    }
+
+    /// Stages through the `stage_chunks*` entry functions from now on. An object deployment of the
+    /// package at `path` creates its object at an address derived from the number of transactions
+    /// it takes, which depends on the entry functions, so the expected address is updated.
+    fn use_positional_abi(&mut self, path: &Path) {
+        self.abi = LargePackagesAbi::Positional;
+        let num_transactions = self
+            .create_payloads(path, |_| {}, PublishType::ObjectDeploy)
+            .len() as u64;
+        let sequence_number = self.harness.sequence_number(self.account.address());
+        self.object_address = create_object_code_deployment_address(
+            *self.account.address(),
+            sequence_number + num_transactions,
+        );
+    }
+
+    fn run_payload(&mut self, account: &Account, payload: TransactionPayload) -> TransactionStatus {
+        let signed_tx = self
+            .harness
+            .create_transaction_without_sign(account, payload)
+            .sign();
+        self.harness.run(signed_tx)
+    }
+
+    /// Checks that the example package is published at `address` and that its code runs.
+    fn assert_example_package_published(&mut self, account: &Account, address: AccountAddress) {
+        let registry = self
+            .harness
+            .read_resource::<PackageRegistry>(
+                &address,
+                parse_struct_tag("0x1::code::PackageRegistry").unwrap(),
+            )
+            .unwrap();
+        assert_eq!(registry.packages.len(), 1);
+        assert_eq!(registry.packages[0].name, "LargePackageExample");
+        assert_eq!(registry.packages[0].modules.len(), 9);
+
+        assert_success!(self.harness.run_entry_function(
+            account,
+            str::parse(&format!("{}::eight::hello", address)).unwrap(),
+            vec![],
+            vec![bcs::to_bytes::<u64>(&42).unwrap()]
+        ));
+        let state = self
+            .harness
+            .read_resource::<State>(
+                account.address(),
+                parse_struct_tag(&format!("{}::eight::State", address)).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(state.value, 42);
     }
 
     /// Get the local framework path based on this source file's location.
@@ -98,6 +152,20 @@ impl LargePackageTestContext {
         patch_metadata: impl FnMut(&mut PackageMetadata),
         publish_type: PublishType,
     ) -> Vec<TransactionStatus> {
+        let payloads = self.create_payloads(path, patch_metadata, publish_type);
+        payloads
+            .into_iter()
+            .map(|payload| self.run_payload(account, payload))
+            .collect()
+    }
+
+    /// Create the transactions that publish the package at `path` to its deployment address.
+    fn create_payloads(
+        &mut self,
+        path: &Path,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+        publish_type: PublishType,
+    ) -> Vec<TransactionPayload> {
         let deploy_address = match publish_type {
             PublishType::AccountDeploy => AccountAddress::from_hex_literal("0xcafe").unwrap(),
             PublishType::ObjectDeploy | PublishType::ObjectUpgrade => self.object_address,
@@ -107,22 +175,12 @@ impl LargePackageTestContext {
             String::from("large_package_example"),
             deploy_address,
         )]);
-        let payloads = self.create_publish_large_package_from_path(
+        self.create_publish_large_package_from_path(
             path,
             Some(build_options),
             patch_metadata,
             publish_type,
-        );
-        payloads
-            .into_iter()
-            .map(|payload| {
-                let signed_tx = self
-                    .harness
-                    .create_transaction_without_sign(account, payload)
-                    .sign();
-                self.harness.run(signed_tx)
-            })
-            .collect()
+        )
     }
 
     /// Create transactions for publishing a large package.
@@ -148,6 +206,7 @@ impl LargePackageTestContext {
             Some(self.object_address),
             AccountAddress::from_str(LARGE_PACKAGES_DEV_MODULE_ADDRESS).unwrap(),
             CHUNK_SIZE_IN_BYTES,
+            self.abi,
         )
     }
 }
@@ -420,4 +479,96 @@ fn large_package_object_code_deployment_upgrade_success_compat() {
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
     }
+}
+
+fn large_package_example_path() -> PathBuf {
+    common::test_dir_path("../../../move-examples/large_packages/large_package_example")
+}
+
+#[test]
+fn large_package_positional_publishing_basic() {
+    let mut context = LargePackageTestContext::new();
+    let path = large_package_example_path();
+    context.use_positional_abi(&path);
+    let acc = context.account.clone();
+
+    let tx_statuses =
+        context.publish_large_package(&acc, &path, |_| {}, PublishType::AccountDeploy);
+    for tx_status in tx_statuses.into_iter() {
+        assert_success!(tx_status);
+    }
+    context.assert_example_package_published(&acc, *acc.address());
+}
+
+#[test]
+fn large_package_positional_out_of_order_and_repeated_chunks() {
+    let mut context = LargePackageTestContext::new();
+    let path = large_package_example_path();
+    context.use_positional_abi(&path);
+    let acc = context.account.clone();
+
+    let mut payloads = context.create_payloads(&path, |_| {}, PublishType::AccountDeploy);
+    let publish = payloads.pop().unwrap();
+    assert!(
+        payloads.len() > 1,
+        "the package needs several staging transactions"
+    );
+    // Stage in reverse order, then stage some chunks again, as a retried transaction would.
+    payloads.reverse();
+    payloads.push(payloads[0].clone());
+    for payload in payloads.into_iter().chain([publish]) {
+        assert_success!(context.run_payload(&acc, payload));
+    }
+    context.assert_example_package_published(&acc, *acc.address());
+}
+
+#[test]
+fn large_package_positional_missing_chunk() {
+    let mut context = LargePackageTestContext::new();
+    let path = large_package_example_path();
+    context.use_positional_abi(&path);
+    let acc = context.account.clone();
+
+    let mut payloads = context.create_payloads(&path, |_| {}, PublishType::AccountDeploy);
+    let publish = payloads.pop().unwrap();
+    // Leave out the first staging transaction.
+    payloads.remove(0);
+    for payload in payloads {
+        assert_success!(context.run_payload(&acc, payload));
+    }
+    let tx_status = context.run_payload(&acc, publish);
+    let abort_info = Some(AbortInfo {
+        reason_name: "EMISSING_CHUNK".to_string(),
+        description: "A chunk that the package needs is not staged.".to_string(),
+    });
+    assert_move_abort!(tx_status, abort_info);
+}
+
+#[test]
+fn large_package_positional_object_code_deployment_and_upgrade() {
+    let mut context = LargePackageTestContext::new();
+    let path = large_package_example_path();
+    context.use_positional_abi(&path);
+    let acc = context.account.clone();
+
+    let tx_statuses = context.publish_large_package(&acc, &path, |_| {}, PublishType::ObjectDeploy);
+    for tx_status in tx_statuses.into_iter() {
+        assert_success!(tx_status);
+    }
+    let object_address = context.object_address;
+    context.assert_example_package_published(&acc, object_address);
+
+    let tx_statuses =
+        context.publish_large_package(&acc, &path, |_| {}, PublishType::ObjectUpgrade);
+    for tx_status in tx_statuses.into_iter() {
+        assert_success!(tx_status);
+    }
+    let registry = context
+        .harness
+        .read_resource::<PackageRegistry>(
+            &object_address,
+            parse_struct_tag("0x1::code::PackageRegistry").unwrap(),
+        )
+        .unwrap();
+    assert_eq!(registry.packages[0].upgrade_number, 1);
 }

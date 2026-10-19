@@ -4,7 +4,7 @@
 use crate::{
     bytecode::{Decompile, Disassemble},
     coverage::{CoverageCommon, SummaryCoverage},
-    dispatch_transaction, exchange,
+    did_not_succeed, dispatch_transaction, dispatch_transactions, exchange,
     fmt::Fmt,
     lint::LintPackage,
     local_simulation,
@@ -32,7 +32,8 @@ use aptos_crypto::HashValue;
 use aptos_framework::{
     build_model,
     chunked_publish::{
-        chunk_package_and_create_payloads, large_packages_cleanup_staging_area, PublishType,
+        chunk_package_and_create_payloads, chunk_position, create_positional_payloads_for,
+        large_packages_cleanup_staging_area, LargePackagesAbi, PositionalChunks, PublishType,
     },
     docgen::DocgenOptions,
     extended_checks,
@@ -50,9 +51,10 @@ use aptos_transaction_simulation::SimulationStateStore;
 use aptos_transaction_simulation_session::Session;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
+    account_config::AccountResource,
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, table::TableHandle, TStateView},
     transaction::{
         ReplayProtector, Transaction, TransactionArgument, TransactionPayload, TransactionStatus,
     },
@@ -62,10 +64,15 @@ use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use itertools::Itertools;
-use move_binary_format::file_format_common::{write_u64_as_uleb128, BinaryData};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format_common::{write_u64_as_uleb128, BinaryData},
+    CompiledModule,
+};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_compiler_v2::Experiment;
 use move_core_types::{
+    ident_str,
     identifier::Identifier,
     int256::{I256, U256},
     language_storage::{ModuleId, StructTag, MODULE_SEPARATOR},
@@ -77,7 +84,7 @@ use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt::{Display, Formatter},
     io::Write,
     path::{Path, PathBuf},
@@ -1120,8 +1127,24 @@ pub(crate) struct PackagePublicationData {
     payload: TransactionPayload,
 }
 
+/// The transactions of a chunked publish.
 pub(crate) struct ChunkedPublishPayloads {
     payloads: Vec<TransactionPayload>,
+    /// How many of the transactions that stage chunks are sent at the same time: more than one only
+    /// if the module stages chunks by position, because then they don't depend on each other.
+    parallelism: usize,
+    large_packages_module: LargePackagesModule,
+    /// Set if the module stages chunks by position, which is what makes it possible to resume a
+    /// chunked publish that did not complete.
+    resume: Option<ChunkedPublishResume>,
+}
+
+/// What it takes to resume a chunked publish that stages chunks by position.
+struct ChunkedPublishResume {
+    chunks: PositionalChunks,
+    publish_type: PublishType,
+    object_address: Option<AccountAddress>,
+    chunk_size: usize,
 }
 
 /// Build a publication transaction payload and store it in a JSON output file.
@@ -1181,9 +1204,9 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             None,
             self.chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options)
+                .resolve(&self.txn_options)
                 .await?,
-            self.chunked_publish_option.chunk_size,
+            &self.chunked_publish_option,
         )?;
 
         let size = &chunked_publish_payloads
@@ -1343,9 +1366,10 @@ fn create_chunked_publish_payloads(
     package: BuiltPackage,
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
-    large_packages_module_address: AccountAddress,
-    chunk_size: usize,
+    large_packages_module: LargePackagesModule,
+    chunked_publish_option: &ChunkedPublishOption,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
+    let chunk_size = chunked_publish_option.chunk_size;
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
     let metadata_serialized = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
@@ -1356,16 +1380,45 @@ fn create_chunked_publish_payloads(
         None
     };
 
-    let payloads = chunk_package_and_create_payloads(
-        metadata_serialized,
-        compiled_units,
-        publish_type,
-        maybe_object_address,
-        large_packages_module_address,
-        chunk_size,
-    );
-
-    Ok(ChunkedPublishPayloads { payloads })
+    match large_packages_module.abi {
+        LargePackagesAbi::Append => Ok(ChunkedPublishPayloads {
+            payloads: chunk_package_and_create_payloads(
+                metadata_serialized,
+                compiled_units,
+                publish_type,
+                maybe_object_address,
+                large_packages_module.address,
+                chunk_size,
+                LargePackagesAbi::Append,
+            ),
+            // These chunks have to be staged in order.
+            parallelism: 1,
+            large_packages_module,
+            resume: None,
+        }),
+        LargePackagesAbi::Positional => {
+            let chunks = PositionalChunks::new(metadata_serialized, compiled_units, chunk_size);
+            let payloads = create_positional_payloads_for(
+                chunks.chunks.clone(),
+                &chunks.chunk_counts,
+                publish_type,
+                maybe_object_address,
+                large_packages_module.address,
+                chunk_size,
+            );
+            Ok(ChunkedPublishPayloads {
+                payloads,
+                parallelism: usize::from(chunked_publish_option.chunk_parallelism),
+                large_packages_module,
+                resume: Some(ChunkedPublishResume {
+                    chunks,
+                    publish_type,
+                    object_address: maybe_object_address,
+                    chunk_size,
+                }),
+            })
+        },
+    }
 }
 
 #[async_trait]
@@ -1381,12 +1434,8 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", chunked_package_payloads.payloads.len());
             println!("{}", message.bold());
             submit_chunked_publish_transactions(
-                chunked_package_payloads.payloads,
+                chunked_package_payloads,
                 &self.txn_options,
-                self.chunked_publish_option
-                    .large_packages_module
-                    .large_packages_module_address(&self.txn_options)
-                    .await?,
                 &self.env,
             )
             .await
@@ -1491,17 +1540,16 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
 
-        let chunked_publish_large_packages_module_address =
-            if self.chunked_publish_option.chunked_publish {
-                Some(
-                    self.chunked_publish_option
-                        .large_packages_module
-                        .large_packages_module_address(&self.txn_options)
-                        .await?,
-                )
-            } else {
-                None
-            };
+        let chunked_publish_large_packages_module = if self.chunked_publish_option.chunked_publish {
+            Some(
+                self.chunked_publish_option
+                    .large_packages_module
+                    .resolve(&self.txn_options)
+                    .await?,
+            )
+        } else {
+            None
+        };
 
         let sequence_number = if self.chunked_publish_option.chunked_publish {
             // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
@@ -1518,16 +1566,22 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                chunked_publish_large_packages_module_address.unwrap(),
-                self.chunked_publish_option.chunk_size,
+                chunked_publish_large_packages_module.unwrap(),
+                &self.chunked_publish_option,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await?
-                + staging_tx_count
-                + 1
+            // Clear leftovers from an earlier chunked publish before the sequence number is read:
+            // the cleanup is a transaction, so it would shift the derived object address.
+            clear_stale_staging_area(
+                &self.txn_options,
+                chunked_publish_large_packages_module.unwrap().address,
+                &self.env,
+            )
+            .await?;
+            account_sequence_number(&self.txn_options, sender_address).await? + staging_tx_count + 1
         } else {
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await? + 1
+            account_sequence_number(&self.txn_options, sender_address).await? + 1
         };
 
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
@@ -1544,14 +1598,15 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let payloads = create_chunked_publish_payloads(
+            let chunked_payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                chunked_publish_large_packages_module_address.unwrap(),
-                self.chunked_publish_option.chunk_size,
-            )?
-            .payloads;
+                chunked_publish_large_packages_module.unwrap(),
+                &self.chunked_publish_option,
+            )?;
+            let parallelism = chunked_payloads.parallelism;
+            let payloads = chunked_payloads.payloads;
 
             let size = &payloads
                 .iter()
@@ -1561,13 +1616,9 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", payloads.len());
             println!("{}", message.bold());
 
-            submit_chunked_publish_transactions(
-                payloads,
-                &self.txn_options,
-                chunked_publish_large_packages_module_address.unwrap(),
-                &self.env,
-            )
-            .await
+            // The StagingArea was already cleared, before the object address was derived.
+            submit_chunk_transactions(payloads, parallelism, false, &self.txn_options, &self.env)
+                .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1631,19 +1682,16 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let built_package =
             build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
-        let client = self
-            .txn_options
-            .rest_options
-            .client(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given object address.
-        let registry = CachedPackageRegistry::create(client, self.object_address, false).await?;
-        let package = registry
-            .get_package(built_package.name())
-            .await
-            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        let upgrade_policy = object_package_upgrade_policy(
+            &self.txn_options,
+            self.object_address,
+            built_package.name(),
+        )
+        .await?;
 
-        if package.upgrade_policy() == UpgradePolicy::immutable() {
+        if upgrade_policy == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
                 "A package with upgrade policy `immutable` cannot be upgraded".to_owned(),
             ));
@@ -1651,41 +1699,36 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
         let message = format!(
             "Do you want to upgrade the package '{}' at object address {}",
-            package.name(),
+            built_package.name(),
             self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let chunked_publish_large_packages_module_address = self
+            let large_packages_module = self
                 .chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options)
+                .resolve(&self.txn_options)
                 .await?;
 
-            let payloads = create_chunked_publish_payloads(
+            let chunked_payloads = create_chunked_publish_payloads(
                 built_package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                chunked_publish_large_packages_module_address,
-                self.chunked_publish_option.chunk_size,
-            )?
-            .payloads;
+                large_packages_module,
+                &self.chunked_publish_option,
+            )?;
 
-            let size = &payloads
+            let size = &chunked_payloads
+                .payloads
                 .iter()
                 .map(bcs::serialized_size)
                 .sum::<Result<usize, _>>()?;
             println!("package size {} bytes", size);
-            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", payloads.len());
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", chunked_payloads.payloads.len());
             println!("{}", message.bold());
-            submit_chunked_publish_transactions(
-                payloads,
-                &self.txn_options,
-                chunked_publish_large_packages_module_address,
-                &self.env,
-            )
-            .await
+            submit_chunked_publish_transactions(chunked_payloads, &self.txn_options, &self.env)
+                .await
         } else {
             let payload = create_package_publication_data(
                 built_package,
@@ -1750,17 +1793,16 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let sender_address = self.txn_options.get_public_key_and_address()?.1;
 
-        let chunked_publish_large_packages_module_address =
-            if self.chunked_publish_option.chunked_publish {
-                Some(
-                    self.chunked_publish_option
-                        .large_packages_module
-                        .large_packages_module_address(&self.txn_options)
-                        .await?,
-                )
-            } else {
-                None
-            };
+        let chunked_publish_large_packages_module = if self.chunked_publish_option.chunked_publish {
+            Some(
+                self.chunked_publish_option
+                    .large_packages_module
+                    .resolve(&self.txn_options)
+                    .await?,
+            )
+        } else {
+            None
+        };
 
         let sequence_number = if self.chunked_publish_option.chunked_publish {
             // Perform a preliminary build to determine the number of transactions needed for chunked publish mode.
@@ -1777,16 +1819,22 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 package,
                 PublishType::AccountDeploy,
                 None,
-                chunked_publish_large_packages_module_address.unwrap(),
-                self.chunked_publish_option.chunk_size,
+                chunked_publish_large_packages_module.unwrap(),
+                &self.chunked_publish_option,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await?
-                + staging_tx_count
-                + 1
+            // Clear leftovers from an earlier chunked publish before the sequence number is read:
+            // the cleanup is a transaction, so it would shift the derived object address.
+            clear_stale_staging_area(
+                &self.txn_options,
+                chunked_publish_large_packages_module.unwrap().address,
+                &self.env,
+            )
+            .await?;
+            account_sequence_number(&self.txn_options, sender_address).await? + staging_tx_count + 1
         } else {
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await? + 1
+            account_sequence_number(&self.txn_options, sender_address).await? + 1
         };
 
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
@@ -1803,14 +1851,15 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let mut result = if self.chunked_publish_option.chunked_publish {
-            let payloads = create_chunked_publish_payloads(
+            let chunked_payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectDeploy,
                 None,
-                chunked_publish_large_packages_module_address.unwrap(),
-                self.chunked_publish_option.chunk_size,
-            )?
-            .payloads;
+                chunked_publish_large_packages_module.unwrap(),
+                &self.chunked_publish_option,
+            )?;
+            let parallelism = chunked_payloads.parallelism;
+            let payloads = chunked_payloads.payloads;
 
             let size = &payloads
                 .iter()
@@ -1820,13 +1869,9 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", payloads.len());
             println!("{}", message.bold());
 
-            submit_chunked_publish_transactions(
-                payloads,
-                &self.txn_options,
-                chunked_publish_large_packages_module_address.unwrap(),
-                &self.env,
-            )
-            .await
+            // The StagingArea was already cleared, before the object address was derived.
+            submit_chunk_transactions(payloads, parallelism, false, &self.txn_options, &self.env)
+                .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1903,49 +1948,9 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
 
         // Get the `PackageRegistry` at the given code object address.
-        let upgrade_policy = match &self.txn_options.session {
-            None => {
-                let client = self
-                    .txn_options
-                    .rest_options
-                    .client(&self.txn_options.profile_options)?;
-
-                let registry =
-                    CachedPackageRegistry::create(client, self.object_address, false).await?;
-                let package_info = registry
-                    .get_package(package.name())
-                    .await
-                    .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
-                package_info.upgrade_policy()
-            },
-            Some(session_path) => {
-                let sess = Session::load(session_path)?;
-
-                let package_registry = sess
-                    .state_store()
-                    .get_resource::<PackageRegistry>(self.object_address)?
-                    .ok_or_else(|| {
-                        CliError::CommandArgumentError(format!(
-                            "Package registry not found at object address {}",
-                            self.object_address
-                        ))
-                    })?;
-
-                let metadata = package_registry
-                    .packages
-                    .iter()
-                    .find(|p| p.name == package.name())
-                    .ok_or_else(|| {
-                        CliError::CommandArgumentError(format!(
-                            "Package {} not found at object address {}",
-                            package.name(),
-                            self.object_address
-                        ))
-                    })?;
-
-                metadata.upgrade_policy
-            },
-        };
+        let upgrade_policy =
+            object_package_upgrade_policy(&self.txn_options, self.object_address, package.name())
+                .await?;
 
         if upgrade_policy == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
@@ -1961,35 +1966,30 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let chunked_publish_large_packages_module_address = self
+            let large_packages_module = self
                 .chunked_publish_option
                 .large_packages_module
-                .large_packages_module_address(&self.txn_options)
+                .resolve(&self.txn_options)
                 .await?;
 
-            let payloads = create_chunked_publish_payloads(
+            let chunked_payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
-                chunked_publish_large_packages_module_address,
-                self.chunked_publish_option.chunk_size,
-            )?
-            .payloads;
+                large_packages_module,
+                &self.chunked_publish_option,
+            )?;
 
-            let size = &payloads
+            let size = &chunked_payloads
+                .payloads
                 .iter()
                 .map(bcs::serialized_size)
                 .sum::<Result<usize, _>>()?;
             println!("package size {} bytes", size);
-            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", payloads.len());
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", chunked_payloads.payloads.len());
             println!("{}", message.bold());
-            submit_chunked_publish_transactions(
-                payloads,
-                &self.txn_options,
-                chunked_publish_large_packages_module_address,
-                &self.env,
-            )
-            .await
+            submit_chunked_publish_transactions(chunked_payloads, &self.txn_options, &self.env)
+                .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -2034,59 +2034,288 @@ fn build_package_options(
     BuiltPackage::build_to(&w, move_options.get_package_path()?, options)
 }
 
+/// Submits the chunked publish transactions. If the sender has a `StagingArea` left by an earlier
+/// chunked publish that did not complete, its chunks are reused when the module stages chunks by
+/// position and they are chunks of this package; otherwise it is cleared first.
 async fn submit_chunked_publish_transactions(
+    chunked_payloads: ChunkedPublishPayloads,
+    txn_options: &TransactionOptions,
+    env: &MoveEnv,
+) -> CliTypedResult<TransactionSummary> {
+    let ChunkedPublishPayloads {
+        payloads,
+        parallelism,
+        large_packages_module,
+        resume,
+    } = chunked_payloads;
+    // A chunked publish that stages chunks by position continues with the chunks that are staged.
+    let resumable = resume.is_some();
+    let payloads = match resume {
+        Some(resume) => {
+            resume_or_clear_staging_area(
+                payloads,
+                &resume,
+                txn_options,
+                large_packages_module.address,
+                env,
+            )
+            .await?
+        },
+        None => {
+            clear_stale_staging_area(txn_options, large_packages_module.address, env).await?;
+            payloads
+        },
+    };
+    submit_chunk_transactions(payloads, parallelism, resumable, txn_options, env).await
+}
+
+/// Picks the transactions of a chunked publish that stages chunks by position, given what the
+/// sender's `StagingArea` holds. Chunks that an earlier chunked publish staged are not staged again
+/// if they are identical to chunks of this package, so that it can be resumed. Anything else that is
+/// staged is cleared.
+async fn resume_or_clear_staging_area(
     payloads: Vec<TransactionPayload>,
+    resume: &ChunkedPublishResume,
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
+    env: &MoveEnv,
+) -> CliTypedResult<Vec<TransactionPayload>> {
+    match read_staged_chunks(txn_options, large_packages_module_address, &resume.chunks).await? {
+        StagedChunks::NoStagingArea => Ok(payloads),
+        // A `StagingArea` without chunks has nothing to resume or to clear.
+        StagedChunks::OfThisPackage(staged) if staged.is_empty() => Ok(payloads),
+        StagedChunks::OfThisPackage(staged) => {
+            let missing = resume.chunks.missing(&staged);
+            let message = format!(
+                "{} of the {} chunks of this package are already staged, by a chunked publish that did not complete. Staging the other {}.\n",
+                staged.len(),
+                resume.chunks.chunks.len(),
+                missing.len(),
+            )
+            .bold();
+            println!("{}", message);
+            Ok(create_positional_payloads_for(
+                missing,
+                &resume.chunks.chunk_counts,
+                resume.publish_type,
+                resume.object_address,
+                large_packages_module_address,
+                resume.chunk_size,
+            ))
+        },
+        StagedChunks::OfSomethingElse => {
+            clear_stale_staging_area(txn_options, large_packages_module_address, env).await?;
+            Ok(payloads)
+        },
+    }
+}
+
+/// Clears data left in the sender's `StagingArea` by an earlier chunked publish that did not
+/// complete. Leftover data would make the new publish fail, but only after all of its staging
+/// transactions had been paid for.
+///
+/// The cleanup is a transaction of its own, so flows that derive an address from the sender's
+/// sequence number must call this before reading it.
+async fn clear_stale_staging_area(
+    txn_options: &TransactionOptions,
+    large_packages_module_address: AccountAddress,
+    env: &MoveEnv,
+) -> CliTypedResult<()> {
+    if is_staging_area_empty(txn_options, large_packages_module_address).await? {
+        return Ok(());
+    }
+
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
+    let message = format!(
+        "The resource {}::large_packages::StagingArea under account {} holds data from a chunked publish that did not complete.\
+        \nIt has to be cleared first, because it can't be combined with the chunks of this package.",
+        large_packages_module_address, account_address,
+    )
+    .bold();
+    println!("{}", message);
+    prompt_yes_with_override(
+        "Do you want to clear it and continue?",
+        txn_options.prompt_options,
+    )?;
+
+    let payload = large_packages_cleanup_staging_area(large_packages_module_address);
+    let tx_summary = dispatch_transaction(payload, txn_options, env).await?;
+    if did_not_succeed(&tx_summary) {
+        return Err(CliError::SimulationError(format!(
+            "{} (clearing the StagingArea, transaction {})",
+            tx_summary
+                .vm_status
+                .unwrap_or_else(|| "The transaction did not succeed".to_string()),
+            tx_summary.transaction_hash,
+        )));
+    }
+    println!("StagingArea cleared ({})\n", tx_summary.transaction_hash);
+    Ok(())
+}
+
+/// Splits the transactions of a chunked publish into the ones that are sent at the same time.
+///
+/// With a `parallelism` above 1, the transactions that stage chunks are sent that many at a time,
+/// and the last transaction, which publishes the package, is on its own, because it has to be sent
+/// when the others are committed. Otherwise every transaction is on its own.
+pub(crate) fn chunk_windows(
+    mut payloads: Vec<TransactionPayload>,
+    parallelism: usize,
+) -> Vec<Vec<TransactionPayload>> {
+    if parallelism <= 1 {
+        return payloads.into_iter().map(|payload| vec![payload]).collect();
+    }
+
+    let publishing = payloads.pop();
+    let mut windows = vec![];
+    let mut staging = payloads.into_iter();
+    loop {
+        let window: Vec<TransactionPayload> = staging.by_ref().take(parallelism).collect();
+        if window.is_empty() {
+            break;
+        }
+        windows.push(window);
+    }
+    windows.extend(publishing.map(|payload| vec![payload]));
+    windows
+}
+
+/// Advice for a failed transaction that has the sequence number of one that is waiting in the
+/// mempool of the node, e.g. one that an earlier chunked publish sent before it was interrupted.
+pub(crate) fn mempool_conflict_hint(error: &CliError) -> Option<&'static str> {
+    error.to_string().contains("InvalidTransactionUpdate").then_some(
+        "A transaction with the same sequence number is waiting in the mempool of the node, for example from a chunked publish that was interrupted. It is committed or dropped within the expiration time of transactions (30 seconds by default). Then run the command again to resume.",
+    )
+}
+
+/// Checks the outcome of transaction `number` of `total` of a chunked publish, and prints how it
+/// went. `numbered` is set when transactions are sent together, so that they are told apart.
+fn report_chunk_transaction(
+    outcome: CliTypedResult<TransactionSummary>,
+    number: usize,
+    total: usize,
+    numbered: bool,
+) -> CliTypedResult<TransactionSummary> {
+    let tx_summary = match outcome {
+        Ok(tx_summary) => tx_summary,
+        Err(error) => {
+            if numbered {
+                println!("Transaction {} of {} failed: {}\n", number, total, error);
+            }
+            return Err(error);
+        },
+    };
+
+    let tx_hash = tx_summary.transaction_hash.to_string();
+    let failed = did_not_succeed(&tx_summary);
+    let outcome = match tx_summary.success {
+        Some(true) => "executed: Success",
+        Some(false) => "executed: Failed",
+        None if failed => "was not executed",
+        None => "executed: ",
+    };
+    if numbered {
+        println!("Transaction {} {} ({})\n", number, outcome, tx_hash);
+    } else {
+        println!("Transaction {} ({})\n", outcome, tx_hash);
+    }
+
+    // Chain submission reports a failed transaction as an error, but simulation backends
+    // (e.g. `--session`) return it as a summary, and one that they discard without a `success`.
+    // Either way the remaining chunks can't succeed.
+    if failed {
+        return Err(CliError::SimulationError(format!(
+            "{} (transaction {} of {}, {})",
+            tx_summary
+                .vm_status
+                .unwrap_or_else(|| "The transaction did not succeed".to_string()),
+            number,
+            total,
+            tx_hash,
+        )));
+    }
+    Ok(tx_summary)
+}
+
+/// Submits the chunked publish transactions in order, stopping at the first one that fails.
+///
+/// With a `parallelism` above 1, the transactions that stage chunks are sent that many at a time,
+/// without waiting for each of them to be committed, which is possible because the chunks don't
+/// depend on each other. The transaction that publishes the package is sent when all of those are
+/// committed. If one of the transactions that are sent together fails, the others may still be
+/// committed. `resumable` is whether running the command again continues with the chunks that are
+/// staged, which is for what the caution says.
+async fn submit_chunk_transactions(
+    payloads: Vec<TransactionPayload>,
+    parallelism: usize,
+    resumable: bool,
+    txn_options: &TransactionOptions,
     env: &MoveEnv,
 ) -> CliTypedResult<TransactionSummary> {
     let mut publishing_result = Err(CliError::UnexpectedError(
         "No payload provided for batch transaction run".to_string(),
     ));
-    let payloads_length = payloads.len() as u64;
+    let payloads_length = payloads.len();
     let mut tx_hashes = vec![];
+    // The number of transactions that were submitted
+    let mut submitted = 0;
 
-    let (_, account_address) = txn_options.get_public_key_and_address()?;
-
-    if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
-        let message = format!(
-            "The resource {}::large_packages::StagingArea under account {} is not empty.\
-        \nThis may cause package publishing to fail if the data is unexpected. \
-        \nUse the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under the account.",
-            large_packages_module_address, account_address,
-        )
-            .bold();
-        println!("{}", message);
-        prompt_yes_with_override("Do you want to proceed?", txn_options.prompt_options)?;
-    }
-
-    for (idx, payload) in payloads.into_iter().enumerate() {
-        println!("Transaction {} of {}", idx + 1, payloads_length);
-        let result = dispatch_transaction(payload, txn_options, env).await;
-
-        match result {
-            Ok(tx_summary) => {
-                let tx_hash = tx_summary.transaction_hash.to_string();
-                let status = tx_summary.success.map_or_else(String::new, |success| {
-                    if success {
-                        "Success".to_string()
-                    } else {
-                        "Failed".to_string()
-                    }
-                });
-                println!("Transaction executed: {} ({})\n", status, tx_hash);
-                tx_hashes.push(tx_hash);
-                publishing_result = Ok(tx_summary);
-            },
-
-            Err(e) => {
-                println!("{}", "Caution: An error occurred while submitting chunked publish transactions. \
-                \nDue to this error, there may be incomplete data left in the `StagingArea` resource. \
-                \nThis could cause further errors if you attempt to run the chunked publish command again. \
-                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.".bold());
-                return Err(e);
-            },
+    for window in chunk_windows(payloads, parallelism) {
+        let window_length = window.len();
+        let together = window_length > 1;
+        let mut outcomes = if together {
+            println!(
+                "Transactions {} to {} of {}",
+                submitted + 1,
+                submitted + window_length,
+                payloads_length
+            );
+            dispatch_transactions(window, txn_options, env).await?
+        } else {
+            println!("Transaction {} of {}", submitted + 1, payloads_length);
+            let payload = window
+                .into_iter()
+                .next()
+                .expect("a window has a transaction");
+            vec![dispatch_transaction(payload, txn_options, env).await]
+        };
+        if outcomes.len() < window_length && outcomes.iter().all(|outcome| outcome.is_ok()) {
+            outcomes.push(Err(CliError::UnexpectedError(
+                "Some of the transactions were not submitted".to_string(),
+            )));
         }
+
+        // Report all of them, to see which ones failed, but stop with the first failure.
+        let mut first_failure = None;
+        let mut hint = None;
+        for (offset, outcome) in outcomes.into_iter().enumerate() {
+            let number = submitted + offset + 1;
+            match report_chunk_transaction(outcome, number, payloads_length, together) {
+                Ok(tx_summary) => {
+                    tx_hashes.push(tx_summary.transaction_hash.to_string());
+                    publishing_result = Ok(tx_summary);
+                },
+                Err(error) => {
+                    hint = hint.or_else(|| mempool_conflict_hint(&error));
+                    first_failure.get_or_insert(error);
+                },
+            }
+        }
+        if let Some(error) = first_failure {
+            if let Some(hint) = hint {
+                println!("{}", hint.bold());
+            }
+            if together {
+                println!(
+                    "{}",
+                    "Transactions that are sent together can be dropped without being executed, e.g. when the account can't pay for them after the transactions before them, or when the node is busy. The ones that were committed stay committed."
+                        .bold()
+                );
+            }
+            print_incomplete_chunked_publish_caution(resumable);
+            return Err(error);
+        }
+        submitted += window_length;
     }
 
     println!(
@@ -2103,6 +2332,337 @@ async fn submit_chunked_publish_transactions(
     );
     println!("\n{}\n", tx_hash_formatted);
     publishing_result
+}
+
+/// Tells what an incomplete chunked publish leaves behind, and what to do about it. `resumable` is
+/// whether running the command again continues with the chunks that are staged.
+fn print_incomplete_chunked_publish_caution(resumable: bool) {
+    let advice = if resumable {
+        "Run the command again to continue with the chunks that are staged, or clear them with `aptos move clear-staging-area`."
+    } else {
+        "The next chunked publish will offer to clear it first, or you can clear it now with `aptos move clear-staging-area`."
+    };
+    println!(
+        "{}",
+        format!(
+            "Caution: The chunked publish did not complete, so incomplete data may be left in the `StagingArea` resource under your account. \n{}",
+            advice
+        )
+        .bold()
+    );
+}
+
+/// The sequence number of `address`, read from the session when simulating with `--session` and
+/// from the chain otherwise. Object addresses are derived from it, so it has to come from where the
+/// transactions are executed.
+async fn account_sequence_number(
+    txn_options: &TransactionOptions,
+    address: AccountAddress,
+) -> CliTypedResult<u64> {
+    match &txn_options.session {
+        None => get_sequence_number(&txn_options.rest_client()?, address).await,
+        Some(session_path) => {
+            let session = Session::load(session_path)?;
+            Ok(session
+                .state_store()
+                .get_resource::<AccountResource>(address)?
+                .map_or(0, |account| account.sequence_number))
+        },
+    }
+}
+
+/// The upgrade policy of the package `package_name` that is published at `object_address`, read from
+/// the session when simulating with `--session` and from the chain otherwise.
+async fn object_package_upgrade_policy(
+    txn_options: &TransactionOptions,
+    object_address: AccountAddress,
+    package_name: &str,
+) -> CliTypedResult<UpgradePolicy> {
+    match &txn_options.session {
+        None => {
+            let client = txn_options
+                .rest_options
+                .client(&txn_options.profile_options)?;
+
+            let registry = CachedPackageRegistry::create(client, object_address, false).await?;
+            let package_info = registry
+                .get_package(package_name)
+                .await
+                .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+            Ok(package_info.upgrade_policy())
+        },
+        Some(session_path) => {
+            let session = Session::load(session_path)?;
+
+            let package_registry = session
+                .state_store()
+                .get_resource::<PackageRegistry>(object_address)?
+                .ok_or_else(|| {
+                    CliError::CommandArgumentError(format!(
+                        "Package registry not found at object address {}",
+                        object_address
+                    ))
+                })?;
+
+            let metadata = package_registry
+                .packages
+                .iter()
+                .find(|p| p.name == package_name)
+                .ok_or_else(|| {
+                    CliError::CommandArgumentError(format!(
+                        "Package {} not found at object address {}",
+                        package_name, object_address
+                    ))
+                })?;
+
+            Ok(metadata.upgrade_policy)
+        },
+    }
+}
+
+/// The `large_packages` module that a chunked publish stages through.
+#[derive(Clone, Copy)]
+pub(crate) struct LargePackagesModule {
+    address: AccountAddress,
+    abi: LargePackagesAbi,
+}
+
+impl LargePackagesModuleOption {
+    /// Resolves the `large_packages` module to stage through, and which entry functions it has.
+    async fn resolve(
+        &self,
+        txn_options: &TransactionOptions,
+    ) -> CliTypedResult<LargePackagesModule> {
+        let address = self.large_packages_module_address(txn_options).await?;
+        let abi = large_packages_abi(txn_options, address).await?;
+        Ok(LargePackagesModule { address, abi })
+    }
+}
+
+/// Reads the `large_packages` module at `address` to find out which entry functions it has. Earlier
+/// versions of the module, such as the one on mainnet, only have the `stage_code_chunk*` ones.
+async fn large_packages_abi(
+    txn_options: &TransactionOptions,
+    address: AccountAddress,
+) -> CliTypedResult<LargePackagesAbi> {
+    let module_bytes = match &txn_options.session {
+        None => {
+            let client = txn_options.rest_client()?;
+            match client
+                .get_account_module_bcs(address, "large_packages")
+                .await
+            {
+                Ok(response) => Some(response.into_inner()),
+                Err(RestError::Api(aptos_error_response))
+                    if aptos_error_response.error.error_code == AptosErrorCode::ModuleNotFound =>
+                {
+                    None
+                },
+                Err(rest_err) => return Err(CliError::from(rest_err)),
+            }
+        },
+        Some(session_path) => {
+            let sess = Session::load(session_path)?;
+            sess.state_store()
+                .get_state_value_bytes(&StateKey::module(&address, ident_str!("large_packages")))
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to read the large_packages module from the session: {}",
+                        e
+                    ))
+                })?
+        },
+    };
+    let module_bytes = module_bytes.ok_or_else(|| {
+        CliError::CommandArgumentError(format!(
+            "There is no large_packages module at {}. Pass the address of one with \
+            --large-packages-module-address.",
+            address
+        ))
+    })?;
+    let module = CompiledModule::deserialize(&module_bytes).map_err(|e| {
+        CliError::UnexpectedError(format!(
+            "Failed to deserialize the large_packages module at {}: {}",
+            address, e
+        ))
+    })?;
+    Ok(LargePackagesAbi::from_function_names(
+        module.function_defs().iter().map(|function_def| {
+            module
+                .identifier_at(module.function_handle_at(function_def.function).name)
+                .as_str()
+        }),
+    ))
+}
+
+/// What the sender's `StagingArea` holds, compared with the chunks of the package being published.
+enum StagedChunks {
+    /// The sender has no `StagingArea`.
+    NoStagingArea,
+    /// The `StagingArea` holds only chunks that are identical to chunks of the package, at these
+    /// positions.
+    OfThisPackage(HashSet<(u16, u16)>),
+    /// The `StagingArea` holds anything else.
+    OfSomethingElse,
+}
+
+/// The layout of `large_packages::StagingArea` for the `stage_chunks*` functions: the chunks are
+/// in a table, and `keys` has the key of every staged chunk.
+#[derive(Deserialize)]
+struct StagingAreaLayout {
+    chunks: TableWithLengthLayout,
+    keys: Vec<u64>,
+}
+
+#[derive(Deserialize)]
+struct TableWithLengthLayout {
+    inner: TableLayout,
+    _length: u64,
+}
+
+#[derive(Deserialize)]
+struct TableLayout {
+    handle: AccountAddress,
+}
+
+/// The key, part and index of every chunk in `staging_area`, or `None` if the package doesn't have
+/// a chunk at the position of one of them.
+fn staged_chunk_positions(
+    staging_area: &StagingAreaLayout,
+    package: &PositionalChunks,
+) -> Option<Vec<(u64, u16, u16)>> {
+    staging_area
+        .keys
+        .iter()
+        .map(|key| {
+            let (part, index) = chunk_position(*key)?;
+            package.get(part, index)?;
+            Some((*key, part, index))
+        })
+        .collect()
+}
+
+fn is_chunk_of(package: &PositionalChunks, part: u16, index: u16, bytes: &[u8]) -> bool {
+    package
+        .get(part, index)
+        .is_some_and(|chunk| chunk.bytes == bytes)
+}
+
+/// Reads the chunks that the sender has staged, on the chain or in the session, and compares them
+/// with the chunks of `package`.
+async fn read_staged_chunks(
+    txn_options: &TransactionOptions,
+    large_packages_module_address: AccountAddress,
+    package: &PositionalChunks,
+) -> CliTypedResult<StagedChunks> {
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
+    let staging_area_type_name = format!(
+        "{}::large_packages::StagingArea",
+        large_packages_module_address
+    );
+
+    match &txn_options.session {
+        None => {
+            let client = txn_options.rest_client()?;
+            let staging_area = match client
+                .get_account_resource_bcs::<StagingAreaLayout>(
+                    account_address,
+                    &staging_area_type_name,
+                )
+                .await
+            {
+                Ok(response) => response.into_inner(),
+                Err(RestError::Api(aptos_error_response))
+                    if aptos_error_response.error.error_code
+                        == AptosErrorCode::ResourceNotFound =>
+                {
+                    return Ok(StagedChunks::NoStagingArea);
+                },
+                // The resource isn't laid out like a `StagingArea` that stages chunks by position.
+                Err(RestError::Bcs(_)) => return Ok(StagedChunks::OfSomethingElse),
+                Err(rest_err) => return Err(CliError::from(rest_err)),
+            };
+            let Some(positions) = staged_chunk_positions(&staging_area, package) else {
+                return Ok(StagedChunks::OfSomethingElse);
+            };
+
+            let mut staged = HashSet::new();
+            for (key, part, index) in positions {
+                let bytes = match client
+                    .get_table_item_bcs::<String, Vec<u8>>(
+                        staging_area.chunks.inner.handle,
+                        "u64",
+                        "vector<u8>",
+                        // The API represents a `u64` as a string.
+                        key.to_string(),
+                    )
+                    .await
+                {
+                    Ok(response) => response.into_inner(),
+                    Err(RestError::Api(aptos_error_response))
+                        if aptos_error_response.error.error_code
+                            == AptosErrorCode::TableItemNotFound =>
+                    {
+                        return Ok(StagedChunks::OfSomethingElse);
+                    },
+                    Err(rest_err) => return Err(CliError::from(rest_err)),
+                };
+                if !is_chunk_of(package, part, index, &bytes) {
+                    return Ok(StagedChunks::OfSomethingElse);
+                }
+                staged.insert((part, index));
+            }
+            Ok(StagedChunks::OfThisPackage(staged))
+        },
+        Some(session_path) => {
+            let session = Session::load(session_path)?;
+            let state_store = session.state_store();
+
+            let staging_area_bytes = state_store
+                .get_resource_bytes(
+                    &StateKey::resource(
+                        &account_address,
+                        &StructTag::from_str(&staging_area_type_name)
+                            .expect("Should be able to construct staging area tag"),
+                    )
+                    .expect("Should be able to construct staging area state key"),
+                    None,
+                )
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!("Failed to get staging area: {}", e))
+                })?;
+            let Some(staging_area_bytes) = staging_area_bytes else {
+                return Ok(StagedChunks::NoStagingArea);
+            };
+            let Ok(staging_area) = bcs::from_bytes::<StagingAreaLayout>(&staging_area_bytes) else {
+                return Ok(StagedChunks::OfSomethingElse);
+            };
+            let Some(positions) = staged_chunk_positions(&staging_area, package) else {
+                return Ok(StagedChunks::OfSomethingElse);
+            };
+
+            let mut staged = HashSet::new();
+            for (key, part, index) in positions {
+                let item = state_store
+                    .get_state_value_bytes(&StateKey::table_item(
+                        &TableHandle(staging_area.chunks.inner.handle),
+                        &bcs::to_bytes(&key)?,
+                    ))
+                    .map_err(|e| {
+                        CliError::UnexpectedError(format!("Failed to get a staged chunk: {}", e))
+                    })?;
+                let Some(bytes) = item.and_then(|item| bcs::from_bytes::<Vec<u8>>(&item).ok())
+                else {
+                    return Ok(StagedChunks::OfSomethingElse);
+                };
+                if !is_chunk_of(package, part, index, &bytes) {
+                    return Ok(StagedChunks::OfSomethingElse);
+                }
+                staged.insert((part, index));
+            }
+            Ok(StagedChunks::OfThisPackage(staged))
+        },
+    }
 }
 
 async fn is_staging_area_empty(
@@ -2175,24 +2735,34 @@ pub struct ClearStagingArea {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for ClearStagingArea {
+impl CliCommand<Option<TransactionSummary>> for ClearStagingArea {
     fn command_name(&self) -> &'static str {
         "ClearStagingArea"
     }
 
-    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+    async fn execute(self) -> CliTypedResult<Option<TransactionSummary>> {
         let (_, account_address) = self.txn_options.get_public_key_and_address()?;
 
         let large_packages_module_address = self
             .large_packages_module
             .large_packages_module_address(&self.txn_options)
             .await?;
+        // Checked here because earlier versions of the module abort when there is nothing to remove.
+        if is_staging_area_empty(&self.txn_options, large_packages_module_address).await? {
+            println!(
+                "There is no resource {}::large_packages::StagingArea under account {}, so there is nothing to clean up.",
+                large_packages_module_address, account_address,
+            );
+            return Ok(None);
+        }
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
             large_packages_module_address, account_address,
         );
         let payload = large_packages_cleanup_staging_area(large_packages_module_address);
-        dispatch_transaction(payload, &self.txn_options, &self.env).await
+        dispatch_transaction(payload, &self.txn_options, &self.env)
+            .await
+            .map(Some)
     }
 }
 

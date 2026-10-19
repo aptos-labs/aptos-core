@@ -907,10 +907,12 @@ pub struct OverrideSizeCheckOption {
 pub struct LargePackagesModuleOption {
     /// Address of the `large_packages` move module for chunked publishing
     ///
-    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
-    /// on Testnet and Mainnet, and `0x7` on localnest/devnet.
-    /// On any custom network where neither is used, you will need to first publish it from the framework
-    /// under move-examples/large_packages.
+    /// By default, the module is at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Mainnet, and at `0x7` on Testnet, devnet and localnet.
+    /// On a custom network where neither is available, publish your own copy of
+    /// `aptos-move/framework/aptos-experimental/sources/large_packages.move` and pass its address here.
+    /// Chunks are staged with their positions if the module supports it (`stage_chunks`), so that
+    /// repeated or conflicting chunks are detected; earlier versions only support staging in order.
     #[clap(long, value_parser = load_account_arg)]
     pub large_packages_module_address: Option<AccountAddress>,
 }
@@ -947,6 +949,11 @@ pub struct ChunkedPublishOption {
     /// for publishing the Move package.
     ///
     /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
+    ///
+    /// If an earlier chunked publish of the same package did not complete, the chunks that it staged
+    /// are not staged again, provided that the `large_packages` module stages chunks by position
+    /// (it has `stage_chunks`). This doesn't apply to publishing to a new object, whose address
+    /// depends on the number of transactions, and chunks that belong to another package are cleared.
     #[clap(long)]
     pub chunked_publish: bool,
 
@@ -960,4 +967,29 @@ pub struct ChunkedPublishOption {
     /// transaction to fail due to exceeding the execution gas limit.
     #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
     pub chunk_size: usize,
+
+    /// How many of the transactions that stage chunks are sent at the same time.
+    ///
+    /// The `large_packages` module has to stage chunks by position (it has `stage_chunks`). Then the
+    /// transactions don't depend on each other, so they are sent without waiting for the previous
+    /// ones to be committed, which is much faster than one at a time. The transaction that publishes
+    /// is sent when all the others are committed. Use 1 to send one transaction at a time, which is
+    /// always how the chunks are sent to earlier versions of the module, because they need the
+    /// chunks in order.
+    ///
+    /// A package with more of these transactions than this is sent in several groups, and each group
+    /// waits for the previous one to be committed, so a larger value can be faster for a big package:
+    /// all the transactions of a group are committed in the same block or the next ones.
+    ///
+    /// If a transaction fails, the ones that were sent with it may still be committed. Running the
+    /// command again resumes the publish.
+    #[clap(long, default_value_t = DEFAULT_CHUNK_PARALLELISM, value_parser = clap::value_parser!(u16).range(1..=MAX_CHUNK_PARALLELISM as i64))]
+    pub chunk_parallelism: u16,
 }
+
+/// How many transactions that stage chunks are sent at the same time by default.
+pub const DEFAULT_CHUNK_PARALLELISM: u16 = 10;
+
+/// The most transactions that can be sent at the same time. A node keeps at most 100 transactions
+/// of an account that are waiting to be committed, by default.
+pub const MAX_CHUNK_PARALLELISM: u16 = 100;

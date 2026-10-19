@@ -4,8 +4,8 @@
 use super::entry_point_trait::PreBuiltPackages;
 use aptos_framework::{
     chunked_publish::{
-        chunk_package_and_create_payloads, default_large_packages_module_address, PublishType,
-        CHUNK_SIZE_IN_BYTES,
+        chunk_package_and_create_payloads, default_large_packages_module_address, LargePackagesAbi,
+        PublishType, CHUNK_SIZE_IN_BYTES,
     },
     natives::code::PackageMetadata,
 };
@@ -216,6 +216,8 @@ impl Package {
                 AccountAddress::from_str_strict(default_large_packages_module_address(chain_id))
                     .unwrap(),
                 CHUNK_SIZE_IN_BYTES,
+                // Every version of the module has these entry functions.
+                LargePackagesAbi::Append,
             )
         } else {
             vec![aptos_stdlib::code_publish_package_txn(

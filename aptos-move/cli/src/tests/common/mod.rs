@@ -191,6 +191,12 @@ pub fn env_with_mock(
 ) -> (Arc<MoveEnv>, Arc<Mutex<Buffer>>) {
     let mut ctx = mock::MockAptosCtx::new();
     setup(&mut ctx);
+    env_with_context(ctx)
+}
+
+/// Like [`env_with_mock`], for any [`crate::AptosContext`], e.g. one that records how transactions
+/// are submitted.
+pub fn env_with_context(ctx: impl crate::AptosContext) -> (Arc<MoveEnv>, Arc<Mutex<Buffer>>) {
     let debugger_factory: Box<
         dyn Fn(aptos_rest_client::Client) -> anyhow::Result<Box<dyn crate::MoveDebugger>>
             + Send
