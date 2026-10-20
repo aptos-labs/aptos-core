@@ -727,6 +727,8 @@ inductive ReferenceOperation where
 are strong references rather than profile payload strings. -/
 inductive DataOperation where
   | select (type : QualifiedRef) (field : String)
+  /-- A ghost field's value: the contents of its slot (`designs/ghost-fields.md`). -/
+  | selectGhost (type : QualifiedRef) (field : String)
   /-- The field of whichever listed variant the operand holds, as
   `(variant, field)` pairs. -/
   | selectVariants (type : QualifiedRef) (fields : Array (String × String))
@@ -855,6 +857,9 @@ inductive Place where
   names it, so resolving the projection is a static decision rather than a
   question about the value that happens to be at the base. -/
   | field (base : PlaceId) (owner : QualifiedRef) (field : NameId)
+  /-- A ghost field's slot contents, a place of the field's type
+  (`designs/ghost-fields.md`); the owner is named as for a field. -/
+  | ghostField (base : PlaceId) (owner : QualifiedRef) (field : NameId)
   | index (base : PlaceId) (index : ExprId)
   /-- Select `from..to` when `fromEnd` is false, or
   `from..length-to` when it is true. -/
@@ -1129,6 +1134,19 @@ structure VariantDecl where
   discriminant : Option Int := none
   deriving Repr, BEq, Inhabited
 
+/-- A ghost field (`designs/ghost-fields.md`): a model-only field of every
+value of its declaration, of every variant of an enum, held in a slot after
+the declared fields. Its initializer, an expression over the declaration's
+locals (a struct's fields), gives its value at a pack; without one a pack
+leaves it unconstrained. -/
+structure GhostFieldDecl where
+  loc : LocId
+  name : NameId
+  type : TypeUse
+  initializer : Option ExprId := none
+  doc : String := ""
+  deriving Repr, BEq, Inhabited
+
 /-- Nominal data declaration representing either a structure or enum.
 `abilities` carries Move abilities and Rust traits, `properties` retains only
 extension semantics, and `contract` stores data invariants. -/
@@ -1139,12 +1157,21 @@ structure StructDecl where
   generics : Array GenericBinder := #[]
   fields : Array FieldDecl := #[]
   variants : Array VariantDecl := #[]
+  ghosts : Array GhostFieldDecl := #[]
   abilities : Array Ability := #[]
   properties : Array ProfileValue := #[]
   locals : Array LocalDecl := #[]
   contract : FunctionContract := {}
   attributes : Array Attribute := #[]
   deriving Repr, BEq, Inhabited
+
+/-- Whether a struct is a spec variable's memory (`pragma ghost_memory`): a
+resource only verification holds, never the runtime
+(`designs/ghost-fields.md`). -/
+def StructDecl.isGhostMemory (declaration : StructDecl) : Bool :=
+  declaration.contract.pragmas.any fun
+    | .assign "ghost_memory" (.constant (.bool true)) _ => true
+    | _ => false
 
 /-- Executable function declaration parameterized by its construction-stage
 body representation: `RawBody` at the frontend boundary and `FunctionBody`

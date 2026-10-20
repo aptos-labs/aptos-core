@@ -45,6 +45,10 @@ structure BuildState where
   /-- Hidden temporaries the encoder introduced, named `$t<n>` like the
   VerexSL lowering's, so the two lowerings of one element access agree. -/
   temporaryLocals : Nat := 0
+  /-- The one lifetime the unit's references are inferred at: Move
+  references carry no lifetimes, so a call's result borrows from every
+  reference argument. -/
+  inferenceLifetime : Option VerexIR.LifetimeId := none
   /-- Whether the module being built is not a verification target: its
   pragmas then resolve `verify` to false. -/
   nonTarget : Bool := false
@@ -76,6 +80,9 @@ structure BuildState where
   parameterLocals : Array VerexIR.LocalId := #[]
   /-- The steps of the function's proof the Move Prover runs at each return. -/
   exitSteps : Array Proofs.Step := #[]
+  /-- The package's and its dependencies' ghost fields, by struct: the
+  verification model's alone (`designs/ghost-fields.md`). -/
+  ghostFields : List (QualifiedName × List String) := []
 
 abbrev BuildM := StateT BuildState (Except String)
 
@@ -181,8 +188,11 @@ private def virBorrowKind : RefKind → VerexIR.BorrowKind
 
 private def addInferredLifetime (loc : VerexIR.LocId) : BuildM VerexIR.LifetimeId := do
   let state ← get
+  if let some id := state.inferenceLifetime then return id
   let id : VerexIR.LifetimeId := ⟨state.lifetimes.size⟩
-  set { state with lifetimes := state.lifetimes.push { kind := .inference, loc } }
+  set { state with
+    lifetimes := state.lifetimes.push { kind := .inference, loc }
+    inferenceLifetime := some id }
   return id
 
 /-- VIR's unit type, which the validator expects of unit-valued operations
@@ -376,6 +386,20 @@ private def addSpecificationParameter (parameter : Param)
     else specificationType parameter.ty
   addParameter { parameter with ty } loc
 
+/-- Whether an expression names a storage path: a local, a place borrow, or
+a borrow through dereferences and field selections of one, which evaluating
+again reads the same place. -/
+private def namesPath (expressions : Array VerexIR.Expr) : Nat → VerexIR.ExprId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match expressions[id.index]? with
+    | some { kind := .localVar _, .. } => true
+    | some { kind := .operation (.borrow _ _) _ #[] _, .. } => true
+    | some { kind := .operation (.reference (.borrow _)) _ #[operand] _, .. }
+    | some { kind := .operation (.reference .dereference) _ #[operand] _, .. }
+    | some { kind := .operation (.data (.select ..)) _ #[operand] _, .. } =>
+        namesPath expressions fuel operand
+    | _ => false
+
 /-- Mark the locals a body borrows mutably as mutable declarations.
 
 Move has no immutable local: every local is assignable and can be borrowed
@@ -407,15 +431,27 @@ private def withMutablyBorrowedLocals (expressionsBefore : Nat)
     | fuel + 1, some (.subslice base ..) => rootLocal? base fuel
     | fuel + 1, some (.downcast base _) => rootLocal? base fuel
     | _, _ => none
+  -- A value borrow's operand reaches the local it borrows through field and
+  -- variant field selections (`&mut s.x`); a selection through a reference
+  -- local writes through the reference instead.
+  let rec selectedLocal? (operand : VerexIR.ExprId) (fuel : Nat) :
+      Option VerexIR.LocalId :=
+    match fuel, state.expressions[operand.index]? with
+    | 0, _ => none
+    | _, some { kind := .localVar id, .. } => some id
+    | fuel + 1, some { kind := .operation (.data (.select ..)) _ operands _, .. }
+    | fuel + 1, some { kind := .operation (.data (.selectVariants ..)) _ operands _, .. } => do
+        let id ← selectedLocal? (← operands[0]?) fuel
+        let declaration ← state.locals.find? (·.id == id)
+        match state.types[declaration.type.typeId.index]? with
+        | some (.reference _) => none
+        | _ => some id
+    | _, _ => none
   let borrowedLocal? (expression : VerexIR.Expr) : Option VerexIR.LocalId :=
     match expression.kind with
     | .operation (.borrow .mutable place) _ _ _ => rootLocal? place state.places.size
     | .operation (.reference (.borrow .mutable)) _ operands _ => do
-        let operand ← operands[0]?
-        let target : VerexIR.Expr ← state.expressions[operand.index]?
-        match target.kind with
-        | .localVar id => some id
-        | _ => none
+        selectedLocal? (← operands[0]?) state.expressions.size
     | _ => none
   let borrowed : Array VerexIR.LocalId := body.foldl (init := #[]) fun borrowed expression =>
     match borrowedLocal? expression with
@@ -512,7 +548,12 @@ private def virOperation : Xast.Operation → BuildM VerexIR.Operation
   | .borrow kind => return .reference (.borrow (virBorrowKind kind))
   | .deref => return .reference .dereference
   | .freeze explicit => return .reference (.freeze explicit)
-  | .select name field => return .data (.select (← addQualifiedRef name) field)
+  | .select name field => do
+      -- A ghost field is read from its slot (`designs/ghost-fields.md`).
+      let ghost := (← get).ghostFields.any fun (owner, ghosts) =>
+        owner == name && ghosts.contains field
+      if ghost then return .data (.selectGhost (← addQualifiedRef name) field)
+      else return .data (.select (← addQualifiedRef name) field)
   | .selectVariants name fields =>
       return .data (.selectVariants (← addQualifiedRef name) fields.toArray)
   | .testVariants name variants =>
@@ -888,6 +929,29 @@ mutual
                       let some slot := slot? | return some (.block #[] (some expression))
                       let slotPattern ← addPatternNode nativeLoc referenceType (.variable slot)
                       pure <| some <| .letDecl slotPattern (some reference) expression
+                    -- An update written back through the native's reference.
+                    -- A reference the call computes is held by a slot local,
+                    -- so that it is evaluated once; a path is read twice.
+                    let updateThrough (reference : VerexIR.ExprId) (referenceTy : Xast.Ty)
+                        (nativeLoc : VerexIR.LocId) (vectorType : VerexIR.TypeId)
+                        (update : VerexIR.ExprId → BuildM VerexIR.ExprId) :
+                        BuildM VerexIR.ExprKind := do
+                      let expressions := (← get).expressions
+                      if namesPath expressions expressions.size reference then
+                        let current ← addExprNode nativeLoc vectorType <|
+                          .operation (.reference .dereference) #[] #[reference]
+                        return .operation (.reference .mutate) #[]
+                          #[reference, ← update current] (surfaceSyntax surface)
+                      let referenceType ← addType nativeLoc referenceTy
+                      let slot ← temporaryLocal referenceType nativeLoc
+                      let read : BuildM VerexIR.ExprId :=
+                        addExprNode nativeLoc referenceType (.localVar slot)
+                      let current ← addExprNode nativeLoc vectorType <|
+                        .operation (.reference .dereference) #[] #[← read]
+                      let mutation ← addExprNode nativeLoc typeId <|
+                        .operation (.reference .mutate) #[] #[← read, ← update current]
+                      let slotPattern ← addPatternNode nativeLoc referenceType (.variable slot)
+                      return .letDecl slotPattern (some reference) mutation
                     match native with
                     | "empty" =>
                         pure <| some <| .operation (.primitive .vector) instantiations #[]
@@ -914,16 +978,13 @@ mutual
                             return some (.assign place swapped)
                         let some reference := arguments[0]?
                           | throw "`vector::swap` has no vector operand"
-                        let some (.mk (.reference _ referent) _ _) := sourceArguments.head?
+                        let some (.mk referenceTy@(.reference _ referent) _ _) := sourceArguments.head?
                           | throw "`vector::swap` does not take a reference"
                         let swapLoc ← addGeneratedLocation loc
                         let vectorType ← addType swapLoc referent
-                        let current ← addExprNode swapLoc vectorType <|
-                          .operation (.reference .dereference) #[] #[reference]
-                        let swapped ← addExprNode swapLoc vectorType <|
-                          .operation (.primitive .swapVector) #[] #[current, left, right]
-                        pure <| some <| .operation (.reference .mutate) #[]
-                          #[reference, swapped] (surfaceSyntax surface)
+                        some <$> updateThrough reference referenceTy swapLoc vectorType fun current =>
+                          addExprNode swapLoc vectorType <|
+                            .operation (.primitive .swapVector) #[] #[current, left, right]
                     | "pop_back" => do
                         -- Removing the last element is the value-level
                         -- removal at the last index, the rest written back
@@ -1200,7 +1261,7 @@ mutual
                             return some (.assign place pushed)
                         let some reference := arguments[0]?
                           | throw "`vector::push_back` has no vector operand"
-                        let some (.mk (.reference _ referent) _ _) := sourceArguments.head?
+                        let some (.mk referenceTy@(.reference _ referent) _ _) := sourceArguments.head?
                           | throw "`vector::push_back` does not take a reference"
                         let pushLoc ← addGeneratedLocation loc
                         let vectorType ← addType pushLoc referent
@@ -1208,12 +1269,9 @@ mutual
                         -- borrowed local: the loan taken for the write is
                         -- live here, and a second read of the local under it
                         -- is a borrow conflict.
-                        let current ← addExprNode pushLoc vectorType <|
-                          .operation (.reference .dereference) #[] #[reference]
-                        let pushed ← addExprNode pushLoc vectorType <|
-                          .operation (.primitive .pushVector) #[] #[current, element]
-                        pure <| some <| .operation (.reference .mutate) #[]
-                          #[reference, pushed] (surfaceSyntax surface)
+                        some <$> updateThrough reference referenceTy pushLoc vectorType fun current =>
+                          addExprNode pushLoc vectorType <|
+                            .operation (.primitive .pushVector) #[] #[current, element]
                     | "borrow" | "borrow_mut" => do
                         -- Borrowing an element is a borrow of the indexed
                         -- place, which is the executable form. Without a
@@ -1387,20 +1445,9 @@ mutual
           | .mutate target value =>
               pure <| .operation (.reference .mutate)
                 #[] #[← addMutationTarget target, ← addExpr value]
-          | .specBlock (.mk specLoc pragmas conditions frame accessOf proof) => do
-              -- An `update x = e` of a spec variable is a write of the ghost
-              -- resource backing `x`; the other conditions stay a
-              -- specification block.
-              let writes ← conditions.toArray.filterMapM (ghostUpdate loc typeId)
-              if writes.isEmpty then .spec <$> addSpecBlock (.mk specLoc pragmas conditions frame accessOf proof) loc
-              else
-                let rest := conditions.filter fun
-                  | .mk .update .. => false
-                  | _ => true
-                let statements ← if rest.isEmpty then pure writes else do
-                  let block ← addSpecBlock (.mk specLoc pragmas rest frame accessOf proof) loc
-                  pure (writes.push (← addExprNode loc typeId (.spec block)))
-                pure <| .block statements.pop (some statements.back!)
+          -- An `update` writes model state only: a ghost field, or the ghost
+          -- resource backing a spec variable (`designs/ghost-fields.md`).
+          | .specBlock spec => .spec <$> addSpecBlock spec loc
           | .quant kind ranges triggers condition body => do
               let kind := match kind with
                 | .forall => VerexIR.QuantifierKind.forall
@@ -1418,33 +1465,6 @@ mutual
                 let triggers ← triggers.toArray.mapM fun trigger => trigger.toArray.mapM addExpr
                 pure <| .quantifier kind binders triggers (← condition.mapM addExpr) (← addExpr body)
         addExprNode loc typeId kind
-
-  /-- The write an `update x = e` condition denotes: the model states the
-  target as the field `v` of the ghost resource `global<Ghost$x>(@0)`
-  backing the spec variable, and the write replaces that resource, whose
-  only field it is. -/
-  private partial def ghostUpdate (loc : VerexIR.LocId) (typeId : VerexIR.TypeId) :
-      Xast.Condition → BuildM (Option VerexIR.ExprId)
-    | .mk .update _ _ value _ _ _ _
-        (some (.mk _ _ (.call (.select ghostName "v") _
-          [.mk ghostType _ (.call (.global _) _ [address] _)] _))) => do
-        let .struct _ arguments := ghostType
-          | throw s!"the ghost memory of `{ghostName.name}` is not a struct type"
-        let writeLoc ← addGeneratedLocation loc
-        let ghostTypeId ← addType writeLoc ghostType
-        let referenceTypeId ← addType writeLoc (.reference true ghostType)
-        let address ← addExpr address
-        let ghostArgument := VerexIR.GenericArgument.typeArg (← generatedTypeUse writeLoc ghostType)
-        let instantiations ← generatedTypeArguments writeLoc arguments
-        let reference ← addExprNode writeLoc referenceTypeId <|
-          .operation (.global (.borrow .mutable)) #[ghostArgument] #[address]
-        let packed ← addExprNode writeLoc ghostTypeId <|
-          .operation (.call (.constructor (← addQualifiedRef ghostName))) instantiations
-            #[← addExpr value]
-        return some (← addExprNode writeLoc typeId <|
-          .operation (.reference .mutate) #[] #[reference, packed])
-    | .mk .update .. => throw "an `update` condition must target a spec variable"
-    | _ => pure none
 
   /-- A hidden temporary holding a computed element index, named like the
   VerexSL lowering's `$t<n>`. -/
@@ -1518,6 +1538,25 @@ mutual
         | none => pure none
     | _ => pure none
 
+  /-- An `update`'s target: a read of the ghost field's place, through the
+  reference where the base is one (`designs/ghost-fields.md`); any other
+  target as its expression. -/
+  private partial def addUpdateTarget (target : Exp) : BuildM VerexIR.ExprId := do
+    match target with
+    | .mk fieldType sourceLoc (.call (.select owner field) _ [base@(.mk baseType _ _)] _) =>
+        let ghost := (← get).ghostFields.any fun (candidate, ghosts) =>
+          candidate == owner && ghosts.contains field
+        let some basePlace ← (if ghost then placeOf? base else pure none)
+          | addExpr target
+        let basePlace ← match baseType with
+          | .reference .. => addPlaceNode (.deref basePlace)
+          | _ => pure basePlace
+        let place ← addPlaceNode (.ghostField basePlace (← addQualifiedRef owner)
+          (← addName { module := owner.module, name := field }))
+        let loc ← addLocation sourceLoc
+        addExprNode loc (← addType loc fieldType) (.operation (.read place) #[] #[] none)
+    | _ => addExpr target
+
   /-- Compiler-v2 represents assignment targets as value-typed XAST place
   trees. VIR mutation instead consumes a concrete reference. Reconstruct that
   reference while the place tree is still available, preserving a global or
@@ -1584,8 +1623,29 @@ mutual
         for value in additionalCodes do auxiliary := auxiliary.push ("additionalCode", ← addExpr value)
         if let some value := emitsHandle then auxiliary := auxiliary.push ("emitsHandle", ← addExpr value)
         if let some value := emitsCondition then auxiliary := auxiliary.push ("emitsCondition", ← addExpr value)
-        if let some value := updateTarget then auxiliary := auxiliary.push ("updateTarget", ← addExpr value)
+        if let some value := updateTarget then
+          auxiliary := auxiliary.push ("updateTarget", ← addUpdateTarget value)
         let encoded ← addExpr expression
+        -- Updates cross the boundary between mathematical integers and
+        -- fixed-width fields in either direction (`designs/ghost-fields.md`).
+        let encoded ← match kind, updateTarget, expression with
+          | .update, some (.mk targetType _ _), .mk .num valueLoc _ =>
+              match targetType with
+              | .u8 | .u16 | .u32 | .u64 | .u128 | .u256
+              | .i8 | .i16 | .i32 | .i64 | .i128 | .i256 => do
+                  let valueLoc ← addLocation valueLoc
+                  addExprNode valueLoc (← addType valueLoc targetType)
+                    (.operation (.specification .intToBitVector) #[] #[encoded] none)
+              | _ => pure encoded
+          | .update, some (.mk .num _ _), .mk valueType valueLoc _ =>
+              match valueType with
+              | .u8 | .u16 | .u32 | .u64 | .u128 | .u256
+              | .i8 | .i16 | .i32 | .i64 | .i128 | .i256 => do
+                  let valueLoc ← addLocation valueLoc
+                  addExprNode valueLoc (← addType valueLoc .num)
+                    (.operation (.specification .bitVectorToInt) #[] #[encoded] none)
+              | _ => pure encoded
+          | _, _, _ => pure encoded
         -- A specification `let` binds its name for the conditions after it.
         match kind with
         | .letPre name | .letPost name =>
@@ -1890,8 +1950,10 @@ private def buildStructDecl (module : Module) (structDecl : Xast.Struct) :
   let owner ← addName (ownName module structDecl.name)
   -- An invariant reads the whole value as `this` after a local per field, as
   -- VerexSL lays a nominal invariant out (an enum's has no field locals);
-  -- Move names the value `self`.
-  if hasWriteFrames || structDecl.spec.conditions.any (·.kind == .structInvariant) then
+  -- Move names the value `self`. A ghost field's initializer reads the
+  -- field locals.
+  if hasWriteFrames || structDecl.spec.conditions.any (·.kind == .structInvariant) ||
+      structDecl.ghostFields.any (·.init.isSome) then
     if structDecl.variants.isNone then
       for field in structDecl.fields do
         let fieldLoc ← addGeneratedLocation structLoc
@@ -1908,7 +1970,20 @@ private def buildStructDecl (module : Module) (structDecl : Xast.Struct) :
     set { state with
       sourceLocals := state.sourceLocals.push ("self", selfTy, id)
       locals := state.locals.push { id, name := "this", type, loc := thisLoc } }
+  let ghosts ← structDecl.ghostFields.toArray.mapM fun ghost => do
+    let ghostLoc ← addGeneratedLocation structLoc
+    let name ← addName (ownName module ghost.name)
+    let type ← typeUse ghostLoc ghost.ty
+    let initializer ← logically (ghost.init.mapM addExpr)
+    return ({ loc := ghostLoc, name, type, initializer, doc := ghost.doc } :
+      VerexIR.GhostFieldDecl)
   let structContract ← addContract structDecl.spec structLoc
+  -- The model backs a spec variable `x` with the resource `Ghost$x`
+  -- (`GHOST_MEMORY_PREFIX` of the move-model), which only verification holds.
+  let ghostMemory : VerexIR.Attribute := .assign "ghost_memory" (.constant (.bool true))
+  let structContract := if structDecl.name.startsWith "Ghost$" then
+      { structContract with pragmas := structContract.pragmas.push ghostMemory }
+    else structContract
   let parameterFrames ← addParameterFrames
     (structDecl.fields.map fun field => { name := field.name, ty := field.ty })
     structDecl.spec.accessOf
@@ -1922,6 +1997,7 @@ private def buildStructDecl (module : Module) (structDecl : Xast.Struct) :
     generics := ← structDecl.typeParams.toArray.mapM (addGenericBinder structLoc)
     fields
     variants
+    ghosts
     abilities := structDecl.abilities.toArray.map virAbility
     properties := (if structDecl.isNative then #[functionProperty "struct.native"] else #[]) ++
       (if structDecl.variants.isSome then #[functionProperty "struct.variants"] else #[])
@@ -1959,8 +2035,11 @@ private def buildInterface (module : Module) :
         requires its owning module; dependency interfaces do not carry field contracts"
     resetLocals
     let declaration ← buildStructDecl module structDecl
+    -- A dependency's values hold its ghost slots; its packs, which give them
+    -- their initial values, stay with the package that declares it.
     structs := structs.push { declaration with
-      contract := {}, locals := #[], attributes := #[] }
+      contract := {}, locals := #[], attributes := #[]
+      ghosts := declaration.ghosts.map ({ · with initializer := none }) }
   let inlineFunctions := module.functions.filterMap fun function =>
     if isExpandedInline function then some function.name else none
   let mut functions := #[]
@@ -2346,7 +2425,12 @@ def package (package : Package) : Except String VerexIR.Import.RawUnit := do
     functionResults := (package.modules ++ package.dependencies).flatMap fun module =>
       module.functions.map fun function =>
         ({ module := module.ref, name := function.name }, function.result)
-    mutableSpecParameters }
+    mutableSpecParameters
+    ghostFields := (package.modules ++ package.dependencies).flatMap fun module =>
+      module.structs.filterMap fun structDecl =>
+        if structDecl.ghostFields.isEmpty then none
+        else some ({ module := module.ref, name := structDecl.name },
+          structDecl.ghostFields.map (·.name)) }
   -- Dependency interfaces are built after the owned namespaces, so their
   -- namespace identities follow the ones this unit declares.
   let build : BuildM (Array VerexIR.Import.RawNamespace ×

@@ -96,6 +96,7 @@ partial def quoteNTy : VerexIR.Proofs.Denote.NTy → MetaM Lean.Expr
   | .unit => return mkConst ``VerexIR.Proofs.Denote.NTy.unit
   | .bool => return mkConst ``VerexIR.Proofs.Denote.NTy.bool
   | .int width signed => return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.int) #[toExpr width, toExpr signed]
+  | .num => return mkConst ``VerexIR.Proofs.Denote.NTy.num
   | .address => return mkConst ``VerexIR.Proofs.Denote.NTy.address
   | .signer => return mkConst ``VerexIR.Proofs.Denote.NTy.signer
   | .string => return mkConst ``VerexIR.Proofs.Denote.NTy.string
@@ -113,6 +114,7 @@ partial def quoteNTy : VerexIR.Proofs.Denote.NTy → MetaM Lean.Expr
         #[toExpr source, ← quoteRow arguments, namesExpr, ← quoteRows rows, distinct]
   | .vector element => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) (← quoteNTy element)
   | .ref referent => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.ref) (← quoteNTy referent)
+  | .ghost slot => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.ghost) (← quoteNTy slot)
   | .param index => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) (toExpr index)
   | .function parameters shared results =>
       return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.function)
@@ -143,16 +145,31 @@ def frameUnit (frame : Lean.Expr) : MetaM Lean.Expr := do
     throwError "internal: {frame} is not a frame"
   return type.appArg!
 
-/-- The validated unit an executable unit executes. -/
+/-- The validated unit an executable unit executes, or a model is of
+(`ModelUnit`, `designs/ghost-fields.md`). -/
 def executableUnit (executable : Lean.Expr) : MetaM Lean.Expr := do
   let type ← whnfR (← inferType executable)
-  unless type.isAppOfArity ``VerexIR.Validation.ExecutableUnit 1 do
+  unless type.isAppOfArity ``VerexIR.Validation.ExecutableUnit 1 ||
+      type.isAppOfArity ``VerexIR.Proofs.ModelUnit 1 do
     throwError "internal: {executable} is not an executable unit"
   return type.appArg!
 
 /-- The type of the executable units of a unit. -/
 def executableType (unit : Lean.Expr) : Lean.Expr :=
   mkApp (mkConst ``VerexIR.Validation.ExecutableUnit) unit
+
+/-- The type of what a contract reading the unit takes: an executable unit,
+or, in a unit verified through its model, a model (`ModelUnit`). -/
+def unitReaderType (unit : ValidatedUnit) (unitExpr : Lean.Expr) : Lean.Expr :=
+  if VerexIR.Proofs.Denote.declaresGhosts unit then mkApp (mkConst ``VerexIR.Proofs.ModelUnit) unitExpr
+  else executableType unitExpr
+
+/-- The invocation meaning a model gives at a frame; none where a contract
+takes an executable unit, whose invocations mean big-step runs. -/
+def modelInvoke? (reader frame : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let type ← whnfR (← inferType reader)
+  unless type.isAppOfArity ``VerexIR.Proofs.ModelUnit 1 do return none
+  return some (mkApp3 (mkConst ``VerexIR.Proofs.ModelUnit.invoke) type.appArg! reader frame)
 
 /-- The carriers of a frame. -/
 def frameCarriers (frame : Lean.Expr) : MetaM Lean.Expr := do
@@ -414,6 +431,14 @@ private def signatureDomain (unit : ValidatedUnit) (typeId : TypeId) (role : Str
     | throwError "{role} has an unknown type"
   pure (domainOf ty)
 
+/-- A proposition decided as a Boolean: by its instance where one exists, a
+quantifier over an unbounded domain classically. -/
+private def decideProposition (proposition : Lean.Expr) : MetaM Lean.Expr := do
+  match ← trySynthInstance (mkApp (mkConst ``Decidable) proposition) with
+  | .some decision => pure (mkApp2 (mkConst ``Decidable.decide) proposition decision)
+  | _ => pure (mkApp2 (mkConst ``Decidable.decide) proposition
+      (mkApp (mkConst ``Classical.propDecidable) proposition))
+
 /-- The values of a bounded integer type, as a binder's membership. -/
 private def boundedMembership? : IrTy → Option (Lean.Expr → MetaM Lean.Expr)
   | .integer (.bits width) signed => some fun value => pure (mkApp3
@@ -633,6 +658,15 @@ machine in proof obligations. -/
   | candidate :: rest =>
       if candidate == variant then true else variantMember variant rest
 
+/-- A ghost slot's contents (`designs/ghost-fields.md`). -/
+@[simp, vir_denote_norm] def ghostContents : RuntimeValue → RuntimeValue
+  | .ghost contents => contents
+  | _ => .unit
+
+/-- The contents of a ghost slot of a value a specification builds: unspecified,
+as the Move Prover leaves a ghost field no `update` wrote. -/
+opaque unspecifiedGhostContents (_slot : VerexIR.Proofs.Denote.NTy) : RuntimeValue := .unit
+
 /-- Total enum-payload selection used by specifications after the declaration
 resolver has reduced a source field name to one payload offset per variant. -/
 @[simp] def selectVariantField (value : RuntimeValue)
@@ -646,6 +680,27 @@ resolver has reduced a source field name to one payload offset per variant. -/
         | none => .unit
       else .unit
   | _ => .unit
+
+/-- Integer field observations are unchanged by erasing ghost contents. -/
+theorem asInt_select_eraseGhosts (value : RuntimeValue) (owner : VerexIR.StructHandle)
+    (variants : Array (String × Nat)) :
+    (selectVariantField value.eraseGhosts owner variants).asInt =
+      (selectVariantField value owner variants).asInt := by
+  have erase_all (xs : List RuntimeValue) :
+      RuntimeValue.eraseGhostsAll xs = xs.map RuntimeValue.eraseGhosts := by
+    induction xs <;> simp_all [RuntimeValue.eraseGhostsAll]
+  cases value <;> simp only [RuntimeValue.eraseGhosts, selectVariantField, RuntimeValue.asInt]
+  next actual variant fields =>
+    cases variant
+    · rfl
+    · simp only [selectVariantField]
+      split
+      · split
+        next i hi =>
+          simp only [erase_all, ← List.map_toArray, Array.toArray_toList, Array.getElem?_map]
+          cases fields[i]? <;> simp [VerexIR.Proofs.Denote.asInt_eraseGhosts]
+        · rfl
+      · rfl
 
 /-- Payload offset of a specification field update, resolved at translation. -/
 @[simp] def updateFieldIndex (variant : Option String) : List (Option String × Nat) → Option Nat
@@ -707,6 +762,21 @@ unrelated runtime-value cases during contract reduction. -/
   | .nominal actual (some variant) _ =>
       actual == owner && variantMember variant variants.toList
   | _ => false
+
+/-- A ghost slot of a value by its distance from the end of its fields: the
+slots follow the declared fields of every variant alike, so a slot's distance
+from the end is the same in each, and the read needs no variant. -/
+def slotFromEnd (value : RuntimeValue) (fromEnd : Nat) : RuntimeValue :=
+  match value with
+  | .nominal _ _ fields => fields[fields.size - fromEnd]?.getD .unit
+  | _ => .unit
+
+/-- The slot of a nominal value, the one read the normal form takes: the
+slot of an encoded value stays a term, which the contracts only equate. -/
+theorem slotFromEnd_nominal (owner : VerexIR.StructHandle) (variant : Option String)
+    (fields : Array RuntimeValue) (fromEnd : Nat) :
+    slotFromEnd (.nominal owner variant fields) fromEnd =
+      fields[fields.size - fromEnd]?.getD .unit := rfl
 
 theorem selectVariantField_nominal (actual owner : VerexIR.StructHandle) (variant : String)
     (fields : Array RuntimeValue) (variants : Array (String × Nat)) :
@@ -849,72 +919,94 @@ An owner of an intrinsic map is read through the map model
 (`designs/intrinsic-maps.md`): its layout, and its discipline, ordered when
 the owner binds a role that enumerates it in key order. -/
 
-/-- The roles of an intrinsic map that enumerate it in key order. Insertion
-position roles deliberately do not select the ordered discipline. -/
-private def orderingRoles : Array String := #["map_spec_key_at", "map_spec_rank",
-  "map_borrow_front", "map_borrow_back", "map_front_key", "map_back_key", "map_pop_front",
-  "map_pop_back", "map_prev_key", "map_next_key"]
-
 /-- A map owner's model, quoted: its layout and discipline, and whether the
 layout is a table's, whose entries are the hidden contents field behind its
 handle. -/
 private structure MapModel where
+  /-- The canonical layout of the owner's abstract value
+  (`OwnerLayout.canonical`). -/
   layout : Lean.Expr
   discipline : Lean.Expr
-  table : Bool := false
-  /-- A table layout with a handle, which allocating records. -/
+  /-- An owner holding table storage, whose allocation `new` records. -/
   handle : Bool := false
+  /-- The owner's ghost slots: the validity slot the Move model synthesizes
+  for a map binding a validity role (`designs/ghost-fields.md`). -/
+  ghosts : Nat := 0
 
-/-- The model of an intrinsic map owner: holding its entries in one vector of
-two-field entries, a plain struct or the single variant of an enum, or a
-table owner of a handle and possibly a cached length, whose entries are its
-hidden contents field (`designs/intrinsic-maps.md`, "Views"). -/
+/-- The model of an intrinsic map owner: its abstract map, under the owner's
+discipline, at the canonical layout of its abstract value
+(`designs/intrinsic-maps.md`, "Abstract representation"). -/
 private def mapModel? (unit : ValidatedUnit) (ty : IrTy) : Option MapModel := do
-  let (owner, ns, declaration) ← nominalDeclaration? unit ty
-  let intrinsic ← ns.intrinsics.find? fun intrinsic =>
-    intrinsic.model == "map" && intrinsic.owner == declaration.name
-  let ordered := (intrinsic.executableBindings ++ intrinsic.specBindings).any
-    (orderingRoles.contains ·.role)
+  let (owner, ns, _) ← nominalDeclaration? unit ty
+  let layout ← VerexIR.Validation.ownerLayout? unit owner.namespaceId owner.structId
+  let canonical := layout.canonical
   let rank := mkApp (mkConst ``VerexIR.SemanticOperations.valueRanks) (toExpr ns.orders)
-  let (variant, fields) ← match declaration.variants.toList with
-    | [] => some (none, declaration.fields)
-    | [variant] => some (some (((unit.tables.names[variant.name.index]?).map (·.name)).getD ""),
-        variant.fields)
-    | _ => none
-  let fieldTypes : List IrTy ← fields.toList.mapM fun field =>
-    unit.tables.types[field.type.typeId.index]?
-  let entriesLayout : Option MapModel := do
-    let [field] := fields.toList | none
-    let .vector element _ ← unit.tables.types[field.type.typeId.index]? | none
-    let entryType ← unit.tables.types[element.index]?
-    let (entry, _, entryDeclaration) ← nominalDeclaration? unit entryType
-    guard (entryDeclaration.variants.isEmpty && entryDeclaration.fields.size == 2)
-    let discipline := if ordered then mkApp (mkConst ``VerexIR.Maps.Discipline.ordered) rank
-      else mkConst ``VerexIR.Maps.Discipline.sequence
-    let layout := mkAppN (mkConst ``VerexIR.Maps.Layout.mk) #[toExpr owner, toExpr variant,
-      toExpr (some entry), toExpr false, toExpr false]
-    some { layout, discipline }
-  let tableLayout : Option MapModel := do
-    guard (declaration.variants.isEmpty && declaration.generics.size == 2)
-    let (handle, length) ← match fieldTypes with
-      | [] => some (false, false)
-      | [.address] => some (true, false)
-      | [.address, .integer (.bits 64) false] => some (true, true)
-      | _ => none
-    guard !ordered
-    let layout := mkAppN (mkConst ``VerexIR.Maps.Layout.mk) #[toExpr owner,
-      toExpr (none : Option String), toExpr (none : Option VerexIR.StructHandle), toExpr handle,
-      toExpr length]
-    some { layout, discipline := mkConst ``VerexIR.Maps.Discipline.sequence, table := true, handle }
-  entriesLayout <|> tableLayout
+  let discipline := if layout.ordered then mkApp (mkConst ``VerexIR.Maps.Discipline.ordered) rank
+    else mkConst ``VerexIR.Maps.Discipline.sequence
+  some {
+    layout := mkAppN (mkConst ``VerexIR.Maps.Layout.mk) #[toExpr owner,
+      toExpr (none : Option String), toExpr (none : Option VerexIR.StructHandle),
+      toExpr canonical.handle, toExpr canonical.length, toExpr canonical.dummy,
+      toExpr canonical.ghosts]
+    discipline
+    handle := canonical.handle
+    ghosts := canonical.ghosts }
+
+/-- The map a value of the owner holds: the value itself. -/
+private def MapModel.read (_model : MapModel) (value : Lean.Expr) : MetaM Lean.Expr := pure value
+
+/-- The owner's value holding a map: the map itself. -/
+private def MapModel.write (_model : MapModel) (map : Lean.Expr) : MetaM Lean.Expr := pure map
+
+/-- That an owner's value holds a map: it is the map. -/
+private def MapModel.holds (_model : MapModel) (value map : Lean.Expr) : MetaM Lean.Expr :=
+  mkEq value map
+
+/-- The ghost field the Move model synthesizes as the validity slot of a map
+binding a validity role, and of its iterators (`$validity`,
+`designs/ghost-fields.md`), as a VerexSL rendering spells a hidden name. -/
+def validitySlotName : String := "_validity"
+
+/-- The position among an owner's or iterator's ghost slots of its validity
+slot, none without one. -/
+private def validitySlot? (unit : ValidatedUnit) (handle : VerexIR.StructHandle) : Option Nat := do
+  let ns ← unit.namespaces[handle.namespaceId.index]?
+  (VerexIR.SemanticOperations.nominalGhosts unit handle).findIdx? fun ghost =>
+    (ns.tables.names[ghost.name.index]?).any (·.name == validitySlotName)
+
+/-- The validity slot of an owner's value: through its layout. -/
+private def ownerValiditySlot (context : Context) (model : MapModel) (ty : IrTy)
+    (value : Lean.Expr) : MetaM Lean.Expr := do
+  let some (handle, _, _) := nominalDeclaration? context.unit ty
+    | throwError "a map's owner is not a declared nominal"
+  let some position := validitySlot? context.unit handle
+    | throwError "the map's owner has no validity slot"
+  mkAppM ``VerexIR.Maps.Layout.slot #[model.layout, value, toExpr position]
+
+/-- The validity slot of an iterator's value: its ghost slot, read by its
+distance from the end of the fields, the same in every variant, so that an
+iterator of an unknown variant has a slot. -/
+private def iteratorValiditySlot (context : Context) (ty : IrTy) (value : Lean.Expr) :
+    MetaM Lean.Expr := do
+  let some (handle, _, _) := nominalDeclaration? context.unit ty
+    | throwError "an iterator is not a declared nominal"
+  let some position := validitySlot? context.unit handle
+    | throwError "the iterator has no validity slot"
+  let ghosts := (VerexIR.SemanticOperations.nominalGhosts context.unit handle).size
+  mkAppM ``VerexSL.Contract.slotFromEnd #[value, toExpr (ghosts - position)]
 
 /-- The specification role a specification function plays for an intrinsic
 map of its namespace, with the map's owner. -/
 private def mapSpecRole? (ns : ValidatedNamespace) (reference : VerexIR.QualifiedRef) :
-    Option (String × VerexIR.NameId) :=
+    Option (VerexIR.MapSpecRole × VerexIR.NameId) :=
   ns.intrinsics.findSome? fun intrinsic =>
     if intrinsic.model == "map" then
-      (intrinsic.specBindings.find? (·.target == reference)).map (·.role, intrinsic.owner)
+      -- A leaf offset is uninterpreted (`designs/intrinsic-maps.md`, "Roles").
+      intrinsic.specBindings.findSome? fun binding => do
+        guard (binding.target == reference)
+        let role ← VerexIR.MapSpecRole.ofName? binding.role
+        guard (role != .leafOffset)
+        some (role, intrinsic.owner)
     else none
 
 /-- The rank a map model's ordered discipline compares keys by. -/
@@ -923,39 +1015,76 @@ private def MapModel.rank? (model : MapModel) : Option Lean.Expr :=
     some (model.discipline.getArg! 0)
   else none
 
-/-- The position variant of an iterator enum, with the enum's handle: the
-variant holding one field, the position. -/
-private def iteratorPosition? (unit : ValidatedUnit) (ty : IrTy) :
-    Option (VerexIR.StructHandle × String) := do
+/-- How an iterator of an intrinsic map names its entry, as the Move Prover
+classifies its payload variant (`iter_key_field`): by the key it carries, a
+field of the map's key type parameter, or by a position, one integer field
+the map's enumeration turns into a key. -/
+private structure IteratorModel where
+  owner : VerexIR.StructHandle
+  variant : String
+  keyed : Bool
+
+private def iteratorModel? (unit : ValidatedUnit) (ty : IrTy) : Option IteratorModel := do
   let (owner, _, declaration) ← nominalDeclaration? unit ty
   let variant ← declaration.variants.find? (·.fields.size == 1)
   let name ← (unit.tables.names[variant.name.index]?).map (·.name)
-  pure (owner, name)
+  let field ← variant.fields[0]?
+  let keyed := unit.tables.types[field.type.typeId.index]? == some (.typeParameter 0)
+  pure { owner, variant := name, keyed }
 
-/-- The position an iterator holds, as a specification reads its payload
-field. -/
-private def iteratorPosition (owner : VerexIR.StructHandle) (variant : String)
-    (iterator : Lean.Expr) : MetaM Lean.Expr := do
-  let variants := #[(variant, (0 : Nat))]
-  mkAppM ``VerexIR.RuntimeValue.asInt
-    #[← mkAppM ``VerexSL.Contract.selectVariantField #[iterator, toExpr owner, toExpr variants]]
+/-- The payload an iterator holds: its key, or its position. -/
+private def iteratorPayload (model : IteratorModel) (iterator : Lean.Expr) : MetaM Lean.Expr :=
+  mkAppM ``VerexSL.Contract.selectVariantField
+    #[iterator, toExpr model.owner, toExpr #[(model.variant, (0 : Nat))]]
 
-/-- Whether an iterator is at a position of a map: its position variant,
-below the map's size. -/
-private def iteratorInRange (owner : VerexIR.StructHandle) (variant : String)
-    (iterator map : Lean.Expr) : MetaM Lean.Expr := do
+/-- Whether an iterator names an entry of a map: its payload variant, with
+a key the map holds, or a position below the map's size. -/
+private def iteratorInRange (model : IteratorModel) (iterator map : Lean.Expr) :
+    MetaM Lean.Expr := do
   let test ← mkEq (← mkAppM ``VerexSL.Contract.testVariants
-    #[iterator, toExpr owner, toExpr #[variant]]) (mkConst ``Bool.true)
-  let position ← iteratorPosition owner variant iterator
-  mkAppM ``And #[test, ← mkAppM ``LT.lt #[position, ← mkAppM ``VerexIR.Maps.size #[map]]]
+    #[iterator, toExpr model.owner, toExpr #[model.variant]]) (mkConst ``Bool.true)
+  let payload ← iteratorPayload model iterator
+  if model.keyed then
+    mkAppM ``And #[test,
+      ← mkEq (← mkAppM ``VerexIR.Maps.hasKey #[map, payload]) (mkConst ``Bool.true)]
+  else
+    let position ← mkAppM ``VerexIR.RuntimeValue.asInt #[payload]
+    mkAppM ``And #[test, ← mkAppM ``LT.lt #[position, ← mkAppM ``VerexIR.Maps.size #[map]]]
 
-/-- The key at an iterator's position. -/
-private def iteratorKey (owner : VerexIR.StructHandle) (variant : String)
-    (iterator map : Lean.Expr) : MetaM Lean.Expr := do
-  mkAppM ``VerexIR.Maps.keyAt #[map, ← iteratorPosition owner variant iterator]
+/-- The key an iterator names: its payload, or the key at its position. -/
+private def iteratorKey (model : IteratorModel) (iterator map : Lean.Expr) : MetaM Lean.Expr := do
+  let payload ← iteratorPayload model iterator
+  if model.keyed then pure payload
+  else mkAppM ``VerexIR.Maps.keyAt #[map, ← mkAppM ``VerexIR.RuntimeValue.asInt #[payload]]
 
 private def aggregateField (value index : Lean.Expr) : MetaM Lean.Expr :=
   mkAppM ``VerexIR.RuntimeValue.field #[value, index]
+
+mutual
+/-- Whether a type holds a part a specification's equality reads through its
+identity (`NTy.identityRuntime`): an owner identified by its handle, a ghost
+slot, or a function value, at some depth; a function value's captures may
+hold ghost slots, and in a unit declaring ghosts (`ghosts`) so may a type
+parameter's instance. An owner without a handle compares by its contents,
+so its entries are read as values are. -/
+private def holdsContents (ghosts : Bool) : VerexIR.Proofs.Denote.NTy → Bool
+  | .ghost _ | .function _ _ _ => true
+  | .param _ => ghosts
+  | .table key value => holdsContents ghosts key || holdsContents ghosts value
+  | .tuple elements => rowHoldsContents ghosts elements
+  | .struct _ _ elements => elements.ownsHandle || rowHoldsContents ghosts elements
+  | .enum _ _ _ rows _ => rowsHoldContents ghosts rows
+  | .vector element | .ref element => holdsContents ghosts element
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => false
+
+private def rowHoldsContents (ghosts : Bool) : VerexIR.Proofs.Denote.NRow → Bool
+  | .nil => false
+  | .cons τ rest => holdsContents ghosts τ || rowHoldsContents ghosts rest
+
+private def rowsHoldContents (ghosts : Bool) : VerexIR.Proofs.Denote.NRows → Bool
+  | .nil => false
+  | .cons fields rest => rowHoldsContents ghosts fields || rowsHoldContents ghosts rest
+end
 
 /-- The identities of two operands of a type holding map contents, which a
 specification's equality compares by allocation identity
@@ -965,11 +1094,23 @@ private def identityOperands (context : Context) (operand : ExprId) (left right 
     MetaM (Option (Lean.Expr × Lean.Expr)) := do
   let some expression := context.ns.expressions[operand.index]? | return none
   let some nty := context.ntyOf? (specTypeId context.unit expression.typeId) | return none
-  if nty.tableFree then return none
+  unless holdsContents (VerexIR.Proofs.Denote.declaresGhosts context.unit) nty do return none
   let type ← quoteNTy nty
   let identity := fun (value : Lean.Expr) =>
     mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.identityRuntime) type value
   return some (identity left, identity right)
+
+/-- Two values of an owner holding its map in its own layout with ghost
+slots are equal where they agree but for the slots: one is the other
+restamped (`designs/ghost-fields.md`, "Validity slots"). -/
+private def ownerSameness? (context : Context) (ty : IrTy) (left right : Lean.Expr) :
+    MetaM (Option Lean.Expr) := do
+  let some model := mapModel? context.unit ty | return none
+  unless model.ghosts > 0 do return none
+  let stampType ← mkArrow (mkConst ``Nat) (mkConst ``RuntimeValue)
+  withLocalDeclD `stamp stampType fun stamp => do
+    let restamped ← mkAppM ``VerexIR.Maps.Layout.restamp #[model.layout, right, stamp]
+    mkAppM ``Exists #[← mkLambdaFVars #[stamp] (← mkEq left restamped)]
 
 private def Domain.ofAggregate (domain : Domain) (value : Lean.Expr) : MetaM Lean.Expr := do
   if domain == .aggregate then return value
@@ -1307,7 +1448,7 @@ private def Context.mutableParameters (context : Context) : Array Nat :=
 /-- A translated value as a local's: a boolean decided. -/
 private def decidedAt (type : IrTy) (value : Lean.Expr) : MetaM Lean.Expr :=
   match domainOf type with
-  | .boolean => mkDecide value
+  | .boolean => decideProposition value
   | _ => pure value
 
 /-- The context with a local bound to a value at a type. -/
@@ -1335,6 +1476,13 @@ private def Context.bindComponent (context : Context) (element : VerexIR.Pattern
       context.bindLocal localId elementType (← valueOf elementType)
   | _ => throwError "generated contracts require a variable or wildcard component \
       in a {pattern} binding pattern"
+
+/-- A predicate over a model's invocation meaning applied to its leading
+arguments (the unit, the frame, and the meaning, packed as `Unit.unit`'s
+arguments in `translateInvocation`) and the rest. -/
+private def modelPredicate (predicate : Name) (leading : Lean.Expr) (rest : Array Lean.Expr) :
+    Lean.Expr :=
+  mkAppN (mkConst predicate) (leading.getAppArgs ++ rest)
 
 mutual
 /-- Bind a specification let in its lexical scope, also used when a free
@@ -1402,12 +1550,16 @@ private partial def Context.labelState (context : Context) (label : Nat) : MetaM
     context.bindLet pattern initializer
   let memory ← match operation with
     | .behavior .ensuresOf range | .behavior .resultOf range => do
-        let (executable, callable, inputs, pre, mutable?) ←
+        let (executable, callable, inputs, pre, mutable?, model?) ←
           translateInvocation context range arguments
         if mutable?.isSome then
           throwError "a state label defined by an invocation lending mutable references \
             is not carried yet"
-        mkAppM ``VerexIR.Proofs.StateOf #[executable, callable, inputs, pre]
+        match model? with
+        | some (leading, row, shape) =>
+            pure (modelPredicate ``VerexIR.Proofs.StateOfAt leading
+              #[row, shape, callable, inputs, pre])
+        | none => mkAppM ``VerexIR.Proofs.StateOf #[executable, callable, inputs, pre]
     | _ => (·.1) <$> translateStateChange context operation instantiations arguments
   return { memory, locals := context.oldLocals }
 
@@ -1512,7 +1664,8 @@ are ones, which of its results hold ones, and how many parameters are ones
 (`VerexIR.Proofs.EnsuresOfMut`). -/
 private partial def translateInvocation (context : Context) (range : VerexIR.MemoryRange)
     (arguments : Array ExprId) :
-    MetaM (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr × Option (Lean.Expr × Lean.Expr × Nat)) := do
+    MetaM (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr × Option (Lean.Expr × Lean.Expr × Nat) ×
+      Option (Lean.Expr × Lean.Expr × Lean.Expr)) := do
   let some executable := context.executable
     | throwError "a behavioral predicate reads the executable unit, which this contract \
         does not take"
@@ -1522,6 +1675,22 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
     | throwError "a behavioral predicate's function value is out of range"
   let some (.function parameters result _) := context.valueTypeOf? callableExpression.typeId
     | throwError "a behavioral predicate's operand is not a function value"
+  -- Over a model (`designs/ghost-fields.md`): the invocation meaning at the
+  -- contract's frame, and the value's native row and result shape.
+  let frame ← context.frame
+  let model? ← (← modelInvoke? executable frame).mapM fun invoke => do
+    let some (.function row _ results) := VerexIR.Proofs.Denote.ntyOf context.unit
+        context.namespaceId callableExpression.typeId
+      | throwError "a behavioral predicate's callable has no native function type"
+    let shape : VerexIR.Proofs.Denote.ResultShape ← match results with
+      | .nil => pure .none
+      | .cons τ .nil => pure (.one τ)
+      | _ => throwError "a behavioral predicate's function value returns several results, \
+          which a model does not carry"
+    -- The predicate's leading arguments, spelled out: the frame may be a
+    -- term, not an instance in scope.
+    pure (mkApp3 (mkConst ``Unit.unit) (← context.unitExpr) frame invoke, ← quoteRow row,
+      ← quoteShape shape)
   -- A shared reference is the observed value itself, at runtime as in a
   -- specification; a mutable one is lent under a loan of its own.
   let mutable := parameters.map fun parameter =>
@@ -1557,7 +1726,10 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
       pure (some (← mkListLit (mkConst ``Bool) (mutable.toList.map toExpr),
         ← mkListLit (mkConst ``Bool) (mutableResults.map toExpr), (mutable.filter id).size))
     else pure none
-  return (executable, callableValue, inputValues, pre, mutable?)
+  if lent && model?.isSome then
+    throwError "a behavioral predicate of a function value lending mutable references is not \
+      carried in a unit verified through its model yet"
+  return (executable, callableValue, inputValues, pre, mutable?, model?)
 
 /-- Encode scalar operands while retaining already-observed aggregate values. -/
 private partial def translateLogicalOperand (context : Context) (id : ExprId) : MetaM Lean.Expr := do
@@ -1576,7 +1748,7 @@ private partial def translateLogicalOperand (context : Context) (id : ExprId) : 
         return ← rep.encode context.codecs translated
     | _ => pure ()
   match domainOf ty with
-  | .boolean => mkAppM ``RuntimeValue.bool #[← mkDecide translated]
+  | .boolean => mkAppM ``RuntimeValue.bool #[← decideProposition translated]
   | domain => domain.encode translated
 
 /-- An operand at an execution boundary: its runtime value. -/
@@ -1911,7 +2083,7 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
               | throwError "an assigned value has an unknown type"
             let translated ← translate active value
             let translated ← match domainOf valueType with
-              | .boolean => mkDecide translated
+              | .boolean => decideProposition translated
               | _ => pure translated
             active := { active with
               locals := active.locals.set! localId.index (some translated)
@@ -2027,7 +2199,7 @@ where
     let mut values : Array Lean.Expr := #[]
     for (argument, domain) in arguments.zip domains do
       let value ← match domain with
-        | .boolean => mkDecide (← translate context argument)
+        | .boolean => decideProposition (← translate context argument)
         | .aggregate => runtimeOperand argument
         | .integer | .text _ => translate context argument
       values := values.push value
@@ -2075,55 +2247,74 @@ where
     | .boolean, .boolean => pure value
     | _, _ => pure value
   /-- A specification role of an intrinsic map, as the map model reads it. -/
-  mapSpecCall (role : String) (owner : VerexIR.NameId) (ty : IrTy) (arguments : Array ExprId) :
+  mapSpecCall (role : VerexIR.MapSpecRole) (owner : VerexIR.NameId) (ty : IrTy)
+      (arguments : Array ExprId) :
       MetaM Lean.Expr := do
     let operand (index : Nat) : MetaM ExprId := do
       let some id := arguments[index]?
-        | throwError m!"the intrinsic map role `{role}` lacks operand {index}"
+        | throwError m!"the intrinsic map role `{role.name}` lacks operand {index}"
       pure id
     let some model := mapModel? context.unit (.nominal owner #[])
-      | throwError m!"the intrinsic map role `{role}` belongs to a map whose representation \
+      | throwError m!"the intrinsic map role `{role.name}` belongs to a map whose representation \
           is not carried"
     -- A table's identity is its allocated handle, which no pure constructor
     -- has (`designs/intrinsic-maps.md`, "Equality and order").
-    if model.table && role == "map_spec_new" then
+    if model.handle && role == .new_ then
       throwError "a pure Table constructor's logical identity is not carried"
     let aggregate (index : Nat) : MetaM Lean.Expr := do runtimeAggregate (← operand index)
     let value (index : Nat) : MetaM Lean.Expr := do runtimeOperand (← operand index)
-    let map := aggregate 0
+    let map := do model.read (← aggregate 0)
     let key := value 1
     let size : MetaM Lean.Expr := do mkAppM ``VerexIR.Maps.size #[← map]
     let hasKey : MetaM Lean.Expr := do mkAppM ``VerexIR.Maps.hasKey #[← map, ← key]
     match role with
-    | "map_spec_new" => mkAppM ``VerexIR.Maps.empty #[model.layout]
-    | "map_spec_len" => size
-    | "map_spec_is_empty" | "map_spec_aborts_empty" => mkEq (← size) (mkIntLit 0)
-    | "map_spec_has_key" | "map_spec_aborts_add" => mkEq (← hasKey) (mkConst ``Bool.true)
-    | "map_spec_aborts_del" | "map_spec_aborts_borrow" => mkEq (← hasKey) (mkConst ``Bool.false)
-    | "map_spec_aborts_destroy_empty" => mkAppM ``Ne #[← size, mkIntLit 0]
-    | "map_spec_get" => (domainOf ty).ofRuntime (← mkAppM ``VerexIR.Maps.valueAt #[← map, ← key])
-    | "map_spec_set" =>
-        mkAppM ``VerexIR.Maps.update #[model.layout, model.discipline, ← map, ← key, ← value 2]
-    | "map_spec_del" => mkAppM ``VerexIR.Maps.remove #[model.layout, model.discipline, ← map, ← key]
-    | "map_spec_key_at" | "map_spec_insertion_key_at" =>
+    | .new_ => model.write (← mkAppM ``VerexIR.Maps.empty #[model.layout])
+    | .len => size
+    | .isEmpty | .abortsEmpty => mkEq (← size) (mkIntLit 0)
+    | .hasKey | .abortsAdd => mkEq (← hasKey) (mkConst ``Bool.true)
+    | .abortsDel | .abortsBorrow => mkEq (← hasKey) (mkConst ``Bool.false)
+    | .abortsDestroyEmpty => mkAppM ``Ne #[← size, mkIntLit 0]
+    | .get => (domainOf ty).ofRuntime (← mkAppM ``VerexIR.Maps.valueAt #[← map, ← key])
+    | .set =>
+        model.write (← mkAppM ``VerexIR.Maps.update
+          #[model.layout, model.discipline, ← map, ← key, ← value 2])
+    | .del =>
+        model.write (← mkAppM ``VerexIR.Maps.remove #[model.layout, model.discipline, ← map, ← key])
+    | .keyAt | .insertionKeyAt =>
         (domainOf ty).ofRuntime (← mkAppM ``VerexIR.Maps.keyAt #[← map, ← translate context (← operand 1)])
-    | "map_spec_rank" | "map_spec_insertion_rank" => mkAppM ``VerexIR.Maps.rank #[← map, ← key]
-    | "map_spec_aborts_add_all" => mkAppM ``VerexIR.Maps.AbortsAddAll #[← map, ← aggregate 1, ← aggregate 2]
-    | "map_spec_aborts_new_from" => mkAppM ``VerexIR.Maps.AbortsNewFrom #[← aggregate 0, ← aggregate 1]
-    | "map_spec_aborts_upsert_all" => mkAppM ``VerexIR.Maps.AbortsUpsertAll #[← aggregate 1, ← aggregate 2]
-    | "map_spec_aborts_append_disjoint" =>
-        mkAppM ``VerexIR.Maps.AbortsAppendDisjoint #[← map, ← aggregate 1]
-    | "map_spec_aborts_trim" => mkAppM ``LT.lt #[← size, ← translate context (← operand 1)]
-    | "map_spec_aborts_replace_key_inplace" =>
+    | .rank | .insertionRank => mkAppM ``VerexIR.Maps.rank #[← map, ← key]
+    | .abortsAddAll => mkAppM ``VerexIR.Maps.AbortsAddAll #[← map, ← aggregate 1, ← aggregate 2]
+    | .abortsNewFrom => mkAppM ``VerexIR.Maps.AbortsNewFrom #[← aggregate 0, ← aggregate 1]
+    | .abortsUpsertAll => mkAppM ``VerexIR.Maps.AbortsUpsertAll #[← aggregate 1, ← aggregate 2]
+    | .abortsAppendDisjoint =>
+        mkAppM ``VerexIR.Maps.AbortsAppendDisjoint #[← map, ← model.read (← aggregate 1)]
+    | .abortsTrim => mkAppM ``LT.lt #[← size, ← translate context (← operand 1)]
+    | .abortsReplaceKeyInplace =>
         mkAppM ``VerexIR.Maps.AbortsReplaceKey
           #[model.layout, model.discipline, ← map, ← value 1, ← value 2]
-    | "map_spec_aborts_iter_borrow_mut" =>
+    | .abortsIterBorrowMut =>
         let some iteratorType := arguments[0]?.bind (typeOfExpr? context)
           | throwError "an iterator operand has an unknown type"
-        let some (iteratorOwner, variant) := iteratorPosition? context.unit iteratorType
-          | throwError "an iterator of an intrinsic map has no position variant"
-        mkAppM ``Not #[← iteratorInRange iteratorOwner variant (← aggregate 0) (← aggregate 1)]
-    | _ => throwError m!"the intrinsic map role `{role}` is not carried"
+        let some iterator := iteratorModel? context.unit iteratorType
+          | throwError "an iterator of an intrinsic map has no key or position variant"
+        mkAppM ``Not #[← iteratorInRange iterator (← aggregate 0) (← aggregate 1)]
+    -- Iterator validity (`designs/ghost-fields.md`, "Validity slots"): an
+    -- iterator is valid at a map whose validity slot it carries; two map
+    -- states preserve iterators where their slots agree.
+    | .iterPreserved =>
+        let some ownerType := arguments[0]?.bind (typeOfExpr? context)
+          | throwError "a map operand has an unknown type"
+        mkEq (← ownerValiditySlot context model ownerType (← aggregate 0))
+          (← ownerValiditySlot context model ownerType (← aggregate 1))
+    | .iterValid | .leafIterValid =>
+        let some iteratorType := arguments[0]?.bind (typeOfExpr? context)
+          | throwError "an iterator operand has an unknown type"
+        let some ownerType := arguments[1]?.bind (typeOfExpr? context)
+          | throwError "a map operand has an unknown type"
+        mkEq (← iteratorValiditySlot context iteratorType (← aggregate 0))
+          (← ownerValiditySlot context model ownerType (← aggregate 1))
+    | .abortsNewWithConfig | .leafOffset =>
+        throwError m!"the intrinsic map role `{role.name}` is not carried"
   /-- The bounds the integer parameters of a bundle carry by their Move
   types, in the form `SpecInt.unsigned_bounds`/`signed_bounds` state them;
   `none` when no parameter is bounded. -/
@@ -2477,7 +2668,7 @@ where
     let mut values : Array Lean.Expr := #[]
     for (argument, domain) in arguments.zip domains do
       let value ← match domain with
-        | .boolean => mkDecide (← translate context argument)
+        | .boolean => decideProposition (← translate context argument)
         | .aggregate => runtimeOperand argument
         | .integer | .text _ => translate context argument
       values := values.push value
@@ -2800,7 +2991,7 @@ where
             | throwError "specification function parameter has an unknown type"
           let value ← translate context argument
           let value ← match domainOf parameterType with
-            | .boolean => mkDecide value
+            | .boolean => decideProposition value
             | _ => pure value
           targetLocals := targetLocals.set! index (some value)
           values := values.push value
@@ -2974,6 +3165,34 @@ where
               generated contracts"
         let selected ← aggregateField (← runtimeAggregate base) (toExpr index)
         (domainOf ty).ofAggregate selected
+    -- A ghost field's slot follows the declared fields; it reads as its
+    -- contents (`designs/ghost-fields.md`).
+    | .data (.selectGhost reference field) =>
+        let some base := arguments[0]?
+          | throwError "a ghost field selection expects one operand"
+        let handle ← structHandleOf context reference
+        let some owner := context.unit.namespaces[handle.namespaceId.index]?
+          | throwError "a ghost field selection has no owner namespace"
+        let some declaration := owner.structs[handle.structId]?
+          | throwError "a ghost field selection has no owner declaration"
+        let aggregate ← runtimeAggregate base
+        let selected ← if declaration.variants.isEmpty then
+            let some index :=
+                VerexIR.SemanticOperations.handleGhostIndex? context.unit handle none field
+              | throwError "ghost field `{field}` does not resolve in generated contracts"
+            aggregateField aggregate (toExpr index)
+          else
+            -- Each variant's slot follows its own fields.
+            let some choices := declaration.variants.toList.mapM fun (variant : VerexIR.VariantDecl) => do
+                let named : VerexIR.QualifiedName ← owner.tables.names[variant.name.index]?
+                let name := named.name
+                let index ← VerexIR.SemanticOperations.handleGhostIndex? context.unit handle
+                  (some name) field
+                some (name, index)
+              | throwError "ghost field `{field}` does not resolve in generated contracts"
+            mkAppM ``VerexSL.Contract.selectVariantField
+              #[aggregate, toExpr handle, toExpr choices.toArray]
+        (domainOf ty).ofAggregate (← mkAppM ``VerexSL.Contract.ghostContents #[selected])
     | .data (.selectVariants reference fields) =>
         let some base := arguments[0]?
           | throwError "a variant field selection expects one operand"
@@ -3022,7 +3241,18 @@ where
           | none => pure (mkApp (mkConst ``Option.none [Lean.Level.zero])
               (mkConst ``String))
         let operands ← arguments.mapM logicalOperand
-        aggregateConstructor ``RuntimeValue.nominal #[toExpr handle, variant] operands
+        -- A value a specification builds carries its type's ghost slots, their
+        -- contents unspecified (`designs/ghost-fields.md`).
+        let ghosts ← match context.unit.namespaces[handle.namespaceId.index]?.bind
+            (·.structs[handle.structId]?) with
+          | some declaration => declaration.ghosts.mapM fun ghost => do
+              let some slot := VerexIR.Proofs.Denote.ntyOf context.unit handle.namespaceId
+                  ghost.type.typeId
+                | throwError "a ghost field's type has no native type"
+              return mkApp (mkConst ``RuntimeValue.ghost)
+                (mkApp (mkConst ``VerexSL.Contract.unspecifiedGhostContents) (← quoteNTy slot))
+          | none => pure #[]
+        aggregateConstructor ``RuntimeValue.nominal #[toExpr handle, variant] (operands ++ ghosts)
     | .reference .dereference =>
         -- Specifications see through references: the accessors read a
         -- borrow's content, so a dereference is the operand itself.
@@ -3078,18 +3308,21 @@ where
 state labels. -/
   translateBehavior (kind : VerexIR.BehaviorKind) (range : VerexIR.MemoryRange)
       (arguments : Array ExprId) (ty : IrTy) : MetaM Lean.Expr := do
-    let (executable, callableValue, inputValues, pre, mutable?) ←
+    let (executable, callableValue, inputValues, pre, mutable?, model?) ←
       translateInvocation context range arguments
     let post ← match range.post with
       | some label => (·.memory) <$> context.labelState label
       | none => currentState
     match kind with
     | .abortsOf =>
-        match mutable? with
-        | some (mutable, _, _) =>
+        match mutable?, model? with
+        | _, some (leading, row, shape) =>
+            pure (modelPredicate ``VerexIR.Proofs.AbortsOfAt leading
+              #[row, shape, callableValue, inputValues, pre])
+        | some (mutable, _, _), none =>
             mkAppM ``VerexIR.Proofs.AbortsOfMut
               #[executable, callableValue, mutable, inputValues, pre]
-        | none => mkAppM ``VerexIR.Proofs.AbortsOf #[executable, callableValue, inputValues, pre]
+        | none, none => mkAppM ``VerexIR.Proofs.AbortsOf #[executable, callableValue, inputValues, pre]
     | .ensuresOf =>
         let some callableExpression := context.ns.expressions[arguments[0]!.index]?
           | throwError "a behavioral predicate's function value is out of range"
@@ -3100,8 +3333,13 @@ state labels. -/
         | none =>
             let results ← mkArrayLit (mkConst ``VerexIR.RuntimeValue)
               (← outputs.toList.mapM runtimeOperand)
-            mkAppM ``VerexIR.Proofs.EnsuresOf
-              #[executable, callableValue, inputValues, results, pre, post]
+            match model? with
+            | some (leading, row, shape) =>
+                pure (modelPredicate ``VerexIR.Proofs.EnsuresOfAt leading
+                  #[row, shape, callableValue, inputValues, results, pre, post])
+            | none =>
+                mkAppM ``VerexIR.Proofs.EnsuresOf
+                  #[executable, callableValue, inputValues, results, pre, post]
         | some (mutable, mutableResults, count) =>
             -- The declared results, then each mutable reference's final value,
             -- read at the post-state.
@@ -3118,11 +3356,14 @@ state labels. -/
               #[executable, callableValue, mutable, mutableResults, inputValues, results,
                 finalValues, pre, post]
     | .resultOf =>
-        let results ← match mutable? with
-          | some (mutable, mutableResults, _) =>
+        let results ← match mutable?, model? with
+          | _, some (leading, row, shape) =>
+              pure (modelPredicate ``VerexIR.Proofs.ResultOfAt leading
+                #[row, shape, callableValue, inputValues, pre])
+          | some (mutable, mutableResults, _), none =>
               mkAppM ``VerexIR.Proofs.ResultOfMut
                 #[executable, callableValue, mutable, mutableResults, inputValues, pre]
-          | none =>
+          | none, none =>
               mkAppM ``VerexIR.Proofs.ResultOf #[executable, callableValue, inputValues, pre]
         (domainOf ty).ofRuntime (← mkAppM ``VerexIR.SemanticOperations.packResults #[results])
     | .requiresOf =>
@@ -3218,6 +3459,7 @@ state labels. -/
         let some operandTy := arguments[0]?.bind (typeOfExpr? context)
           | throwError "an equality operand has an unknown type"
         if operandTy == VerexIR.Ty.bool then mkAppM ``Iff #[l, r]
+        else if let some same ← ownerSameness? context operandTy l r then pure same
         else if let some (l, r) ← identityOperands context left l r then mkAppM ``Eq #[l, r]
         else mkAppM ``Eq #[l, r]
     | .notEqual =>
@@ -3231,6 +3473,7 @@ state labels. -/
           | throwError "an inequality operand has an unknown type"
         if operandTy == VerexIR.Ty.bool then
           mkAppM ``Not #[← mkAppM ``Iff #[l, r]]
+        else if let some same ← ownerSameness? context operandTy l r then mkAppM ``Not #[same]
         else if let some (l, r) ← identityOperands context left l r then mkAppM ``Ne #[l, r]
         else mkAppM ``Ne #[l, r]
     | .logicalAnd => let (l, r) ← binary arguments; mkAppM ``And #[l, r]
@@ -4138,7 +4381,7 @@ private def bindLets (context : Context) (lets : Array ContractLet) (post : Bool
       throwError "the contract binding `{binding.name}` has no local"
     let value ← translate reading binding.value
     let value ← match context.localTypes[index]?.map domainOf with
-      | some .boolean => mkDecide value
+      | some .boolean => decideProposition value
       | _ => pure value
     context := { context with
       locals := context.locals.set! index (some value)
@@ -4213,22 +4456,13 @@ private partial def Scoped.valueRep? (unit : ValidatedUnit) (twins : Array SpecT
         (·.substitute (arguments.map (Scoped.valueRep? unit twins profile)))
 
 /-- The type of the values an intrinsic map holds, as a use under the owner's
-arguments: a table's second type argument, or the second field of an entries
-layout's entry. -/
+arguments: its second type argument. -/
 private def mapValueType? (unit : ValidatedUnit) (declaration : VerexIR.StructDecl)
     (arguments : Array Scoped) : Option (IrTy × Array Scoped) := do
-  if (mapModel? unit (.nominal declaration.name #[])).any (·.table) then
-    let valueArgument ← arguments[1]?
-    let .mk id scope := valueArgument
-    return ← Scoped.resolve unit scope id
-  let [(_, fields)] := (fieldRows unit declaration).toList | none
-  let [field] := fields.toList | none
-  let (.vector element _, scope) ← Scoped.resolve unit arguments field.type.typeId | none
-  let (entryType, scope) ← Scoped.resolve unit scope element
-  let .nominal _ uses := entryType | none
-  let (_, _, entry) ← nominalDeclaration? unit entryType
-  let valueField ← entry.fields[1]?
-  Scoped.resolve unit (Scoped.ofNominal scope uses) valueField.type.typeId
+  guard (mapModel? unit (.nominal declaration.name #[])).isSome
+  let valueArgument ← arguments[1]?
+  let .mk id scope := valueArgument
+  Scoped.resolve unit scope id
 
 /-- Whether values of a type carry a data invariant at any depth: one it
 declares, the representation invariant of an intrinsic map, or one of a
@@ -4302,6 +4536,59 @@ def signatureInvariantsReadUnit (unit : ValidatedUnit) (ns : ValidatedNamespace)
   declaration.signature.parameters.any (carries ·.typeUse.typeId) ||
     declaration.signature.results.any (carries ·.typeId)
 
+/-- The field, `this`, and ghost binders shared by a nominal declaration's
+invariants and ghost initializers. An enum has no payload field locals. -/
+private def declarationLocalValues (unit : ValidatedUnit) (owner : VerexIR.StructHandle)
+    (ns : ValidatedNamespace) (declaration : VerexIR.StructDecl)
+    (localTypes : Array IrTy) (value : Lean.Expr) : MetaM (Array (Option Lean.Expr)) := do
+  let mut locals := Array.replicate declaration.locals.size none
+  if declaration.variants.isEmpty then
+    unless declaration.fields.size <= declaration.locals.size do
+      throwError "a struct invariant has fewer declaration locals than fields"
+    for (_, index) in declaration.fields.zipIdx do
+      let some localType := localTypes[index]?
+        | throwError "a struct invariant field local is out of range"
+      let selected ← mkAppM ``VerexIR.RuntimeValue.field #[value, toExpr index]
+      locals := locals.set! index
+        (some (← (domainOf localType).binderOfRuntime selected))
+    -- The whole value, after the fields.
+    if (declaration.locals[declaration.fields.size]?).any (·.name == "this") then
+      locals := locals.set! declaration.fields.size (some value)
+    -- A ghost field's local, its slot's contents.
+    for ghost in declaration.ghosts do
+      let some ghostName := ns.tables.names[ghost.name.index]? | continue
+      let some position := declaration.locals.findIdx? (·.name == ghostName.name) | continue
+      let some slot := VerexIR.SemanticOperations.handleGhostIndex? unit owner none
+          ghostName.name
+        | throwError "ghost field `{ghostName.name}` does not resolve in a data invariant"
+      let some localType := localTypes[position]?
+        | throwError "a data invariant's ghost local is out of range"
+      let contents ← mkAppM ``VerexSL.Contract.ghostContents
+        #[← mkAppM ``VerexIR.RuntimeValue.field #[value, toExpr slot]]
+      locals := locals.set! position (some (← (domainOf localType).binderOfRuntime contents))
+  else
+    unless !declaration.locals.isEmpty do
+      throwError "an enum invariant has no `this` declaration local"
+    locals := locals.set! 0 (some value)
+    -- A ghost field's local, its slot's contents: each variant's slot
+    -- follows its own fields.
+    for ghost in declaration.ghosts do
+      let some ghostName := ns.tables.names[ghost.name.index]? | continue
+      let some position := declaration.locals.findIdx? (·.name == ghostName.name) | continue
+      let some choices := declaration.variants.toList.mapM fun (variant : VerexIR.VariantDecl) => do
+          let named : VerexIR.QualifiedName ← ns.tables.names[variant.name.index]?
+          let index ← VerexIR.SemanticOperations.handleGhostIndex? unit owner
+            (some named.name) ghostName.name
+          some (named.name, index)
+        | throwError "ghost field `{ghostName.name}` does not resolve in a data invariant"
+      let some localType := localTypes[position]?
+        | throwError "a data invariant's ghost local is out of range"
+      let contents ← mkAppM ``VerexSL.Contract.ghostContents
+        #[← mkAppM ``VerexSL.Contract.selectVariantField
+          #[value, toExpr owner, toExpr choices.toArray]]
+      locals := locals.set! position (some (← (domainOf localType).binderOfRuntime contents))
+  return locals
+
 /-- Specialize every invariant declared by `ty` to its erased runtime value.
 Struct invariant locals are the fields in declaration order; enum invariants
 receive the whole tagged value as local zero and bind payloads in their own
@@ -4325,23 +4612,7 @@ private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Arra
     let some argumentType := argument.bindingType? context.unit
       | throwError "a data invariant's type argument is out of range"
     pure (argumentType, Scoped.valueRep? context.unit context.twins ns.profile argument)
-  let mut locals := Array.replicate declaration.locals.size none
-  if declaration.variants.isEmpty then
-    unless declaration.fields.size <= declaration.locals.size do
-      throwError "a struct invariant has fewer declaration locals than fields"
-    for (_, index) in declaration.fields.zipIdx do
-      let some localType := localTypes[index]?
-        | throwError "a struct invariant field local is out of range"
-      let selected ← mkAppM ``VerexIR.RuntimeValue.field #[value, toExpr index]
-      locals := locals.set! index
-        (some (← (domainOf localType).binderOfRuntime selected))
-    -- The whole value, after the fields.
-    if (declaration.locals[declaration.fields.size]?).any (·.name == "this") then
-      locals := locals.set! declaration.fields.size (some value)
-  else
-    unless !declaration.locals.isEmpty do
-      throwError "an enum invariant has no `this` declaration local"
-    locals := locals.set! 0 (some value)
+  let locals ← declarationLocalValues context.unit owner ns declaration localTypes value
   let invariantContext : Context := {
     context with
     namespaceId, ns, locals, localTypes, oldLocals := locals
@@ -4465,9 +4736,16 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
   let skolems ← context.frame
   let unitExpr ← context.unitExpr
   let row ← quoteRow parameters
+  -- Over a model, the frame is of the model's invocations.
+  let invoke? ← modelInvoke? executable skolems
   let some frame := declaration.contract.parameterFrames.find? (·.parameter.index == index)
-    | mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.EncodedKeepsMemory)
-        unitExpr executable skolems) #[row, value]
+    | match invoke? with
+      | some invoke =>
+          mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.EncodedKeepsMemoryOf) unitExpr skolems invoke)
+            #[row, value]
+      | none =>
+          mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.EncodedKeepsMemory)
+            unitExpr executable skolems) #[row, value]
   if frame.modifiesAll then return mkConst ``True
   let some ns := context.unit.namespaces[owner.index]?
     | throwError "a field frame's namespace is out of range"
@@ -4508,8 +4786,13 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
           oldLocals := active.oldLocals.set! formal.index (some binder) }
       let slots ← frame.modifies.mapM (modifiedSlotTerm active)
       mkLambdaFVars #[invocation, pre, post] (← slotFrame pre post slots false)
-  mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.EncodedFramed)
-    unitExpr executable skolems) #[row, frameTerm, value]
+  match invoke? with
+  | some invoke =>
+      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.EncodedFramedOf) unitExpr skolems invoke)
+        #[row, frameTerm, value]
+  | none =>
+      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.EncodedFramed)
+        unitExpr executable skolems) #[row, frameTerm, value]
 
 /-- The data invariants of a value of a type, at any depth, as the Move
 Prover assumes them: the type's declared invariants; for an intrinsic map,
@@ -4546,13 +4829,14 @@ private partial def deepInvariantTerms (context : Context) (ty : IrTy) (argument
       if let some model := mapModel? context.unit ty then
         let some intrinsic := ns.intrinsics.find? (·.owner == declaration.name) | return terms
         let range := locRange context.unit intrinsic.loc
-        terms := terms.push (← mkAppM ``VerexIR.Maps.Valid #[model.discipline, value], range)
+        let map ← model.read value
+        terms := terms.push (← mkAppM ``VerexIR.Maps.Valid #[model.discipline, map], range)
         if let some (valueType, valueScope) := mapValueType? context.unit declaration scope then
           let stored ← withLocalDeclD `key (mkConst ``RuntimeValue) fun key => do
-            let held ← mkAppM ``VerexIR.Maps.valueAt #[value, key]
+            let held ← mkAppM ``VerexIR.Maps.valueAt #[map, key]
             let inner ← deepInvariantTerms context valueType valueScope held (depth + 1)
             let some (_, range) := inner[0]? | return none
-            let present ← mkEq (← mkAppM ``VerexIR.Maps.hasKey #[value, key]) (mkConst ``Bool.true)
+            let present ← mkEq (← mkAppM ``VerexIR.Maps.hasKey #[map, key]) (mkConst ``Bool.true)
             let body ← mkArrow present (← conjunction (inner.map (·.1)))
             return some (← mkForallFVars #[key] body, range)
           if let some term := stored then terms := terms.push term
@@ -4993,7 +5277,7 @@ def storedInvariantTerm (unit : ValidatedUnit) (twins : Array SpecTypes.TwinInfo
       unless hasDataInvariant unit ty do continue
       let case? : Option Lean.Expr ⊕ String ←
           withLocalDeclD `unit (mkConst ``ValidatedUnit) fun memoryUnit =>
-          withLocalDeclD `executable (executableType memoryUnit) fun executable =>
+          withLocalDeclD `executable (unitReaderType unit memoryUnit) fun executable =>
           withLocalDeclD `value (mkConst ``RuntimeValue) fun value => do
         let leading := if readsUnit then #[memoryUnit, executable] else #[memoryUnit]
         -- The runtime frame, spelled as every contract spells its frame, so
@@ -5090,6 +5374,46 @@ def valueDataInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceI
     oldState := some state, twins, executable }
   conjunction ((← dataInvariantTerms context ty value).map fun (clause, range) =>
     markObligation range clause)
+
+/-- The runtime value a specification expression denotes over a function's
+locals and state: what an `update` writes (`designs/ghost-fields.md`). A read
+under `old` has no binder here. -/
+def translateUpdateValue (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace) (expression : ExprId)
+    (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (codecs types : Option Lean.Expr)
+    (localNames : Array String) (twins : Array SpecTypes.TwinInfo) (state : Lean.Expr)
+    (executable : Option Lean.Expr) : MetaM Lean.Expr := do
+  let context : Context := {
+    unit, namespaceId, ns, locals, oldLocals := locals.map fun _ => none, localTypes,
+    localNames, results := #[], codecs, types, state := some state, twins, executable }
+  translateRuntimeOperand context expression
+
+/-- The runtime value a ghost field's initializer gives a value packed at a
+nominal type, over the packed value's fields (its runtime encoding) and the
+state (`designs/ghost-fields.md`). -/
+def translateGhostInitializer (unit : ValidatedUnit) (codecs types : Option Lean.Expr)
+    (twins : Array SpecTypes.TwinInfo) (ty : IrTy) (_variant : Option String)
+    (initializer : ExprId) (value state : Lean.Expr) (executable : Option Lean.Expr) :
+    MetaM Lean.Expr := do
+  let some (owner, ns, declaration) := nominalDeclaration? unit ty
+    | throwError "a ghost initializer's type is not a declared nominal"
+  let .nominal _ uses := ty | throwError "a ghost initializer's type is not a declared nominal"
+  let scope := Scoped.ofNominal #[] uses
+  let localTypes ← declaration.locals.mapM fun localDecl => do
+    let some localType := (Scoped.mk localDecl.type.typeId scope).bindingType? unit
+      | throwError "a ghost initializer's local type is out of range"
+    pure localType
+  let typeArgumentTypes := scope.map (Scoped.toNative? unit owner.namespaceId)
+  let typeArguments ← scope.mapM fun argument => do
+    let some argumentType := argument.bindingType? unit
+      | throwError "a ghost initializer's type argument is out of range"
+    pure (argumentType, Scoped.valueRep? unit twins ns.profile argument)
+  let locals ← declarationLocalValues unit owner ns declaration localTypes value
+  let context : Context := {
+    unit, namespaceId := owner.namespaceId, ns, locals, oldLocals := locals.map fun _ => none,
+    localTypes, results := #[], codecs, types, state := some state, twins, executable,
+    typeArguments, typeArgumentTypes }
+  translateRuntimeOperand context initializer
 
 /-- Whether a quoted native row holds only scalars and type parameters, and
 at least one type parameter: a row an unseen invocation is decided at only
@@ -5550,8 +5874,8 @@ private def orderResult (context : Context)
   mkEq resultBinders.entry (← orderingValue context resultSlot.physical order)
 
 /-- The executable role a function plays for an intrinsic map of its
-namespace, with the map's model. -/
-def mapRoleOf? (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+namespace with a carried model, by the name its binding declares. -/
+def mapRoleName? (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Option String := do
   let target : VerexIR.QualifiedRef := { namespaceId, name := declaration.name }
@@ -5560,6 +5884,62 @@ def mapRoleOf? (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let binding ← intrinsic.executableBindings.find? (·.target == target)
   guard (mapModel? unit (.nominal intrinsic.owner #[])).isSome
   pure binding.role
+
+/-- The executable role a function plays for an intrinsic map of its
+namespace with a carried model. -/
+def mapRoleOf? (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Option VerexIR.MapOperation :=
+  (mapRoleName? unit namespaceId ns declaration).bind VerexIR.MapOperation.ofName?
+
+/-- The intrinsic map owner whose representation a function's body reads:
+the owner it constructs or destructures, whose declared fields or variants
+it selects, tests, or updates, or through whose field a place of the body
+projects; a table's declared fields are its abstract value's leading fields,
+so a table is no such owner. In verification an owner is its abstract map
+(`designs/intrinsic-maps.md`, "Abstract representation"): such a body has
+no denotation, so the function is used through its specification. Only the
+owner's module can read its representation, by Move's visibility, which the
+frontend enforces. -/
+def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Option VerexIR.QualifiedRef := Id.run do
+  let .structured root := declaration.body | return none
+  -- A table's declared fields are the leading fields of its abstract value.
+  let owner? (reference : VerexIR.QualifiedRef) : Option VerexIR.QualifiedRef := do
+    let ownerNs ← unit.namespaces[reference.namespaceId.index]?
+    let structId ← ownerNs.structs.findIdx? (·.name == reference.name)
+    let layout ← VerexIR.Validation.ownerLayout? unit reference.namespaceId structId
+    guard (!(layout.shape matches .table _))
+    some reference
+  let rec placeOwner? (placeId : VerexIR.PlaceId) (fuel : Nat) : Option VerexIR.QualifiedRef :=
+    match fuel, ns.places[placeId.index]? with
+    | 0, _ | _, none | _ + 1, some (.localVar _) => none
+    | fuel + 1, some (.field base reference _) | fuel + 1, some (.ghostField base reference _) =>
+        owner? reference <|> placeOwner? base fuel
+    | fuel + 1, some (.deref base) | fuel + 1, some (.index base _)
+    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+        placeOwner? base fuel
+  let mut pending := #[root]
+  let mut visited : Array Nat := #[]
+  while let some id := pending.back? do
+    pending := pending.pop
+    if visited.contains id.index then continue
+    visited := visited.push id.index
+    let some expression := ns.expressions[id.index]? | continue
+    if let .operation operation .. := expression.kind then
+      let read := match operation with
+        | .call (.constructor reference _) | .call (.destructor reference _) => owner? reference
+        | .data (.select reference _) | .data (.selectGhost reference _)
+        | .data (.selectVariants reference _) | .data (.testVariants reference _)
+        | .data (.discriminant reference) | .data (.updateField reference _) => owner? reference
+        | .move place | .copy place | .borrow _ place | .read place | .write place
+        | .drop place => placeOwner? place ns.places.size
+        | _ => none
+      if let some owner := read then return some owner
+    pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
+  return none
 
 /-- The model of the map a role function's namespace owns. -/
 private def mapRoleModel (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
@@ -5581,7 +5961,7 @@ def allocatesTables (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
   let allocator (namespaceId : VerexIR.NamespaceId) (ns : ValidatedNamespace)
       (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
-    mapRoleOf? unit namespaceId ns declaration == some "map_new" &&
+    mapRoleOf? unit namespaceId ns declaration == some .new_ &&
       (Id.run do
         let target : VerexIR.QualifiedRef := { namespaceId, name := declaration.name }
         let some intrinsic := ns.intrinsics.find? fun intrinsic =>
@@ -5606,21 +5986,27 @@ private def slotRuntime (slot : Slot) (binder : Lean.Expr) : MetaM Lean.Expr := 
   if (← whnfR (← inferType binder)).isConstOf ``RuntimeValue then return binder
   (domainOf slot.physical).encode binder
 
-/-- The value of the `Option` result type at an optional runtime value: its
-one vector field holds the value or nothing. -/
+/-- An optional map result in its declared vector or enum representation. -/
 private def optionValue (context : Context) (ty : IrTy) (value : Option Lean.Expr) :
     MetaM Lean.Expr := do
-  let some (owner, _, _) := nominalDeclaration? context.unit ty
+  let some (owner, ns, declaration) := nominalDeclaration? context.unit ty
     | throwError "an optional map result is not an `Option`"
+  let some layout := VerexIR.SemanticOperations.optionalLayout? ns declaration
+    | throwError "an optional map result must be a vector wrapper or an enum with empty and single-field variants"
   let elements ← mkArrayLit (mkConst ``RuntimeValue) value.toList
-  let vector ← mkAppM ``RuntimeValue.vector #[elements]
+  let (variant, fields) ← match layout with
+    | .vector => do
+        let vector ← mkAppM ``RuntimeValue.vector #[elements]
+        pure (none, ← mkArrayLit (mkConst ``RuntimeValue) [vector])
+    | .variants empty present =>
+        pure (some (if value.isSome then present else empty), elements)
   mkAppM ``RuntimeValue.nominal
-    #[toExpr owner, toExpr (none : Option String), ← mkArrayLit (mkConst ``RuntimeValue) [vector]]
+    #[toExpr owner, toExpr variant, fields]
 
 /-- The runtime values of a role's parameters at entry, and of its map at
 exit, with the model terms the roles share. -/
 private structure RoleOperands where
-  role : String
+  role : VerexIR.MapOperation
   model : MapModel
   slots : Array Slot
   bound : Array SlotBinders
@@ -5629,7 +6015,7 @@ namespace RoleOperands
 
 private def parameter (operands : RoleOperands) (index : Nat) : MetaM (Slot × SlotBinders) := do
   let (some slot, some binders) := (operands.slots[index]?, operands.bound[index]?)
-    | throwError m!"the intrinsic map role `{operands.role}` lacks parameter {index}"
+    | throwError m!"the intrinsic map role `{operands.role.name}` lacks parameter {index}"
   pure (slot, binders)
 
 /-- A parameter's runtime value at entry. -/
@@ -5645,7 +6031,7 @@ private def clause (operands : RoleOperands) (index : Nat) : MetaM Lean.Expr := 
 private def exit (operands : RoleOperands) (index : Nat) : MetaM Lean.Expr := do
   let (slot, binders) ← operands.parameter index
   let some exit := binders.exit
-    | throwError m!"the intrinsic map role `{operands.role}` does not mutate parameter {index}"
+    | throwError m!"the intrinsic map role `{operands.role.name}` does not mutate parameter {index}"
   slotRuntime slot exit
 
 private def size (map : Lean.Expr) : MetaM Lean.Expr :=
@@ -5659,8 +6045,8 @@ private def empty (map : Lean.Expr) : MetaM Lean.Expr := do
 
 /-- The key an enumerating role reads: the first, or the last. -/
 private def endKey (operands : RoleOperands) (map : Lean.Expr) : MetaM Lean.Expr := do
-  let front := operands.role == "map_borrow_front" || operands.role == "map_front_key" ||
-    operands.role == "map_pop_front"
+  let front := operands.role == .borrowFront || operands.role == .frontKey ||
+    operands.role == .popFront
   let position ← if front then pure (mkIntLit 0)
     else mkAppM ``HSub.hSub #[← size map, mkIntLit 1]
   mkAppM ``VerexIR.Maps.keyAt #[map, position]
@@ -5671,44 +6057,56 @@ end RoleOperands
 (`designs/intrinsic-maps.md`, "Roles"), `none` when it never aborts. -/
 private def mapRoleAborts (context : Context) (operands : RoleOperands) :
     MetaM (Option Lean.Expr) := do
-  let map := operands.entry 0
+  let map := do operands.model.read (← operands.entry 0)
   let absent : MetaM Lean.Expr := do
     mkEq (← RoleOperands.hasKey (← map) (← operands.entry 1)) (mkConst ``Bool.false)
   match operands.role with
-  | "map_borrow" | "map_borrow_mut" | "map_del_must_exist" | "map_del_return_key" =>
+  | .borrow | .borrowMut | .delMustExist | .delReturnKey =>
       return some (← absent)
-  | "map_add_no_override" =>
+  | .addNoOverride =>
       return some (← mkEq (← RoleOperands.hasKey (← map) (← operands.entry 1)) (mkConst ``Bool.true))
-  | "map_destroy_empty" => return some (← mkAppM ``Ne #[← RoleOperands.size (← map), mkIntLit 0])
-  | "map_borrow_front" | "map_borrow_back" | "map_front_key" | "map_back_key" | "map_pop_front"
-  | "map_pop_back" => return some (← RoleOperands.empty (← map))
-  | "map_new_from" =>
+  | .destroyEmpty => return some (← mkAppM ``Ne #[← RoleOperands.size (← map), mkIntLit 0])
+  | .borrowFront | .borrowBack | .frontKey | .backKey | .popFront
+  | .popBack => return some (← RoleOperands.empty (← map))
+  | .newFrom =>
       return some (← mkAppM ``VerexIR.Maps.AbortsNewFrom #[← operands.entry 0, ← operands.entry 1])
-  | "map_add_all" =>
+  | .addAll =>
       return some (← mkAppM ``VerexIR.Maps.AbortsAddAll
         #[← map, ← operands.entry 1, ← operands.entry 2])
-  | "map_upsert_all" =>
+  | .upsertAll =>
       return some (← mkAppM ``VerexIR.Maps.AbortsUpsertAll #[← operands.entry 1, ← operands.entry 2])
-  | "map_append_disjoint" =>
-      return some (← mkAppM ``VerexIR.Maps.AbortsAppendDisjoint #[← map, ← operands.entry 1])
-  | "map_trim" => return some (← mkAppM ``LT.lt #[← RoleOperands.size (← map), ← operands.clause 1])
-  | "map_replace_key_inplace" =>
+  | .appendDisjoint =>
+      return some (← mkAppM ``VerexIR.Maps.AbortsAppendDisjoint
+        #[← map, ← operands.model.read (← operands.entry 1)])
+  | .trim => return some (← mkAppM ``LT.lt #[← RoleOperands.size (← map), ← operands.clause 1])
+  | .replaceKeyInplace =>
       return some (← mkAppM ``VerexIR.Maps.AbortsReplaceKey
         #[operands.model.layout, operands.model.discipline, ← map, ← operands.entry 1,
           ← operands.entry 2])
-  | "map_iter_borrow_mut" =>
+  | .iterBorrowMut =>
       let (iteratorSlot, _) ← operands.parameter 0
-      let some (owner, variant) := iteratorPosition? context.unit iteratorSlot.physical
-        | throwError "an iterator of an intrinsic map has no position variant"
-      return some (← mkAppM ``Not
-        #[← iteratorInRange owner variant (← operands.entry 0) (← operands.entry 1)])
-  | _ => return none
+      let some iterator := iteratorModel? context.unit iteratorSlot.physical
+        | throwError "an iterator of an intrinsic map has no key or position variant"
+      return some (← mkAppM ``Not #[← iteratorInRange iterator (← operands.entry 0)
+        (← operands.model.read (← operands.entry 1))])
+  | .newWithConfig =>
+      -- A nonzero degree outside its range.
+      let degree (index : Nat) (least : Int) : MetaM Lean.Expr := do
+        let value ← operands.clause index
+        mkAppM ``And #[← mkAppM ``Ne #[value, mkIntLit 0], ← mkAppM ``Or
+          #[← mkAppM ``LT.lt #[value, mkIntLit least], ← mkAppM ``LT.lt #[mkIntLit 4096, value]]]
+      return some (← mkAppM ``Or #[← degree 0 4, ← degree 1 3])
+  | .new_ | .len | .isEmpty | .hasKey | .borrowWithDefault | .get
+  | .borrowMutWithDefault | .addOverrideIfExists | .upsert
+  | .removeOrNone | .destroyUnchecked | .append | .prevKey
+  | .nextKey | .keys | .values | .toVecPair | .toOrderedMap =>
+      return none
 
 /-- The roles returning a mutable reference into the map, whose ensures state
 the map at the reference's final value. -/
-private def mapRoleReadsFinal (role : String) : Bool :=
-  role == "map_borrow_mut" || role == "map_borrow_mut_with_default" ||
-    role == "map_iter_borrow_mut"
+private def mapRoleReadsFinal (role : VerexIR.MapOperation) : Bool :=
+  role == .borrowMut || role == .borrowMutWithDefault ||
+    role == .iterBorrowMut
 
 /-- The result and effect clauses of an intrinsic map role, over the entry
 binders, the exit binders of a mutated map, and the result binders. A value
@@ -5721,7 +6119,7 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
   let role := operands.role
   let result : MetaM (Slot × Lean.Expr) := do
     let (some slot, some binders) := (resultSlots[0]?, resultBound[0]?)
-      | throwError m!"the intrinsic map role `{role}` lacks its result"
+      | throwError m!"the intrinsic map role `{role.name}` lacks its result"
     pure (slot, binders.entry)
   let observed (value : Lean.Expr) : MetaM Lean.Expr := do
     let (slot, binder) ← result
@@ -5731,7 +6129,8 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
     mkEq binder value
   let tuple (values : List Lean.Expr) : MetaM Lean.Expr := do
     mkAppM ``RuntimeValue.tuple #[← mkArrayLit (mkConst ``RuntimeValue) values]
-  let map := operands.entry 0
+  -- A wrapper's map is the table it holds, and a map it yields is wrapped.
+  let map := do model.read (← operands.entry 0)
   let key := operands.entry 1
   let valueAt (map key : Lean.Expr) : MetaM Lean.Expr := mkAppM ``VerexIR.Maps.valueAt #[map, key]
   let present : MetaM Lean.Expr := do
@@ -5740,7 +6139,30 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
     mkAppM ``VerexIR.Maps.update #[model.layout, model.discipline, map, key, value]
   let remove (map key : Lean.Expr) : MetaM Lean.Expr := do
     mkAppM ``VerexIR.Maps.remove #[model.layout, model.discipline, map, key]
-  let exitIs (value : Lean.Expr) : MetaM Lean.Expr := do mkEq (← operands.exit 0) value
+  let exitIs (value : Lean.Expr) : MetaM Lean.Expr := do
+    model.holds (← operands.exit 0) value
+  -- An owner with ghost slots: a map the role builds or structurally
+  -- mutates carries fresh slots, chosen by the role
+  -- (`designs/ghost-fields.md`, "Validity slots"); a value write keeps
+  -- them, as the model operations do.
+  let freshOf (model : MapModel) (value : Lean.Expr) (holds : Lean.Expr → MetaM Lean.Expr) :
+      MetaM Lean.Expr := do
+    unless model.ghosts > 0 do return ← holds value
+    let stampType ← mkArrow (mkConst ``Nat) (mkConst ``RuntimeValue)
+    withLocalDeclD `stamp stampType fun stamp => do
+      let restamped ← mkAppM ``VerexIR.Maps.Layout.restamp #[model.layout, value, stamp]
+      mkAppM ``Exists #[← mkLambdaFVars #[stamp] (← holds restamped)]
+  let fresh := freshOf model
+  let exitFresh (value : Lean.Expr) : MetaM Lean.Expr :=
+    fresh value fun value => do model.holds (← operands.exit 0) value
+  -- The slots kept where the key is present, fresh where the role inserts.
+  let exitKeptIf (present value : Lean.Expr) : MetaM Lean.Expr :=
+    fresh value fun restamped => do
+      model.holds (← operands.exit 0) (← mkAppOptM ``ite #[none, present, none, value, restamped])
+  let builtMap (map : Lean.Expr) : MetaM Lean.Expr :=
+    fresh map fun map => do
+      let (_, binder) ← result
+      model.holds binder map
   let optional (value : Option Lean.Expr) (condition : Option Lean.Expr) : MetaM Lean.Expr := do
     let (slot, binder) ← result
     let some_ ← optionValue context slot.physical value
@@ -5751,11 +6173,12 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
   let final : MetaM Lean.Expr := do
     let (slot, _) ← result
     let some (some final) := finals[0]?
-      | throwError m!"the intrinsic map role `{role}` returns no mutable reference"
+      | throwError m!"the intrinsic map role `{role.name}` returns no mutable reference"
     slotRuntime slot final
   match role with
-  | "map_new" =>
-      unless model.handle do return #[← built (← mkAppM ``VerexIR.Maps.empty #[model.layout])]
+  | .new_ | .newWithConfig =>
+      unless model.handle do
+        return #[← builtMap (← mkAppM ``VerexIR.Maps.empty #[model.layout])]
       -- A fresh handle: one the allocation history does not hold, which the
       -- allocation appends to it.
       let (_, binder) ← result
@@ -5767,9 +6190,11 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
       let historyKey := mkConst ``VerexIR.StorageKey.unit
       let history (memory : Lean.Expr) : Lean.Expr := mkApp2 memory allocation historyKey
       let clause ← withLocalDeclD `handle (mkConst ``String) fun handle => do
-        let built ← mkEq binder (← mkAppM ``VerexIR.Maps.Layout.build
-          #[model.layout, ← mkAppM ``RuntimeValue.address #[handle],
-            ← mkListLit (← mkAppM ``Prod #[mkConst ``RuntimeValue, mkConst ``RuntimeValue]) []])
+        let built ← fresh (← mkAppM ``VerexIR.Maps.Layout.build
+            #[model.layout, ← mkAppM ``RuntimeValue.address #[handle],
+              ← mkListLit (← mkAppM ``Prod #[mkConst ``RuntimeValue, mkConst ``RuntimeValue]) [],
+              ← mkAppM ``VerexIR.Maps.Layout.freshSlots #[model.layout]])
+          fun built => model.holds binder built
         let recorded ← withLocalDeclD `history (← mkAppM ``Array #[mkConst ``String])
             fun allocated => do
           let held ← mkEq (history entry) (← mkAppOptM ``Option.some #[none, allocated])
@@ -5779,86 +6204,105 @@ private def mapRoleEnsures (context : Context) (operands : RoleOperands)
           mkForallFVars #[allocated] (← mkArrow held (← mkAppM ``And #[fresh, appended]))
         mkLambdaFVars #[handle] (← mkAppM ``And #[built, recorded])
       return #[← mkAppM ``Exists #[clause]]
-  | "map_new_from" =>
-      return #[← built (← mkAppM ``VerexIR.Maps.updateAll #[model.layout, model.discipline,
-        ← mkAppM ``VerexIR.Maps.empty #[model.layout], ← operands.entry 0, ← operands.entry 1])]
-  | "map_len" =>
+  | .newFrom =>
+      return #[← builtMap (← mkAppM ``VerexIR.Maps.updateAll #[model.layout,
+        model.discipline, ← mkAppM ``VerexIR.Maps.empty #[model.layout], ← operands.entry 0,
+        ← operands.entry 1])]
+  | .len =>
       let (_, binder) ← result
       return #[← mkEq (← RoleOperands.size (← map)) binder]
-  | "map_is_empty" =>
+  | .isEmpty =>
       let (_, binder) ← result
       return #[← mkEq (← mkDecide (← RoleOperands.empty (← map))) binder]
-  | "map_has_key" =>
+  | .hasKey =>
       let (_, binder) ← result
       return #[← mkEq (← RoleOperands.hasKey (← map) (← key)) binder]
-  | "map_borrow" => return #[← observed (← valueAt (← map) (← key))]
-  | "map_borrow_with_default" =>
+  | .borrow => return #[← observed (← valueAt (← map) (← key))]
+  | .borrowWithDefault =>
       return #[← observed (← mkAppOptM ``ite
         #[none, ← present, none, ← valueAt (← map) (← key), ← operands.entry 2])]
-  | "map_get" => return #[← optional (some (← valueAt (← map) (← key))) (some (← present))]
-  | "map_borrow_mut" | "map_borrow_mut_with_default" =>
-      let current ← if role == "map_borrow_mut" then valueAt (← map) (← key)
-        else mkAppOptM ``ite #[none, ← present, none, ← valueAt (← map) (← key), ← operands.entry 2]
-      return #[← observed current, ← exitIs (← update (← map) (← key) (← final))]
-  | "map_iter_borrow_mut" =>
+  | .get => return #[← optional (some (← valueAt (← map) (← key))) (some (← present))]
+  | .borrowMut =>
+      return #[← observed (← valueAt (← map) (← key)),
+        ← exitIs (← update (← map) (← key) (← final))]
+  | .borrowMutWithDefault =>
+      let current ← mkAppOptM ``ite
+        #[none, ← present, none, ← valueAt (← map) (← key), ← operands.entry 2]
+      return #[← observed current, ← exitKeptIf (← present) (← update (← map) (← key) (← final))]
+  | .iterBorrowMut =>
       -- The iterator is parameter 0, the map parameter 1.
       let (iteratorSlot, _) ← operands.parameter 0
-      let some (owner, variant) := iteratorPosition? context.unit iteratorSlot.physical
-        | throwError "an iterator of an intrinsic map has no position variant"
-      let iteratorKey ← iteratorKey owner variant (← operands.entry 0) (← operands.entry 1)
-      return #[← observed (← valueAt (← operands.entry 1) iteratorKey),
-        ← mkEq (← operands.exit 1) (← update (← operands.entry 1) iteratorKey (← final))]
-  | "map_add_no_override" | "map_add_override_if_exists" =>
-      return #[← exitIs (← update (← map) (← key) (← operands.entry 2))]
-  | "map_upsert" =>
+      let some iterator := iteratorModel? context.unit iteratorSlot.physical
+        | throwError "an iterator of an intrinsic map has no key or position variant"
+      let iterated ← model.read (← operands.entry 1)
+      let iteratorKey ← iteratorKey iterator (← operands.entry 0) iterated
+      return #[← observed (← valueAt iterated iteratorKey),
+        ← model.holds (← operands.exit 1) (← update iterated iteratorKey (← final))]
+  | .addNoOverride =>
+      return #[← exitFresh (← update (← map) (← key) (← operands.entry 2))]
+  | .addOverrideIfExists =>
+      return #[← exitKeptIf (← present) (← update (← map) (← key) (← operands.entry 2))]
+  | .upsert =>
       return #[← optional (some (← valueAt (← map) (← key))) (some (← present)),
-        ← exitIs (← update (← map) (← key) (← operands.entry 2))]
-  | "map_del_must_exist" =>
-      return #[← observed (← valueAt (← map) (← key)), ← exitIs (← remove (← map) (← key))]
-  | "map_remove_or_none" =>
+        ← exitKeptIf (← present) (← update (← map) (← key) (← operands.entry 2))]
+  | .delMustExist =>
+      return #[← observed (← valueAt (← map) (← key)), ← exitFresh (← remove (← map) (← key))]
+  | .removeOrNone =>
       return #[← optional (some (← valueAt (← map) (← key))) (some (← present)),
-        ← exitIs (← remove (← map) (← key))]
-  | "map_del_return_key" =>
+        ← exitFresh (← remove (← map) (← key))]
+  | .delReturnKey =>
       return #[← built (← tuple [← key, ← valueAt (← map) (← key)]),
-        ← exitIs (← remove (← map) (← key))]
-  | "map_destroy_empty" => return #[]
-  | "map_add_all" | "map_upsert_all" =>
-      return #[← exitIs (← mkAppM ``VerexIR.Maps.updateAll #[model.layout, model.discipline, ← map,
-        ← operands.entry 1, ← operands.entry 2])]
-  | "map_append" | "map_append_disjoint" =>
-      let other ← operands.entry 1
-      return #[← exitIs (← mkAppM ``VerexIR.Maps.updateAll #[model.layout, model.discipline, ← map,
-        ← mkAppM ``VerexIR.Maps.keysOf #[other], ← mkAppM ``VerexIR.Maps.valuesOf #[other]])]
-  | "map_trim" =>
+        ← exitFresh (← remove (← map) (← key))]
+  | .destroyEmpty | .destroyUnchecked => return #[]
+  | .addAll | .upsertAll =>
+      return #[← exitFresh (← mkAppM ``VerexIR.Maps.updateAll #[model.layout, model.discipline,
+        ← map, ← operands.entry 1, ← operands.entry 2])]
+  | .append | .appendDisjoint =>
+      let other ← model.read (← operands.entry 1)
+      return #[← exitFresh (← mkAppM ``VerexIR.Maps.updateAll #[model.layout, model.discipline,
+        ← map, ← mkAppM ``VerexIR.Maps.keysOf #[other], ← mkAppM ``VerexIR.Maps.valuesOf #[other]])]
+  | .trim =>
       let count ← operands.clause 1
-      return #[← built (← mkAppM ``VerexIR.Maps.dropEntries #[model.layout, ← map, count]),
-        ← exitIs (← mkAppM ``VerexIR.Maps.takeEntries #[model.layout, ← map, count])]
-  | "map_replace_key_inplace" =>
-      return #[← exitIs (← mkAppM ``VerexIR.Maps.replaceKey
+      return #[← builtMap (← mkAppM ``VerexIR.Maps.dropEntries
+          #[model.layout, ← map, count]),
+        ← exitFresh (← mkAppM ``VerexIR.Maps.takeEntries #[model.layout, ← map, count])]
+  | .replaceKeyInplace =>
+      return #[← exitFresh (← mkAppM ``VerexIR.Maps.replaceKey
         #[model.layout, ← map, ← operands.entry 1, ← operands.entry 2])]
-  | "map_borrow_front" | "map_borrow_back" =>
+  | .borrowFront | .borrowBack =>
       let key ← operands.endKey (← map)
       return #[← built (← tuple [key, ← valueAt (← map) key])]
-  | "map_front_key" | "map_back_key" => return #[← observed (← operands.endKey (← map))]
-  | "map_pop_front" | "map_pop_back" =>
+  | .frontKey | .backKey => return #[← observed (← operands.endKey (← map))]
+  | .popFront | .popBack =>
       let key ← operands.endKey (← map)
-      return #[← built (← tuple [key, ← valueAt (← map) key]), ← exitIs (← remove (← map) key)]
-  | "map_prev_key" | "map_next_key" =>
+      return #[← built (← tuple [key, ← valueAt (← map) key]), ← exitFresh (← remove (← map) key)]
+  | .prevKey | .nextKey =>
       let some rank := model.rank?
-        | throwError m!"the intrinsic map role `{role}` needs an ordered map"
-      let neighbour ← mkAppM (if role == "map_prev_key" then ``VerexIR.Maps.prevKey?
+        | throwError m!"the intrinsic map role `{role.name}` needs an ordered map"
+      let neighbour ← mkAppM (if role == .prevKey then ``VerexIR.Maps.prevKey?
         else ``VerexIR.Maps.nextKey?) #[rank, ← map, ← key]
       let (slot, binder) ← result
       let none_ ← optionValue context slot.physical none
       let some_ ← withLocalDeclD `neighbour (mkConst ``RuntimeValue) fun neighbour => do
         mkLambdaFVars #[neighbour] (← optionValue context slot.physical (some neighbour))
       return #[← mkEq (← mkAppOptM ``Option.elim #[none, none, neighbour, none_, some_]) binder]
-  | "map_keys" => return #[← built (← mkAppM ``VerexIR.Maps.keysOf #[← map])]
-  | "map_values" => return #[← built (← mkAppM ``VerexIR.Maps.valuesOf #[← map])]
-  | "map_to_vec_pair" =>
+  | .keys => return #[← built (← mkAppM ``VerexIR.Maps.keysOf #[← map])]
+  | .values => return #[← built (← mkAppM ``VerexIR.Maps.valuesOf #[← map])]
+  | .toVecPair =>
       return #[← built (← tuple [← mkAppM ``VerexIR.Maps.keysOf #[← map],
         ← mkAppM ``VerexIR.Maps.valuesOf #[← map]])]
-  | _ => throwError m!"the intrinsic map role `{role}` is not carried"
+  | .toOrderedMap =>
+      -- The same entries, in the result's representation; a result with a
+      -- handle would be an allocation, which no conversion is.
+      let (slot, binder) ← result
+      let some resultModel := mapModel? context.unit slot.physical
+        | throwError m!"the result of `{role.name}` has no carried representation"
+      if resultModel.handle then
+        throwError m!"the result of `{role.name}` is a table, which no conversion allocates"
+      let entries ← mkAppM ``VerexIR.Maps.updateAll #[resultModel.layout, resultModel.discipline,
+        ← mkAppM ``VerexIR.Maps.empty #[resultModel.layout],
+        ← mkAppM ``VerexIR.Maps.keysOf #[← map], ← mkAppM ``VerexIR.Maps.valuesOf #[← map]]
+      return #[← freshOf resultModel entries fun entries => resultModel.holds binder entries]
 
 /-- Free state-label definitions, independent of clause order. Definitions
 under a quantifier are local to that quantifier. -/
@@ -5926,11 +6370,16 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     mkAppM ``VerexIR.Proofs.Denote.MemoryInvariants
       #[← storedInvariantAt unit invariant executable state, state]
   -- An intrinsic map role is read by the map model, not by its source
-  -- specification (`designs/intrinsic-maps.md`, "Roles").
-  let mapRole ← (mapRoleOf? unit namespaceId ns declaration).mapM fun role =>
+  -- specification (`designs/intrinsic-maps.md`, "Roles"), but for the
+  -- preconditions it declares, which its callers owe as the Move Prover
+  -- asserts them.
+  let mapRole ← (mapRoleName? unit namespaceId ns declaration).mapM fun name => do
+    let some role := VerexIR.MapOperation.ofName? name
+      | throwError m!"the intrinsic map role `{name}` is not carried"
     return (role, ← mapRoleModel unit namespaceId ns declaration)
-  let groups ← if mapRole.isSome then pure {}
-    else groupConditions unit declaration.contract.conditions
+  let declared ← groupConditions unit declaration.contract.conditions
+  let groups := if mapRole.isSome then { requires := declared.requires, lets := declared.lets }
+    else declared
   let invariantResources ← invariantModifiedResources ns declaration.contract
   -- A function's pragmas: its contract's, and those its module sets and its
   -- contract does not.
@@ -6014,8 +6463,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       let storedAssumed ← if assumesStored && storedInvariant.isSome then
           pure #[← memoryInvariants state] else pure #[]
       let signers ← signerFacts context parameterSlots bound (some ·.entry)
-      let hashes ← hashFacts context declaration parameterSlots bound
-      let serialized ← serializeFacts context declaration parameterSlots bound
+      -- What a body applying hashes and serialization assumes: a role's
+      -- meaning is the map model, which assumes none of it.
+      let (hashes, serialized) ← if mapRole.isSome then pure (#[], #[]) else
+        pure (← hashFacts context declaration parameterSlots bound,
+          ← serializeFacts context declaration parameterSlots bound)
       let body ← conjunction (clauses ++ dataInvariants.map (·.1) ++ invariants.map (·.1) ++
         storedAssumed ++ signers ++ hashes ++ serialized)
       mkLambdaFVars #[arguments, state] body
@@ -6205,12 +6657,17 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             if mentionsInvocableParameter invoked then
               conjuncts := conjuncts.push
                 (mkApp3 (mkConst ``VerexIR.Proofs.ScalarAt) unitExpr signature.skolems invoked)
+          -- Over a model, the frame is of the model's invocations.
+          let invoke? ← modelInvoke? executable signature.skolems
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>
-              conjuncts := conjuncts.push (← mkAppM'
-                  (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAt) unitExpr executable
-                    signature.skolems)
-                #[row, value])
+              conjuncts := conjuncts.push (← match invoke? with
+                | some invoke =>
+                    mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf) unitExpr
+                      signature.skolems invoke) #[row, value]
+                | none =>
+                    mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAt) unitExpr executable
+                      signature.skolems) #[row, value])
           | some frame =>
               -- The closed frame but for the targets, the formals bound to
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.
@@ -6233,10 +6690,13 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                           oldLocals := context.oldLocals.set! formal.index (some binder) }
                       let slots ← frame.modifies.mapM (modifiedSlotTerm context)
                       mkLambdaFVars #[invocation, pre, post] (← slotFrame pre post slots false)
-                conjuncts := conjuncts.push (← mkAppM'
-                    (mkApp3 (mkConst ``VerexIR.Proofs.FramedAt) unitExpr executable
-                      signature.skolems)
-                  #[row, frameTerm, value])
+                conjuncts := conjuncts.push (← match invoke? with
+                  | some invoke =>
+                      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAtOf) unitExpr
+                        signature.skolems invoke) #[row, frameTerm, value]
+                  | none =>
+                      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAt) unitExpr executable
+                        signature.skolems) #[row, frameTerm, value])
       mkLambdaFVars #[arguments, initial] (← conjunction conjuncts)
   mkAppOptM ``VerexIR.Proofs.Contract.mk
     #[some runtimeState, some failure, some argumentsType, some resultType,
@@ -6397,11 +6857,18 @@ def ensureUnitDefinition (namespaceSegments : Array String)
   unless loanErrors.isEmpty do
     throwError m!"the borrow analysis rejects the unit, so preparation refuses it:\n\
       {"\n".intercalate (loanErrors.toList.map fun d => s!"{d.code}: {d.message}")}"
+  -- Nor may execution preparation refuse it under every registry.
+  let refusals := VerexIR.Validation.executionRefusals unit
+  unless refusals.isEmpty do
+    throwError m!"execution preparation refuses the unit under every registry, so its \
+      theorems would be vacuous:\n\
+      {"\n".intercalate (refusals.toList.map fun d => s!"{d.code}: {d.message}")}"
+  let value ← VerexSL.Quote.quoteUnit unit
   liftTermElabM do
     addDecl (.defnDecl {
       name, levelParams := []
       type := mkConst ``VerexIR.Validation.ValidatedUnit
-      value := toExpr unit
+      value
       hints := .abbrev, safety := .safe })
     enableRealizationsForConst name
   return name

@@ -63,14 +63,26 @@ verify 0x42::state_label_decoding::caller
 /--
 error: the specification clause `ensures ..S |~ update<Counter>(addr, new Counter { value := 1 })` is not established
 ---
-error: verex verification failed: the automatic verification of `missing_label` failed; provide a proof: `verify missing_label by …` in the module (`verify missing_label by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `missing_label` failed; provide a proof in the module:
+  verify missing_label by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::state_label_decoding::missing_label
 /--
 error: the specification clause `ensures ..S |~ update<Counter>(addr, core.data.updateField(old(global<Counter>(addr)), value, old(global<Counter>(addr).value) + 1))` is not established
 ---
-error: verex verification failed: the automatic verification of `overflow_label` failed; provide a proof: `verify overflow_label by …` in the module (`verify overflow_label by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `overflow_label` failed; provide a proof in the module:
+  verify overflow_label by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::state_label_decoding::overflow_label

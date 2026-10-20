@@ -1,6 +1,6 @@
 {
   "schema": "move-xast-module",
-  "version": 10,
+  "version": 11,
   "address": "0x42",
   "address_alias": null,
   "name": "lemmas",

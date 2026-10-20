@@ -88,6 +88,12 @@ pub struct RocksdbOpt {
     max_background_jobs: i32,
     #[clap(long, hide(true), default_value_t = RocksdbConfigs::DEFAULT_BLOCK_CACHE_SIZE)]
     block_cache_size: usize,
+    #[clap(
+        long,
+        help = "Open native-position storage, so state snapshot restores bring positions along. \
+        Required for a DB a node will run with storage.rocksdb_configs.enable_trading_native."
+    )]
+    enable_trading_native: bool,
 }
 
 impl From<RocksdbOpt> for RocksdbConfigs {
@@ -119,6 +125,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 ..Default::default()
             },
             shared_block_cache_size: opt.block_cache_size,
+            enable_trading_native: opt.enable_trading_native,
             ..Default::default()
         }
     }
@@ -127,6 +134,13 @@ impl From<RocksdbOpt> for RocksdbConfigs {
 impl Default for RocksdbOpt {
     fn default() -> Self {
         Self::parse_from(vec!["exe"])
+    }
+}
+
+impl RocksdbOpt {
+    #[cfg(test)]
+    pub fn default_with_trading_native() -> Self {
+        Self::parse_from(vec!["exe", "--enable-trading-native"])
     }
 }
 
@@ -238,12 +252,54 @@ impl RestoreRunMode {
         }
     }
 
-    pub fn finish(&self) {
+    pub fn finish(&self) -> Result<()> {
+        match self {
+            Self::Restore { restore_handler } => Ok(restore_handler.reset_state_store()?),
+            Self::Verify => Ok(()),
+        }
+    }
+
+    /// Whether position snapshots get restored. A dry run verifies them
+    /// regardless.
+    pub fn has_position_store(&self) -> bool {
+        match self {
+            Self::Restore { restore_handler } => restore_handler.has_position_store(),
+            Self::Verify => true,
+        }
+    }
+
+    pub fn get_position_restore_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         match self {
             Self::Restore { restore_handler } => {
-                restore_handler.reset_state_store();
+                restore_handler.get_position_restore_receiver(version, expected_root_hash)
             },
-            Self::Verify => (),
+            Self::Verify => {
+                let mock_store = Arc::new(MockStore);
+                StateSnapshotRestore::new_overwrite(
+                    Arc::clone(&mock_store),
+                    mock_store,
+                    version,
+                    expected_root_hash,
+                    StateSnapshotRestoreMode::Default,
+                )
+            },
+        }
+    }
+
+    pub fn reset_position_store(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<()> {
+        match self {
+            Self::Restore { restore_handler } => {
+                restore_handler.reset_position_store(version, expected_root_hash)
+            },
+            Self::Verify => Ok(()),
         }
     }
 

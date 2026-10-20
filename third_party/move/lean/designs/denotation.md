@@ -509,6 +509,16 @@ as hypotheses that no proof discharges: `GlobalsPreserved`, which static
 typing is to establish, and, for a function whose proof reads `result_of`
 of a known function value, `Terminating`: runs of the unit's functions
 end, as the Move Prover assumes of every function (decided 2026-10-02).
+A theorem assuming typing (`Contract.assumesTyping`) also takes, beside the
+natives' `NativesTyped` and `NativesShift`, two hypotheses on the unit's
+abstract maps (`intrinsic-maps.md`, "Abstract representation"):
+`RunsAgree`, that runs of the function meaning from starts with the same
+globals and table handles agree up to loan renaming, which is to say that a
+run depends on its maps' abstract values alone, and `OwnersRepresentable`,
+that every value a closed native type admits has a typed runtime
+representation normalizing to it. Both hold of a unit whose owners' Move
+bodies refine their roles' contracts up to normalization; neither is
+discharged by a proof (decided 2026-10-17).
 A function stating an in-body `assume` is verified of the reading in which
 its runs pass each assumption only where its condition holds
 (`Meanings.assumption`, `Term.assume`), and its theorems take that its
@@ -797,6 +807,18 @@ and prophecy resolution:
 `compileFunction_agrees` becomes
 `Spec.Equiv (f.denote unit args) (propheticMeaning unit handle f args)`
 and stays the only admission.
+
+Intrinsic maps (2026-10-17, `intrinsic-maps.md`, "Abstract
+representation"): the runtime's values are read up to `normalize`, which
+replaces every well-formed value of an intrinsic map owner by the
+canonical value of its abstract layout. The runtime meaning of a function
+(`functionSpecAt`) is the quotient of big-step evaluation by `normalize`:
+it relates normalized starts, arguments, results, and exits exactly when
+some representation of them runs. The equations above between runtime
+values and encodings are unchanged over this quotient, so a callee
+receives and returns any representation of an abstract map, and the role
+and specification contracts of the map modules are assumed of their
+concrete bodies up to that normalization.
 
 The public theorem keeps its meaning. `satisfies_prophetic`
 transports a contract over the denotation to `SatisfiesFunction` of its

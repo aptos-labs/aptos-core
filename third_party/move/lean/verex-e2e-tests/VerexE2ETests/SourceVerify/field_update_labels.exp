@@ -1,2 +1,8 @@
 VerexE2ETests/SourceVerify/field_update_labels.move:34:9: error: the specification clause `ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + 2` is not established
-VerexE2ETests/SourceVerify/field_update_labels.move:30:5: error: verex verification failed: the automatic verification of `caller_wrong` failed; provide a proof: `verify caller_wrong by …` in `VerexE2ETests/SourceVerify/field_update_labels.proof.lean` (`verify caller_wrong by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/field_update_labels.move:30:5: error: verex verification failed: the automatic verification of `caller_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/field_update_labels.proof.lean`:
+  verify caller_wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

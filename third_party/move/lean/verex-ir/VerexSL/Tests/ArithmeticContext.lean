@@ -3,6 +3,61 @@
 
 import VerexSL
 
+-- Distinct path binders can share preparation, while each path must still
+-- receive a proof at its own argument (including dependent local definitions).
+example : (∀ n : Nat, let k := n + 1; k > n) ∧
+    (∀ m : Nat, let k := m + 1; k ≥ m) := by
+  constructor <;> intro n k
+  verex_group_contexts
+  run_tac do
+    unless (← Lean.Elab.Tactic.getGoals).length == 1 do
+      throwError "equivalent contexts were not grouped"
+  constructor <;> omega
+
+-- The same binder types do not suffice when the hypotheses differ.
+example : (∀ n : Nat, n = 0 → n < 1) ∧ (∀ n : Nat, n = 2 → n < 3) := by
+  constructor <;> intro n h
+  verex_group_contexts
+  run_tac do
+    unless (← Lean.Elab.Tactic.getGoals).length == 2 do
+      throwError "different contexts were grouped"
+  all_goals omega
+
+-- Local typeclass instances survive closing and reopening a shared context.
+example : (∀ (α : Type) [Inhabited α], ∃ _ : α, True) ∧
+    (∀ (β : Type) [Inhabited β], Nonempty β) := by
+  constructor <;> intro α inst
+  verex_group_contexts
+  run_tac do
+    unless (← Lean.Elab.Tactic.getGoals).length == 1 do
+      throwError "equivalent contexts were not grouped"
+  exact ⟨⟨default, trivial⟩, ⟨default⟩⟩
+
+-- Generated callee certificates introduce auxiliary declarations. Grouping
+-- their postconditions must preserve those declarations' full names too.
+verex module 0x42::authored_context_sharing where
+  fun source(x : u64) -> u64 := x
+  spec source where
+    pragma opaque
+    aborts_if false
+    ensures result == x
+
+  fun copy_twice(x : u64) -> u64 := source(source(x))
+  spec copy_twice where
+    aborts_if false
+    ensures result == x
+    ensures result <= x
+    ensures result >= x
+
+verify 0x42::authored_context_sharing::source
+verify 0x42::authored_context_sharing::copy_twice by
+  verex_obligations
+  verex_group_contexts
+  all_goals verex_prepare only
+  all_goals repeat' apply And.intro
+  all_goals verex_intro_any
+  all_goals verex_decide
+
 -- Concrete inputs should be substituted before solving nested modular
 -- arithmetic. These shapes arise from calls between bitvector spec helpers.
 set_option maxHeartbeats 10000 in

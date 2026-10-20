@@ -1,2 +1,9 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ghost_field.move:1:1: error: an `update` condition must target a spec variable
+tests/sources/functional/ghost_field.move:35:9: error: the specification clause `ensures result.g == 0` is not established
+tests/sources/functional/ghost_field.move:34:5: error: verex verification failed: the automatic verification of `fresh_unconstrained` failed; provide a proof in `tests/sources/functional/ghost_field.proof.lean`:
+  verify fresh_unconstrained by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

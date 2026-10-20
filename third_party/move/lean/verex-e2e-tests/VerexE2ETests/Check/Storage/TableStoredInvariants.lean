@@ -5,8 +5,8 @@ import VerexE2ETests.CheckSupport
 /-! A table's entries carry deep data invariants at their resolved type
 arguments. Computed keys, generic and phantom parameters, and
 specification-only reads all read the owned contents. A nested table is read
-through a role at a table-bearing type argument, which the denotation does
-not carry (`designs/intrinsic-maps.md`, "Stages"). -/
+through a role at a table-bearing type argument, its inner entries' invariants
+included. -/
 
 set_option maxHeartbeats 25000
 set_option verex.verifyHeartbeats 25000
@@ -52,6 +52,7 @@ verex module 0x42::table_stored_invariants where
     requires has(get(t, a), b)
     aborts_if false
     ensures result <= 10
+  verify nested
 
   public fun direct(t : &Table<u64, Payload>, k : u64) -> u64 := 10
   spec direct where
@@ -99,15 +100,15 @@ verex module 0x42::table_stored_invariants where
   verify tagged_u8
 
 /--
-error: no denotation for `nested`: a type argument holding a map's contents is not carried by the denotation
--/
-#guard_msgs in
-verify 0x42::table_stored_invariants::nested
-
-/--
 error: the specification clause `ensures result < 10` is not established
 ---
-error: verex verification failed: the automatic verification of `too_strong` failed; provide a proof: `verify too_strong by …` in the module (`verify too_strong by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `too_strong` failed; provide a proof in the module:
+  verify too_strong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::table_stored_invariants::too_strong
@@ -115,7 +116,13 @@ verify 0x42::table_stored_invariants::too_strong
 /--
 error: the specification clause `ensures permitted::<Bool>(result)` is not established
 ---
-error: verex verification failed: the automatic verification of `wrong_type` failed; provide a proof: `verify wrong_type by …` in the module (`verify wrong_type by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `wrong_type` failed; provide a proof in the module:
+  verify wrong_type by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::table_stored_invariants::wrong_type

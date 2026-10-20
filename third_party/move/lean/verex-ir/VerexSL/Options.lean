@@ -22,14 +22,14 @@ register_option verex.ignoreProofs : Bool := {
     `pragma verify = manual`"
 }
 
-/-- Skip the `verify` items: set, or unset in the language server, where
-every change to an open file would run them again; `lake test` and the
-command line check them. A `verify! f` item runs regardless; the code action
-"Verify `f` here" marks one. -/
+/-- Skip the `verify` items and automatic targets: set, or unset in the
+language server, where every change to an open file would run them again;
+`lake test` and the command line check them. A `verify! f` item runs
+regardless; the code action "Verify `f` here" marks one. -/
 register_option verex.skip_verify : Bool := {
   defValue := false
-  descr := "skip the `verify` items but the `verify!` ones; unset, skipped in the language \
-    server only"
+  descr := "skip the `verify` items but the `verify!` ones, and the automatic targets; unset, \
+    skipped in the language server only"
 }
 
 /-- Whether the `verify` items are skipped: `verex.skip_verify` where set;

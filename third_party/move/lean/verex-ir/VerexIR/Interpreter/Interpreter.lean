@@ -89,8 +89,9 @@ mutual
         if arguments.size != declaration.signature.parameters.size then
           failAt handle.namespaceId declaration.loc
             (.argumentArity declaration.signature.parameters.size arguments.size)
-        if declaration.body = .absent then
-          -- A function without a body runs as the runtime implements it.
+        if BigStep.runtimeProvided unit handle declaration then
+          -- A function the runtime provides, without a body or a role of a
+          -- table owner, runs as the runtime implements it.
           let some (finalState, outcome) :=
               BigStep.nativeCall executable handle typeInstantiation state arguments
             | failAt handle.namespaceId declaration.loc (.functionHasNoBody handle)

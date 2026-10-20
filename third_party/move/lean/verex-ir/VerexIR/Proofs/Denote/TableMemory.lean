@@ -5,15 +5,13 @@ import VerexIR.Proofs.Denote.Types
 import VerexIR.Proofs.Maps.Table
 
 /-!
-# Tables in native storage
+# Table allocation and identity
 
 A table is a value of its owner's type: its handle among the declared fields
 and its contents in a hidden last field (`designs/intrinsic-maps.md`, "Owned
-Table values"). Native storage holds each table's entries at the slot of its
-owner's type and handle (`tableSlot?`), beside the physical values, and the
-allocation history of handles at a fixed resource. This module relates the
-tables a frame's values hold to that storage; `Resources.lean` relates a whole
-memory to it.
+Table values"). The handles allocated so far are a slot of the memory
+(`allocationResource`), as the runtime keeps them (`RuntimeState.tableHandles`);
+the model operations keep a table's identity.
 -/
 
 namespace VerexIR.Proofs.Denote.TableMemory
@@ -33,39 +31,6 @@ theorem encodeAllocated_injective (left right : Array String)
     (equal : encodeAllocated (unit := unit) left = encodeAllocated right) : left = right := by
   exact equal
 
-/-- The tables of a frame's values held in native storage: each at the slot
-of its owner's type, resolved at the frame, and its handle. -/
-def TablesIn (unit : ValidatedUnit) [Θ : Skolems unit]
-    (tables : List (NTy × String × RuntimeValue)) (storage : NativeTableStorage) : Prop :=
-  TablesAt (fun owner handle => tableSlot? unit (Θ.resolve owner) handle)
-    storage.contents.lookup tables
-
-theorem TablesIn.append_left [Skolems unit] {left right : List (NTy × String × RuntimeValue)}
-    {storage : NativeTableStorage} (held : TablesIn unit (left ++ right) storage) :
-    TablesIn unit left storage :=
-  TablesAt.append_left held
-
-theorem TablesIn.append_right [Skolems unit] {left right : List (NTy × String × RuntimeValue)}
-    {storage : NativeTableStorage} (held : TablesIn unit (left ++ right) storage) :
-    TablesIn unit right storage :=
-  TablesAt.append_right held
-
-theorem TablesIn.append [Skolems unit] {left right : List (NTy × String × RuntimeValue)}
-    {storage : NativeTableStorage} (heldLeft : TablesIn unit left storage)
-    (heldRight : TablesIn unit right storage) : TablesIn unit (left ++ right) storage :=
-  fun table member => (List.mem_append.mp member).elim (heldLeft table) (heldRight table)
-
-theorem TablesIn.nil [Skolems unit] (storage : NativeTableStorage) : TablesIn unit [] storage :=
-  fun _ member => nomatch member
-
-/-- Tables read at an induced frame are the tables read at the caller's frame
-with their owners at the type arguments. -/
-theorem TablesIn.instantiate (θ : TypeArgs) (Θ : Skolems unit)
-    (tables : List (NTy × String × RuntimeValue)) (storage : NativeTableStorage) :
-    @TablesIn unit (Skolems.instantiate θ Θ) tables storage ↔
-      @TablesIn unit Θ (tables.map (tableSubst θ)) storage := by
-  simp only [TablesIn, TablesAt, List.forall_mem_map, tableSubst, Skolems.resolve_instantiate]
-
 end VerexIR.Proofs.Denote.TableMemory
 
 namespace VerexIR.Proofs.Denote
@@ -78,11 +43,11 @@ table and its functional updates. -/
 
 theorem NTy.identityRuntime_build (source : StructHandle) (arguments rest : NRow)
     (hidden : rest.holdsContents = true) (layout : Maps.Layout) (h : layout.handle = true)
-    (handle : RuntimeValue) (entries : Maps.Entries) :
+    (handle : RuntimeValue) (slots : List RuntimeValue) (entries : Maps.Entries) :
     NTy.identityRuntime (.struct source arguments (.cons .address rest))
-        (layout.build handle entries) =
+        (layout.build handle entries slots) =
       .nominal layout.owner layout.variant #[handle] := by
-  have field := Maps.Layout.field_zero_build layout handle entries h
+  have field := Maps.Layout.field_zero_build layout handle slots entries h
   unfold Maps.Layout.build at field ⊢
   rw [NTy.identityRuntime_handle _ _ _ hidden, field]
 

@@ -3,4 +3,10 @@ tests/sources/regression/Escape.move:37:5: error: the module invariant `invarian
         exists<Wrapper<OutdoorThing> >(addr) ==> addr == @0x123` does not hold after a write of memory it reads
 tests/sources/regression/Escape.move:36:5: error: the module invariant `invariant ∀ (addr : Address),
         exists<Wrapper<IndoorThing> >(addr) ==> addr == @0x123` does not hold after a write of memory it reads
-tests/sources/regression/Escape.move:24:5: error: verex verification failed: the automatic verification of `install` failed; provide a proof: `verify install by …` in `tests/sources/regression/Escape.proof.lean` (`verify install by verex_obligations` lists its obligations)
+tests/sources/regression/Escape.move:24:5: error: verex verification failed: the automatic verification of `install` failed; provide a proof in `tests/sources/regression/Escape.proof.lean`:
+  verify install by
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

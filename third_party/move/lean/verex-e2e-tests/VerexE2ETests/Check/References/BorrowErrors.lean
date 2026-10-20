@@ -193,3 +193,21 @@ run_cmd do
       | .ok value => pure value
       | .error reason => throwError "borrow reimport failed: {repr reason}"
     unless printed == formatted do throwError "borrow source is not a fixed point"
+
+-- Losing the local holder at return must not turn a loan of frame storage
+-- into caller-owned storage.
+verex module 0x42::local_reborrow_escape where
+  fun escape() -> &mut u64 := do
+    let mut owner : u64 := 7
+    let reference := &mut owner
+    &mut *reference
+
+open Lean Elab Command VerexIR in
+run_cmd do
+  let some unit := VerexSL.registeredUnit? (← getEnv) `«0x42».local_reborrow_escape
+    | throwError "missing local escape fixture"
+  match Validation.prepareExecution #[Move.semantics] unit with
+  | .ok _ => throwError "a reborrow of frame-owned storage escaped"
+  | .error diagnostics =>
+      unless diagnostics.any (·.code == "VIR-SEMANTIC-BORROW-ESCAPE") do
+        throwError "wrong escape rejection: {repr diagnostics}"

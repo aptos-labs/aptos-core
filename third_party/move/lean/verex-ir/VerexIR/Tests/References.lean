@@ -451,8 +451,14 @@ private def valueBorrowWithoutLocalPlaceFixture : RawUnit :=
     | some ns => match ns.expressions[1]? with
       | some expression => match expression.kind with
         | .operation (.borrow .mutable place) #[] #[] _ =>
-            place == ⟨3⟩ && ns.places.size == 4 &&
-              ns.places[place.index]? == some (.localVar ⟨0⟩)
+            place == ⟨3⟩ && ns.places.size == 5 &&
+              ns.places[place.index]? == some (.localVar ⟨0⟩) &&
+              -- The `let` copying the mutable reference is its local's only
+              -- use, so it moves the local.
+              (match (ns.expressions[11]?).map (fun (expression : Expr) => expression.kind) with
+                | some (ExprKind.operation (.move copied) #[] #[] _) =>
+                    ns.places[copied.index]? == some (.localVar ⟨0⟩)
+                | _ => false)
         | _ => false
       | none => false
     | none => false
@@ -524,12 +530,16 @@ private def nonPlaceValueBorrowFixture : RawUnit :=
       expressions := ns.expressions.set! 1 { expression with kind :=
         (ExprKind.operation borrowOperation #[] #[⟨0⟩]) } }] }
 
+-- A mutable borrow of a computed value borrows a temporary holding it
+-- (`holdMutableReferences`), so the function runs as with the local.
 #guard match validate #[schema] nonPlaceValueBorrowFixture with
   | .error _ => false
   | .ok checked => match prepareExecution #[semantics] checked with
-      | .error diagnostics => diagnostics.any fun diagnostic =>
-          diagnostic.code == "VIR-EXEC-UNSUPPORTED" && diagnostic.primary == some ⟨1⟩
-      | .ok _ => false
+      | .error _ => false
+      | .ok executable => match VerexIR.Interpreter.run executable 32
+          { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[] with
+        | .ok (state, outcome) => outcome.value == .returned #[.integer 9] && state.pending.isEmpty
+        | .error _ => false
 
 private def subsliceFixture (start stop : Nat) (fromEnd : Bool)
     (resultLength : Nat) : RawUnit :=
@@ -2885,7 +2895,7 @@ private def heldKey : GlobalKey := { namespaceId := ⟨0⟩, typeId := ⟨5⟩, 
 
 private def holelessSlot : RuntimeState :=
   { globals := ({} : GlobalMap).insert heldKey (.integer 5)
-    storageLoans := [(0, .global heldKey)]
+    globalLoans := [(0, heldKey)]
     nextLoan := 1 }
 
 -- The value goes to the pending set; the slot keeps what it holds.

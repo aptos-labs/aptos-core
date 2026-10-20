@@ -137,7 +137,7 @@ verify square_of_sum by
 ```
 
 The Move Prover reads `verify = manual` as true and ignores `heartbeats`.
-In the editor, `verify` items are skipped (`verex.skip_verify`, on by
+In the editor, `verify` items and automatic targets are skipped (`verex.skip_verify`, on by
 default in the language server only); `verify! f`, marked by the code action "Verify `f` here",
 runs. A proof file opens with its goals in the InfoView once its Move file
 has been verified: the header loads the rendering that verification wrote

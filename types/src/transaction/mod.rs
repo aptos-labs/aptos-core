@@ -2239,12 +2239,10 @@ impl TransactionOutput {
             expected_events,
         );
 
-        // TODO(trading-native): this comparator ignores the checkpoint hashes
-        // (state/hot-state and `position_state_checkpoint_hash`), so replay-verify
-        // tooling (e.g. db-tool's `replay_on_archive`) can report a successful
-        // replay even when the authenticated position state root diverges from
-        // local execution. Validate the checkpoint hashes here before enabling
-        // COMPUTE_TRADING_NATIVE_STATE_ROOTS.
+        // Checkpoint hashes (state, hot state, position) are derived from many
+        // outputs and checked at ledger update, not here. The position ops
+        // themselves are covered above: `state_change_hash` hashes the V1 write
+        // set, extensions included.
         Ok(())
     }
 

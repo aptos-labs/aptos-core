@@ -689,6 +689,13 @@ function {:inline} $StdError(cat: int, reason: int): int {
     reason * 256 + cat
 }
 
+// The encoding of `std::error::canonical`, which Move sources raise through
+// `error::invalid_argument(r)`, `error::invalid_state(r)`, ... ; `$StdError`
+// is the legacy encoding of the table natives.
+function {:inline} $CanonicalError(cat: int, reason: int): int {
+    cat * 65536 + reason
+}
+
 procedure {:inline 1} $InitVerification() {
     // Set abort_flag to false, and havoc abort_code
     $abort_flag := false;

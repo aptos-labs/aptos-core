@@ -1,3 +1,9 @@
 VerexE2ETests/SourceVerify/behavior_label_witness.move:38:9: error: the specification clause `ensures ∃ (S : StateDomain),
         !(S.. |~ aborts_of<function[Fn(&mut Counter) -> u64](checked_inc)>(c))` is not established
-VerexE2ETests/SourceVerify/behavior_label_witness.move:36:5: error: verex verification failed: the automatic verification of `reset_to_limit` failed; provide a proof: `verify reset_to_limit by …` in `VerexE2ETests/SourceVerify/behavior_label_witness.proof.lean` (`verify reset_to_limit by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/behavior_label_witness.move:36:5: error: verex verification failed: the automatic verification of `reset_to_limit` failed; provide a proof in `VerexE2ETests/SourceVerify/behavior_label_witness.proof.lean`:
+  verify reset_to_limit by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

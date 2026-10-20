@@ -1,7 +1,13 @@
 processed 1 task
 task 0 lines 3-11:  publish [import VerexMove]
 Error: compilation errors:
- error: verex verification failed: the automatic verification of `wrong_increment` failed; provide a proof: `verify wrong_increment by …` in the module (`verify wrong_increment by verex_obligations` lists its obligations)
+ error: verex verification failed: the automatic verification of `wrong_increment` failed; provide a proof in the module:
+  verify wrong_increment by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
   ┌─ TEMPFILE:7:8
   │
 7 │   spec wrong_increment where

@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/ghost_field_equality.move:1:1: error: an `update` condition must target a spec variable

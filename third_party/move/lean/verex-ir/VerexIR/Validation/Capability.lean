@@ -9,6 +9,7 @@ import VerexIR.Validation.PlaceIndex
 import VerexIR.Validation.Eliminate
 import VerexIR.Validation.IndexedArena
 import VerexIR.Validation.StaticTyping
+import VerexIR.Validation.TableRoles
 
 /-!
 # VIR semantic capability preparation
@@ -328,14 +329,16 @@ def corePrimitiveFeature : PrimitiveOperation → SemanticFeature
   | .identical => feature "primitive.identical" .logicalOnly
 
 def coreReferenceOperationFeature : ReferenceOperation → SemanticFeature
+  | .borrow .immutable => feature "reference.borrowSharedValue" .executable
   | .borrow _ => unsupportedExecutable "reference.borrowValue"
-      "value borrow requires checked place normalization"
+      "a mutable borrow of a computed value requires checked place normalization"
   | .dereference => feature "reference.dereferenceValue" .executable
   | .freeze _ => feature "reference.freeze" .executable
   | .mutate => feature "reference.mutate" .executable
 
 def coreDataOperationFeature : DataOperation → SemanticFeature
   | .select _ _ => feature "data.select" .executable
+  | .selectGhost _ _ => feature "data.selectGhost" .logicalOnly
   | .selectVariants _ _ => feature "data.selectVariants" .executable
   | .testVariants _ _ => feature "data.testVariants" .executable
   | .discriminant _ => feature "data.discriminant" .executable
@@ -429,6 +432,7 @@ def corePlaceFeature : Place → SemanticFeature
   | .localVar _ => feature "place.local" .executable
   | .deref _ => feature "place.deref" .executable
   | .field .. => feature "place.field" .executable
+  | .ghostField .. => feature "place.ghostField" .logicalOnly
   | .index _ _ => feature "place.index" .executable
   | .subslice .. => feature "place.subslice" .executable
   | .downcast _ _ => feature "place.downcast" .executable
@@ -816,8 +820,8 @@ private partial def isOwnedLocalPlaceBase (ns : ValidatedNamespace) (id : PlaceI
   match fuel, ns.places[id.index]? with
   | 0, _ | _, none => false
   | _ + 1, some (.localVar _) => true
-  | fuel + 1, some (.field base ..) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) =>
+  | fuel + 1, some (.field base ..) | fuel + 1, some (.ghostField base ..) |
+      fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
       isOwnedLocalPlaceBase ns base fuel
   | fuel + 1, some (.index base index) =>
       isSimplePlaceIndex ns index && isOwnedLocalPlaceBase ns base fuel
@@ -921,6 +925,11 @@ private def nominalDeclarationForType? (unit : ValidatedUnit) (ns : ValidatedNam
 private def sourceName? (ns : ValidatedNamespace) (name : NameId) : Option String :=
   (ns.tables.names[name.index]?).map (·.name)
 
+
+/-- A declaration's ghost field of a name (`designs/ghost-fields.md`). -/
+private def ghostFieldNamed? (targetNs : ValidatedNamespace) (declaration : StructDecl)
+    (name : String) : Option GhostFieldDecl :=
+  declaration.ghosts.find? fun ghost => sourceName? targetNs ghost.name == some name
 
 private def fieldNamedForPlace? (targetNs : ValidatedNamespace)
     (fields : Array FieldDecl) (name : String) : Option FieldDecl :=
@@ -1133,6 +1142,14 @@ private def staticPlaceInfoFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace
         baseInfo.selectedVariant fieldName
       let typeId ← instantiatedCommonPlaceTypeId? targetNs instantiations selected
       some { typeId, writable := baseInfo.writable }
+  | .ghostField base _ field => do
+      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base placeAt typeAt
+      let (targetNs, declaration, instantiations) ←
+        nominalDeclarationForType? unit ns baseInfo.typeId typeAt
+      let fieldName ← sourceName? ns field
+      let ghost ← ghostFieldNamed? targetNs declaration fieldName
+      let typeId ← instantiatedCommonPlaceTypeId? targetNs instantiations #[ghost.type]
+      some { typeId, writable := baseInfo.writable }
 
 /-- `staticPlaceInfoFuel?` at the exact arena budget. -/
 private def staticPlaceInfo? (unit : ValidatedUnit) (ns : ValidatedNamespace)
@@ -1217,6 +1234,22 @@ private def staticPlaceNodeDiagnostics (mode : PreparationMode) (unit : Validate
                               "instantiated nominal field type is not interned" loc])
                         else typeMismatch loc
                           "field place has different types across possible enum variants"
+  | .ghostField base _ field => match staticPlaceInfo? unit ns context base with
+      | none => #[]
+      | some info => match nominalDeclarationForType? unit ns info.typeId with
+          | none => typeMismatch loc "ghost field place base is not a resolved nominal type"
+          | some (targetNs, declaration, instantiations) =>
+              match sourceName? ns field with
+              | none => #[]
+              | some fieldName => match ghostFieldNamed? targetNs declaration fieldName with
+                  | none => #[.at "VIR-SEMANTIC-TARGET"
+                      "ghost field place does not name a ghost field of its nominal type" loc]
+                  | some ghost =>
+                      match instantiatedCommonPlaceTypeId? targetNs instantiations #[ghost.type] with
+                      | some _ => #[]
+                      | none => if mode matches .typing then #[] else
+                          #[.at "VIR-SEMANTIC-GENERIC-TYPE"
+                            "instantiated ghost field type is not interned" loc]
 
 private def placeResultDiagnostics (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (context : ScanContext)
@@ -2631,8 +2664,8 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
     (loc : LocId) (resultType : TypeId) (operation : DataOperation)
     (arguments : Array ExprId) : Array Diagnostic :=
   let reference := match operation with
-    | .select reference _ | .selectVariants reference _ | .testVariants reference _ |
-        .discriminant reference | .updateField reference _ => reference
+    | .select reference _ | .selectGhost reference _ | .selectVariants reference _ |
+        .testVariants reference _ | .discriminant reference | .updateField reference _ => reference
   match resolveStructDeclaration? unit ns reference with
   | none => if mode matches .typing then #[] else
       #[.at "VIR-SEMANTIC-TARGET" "data operation target does not resolve" loc]
@@ -2646,7 +2679,7 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
       let referenceOperandErrors :=
         if !(mode matches .execution) then #[] else
         match operation with
-        | .select .. | .selectVariants .. =>
+        | .select .. | .selectGhost .. | .selectVariants .. =>
             match (do
               let argument ← arguments[0]?
               let argumentType ← exprType? ns argument
@@ -2680,6 +2713,14 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
               operandErrors ++ resultErrors
           | none => operandErrors ++ #[.at "VIR-SEMANTIC-TARGET"
               "selected field does not exist on every possible variant" loc]
+      | .selectGhost _ field => match ghostFieldNamed? targetNs declaration field with
+          | some ghost =>
+              let resultErrors := if selectedTypesMatchResult ns targetNs context.logical resultType
+                  solution sourceReference #[ghost.type] then #[]
+                else typeMismatch loc "selected ghost field type differs from the operation result"
+              operandErrors ++ resultErrors
+          | none => operandErrors ++ #[.at "VIR-SEMANTIC-TARGET"
+              "selected ghost field is not a ghost field of its nominal type" loc]
       | .selectVariants _ fields => match variantFieldTypes? targetNs declaration fields with
           | some selected =>
               let resultErrors := if selectedTypesMatchResult ns targetNs context.logical resultType
@@ -3631,7 +3672,8 @@ mutual
           | .localVar localId =>
               typingGate mode (if localId.index < context.locals.size then #[]
                 else #[.at "VIR-SEMANTIC-LOCAL" s!"unknown local {localId.index}" loc])
-          | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
+          | .deref base | .field base .. | .ghostField base .. | .subslice base .. |
+              .downcast base _ =>
               scanPlace registry unit mode ns context loc base
           | .index base index =>
               let ds := scanPlace registry unit mode ns context loc base ++
@@ -4490,7 +4532,7 @@ private def scanNamespaceInvariant (registry : SemanticsRegistry) (unit : Valida
 
 private def scanFunction (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace)
-    (function : FunctionDecl FunctionBody) : Array Diagnostic :=
+    (function : FunctionDecl FunctionBody) (provided : Bool := false) : Array Diagnostic :=
   let context : ScanContext := {
     locals := function.locals
     results := function.signature.results
@@ -4515,7 +4557,10 @@ private def scanFunction (registry : SemanticsRegistry) (unit : ValidatedUnit)
         function.signature.generics) #[]
   let profileErrors := function.profileData.foldl (fun ds value =>
     ds ++ profileDiagnostics registry unit mode .property function.loc value) #[]
-  let bodyErrors := match function.body with
+  -- A function the runtime provides, a native by the host or a role of a
+  -- table owner by the map model (`BigStep.runtimeProvided`), runs no body.
+  let bodyErrors := if (mode matches .execution) && provided then #[] else
+    match function.body with
     | .absent => if mode matches .typing then #[] else
         #[.at (unsupportedCode mode)
           "absent function bodies require an external semantic implementation" function.loc]
@@ -4544,9 +4589,26 @@ private def ownedBy (ns : ValidatedNamespace) (kind : String) (name : NameId)
 
 private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace) : Array Diagnostic :=
-  let functionErrors := ns.functions.foldl (fun ds function =>
+  let functionErrors := (ns.functions.zipIdx).foldl (fun ds (function, index) =>
+    let provided := function.body matches .absent ||
+      (tableRoleOf? unit ns.identity ⟨index⟩).isSome
+    -- The runtime provides a table owner's roles: the executable ones, and
+    -- a conversion only to a table it builds.
+    let roleErrors := match mode, tableRoleOf? unit ns.identity ⟨index⟩ with
+      | .typing, _ => #[]
+      | _, some (role, _) =>
+          match MapOperation.ofName? role with
+          | none => #[Diagnostic.at (unsupportedCode mode)
+              s!"`{role}` is not an executable map role" function.loc]
+          | some .toOrderedMap =>
+              if (resultLayout? unit ns function).isNone then
+                #[Diagnostic.at (unsupportedCode mode)
+                  s!"the result of `{role}` is not a table the runtime builds" function.loc]
+              else #[]
+          | some _ => #[]
+      | _, none => #[]
     ds ++ ownedBy ns "fun" function.name
-      (scanFunction registry unit mode ns function)) #[]
+      (roleErrors ++ scanFunction registry unit mode ns function provided)) #[]
   let constantErrors := ns.constants.foldl (fun ds constant =>
     let ds := ds ++ scanType registry unit mode ns constant.type.loc constant.type.typeId ++
       scanExpr registry unit mode ns { profile := ns.profile.getD .move } constant.value
@@ -4562,13 +4624,16 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
       own ++ scanAbility mode declaration.loc ability) own
     let own := declaration.properties.foldl (fun own value =>
       own ++ profileDiagnostics registry unit mode .property declaration.loc value) own
-    let own := declaration.fields.foldl (fun own field =>
-      own ++ scanType registry unit mode ns field.type.loc field.type.typeId
-        declaration.generics) own
-    let own := declaration.variants.foldl (fun own variant =>
-      variant.fields.foldl (fun own field =>
+    -- Only specification memory is erased from execution. Ordinary field
+    -- types must remain executable even when no body reads them.
+    let own := if (mode matches .execution) && declaration.isGhostMemory then own else
+      let own := declaration.fields.foldl (fun own field =>
         own ++ scanType registry unit mode ns field.type.loc field.type.typeId
-          declaration.generics) own) own
+          declaration.generics) own
+      declaration.variants.foldl (fun own variant =>
+        variant.fields.foldl (fun own field =>
+          own ++ scanType registry unit mode ns field.type.loc field.type.typeId
+            declaration.generics) own) own
     let own := own ++ typingGate mode (structAbilityDiagnostics unit ns declaration)
     let own := if mode matches .verification | .typing then
         own ++ scanContract registry unit mode ns {
@@ -4596,8 +4661,12 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
         (scanLemma registry unit mode ns declaration)) ds
     ns.invariants.foldl (fun ds declaration =>
       ds ++ scanNamespaceInvariant registry unit mode ns declaration) ds
+  -- A map's roles run by their bodies, or, at a table owner, as the runtime
+  -- provides them (`designs/intrinsic-maps.md`, "Tables in the runtime
+  -- semantics").
   let intrinsicErrors := if ns.intrinsics.isEmpty || (mode matches .typing) then #[] else
     ns.intrinsics.foldl (fun ds declaration =>
+      if (mode matches .execution) && declaration.model == "map" then ds else
       ds.push <| .at (unsupportedCode mode)
         "intrinsic semantic models are not implemented" declaration.loc) #[]
   let metadataErrors := ns.profileMetadata.foldl (fun ds value =>
@@ -4706,7 +4775,7 @@ private def markReachable (expressionAt : Nat → Option Expr)
           match place with
           | .deref base =>
               (index, base) :: visit (queueReachable expressionAt placeAt work (.inr base))
-          | .field base ..
+          | .field base .. | .ghostField base ..
           | .subslice base _ _ _ | .downcast base _ =>
               visit (queueReachable expressionAt placeAt work (.inr base))
           | .index base index =>
@@ -4897,8 +4966,8 @@ private def executableExpressions (ns : ValidatedNamespace) : Array Bool := Id.r
       if visitedPlaces[place.index]?.getD true then continue
       visitedPlaces := visitedPlaces.set! place.index true
       match ns.places[place.index]? with
-      | some (.deref base) | some (.field base _ _) | some (.subslice base _ _ _)
-      | some (.downcast base _) => places := places.push base
+      | some (.deref base) | some (.field base _ _) | some (.ghostField base _ _)
+      | some (.subslice base _ _ _) | some (.downcast base _) => places := places.push base
       | some (.index base index) =>
           places := places.push base
           pending := pending.push index
@@ -5029,6 +5098,17 @@ def prepareExecution (registry : SemanticsRegistry) (unit : ValidatedUnit) :
       unit.initializationCertificates unit.borrowCertificates typed rfl)
   else .error ((StaticTyping.unitFailures unit (targetPointerWidth? unit)).map
     (Diagnostic.error "VIR-STATIC-TYPE" ·))
+
+/-- The diagnostics that refuse a unit's execution under every registry:
+execution preparation's, but for a profile's semantics, which a registry
+provides. A theorem quantifying over the prepared unit is vacuous where
+there is one (`ensureUnitDefinition`). -/
+def executionRefusals (unit : ValidatedUnit) : Array Diagnostic :=
+  (prepareDiagnostics #[] unit .execution ++ loanDeathDiagnostics unit).filter fun d =>
+    d.severity == .error && !registryCodes.contains d.code
+where
+  registryCodes : Array String := #["VIR-SEMANTICS-UNREGISTERED", "VIR-SEMANTICS-VERSION",
+    "VIR-SEMANTICS-UNCLASSIFIED", "VIR-SEMANTICS-DUPLICATE"]
 
 /-- Check that every reachable body and specification node has a classified,
 currently supported logical meaning and return the private verifier input

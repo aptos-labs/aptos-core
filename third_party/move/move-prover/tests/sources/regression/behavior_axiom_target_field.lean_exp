@@ -1,10 +1,28 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/behavior_axiom_target_field.move:41:9: error: the specification clause `ensures result >= 5` is not established
-tests/sources/regression/behavior_axiom_target_field.move:40:5: error: verex verification failed: the automatic verification of `g_lower` failed; provide a proof: `verify g_lower by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify g_lower by verex_obligations` lists its obligations)
+tests/sources/regression/behavior_axiom_target_field.move:40:5: error: verex verification failed: the automatic verification of `g_lower` failed; provide a proof in `tests/sources/regression/behavior_axiom_target_field.proof.lean`:
+  verify g_lower by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavior_axiom_target_field.move:49:9: error: the specification clause `ensures result <= 5` is not established
-tests/sources/regression/behavior_axiom_target_field.move:48:5: error: verex verification failed: the automatic verification of `f_upper` failed; provide a proof: `verify f_upper by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify f_upper by verex_obligations` lists its obligations)
+tests/sources/regression/behavior_axiom_target_field.move:48:5: error: verex verification failed: the automatic verification of `f_upper` failed; provide a proof in `tests/sources/regression/behavior_axiom_target_field.proof.lean`:
+  verify f_upper by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavior_axiom_target_field.move:7:1: error: quantification over nominal values containing function fields requires a field-validity domain, which is not carried yet
 tests/sources/regression/behavior_axiom_target_field.move:7:1: error: quantification over nominal values containing function fields requires a field-validity domain, which is not carried yet
 tests/sources/regression/behavior_axiom_target_field.move:117:9: error: the specification clause `ensures result == 0` is not established
-tests/sources/regression/behavior_axiom_target_field.move:116:5: error: verex verification failed: the automatic verification of `fixed_value` failed; provide a proof: `verify fixed_value by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify fixed_value by verex_obligations` lists its obligations)
+tests/sources/regression/behavior_axiom_target_field.move:116:5: error: verex verification failed: the automatic verification of `fixed_value` failed; provide a proof in `tests/sources/regression/behavior_axiom_target_field.proof.lean`:
+  verify fixed_value by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavior_axiom_target_field.move:7:1: error: quantification over nominal values containing function fields requires a field-validity domain, which is not carried yet

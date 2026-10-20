@@ -1,2 +1,43 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ghost_field_invariants.move:1:1: error: an `update` condition must target a spec variable
+tests/sources/functional/ghost_field_invariants.move:84:9: error: the specification clause `invariant max_seen >= x` is not established
+tests/sources/functional/ghost_field_invariants.move:106:5: error: verex verification failed: the automatic verification of `mono_break_write` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
+  verify mono_break_write by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/ghost_field_invariants.move:51:9: error: the data invariant `invariant g >= x` does not hold where a value is constructed
+tests/sources/functional/ghost_field_invariants.move:53:5: error: verex verification failed: the automatic verification of `bad_init_pack` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
+  verify bad_init_pack by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/ghost_field_invariants.move:61:9: error: the specification clause `invariant total >= y` is not established
+tests/sources/functional/ghost_field_invariants.move:60:9: error: the specification clause `invariant total >= x` is not established
+tests/sources/functional/ghost_field_invariants.move:76:5: error: verex verification failed: the automatic verification of `sum_break` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
+  verify sum_break by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/ghost_field_invariants.move:113:9: error: the data invariant `invariant g_lo <= g_hi` does not hold where a value is constructed
+tests/sources/functional/ghost_field_invariants.move:120:5: error: verex verification failed: the automatic verification of `range_pack_reversed` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
+  verify range_pack_reversed by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/ghost_field_invariants.move:127:9: error: the specification clause `invariant h < 100` is not established
+tests/sources/functional/ghost_field_invariants.move:127:9: error: the specification clause `invariant h < 100` is not established
+tests/sources/functional/ghost_field_invariants.move:134:5: error: verex verification failed: the automatic verification of `einit_update_bad` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
+  verify einit_update_bad by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

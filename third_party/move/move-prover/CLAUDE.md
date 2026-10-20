@@ -357,7 +357,7 @@ MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
 MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite  # Verex verifier, `.lean_exp` baselines
 ```
 
-The `lean` feature runs only on request, not in CI; see `tests/README.md`.
+The `lean` feature runs only on request; CI requests it in the Lean workflow. See `tests/README.md`.
 
 ## Test Organization
 

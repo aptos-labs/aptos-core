@@ -328,8 +328,12 @@ needed.
   at rest or reconciles a consumed temporary; shared borrows carried a loan
   instance for uniform typing (superseded by P6's full erasure); `nextLoan` is run-local bookkeeping and
   excluded from differential state comparison; duplicated mutable borrows
-  (never produced by borrow-checked profiles) remain trusted to the
-  certificate rather than dynamically rejected.
+  remain trusted to the certificate rather than dynamically rejected, and
+  validation produces none: a mutable reference copied by name out of a
+  local — into a call's parameter, a local it initializes, or a local it is
+  assigned to — is a reborrow of that local, or a move where the copy is
+  the local's last executable use (`normalizeReferenceCopies`), so one loan
+  rests in one holder and the copy's write-back reaches the original.
 - **DONE — P3: Prophetic relation and symbolic execution.** 2026-08-28,
   with one deliberate deviation: the separate ghost judgment planned here
   proved redundant. P2 had already consolidated BigStep and the

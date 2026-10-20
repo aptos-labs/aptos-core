@@ -267,4 +267,10 @@ h✝ : key = VerexIR.StorageKey.address addr2
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil),
         arguments := VerexIR.Proofs.Denote.NRow.nil }
       key
-tests/sources/functional/ModifiesSchemaTest.move:33:5: error: verex verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof: `verify mutate_at_wrapper2 by …` in `tests/sources/functional/ModifiesSchemaTest.proof.lean` (`verify mutate_at_wrapper2 by verex_obligations` lists its obligations)
+tests/sources/functional/ModifiesSchemaTest.move:33:5: error: verex verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof in `tests/sources/functional/ModifiesSchemaTest.proof.lean`:
+  verify mutate_at_wrapper2 by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -46,6 +46,7 @@ inductive Plain : RuntimeValue → Prop
       (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue)
       (plain : ∀ capture ∈ captures, Plain capture) :
       Plain (.closure function mask typeInstantiation captures)
+  | ghost (contents : RuntimeValue) (plain : Plain contents) : Plain (.ghost contents)
 
 /-- A nominal value over a literal field row is plain when its fields are:
 the form a generated erasure has. -/
@@ -59,11 +60,12 @@ mutual
 def plain? : RuntimeValue → Bool
   | .vector elements | .tuple elements | .nominal _ _ elements | .closure _ _ _ elements =>
       plainList? elements.toList
+  | .ghost contents => plain? contents
   | .borrow .. | .loanHole _ => false
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => true
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- Whether every value of a list is loan-free. -/
 def plainList? : List RuntimeValue → Bool
@@ -99,6 +101,10 @@ private theorem plain?_iff_below : (bound : Nat) →
               | exact .closure _ _ _ _ fun element member => plain element (by simpa using member)
           · intro plain element member
             cases plain <;> rename_i all <;> exact all element (by simpa using member)
+        case ghost contents =>
+          simp only [RuntimeValue.ghost.sizeOf_spec] at small
+          rw [plain?, values _ (by omega)]
+          exact ⟨fun plain => .ghost _ plain, fun plain => by cases plain; assumption⟩
         case borrow | loanHole =>
           simp only [plain?, Bool.false_eq_true, false_iff]
           intro plain
@@ -139,7 +145,7 @@ private theorem collectPrunedList_borrowEntry?_eq_empty
 theorem Plain.collectPruned_borrowEntry?_eq_empty {value : RuntimeValue}
     (plain : Plain value) : collectPruned borrowEntry? value = #[] := by
   induction plain with
-  | unit | bool | character | integer | address | signer | string | bytes =>
+  | unit | bool | character | integer | address | signer | string | bytes | ghost =>
       simp [collectPruned, borrowEntry?]
   | vector elements fields ih
   | tuple elements fields ih
@@ -171,6 +177,7 @@ theorem Plain.maskReturnedBorrows_eq_self {value : RuntimeValue}
   induction plain with
   | unit | bool | character | integer | address | signer | string | bytes =>
       simp [maskReturnedBorrows]
+  | ghost contents _ ih => simp only [maskReturnedBorrows, ih]
   | vector elements fields ih
   | tuple elements fields ih
   | nominal _ _ elements fields ih
@@ -275,6 +282,8 @@ theorem findFirst_eq_none_of_plain {α : Type} {f : RuntimeValue → Option α}
   induction plain with
   | unit | bool | character | integer | address | signer | string | bytes =>
       rw [findFirst.eq_def, matcher.plain (by constructor)]
+  | ghost contents plain =>
+      rw [findFirst.eq_def, matcher.plain (Plain.ghost contents plain)]
   | vector elements plain ih =>
       rw [findFirst.eq_def, matcher.plain (Plain.vector elements plain)]
       dsimp only
@@ -312,6 +321,8 @@ theorem rewriteFirst_eq_none_of_plain {f : RuntimeValue → Option RuntimeValue}
   induction plain with
   | unit | bool | character | integer | address | signer | string | bytes =>
       rw [rewriteFirst.eq_def, matcher.plain (by constructor)]
+  | ghost contents plain =>
+      rw [rewriteFirst.eq_def, matcher.plain (Plain.ghost contents plain)]
   | vector elements plain ih =>
       rw [rewriteFirst.eq_def, matcher.plain (Plain.vector elements plain)]
       dsimp only

@@ -64,6 +64,11 @@ partial def writesGlobal (callee : QualifiedName → Bool) (params kept : List S
   let own := match expression.node with
     | .call (.borrowGlobal .mutable) .. | .call .moveTo .. | .call .moveFrom .. => true
     | .call (.moveFunction name) .. => callee name
+    -- An `update` of a spec variable writes the memory backing it.
+    | .specBlock (.mk _ _ conditions _ _ _) => conditions.any fun condition =>
+        condition.kind == .update && (condition.updateTarget.any fun
+          | .mk _ _ (.call (.select _ _) _ [.mk _ _ (.call (.global _) _ _ _)] _) => true
+          | _ => false)
     | .invoke function _ => match function.node with
         | .«local» name => !kept.contains name
         | .param index => !(params[index]?.any kept.contains)

@@ -31,6 +31,7 @@ def RuntimeValue.rename (ρ : Nat → Nat) : RuntimeValue → RuntimeValue
         (RuntimeValue.renameList ρ captures.toList).toArray
   | .borrow loan current => .borrow (ρ loan) (current.rename ρ)
   | .loanHole loan => .loanHole (ρ loan)
+  | .ghost contents => .ghost (contents.rename ρ)
   | .unit => .unit
   | .bool value => .bool value
   | .character value => .character value
@@ -40,7 +41,7 @@ def RuntimeValue.rename (ρ : Nat → Nat) : RuntimeValue → RuntimeValue
   | .string value => .string value
   | .bytes value => .bytes value
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- Each value of a list with its loan identities renamed. -/
 def RuntimeValue.renameList (ρ : Nat → Nat) : List RuntimeValue → List RuntimeValue
@@ -57,10 +58,11 @@ def RuntimeValue.Within (inside : Nat → Prop) : RuntimeValue → Prop
       RuntimeValue.WithinList inside elements.toList
   | .borrow loan current => inside loan ∧ current.Within inside
   | .loanHole loan => inside loan
+  | .ghost contents => contents.Within inside
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => True
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- Every loan identity a list's values hold satisfies `inside`. -/
 def RuntimeValue.WithinList (inside : Nat → Prop) : List RuntimeValue → Prop
@@ -116,6 +118,10 @@ variable (ρ : Nat → Nat) (inside : Nat → Prop)
     (RuntimeValue.loanHole loan).rename ρ = .loanHole (ρ loan) := by
   rw [RuntimeValue.rename]
 
+@[simp] theorem RuntimeValue.rename_ghost (contents : RuntimeValue) :
+    (RuntimeValue.ghost contents).rename ρ = .ghost (contents.rename ρ) := by
+  rw [RuntimeValue.rename]
+
 @[simp] theorem RuntimeValue.rename_unit : RuntimeValue.unit.rename ρ = .unit := by
   rw [RuntimeValue.rename]
 @[simp] theorem RuntimeValue.rename_bool (value : Bool) :
@@ -154,6 +160,9 @@ variable (ρ : Nat → Nat) (inside : Nat → Prop)
   rw [RuntimeValue.Within]
 @[simp] theorem RuntimeValue.within_loanHole (loan : Nat) :
     (RuntimeValue.loanHole loan).Within inside ↔ inside loan := by
+  rw [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_ghost (contents : RuntimeValue) :
+    (RuntimeValue.ghost contents).Within inside ↔ contents.Within inside := by
   rw [RuntimeValue.Within]
 @[simp] theorem RuntimeValue.within_unit : RuntimeValue.unit.Within inside := by
   simp [RuntimeValue.Within]
@@ -198,11 +207,12 @@ theorem RuntimeValue.rename_rename (ρ σ : Nat → Nat) (value : RuntimeValue) 
         simpa using RuntimeValue.rename_rename ρ σ element
   | .borrow loan current =>
       simp [RuntimeValue.rename_rename ρ σ current]
+  | .ghost contents => simp [RuntimeValue.rename_rename ρ σ contents]
   | .loanHole loan => simp
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => simp
 termination_by sizeOf value
-decreasing_by all_goals (simp_wf; first
+decreasing_by all_goals (simp_wf; try first
   | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
 end
 
@@ -231,13 +241,16 @@ theorem RuntimeValue.rename_congr {inside : Nat → Prop} {ρ σ : Nat → Nat}
   | .borrow loan current, within => by
       simp only [RuntimeValue.within_borrow] at within
       simp [same loan within.1, RuntimeValue.rename_congr same current within.2]
+  | .ghost contents, within => by
+      simp only [RuntimeValue.within_ghost] at within
+      simp only [RuntimeValue.rename_ghost, RuntimeValue.rename_congr same contents within]
   | .loanHole loan, within => by
       simp only [RuntimeValue.within_loanHole] at within
       simp [same loan within]
   | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
   | .string _, _ | .bytes _, _ => by simp
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; first
+decreasing_by all_goals (simp_wf; try first
   | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
 
 /-- The identity renaming changes nothing. -/
@@ -258,11 +271,12 @@ theorem RuntimeValue.rename_id : ∀ (value : RuntimeValue), value.rename id = v
       conv => rhs; rw [← Array.map_id captures]
       exact Array.map_congr_left fun element member => RuntimeValue.rename_id element
   | .borrow loan current => by simp [RuntimeValue.rename_id current]
+  | .ghost contents => by simp [RuntimeValue.rename_id contents]
   | .loanHole loan => by simp
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => by simp
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; first
+decreasing_by all_goals (simp_wf; try first
   | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
 
 /-- A value is the renaming back of its renaming by a renaming with a left
@@ -299,6 +313,10 @@ theorem RuntimeValue.within_rename {inside : Nat → Prop} (ρ : Nat → Nat) :
       simp only [RuntimeValue.within_borrow] at within
       simp only [RuntimeValue.rename_borrow, RuntimeValue.within_borrow]
       exact ⟨⟨loan, within.1, rfl⟩, RuntimeValue.within_rename ρ current within.2⟩
+  | .ghost contents, within => by
+      simp only [RuntimeValue.within_ghost] at within
+      simp only [RuntimeValue.rename_ghost, RuntimeValue.within_ghost]
+      exact RuntimeValue.within_rename ρ contents within
   | .loanHole loan, within => by
       simp only [RuntimeValue.within_loanHole] at within
       simp only [RuntimeValue.rename_loanHole, RuntimeValue.within_loanHole]
@@ -306,7 +324,7 @@ theorem RuntimeValue.within_rename {inside : Nat → Prop} (ρ : Nat → Nat) :
   | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
   | .string _, _ | .bytes _, _ => by simp
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; first
+decreasing_by all_goals (simp_wf; try first
   | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
 
 /-- A weaker predicate holds of every loan a value holds. -/
@@ -325,13 +343,16 @@ theorem RuntimeValue.Within.mono {inside outside : Nat → Prop}
   | .borrow loan current, within => by
       simp only [RuntimeValue.within_borrow] at within ⊢
       exact ⟨weaker loan within.1, RuntimeValue.Within.mono weaker within.2⟩
+  | .ghost contents, within => by
+      simp only [RuntimeValue.within_ghost] at within ⊢
+      exact RuntimeValue.Within.mono weaker within
   | .loanHole loan, within => by
       simp only [RuntimeValue.within_loanHole] at within ⊢
       exact weaker loan within
   | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
   | .string _, _ | .bytes _, _ => by simp
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; first
+decreasing_by all_goals (simp_wf; try first
   | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
 
 /-- Every value holds only loans everything satisfies. -/
@@ -346,11 +367,12 @@ theorem RuntimeValue.within_true : ∀ (value : RuntimeValue), value.Within fun 
       simp only [RuntimeValue.within_closure]
       exact fun element member => RuntimeValue.within_true element
   | .borrow loan current => by simp [RuntimeValue.within_true current]
+  | .ghost contents => by simp [RuntimeValue.within_true contents]
   | .loanHole loan => by simp
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => by simp
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; first
+decreasing_by all_goals (simp_wf; try first
   | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
 
 open Classical in
@@ -391,6 +413,8 @@ theorem RuntimeValue.rename_of_plain (ρ : Nat → Nat) :
     ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.rename ρ = value
   | _, .unit | _, .bool _ | _, .character _ | _, .integer _ | _, .address _ | _, .signer _
   | _, .string _ | _, .bytes _ => by simp
+  | _, .ghost contents plain => by
+      simp only [RuntimeValue.rename_ghost, RuntimeValue.rename_of_plain ρ plain]
   | _, .vector elements plain => by
       simp only [RuntimeValue.rename_vector, RuntimeValue.vector.injEq]
       conv => rhs; rw [← Array.map_id elements]
@@ -416,6 +440,7 @@ theorem RuntimeValue.within_of_plain (inside : Nat → Prop) :
     ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.Within inside
   | _, .unit | _, .bool _ | _, .character _ | _, .integer _ | _, .address _ | _, .signer _
   | _, .string _ | _, .bytes _ => by simp
+  | _, .ghost _ plain => by simpa using RuntimeValue.within_of_plain inside plain
   | _, .vector _ plain | _, .tuple _ plain => by
       simpa using fun element member => RuntimeValue.within_of_plain inside (plain element member)
   | _, .nominal _ _ _ plain => by
@@ -447,11 +472,14 @@ theorem RuntimeValue.observe_rename (ρ : Nat → Nat) (value : RuntimeValue) :
   | .borrow loan current =>
       rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
         RuntimeValue.observe_rename ρ current]
+  | .ghost contents =>
+      rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
+        RuntimeValue.observe_rename ρ contents]
   | .loanHole loan => rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe]
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => rw [RuntimeValue.rename]
 termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 theorem RuntimeValue.observeList_renameList (ρ : Nat → Nat) (values : List RuntimeValue) :
     RuntimeValue.observeList (RuntimeValue.renameList ρ values) =
@@ -483,6 +511,8 @@ theorem RuntimeValue.observe_of_plain :
     ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.observe = value
   | _, .unit | _, .bool _ | _, .character _ | _, .integer _ | _, .address _ | _, .signer _
   | _, .string _ | _, .bytes _ => by rw [RuntimeValue.observe]
+  | _, .ghost contents plain => by
+      rw [RuntimeValue.observe, RuntimeValue.observe_of_plain plain]
   | _, .vector elements plain => by
       rw [RuntimeValue.observe, RuntimeValue.observeList_eq_map,
         RuntimeValue.observeList_plain_aux elements (fun element member =>
@@ -543,10 +573,11 @@ theorem rewriteFirst_rename {f g : RuntimeValue → Option RuntimeValue}
             rewriteFirst_rename node current, Option.map_map]
           congr 1; funext x; simp
       | loanHole loan => simp
+      | ghost contents => simp
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp
 termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 theorem rewriteFirstList_rename {f g : RuntimeValue → Option RuntimeValue}
     (node : ∀ value, f (value.rename ρ) = (g value).map (·.rename ρ))
@@ -593,10 +624,11 @@ theorem findFirst_rename {α β : Type} {f : RuntimeValue → Option β} {g : Ru
       | borrow loan current =>
           simp only [Option.map_none, RuntimeValue.rename_borrow, findFirst_rename node current]
       | loanHole loan => simp
+      | ghost contents => simp
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp
 termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 theorem findFirstList_rename {α β : Type} {f : RuntimeValue → Option β}
     {g : RuntimeValue → Option α} {φ : α → β}
@@ -641,10 +673,11 @@ theorem collectPruned_rename {α β : Type} {f : RuntimeValue → Option β}
       | borrow loan current =>
           simp only [Option.map_none, RuntimeValue.rename_borrow, collectPruned_rename node current]
       | loanHole loan => simp
+      | ghost contents => simp
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp
 termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 theorem collectPrunedList_rename {α β : Type} {f : RuntimeValue → Option β}
     {g : RuntimeValue → Option α} {φ : α → β}
@@ -709,11 +742,6 @@ abbrev renameEntry {α : Type} (ρ : Nat → Nat) (entry : Nat × α) : Nat × �
 /-- Global memory with the loans its slots hold renamed. -/
 def GlobalMap.rename (ρ : Nat → Nat) (globals : GlobalMap) : GlobalMap :=
   ⟨globals.entries.map fun slot => { slot with value := slot.value.rename ρ }⟩
-
-/-- Native Table contents with loans renamed; allocation identities are unchanged. -/
-def NativeTableStorage.rename (ρ : Nat → Nat) (storage : NativeTableStorage) :
-    NativeTableStorage :=
-  { storage with contents := storage.contents.rename ρ }
 
 /-- A frame with its loans renamed: its locals' values, the instance each
 site's loan has, and the loans whose places it caches. -/
@@ -897,15 +925,15 @@ structure LoanRenaming (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat 
 registrations of the loans it holds (`inside`), renamed, before entries of
 loans neither run holds, which no loan of the run reaches. -/
 def RegistryRenamed (ρ : Nat → Nat) (inside : Nat → Prop)
-    (registry registry' : List (Nat × LoanTarget)) : Prop :=
+    (registry registry' : List (Nat × GlobalKey)) : Prop :=
   ∃ held junk junk', registry = held ++ junk ∧
     registry' = held.map (renameEntry ρ) ++ junk' ∧
     (∀ entry ∈ held, inside entry.1) ∧ (∀ entry ∈ junk, ¬inside entry.1) ∧
     ∀ entry ∈ junk', ∀ loan, inside loan → ρ loan ≠ entry.1
 
-/-- A state of a second run mirroring one of a first: its global memory,
-Table contents, and the write-backs pending past each run's first `inert`,
-with their loans renamed; its frontier raised by `offset`; and its loan
+/-- A state of a second run mirroring one of a first: its global memory and
+the write-backs pending past each run's first `inert`, with their loans
+renamed; the same table handles; its frontier raised by `offset`; and its loan
 registry the first's registrations of the loans minted at or beyond
 registrations of the loans it holds, renamed, before entries of loans neither
 run holds. Every loan the first run's state holds outside its inert
@@ -914,7 +942,7 @@ structure StateRenamed (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat 
     (inert inert' : Nat) (state state' : RuntimeState) : Prop where
   renames : LoanRenaming ρ offset frontier inside
   globals : state'.globals = state.globals.rename ρ
-  tables : state'.tables = state.tables.rename ρ
+  tableHandles : state'.tableHandles = state.tableHandles
   nextLoan : state'.nextLoan = state.nextLoan + offset
   frontier_le : frontier ≤ state.nextLoan
   inert_le : inert ≤ state.pending.size
@@ -922,9 +950,8 @@ structure StateRenamed (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat 
   pending : state'.pending.extract inert' state'.pending.size =
     (state.pending.extract inert state.pending.size).map fun entry =>
       (ρ entry.1, entry.2.rename ρ)
-  registry : RegistryRenamed ρ inside state.storageLoans state'.storageLoans
+  registry : RegistryRenamed ρ inside state.globalLoans state'.globalLoans
   globalsWithin : ∀ slot ∈ state.globals.entries, slot.value.Within inside
-  tablesWithin : ∀ slot ∈ state.tables.contents.entries, slot.value.Within inside
   pendingWithin : ∀ entry ∈ state.pending.extract inert state.pending.size,
     inside entry.1 ∧ entry.2.Within inside
 

@@ -363,7 +363,7 @@ private def checkTables (registry : ProfileRegistry) (unit : RawUnit) (tables : 
 
 private def placeChildren : Place → Array PlaceId
   | .localVar _ => #[]
-  | .deref base | .field base .. | .index base _ | .subslice base .. |
+  | .deref base | .field base .. | .ghostField base .. | .index base _ | .subslice base .. |
       .downcast base _ => #[base]
 
 private def genericArgumentTypeChildren : GenericArgument → Array TypeId
@@ -629,6 +629,44 @@ private def checkGenericBinders (registry : ProfileRegistry) (unit : RawUnit) (t
 private def checkField (tables : Tables) (field : FieldDecl) : Array Diagnostic :=
   checkLoc tables field.loc ++ checkName tables field.name (some field.loc) ++
     checkTypeUse tables field.type
+
+/-- Whether a type holds a reference, by its structure; a function value's
+type holds none of its parameters' or result's. -/
+private def typeHoldsReference (tables : Tables) : Nat → TypeId → Bool
+  | 0, _ => true
+  | fuel + 1, typeId => match tables.types[typeId.index]? with
+    | some (.reference _) => true
+    | some (.vector element _) | some (.typeDomain element) =>
+        typeHoldsReference tables fuel element
+    | some (.tuple elements) => elements.any (typeHoldsReference tables fuel)
+    | some (.resourceDomain _ arguments) =>
+        arguments.any (·.any (typeHoldsReference tables fuel))
+    | some (.nominal _ arguments) => arguments.any fun
+        | .typeArg use => typeHoldsReference tables fuel use.typeId
+        | .const _ | .lifetime _ | .evidence _ => false
+    | some .unit | some .never | some .bool | some .character | some .string | some .bytes
+    | some .address | some .signer | some (.integer ..) | some .range | some .eventStore
+    | some .stateDomain | some (.function ..) | some (.typeParameter _) | some (.profile _)
+    | none => false
+
+/-- A ghost field's declaration (`designs/ghost-fields.md`): its type holds
+no reference, so that its slot holds no loan; an initializer is an
+expression of an owned namespace. -/
+private def checkGhostField (registry : ProfileRegistry) (unit : RawUnit)
+    (binders : Array BinderKind) (expressions : Option RawNamespace)
+    (ghost : GhostFieldDecl) : Array Diagnostic :=
+  let ds := checkLoc unit.tables ghost.loc ++ checkName unit.tables ghost.name (some ghost.loc) ++
+    checkTypeUse unit.tables ghost.type ++
+    checkScopedTypeUse registry unit unit.tables binders ghost.type
+  let ds := if typeHoldsReference unit.tables (unit.tables.types.size + 1) ghost.type.typeId then
+      ds.push <| .at "VIR-GHOST-REFERENCE" "a ghost field's type cannot hold a reference" ghost.loc
+    else ds
+  match ghost.initializer, expressions with
+  | none, _ => ds
+  | some initializer, some ns => ds ++ checkExprId ns initializer (some ghost.loc)
+  | some _, none =>
+      ds.push <| .at "VIR-DEPENDENCY-INTERFACE"
+        "a dependency interface declaration carries no ghost initializer" ghost.loc
 
 private def checkPredicates (registry : ProfileRegistry) (unit : RawUnit)
     (ns : RawNamespace) (loc : LocId) (binders : Array BinderKind)
@@ -965,9 +1003,12 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       checkGenericBinders registry unit unit.tables ns.associatedItems.size struct.generics ++
       checkAbilityList "nominal declaration" struct.abilities (some struct.loc) ++
       checkDeclarationNames unit.tables ns.identity "struct field"
-        (struct.fields.map fun field => (field.name, field.loc)) ++
+        ((struct.fields.map fun field => (field.name, field.loc)) ++
+          struct.ghosts.map fun ghost => (ghost.name, ghost.loc)) ++
       struct.fields.foldl (fun ds field => ds ++ checkField unit.tables field ++
         checkScopedTypeUse registry unit unit.tables structBinders field.type) #[] ++
+      struct.ghosts.foldl (fun ds ghost =>
+        ds ++ checkGhostField registry unit structBinders (some ns) ghost) #[] ++
       struct.properties.foldl (fun ds property =>
         ds ++ checkProfileValue registry unit property ProfileSchema.checkProperty) #[] ++
       checkLocals unit.tables struct.locals ++
@@ -985,7 +1026,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     struct.variants.foldl (fun ds variant =>
       ds ++ checkLoc unit.tables variant.loc ++ checkName unit.tables variant.name (some variant.loc) ++
         checkDeclarationNames unit.tables ns.identity "variant field"
-          (variant.fields.map fun field => (field.name, field.loc)) ++
+          ((variant.fields.map fun field => (field.name, field.loc)) ++
+            struct.ghosts.map fun ghost => (ghost.name, ghost.loc)) ++
         variant.fields.foldl (fun ds field => ds ++ checkField unit.tables field ++
           checkScopedTypeUse registry unit unit.tables structBinders field.type) #[]) ds) #[]
   let associatedItemErrors := ns.associatedItems.zipIdx.foldl (init := #[])
@@ -1322,9 +1364,12 @@ private def checkInterfaceStruct (registry : ProfileRegistry) (unit : RawUnit)
     checkGenericBinders registry unit unit.tables 0 struct.generics ++
     checkAbilityList "nominal declaration" struct.abilities (some struct.loc) ++
     checkDeclarationNames unit.tables owner "struct field"
-      (struct.fields.map fun field => (field.name, field.loc)) ++
+      ((struct.fields.map fun field => (field.name, field.loc)) ++
+        struct.ghosts.map fun ghost => (ghost.name, ghost.loc)) ++
     struct.fields.foldl (fun ds field => ds ++ checkField unit.tables field ++
       checkScopedTypeUse registry unit unit.tables binders field.type) #[] ++
+    struct.ghosts.foldl (fun ds ghost =>
+      ds ++ checkGhostField registry unit binders none ghost) #[] ++
     struct.properties.foldl (fun ds property =>
       ds ++ checkProfileValue registry unit property ProfileSchema.checkProperty) #[] ++
     checkDeclarationNames unit.tables owner "enum variant"
@@ -1333,7 +1378,8 @@ private def checkInterfaceStruct (registry : ProfileRegistry) (unit : RawUnit)
       ds ++ checkLoc unit.tables variant.loc ++
         checkName unit.tables variant.name (some variant.loc) ++
         checkDeclarationNames unit.tables owner "variant field"
-          (variant.fields.map fun field => (field.name, field.loc)) ++
+          ((variant.fields.map fun field => (field.name, field.loc)) ++
+            struct.ghosts.map fun ghost => (ghost.name, ghost.loc)) ++
         variant.fields.foldl (fun ds field => ds ++ checkField unit.tables field ++
           checkScopedTypeUse registry unit unit.tables binders field.type) #[]) #[]
   let ds := if !struct.fields.isEmpty && !struct.variants.isEmpty then
@@ -1440,15 +1486,126 @@ private def checkUnit (registry : ProfileRegistry) (unit : RawUnit) : Array Diag
         #[.error "VIR-NAMESPACE-TABLE"
           s!"unit has {unit.namespaces.size} owned namespaces but its table has only {unit.tables.namespaces.size} entries"]))
 
-/-- A mutable reference held in a local and passed by name to a mutable
-reference parameter is copied into the call, and in the prophecy model a
-copy of a mutable reference is a reborrow: the argument becomes
-`&mut *local`, a fresh loan whose hole rests in the caller's frame and whose
-death the borrow analysis records, so the callee's write-back lands where
-the caller reads and exports.  Frontends spell such an argument as the
-bare local, the way their sources do, and the printer spells it back that
-way; the rewrite keeps the argument's arena slot, so no ordering changes. -/
-private def normalizeReferenceArguments (unit : RawUnit) : RawUnit :=
+/-- The expressions a value flows out of: the leaves of its branches and
+blocks, where a copied reference rests before it reaches its holder. -/
+private def valueLeaves (expressions : Array Expr) : Nat → ExprId → Array ExprId
+  | 0, id => #[id]
+  | fuel + 1, id =>
+      match (expressions[id.index]?).map (fun (node : Expr) => node.kind) with
+      | some (.ifElse _ thenBranch (some elseBranch)) =>
+          valueLeaves expressions fuel thenBranch ++ valueLeaves expressions fuel elseBranch
+      | some (.match_ _ arms) => arms.flatMap fun arm => valueLeaves expressions fuel arm.body
+      | some (.block _ (some result)) => valueLeaves expressions fuel result
+      | some (.letDecl _ _ body) => valueLeaves expressions fuel body
+      | some (.operation (.primitive .tuple) _ #[element] _) => valueLeaves expressions fuel element
+      | _ => #[id]
+
+/-- Whether a pattern binds one local: a variable, possibly in one-element
+tuples, as compilers spell a binding. -/
+private def bindsOneLocal (patterns : Array Pattern) : Nat → PatternId → Bool
+  | 0, _ => false
+  | fuel + 1, id =>
+      match (patterns[id.index]?).map (fun (pattern : Pattern) => pattern.kind) with
+      | some (.variable _) => true
+      | some (.tuple #[child]) => bindsOneLocal patterns fuel child
+      | _ => false
+
+/-- The locals a pattern binds. -/
+private def patternLocals (patterns : Array Pattern) : Nat → PatternId → Array LocalId
+  | 0, _ => #[]
+  | fuel + 1, id =>
+      match (patterns[id.index]?).map (fun (pattern : Pattern) => pattern.kind) with
+      | some (.variable localId) => #[localId]
+      | some (.tuple children) | some (.constructor _ _ _ children) =>
+          children.flatMap (patternLocals patterns fuel)
+      | _ => #[]
+
+/-- The local a place is rooted at. -/
+private def placeRootLocal? (places : Array Place) : Nat → PlaceId → Option LocalId
+  | 0, _ => none
+  | fuel + 1, id =>
+      match places[id.index]? with
+      | some (.localVar localId) => some localId
+      | some (.deref base) | some (.field base ..) | some (.ghostField base ..)
+      | some (.index base _) | some (.subslice base ..) | some (.downcast base _) =>
+          placeRootLocal? places fuel base
+      | none => none
+
+/-- The local a copy reads, in either local-access form frontends use. -/
+private def copiedLocal? (places : Array Place) : ExprKind → Option LocalId
+  | .localVar localId => some localId
+  | .operation (.copy place) _ _ _ | .operation (.read place) _ _ _ =>
+      match places[place.index]? with
+      | some (.localVar localId) => some localId
+      | _ => none
+  | _ => none
+
+/-- What a function body does with its locals, outside its specifications:
+how often each is used, the loops its declaration sits in, and the loops
+each node sits in. A local never declared is a parameter. -/
+private structure LocalUses where
+  counts : Array Nat
+  declaredUnder : Array (Option (Array ExprId))
+  loopsAt : Array (Option (Array ExprId))
+
+private def LocalUses.use (uses : LocalUses) (localId : LocalId) : LocalUses :=
+  { uses with counts := uses.counts.modify localId.index (· + 1) }
+
+private def LocalUses.declare (uses : LocalUses) (loops : Array ExprId) (localId : LocalId) :
+    LocalUses :=
+  { uses with declaredUnder := uses.declaredUnder.set! localId.index (some loops) }
+
+private def collectLocalUses (expressions : Array Expr) (places : Array Place)
+    (patterns : Array Pattern) (loops : Array ExprId) : Nat → ExprId → LocalUses → LocalUses
+  | 0, _, uses => uses
+  | fuel + 1, id, uses =>
+  -- A node visited twice is a cycle the structural checks reject.
+  match expressions[id.index]?, uses.loopsAt[id.index]? with
+  | none, _ | _, some (some _) => uses
+  | some node, _ =>
+      let uses := { uses with loopsAt := uses.loopsAt.set! id.index (some loops) }
+      let rootUse (uses : LocalUses) (place : PlaceId) : LocalUses :=
+        match placeRootLocal? places places.size place with
+        | some localId => uses.use localId
+        | none => uses
+      let uses := match node.kind with
+        | .localVar localId => uses.use localId
+        | .operation operation _ _ _ =>
+            match operation with
+            | .move place | .copy place | .read place | .borrow _ place | .write place
+            | .drop place => rootUse uses place
+            | _ => uses
+        | .assign place _ => rootUse uses place
+        | .assignPattern pattern _ =>
+            (patternLocals patterns patterns.size pattern).foldl (·.use ·) uses
+        | .letDecl pattern _ _ =>
+            (patternLocals patterns patterns.size pattern).foldl (·.declare loops ·) uses
+        | .match_ _ arms =>
+            arms.foldl (fun uses arm =>
+              (patternLocals patterns patterns.size arm.pattern).foldl (·.declare loops ·) uses) uses
+        | _ => uses
+      match node.kind with
+      -- Specifications are not executed.
+      | .spec _ | .quantifier .. => uses
+      | .loop _ body => collectLocalUses expressions places patterns (loops.push id) fuel body uses
+      | kind => (expressionChildren kind).foldl
+          (fun uses child => collectLocalUses expressions places patterns loops fuel child uses) uses
+
+/-- A mutable reference held in a local and copied by name — into a call's
+mutable reference parameter, a local it initializes, or a local it is
+assigned to — is, in the prophecy model, a reborrow: the copy becomes
+`&mut *local`, a fresh loan whose hole rests in the holder's frame and whose
+death the borrow analysis records, so a write through the copy lands where
+the original reads and exports, and no two locals hold one loan. A copy
+into a binding that is the local's only executable use, and not repeated by
+an enclosing loop the local outlives, is the local's last use, which the
+compiler spells as a move: it becomes `move local`, which lends nothing. A
+copy flowing out of a branch or a block is rewritten at its leaves;
+specifications, which are not executed, are left as they are. Frontends
+spell such a copy as the bare local, the way their sources do, and the
+printer spells it back that way; the rewrite keeps the copy's arena slot,
+so no ordering changes. -/
+private def normalizeReferenceCopies (unit : RawUnit) : RawUnit :=
   let parameterTypes (reference : QualifiedRef) : Option (Array TypeId) :=
     let signature? :=
       if reference.namespaceId.index < unit.namespaces.size then
@@ -1465,6 +1622,45 @@ private def normalizeReferenceArguments (unit : RawUnit) : RawUnit :=
     | _ => none
   let (tables, namespaces) := unit.namespaces.foldl (init := (unit.tables, #[]))
     fun (tables, namespaces) ns =>
+      -- The copy at `copy`, where it reads a local mutable reference, as a
+      -- move of the local or a reborrow of its referent: with a lifetime of
+      -- its own where it is lent to a call, with the local's where it rests
+      -- in a binding.
+      let rewrite (lent moved : Bool) (tables : Tables) (expressions : Array Expr)
+          (places : Array Place) (copy : ExprId) : Tables × Array Expr × Array Place :=
+        match expressions[copy.index]? with
+        | some copyNode =>
+            match copiedLocal? places copyNode.kind, mutableReference? tables copyNode.typeId with
+            | some localId, some reference =>
+                let localPlace : PlaceId := ⟨places.size⟩
+                let places := places.push (.localVar localId)
+                if moved then
+                  (tables, expressions.set! copy.index { copyNode with
+                    kind := .operation (.move localPlace) #[] #[] none }, places)
+                else
+                -- A Move reborrow keeps the reference's type: Move
+                -- references carry no lifetimes.
+                let (tables, typeId) := if ns.profile == some .move || !lent then
+                    (tables, copyNode.typeId)
+                  else
+                    let lifetime : LifetimeId := ⟨tables.lifetimes.size⟩
+                    let inferred : Lifetime :=
+                      { kind := .inference, loc := copyNode.loc }
+                    let tables :=
+                      { tables with lifetimes := tables.lifetimes.push inferred }
+                    let reborrowed : Ty := .reference { reference with lifetime }
+                    ({ tables with types := tables.types.push reborrowed },
+                      ⟨tables.types.size⟩)
+                let derefPlace : PlaceId := ⟨places.size⟩
+                let places := places.push (.deref localPlace)
+                let expressions := expressions.set! copy.index
+                  { copyNode with
+                    typeId
+                    kind := .operation (.borrow .mutable derefPlace) #[] #[] none }
+                (tables, expressions, places)
+            | _, _ => (tables, expressions, places)
+        | none => (tables, expressions, places)
+      -- The copies a call lends: reborrows.
       let (tables, expressions, places) :=
         ns.expressions.foldl (init := (tables, ns.expressions, ns.places))
           fun (tables, expressions, places) node =>
@@ -1475,28 +1671,53 @@ private def normalizeReferenceArguments (unit : RawUnit) : RawUnit :=
                 | some parameters =>
                     (arguments.zip parameters).foldl (init := (tables, expressions, places))
                       fun (tables, expressions, places) (argument, parameter) =>
-                        match expressions[argument.index]? with
-                        | some argumentNode =>
-                            match argumentNode.kind, mutableReference? tables argumentNode.typeId,
-                                mutableReference? tables parameter with
-                            | .localVar localId, some reference, some _ =>
-                                let lifetime : LifetimeId := ⟨tables.lifetimes.size⟩
-                                let inferred : Lifetime := { kind := .inference, loc := argumentNode.loc }
-                                let tables := { tables with lifetimes := tables.lifetimes.push inferred }
-                                let typeId : TypeId := ⟨tables.types.size⟩
-                                let reborrowed : Ty := .reference { reference with lifetime }
-                                let tables := { tables with types := tables.types.push reborrowed }
-                                let localPlace : PlaceId := ⟨places.size⟩
-                                let places := places.push (.localVar localId)
-                                let derefPlace : PlaceId := ⟨places.size⟩
-                                let places := places.push (.deref localPlace)
-                                let expressions := expressions.set! argument.index
-                                  { argumentNode with
-                                    typeId
-                                    kind := .operation (.borrow .mutable derefPlace) #[] #[] none }
-                                (tables, expressions, places)
-                            | _, _, _ => (tables, expressions, places)
-                        | none => (tables, expressions, places)
+                        if (mutableReference? tables parameter).isSome then
+                          (valueLeaves expressions expressions.size argument).foldl
+                            (init := (tables, expressions, places))
+                            fun (tables, expressions, places) leaf =>
+                              rewrite true false tables expressions places leaf
+                        else (tables, expressions, places)
+            | _ => (tables, expressions, places)
+      -- The copies a function's bindings hold: moves where they are the
+      -- local's last use, reborrows otherwise.
+      let (tables, expressions, places) :=
+        ns.functions.foldl (init := (tables, expressions, places))
+          fun (tables, expressions, places) function =>
+            match function.body with
+            | .structured root =>
+                let uses := collectLocalUses expressions places ns.patterns #[]
+                  (expressions.size + 1) root {
+                  counts := Array.replicate function.locals.size 0
+                  declaredUnder := Array.replicate function.locals.size none
+                  loopsAt := Array.replicate expressions.size none }
+                let lastUse (site : ExprId) (localId : LocalId) : Bool :=
+                  uses.counts[localId.index]? == some 1 &&
+                    let declared := (uses.declaredUnder[localId.index]?.bind id).getD #[]
+                    ((uses.loopsAt[site.index]?.bind id).getD #[]).all declared.contains
+                let bound (tables : Tables) (expressions : Array Expr) (places : Array Place)
+                    (site value : ExprId) : Tables × Array Expr × Array Place :=
+                  (valueLeaves expressions expressions.size value).foldl
+                    (init := (tables, expressions, places))
+                    fun (tables, expressions, places) leaf =>
+                      let moved := match expressions[leaf.index]? with
+                        | some leafNode =>
+                            (copiedLocal? places leafNode.kind).any (lastUse site)
+                        | none => false
+                      rewrite false moved tables expressions places leaf
+                (uses.loopsAt.zipIdx).foldl (init := (tables, expressions, places))
+                  fun (tables, expressions, places) (visited, index) =>
+                    if visited.isNone then (tables, expressions, places) else
+                    let site : ExprId := ⟨index⟩
+                    match (expressions[index]?).map (fun (node : Expr) => node.kind) with
+                    | some (.letDecl pattern (some value) _) =>
+                        if bindsOneLocal ns.patterns ns.patterns.size pattern then
+                          bound tables expressions places site value
+                        else (tables, expressions, places)
+                    | some (.assign place value) =>
+                        match places[place.index]? with
+                        | some (.localVar _) => bound tables expressions places site value
+                        | _ => (tables, expressions, places)
+                    | _ => (tables, expressions, places)
             | _ => (tables, expressions, places)
       (tables, namespaces.push { ns with expressions, places })
   { unit with tables, namespaces }
@@ -1512,7 +1733,7 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   let (rawUnit, holders) := holdMutableReferences rawUnit
   let rawUnit := { rawUnit with
     namespaces := rawUnit.namespaces.map (normalizeValueBorrows rawUnit.tables) }
-  let rawUnit := normalizeReferenceArguments rawUnit
+  let rawUnit := normalizeReferenceCopies rawUnit
   let rawUnit := internSharedViews rawUnit
   let rawDiagnostics := checkUnit registry rawUnit
   if rawDiagnostics.any (·.severity == .error) then

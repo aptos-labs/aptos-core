@@ -73,14 +73,29 @@ private structure LoanPlace where
   projections : Array LoanProjection := #[]
   deriving Repr, BEq, Inhabited
 
+/-- An incoming loan has no borrow expression in this frame and must never
+produce a runtime loan-death event. Its identity still follows the same
+holder and aggregate-carrier flow as loans created by the body. -/
+private inductive LoanSource where
+  | parameter (localId : LocalId)
+  | expression (exprId : ExprId)
+  deriving Repr, BEq, Inhabited
+
+private def LoanSource.expression? : LoanSource → Option ExprId
+  | .parameter _ => none
+  | .expression exprId => some exprId
+
 private structure LoanFact where
-  expression : ExprId
+  source : LoanSource
   kind : ReferenceKind
   place : LoanPlace
   lifetime : LifetimeId
   loc : LocId
   holders : Array LocalId := #[]
   holderPlaces : Array LoanPlace := #[]
+  /-- Established when the loan is created, before local holders can die.
+  Joining alternative origins requires every origin to allow escape. -/
+  canEscape : Bool := false
   deriving Repr, BEq, Inhabited
 
 private structure BorrowState where
@@ -114,20 +129,21 @@ private def appendUniqueLoanPlaces (left right : Array LoanPlace) : Array LoanPl
 
 private def appendUniqueLoans (left right : Array LoanFact) : Array LoanFact :=
   right.foldl (init := left) fun loans loan =>
-    if loans.any (·.expression == loan.expression) then
+    if loans.any (·.source == loan.source) then
       loans.map fun current =>
-        if current.expression == loan.expression then
+        if current.source == loan.source then
           { current with
             holders := appendUniqueLocals current.holders loan.holders
-            holderPlaces := appendUniqueLoanPlaces current.holderPlaces loan.holderPlaces }
+            holderPlaces := appendUniqueLoanPlaces current.holderPlaces loan.holderPlaces
+            canEscape := current.canEscape && loan.canEscape }
         else current
     else loans.push loan
 
 /-- Mutable loans of `before` no longer active in `after`. -/
 private def diffLoans (before after : BorrowState) : Array LoanFact :=
   before.active.filter fun loan =>
-    loan.kind == .mutable &&
-      !after.active.any (·.expression == loan.expression)
+    loan.kind == .mutable && loan.source.expression?.isSome &&
+      !after.active.any (·.source == loan.source)
 
 private def appendUniqueDeaths (left right : Array (ExprId × LoanDeath)) :
     Array (ExprId × LoanDeath) :=
@@ -137,7 +153,9 @@ private def appendUniqueDeaths (left right : Array (ExprId × LoanDeath)) :
 private def pushDeaths (deaths : Array (ExprId × LoanDeath))
     (died : Array LoanFact) (death : LoanDeath) : Array (ExprId × LoanDeath) :=
   died.foldl (init := deaths) fun deaths loan =>
-    appendUniqueDeaths deaths #[(loan.expression, death)]
+    match loan.source with
+    | .parameter _ => deaths
+    | .expression exprId => appendUniqueDeaths deaths #[(exprId, death)]
 
 private def mergeState (left right : BorrowState) : BorrowState :=
   { active := appendUniqueLoans left.active right.active }
@@ -171,7 +189,7 @@ private partial def loanPlace? (ns : ValidatedNamespace) (placeId : PlaceId)
   | fuel + 1, some (.deref base) => do
       let place ← loanPlace? ns base fuel
       some { place with projections := place.projections.push .dereference }
-  | fuel + 1, some (.field base _ field) => do
+  | fuel + 1, some (.field base _ field) | fuel + 1, some (.ghostField base _ field) => do
       let place ← loanPlace? ns base fuel
       some { place with projections := place.projections.push (.field field) }
   | fuel + 1, some (.index base index) => do
@@ -261,6 +279,14 @@ private def referenceType? (ns : ValidatedNamespace) (typeId : TypeId) : Option 
   | some (.reference reference) => some reference
   | _ => none
 
+/-- A reborrow can escape only when every current origin of its reference
+is known to outlive this frame. Missing origins provide no such evidence. -/
+private def reborrowCanEscape (state : BorrowState) (place : LoanPlace) : Bool :=
+  place.projections[0]? == some .dereference &&
+    place.root.local?.any fun rootLocal =>
+      let parents := state.active.filter (·.holders.contains rootLocal)
+      !parents.isEmpty && parents.all (·.canEscape)
+
 private def addBorrow (ns : ValidatedNamespace) (exprId : ExprId) (loc : LocId)
     (resultType : TypeId) (kind : BorrowKind) (placeId : PlaceId)
     (state : BorrowState) (discarded : Bool := false) :
@@ -268,15 +294,19 @@ private def addBorrow (ns : ValidatedNamespace) (exprId : ExprId) (loc : LocId)
   match kind, loanPlace? ns placeId, referenceType? ns resultType with
   | .immutable, some place, some reference =>
       let kind := ReferenceKind.shared
-      let loan : LoanFact := { expression := exprId, kind, place, lifetime := reference.lifetime, loc }
-      let prior := { state with active := state.active.filter (·.expression != exprId) }
+      let loan : LoanFact := {
+        source := .expression exprId, kind, place
+        lifetime := reference.lifetime, loc, canEscape := reborrowCanEscape state place }
+      let prior := { state with active := state.active.filter (·.source != .expression exprId) }
       let diagnostics := accessDiagnostics prior loc place false "borrow"
-      let active := if state.active.any (·.expression == exprId) then state.active else state.active.push loan
+      let active := appendUniqueLoans state.active #[loan]
       ({ active }, #[loan], diagnostics)
   | .mutable, some place, some reference =>
       let kind := ReferenceKind.mutable
-      let loan : LoanFact := { expression := exprId, kind, place, lifetime := reference.lifetime, loc }
-      let prior := { state with active := state.active.filter (·.expression != exprId) }
+      let loan : LoanFact := {
+        source := .expression exprId, kind, place
+        lifetime := reference.lifetime, loc, canEscape := reborrowCanEscape state place }
+      let prior := { state with active := state.active.filter (·.source != .expression exprId) }
       -- Move's local-handle creation does not itself read or write the
       -- referent. An unobserved direct-local result can therefore take an
       -- empty live range even when another handle exists. The let analysis
@@ -285,7 +315,7 @@ private def addBorrow (ns : ValidatedNamespace) (exprId : ExprId) (loc : LocId)
       let diagnostics := if discarded && ns.profile == some .move &&
           place.projections.isEmpty then #[]
         else accessDiagnostics prior loc place true "borrow"
-      let active := if state.active.any (·.expression == exprId) then state.active else state.active.push loan
+      let active := appendUniqueLoans state.active #[loan]
       ({ active }, #[loan], diagnostics)
   | .profile _, _, _ =>
       (state, #[], #[.at "VIR-SEMANTIC-BORROW-COVERAGE"
@@ -309,10 +339,11 @@ private def addGlobalBorrow (ns : ValidatedNamespace) (exprId : ExprId) (loc : L
         | _ => .shared
       let place : LoanPlace := { root := .global resource.typeId }
       let loan : LoanFact := {
-        expression := exprId, kind, place, lifetime := reference.lifetime, loc }
-      let prior := { state with active := state.active.filter (·.expression != exprId) }
+        source := .expression exprId, kind, place, lifetime := reference.lifetime, loc
+        canEscape := ns.profile != some .move }
+      let prior := { state with active := state.active.filter (·.source != .expression exprId) }
       let diagnostics := accessDiagnostics prior loc place (kind == .mutable) "global borrow"
-      let active := if state.active.any (·.expression == exprId) then state.active
+      let active := if state.active.any (·.source == .expression exprId) then state.active
         else state.active.push loan
       ({ active }, #[loan], diagnostics)
   | _, _ => (state, #[], #[])
@@ -322,7 +353,8 @@ private partial def placeIndexAccessDiagnostics (ns : ValidatedNamespace)
   match fuel, ns.places[placeId.index]? with
   | 0, _ | _, none | _, some (.localVar _) => #[]
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
-      fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+      fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
+      fuel + 1, some (.downcast base _) =>
       placeIndexAccessDiagnostics ns state loc base fuel
   | fuel + 1, some (.index base index) =>
       let baseDiagnostics := placeIndexAccessDiagnostics ns state loc base fuel
@@ -349,8 +381,9 @@ private partial def placeContainsDereference (ns : ValidatedNamespace) (placeId 
   match fuel, ns.places[placeId.index]? with
   | 0, _ | _, none | _, some (.localVar _) => false
   | _, some (.deref _) => true
-  | fuel + 1, some (.field base _ _) | fuel + 1, some (.index base _) |
-      fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+  | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _) |
+      fuel + 1, some (.index base _) | fuel + 1, some (.subslice base ..) |
+      fuel + 1, some (.downcast base _) =>
       placeContainsDereference ns base fuel
 
 private def dereferenceConsumptionDiagnostics (ns : ValidatedNamespace) (loc : LocId)
@@ -366,7 +399,7 @@ private partial def placeUsesLocal (ns : ValidatedNamespace) (placeId : PlaceId)
   | 0, _ | _, none => true
   | _ + 1, some (.localVar candidate) => candidate == localId
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
-      fuel + 1, some (.subslice base ..) |
+      fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
       fuel + 1, some (.downcast base _) => placeUsesLocal ns base localId fuel
   | fuel + 1, some (.index base index) =>
       placeUsesLocal ns base localId fuel || match ns.expressions[index.index]? with
@@ -418,7 +451,9 @@ private partial def expressionUsesLocal (ns : ValidatedNamespace) (exprId : Expr
       expressionUsesLocal ns value localId fuel
   | fuel + 1, some { kind := .spec block, .. } =>
       (expressionChildren (.spec block)).any (expressionUsesLocal ns · localId fuel)
-  | _, some { kind := .quantifier .., .. } => true
+  -- A quantifier uses what its domains, triggers, condition, and body use.
+  | fuel + 1, some { kind := kind@(.quantifier ..), .. } =>
+      (expressionChildren kind).any (expressionUsesLocal ns · localId fuel)
   | _, some { kind := .value .., .. } | _, some { kind := .constant _, .. } |
       _, some { kind := .continue_ _, .. } => false
 
@@ -469,7 +504,8 @@ private partial def expressionUsesCarrier (ns : ValidatedNamespace) (exprId : Ex
       expressionUsesCarrier ns value carrier fuel
   | fuel + 1, some { kind := .spec block, .. } =>
       (expressionChildren (.spec block)).any (expressionUsesCarrier ns · carrier fuel)
-  | _, some { kind := .quantifier .., .. } => true
+  | fuel + 1, some { kind := kind@(.quantifier ..), .. } =>
+      (expressionChildren kind).any (expressionUsesCarrier ns · carrier fuel)
   | _, some { kind := .value .., .. } | _, some { kind := .constant _, .. } |
       _, some { kind := .continue_ _, .. } => false
 
@@ -530,10 +566,10 @@ private def loanUsedBy (ns : ValidatedNamespace) (expressions : List ExprId)
       expressionUsesCarrier ns expression carrier (ns.expressions.size + 1)) expressions
 
 private def loansUsedBy (ns : ValidatedNamespace) (expressions : List ExprId)
-    (state : BorrowState) (initial : Array ExprId := #[]) : Array ExprId :=
+    (state : BorrowState) (initial : Array LoanSource := #[]) : Array LoanSource :=
   state.active.foldl (init := initial) fun preserved loan =>
-    if preserved.contains loan.expression || !loanUsedBy ns expressions loan then preserved
-    else preserved.push loan.expression
+    if preserved.contains loan.source || !loanUsedBy ns expressions loan then preserved
+    else preserved.push loan.source
 
 private def loanUsedByPlace (ns : ValidatedNamespace) (placeId : PlaceId)
     (loan : LoanFact) : Bool :=
@@ -543,10 +579,10 @@ private def loanUsedByPlace (ns : ValidatedNamespace) (placeId : PlaceId)
     else carriers.any (placeUsesCarrier ns placeId)
 
 private def loansUsedByPlace (ns : ValidatedNamespace) (placeId : PlaceId)
-    (state : BorrowState) (initial : Array ExprId := #[]) : Array ExprId :=
+    (state : BorrowState) (initial : Array LoanSource := #[]) : Array LoanSource :=
   state.active.foldl (init := initial) fun preserved loan =>
-    if preserved.contains loan.expression || !loanUsedByPlace ns placeId loan then preserved
-    else preserved.push loan.expression
+    if preserved.contains loan.source || !loanUsedByPlace ns placeId loan then preserved
+    else preserved.push loan.source
 
 private def operationPlace? : Operation → Option PlaceId
   | .move place | .copy place | .borrow _ place | .read place |
@@ -554,16 +590,16 @@ private def operationPlace? : Operation → Option PlaceId
   | _ => none
 
 private def retainLoansUsedBy (ns : ValidatedNamespace) (expressions : List ExprId)
-    (state : BorrowState) (preserved : Array ExprId := #[]) : BorrowState :=
+    (state : BorrowState) (preserved : Array LoanSource := #[]) : BorrowState :=
   { active := state.active.filter fun loan =>
-      loan.holders.isEmpty || preserved.contains loan.expression ||
+      loan.holders.isEmpty || preserved.contains loan.source ||
         loanUsedBy ns expressions loan }
 
 private def bindObservedLoans (state : BorrowState) (observed : Array LoanFact)
     (holder : LocalId) : BorrowState :=
   let holderPlace : LoanPlace := { root := .local holder }
   { active := state.active.map fun loan =>
-      if observed.any (·.expression == loan.expression) then
+      if observed.any (·.source == loan.source) then
         { loan with
           holders := if loan.holders.contains holder then loan.holders else loan.holders.push holder
           holderPlaces := if loan.holderPlaces.contains holderPlace then loan.holderPlaces
@@ -576,7 +612,7 @@ private def releaseHolderLoans (state : BorrowState) (carried : Array LoanFact)
       if !loan.holders.contains holder then some loan else
         let holders := loan.holders.filter (· != holder)
         let holderPlaces := loan.holderPlaces.filter (·.root != .local holder)
-        if holders.isEmpty && !carried.any (·.expression == loan.expression) then none
+        if holders.isEmpty && !carried.any (·.source == loan.source) then none
         else some { loan with holders, holderPlaces } }
 
 private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
@@ -591,7 +627,7 @@ private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
         | some rootLocal =>
             if place.projections.isEmpty && loan.holders.contains rootLocal then
               let holders := loan.holders.filter (· != rootLocal)
-              if holders.isEmpty && !carried.any (·.expression == loan.expression) then none
+              if holders.isEmpty && !carried.any (·.source == loan.source) then none
               else some ({ loan with holders } : LoanFact)
             else some loan
         | none => some loan
@@ -603,7 +639,7 @@ private def releasePlaceLoans (ns : ValidatedNamespace) (state : BorrowState)
             else match place.root.local? with
               | some rootLocal => loan.holders.filter (· != rootLocal)
               | none => loan.holders
-          if holders.isEmpty && !carried.any (·.expression == loan.expression) then none
+          if holders.isEmpty && !carried.any (·.source == loan.source) then none
           else some ({ loan with holders, holderPlaces } : LoanFact)
     { active }
 
@@ -646,7 +682,7 @@ private def replaceHolderLoans (state : BorrowState) (observed : Array LoanFact)
 
 private def recordBoundLoans (state : BorrowState) (observed : Array LoanFact) : Array LoanFact :=
   appendUniqueLoans observed <| state.active.filter fun loan =>
-    observed.any (·.expression == loan.expression)
+    observed.any (·.source == loan.source)
 
 private def loansHeldAtPlace (ns : ValidatedNamespace) (state : BorrowState)
     (placeId : PlaceId) : Array LoanFact :=
@@ -753,9 +789,49 @@ private partial def expressionContains (ns : ValidatedNamespace) (root target : 
             childrenContain (domains ++ triggers ++ condition.toArray.push body)
         | .value .. | .constant _ | .localVar _ | .continue_ _ | .spec _ => false
 
+/-- How an expression leaves its continuation on every path: it leaves the
+function (a return or a throw), or it jumps (a break or a continue), which a
+loop's continuation follows. A loop's body is not looked into. -/
+private inductive Exit where
+  | leaves
+  | jumps
+  deriving BEq
+
+private def exitOf (ns : ValidatedNamespace) : Nat → ExprId → Option Exit
+  | 0, _ => none
+  | fuel + 1, id =>
+    let both (left right : Option Exit) : Option Exit := match left, right with
+      | some .leaves, some .leaves => some .leaves
+      | some _, some _ => some .jumps
+      | _, _ => none
+    match ns.expressions[id.index]? with
+    | some { kind := .return_ _, .. } | some { kind := .throw_ .., .. } => some .leaves
+    | some { kind := .break_ .., .. } | some { kind := .continue_ _, .. } => some .jumps
+    | some { kind := .block statements result, .. } =>
+        statements.findSome? (exitOf ns fuel) <|> result.bind (exitOf ns fuel)
+    | some { kind := .letDecl _ value body, .. } =>
+        value.bind (exitOf ns fuel) <|> exitOf ns fuel body
+    | some { kind := .ifElse condition thenBranch elseBranch, .. } =>
+        exitOf ns fuel condition <|>
+          elseBranch.bind fun branch => both (exitOf ns fuel thenBranch) (exitOf ns fuel branch)
+    | some { kind := .match_ scrutinee arms, .. } =>
+        exitOf ns fuel scrutinee <|>
+          if arms.isEmpty then none
+          else arms.foldl (fun exit arm => both exit (exitOf ns fuel arm.body))
+            (exitOf ns fuel arms[0]!.body)
+    | some { kind := .operation _ _ arguments _, .. } => arguments.findSome? (exitOf ns fuel)
+    | _ => none
+
+/-- The loans a branch preserves for what follows it: none where it leaves
+the function, which no continuation follows. -/
+private def branchPreserved (ns : ValidatedNamespace) (branch : ExprId)
+    (preserved : Array LoanSource) : Array LoanSource :=
+  if exitOf ns (ns.expressions.size + 1) branch == some .leaves then #[] else preserved
+
 private def loanFlowsFromExpression (ns : ValidatedNamespace) (loan : LoanFact)
     (expression : ExprId) : Bool :=
-  expressionContains ns expression loan.expression (ns.expressions.size + 1) ||
+  loan.source.expression?.any (fun source =>
+    expressionContains ns expression source (ns.expressions.size + 1)) ||
     loan.holders.any fun holder =>
       expressionUsesLocal ns expression holder (ns.expressions.size + 1)
 
@@ -914,7 +990,10 @@ private partial def loanPathsInExpression (unit : ValidatedUnit) (ns : Validated
             let nested := loanPathsInExpression unit ns loan pair.1 fuel |>.map fun path =>
               #[.index (some pair.2)] ++ path
             appendUniqueProjectionPaths paths nested
+      -- A call's result carries only loans its arguments carry, at the
+      -- components whose lifetimes the loan's outlives.
       | .call (.function reference) =>
+          if !loanFlowsFromExpression ns loan exprId then #[] else
           match functionAt? unit reference with
             | some (_, declaration) =>
                   let predicates := declaration.signature.generics.foldl
@@ -937,10 +1016,9 @@ private partial def loanPathsInExpression (unit : ValidatedUnit) (ns : Validated
                             #[.index (some pair.2)]
                           pure (appendUniqueProjectionPaths paths nested)
                   match paths? with
-                  | some paths => if paths.isEmpty && loanFlowsFromExpression ns loan exprId then
-                      #[#[]] else paths
-                  | none => if loanFlowsFromExpression ns loan exprId then #[#[]] else #[]
-            | none => if loanFlowsFromExpression ns loan exprId then #[#[]] else #[]
+                  | some paths => if paths.isEmpty then #[#[]] else paths
+                  | none => #[#[]]
+            | none => #[#[]]
       | .call (.constructor reference variantName) =>
           match nominalAt? unit reference.name with
             | some (declarationNs, declaration) =>
@@ -984,7 +1062,7 @@ private def bindObservedLoansFromExpressionAtProjection (unit : ValidatedUnit)
     (state : BorrowState) (observed : Array LoanFact) (holder : LocalId)
     (expression : ExprId) (projectionPrefix : Array LoanProjection) : BorrowState :=
   { active := state.active.map fun loan =>
-      match observed.find? (·.expression == loan.expression) with
+      match observed.find? (·.source == loan.source) with
       | none => loan
       | some carried =>
           let paths := loanPathsInExpression unit ns carried expression (ns.expressions.size + 1)
@@ -1009,7 +1087,7 @@ private def bindObservedLoansAtPlaceFromExpression (unit : ValidatedUnit) (ns : 
   | some place =>
     if !isOwnedCarrierPlace place then state else
     { active := state.active.map fun loan =>
-        match observed.find? (·.expression == loan.expression) with
+        match observed.find? (·.source == loan.source) with
         | none => loan
         | some carried =>
             let paths := loanPathsInExpression unit ns carried expression (ns.expressions.size + 1)
@@ -1206,8 +1284,8 @@ private def directCallResultLoans? (unit : ValidatedUnit) (ns : ValidatedNamespa
 private def discardUncarriedTemporaries (state : BorrowState)
     (observed carried : Array LoanFact) : BorrowState :=
   { active := state.active.filter fun loan =>
-      !loan.holders.isEmpty || !observed.any (·.expression == loan.expression) ||
-        carried.any (·.expression == loan.expression) }
+      !loan.holders.isEmpty || !observed.any (·.source == loan.source) ||
+        carried.any (·.source == loan.source) }
 
 /-- The flow after a call, direct or through a function value, whose result
 carries `directLoans` of the loans its arguments `observed`. A mutable
@@ -1216,15 +1294,20 @@ callee's return registers it, and its death ends it. -/
 private def callResultFlow (ns : ValidatedNamespace) (exprId : ExprId) (expression : Expr)
     (afterArguments : BorrowState) (observed directLoans : Array LoanFact) :
     Option BorrowState × Array LoanFact × Array LoanFact × Array Diagnostic :=
-  let produced := if directLoans.isEmpty && observed.isEmpty then
+  -- Incoming parameter origins carry provenance, but have no local runtime
+  -- loan event. A mutable reference returned through them still needs the
+  -- call-site registration and death that an otherwise untracked result uses.
+  let onlyIncoming := (directLoans ++ observed).all (·.source.expression?.isNone)
+  let produced := if onlyIncoming then
     match referenceType? ns expression.typeId with
     | some referenceType =>
         if referenceType.kind == .mutable then
-          #[{ expression := exprId
+          #[{ source := .expression exprId
               kind := .mutable
               place := { root := .external }
               lifetime := referenceType.lifetime
-              loc := expression.loc : LoanFact }]
+              loc := expression.loc
+              canEscape := true : LoanFact }]
         else #[]
     | none => #[]
   else #[]
@@ -1240,7 +1323,7 @@ write-back and record no death. -/
 private def retainResultLoans (state : BorrowState)
     (carried : Array LoanFact) : BorrowState :=
   { active := state.active.filter fun loan =>
-      loan.kind != .mutable || carried.any (·.expression == loan.expression) }
+      loan.kind != .mutable || carried.any (·.source == loan.source) }
 
 private def releaseHoldersUnusedBy (ns : ValidatedNamespace) (state : BorrowState)
     (holders : Array LocalId) (expressions : List ExprId) : BorrowState :=
@@ -1255,7 +1338,7 @@ mutual
   descendant already recorded a more precise point. -/
   private partial def analyzeExpr (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (exprId : ExprId)
-      (state : BorrowState) (preserved : Array ExprId := #[])
+      (state : BorrowState) (preserved : Array LoanSource := #[])
       (discarded : Bool := false) (readOnly : Bool := false) : BorrowFlow :=
     let flow := analyzeExprCore unit ns exprId state preserved discarded readOnly
     match flow.normal with
@@ -1263,9 +1346,9 @@ mutual
     | some exit =>
         let candidates := appendUniqueLoans state.active flow.observed
         let died := candidates.filter fun loan =>
-          loan.kind == .mutable &&
-            !exit.active.any (·.expression == loan.expression) &&
-            !flow.deaths.any (·.1 == loan.expression)
+          loan.kind == .mutable && loan.source.expression?.isSome &&
+            !exit.active.any (·.source == loan.source) &&
+            !flow.deaths.any (fun death => loan.source == .expression death.1)
         if died.isEmpty then flow
         else { flow with deaths := pushDeaths flow.deaths died { anchor := exprId } }
 
@@ -1273,7 +1356,7 @@ mutual
   reference anywhere else may write its referent. -/
   private partial def analyzeExprCore (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (exprId : ExprId)
-      (state : BorrowState) (preserved : Array ExprId := #[])
+      (state : BorrowState) (preserved : Array LoanSource := #[])
       (discarded : Bool := false) (readOnly : Bool := false) : BorrowFlow :=
     match ns.expressions[exprId.index]? with
     | none => { normal := some state }
@@ -1445,16 +1528,18 @@ mutual
             match conditionFlow.normal with
             | none => conditionFlow
             | some branchState =>
-                let thenState := retainLoansUsedBy ns [thenBranch] branchState preserved
+                let thenPreserved := branchPreserved ns thenBranch preserved
+                let thenState := retainLoansUsedBy ns [thenBranch] branchState thenPreserved
                 let thenEntryDeaths := pushDeaths #[] (diffLoans branchState thenState)
                   { anchor := thenBranch, before := true }
-                let thenFlow := analyzeExpr unit ns thenBranch thenState preserved
+                let thenFlow := analyzeExpr unit ns thenBranch thenState thenPreserved
                 let (elseEntryDeaths, elseFlow) := match elseBranch with
                   | some branch =>
-                      let elseState := retainLoansUsedBy ns [branch] branchState preserved
+                      let elsePreserved := branchPreserved ns branch preserved
+                      let elseState := retainLoansUsedBy ns [branch] branchState elsePreserved
                       (pushDeaths #[] (diffLoans branchState elseState)
                           { anchor := branch, before := true },
-                        analyzeExpr unit ns branch elseState preserved)
+                        analyzeExpr unit ns branch elseState elsePreserved)
                   | none =>
                       let elseState := retainLoansUsedBy ns [] branchState preserved
                       (pushDeaths #[] (diffLoans branchState elseState) { anchor := exprId },
@@ -1480,10 +1565,11 @@ mutual
             | some armState =>
                 let armsFlow := arms.foldl (fun flow arm =>
                   let expressions := arm.guard.toList ++ [arm.body]
-                  let state := retainLoansUsedBy ns expressions armState preserved
+                  let armPreserved := branchPreserved ns arm.body preserved
+                  let state := retainLoansUsedBy ns expressions armState armPreserved
                   let entryDeaths := pushDeaths #[] (diffLoans armState state)
                     { anchor := arm.guard.getD arm.body, before := true }
-                  let armFlow := analyzeArm unit ns arm state preserved
+                  let armFlow := analyzeArm unit ns arm state armPreserved
                   mergeFlows flow
                     { armFlow with
                       deaths := appendUniqueDeaths entryDeaths armFlow.deaths }) {}
@@ -1592,8 +1678,8 @@ mutual
   unless the value of an earlier operand carries it (`carried`). -/
   private partial def analyzeExprList (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (expressions : List ExprId)
-      (state : BorrowState) (preserved : Array ExprId := #[]) (readOnly : Bool := false)
-      (carried : Array ExprId := #[]) : BorrowFlow :=
+      (state : BorrowState) (preserved : Array LoanSource := #[]) (readOnly : Bool := false)
+      (carried : Array LoanSource := #[]) : BorrowFlow :=
     match expressions with
     | [] => { normal := some state }
     | expression :: tail =>
@@ -1607,7 +1693,7 @@ mutual
         | none => { head with deaths := appendUniqueDeaths entryDeaths head.deaths }
         | some afterHead =>
             let carried := head.valueLoans.foldl (init := carried) fun carried loan =>
-              if carried.contains loan.expression then carried else carried.push loan.expression
+              if carried.contains loan.source then carried else carried.push loan.source
             let rest := analyzeExprList unit ns tail afterHead preserved readOnly carried
             { rest with
               breaks := head.breaks ++ rest.breaks
@@ -1622,7 +1708,7 @@ mutual
 
   private partial def analyzeBlockExprList (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (expressions : List ExprId) (state : BorrowState)
-      (preserved : Array ExprId := #[]) : BorrowFlow :=
+      (preserved : Array LoanSource := #[]) : BorrowFlow :=
     match expressions with
     | [] => { normal := some state }
     | expression :: tail =>
@@ -1654,7 +1740,7 @@ mutual
 
   private partial def analyzeArm (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (arm : MatchArm)
-      (state : BorrowState) (preserved : Array ExprId := #[]) : BorrowFlow :=
+      (state : BorrowState) (preserved : Array LoanSource := #[]) : BorrowFlow :=
     match arm.guard with
     | none => analyzeExpr unit ns arm.body state preserved
     | some guard =>
@@ -1676,7 +1762,7 @@ mutual
   private partial def analyzeLoop (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (body : ExprId)
       (initial entry : BorrowState) (fuel : Nat)
-      (preserved : Array ExprId := #[]) (declared? : Option (Array LocalId) := none) :
+      (preserved : Array LoanSource := #[]) (declared? : Option (Array LocalId) := none) :
       BorrowFlow :=
     let bodyFlow := analyzeExpr unit ns body entry preserved
     let valueLoans := bodyFlow.breakValueLoans.foldl (init := #[]) fun loans pair =>
@@ -2054,7 +2140,17 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
   match function.body with
   | .absent => {}
   | .structured root =>
-      let flow := analyzeExpr unit ns root {}
+      let parameters := referenceParameters ns function
+      let incoming := parameters.map fun parameter => ({
+        source := .parameter parameter.localId
+        kind := parameter.kind
+        place := { root := .external }
+        lifetime := parameter.lifetime
+        loc := function.loc
+        holders := #[parameter.localId]
+        holderPlaces := #[{ root := .local parameter.localId }]
+        canEscape := true } : LoanFact)
+      let flow := analyzeExpr unit ns root { active := incoming }
       -- A normally returned value is the last possible carrier. Mutable
       -- loans absent from that value die after the root evaluates; recording
       -- that point makes function-exit reconciliation explicit rather than
@@ -2067,36 +2163,14 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
             { flow with
               normal := some returned
               deaths := pushDeaths flow.deaths died { anchor := root } }
-      -- A loan taken through a dereference of a reference parameter reborrows
-      -- caller-owned storage and escapes with the parameter's lifetime, and
-      -- so does a loan through a local holding such a reborrow; only loans
-      -- of frame-owned storage must not outlive the frame. Move's VM also
-      -- roots global resources in the invocation frame: references to those
-      -- resources may not escape, even through another local holder.
-      let parameters := referenceParameters ns function
-      let escapingRoot (root : LoanRoot) : Bool :=
-        match root with
-        | .external => true
-        | .global _ => ns.profile != some .move
-        | _ => false
-      let rec callerRooted (state : BorrowState) (loan : LoanFact) : Nat → Bool
-        | 0 => false
-        | fuel + 1 =>
-            escapingRoot loan.place.root ||
-              (loan.place.projections[0]? == some .dereference &&
-                loan.place.root.local?.any fun rootLocal =>
-                  parameters.any (·.localId == rootLocal) ||
-                    state.active.any fun parent =>
-                      parent.expression != loan.expression &&
-                        parent.holders.contains rootLocal &&
-                        callerRooted state parent fuel)
-      let frameOwned (state : BorrowState) (loan : LoanFact) : Bool :=
-        !callerRooted state loan (state.active.size + 1)
+      -- Provenance was established before aliases and parent holders could
+      -- be released. Absence from the final holder set cannot establish it.
+      let frameOwned (loan : LoanFact) : Bool := !loan.canEscape
       let normalEscapes := match flow.normal with
-        | some state => state.active.any (frameOwned state)
+        | some state => state.active.any frameOwned
         | none => false
       let returnEscapes := flow.returns.any fun state =>
-        state.active.any (frameOwned state)
+        state.active.any frameOwned
       if (!normalEscapes && !returnEscapes) ||
           !function.signature.results.any (fun result =>
             typeMayContainReference ns result.typeId) then flow
@@ -2123,11 +2197,13 @@ def borrowOutcome (namespaceId : NamespaceId) (functionId : FunctionId)
           functionId
           root
           parameters := referenceParameters ns function
-          loans := analysis.observed.map fun loan =>
-            { expression := loan.expression, lifetime := loan.lifetime
+          loans := analysis.observed.filterMap fun loan => do
+            let expression ← loan.source.expression?
+            some {
+              expression, lifetime := loan.lifetime
               holders := loan.holders
               deaths := analysis.deaths.filterMap fun (loanExpression, death) =>
-                if loanExpression == loan.expression then some death else none }
+                if loanExpression == expression then some death else none }
           lifetimeRelations := relations })
       else (analysis.diagnostics, none)
 

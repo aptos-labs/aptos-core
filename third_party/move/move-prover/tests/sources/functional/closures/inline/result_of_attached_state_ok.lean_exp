@@ -15,9 +15,9 @@ recursive✝ :
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                 (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                         VerexIR.Proofs.Denote.NRow.nil))))))))) →
     VerexIR.Proofs.Denote.Comp unit
       (VerexIR.Proofs.Denote.Flow
@@ -28,17 +28,17 @@ recursive✝ :
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
                 (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                           VerexIR.Proofs.Denote.NRow.nil)))))))))
         Unit)
 state✝ : VerexIR.Proofs.Denote.Memory unit
 fst✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 v result : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
 i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-left✝² : ↑result.values.size = i.val
-right✝ :
+invariant_3 : ↑result.values.size = i.val
+invariant_4 :
   ∀ (j : Int),
     0 ≤ j →
       j < i.val →
@@ -66,9 +66,9 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
@@ -80,9 +80,9 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
@@ -94,9 +94,9 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
@@ -111,9 +111,9 @@ loopHypothesis✝ :
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
                 (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                           VerexIR.Proofs.Denote.NRow.nil))))))))))
     (state : VerexIR.Proofs.Denote.Memory unit),
     env.fst = some v →
@@ -157,8 +157,8 @@ loopHypothesis✝ :
                                                       (VerexIR.StorageKey.address a))).getD
                                                 VerexIR.RuntimeValue.unit).asInt)) →
                   VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝ (fun failure => True) state
-left✝¹ : i.val ≤ ↑v.values.size
-left✝ : True
+invariant_1 : i.val ≤ ↑v.values.size
+invariant_2 : True
 verexContinuation : VerexIR.Proofs.Denote.Flow
     (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false).vector)
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
@@ -167,9 +167,9 @@ verexContinuation : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
@@ -177,7 +177,15 @@ a✝ : ↑v.values.size ≤ i.val
 ⊢ state✝ = initialState✝
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:55:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), result[i] == v[i] + global<R>(a).v` is not established
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:44:13: error: the loop invariant `∀ (j in 0 .. i), result[j] == v[j] + old(global<R>(a).v)` is not preserved by an iteration
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: verex verification failed: the automatic verification of `map_add_global` failed; provide a proof: `verify map_add_global by …` in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean` (`verify map_add_global by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: verex verification failed: the automatic verification of `map_add_global` failed; provide a proof in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean`:
+  verify map_add_global by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | invariant_4_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: verification failed with a residual obligation:
 case step.some.some.some.some.some.right.right.right
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -193,9 +201,9 @@ recursive✝ :
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                 (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                         VerexIR.Proofs.Denote.NRow.nil))))))))) →
     VerexIR.Proofs.Denote.Comp unit
       (VerexIR.Proofs.Denote.Flow
@@ -206,9 +214,9 @@ recursive✝ :
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
                 (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                           VerexIR.Proofs.Denote.NRow.nil)))))))))
         Unit)
 state✝ : VerexIR.Proofs.Denote.Memory unit
@@ -216,8 +224,8 @@ fst✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 a : VerexIR.Proofs.Denote.NTy.address.carrier
 v result : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
 i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-left✝² : ↑result.values.size = i.val
-right✝ :
+invariant_3 : ↑result.values.size = i.val
+invariant_4 :
   ∀ (j : Int),
     0 ≤ j →
       j < i.val →
@@ -242,9 +250,9 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
@@ -256,9 +264,9 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
@@ -270,9 +278,9 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
@@ -287,9 +295,9 @@ loopHypothesis✝ :
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
                 (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                           VerexIR.Proofs.Denote.NRow.nil))))))))))
     (state : VerexIR.Proofs.Denote.Memory unit),
     env.fst = some v →
@@ -334,8 +342,8 @@ loopHypothesis✝ :
                                                         (VerexIR.StorageKey.address a))).getD
                                                   VerexIR.RuntimeValue.unit).asInt)) →
                   VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝ (fun failure => True) state
-left✝¹ : i.val ≤ ↑v.values.size
-left✝ : True
+invariant_1 : i.val ≤ ↑v.values.size
+invariant_2 : True
 verexContinuation : VerexIR.Proofs.Denote.Flow
     (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false).vector)
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
@@ -344,12 +352,18 @@ verexContinuation : VerexIR.Proofs.Denote.Flow
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
                       VerexIR.Proofs.Denote.NRow.nil)))))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
 a✝ : ↑v.values.size ≤ i.val
 ⊢ state✝ = initialState✝
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: verex verification failed: the automatic verification of `map_add_global_bare` failed; provide a proof: `verify map_add_global_bare by …` in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean` (`verify map_add_global_bare by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: verex verification failed: the automatic verification of `map_add_global_bare` failed; provide a proof in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean`:
+  verify map_add_global_bare by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

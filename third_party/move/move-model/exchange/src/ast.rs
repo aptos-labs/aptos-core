@@ -60,14 +60,15 @@
 //! blocks; version 8 names the variant of each field a variant field
 //! selection reads; version 9 names the module's state labels and ties a
 //! state-domain quantifier binder to the label it binds; version 10 preserves
-//! which numeric literals received the specification-mode default type.
+//! which numeric literals received the specification-mode default type;
+//! version 11 exports the ghost fields of structs and enums.
 
 use serde::{Deserialize, Serialize};
 
 /// Schema identifier of an XAST module document.
 pub const XAST_SCHEMA: &str = "move-xast-module";
 /// Current version of the XAST format.
-pub const XAST_VERSION: u64 = 10;
+pub const XAST_VERSION: u64 = 11;
 
 /// Index into [`XastModule::types`].
 pub type TypeId = usize;
@@ -388,6 +389,10 @@ pub struct Struct {
     pub variants: Option<Vec<Variant>>,
     /// The struct spec: data invariants and pragmas.
     pub spec: Spec,
+    /// The ghost fields of the struct spec (`ghost g: T [= e];`): model-only
+    /// fields of every value, of every variant of an enum.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ghost_fields: Vec<GhostField>,
     /// A resolved intrinsic declaration. The model builder consumes the
     /// source's role properties while validating them, so they are carried
     /// separately from `spec.pragmas` rather than reconstructed by consumers.
@@ -427,6 +432,18 @@ pub struct Field {
     pub name: String,
     pub doc: String,
     pub ty: TypeId,
+}
+
+/// A ghost field. Its initializer reads the struct's fields as locals of
+/// their names; an enum's reads none. Without one, a pack leaves the ghost
+/// unconstrained.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GhostField {
+    pub name: String,
+    pub doc: String,
+    pub ty: TypeId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub init: Option<Exp>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

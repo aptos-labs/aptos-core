@@ -40,4 +40,11 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       state
 a✝ : x.val > 815
 ⊢ x.val ≤ 815
-tests/sources/functional/bv_aborts.move:14:5: error: verex verification failed: the automatic verification of `assert_with_spec` failed; provide a proof: `verify assert_with_spec by …` in `tests/sources/functional/bv_aborts.proof.lean` (`verify assert_with_spec by verex_obligations` lists its obligations)
+tests/sources/functional/bv_aborts.move:14:5: error: verex verification failed: the automatic verification of `assert_with_spec` failed; provide a proof in `tests/sources/functional/bv_aborts.proof.lean`:
+  verify assert_with_spec by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

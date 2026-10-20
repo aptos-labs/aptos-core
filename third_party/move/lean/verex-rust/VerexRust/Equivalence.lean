@@ -792,7 +792,7 @@ private partial def enumAdminPlace? (ns : ValidatedNamespace) (environment : Enu
       some (.field (← enumAdminPlace? ns environment base (fuel - 1)) field)
   | .downcast base variant =>
       some (.downcast (← enumAdminPlace? ns environment base (fuel - 1)) variant)
-  | .index .. | .subslice .. => none
+  | .index .. | .subslice .. | .ghostField .. => none
 
 private partial def enumAdminValue? (ns : ValidatedNamespace) (environment : EnumAdminEnv)
     (expressionId : ExprId) (fuel : Nat) : Option EnumAdminValue := do
@@ -1072,6 +1072,8 @@ mutual
         pure s!"subslice:{← placeProjection unit ns base (fuel - 1)}:{start}:{stop}:{fromEnd}"
     | .downcast base variant =>
         pure s!"downcast:{← placeProjection unit ns base (fuel - 1)}:{← liftProjection <| nameProjection unit variant}"
+    | .ghostField base _ field =>
+        pure s!"ghostField:{← placeProjection unit ns base (fuel - 1)}:{← liftProjection <| nameProjection unit field}"
 
   private partial def patternProjection (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (patternId : PatternId) (fuel : Nat) : ProjectionM String := do
@@ -1429,6 +1431,8 @@ mutual
             pure s!"discriminant:{← liftProjection <| qualifiedProjection unit type}"
         | .updateField type field =>
             pure s!"updateField:{← liftProjection <| qualifiedProjection unit type}:{field}"
+        | .selectGhost type field =>
+            pure s!"selectGhost:{← liftProjection <| qualifiedProjection unit type}:{field}"
     | .specification _ =>
         liftProjection <| fail "specification operations are outside Rust source alpha-equivalence"
     | .assert => pure "assert"
