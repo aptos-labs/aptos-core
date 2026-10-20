@@ -17,7 +17,10 @@ use crate::{
         ContinuouslyStreamTransactionOutputsRequest, GetAllEpochEndingLedgerInfosRequest,
         GetAllStatesRequest, GetAllTransactionsRequest, SnapshotKind, StreamRequest,
     },
-    tests::{utils, utils::create_ledger_info},
+    tests::{
+        utils,
+        utils::{create_epoch_state, create_ledger_info},
+    },
 };
 use aptos_config::config::DataStreamingServiceConfig;
 use aptos_crypto::HashValue;
@@ -733,7 +736,7 @@ fn transform_continuous_outputs_stream_notifications() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             target: None,
         },
     );

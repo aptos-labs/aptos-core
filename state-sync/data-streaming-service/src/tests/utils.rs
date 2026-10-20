@@ -33,7 +33,7 @@ use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::SparseMerkleRangeProof,
     state_store::{
         hot_state::{HotStateValue, HotStateValueChunkWithProof},
@@ -46,6 +46,8 @@ use aptos_types::{
         TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionPayload,
         TransactionStatus, Version,
     },
+    validator_signer::ValidatorSigner,
+    validator_verifier::generate_validator_verifier,
     write_set::WriteSet,
 };
 use async_trait::async_trait;
@@ -934,6 +936,47 @@ pub fn create_data_client_response<T>(payload: T) -> Response<T> {
     let id = create_random_u64(MAX_RESPONSE_ID);
     let context = ResponseContext::new(id, Box::new(NoopResponseCallback));
     Response::new(context, payload)
+}
+
+/// Creates an epoch state for the given epoch. The validator set is empty, so
+/// it accepts the (unsigned) ledger infos created by `create_ledger_info()`.
+pub fn create_epoch_state(epoch: Epoch) -> EpochState {
+    let mut epoch_state = EpochState::empty();
+    epoch_state.epoch = epoch;
+    epoch_state
+}
+
+/// Creates a set of validator signers (deterministically derived from the seed)
+/// and the trusted state of the given epoch for those validators.
+pub fn create_validators_and_epoch_state(
+    seed: u8,
+    epoch: Epoch,
+) -> (Vec<ValidatorSigner>, EpochState) {
+    let signers: Vec<_> = (0..4u8)
+        .map(|i| ValidatorSigner::random([seed.wrapping_mul(16).wrapping_add(i); 32]))
+        .collect();
+    let epoch_state = EpochState::new(epoch, generate_validator_verifier(&signers));
+    (signers, epoch_state)
+}
+
+/// Creates an epoch ending ledger info with the given version and epoch, signed
+/// by the given signers. The next epoch state is the given one.
+pub fn create_signed_epoch_ending_ledger_info(
+    signers: &[ValidatorSigner],
+    version: Version,
+    epoch: Epoch,
+    next_epoch_state: EpochState,
+) -> LedgerInfoWithSignatures {
+    let block_info = BlockInfo::new(
+        epoch,
+        0,
+        HashValue::zero(),
+        HashValue::zero(),
+        version,
+        0,
+        Some(next_epoch_state),
+    );
+    generate_ledger_info_with_sig(signers, LedgerInfo::new(block_info, HashValue::zero()))
 }
 
 /// Creates a ledger info with the given version and epoch. If `epoch_ending`

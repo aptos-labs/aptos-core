@@ -65,7 +65,7 @@ async fn test_critical_timeout() {
             .times(1)
             .with(
                 eq(current_synced_version),
-                eq(current_synced_epoch),
+                eq(create_epoch_state(current_synced_epoch)),
                 eq(None),
             )
             .return_once(move |_, _, _| Ok(data_stream_listener))
@@ -141,7 +141,7 @@ async fn test_data_stream_transactions_with_sync_duration() {
             .times(1)
             .with(
                 eq(current_synced_version),
-                eq(current_synced_epoch),
+                eq(create_epoch_state(current_synced_epoch)),
                 eq(false),
                 eq(None),
             )
@@ -224,7 +224,7 @@ async fn test_data_stream_transactions_with_sync_target() {
             .times(1)
             .with(
                 eq(current_synced_version),
-                eq(current_synced_epoch),
+                eq(create_epoch_state(current_synced_epoch)),
                 eq(false),
                 eq(Some(target_ledger_info.clone())),
             )
@@ -304,7 +304,7 @@ async fn test_data_stream_transaction_outputs() {
             .times(1)
             .with(
                 eq(current_synced_version),
-                eq(current_synced_epoch),
+                eq(create_epoch_state(current_synced_epoch)),
                 eq(None),
             )
             .return_once(move |_, _, _| Ok(data_stream_listener))
@@ -383,7 +383,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_duration() {
             .times(1)
             .with(
                 eq(current_synced_version),
-                eq(current_synced_epoch),
+                eq(create_epoch_state(current_synced_epoch)),
                 eq(false),
                 eq(None),
             )
@@ -466,7 +466,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_target() {
             .times(1)
             .with(
                 eq(current_synced_version),
-                eq(current_synced_epoch),
+                eq(create_epoch_state(current_synced_epoch)),
                 eq(false),
                 eq(Some(target_ledger_info.clone())),
             )
@@ -549,7 +549,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_duration_fallback() 
         .times(1)
         .with(
             eq(current_synced_version),
-            eq(current_synced_epoch),
+            eq(create_epoch_state(current_synced_epoch)),
             eq(false),
             eq(None),
         )
@@ -572,7 +572,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_duration_fallback() 
         .times(1)
         .with(
             eq(current_synced_version),
-            eq(current_synced_epoch),
+            eq(create_epoch_state(current_synced_epoch)),
             eq(None),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_2))
@@ -594,7 +594,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_duration_fallback() 
         .times(1)
         .with(
             eq(current_synced_version),
-            eq(current_synced_epoch),
+            eq(create_epoch_state(current_synced_epoch)),
             eq(false),
             eq(None),
         )
@@ -681,7 +681,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_target_fallback() {
         .times(1)
         .with(
             eq(current_synced_version),
-            eq(current_synced_epoch),
+            eq(create_epoch_state(current_synced_epoch)),
             eq(false),
             eq(Some(target_ledger_info.clone())),
         )
@@ -704,7 +704,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_target_fallback() {
         .times(1)
         .with(
             eq(current_synced_version),
-            eq(current_synced_epoch),
+            eq(create_epoch_state(current_synced_epoch)),
             eq(Some(target_ledger_info.clone())),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_2))
@@ -726,7 +726,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_target_fallback() {
         .times(1)
         .with(
             eq(current_synced_version),
-            eq(current_synced_epoch),
+            eq(create_epoch_state(current_synced_epoch)),
             eq(false),
             eq(Some(target_ledger_info.clone())),
         )

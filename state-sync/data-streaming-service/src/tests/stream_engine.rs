@@ -4,7 +4,9 @@
 use crate::{
     data_notification::{DataClientRequest, EpochEndingLedgerInfosRequest},
     error::Error,
-    stream_engine::{DataStreamEngine, EpochEndingStreamEngine, StreamEngine},
+    stream_engine::{
+        ContinuousTransactionStreamEngine, DataStreamEngine, EpochEndingStreamEngine, StreamEngine,
+    },
     streaming_client::{
         ContinuouslyStreamTransactionOutputsRequest,
         ContinuouslyStreamTransactionsOrOutputsRequest, ContinuouslyStreamTransactionsRequest,
@@ -19,7 +21,7 @@ use aptos_data_client::{
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_storage_service_types::responses::CompleteDataRange;
-use aptos_types::transaction::Version;
+use aptos_types::{epoch_state::EpochState, transaction::Version};
 use claims::{assert_matches, assert_ok};
 use std::{cmp, sync::Arc};
 
@@ -256,7 +258,7 @@ fn test_invalid_continuous_transactions_stream_engine() {
     let stream_request =
         StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: utils::create_epoch_state(known_epoch),
             include_events: false,
             target: Some(target),
         });
@@ -284,7 +286,7 @@ fn test_invalid_continuous_transactions_or_outputs_stream_engine() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionsOrOutputs(
         ContinuouslyStreamTransactionsOrOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: utils::create_epoch_state(known_epoch),
             include_events: false,
             target: Some(target),
         },
@@ -313,7 +315,7 @@ fn test_invalid_continuous_outputs_stream_engine() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: utils::create_epoch_state(known_epoch),
             target: Some(target),
         },
     );
@@ -330,6 +332,142 @@ fn test_invalid_continuous_outputs_stream_engine() {
         &global_data_summary.advertised_data,
     );
     assert_matches!(result, Err(Error::UnexpectedErrorEncountered(_)));
+}
+
+#[test]
+fn test_continuous_stream_verify_epoch_ending_ledger_info() {
+    // Create a continuous transaction stream engine with a trusted epoch state
+    let known_version = 100;
+    let known_epoch = 10;
+    let (signers, epoch_state) = utils::create_validators_and_epoch_state(0, known_epoch);
+    let stream_engine = create_continuous_transaction_stream_engine(known_version, epoch_state);
+
+    // Create epoch ending ledger infos signed by the trusted and other validators
+    let (other_signers, next_epoch_state) =
+        utils::create_validators_and_epoch_state(1, known_epoch + 1);
+    let valid_ledger_info = utils::create_signed_epoch_ending_ledger_info(
+        &signers,
+        known_version + 50,
+        known_epoch,
+        next_epoch_state.clone(),
+    );
+    let other_chain_ledger_info = utils::create_signed_epoch_ending_ledger_info(
+        &other_signers,
+        known_version + 50,
+        known_epoch,
+        next_epoch_state.clone(),
+    );
+    let wrong_epoch_ledger_info = utils::create_signed_epoch_ending_ledger_info(
+        &signers,
+        known_version + 50,
+        known_epoch + 1,
+        next_epoch_state,
+    );
+
+    // Verify only the ledger info signed by the trusted validators is accepted
+    let client_request = create_epoch_ending_request(known_epoch);
+    assert_ok!(stream_engine.verify_client_response(
+        &client_request,
+        &ResponsePayload::EpochEndingLedgerInfos(vec![valid_ledger_info.clone()]),
+    ));
+    for invalid_ledger_info in [other_chain_ledger_info, wrong_epoch_ledger_info] {
+        let result = stream_engine.verify_client_response(
+            &client_request,
+            &ResponsePayload::EpochEndingLedgerInfos(vec![invalid_ledger_info]),
+        );
+        assert_matches!(result, Err(Error::AptosDataClientResponseIsInvalid(_)));
+    }
+
+    // Verify a mix of valid and invalid ledger infos is rejected
+    let (other_signers, _) = utils::create_validators_and_epoch_state(2, known_epoch);
+    let other_chain_ledger_info = utils::create_signed_epoch_ending_ledger_info(
+        &other_signers,
+        known_version + 50,
+        known_epoch,
+        valid_ledger_info
+            .ledger_info()
+            .next_epoch_state()
+            .unwrap()
+            .clone(),
+    );
+    let result = stream_engine.verify_client_response(
+        &client_request,
+        &ResponsePayload::EpochEndingLedgerInfos(vec![valid_ledger_info, other_chain_ledger_info]),
+    );
+    assert_matches!(result, Err(Error::AptosDataClientResponseIsInvalid(_)));
+}
+
+#[test]
+fn test_continuous_stream_verify_across_epoch_change() {
+    // Create a continuous transaction stream engine with a trusted epoch state
+    let known_version = 100;
+    let known_epoch = 10;
+    let (signers, epoch_state) = utils::create_validators_and_epoch_state(0, known_epoch);
+    let mut stream_engine =
+        create_continuous_transaction_stream_engine(known_version, epoch_state.clone());
+
+    // Process an epoch ending ledger info that hands over to a new validator set
+    let epoch_ending_version = known_version + 50;
+    let (next_signers, next_epoch_state) =
+        utils::create_validators_and_epoch_state(1, known_epoch + 1);
+    let epoch_ending_ledger_info = utils::create_signed_epoch_ending_ledger_info(
+        &signers,
+        epoch_ending_version,
+        known_epoch,
+        next_epoch_state.clone(),
+    );
+    let client_request = create_epoch_ending_request(known_epoch);
+    let client_response_payload =
+        ResponsePayload::EpochEndingLedgerInfos(vec![epoch_ending_ledger_info]);
+    assert_ok!(stream_engine.verify_client_response(&client_request, &client_response_payload));
+    let notification = stream_engine
+        .transform_client_response_into_notification(
+            &client_request,
+            client_response_payload,
+            create_notification_id_generator(),
+        )
+        .unwrap();
+    assert!(notification.is_none());
+
+    // Request all data up to the epoch ending version
+    let mut global_data_summary = create_global_data_summary_for_transactions(known_version);
+    global_data_summary
+        .optimal_chunk_sizes
+        .transaction_chunk_size = 100;
+    let client_requests = stream_engine
+        .create_data_client_requests(
+            10,
+            10,
+            0,
+            &global_data_summary,
+            create_notification_id_generator(),
+        )
+        .unwrap();
+    assert_eq!(client_requests.len(), 1);
+
+    // Verify the trusted epoch state has advanced to the next epoch
+    assert_eq!(
+        stream_engine.next_request_version_and_epoch,
+        (epoch_ending_version + 1, known_epoch + 1)
+    );
+    assert_eq!(stream_engine.next_request_epoch_state, next_epoch_state);
+
+    // Verify the next epoch ending ledger info must be signed by the new validators
+    let (_, future_epoch_state) = utils::create_validators_and_epoch_state(2, known_epoch + 2);
+    let client_request = create_epoch_ending_request(known_epoch + 1);
+    for (epoch_signers, expect_valid) in [(&next_signers, true), (&signers, false)] {
+        let ledger_info = utils::create_signed_epoch_ending_ledger_info(
+            epoch_signers,
+            epoch_ending_version + 50,
+            known_epoch + 1,
+            future_epoch_state.clone(),
+        );
+        let result = stream_engine.verify_client_response(
+            &client_request,
+            &ResponsePayload::EpochEndingLedgerInfos(vec![ledger_info]),
+        );
+        assert_eq!(result.is_ok(), expect_valid);
+    }
 }
 
 #[test]
@@ -388,6 +526,47 @@ fn test_update_epoch_ending_stream_panic() {
             create_notification_id_generator(),
         )
         .unwrap();
+}
+
+fn create_continuous_transaction_stream_engine(
+    known_version: Version,
+    known_epoch_state: EpochState,
+) -> ContinuousTransactionStreamEngine {
+    initialize_logger();
+
+    // Create a continuous transaction stream request
+    let stream_request =
+        StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
+            known_version,
+            known_epoch_state,
+            include_events: false,
+            target: None,
+        });
+
+    // Create a new continuous transaction stream engine
+    let global_data_summary = create_global_data_summary_for_transactions(known_version);
+    match StreamEngine::new(
+        DataStreamingServiceConfig::default(),
+        &stream_request,
+        &global_data_summary.advertised_data,
+    )
+    .unwrap()
+    {
+        StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => stream_engine,
+        unexpected_engine => {
+            panic!(
+                "Expected continuous transaction stream engine but got {:?}",
+                unexpected_engine
+            );
+        },
+    }
+}
+
+fn create_epoch_ending_request(epoch: u64) -> DataClientRequest {
+    DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
+        start_epoch: epoch,
+        end_epoch: epoch,
+    })
 }
 
 fn create_epoch_ending_stream_engine(start_epoch: u64, end_epoch: u64) -> EpochEndingStreamEngine {

@@ -35,7 +35,10 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use aptos_storage_interface::StateKind;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use aptos_types::{
+    epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    transaction::Version,
+};
 use enum_dispatch::enum_dispatch;
 use std::{cmp, cmp::min, sync::Arc};
 
@@ -102,6 +105,20 @@ pub trait DataStreamEngine {
             "Received a new data request error notification but no request was sent! Reported error: {:?}, request: {:?}",
             request_error, client_request
         )))
+    }
+
+    /// Verifies the given data client response (for the previously sent
+    /// request) before it is transformed into a data notification. If this
+    /// returns an error, the response should not be processed.
+    ///
+    /// Note: Most engines rely on the client to verify the data it receives,
+    /// so a default implementation that accepts all responses is provided.
+    fn verify_client_response(
+        &self,
+        _client_request: &DataClientRequest,
+        _client_response_payload: &ResponsePayload,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 
     /// Transforms a given data client response (for the previously sent
@@ -556,6 +573,10 @@ pub struct ContinuousTransactionStreamEngine {
     // the network. All versions before this have been requested.
     pub next_request_version_and_epoch: (Version, Epoch),
 
+    // The trusted state of the epoch in `next_request_version_and_epoch`,
+    // used to verify epoch ending ledger infos received from peers.
+    pub next_request_epoch_state: EpochState,
+
     // True iff all data has been sent across the stream. This will only be
     // possible if there is a target ledger info specified.
     pub stream_is_complete: bool,
@@ -566,31 +587,34 @@ impl ContinuousTransactionStreamEngine {
         data_streaming_config: DataStreamingServiceConfig,
         stream_request: &StreamRequest,
     ) -> Result<Self, Error> {
-        // Extract the target version, next version, and next epoch
-        let (target_version, next_version, next_epoch) = match stream_request {
+        // Extract the target version, next version, and next epoch (state)
+        let (target_version, next_version, next_epoch, next_epoch_state) = match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
                 let target_version = Self::get_target_version(&request.target);
                 let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
                     request.known_version,
-                    request.known_epoch,
+                    request.known_epoch_state.epoch,
                 )?;
-                (target_version, next_version, next_epoch)
+                let next_epoch_state = request.known_epoch_state.clone();
+                (target_version, next_version, next_epoch, next_epoch_state)
             },
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
                 let target_version = Self::get_target_version(&request.target);
                 let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
                     request.known_version,
-                    request.known_epoch,
+                    request.known_epoch_state.epoch,
                 )?;
-                (target_version, next_version, next_epoch)
+                let next_epoch_state = request.known_epoch_state.clone();
+                (target_version, next_version, next_epoch, next_epoch_state)
             },
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(request) => {
                 let target_version = Self::get_target_version(&request.target);
                 let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
                     request.known_version,
-                    request.known_epoch,
+                    request.known_epoch_state.epoch,
                 )?;
-                (target_version, next_version, next_epoch)
+                let next_epoch_state = request.known_epoch_state.clone();
+                (target_version, next_version, next_epoch, next_epoch_state)
             },
             request => invalid_stream_request!(request),
         };
@@ -615,6 +639,7 @@ impl ContinuousTransactionStreamEngine {
             active_subscription_stream: None,
             next_stream_version_and_epoch: (next_version, next_epoch),
             next_request_version_and_epoch: (next_version, next_epoch),
+            next_request_epoch_state: next_epoch_state,
             stream_is_complete: false,
         })
     }
@@ -1237,6 +1262,9 @@ impl ContinuousTransactionStreamEngine {
             next_request_epoch = next_request_epoch.checked_add(1).ok_or_else(|| {
                 Error::IntegerOverflow("Next request epoch has overflown!".into())
             })?;
+            if let Some(next_epoch_state) = target_ledger_info.ledger_info().next_epoch_state() {
+                self.next_request_epoch_state = next_epoch_state.clone();
+            }
         }
 
         // Update the next request version and epoch
@@ -1465,6 +1493,35 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         } else {
             self.handle_optimistic_fetch_error(client_request, request_error)
         }
+    }
+
+    fn verify_client_response(
+        &self,
+        client_request: &DataClientRequest,
+        client_response_payload: &ResponsePayload,
+    ) -> Result<(), Error> {
+        // The epoch ending ledger info becomes the sync target, so it must be
+        // signed by the trusted validators. Otherwise, a peer on a different
+        // chain (e.g., one that wasn't wiped after a network reset) could
+        // stall the stream on a target that no other peer can serve.
+        if let (
+            EpochEndingLedgerInfos(_),
+            ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos),
+        ) = (client_request, client_response_payload)
+        {
+            for ledger_info in epoch_ending_ledger_infos {
+                self.next_request_epoch_state
+                    .verify(ledger_info)
+                    .map_err(|error| {
+                        Error::AptosDataClientResponseIsInvalid(format!(
+                            "Failed to verify the epoch ending ledger info: {}! Error: {:?}",
+                            ledger_info, error
+                        ))
+                    })?;
+            }
+        }
+
+        Ok(())
     }
 
     fn transform_client_response_into_notification(

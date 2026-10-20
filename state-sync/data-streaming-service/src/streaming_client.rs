@@ -7,7 +7,9 @@ use crate::{
     data_stream::{DataStreamId, DataStreamListener},
     error::Error,
 };
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::Version,
+};
 use async_trait::async_trait;
 use futures::{
     channel::{mpsc, oneshot},
@@ -87,9 +89,9 @@ pub trait DataStreamingClient {
 
     /// Continuously streams transaction outputs with proofs as the blockchain
     /// grows. The stream starts at `known_version + 1` (inclusive) and
-    /// `known_epoch`, where the `known_epoch` is expected to be the epoch
-    /// that contains `known_version + 1`, i.e., any epoch change at
-    /// `known_version` must be noted by the client.
+    /// `known_epoch_state`, where the `known_epoch_state` is expected to be the
+    /// trusted state of the epoch that contains `known_version + 1`, i.e., any
+    /// epoch change at `known_version` must be noted by the client.
     /// Transaction output proof versions are tied to ledger infos within the
     /// same epoch, otherwise epoch ending ledger infos will signify epoch changes.
     ///
@@ -98,15 +100,15 @@ pub trait DataStreamingClient {
     async fn continuously_stream_transaction_outputs(
         &self,
         known_version: u64,
-        known_epoch: u64,
+        known_epoch_state: EpochState,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error>;
 
     /// Continuously streams transactions with proofs as the blockchain
-    /// grows. The stream starts at `known_version + 1` (inclusive) and
-    /// `known_epoch`, where the `known_epoch` is expected to be the epoch
-    /// that contains `known_version + 1`, i.e., any epoch change at
-    /// `known_version` must be noted by the client.
+    /// grows. The stream starts at `start_version + 1` (inclusive) and
+    /// `start_epoch_state`, where the `start_epoch_state` is expected to be the
+    /// trusted state of the epoch that contains `start_version + 1`, i.e., any
+    /// epoch change at `start_version` must be noted by the client.
     /// Transaction proof versions are tied to ledger infos within the
     /// same epoch, otherwise epoch ending ledger infos will signify epoch changes.
     ///
@@ -117,16 +119,16 @@ pub trait DataStreamingClient {
     async fn continuously_stream_transactions(
         &self,
         start_version: Version,
-        start_epoch: Epoch,
+        start_epoch_state: EpochState,
         include_events: bool,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error>;
 
     /// Continuously streams transactions or outputs with proofs as the blockchain
-    /// grows. The stream starts at `known_version + 1` (inclusive) and
-    /// `known_epoch`, where the `known_epoch` is expected to be the epoch
-    /// that contains `known_version + 1`, i.e., any epoch change at
-    /// `known_version` must be noted by the client.
+    /// grows. The stream starts at `start_version + 1` (inclusive) and
+    /// `start_epoch_state`, where the `start_epoch_state` is expected to be the
+    /// trusted state of the epoch that contains `start_version + 1`, i.e., any
+    /// epoch change at `start_version` must be noted by the client.
     /// Transaction or output proof versions are tied to ledger infos within the
     /// same epoch, otherwise epoch ending ledger infos will signify epoch changes.
     ///
@@ -138,7 +140,7 @@ pub trait DataStreamingClient {
     async fn continuously_stream_transactions_or_outputs(
         &self,
         start_version: Version,
-        start_epoch: Epoch,
+        start_epoch_state: EpochState,
         include_events: bool,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error>;
@@ -248,7 +250,7 @@ pub struct GetAllTransactionsOrOutputsRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContinuouslyStreamTransactionsRequest {
     pub known_version: Version,
-    pub known_epoch: Epoch,
+    pub known_epoch_state: EpochState,
     pub include_events: bool,
     pub target: Option<LedgerInfoWithSignatures>,
 }
@@ -257,7 +259,7 @@ pub struct ContinuouslyStreamTransactionsRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContinuouslyStreamTransactionOutputsRequest {
     pub known_version: Version,
-    pub known_epoch: Epoch,
+    pub known_epoch_state: EpochState,
     pub target: Option<LedgerInfoWithSignatures>,
 }
 
@@ -265,7 +267,7 @@ pub struct ContinuouslyStreamTransactionOutputsRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContinuouslyStreamTransactionsOrOutputsRequest {
     pub known_version: Version,
-    pub known_epoch: Epoch,
+    pub known_epoch_state: EpochState,
     pub include_events: bool,
     pub target: Option<LedgerInfoWithSignatures>,
 }
@@ -414,13 +416,13 @@ impl DataStreamingClient for StreamingServiceClient {
     async fn continuously_stream_transaction_outputs(
         &self,
         known_version: u64,
-        known_epoch: u64,
+        known_epoch_state: EpochState,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error> {
         let client_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
             ContinuouslyStreamTransactionOutputsRequest {
                 known_version,
-                known_epoch,
+                known_epoch_state,
                 target,
             },
         );
@@ -430,14 +432,14 @@ impl DataStreamingClient for StreamingServiceClient {
     async fn continuously_stream_transactions(
         &self,
         known_version: u64,
-        known_epoch: u64,
+        known_epoch_state: EpochState,
         include_events: bool,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error> {
         let client_request =
             StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
                 known_version,
-                known_epoch,
+                known_epoch_state,
                 include_events,
                 target,
             });
@@ -447,14 +449,14 @@ impl DataStreamingClient for StreamingServiceClient {
     async fn continuously_stream_transactions_or_outputs(
         &self,
         known_version: u64,
-        known_epoch: u64,
+        known_epoch_state: EpochState,
         include_events: bool,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error> {
         let client_request = StreamRequest::ContinuouslyStreamTransactionsOrOutputs(
             ContinuouslyStreamTransactionsOrOutputsRequest {
                 known_version,
-                known_epoch,
+                known_epoch_state,
                 include_events,
                 target,
             },
