@@ -760,7 +760,7 @@ proc-macro2 = "1.0.38"
 processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.1", default-features = false }
 procfs = "0.14.1"
 project-root = "0.2.2"
-prometheus = { version = "0.13.3", default-features = false }
+prometheus = { version = "0.14.0", default-features = false }
 prometheus-http-query = "0.5.2"
 proptest = "1.4.0"
 proptest-derive = "0.5.1"

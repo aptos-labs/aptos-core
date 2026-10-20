@@ -562,7 +562,7 @@ dependencies = [
  "futures",
  "move-core-types",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.7.3",
  "serde",
  "serde_json",
@@ -1922,7 +1922,7 @@ dependencies = [
  "aptos-metrics-core",
  "once_cell",
  "poem",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
 ]
 
@@ -2573,7 +2573,7 @@ dependencies = [
  "opentelemetry 0.27.1",
  "opentelemetry-otlp",
  "opentelemetry_sdk 0.27.1",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "tempfile",
  "tokio",
@@ -2638,7 +2638,7 @@ dependencies = [
  "lz4",
  "once_cell",
  "opentelemetry 0.27.1",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.13.4",
  "redis",
  "redis-test",
@@ -2712,7 +2712,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.6.5",
  "postgres-native-tls",
- "prometheus",
+ "prometheus 0.13.3",
  "prometheus-client",
  "serde",
  "serde_json",
@@ -2775,7 +2775,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "once_cell",
- "prometheus",
+ "prometheus 0.13.3",
  "prost 0.13.4",
  "sample",
  "serde",
@@ -2810,7 +2810,7 @@ dependencies = [
  "futures",
  "hyper 0.14.28",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "reqwest 0.11.23",
  "rusty-fork",
  "serde_json",
@@ -3121,7 +3121,7 @@ dependencies = [
  "hostname",
  "once_cell",
  "pretty_assertions",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "serde_json",
  "strum 0.27.1",
@@ -3221,7 +3221,7 @@ dependencies = [
  "claims",
  "once_cell",
  "paste",
- "prometheus",
+ "prometheus 0.14.0",
 ]
 
 [[package]]
@@ -3777,7 +3777,7 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "procfs",
- "prometheus",
+ "prometheus 0.14.0",
  "rlimit",
  "sysinfo",
 ]
@@ -4671,7 +4671,7 @@ dependencies = [
  "futures",
  "httpmock",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "reqwest 0.11.23",
@@ -4711,7 +4711,7 @@ dependencies = [
  "httpmock",
  "jsonwebtoken 8.3.0",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.13.4",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -6220,7 +6220,7 @@ dependencies = [
  "once_cell",
  "opentelemetry-prometheus",
  "opentelemetry_sdk 0.21.2",
- "prometheus",
+ "prometheus 0.13.3",
  "prometheus-client",
  "spez",
  "thiserror 1.0.69",
@@ -11683,7 +11683,7 @@ dependencies = [
  "derive_builder",
  "kanal",
  "once_cell",
- "prometheus",
+ "prometheus 0.13.3",
  "prometheus-client",
 ]
 
@@ -14032,7 +14032,7 @@ name = "move-vm-metrics"
 version = "0.1.0"
 dependencies = [
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
 ]
 
 [[package]]
@@ -14813,7 +14813,7 @@ dependencies = [
  "once_cell",
  "opentelemetry 0.21.0",
  "opentelemetry_sdk 0.21.2",
- "prometheus",
+ "prometheus 0.13.3",
  "protobuf",
 ]
 
@@ -16196,7 +16196,7 @@ dependencies = [
  "parquet",
  "parquet_derive",
  "postgres-native-tls",
- "prometheus",
+ "prometheus 0.13.3",
  "prost 0.13.4",
  "rayon",
  "regex",
@@ -16249,6 +16249,20 @@ dependencies = [
  "parking_lot 0.12.5",
  "protobuf",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "prometheus"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ca5326d8d0b950a9acd87e6a3f94745394f62e4dae1b1ee22b2bc0c394af43a"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "memchr",
+ "parking_lot 0.12.5",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
