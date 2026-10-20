@@ -1,2 +1,8 @@
 VerexE2ETests/SourceVerify/inline_spec_false.move:13:9: error: the specification clause `ensures result == x + 1` is not established
-VerexE2ETests/SourceVerify/inline_spec_false.move:11:5: error: verex verification failed: the automatic verification of `bad_inc` failed; provide a proof: `verify bad_inc by …` in `VerexE2ETests/SourceVerify/inline_spec_false.proof.lean` (`verify bad_inc by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/inline_spec_false.move:11:5: error: verex verification failed: the automatic verification of `bad_inc` failed; provide a proof in `VerexE2ETests/SourceVerify/inline_spec_false.proof.lean`:
+  verify bad_inc by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

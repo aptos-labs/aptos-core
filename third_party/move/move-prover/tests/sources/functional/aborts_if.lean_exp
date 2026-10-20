@@ -8,7 +8,13 @@ snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
 ⊢ _y.val < _x.val
-tests/sources/functional/aborts_if.move:34:5: error: verex verification failed: the automatic verification of `abort2_incorrect` failed; provide a proof: `verify abort2_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort2_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:34:5: error: verex verification failed: the automatic verification of `abort2_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort2_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:50:5: error: verification failed with a residual obligation:
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
@@ -27,9 +33,21 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       (fun result final => final = initialState✝ ∧ y.val < x.val) (fun failure => True) state
 a✝ : x.val ≤ y.val
 ⊢ y.val < x.val
-tests/sources/functional/aborts_if.move:50:5: error: verex verification failed: the automatic verification of `abort4_incorrect` failed; provide a proof: `verify abort4_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort4_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:50:5: error: verex verification failed: the automatic verification of `abort4_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort4_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:60:9: error: the specification clause `aborts_if x < y` is not established
-tests/sources/functional/aborts_if.move:59:5: error: verex verification failed: the automatic verification of `abort5_incorrect` failed; provide a proof: `verify abort5_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort5_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:59:5: error: verex verification failed: the automatic verification of `abort5_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort5_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:67:5: error: verification failed with a residual obligation:
 case right
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -52,7 +70,13 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       state
 a✝ : y.val ≤ x.val
 ⊢ y.val < x.val
-tests/sources/functional/aborts_if.move:67:5: error: verex verification failed: the automatic verification of `abort6_incorrect` failed; provide a proof: `verify abort6_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort6_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:67:5: error: verex verification failed: the automatic verification of `abort6_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort6_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:89:5: error: verification failed with a residual obligation:
 case right
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -76,10 +100,22 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       state
 a✝ : y.val ≤ x.val
 ⊢ ¬(x.val < y.val ∨ x.val = y.val)
-tests/sources/functional/aborts_if.move:89:5: error: verex verification failed: the automatic verification of `multi_abort2_incorrect` failed; provide a proof: `verify multi_abort2_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify multi_abort2_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:89:5: error: verex verification failed: the automatic verification of `multi_abort2_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify multi_abort2_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:99:9: error: the specification clause `aborts_if _x < _y` is not established
 tests/sources/functional/aborts_if.move:100:9: error: the specification clause `aborts_if _x == _y` is not established
-tests/sources/functional/aborts_if.move:98:5: error: verex verification failed: the automatic verification of `multi_abort3_incorrect` failed; provide a proof: `verify multi_abort3_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify multi_abort3_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:98:5: error: verex verification failed: the automatic verification of `multi_abort3_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify multi_abort3_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:118:5: error: verification failed with a residual obligation:
 case right
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -101,9 +137,21 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       state
 a✝ : ¬x.val = 0
 ⊢ False
-tests/sources/functional/aborts_if.move:118:5: error: verex verification failed: the automatic verification of `multi_abort5_incorrect` failed; provide a proof: `verify multi_abort5_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify multi_abort5_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:118:5: error: verex verification failed: the automatic verification of `multi_abort5_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify multi_abort5_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:142:9: error: the specification clause `aborts_if x == 2` is not established
-tests/sources/functional/aborts_if.move:139:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_total_incorrect` failed; provide a proof: `verify abort_at_2_or_3_total_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort_at_2_or_3_total_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:139:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_total_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort_at_2_or_3_total_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:148:5: error: verification failed with a residual obligation:
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
@@ -121,7 +169,13 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       (fun result final => final = initialState✝ ∧ ¬x.val = 4) (fun failure => True) state
 a✝ : ¬(x.val = 2 ∨ x.val = 3)
 ⊢ ¬x.val = 4
-tests/sources/functional/aborts_if.move:148:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_spec_incorrect` failed; provide a proof: `verify abort_at_2_or_3_spec_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort_at_2_or_3_spec_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:148:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_spec_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort_at_2_or_3_spec_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/aborts_if.move:157:5: error: verification failed with a residual obligation:
 case left
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -140,4 +194,10 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       (fun result final => final = initialState✝) (fun failure => False) state
 a✝ : x.val = 2 ∨ x.val = 3
 ⊢ False
-tests/sources/functional/aborts_if.move:157:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_strict_incorrect` failed; provide a proof: `verify abort_at_2_or_3_strict_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort_at_2_or_3_strict_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/aborts_if.move:157:5: error: verex verification failed: the automatic verification of `abort_at_2_or_3_strict_incorrect` failed; provide a proof in `tests/sources/functional/aborts_if.proof.lean`:
+  verify abort_at_2_or_3_strict_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

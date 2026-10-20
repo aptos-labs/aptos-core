@@ -1,4 +1,11 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/generic_aliasing_many_resources.move:29:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_many_resources.move:28:9: error: the specification clause `aborts_if false` is not established
-tests/sources/regression/generic_aliasing_many_resources.move:26:5: error: verex verification failed: the automatic verification of `only_at_b` failed; provide a proof: `verify only_at_b by …` in `tests/sources/regression/generic_aliasing_many_resources.proof.lean` (`verify only_at_b by verex_obligations` lists its obligations)
+tests/sources/regression/generic_aliasing_many_resources.move:26:5: error: verex verification failed: the automatic verification of `only_at_b` failed; provide a proof in `tests/sources/regression/generic_aliasing_many_resources.proof.lean`:
+  verify only_at_b by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -163,7 +163,13 @@ verex module 0x43::verification_references_negative where
 /--
 error: the specification clause `ensures result == old(slot) && slot == result + 1` is not established
 ---
-error: verex verification failed: the automatic verification of `reborrow_bad` failed; provide a proof: `verify reborrow_bad by …` in the module (`verify reborrow_bad by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `reborrow_bad` failed; provide a proof in the module:
+  verify reborrow_bad by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x43::verification_references_negative::reborrow_bad

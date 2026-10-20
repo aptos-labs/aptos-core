@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/enum_positional.move:9:9: error: the data invariant `invariant this.0 > 20` does not hold where a mutation ends
-tests/sources/functional/enum_positional.move:12:5: error: verex verification failed: the automatic verification of `test_positional_incorrect` failed; provide a proof: `verify test_positional_incorrect by …` in `tests/sources/functional/enum_positional.proof.lean` (`verify test_positional_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/enum_positional.move:12:5: error: verex verification failed: the automatic verification of `test_positional_incorrect` failed; provide a proof in `tests/sources/functional/enum_positional.proof.lean`:
+  verify test_positional_incorrect by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

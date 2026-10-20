@@ -126,6 +126,7 @@ where
     | .tuple elements => .unmodeled "tuple"
     | .nominal name variant _ => .unmodeled s!"nominal {repr name} {repr variant}"
     | .closure .. => .unmodeled "closure"
+    | .ghost _ => .unmodeled "ghost slot"
     | .borrow _ _ => .unmodeled "reference"
     | .loanHole _ => .unmodeled "reference"
 

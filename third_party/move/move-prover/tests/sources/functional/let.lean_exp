@@ -13,9 +13,9 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
-            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
-              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit VerexIR.Proofs.Denote.NRow.nil))))))
+          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.num VerexIR.Proofs.Denote.NRow.nil))))))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
@@ -55,4 +55,11 @@ x : named = b_final
 tests/sources/functional/let.move:77:9: error: the specification clause `aborts_if sum != 0` is not established
 tests/sources/functional/let.move:78:9: error: the specification clause `aborts_if sum >= MAX_U64` is not established
 tests/sources/functional/let.move:79:9: error: the specification clause `aborts_if product >= MAX_U64` is not established
-tests/sources/functional/let.move:74:5: error: verex verification failed: the automatic verification of `spec_let_with_abort_incorrect` failed; provide a proof: `verify spec_let_with_abort_incorrect by …` in `tests/sources/functional/let.proof.lean` (`verify spec_let_with_abort_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/let.move:74:5: error: verex verification failed: the automatic verification of `spec_let_with_abort_incorrect` failed; provide a proof in `tests/sources/functional/let.proof.lean`:
+  verify spec_let_with_abort_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

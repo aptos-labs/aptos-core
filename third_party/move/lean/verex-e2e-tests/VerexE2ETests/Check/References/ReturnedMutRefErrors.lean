@@ -58,7 +58,7 @@ verex module 0x42::returned_pair_invalid where
     aborts_if false
 
 verex module 0x42::returned_native_invalid where
-  -- A preparation rejection: its contracts are not verified.
+  -- The runtime provides the native; verification rejects its call (below).
   pragma verify = false
 
   native fun native_return_reference(slot : &mut u64) -> &mut u64
@@ -113,8 +113,7 @@ run_cmd do
       (`«0x42».returned_local_invalid, "VIR-SEMANTIC-BORROW-ESCAPE"),
       (`«0x42».returned_global_invalid, "VIR-SEMANTIC-BORROW-ESCAPE"),
       (`«0x42».returned_input_invalid, "VIR-SEMANTIC-BORROW-CONFLICT"),
-      (`«0x42».returned_pair_invalid, "VIR-SEMANTIC-BORROW-CONFLICT"),
-      (`«0x42».returned_native_invalid, "VIR-EXEC-UNSUPPORTED")] do
+      (`«0x42».returned_pair_invalid, "VIR-SEMANTIC-BORROW-CONFLICT")] do
     let some unit := registeredUnit? (← getEnv) name | throwError "missing negative fixture {name}"
     match Validation.prepareExecution #[Move.semantics] unit with
     | .ok _ => throwError "invalid returned-reference fixture accepted: {name}"
@@ -125,6 +124,14 @@ run_cmd do
       if name == `«0x42».returned_global_invalid then
         unless (diagnostics.filter (·.code == expected)).size == 3 do
           throwError "bound, direct, and shared global returns must all be rejected: {repr diagnostics}"
+
+-- A caller reasons over a native through its contract, which states no final
+-- value of the reference it returns (`designs/denotation.md`).
+/--
+error: `call_native_return_reference` calls the native `native_return_reference`, which returns a mutable reference without stating its `final` value: a caller reasons over such a callee through its body, and a native has none
+-/
+#guard_msgs in
+verify 0x42::returned_native_invalid::call_native_return_reference
 
 -- Run the positive control: the returned parameter reference writes through to
 -- the caller's loan.

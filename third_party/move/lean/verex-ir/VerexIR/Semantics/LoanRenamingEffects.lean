@@ -119,10 +119,10 @@ theorem borrowRuntimePlaceAt?_mirror (shifted : StateRenamed ρ offset frontier 
       cases root : place.root with
       | global key =>
           refine ⟨{ writtenState₂ with
-              storageLoans := (state₂.nextLoan, .global key) :: writtenState₂.storageLoans }, rfl, ?_,
+              globalLoans := (state₂.nextLoan, key) :: writtenState₂.globalLoans }, rfl, ?_,
             frame_within', value_within⟩
           rw [← shifted.next]
-          exact writtenShifted.withRegistry (writtenShifted.registry.cons shifted.next_inside (.global key))
+          exact writtenShifted.withRegistry (writtenShifted.registry.cons shifted.next_inside key)
       | «local» _ => exact ⟨writtenState₂, rfl, writtenShifted, frame_within', value_within⟩
 
 theorem borrowRuntimePlace?_mirror (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
@@ -490,7 +490,21 @@ theorem evaluatePlaceOperation?_mirror
       · cases evaluate
   | reference kind =>
       cases kind with
-      | borrow _ => cases evaluate
+      | borrow kind =>
+          cases kind with
+          | immutable =>
+              obtain ⟨arguments⟩ := arguments
+              rcases arguments with _ | ⟨operand, _ | ⟨second, rest⟩⟩
+              · cases evaluate
+              · have operand_within := arguments_within operand (by simp)
+                simp only [List.map_toArray, List.map_cons, List.map_nil]
+                rw [evaluatePlaceOperation?_sharedBorrow] at evaluate ⊢
+                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
+                obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                exact ⟨state₂, rfl, shifted, frame_within, operand_within⟩
+              · cases evaluate
+          | mutable => cases evaluate
+          | profile _ => cases evaluate
       | dereference =>
           obtain ⟨arguments⟩ := arguments
           rcases arguments with _ | ⟨operand, _ | ⟨second, rest⟩⟩

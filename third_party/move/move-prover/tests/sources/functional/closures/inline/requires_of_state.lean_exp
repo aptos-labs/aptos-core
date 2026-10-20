@@ -24,8 +24,20 @@ warning: cannot derive `requires_of` exactly for this lambda argument: per-appli
     │         from a call inlined at this callsite
 
 tests/sources/functional/closures/inline/requires_of_state.move:28:13: error: the assertion `with_state_anchor!(0, old(global<R>(a)).v > 0)` does not hold
-tests/sources/functional/closures/inline/requires_of_state.move:49:5: error: verex verification failed: the automatic verification of `false_at_application` failed; provide a proof: `verify false_at_application by …` in `tests/sources/functional/closures/inline/requires_of_state.proof.lean` (`verify false_at_application by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/requires_of_state.move:49:5: error: verex verification failed: the automatic verification of `false_at_application` failed; provide a proof in `tests/sources/functional/closures/inline/requires_of_state.proof.lean`:
+  verify false_at_application by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/requires_of_state.move:28:13: error: the assertion `with_state_anchor!(
       1, old(result_of<function[Fn(Address) -> u64](read_r)>(a)) > 0
     )` does not hold
-tests/sources/functional/closures/inline/requires_of_state.move:67:5: error: verex verification failed: the automatic verification of `nested_false_at_application` failed; provide a proof: `verify nested_false_at_application by …` in `tests/sources/functional/closures/inline/requires_of_state.proof.lean` (`verify nested_false_at_application by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/requires_of_state.move:67:5: error: verex verification failed: the automatic verification of `nested_false_at_application` failed; provide a proof in `tests/sources/functional/closures/inline/requires_of_state.proof.lean`:
+  verify nested_false_at_application by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -96,6 +96,18 @@ jobs:
           source "$HOME/.profile"
           lake build verex-bench
 
+      - name: Test Verex through the Move Prover and CLI
+        # These tests skip where the verifier is not built; here they must run.
+        env:
+          VEREX_MOVE_REQUIRED: 1
+        run: |
+          source "$HOME/.profile"
+          (cd third_party/move/lean/verex-move && lake build verex-move)
+          MVP_TEST_FEATURE=lean cargo test --locked --profile ci -p move-prover --test testsuite
+          cargo test --locked --profile ci -p aptos-move-cli --lib -- tests::prove::lean
+          cargo test --locked --profile ci -p aptos-framework --test move_prover_tests \
+            -- move_stdlib_lean_prover_tests
+
       - name: Test compiler-v2 Lean integration
         # compiler-v2 elaborates `.lean` sources in verex-move, which the
         # Verex Move step above has built.

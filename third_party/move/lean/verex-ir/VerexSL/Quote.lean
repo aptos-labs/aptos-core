@@ -24,7 +24,10 @@ deriving instance ToExpr for VerexIR.Validation.KeyTree
 open VerexIR.Validation
 
 deriving instance ToExpr for LoanId
-deriving instance ToExpr for FileId
+/-- A file's index as the kernel's raw literal, as `SourceRange`'s offsets. -/
+instance : ToExpr FileId where
+  toExpr file := mkApp (mkConst ``FileId.mk) (mkRawNatLit file.index)
+  toTypeExpr := mkConst ``FileId
 deriving instance ToExpr for LocId
 deriving instance ToExpr for OriginId
 deriving instance ToExpr for AlignmentId
@@ -49,8 +52,27 @@ deriving instance ToExpr for PatternId
 deriving instance ToExpr for BlockId
 deriving instance ToExpr for IntrinsicId
 deriving instance ToExpr for SourceFile
-deriving instance ToExpr for SourceRange
-deriving instance ToExpr for Location
+/-- Byte offsets as the kernel's raw literals: locations are provenance, which
+no proof computes on, and the most numerous entries of a unit's tables. -/
+instance : ToExpr SourceRange where
+  toExpr range := mkApp3 (mkConst ``SourceRange.mk) (toExpr range.file)
+    (mkRawNatLit range.startByte) (mkRawNatLit range.endByte)
+  toTypeExpr := mkConst ``SourceRange
+
+private def noRange : Lean.Expr := toExpr (none : Option SourceRange)
+private def noRanges : Lean.Expr := toExpr (#[] : Array SourceRange)
+private def noGenerator : Lean.Expr := toExpr (none : Option String)
+private def noParent : Lean.Expr := toExpr (none : Option LocId)
+
+/-- A location, its absent parts one shared term each. -/
+instance : ToExpr Location where
+  toExpr location := mkAppN (mkConst ``Location.mk) #[
+    location.primary.elim noRange (toExpr <| some ·),
+    if location.related.isEmpty then noRanges else toExpr location.related,
+    if location.expansion.isEmpty then noRanges else toExpr location.expansion,
+    location.generatedBy.elim noGenerator (toExpr <| some ·),
+    location.parent.elim noParent (toExpr <| some ·)]
+  toTypeExpr := mkConst ``Location
 deriving instance ToExpr for OriginKind
 deriving instance ToExpr for Origin
 deriving instance ToExpr for Trust
@@ -112,6 +134,7 @@ deriving instance ToExpr for FunctionContract
 deriving instance ToExpr for ConstantDecl
 deriving instance ToExpr for FieldDecl
 deriving instance ToExpr for VariantDecl
+deriving instance ToExpr for GhostFieldDecl
 deriving instance ToExpr for StructDecl
 deriving instance ToExpr for FunctionDecl
 deriving instance ToExpr for AssociatedItemKind
@@ -151,9 +174,35 @@ deriving instance ToExpr for VerexIR.Validation.RelatedLocation
 deriving instance ToExpr for VerexIR.Validation.Diagnostic
 deriving instance ToExpr for VerexIR.Validation.OwnedDiagnostic
 deriving instance ToExpr for VerexIR.Validation.ResolutionIndex
-deriving instance ToExpr for ValidatedUnit
 deriving instance ToExpr for FunctionHandle
 deriving instance ToExpr for StructHandle
 deriving instance ToExpr for RuntimeValue
+
+/-- A validated unit as a literal. Each namespace caches views of the unit's
+tables and value orders, most of a unit; equal views are quoted once and
+shared. The unit's constructor is private, so it is read from the
+environment. -/
+def quoteUnit [Monad m] [MonadEnv m] (unit : ValidatedUnit) : m Lean.Expr := do
+  let constructor := (getStructureCtor (← getEnv) ``ValidatedUnit).name
+  let tables := toExpr unit.tables
+  let orders := unit.namespaces[0]?.map fun ns => (ns.orders, toExpr ns.orders)
+  let namespaceType := toTypeExpr ValidatedNamespace
+  let nil := mkApp (mkConst ``List.nil [levelZero]) namespaceType
+  let namespaces := unit.namespaces.foldr (init := nil) fun ns rest =>
+    mkApp3 (mkConst ``List.cons [levelZero]) namespaceType
+      (mkAppN (mkConst ``ValidatedNamespace.mk) #[
+        toExpr ns.toNamespace,
+        if ns.tables == unit.tables then tables else toExpr ns.tables,
+        match orders with
+        | some (shared, quoted) => if ns.orders == shared then quoted else toExpr ns.orders
+        | none => toExpr ns.orders,
+        toExpr ns.holders])
+      rest
+  return mkAppN (mkConst constructor) #[tables, toExpr unit.profiles,
+    mkApp2 (mkConst ``List.toArray [levelZero]) namespaceType namespaces,
+    toExpr unit.dependencies, toExpr unit.evidence, toExpr unit.indexes,
+    toExpr unit.structurizationWitnesses, toExpr unit.resolution,
+    toExpr unit.initializationCertificates, toExpr unit.borrowCertificates,
+    toExpr unit.borrowRejections]
 
 end VerexSL.Quote

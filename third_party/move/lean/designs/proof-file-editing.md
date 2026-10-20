@@ -1,9 +1,9 @@
 # Editing proof files in the editor
 
-Status: option B implemented for Move proof files (P1–P3, 2026-10-12; see
+Option B is implemented for Move proof files (P1–P3; see
 "Implementation"); Rust specification files (P4) and importable renderings
-(P5, option C) are open. Raised in `handoff.md`: opening `foo.proof.lean` in
-VS Code showed parse errors, unresolved names, and no goals in the InfoView.
+(P5, option C) are open. The design addresses parse errors, unresolved
+names and missing InfoView goals when a companion file lacks its module context.
 
 ## Problem
 
@@ -44,8 +44,6 @@ are the `verify` items, callees before callers and the members of a cycle
 of calls together, each with its script, then the specified functions no
 item names, automatically. The spliced items are inside that command, and
 the command has no incremental reuse: Lean re-elaborates it as a whole.
-`handoff.md` measures `OrderedMap.lean` at 7–8 s per edit with its
-`verify` items skipped.
 
 A lakefile alone fixes 1 and 2. The design question is 3 and 4: how an
 editor gets the module context of a companion file, and how the file keeps

@@ -18,7 +18,7 @@ namespace VerexMove.Frontend.Xast
 /-- Schema identifier of an XAST document. -/
 def schema : String := "move-xast-module"
 /-- The XAST version this consumer reads. -/
-def version : Nat := 10
+def version : Nat := 11
 
 /-- A source location: byte offsets into the module's file table. -/
 structure Loc where
@@ -431,6 +431,16 @@ structure Intrinsic where
   specFunctions : List IntrinsicBinding
   deriving Repr, BEq, Inhabited
 
+/-- A ghost field: a model-only field of every value of its struct (of
+every variant of an enum). Its initializer reads the struct's fields as
+locals of their names; without one, a pack leaves the ghost unconstrained. -/
+structure GhostField where
+  name : String
+  doc : String
+  ty : Ty
+  init : Option Exp
+  deriving Inhabited
+
 structure Struct where
   name : String
   doc : String
@@ -442,6 +452,7 @@ structure Struct where
   fields : List Field
   variants : Option (List Variant)
   spec : Spec
+  ghostFields : List GhostField := []
   intrinsic : Option Intrinsic
   deriving Inhabited
 

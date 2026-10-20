@@ -1,3 +1,122 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/uninterpreted_spec_fun_congruence.move:1:1: error: VIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3413, 3420)
-VIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3424, 3431)
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:35:5: error: the precondition of `scramble_internal` is not established
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:35:5: error: verex verification failed: the automatic verification of `scramble` failed; provide a proof in `tests/sources/functional/uninterpreted_spec_fun_congruence.proof.lean`:
+  verify scramble by
+    verex_obligations
+    verex_on
+    | requires_of_scramble_internal => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:67:5: error: the precondition of `scramble_internal` is not established
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:67:5: error: verex verification failed: the automatic verification of `scramble_all` failed; provide a proof in `tests/sources/functional/uninterpreted_spec_fun_congruence.proof.lean`:
+  verify scramble_all by
+    verex_obligations
+    verex_on
+    | requires_of_scramble_internal => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:83:9: error: the specification clause `ensures ∀ (j in 0 .. v.length), v[j].data == old(v)[j].data` is not established
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:81:5: error: the precondition of `scramble_internal` is not established
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:81:5: error: verex verification failed: the automatic verification of `scramble_all_wrong` failed; provide a proof in `tests/sources/functional/uninterpreted_spec_fun_congruence.proof.lean`:
+  verify scramble_all_wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | requires_of_scramble_internal => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:9:1: error: Unknown identifier `verexInvoke`
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:9:1: error: don't know how to synthesize implicit argument `assumed`
+  @VerexIR.Proofs.satisfies_of_assumptions (VerexIR.Proofs.Denote.HList params) (VerexIR.Proofs.Denote.Memory unit)
+    VerexIR.Proofs.Failure shape.carrier (plainMeaning executable✝ ?m.60) (assumedMeaning executable✝ ?m.60)
+    assumptions_ghost_sensitive_function_is_not_move_congruent typedContract ?m.62
+context:
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+assumptions_ghost_sensitive_function_is_not_move_congruent :
+  ∀ {Θ : VerexIR.Proofs.Denote.Skolems unit} {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)},
+    VerexIR.Proofs.AssumptionsHold (plainMeaning executable✝ typeInstantiation)
+      (assumedMeaning executable✝ typeInstantiation)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+verexInvokeDefined :
+  ∀ (Θ : VerexIR.Proofs.Denote.Skolems unit) (closure : VerexIR.Proofs.Denote.ClosureValue)
+    (σs : VerexIR.Proofs.Denote.NRow) (shape : VerexIR.Proofs.Denote.ResultShape)
+    (args : VerexIR.Proofs.Denote.HList σs) (pre : VerexIR.Proofs.Denote.Memory unit),
+    VerexIR.Proofs.RequiresOf (requiresTable unit) closure.encode args.encode pre →
+      ¬(verexInvoke Θ closure σs shape args).undefined pre
+⊢ VerexIR.Proofs.Denote.HList params →
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure shape.carrier
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:9:1: error: don't know how to synthesize implicit argument `plain`
+  @VerexIR.Proofs.satisfies_of_assumptions (VerexIR.Proofs.Denote.HList params) (VerexIR.Proofs.Denote.Memory unit)
+    VerexIR.Proofs.Failure shape.carrier (plainMeaning executable✝ ?m.60) (assumedMeaning executable✝ ?m.60)
+    assumptions_ghost_sensitive_function_is_not_move_congruent typedContract ?m.62
+context:
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+assumptions_ghost_sensitive_function_is_not_move_congruent :
+  ∀ {Θ : VerexIR.Proofs.Denote.Skolems unit} {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)},
+    VerexIR.Proofs.AssumptionsHold (plainMeaning executable✝ typeInstantiation)
+      (assumedMeaning executable✝ typeInstantiation)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+verexInvokeDefined :
+  ∀ (Θ : VerexIR.Proofs.Denote.Skolems unit) (closure : VerexIR.Proofs.Denote.ClosureValue)
+    (σs : VerexIR.Proofs.Denote.NRow) (shape : VerexIR.Proofs.Denote.ResultShape)
+    (args : VerexIR.Proofs.Denote.HList σs) (pre : VerexIR.Proofs.Denote.Memory unit),
+    VerexIR.Proofs.RequiresOf (requiresTable unit) closure.encode args.encode pre →
+      ¬(verexInvoke Θ closure σs shape args).undefined pre
+⊢ VerexIR.Proofs.Denote.HList params →
+    VerexIR.Proofs.Spec (VerexIR.Proofs.Denote.Memory unit) VerexIR.Proofs.Failure shape.carrier
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:9:1: error: don't know how to synthesize implicit argument
+  @assumptions_ghost_sensitive_function_is_not_move_congruent (VerexIR.Proofs.Denote.Skolems.runtime unit) ?m.60
+context:
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+assumptions_ghost_sensitive_function_is_not_move_congruent :
+  ∀ {Θ : VerexIR.Proofs.Denote.Skolems unit} {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)},
+    VerexIR.Proofs.AssumptionsHold (plainMeaning executable✝ typeInstantiation)
+      (assumedMeaning executable✝ typeInstantiation)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+verexInvokeDefined :
+  ∀ (Θ : VerexIR.Proofs.Denote.Skolems unit) (closure : VerexIR.Proofs.Denote.ClosureValue)
+    (σs : VerexIR.Proofs.Denote.NRow) (shape : VerexIR.Proofs.Denote.ResultShape)
+    (args : VerexIR.Proofs.Denote.HList σs) (pre : VerexIR.Proofs.Denote.Memory unit),
+    VerexIR.Proofs.RequiresOf (requiresTable unit) closure.encode args.encode pre →
+      ¬(verexInvoke Θ closure σs shape args).undefined pre
+⊢ Array (VerexIR.TypeId × VerexIR.TypeId)
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:90:5: error: unsolved goals
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+assumptions_ghost_sensitive_function_is_not_move_congruent :
+  ∀ {Θ : VerexIR.Proofs.Denote.Skolems unit} {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)},
+    VerexIR.Proofs.AssumptionsHold (plainMeaning executable✝ typeInstantiation)
+      (assumedMeaning executable✝ typeInstantiation)
+verexInvoke : (Θ : VerexIR.Proofs.Denote.Skolems unit) → VerexIR.Proofs.Denote.InvokeMeaning
+verexInvokeDefined :
+  ∀ (Θ : VerexIR.Proofs.Denote.Skolems unit) (closure : VerexIR.Proofs.Denote.ClosureValue)
+    (σs : VerexIR.Proofs.Denote.NRow) (shape : VerexIR.Proofs.Denote.ResultShape)
+    (args : VerexIR.Proofs.Denote.HList σs) (pre : VerexIR.Proofs.Denote.Memory unit),
+    VerexIR.Proofs.RequiresOf (requiresTable unit) closure.encode args.encode pre →
+      ¬(verexInvoke Θ closure σs shape args).undefined pre
+⊢ VerexIR.Proofs.Satisfies
+    (fun args =>
+      VerexIR.Proofs.Spec.bind
+        (VerexIR.Proofs.Denote.Term.denote
+          (let __src := VerexIR.Proofs.Denote.closedMeanings executable✝ #[];
+          { call := __src.call, generic := __src.generic,
+            invoke := verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit),
+            typeInstantiation := __src.typeInstantiation, assumption := __src.assumption })
+          body (VerexIR.Proofs.Denote.initialEnv params locals args))
+        (VerexIR.Proofs.Denote.ResultShape.finish mutables shape))
+    typedContract
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:90:5: error: verex verification failed: the automatic verification of `ghost_sensitive_function_is_not_move_congruent` failed; provide a proof in `tests/sources/functional/uninterpreted_spec_fun_congruence.proof.lean`:
+  verify ghost_sensitive_function_is_not_move_congruent by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | requires_of_scramble_internal => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

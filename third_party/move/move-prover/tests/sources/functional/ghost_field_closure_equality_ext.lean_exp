@@ -1,2 +1,17 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ghost_field_closure_equality_ext.move:1:1: error: an `update` condition must target a spec variable
+tests/sources/functional/ghost_field_closure_equality_ext.move:34:9: error: the specification clause `ensures result != spec.result[1]` is not established
+tests/sources/functional/ghost_field_closure_equality_ext.move:33:5: error: verex verification failed: the automatic verification of `vec_neq` failed; provide a proof in `tests/sources/functional/ghost_field_closure_equality_ext.proof.lean`:
+  verify vec_neq by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/ghost_field_closure_equality_ext.move:48:9: error: the specification clause `ensures result != spec.result[1]` is not established
+tests/sources/functional/ghost_field_closure_equality_ext.move:47:5: error: verex verification failed: the automatic verification of `fs_neq` failed; provide a proof in `tests/sources/functional/ghost_field_closure_equality_ext.proof.lean`:
+  verify fs_neq by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

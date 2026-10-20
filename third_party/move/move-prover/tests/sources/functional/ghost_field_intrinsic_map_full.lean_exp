@@ -7,7 +7,6 @@ VIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_iter_borrow_mut` targ
 VIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_replace_key_inplace` target has an incompatible physical signature
 VIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_to_ordered_map` target has an incompatible physical signature
 VIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_aborts_iter_borrow_mut` target has an incompatible physical signature
-VIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_iter_valid` target has an incompatible physical signature
 VIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_back_key` requires `map_spec_key_at`
 VIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_borrow_back` requires `map_spec_key_at`
 VIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_borrow_front` requires `map_spec_key_at`

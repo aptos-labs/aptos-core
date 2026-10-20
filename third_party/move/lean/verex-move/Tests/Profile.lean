@@ -142,4 +142,49 @@ private def framedDependency : VerexMove.Frontend.Xast.Module := {
   | .ok unit => unit.namespaces[0]!.structs[0]!.contract.parameterFrames.size == 1
   | .error _ => false
 
+-- A fixed-width source expression may initialize a mathematical ghost.
+-- Validate the whole encoded update, including its target/value type check.
+private def numericGhostUpdate : VerexMove.Frontend.Xast.Module := Id.run do
+  let module : VerexMove.Frontend.Xast.ModuleRef := { address := "0x42", addressAlias := none, name := "numeric_ghost" }
+  let owner : VerexMove.Frontend.Xast.QualifiedName := { module, name := "Counter" }
+  let reference : VerexMove.Frontend.Xast.Ty := .reference true (.struct owner [])
+  let target : VerexMove.Frontend.Xast.Exp := .mk .num default
+    (.call (.select owner "count") [] [.mk reference default (.param 0)] none)
+  let update : VerexMove.Frontend.Xast.Condition := .mk .update default []
+    (.mk .u64 default (.param 1)) none [] none none (some target)
+  return { (default : VerexMove.Frontend.Xast.Module) with
+    address := module.address, name := module.name
+    structs := [{ (default : VerexMove.Frontend.Xast.Struct) with
+      name := "Counter", ghostFields := [{ name := "count", doc := "", ty := .num, init := none }] }]
+    functions := [{ (default : VerexMove.Frontend.Xast.Function) with
+      name := "record", params := [{ name := "c", ty := reference }, { name := "n", ty := .u64 }]
+      result := .tuple []
+      body := some (.mk (.tuple []) default (.specBlock (.mk none [] [update] none [] none))) }] }
+
+#guard match VerexMove.Frontend.VIR.Encode.package
+    { modules := [numericGhostUpdate], dependencies := [] } with
+  | .ok raw => (Validation.validate #[schema] raw).isOk
+  | .error _ => false
+
+-- The declaration selects the semantics, independent of the function's name.
+private def encodedDestroyRole (role : String) : Option String := do
+  let module : VerexMove.Frontend.Xast.ModuleRef :=
+    { address := "0x42", addressAlias := none, name := "user_map" }
+  let name := "consume"
+  let source : VerexMove.Frontend.Xast.Module := {
+    (default : VerexMove.Frontend.Xast.Module) with
+    address := module.address, name := module.name
+    structs := [{ (default : VerexMove.Frontend.Xast.Struct) with
+      name := "Table", intrinsic := some {
+        name := "map", specFunctions := []
+        moveFunctions := [{ role, target := { module, name } }] } }]
+    functions := [{ (default : VerexMove.Frontend.Xast.Function) with
+      name, result := .tuple [] }] }
+  let .ok raw := VerexMove.Frontend.VIR.Encode.package
+    { modules := [source], dependencies := [] } | none
+  return raw.namespaces[0]!.intrinsics[0]!.executableBindings[0]!.role
+
+#guard encodedDestroyRole "map_destroy_unchecked" == some "map_destroy_unchecked"
+#guard encodedDestroyRole "map_destroy_empty" == some "map_destroy_empty"
+
 end VerexIR.Move.Tests

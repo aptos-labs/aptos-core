@@ -3,7 +3,7 @@
 
 use crate::{
     db::AptosDB,
-    native_state_committer::NativeStateCommitter,
+    native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
     native_state_reader::InMemoryNativeStateReader,
     native_state_store::{position_key_of, PositionBase, PositionOverlay, PositionWrites},
     position_buffered_state::{
@@ -27,6 +27,10 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
+use aptos_jellyfish_merkle::{
+    node_type::{Node, NodeKey},
+    TreeWriter,
+};
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
@@ -98,6 +102,12 @@ impl AptosDB {
     /// `rocksdb_configs.enable_trading_native` is set. Shares `env` and
     /// `block_cache` with the main AptosDB so RocksDB background
     /// threads and the block cache stay singleton.
+    ///
+    /// `for_restore` opens at the persisted snapshot without catching up
+    /// to the ledger: a restore saves transactions ahead of the state it
+    /// has restored, and re-seats the position store itself once the
+    /// snapshot lands (`reset_position_store_to_ledger`).
+    #[allow(clippy::too_many_arguments)]
     pub fn init_native_position(
         &mut self,
         db_paths: &StorageDirPaths,
@@ -109,6 +119,7 @@ impl AptosDB {
         env: &Env,
         block_cache: &Cache,
         readonly: bool,
+        for_restore: bool,
     ) -> Result<()> {
         if self.position.is_some() {
             return Err(AptosDbError::Other(
@@ -208,31 +219,6 @@ impl AptosDB {
             (Some(store), Some(persisted))
         };
 
-        // Replay write sets between the JMT snapshot and the chain
-        // tip so the in-memory pipeline + the JMT catch up to
-        // `OverallCommitProgress`.
-        if let Some(store) = state_store.as_ref()
-            && let Some(v_overall) = self.ledger_db.metadata_db().get_synced_version()?
-        {
-            // No JMT snapshot means the base cold-loaded empty, so replay
-            // covers every version; a higher floor would drop positions last
-            // written below it. Nothing ever committed to the position store
-            // means nothing to recover — a fast-synced node whose target
-            // carried no positions.
-            let snapshot_next_version = merkle_progress.map_or(0, |v| v + 1);
-            let position_committed = get_position_commit_progress(&kv_db)?.is_some();
-            if position_committed && snapshot_next_version <= v_overall {
-                self.replay_position_after_snapshot(
-                    store,
-                    &merkle_db,
-                    snapshot_next_version,
-                    v_overall + 1,
-                    &position_base,
-                    &positions,
-                )?;
-            }
-        }
-
         self.position = Some(Arc::new(PositionBundle {
             kv_db,
             merkle_db,
@@ -243,12 +229,124 @@ impl AptosDB {
             persisted,
         }));
 
+        if !readonly && !for_restore {
+            self.catch_up_position_store(merkle_progress)?;
+            self.ensure_position_root_matches_ledger()?;
+        }
+
         info!(
             num_shards = NUM_NATIVE_VALUE_SHARDS,
             readonly = readonly,
             "Native-position subsystem initialized."
         );
 
+        Ok(())
+    }
+
+    /// Replay write sets between the JMT snapshot at `snapshot_version` and
+    /// the chain tip so the in-memory pipeline + the JMT catch up to
+    /// `OverallCommitProgress`.
+    fn catch_up_position_store(&self, snapshot_version: Option<Version>) -> Result<()> {
+        let Some(bundle) = self.position.as_ref() else {
+            return Ok(());
+        };
+        let Some(store) = bundle.state_store.as_ref() else {
+            return Ok(());
+        };
+        let Some(v_overall) = self.ledger_db.metadata_db().get_synced_version()? else {
+            return Ok(());
+        };
+        // No JMT snapshot means the base cold-loaded empty, so replay
+        // covers every version; a higher floor would drop positions last
+        // written below it. Nothing ever committed to the position store
+        // means nothing to recover — a fast-synced node whose target
+        // carried no positions.
+        let snapshot_next_version = snapshot_version.map_or(0, |v| v + 1);
+        if let Some(kv_progress) = get_position_commit_progress(&bundle.kv_db)?
+            && snapshot_next_version <= v_overall
+        {
+            self.replay_position_after_snapshot(
+                store,
+                &bundle.kv_db,
+                &bundle.merkle_db,
+                snapshot_next_version,
+                kv_progress,
+                v_overall + 1,
+                &bundle.position_base,
+                &bundle.positions,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Bring the position store up to the ledger after a restore saved
+    /// transactions past its snapshot without executing them — what
+    /// `StateStore::reset` does for main state.
+    pub(crate) fn reset_position_store_to_ledger(&self) -> Result<()> {
+        let Some(bundle) = self.position.as_ref() else {
+            return Ok(());
+        };
+        let v_overall = self.ledger_db.metadata_db().get_synced_version()?;
+        let snapshot_version = bundle
+            .merkle_db
+            .latest_snapshot_version_at_or_before(v_overall.unwrap_or(Version::MAX))?;
+        // With no snapshot the store is still as opened: empty, nothing
+        // restored into it.
+        if let Some(version) = snapshot_version {
+            let root_hash = bundle.merkle_db.get_root_hash(version)?;
+            self.reset_position_after_fast_sync(version, root_hash)?;
+        }
+        self.catch_up_position_store(snapshot_version)?;
+        self.ensure_position_root_matches_ledger()
+    }
+
+    /// Why a position-summary read cannot be served: storage is off, or
+    /// the DB was opened readonly, which keeps no position pipeline.
+    pub(crate) fn position_storage_unavailable(&self) -> AptosDbError {
+        let reason = if self.position.is_some() {
+            "the DB was opened readonly"
+        } else {
+            "storage.rocksdb_configs.enable_trading_native is off"
+        };
+        AptosDbError::Other(format!(
+            "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position storage is not \
+             available: {reason}"
+        ))
+    }
+
+    /// Refuse to open when the ledger tip commits a position root the
+    /// rebuilt store disagrees with — e.g. position storage enabled on a
+    /// node whose history already carries positions it never stored. Left
+    /// undetected, the node would diverge at its next block.
+    fn ensure_position_root_matches_ledger(&self) -> Result<()> {
+        let Some(store) = self
+            .position
+            .as_ref()
+            .and_then(|bundle| bundle.state_store.as_ref())
+        else {
+            return Ok(());
+        };
+        let Some(v_overall) = self.ledger_db.metadata_db().get_synced_version()? else {
+            return Ok(());
+        };
+        let Some(committed_root) = self
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info(v_overall)?
+            .position_state_checkpoint_hash()
+        else {
+            return Ok(());
+        };
+        let latest = store.current_state().lock().latest().clone();
+        let local_root = latest.root_hash();
+        ensure!(
+            local_root == committed_root,
+            "Native-position store (version {:?}, root {local_root:?}) disagrees with the position \
+             root {committed_root:?} committed at ledger version {v_overall}. Position storage was \
+             likely enabled on a node whose history already carries positions; restore it from a \
+             state snapshot (fast sync or db-tool restore) instead.",
+            latest.version(),
+        );
         Ok(())
     }
 
@@ -272,9 +370,14 @@ impl AptosDB {
 
         // A chain with the root feature on but no positions yet commits the
         // empty-tree placeholder. The snapshot stage then streams no values
-        // and writes no JMT node, so there is nothing to load — but the
-        // baseline still has to move to `version`.
+        // and writes no JMT node, so write the empty root here: the next
+        // merklize reads the root at `version`, and the next open discovers
+        // the snapshot by it.
         if expected_root_hash == *SPARSE_MERKLE_PLACEHOLDER_HASH {
+            bundle.merkle_db.write_node_batch(&HashMap::from([(
+                NodeKey::new_empty_path(version),
+                Node::Null,
+            )]))?;
             bundle
                 .position_base
                 .reset_from_rows(Some(version), "position", std::iter::empty())?;
@@ -304,6 +407,7 @@ impl AptosDB {
         }
         *tip = bundle.position_base.new_overlay();
         drop(tip);
+        bundle.kv_db.write_progress(version)?;
 
         if let (Some(store), Some(persisted)) =
             (bundle.state_store.as_ref(), bundle.persisted.as_ref())
@@ -388,11 +492,19 @@ impl AptosDB {
     /// tip. Coalesces latest-wins-per-key, extends the JMT pipeline
     /// state in one shot, and folds the per-account updates into the
     /// `PositionOverlay` before returning.
+    ///
+    /// Versions above `kv_progress` were committed while position storage
+    /// was off, so their value rows are written here too: a JMT leaf
+    /// resolves its value as the latest row at or before the leaf's
+    /// version, and a missing row would resolve to an older value.
+    #[allow(clippy::too_many_arguments)]
     fn replay_position_after_snapshot(
         &self,
         store: &PositionStateStore,
+        kv_db: &Arc<PositionDb>,
         merkle_db: &Arc<PositionMerkleDb>,
         snapshot_next_version: Version,
+        kv_progress: Version,
         num_transactions: u64,
         position_base: &PositionBase,
         positions: &Arc<Mutex<PositionOverlay>>,
@@ -426,9 +538,22 @@ impl AptosDB {
             .write_set_db()
             .get_write_sets(snapshot_next_version, num_transactions)?;
 
+        let committer = NativeStateCommitter::new(Arc::clone(kv_db));
+        let mut sharded_kv_batches = new_sharded_kv_batches();
+        let mut in_chunk_prior = InChunkPriorVersions::new();
         let mut pending_leaf_updates: HashMap<HashValue, PositionSlot> = HashMap::new();
         let mut pending_position_writes = PositionWrites::new();
-        for write_set in &write_sets {
+        for (version, write_set) in (snapshot_next_version..).zip(&write_sets) {
+            if version > kv_progress {
+                committer.apply(
+                    version,
+                    write_set
+                        .native_position_iter()
+                        .map(|(k, op)| (k.clone(), op.as_write_op().clone())),
+                    &mut sharded_kv_batches,
+                    &mut in_chunk_prior,
+                )?;
+            }
             for (key, op) in write_set.native_position_iter() {
                 let maybe_value = op.as_write_op().as_state_value_opt().cloned();
                 let value_hash = maybe_value.as_ref().map(StateValue::hash);
@@ -450,6 +575,11 @@ impl AptosDB {
             }
         }
 
+        let target_version = num_transactions - 1;
+        if target_version > kv_progress {
+            kv_db.commit(target_version, None, sharded_kv_batches)?;
+        }
+
         if pending_leaf_updates.is_empty() {
             return Ok(());
         }
@@ -458,7 +588,6 @@ impl AptosDB {
         let pipeline_latest = state_lock.lock().latest().clone();
         let snapshot_version = pipeline_latest.version();
 
-        let target_version = num_transactions - 1;
         let updates: Vec<_> = pending_leaf_updates.into_iter().collect();
         let proof_reader = PositionProofReader {
             merkle_db: Arc::clone(merkle_db),

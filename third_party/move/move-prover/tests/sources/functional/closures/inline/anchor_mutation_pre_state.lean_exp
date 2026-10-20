@@ -8,4 +8,10 @@ warning: Unused parameter `a`. Consider removing or prefixing with an underscore
 tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:17:13: error: the assertion `with_state_anchor!(
       3, global<R>(a).v == old(global<R>(a).v) + 3 && res == x
     )` does not hold
-tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:41:5: error: verex verification failed: the automatic verification of `wrong_attached_claim` failed; provide a proof: `verify wrong_attached_claim by …` in `tests/sources/functional/closures/inline/anchor_mutation_pre_state.proof.lean` (`verify wrong_attached_claim by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:41:5: error: verex verification failed: the automatic verification of `wrong_attached_claim` failed; provide a proof in `tests/sources/functional/closures/inline/anchor_mutation_pre_state.proof.lean`:
+  verify wrong_attached_claim by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

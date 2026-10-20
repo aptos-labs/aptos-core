@@ -16,6 +16,9 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
     "-printModel:1",
     "-enhancedErrorMessages:1",
     "-proverOpt:O:model_validate=true",
+    // Boogie's normalized declaration order differs between processes, so
+    // the solver input and its models would too. Keep the generated order.
+    "-normalizeDeclarationOrder:0",
 ];
 
 const MOD_SET_ANALYSIS_LEGACY_FLAG: &str = "-doModSetAnalysis";

@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/state_domain_valid_value.move:17:9: error: the specification clause `ensures ∃ (S : StateDomain), S.. |~ increments_to(old(_x), _x, result)` is not established
-tests/sources/regression/state_domain_valid_value.move:16:5: error: verex verification failed: the automatic verification of `returns_zero` failed; provide a proof: `verify returns_zero by …` in `tests/sources/regression/state_domain_valid_value.proof.lean` (`verify returns_zero by verex_obligations` lists its obligations)
+tests/sources/regression/state_domain_valid_value.move:16:5: error: verex verification failed: the automatic verification of `returns_zero` failed; provide a proof in `tests/sources/regression/state_domain_valid_value.proof.lean`:
+  verify returns_zero by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

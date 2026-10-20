@@ -207,7 +207,7 @@ mutual
 theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (closed : ∀ index, allowed index = true → (types index).paramFree = true) :
     (τ : NTy) → τ.paramsAll allowed = true → (τ.substWith types).paramFree = true
-  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => rfl
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => rfl
   | .param index, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       exact closed index mentioned
@@ -234,6 +234,9 @@ theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
   | .ref referent, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed referent mentioned]
+  | .ghost slot, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed slot mentioned]
   | .function parameters _ results, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, NTy.paramFree, Bool.and_eq_true,
@@ -268,7 +271,7 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (plain : ∀ index, allowed index = true → (types index).refFree = true) :
     (τ : NTy) → τ.paramsAll allowed = true → τ.refFree = true →
       (τ.substWith types).refFree = true
-  | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .address, _, _ | .signer, _, _
+  | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .num, _, _ | .address, _, _ | .signer, _, _
   | .string, _, _ | .bytes, _, _ => rfl
   | .function _ _ _, _, _ => rfl
   | .param index, mentioned, _ => by
@@ -298,6 +301,10 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.refFree, Bool.and_eq_true] at free
       simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain key mentioned.1 free.1,
         NTy.refFree_substWith plain value mentioned.2 free.2, Bool.and_self]
+  | .ghost slot, mentioned, free => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.refFree] at free
+      simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain slot mentioned free]
 
 theorem NRow.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (plain : ∀ index, allowed index = true → (types index).refFree = true) :
@@ -565,7 +572,9 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
       (.closure function mask typeInstantiation captures) = true)
     (typedCaptures : ∀ (row : NRow) (types : List SemTy),
       NRow.admits unit row captures.toList = true → row.TypedAs unit types →
-        row.paramFree = true → row.refFree = true → HasTypes unit loans captures.toList types) :
+        row.paramFree = true → row.refFree = true →
+        ∃ represented : List RuntimeValue, represented.map (normalize unit) = captures.toList ∧
+          HasTypes unit loans represented types) :
     ∃ targetNs declaration arguments allParameters targetResults,
       unit.namespaces[function.namespaceId.index]? = some targetNs ∧
       targetNs.functions[function.functionId.index]? = some declaration ∧
@@ -575,7 +584,8 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
       FrameInstantiation targetNs (requiredAt unit function) typeInstantiation
         (frameEnv declaration.signature.generics arguments) ∧
       mask < 2 ^ declaration.signature.parameters.size ∧
-      HasTypes unit loans captures.toList (ClosureMask.extract mask true allParameters) ∧
+      (∃ represented : Array RuntimeValue, represented.map (normalize unit) = captures ∧
+        HasTypes unit loans represented.toList (ClosureMask.extract mask true allParameters)) ∧
       parameters.ParametersTypedAs unit shared (ClosureMask.extract mask false allParameters) ∧
       results.TypedAs unit targetResults := by
   unfold NTy.admits at admitted
@@ -632,12 +642,18 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
             rw [same]; exact plain
           have capturedMentioned := ofList_paramsAll _
             (extract_all mask true parameterNatives allMentioned.1)
-          have capturesTyped := HasTypes.ofObserved (typedCaptures _ _ capturesAdmitted
+          obtain ⟨represented, normalized, representedTyped⟩ := typedCaptures _ _ capturesAdmitted
             (by rw [NRow.ofList_substWith, ← extract_map]
                 exact ParametersTypedAs.observed (ParametersTypedAs.extract mask true
                   parametersAt))
             (NRow.paramFree_substWith closedArguments _ capturedMentioned)
-            (NRow.refFree_substWith plainArguments _ capturedMentioned capturedFree))
+            (NRow.refFree_substWith plainArguments _ capturedMentioned capturedFree)
+          have capturesTyped : ∃ represented : Array RuntimeValue,
+              represented.map (normalize unit) = captures ∧
+              HasTypes unit loans represented.toList
+                (ClosureMask.extract mask true (genericParameters.map (·.subst semArguments))) :=
+            ⟨represented.toArray, by simpa using congrArg List.toArray normalized,
+              by simpa using HasTypes.ofObserved representedTyped⟩
           refine ⟨targetNs, declaration, semArguments,
             genericParameters.map (·.subst semArguments), genericResults.map (·.subst semArguments),
             namespace_eq, declaration_eq,
@@ -648,34 +664,6 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
           exact bounded
       · cases agreesAt
   · cases rowsAdmitted
-
-/-- A closure the native typing admits at a function type, in a unit whose
-readings agree, inhabits the semantic function type the native type reads
-as, wherever its captures inhabit the types their rows read as. -/
-theorem hasType_closure {unit : ValidatedUnit} (agree : TypesAgree unit) {loans : LoanTypes}
-    {function : FunctionHandle} {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)}
-    {captures : Array RuntimeValue} {parameters : NRow} {shared : List Bool} {results : NRow}
-    {parameterTypes : List SemTy} {result : SemTy}
-    (admitted : NTy.admits unit (.function parameters shared results)
-      (.closure function mask typeInstantiation captures) = true)
-    (typed : (NTy.function parameters shared results).TypedAs unit
-      (.function parameterTypes result))
-    (typedCaptures : ∀ (row : NRow) (types : List SemTy),
-      NRow.admits unit row captures.toList = true → row.TypedAs unit types →
-        row.paramFree = true → row.refFree = true → HasTypes unit loans captures.toList types) :
-    HasType unit loans (.closure function mask typeInstantiation captures)
-      (.function parameterTypes result) := by
-  obtain ⟨targetNs, declaration, arguments, allParameters, targetResults, namespace_eq,
-      declaration_eq, signature_eq, faithful, bound, capturesTyped, parametersAt, resultsAt⟩ :=
-    closureReading agree admitted typedCaptures
-  cases typed with
-  | scalar scalar => simp [NTy.scalarType?] at scalar
-  | function typedParameters typedResults packed =>
-      exact .closure function mask typeInstantiation captures parameterTypes result targetNs
-        declaration arguments allParameters targetResults namespace_eq declaration_eq
-        signature_eq faithful bound capturesTyped
-        (NRow.parametersUnique _ typedParameters parametersAt)
-        (by rw [packed, NRow.readsUnique _ typedResults resultsAt]; exact SemTy.packs_pack _)
 
 private theorem sizeOf_toList_lt (values : Array RuntimeValue) :
     sizeOf values.toList < 1 + sizeOf values := by
@@ -689,13 +677,15 @@ theorem VariantsTypedAs.find {unit : ValidatedUnit} {source : StructHandle}
     {names : List String} → {rows : NRows} → NRows.VariantsTypedAs unit source arguments names rows →
       {name : String} → {row : NRow} → NRows.variant? names rows name = some row →
       rows.paramFree = true → rows.refFree = true →
-      ∃ ns declared fieldTypes,
+      ∃ ns declared fieldTypes ghostTypes,
         SemanticOperations.handleFields? unit source (some name) = some (ns, declared) ∧
         ResolvesAll ns.tables arguments.toArray (declared.toList.map (·.type.typeId)) fieldTypes ∧
-        row.TypedAs unit fieldTypes ∧ row.paramFree = true ∧ row.refFree = true
+        ResolvesAll ns.tables arguments.toArray (ghostTypeIds unit source) ghostTypes ∧
+        row.TypedAs unit (fieldTypes ++ ghostTypes.map .ghost) ∧ row.paramFree = true ∧
+        row.refFree = true
   | [], .nil, .nil, _, _, found, _, _ => by simp [NRows.variant?] at found
-  | candidate :: names, .cons fields rest, .cons declaration_eq resolve typed later, name, row,
-      found, closed, plain => by
+  | candidate :: names, .cons fields rest, .cons declaration_eq resolve ghostsResolve typed later,
+      name, row, found, closed, plain => by
       simp only [NRows.paramFree, NRows.refFree, Bool.and_eq_true] at closed plain
       simp only [NRows.variant?] at found
       split at found
@@ -703,7 +693,7 @@ theorem VariantsTypedAs.find {unit : ValidatedUnit} {source : StructHandle}
           simp only [beq_iff_eq] at same
           subst same
           cases found
-          exact ⟨_, _, _, declaration_eq, resolve, typed, closed.1, plain.1⟩
+          exact ⟨_, _, _, _, declaration_eq, resolve, ghostsResolve, typed, closed.1, plain.1⟩
       · exact VariantsTypedAs.find later found closed.2 plain.2
 
 theorem admits_tuple {unit : ValidatedUnit} {elements : NRow} {value : RuntimeValue}
@@ -718,11 +708,17 @@ theorem admits_vector {unit : ValidatedUnit} {element : NTy} {value : RuntimeVal
   cases value <;> simp only [NTy.admits, Bool.false_eq_true] at admitted
   exact ⟨_, rfl, admitted⟩
 
+theorem admits_table {unit : ValidatedUnit} {key value : NTy} {map : RuntimeValue}
+    (admitted : NTy.admits unit (.table key value) map = true) :
+    ∃ entries, map = .vector entries ∧ NTy.admitsEntries unit key value entries.toList = true := by
+  cases map <;> simp only [NTy.admits, Bool.false_eq_true] at admitted
+  exact ⟨_, rfl, admitted⟩
+
 theorem admits_struct {unit : ValidatedUnit} {source : StructHandle} {arguments fields : NRow}
     {value : RuntimeValue}
     (admitted : NTy.admits unit (.struct source arguments fields) value = true) :
     ∃ values, value = .nominal source none values ∧
-      NRow.admitsFields unit fields values.toList = true := by
+      NRow.admits unit fields values.toList = true := by
   cases value with
   | nominal actual variant values =>
       cases variant with
@@ -761,156 +757,6 @@ theorem admits_function {unit : ValidatedUnit} {parameters : NRow} {shared : Lis
   | closure function mask typeInstantiation captures => exact ⟨_, _, _, _, rfl, admitted⟩
   | _ => simp [NTy.admits] at admitted
 
-mutual
-/-- In a unit whose readings agree, a runtime value a closed native type
-holding no reference admits inhabits the semantic type the native type reads
-as. -/
-theorem NTy.hasType_of_admits {unit : ValidatedUnit} (agree : TypesAgree unit)
-    {loans : LoanTypes} :
-    (value : RuntimeValue) → (τ : NTy) → {type : SemTy} → NTy.admits unit τ value = true →
-      τ.TypedAs unit type → τ.paramFree = true → τ.refFree = true →
-      HasType unit loans value type
-  | value, τ, _, admitted, .scalar scalar, _, _ => by
-      cases τ <;> simp only [NTy.scalarType?, Option.some.injEq, reduceCtorEq] at scalar <;>
-        subst scalar <;> cases value <;> simp only [NTy.admits, reduceCtorEq] at admitted
-      · exact .bool _
-      · simp only [Option.isSome_iff_exists, decodeInt?] at admitted
-        obtain ⟨_, decoded⟩ := admitted
-        split at decoded
-        · next fits => exact .integer _ _ _ (holdsAt_val _ ⟨_, fits⟩)
-        · cases decoded
-      · exact .address _
-      · exact .signer _
-      · exact .string _
-      · exact .bytes _
-  | value, .unit, _, admitted, .unit, _, _ => by
-      cases value <;> simp only [NTy.admits, reduceCtorEq] at admitted
-      exact .unit
-  | value, .tuple elements, _, admitted, .tuple typed, closed, plain =>
-      have shape := admits_tuple admitted
-      have closed : elements.paramFree = true := by simpa [NTy.paramFree] using closed
-      have plain : elements.refFree = true := by simpa [NTy.refFree] using plain
-      match value, shape with
-      | .tuple values, ⟨_, rfl, admitted⟩ =>
-          .tuple _ _ (NRow.hasTypes_of_admits agree values.toList elements admitted typed
-            closed plain)
-  | value, .vector element, _, admitted, .vector typed, closed, plain =>
-      have shape := admits_vector admitted
-      have closed : element.paramFree = true := by simpa [NTy.paramFree] using closed
-      have plain : element.refFree = true := by simpa [NTy.refFree] using plain
-      match value, shape with
-      | .vector values, ⟨_, rfl, admitted⟩ =>
-          .vector _ _ none trivial (NTy.hasTypeEach_of_admits agree values.toList element
-            admitted typed closed plain)
-  | value, .struct source arguments fields, _, admitted,
-      .struct name_eq _ _ declaration_eq resolve typed, closed, plain =>
-      have shape := admits_struct admitted
-      have closed : fields.paramFree = true := by
-        simp only [NTy.paramFree, Bool.and_eq_true] at closed; exact closed.2
-      have plain : fields.refFree = true := by simpa [NTy.refFree] using plain
-      match value, shape with
-      | .nominal _ none values, ⟨_, rfl, admitted⟩ =>
-          .nominal _ none _ _ _ _ _ _ name_eq declaration_eq resolve
-            (NRow.hasTypes_of_admitsFields agree values.toList fields admitted typed closed plain)
-  | value, .enum source arguments names rows distinct, _, admitted,
-      .enum name_eq _ _ _ _ variants, closed, plain =>
-      have shape := admits_enum admitted
-      have closed : rows.paramFree = true := by
-        simp only [NTy.paramFree, Bool.and_eq_true] at closed; exact closed.2
-      have plain : rows.refFree = true := by simpa [NTy.refFree] using plain
-      match value, shape with
-      | .nominal _ (some name) values, ⟨_, row, _, rfl, found, admitted⟩ =>
-          have reading := VariantsTypedAs.find variants found closed plain
-          match reading with
-          | ⟨_, _, _, declaration_eq, resolve, typed, rowClosed, rowPlain⟩ =>
-              .nominal _ (some name) _ _ _ _ _ _ name_eq declaration_eq resolve
-                (NRow.hasTypes_of_admits agree values.toList row admitted typed rowClosed
-                  rowPlain)
-  | value, .function parameters shared results, _, admitted, typed@(.function _ _ _), _, _ =>
-      have shape := admits_function admitted
-      match value, shape with
-      | .closure _ _ _ captures, ⟨_, _, _, _, rfl, admitted⟩ =>
-          hasType_closure agree admitted typed fun row _ capturesAdmitted rowTyped rowClosed
-            rowPlain =>
-            NRow.hasTypes_of_admits agree captures.toList row capturesAdmitted rowTyped rowClosed
-              rowPlain
-  | _, .ref _, _, _, .ref _, _, plain => by simp [NTy.refFree] at plain
-  | _, .param _, _, _, .param _, closed, _ => by simp [NTy.paramFree] at closed
-termination_by value => sizeOf value
-decreasing_by
-  all_goals simp_wf
-  all_goals first
-    | omega
-    | (have := sizeOf_toList_lt ‹Array RuntimeValue›; omega)
-
-/-- In a unit whose readings agree, runtime values a closed row holding no
-reference admits inhabit the types the row reads as. -/
-theorem NRow.hasTypes_of_admits {unit : ValidatedUnit} (agree : TypesAgree unit)
-    {loans : LoanTypes} :
-    (values : List RuntimeValue) → (row : NRow) → {types : List SemTy} →
-      NRow.admits unit row values = true → row.TypedAs unit types → row.paramFree = true →
-      row.refFree = true → HasTypes unit loans values types
-  | [], .nil, _, _, .nil, _, _ => .nil
-  | value :: values, .cons τ rest, _, admitted, .cons head tail, closed, plain => by
-      simp only [NRow.admits, Bool.and_eq_true] at admitted
-      simp only [NRow.paramFree, Bool.and_eq_true] at closed
-      simp only [NRow.refFree, Bool.and_eq_true] at plain
-      exact .cons (NTy.hasType_of_admits agree value τ admitted.1 head closed.1 plain.1)
-        (NRow.hasTypes_of_admits agree values rest admitted.2 tail closed.2 plain.2)
-  | [], .cons _ _, _, admitted, _, _, _ | _ :: _, .nil, _, admitted, _, _, _ => by
-      simp [NRow.admits] at admitted
-termination_by values => sizeOf values
-
-/-- In a unit whose readings agree, runtime values a closed struct's field row
-holding no reference admits as its fields inhabit the declared field types. -/
-theorem NRow.hasTypes_of_admitsFields {unit : ValidatedUnit} (agree : TypesAgree unit)
-    {loans : LoanTypes} :
-    (values : List RuntimeValue) → (row : NRow) → {arguments : NRow} → {types : List SemTy} →
-      NRow.admitsFields unit row values = true → NRow.FieldsTypedAs unit arguments row types →
-      row.paramFree = true → row.refFree = true → HasTypes unit loans values types
-  | [], .nil, _, _, _, .nil, _, _ => .nil
-  | [], .cons τ .nil, _, _, admitted, typed, _, _ => by
-      simp only [NRow.admitsFields] at admitted
-      cases typed with
-      | hidden => exact .nil
-      | cons head _ => simp [head.not_table] at admitted
-  | [value], .cons τ .nil, _, _, admitted, typed, closed, plain => by
-      simp only [NRow.admitsFields, Bool.and_eq_true, Bool.not_eq_true'] at admitted
-      cases typed with
-      | hidden => simp [NTy.isTable] at admitted
-      | cons head tail =>
-          cases tail
-          simp only [NRow.paramFree, Bool.and_eq_true] at closed
-          simp only [NRow.refFree, Bool.and_eq_true] at plain
-          exact .cons (NTy.hasType_of_admits agree value τ admitted.2 head closed.1 plain.1) .nil
-  | value :: values, .cons τ (.cons σ rest), _, _, admitted, .cons head tail, closed, plain => by
-      simp only [NRow.admitsFields, Bool.and_eq_true] at admitted
-      simp only [NRow.paramFree, Bool.and_eq_true] at closed
-      simp only [NRow.refFree, Bool.and_eq_true] at plain
-      exact .cons (NTy.hasType_of_admits agree value τ admitted.1 head closed.1 plain.1)
-        (NRow.hasTypes_of_admitsFields agree values (.cons σ rest) admitted.2 tail
-          (by simp only [NRow.paramFree, Bool.and_eq_true]; exact closed.2)
-          (by simp only [NRow.refFree, Bool.and_eq_true]; exact plain.2))
-  | _ :: _ :: _, .cons _ .nil, _, _, admitted, _, _, _
-  | [], .cons _ (.cons _ _), _, _, admitted, _, _, _
-  | _ :: _, .nil, _, _, admitted, _, _, _ => by simp [NRow.admitsFields] at admitted
-termination_by values => sizeOf values
-
-/-- In a unit whose readings agree, runtime values each admitted at a closed
-type holding no reference inhabit the type it reads as. -/
-theorem NTy.hasTypeEach_of_admits {unit : ValidatedUnit} (agree : TypesAgree unit)
-    {loans : LoanTypes} :
-    (values : List RuntimeValue) → (τ : NTy) → {type : SemTy} →
-      NTy.admitsEach unit τ values = true → τ.TypedAs unit type → τ.paramFree = true →
-      τ.refFree = true → HasTypeEach unit loans values type
-  | [], _, _, _, _, _, _ => .nil
-  | value :: values, τ, _, admitted, typed, closed, plain => by
-      simp only [NTy.admitsEach, Bool.and_eq_true] at admitted
-      exact .cons (NTy.hasType_of_admits agree value τ admitted.1 typed closed plain)
-        (NTy.hasTypeEach_of_admits agree values τ admitted.2 typed closed plain)
-termination_by values => sizeOf values
-end
-
 /-- A frame's function value is admitted at the frame's resolution of its
 function type: its transport to the runtime family keeps its encoding. -/
 theorem Skolems.admits_carrier {unit : ValidatedUnit} [Θ : Skolems unit]
@@ -919,10 +765,9 @@ theorem Skolems.admits_carrier {unit : ValidatedUnit} [Θ : Skolems unit]
     NTy.admits unit (.function parameters.resolved shared results.resolved)
       closure.val.encode = true := by
   have admitted : NTy.admits unit (Θ.resolve (.function parameters shared results))
-      (@NTy.erase (Carriers.runtime unit) _ (Θ.toRuntime _ closure)) = true :=
-    NTy.admits_erase unit _ _
-  rw [@NTy.erase_eq_encode (Carriers.runtime unit) _ (Θ.resolve_tableFree (by simp [NTy.tableFree])),
-    Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq] at admitted
+      (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ closure)) = true :=
+    NTy.admits_encode unit _ _
+  rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq] at admitted
   simpa only [NTy.substWith, NRow.resolved_eq_substWith, Skolems.type] using admitted
 
 /-- A scalar row reads only as its scalar types. -/
@@ -940,9 +785,9 @@ theorem Denote.NRow.TypedAs.scalarTypes_eq {unit : ValidatedUnit} :
 by its carrier where the unit's readings agree, as the rule for an unseen
 invocation takes it. -/
 theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : TypesAgree unit)
-    {parameters results : NRow} {shared : List Bool}
+    (representable : OwnersRepresentable unit) {parameters results : NRow} {shared : List Bool}
     (closure : (NTy.function parameters shared results).carrier)
-    (resultsFree : results.lendsEncoded = true) (parametersScalar : ScalarAt unit parameters)
+    (resultsFree : results.refFree = true) (parametersScalar : ScalarAt unit parameters)
     (resultsScalar : ScalarAt unit results) :
     ClosureTypedAt unit parameters results closure.val := by
   intro _ _
@@ -955,8 +800,8 @@ theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : 
       declaration_eq, signature_eq, faithful, bound, capturesTyped, parametersTyped,
       resultsTyped⟩ := closureReading agree (loans := fun _ => none) admitted
     fun row _ capturesAdmitted rowTyped rowClosed rowPlain =>
-      NRow.hasTypes_of_admits agree captures.toList row capturesAdmitted rowTyped rowClosed
-        rowPlain
+      NRow.represented_of_admits representable agree captures.toList row capturesAdmitted rowTyped
+        rowClosed rowPlain
   have observed := (ParametersTypedAs.observed parametersTyped).scalarTypes_eq parametersScalar
   have results_eq := resultsTyped.scalarTypes_eq resultsScalar
   subst results_eq
@@ -967,28 +812,52 @@ theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : 
   subst row
   exact RowDecodes.ofResolved shape resultsFree resultsScalar
 
-/-- Every runtime encoding of a memory is typed, for a unit whose resource
-types correspond to their keys' types. -/
+/-- Every runtime encoding of a memory has a typed representation, for a unit
+whose resource types correspond to their keys' types and whose typed values
+are representable. -/
 theorem memoryTyped (unit : ValidatedUnit) (resources : ResourcesTyped unit)
-    (memory : Memory unit) :
+    (representable : OwnersRepresentable unit) (memory : Memory unit) :
     MemoryTyped unit memory := by
-  intro start encodes slot member
-  have found := encodes.2 slot.key.namespaceId slot.key.typeId slot.key.key
-  rw [show (⟨slot.key.namespaceId, slot.key.typeId, slot.key.key⟩ : GlobalKey) = slot.key from rfl,
-    encodes.1.lookup_of_mem member] at found
-  split at found
-  · next resource named =>
-      have ordinary := runtimeResourceOf_kind named
-      rcases resource with ⟨native, arguments, kind⟩
-      cases ordinary
-      obtain ⟨value, -, encoded⟩ := Option.map_eq_some_iff.mp found.symm
-      obtain ⟨ns, type, namespace_eq, resolves, typed, closed, plain, closures⟩ :=
-        resources _ _ _ named
-      refine ⟨ns, type, namespace_eq, resolves, encoded ▸ ?_⟩
-      rcases closures with closureFree | agree
-      · exact @NTy.TypedAs.erase unit (Skolems.runtime unit) _ _ _ typed closed plain
-          closureFree value
-      · exact NTy.hasType_of_admits agree _ _ (NTy.admits_erase unit _ value) typed closed plain
-  · cases found
+  intro start encodes
+  have represented : ∀ slot ∈ start.globals.entries, ∃ representation,
+      normalize unit representation = slot.value ∧ ∃ ns type,
+        unit.namespaces[slot.key.namespaceId.index]? = some ns ∧
+        Resolves ns.tables #[] slot.key.typeId type ∧
+        HasType unit (fun _ => none) representation type := by
+    intro slot member
+    have found := encodes.2 slot.key.namespaceId slot.key.typeId slot.key.key
+    rw [show (⟨slot.key.namespaceId, slot.key.typeId, slot.key.key⟩ : GlobalKey) = slot.key from rfl,
+      encodes.1.lookup_of_mem member] at found
+    split at found
+    · next resource named =>
+        have ordinary := runtimeResourceOf_kind named
+        rcases resource with ⟨native, arguments, kind⟩
+        cases ordinary
+        obtain ⟨value, -, encoded⟩ := Option.map_eq_some_iff.mp found.symm
+        obtain ⟨ns, type, namespace_eq, resolves, typed, closed, plain, closures⟩ :=
+          resources _ _ _ named
+        obtain ⟨representation, normalized, typedRepresentation⟩ :=
+          representable _ _ _ typed closed plain closures (NTy.admits_encode unit _ value)
+        exact ⟨representation, encoded ▸ normalized, ns, type, namespace_eq, resolves,
+          typedRepresentation⟩
+    · cases found
+  classical
+  let represent (slot : GlobalSlot) : GlobalSlot :=
+    if member : slot ∈ start.globals.entries then
+      { slot with value := (represented slot member).choose }
+    else slot
+  refine ⟨⟨start.globals.entries.map represent⟩, ?_, ?_⟩
+  · simp only [GlobalMap.normalize, Array.map_map]
+    congr 1
+    rw [Array.map_congr_left (fun slot member => ?_), Array.map_id']
+    simp only [Function.comp, represent, dif_pos member]
+    cases slot
+    simp only [(represented _ member).choose_spec.1]
+  · intro slot member
+    simp only [Array.mem_map] at member
+    obtain ⟨slot, member, rfl⟩ := member
+    obtain ⟨-, ns, type, namespace_eq, resolves, typed⟩ := (represented slot member).choose_spec
+    simp only [represent, dif_pos member]
+    exact ⟨ns, type, namespace_eq, resolves, typed⟩
 
 end VerexIR.Proofs

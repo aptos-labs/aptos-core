@@ -651,6 +651,14 @@ def decodeIntrinsic (j : Json) : Dec Intrinsic := ctx "intrinsic" do
     specFunctions := ← listField j "spec_functions" decodeIntrinsicBinding
   }
 
+def decodeGhostField (j : Json) : Dec GhostField := ctx "ghost field" do
+  return {
+    name := ← strField j "name"
+    doc := ← strField j "doc"
+    ty := ← fieldWith j "ty" decodeTy
+    init := ← optFieldWith j "init" decodeExp
+  }
+
 def decodeStruct (j : Json) : Dec Struct := ctx "struct" do
   return {
     name := ← strField j "name"
@@ -663,6 +671,7 @@ def decodeStruct (j : Json) : Dec Struct := ctx "struct" do
     fields := ← listField j "fields" decodeField
     variants := ← optFieldWith j "variants" fun v => list v decodeVariant
     spec := ← fieldWith j "spec" decodeSpec
+    ghostFields := (← optFieldWith j "ghost_fields" fun v => list v decodeGhostField).getD []
     intrinsic := ← optFieldWith j "intrinsic" decodeIntrinsic
   }
 

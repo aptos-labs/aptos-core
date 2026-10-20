@@ -24,6 +24,7 @@ move-prover-bytecode-pipeline = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+sha2 = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
 

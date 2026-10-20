@@ -1049,6 +1049,7 @@
           "doc": "",
           "fields": [],
           "generics": [],
+          "ghosts": [],
           "loc": {
             "index": 15
           },
@@ -1465,6 +1466,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 5
+    "minor": 6
   }
 }

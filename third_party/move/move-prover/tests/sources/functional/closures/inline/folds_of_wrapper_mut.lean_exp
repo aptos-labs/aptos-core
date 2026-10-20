@@ -2,7 +2,22 @@ Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:58:9: error: the specification clause `ensures ∀ (i in 0 .. entries.length), entries[i].key == old(entries)[i].key` is not established
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:57:9: error: the specification clause `ensures ∀ (i in 0 .. entries.length),
         entries[i].value == old(entries)[i].key` is not established
-tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:55:5: error: verex verification failed: the automatic verification of `mirror_keys` failed; provide a proof: `verify mirror_keys by …` in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean` (`verify mirror_keys by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:25:13: error: the loop invariant `∀ (j in 0 .. i),
+        ∃ (_wp_m1 : u64),
+          v[j]
+            == core.data.updateField(
+              with_state_anchor!(4, old(v))[j], value, _wp_m1
+            )
+            && _wp_m1 == with_state_anchor!(4, old(v))[j].key` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:55:5: error: verex verification failed: the automatic verification of `mirror_keys` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
+  verify mirror_keys by
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | invariant_4_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:75:9: error: the specification clause `ensures ∀ (i in 0 .. b.length), b[i].value == 2` is not established
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:74:9: error: the specification clause `ensures ∀ (i in 0 .. a.length), a[i].value == 1` is not established
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
@@ -10,7 +25,28 @@ tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: verex verification failed: the automatic verification of `set_both` exceeded its budget of 1000000 maxHeartbeats; provide a proof: `verify set_both by …` in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean` (`verify set_both by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: verex verification failed: the automatic verification of `set_both` exceeded its budget of 1000000 maxHeartbeats; provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
+  verify set_both by
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:86:9: error: the specification clause `ensures ∀ (i in 0 .. entries.length),
         entries[i].value == old(entries)[i].value` is not established
-tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:84:5: error: verex verification failed: the automatic verification of `mirror_keys_wrong` failed; provide a proof: `verify mirror_keys_wrong by …` in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean` (`verify mirror_keys_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:25:13: error: the loop invariant `∀ (j in 0 .. i),
+        ∃ (_wp_m1 : u64),
+          v[j]
+            == core.data.updateField(
+              with_state_anchor!(7, old(v))[j], value, _wp_m1
+            )
+            && _wp_m1 == with_state_anchor!(7, old(v))[j].key` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:84:5: error: verex verification failed: the automatic verification of `mirror_keys_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
+  verify mirror_keys_wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_4_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

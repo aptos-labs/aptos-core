@@ -1,5 +1,17 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/frame_conditions.move:154:5: error: the continuation after `apply` is not established
-tests/sources/functional/state_labels/frame_conditions.move:154:5: error: verex verification failed: the automatic verification of `test_aborts_of_wrong` failed; provide a proof: `verify test_aborts_of_wrong by …` in `tests/sources/functional/state_labels/frame_conditions.proof.lean` (`verify test_aborts_of_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/state_labels/frame_conditions.move:154:5: error: verex verification failed: the automatic verification of `test_aborts_of_wrong` failed; provide a proof in `tests/sources/functional/state_labels/frame_conditions.proof.lean`:
+  verify test_aborts_of_wrong by
+    verex_obligations
+    verex_on
+    | after_apply => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/state_labels/frame_conditions.move:171:9: error: the specification clause `ensures result == global<Counter>(addr).value + 1` is not established
-tests/sources/functional/state_labels/frame_conditions.move:169:5: error: verex verification failed: the automatic verification of `test_reads_frame_wrong_result` failed; provide a proof: `verify test_reads_frame_wrong_result by …` in `tests/sources/functional/state_labels/frame_conditions.proof.lean` (`verify test_reads_frame_wrong_result by verex_obligations` lists its obligations)
+tests/sources/functional/state_labels/frame_conditions.move:169:5: error: verex verification failed: the automatic verification of `test_reads_frame_wrong_result` failed; provide a proof in `tests/sources/functional/state_labels/frame_conditions.proof.lean`:
+  verify test_reads_frame_wrong_result by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

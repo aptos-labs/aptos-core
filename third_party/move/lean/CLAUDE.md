@@ -66,7 +66,7 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Verex Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified VIR. |
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Verex printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and VIR adapter were ported to `verex-move`. |
 | [`verex-e2e-tests/`](verex-e2e-tests/) | Discoverable Move-to-VerexSL and Rust-to-VerexSL source/result baselines. Assertion-style legacy tests remain with their owning packages. |
-| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. The verification benchmark driver (`verex-bench.py`); see `designs/verification-benchmarks.md`. |
+| [`scripts/`](scripts/) | The core smoke suite (`smoke.sh`, see "Between turns"), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. The verification benchmark driver (`verex-bench.py`); see `designs/verification-benchmarks.md`. |
 | [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit, and a Move package of problems written for it (`package/`). |
 | [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
 
@@ -90,6 +90,9 @@ older source-specific work those packages own.
   what is open across the designs in priority order, and the test ledger
   (gates, the Check fixtures under `verex-e2e-tests/VerexE2ETests/Check/`,
   and their conventions).
+- [`designs/proof-strategy.md`](designs/proof-strategy.md): the thesis —
+  cheap, predictable automation for easy obligations, authored (AI-generated)
+  proofs for hard ones, no SMT — with its measurements and milestones P1–P4.
 - [`designs/vir-design.md`](designs/vir-design.md): the master design — unified
   VIR ownership, stages, profiles, validation, serialization, frontend/backend
   contracts, deferred-work register, and phase roadmap.
@@ -147,6 +150,10 @@ older source-specific work those packages own.
   closure's meaning, state labels, and milestones H1–H5.
 - [`designs/unsafe-pointers.md`](designs/unsafe-pointers.md): proposal for
   the Rust unsafe profile over the prophetic model, scheduled as Rust M5.
+- [`designs/ghost-fields.md`](designs/ghost-fields.md): the Move Prover's
+  ghost fields carried in VIR values (`RuntimeValue.ghost`), filled by the
+  denotation and agreed up to ghost contents; the validity slots of
+  intrinsic maps; milestones G1–G5.
 - [`designs/state-labels.md`](designs/state-labels.md): state labels of
   Move specifications (`..S |~ …`, `exists S in *`) as memory variables,
   defined by state-change predicates or quantified; exchange, VIR,
@@ -159,9 +166,9 @@ Executed or superseded designs move to
 `certifying-execution.md`, `generic-route.md`, and
 `verification-perf-audit.md`, all replaced by `denotation.md`;
 `test-organization.md` and `test-organization-history.md`, the earlier
-check ledger, replaced by the roadmap's test ledger; `handoff-2026-10.md`,
-the handoff's session notes to 2026-10-11); they are reference only and are
-not updated.
+check ledger, replaced by the roadmap's test ledger); they are reference
+only and are not updated. Session and handoff history belongs in version
+control, not in a separate documentation archive.
 
 ### Verex Move source and verification (deprecated packages)
 
@@ -300,6 +307,26 @@ cd verex-ir
 lake env lean VerexIR/Tests/Validation.lean
 ```
 
+### Between turns: the smoke suite
+
+The four suites and the Move Prover's lean gate are the checkpoint gate
+before a commit. Between edit batches, run the smoke
+suite described in [`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skills/verex-smoke/SKILL.md):
+`scripts/smoke.sh` builds in place and runs the fixtures that catch this
+stack's regressions, read-only against their `.exp`, with one pass/fail line
+each; it refuses `UB=1`. Green smoke is not a commit gate.
+
+Profile code generation as well as proofs when investigating build time.
+Splitting large metaprograms in `VerexIR/Proofs/Denote/Solve.lean` and
+`VerexSL/Verify.lean` into smaller functions reduces compiler work; see
+[`designs/perf-notes.md`](designs/perf-notes.md) for the measurements.
+
+The Move Prover's lean gate (`MVP_TEST_FEATURE=lean cargo test -p move-prover
+--test testsuite`) builds `verex-move` itself and runs a private copy of it
+under `target/tmp`, so a concurrent Lake build cannot change what a test
+loads, and a harness failure of the verifier is never written as a
+baseline; see `designs/source-verification.md` ("From the Move Prover").
+
 Do not add `sorry`, axioms, or other admissions to make a proof compile unless
 the design explicitly models an assumption and the change is requested.
 
@@ -368,6 +395,10 @@ header change regenerates the RawUnit and Rust e2e baselines.
 
 ## Change discipline
 
+- Keep documentation focused on behavior, rationale, open work and reproducible
+  measurements. Put validation results in PRs and benchmark artifacts. Do not
+  append session diaries, branch/worktree state, temporary log locations or
+  dated test-run snapshots to design documents.
 - Lean source metaprograms are trusted. We do not defend against adversarial
   `run_cmd` code tampering with verifier registries or environments. Preserve
   proof correctness and the explicit assumption ledger, but do not expand CI

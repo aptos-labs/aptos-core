@@ -83,7 +83,13 @@ run_cmd do
 /--
 error: the precondition of `apply` is not established
 ---
-error: verex verification failed: the automatic verification of `use_apply` failed; provide a proof: `verify use_apply by …` in the module (`verify use_apply by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `use_apply` failed; provide a proof in the module:
+  verify use_apply by
+    verex_obligations
+    verex_on
+    | requires_of_apply => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verex module 0x42::unbounded where
@@ -336,7 +342,13 @@ verex module 0x42::nested_results where
 /--
 error: the specification clause `aborts_if x + 1 > MAX_U64` is not established
 ---
-error: verex verification failed: the automatic verification of `add_two` failed; provide a proof: `verify add_two by …` in the module (`verify add_two by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `add_two` failed; provide a proof in the module:
+  verify add_two by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 set_option verex.verifyHeartbeats 50000 in

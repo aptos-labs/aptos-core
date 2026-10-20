@@ -1,18 +1,26 @@
 # Performance notes
 
-Status: 2026-09-30. A working log for whoever next works on the stack's
-performance: verification (roadmap §1, **Cost**), and the elaboration,
-kernel certificates, interface rendering, and source scanning around it.
-It covers how to measure, what was changed and why, what was tried and
-rejected, and where the time still goes. The design rules for
-verification are in [`denotation.md`](denotation.md) ("Principles that
-yield performance" and the solver notes). Update the numbers in the
-roadmap, not here.
+Measurement methods and evidence for verification, elaboration, kernel
+certificates, interface rendering and source scanning. The comparisons below
+describe specific changes and experiments, not live test or branch status.
+The verification rules are in [`denotation.md`](denotation.md), and open work
+is tracked in [`roadmap.md`](roadmap.md). Keep run logs and validation results
+with PRs and benchmark artifacts.
+
+## Build cost of verifier metaprograms
+
+Lean code generation can dominate a rebuild even when the proofs themselves
+are cheap. Splitting `solveGoals` and `verifyMember` into smaller step functions
+reduced the measured downstream rebuild from **4m24s to 1m44s (61% less)**:
+`Solve.lean` from **104s to 28s**, and `Verify.lean` from **72s to 14s**.
+A diagnostic experiment stubbing proofs saved only about a tenth and was not
+adopted. Profile the compiler stages before changing proofs to address build
+latency.
 
 ## Where the time went (2026-09-27 round)
 
-The work happened on branch `wrwg/verex-check-speed` (commits `c14bdd0e`
-through `be7b87ea`). The Check fixtures below are the 76 files under
+This comparison spans commits `c14bdd0e` through `be7b87ea`. It measured
+the 76 Check fixtures then present under
 `verex-e2e-tests/VerexE2ETests/Check`. Times are summed per file, with
 four files running at once on four cores.
 
@@ -37,9 +45,8 @@ every input. Sending that expression directly to omega introduces unnecessary
 quotient/remainder constraints. `verex_ground_arithmetic` first rewrites
 the target using only Int/Nat equalities to literals, then uses the existing
 closed-goal decision tactic. It does not rewrite the full context or admit
-symbolic equalities as rules. The source and cost evidence is recorded in the
-roadmap and `historical/handoff-2026-10.md`; `ArithmeticContext` includes false-claim and unresolved-input
-controls as well as a low-budget nested-modular regression.
+symbolic equalities as rules. `ArithmeticContext` includes false-claim and
+unresolved-input controls as well as a low-budget nested-modular regression.
 
 Heartbeats do not show the largest cost: the kernel checks without
 heartbeats, and a kernel stall shows up as time inside whichever `simp`
@@ -819,8 +826,8 @@ Same shape as `compiled_eq` and the pointer-width fact.
 
 ## Failed benchmark targets (2026-10-05)
 
-A fresh full run on `wrwg/lean4` verified 23/32 problems. Two map problems
-crashed before verification: the current `simple_map` source binds
+A benchmark exposed two map problems that crashed before verification:
+the `simple_map` source binds
 `map_spec_insertion_key_at` and `map_spec_insertion_rank`, outside the old
 62-role registry. They now use the existing position operations without
 selecting the ordered discipline (64 roles). `InsertionMap.lean` checks
@@ -2038,9 +2045,6 @@ an opaque caller with no callee program points, and missing-resource/overflow
 rejections. Both cost gates and both focused existing label fixtures pass.
 The regular benchmark passes: 30 verified + one expected rejection, no timeouts,
 15,647,129,560 raw heartbeats (+199,877, +0.0013% against restored-guard).
-`/tmp/verex-benchmark-state-label-decoded.json` matches local JSON; HTML is
-regenerated against main with type_info absent. Full suites were last run at
-the preceding restored-guard checkpoint.
 
 
 ### Constructive state-label witnesses (2026-10-07)
@@ -2061,9 +2065,7 @@ fixture verify at 25k. The state-label registry directory passes 30/30 after
 removing its old timeout baseline. Both cost gates pass, as does StateLabelDecoding;
 StateLabels retains byte-identical intended-negative diagnostics. The regular
 benchmark retains 30 verified + one expected rejection, no timeouts, at
-15,647,293,919 raw heartbeats (+164,359, +0.00105%). Main-relative JSON/HTML
-were refreshed before the broad checkpoint: all four builds/full suites and
-437/437 registry baseline checks pass (`historical/handoff-2026-10.md`).
+15,647,293,919 raw heartbeats (+164,359, +0.00105%).
 Scratch-only alternatives: contradictory-branch checks cost more; moving the
 point search only after arithmetic synthesis gives 27.735M; the fully delayed
 scratch version gives 24.670M (native production measurement above is authoritative).
@@ -2083,8 +2085,6 @@ at 102.153M typed heartbeats (formerly 167.735M with multiple failed clauses).
 Its native 25k timeout remains. All 30 labeled registry checks and both cost
 gates pass. The regular benchmark completed with 30 verified + one expected
 AMM rejection, no timeouts, at 15,644,746,679 raw heartbeats (-2,547,240).
-Measured JSON and main-relative HTML are refreshed; the latest broad validation
-still precedes these guards.
 A scratch leaf tactic proves all clauses at 29.391M, but still times out at
 25k, so it is not installed and the registry baseline is unchanged.
 
@@ -2108,8 +2108,6 @@ StateLabelCallObservations covers the symbolic quotient, nested labeled result,
 opaque caller, and a rejected false postcondition. Both cost gates and existing
 decoding/witness fixtures pass. The regular benchmark retains 30 verified + one
 expected rejection at 15,677,942,351 raw heartbeats (+33,195,672, +0.2122%).
-Measured JSON and main-relative HTML refreshed before broad suites; those suites
-are running (`historical/handoff-2026-10.md`).
 
 
 ### Shared Boolean observations and direct-call eligibility (2026-10-07)
@@ -2155,8 +2153,6 @@ heartbeats, 8,649 objects, and 298,173 transport heartbeats. A wrong labeled
 update is still rejected. Both cost gates, all five label fixtures, and the
 two conditional-cycle regressions pass. The regular benchmark preserves 30
 verified + one expected rejection at 15,696,214,192 raw heartbeats (+0.1242%).
-Main-relative HTML is regenerated. All four full suites and all 437 registry
-baseline checks subsequently pass; see `historical/handoff-2026-10.md` and `/tmp/aliasing-observations-*`.
 
 ## Optional integer reads and sum folds (2026-10-07)
 
@@ -2297,9 +2293,7 @@ companion regression: it demanded fee ≤ 10000 on early abort branches whose
 abort condition follows from fee > 10000. Discharging those disjunctions with
 constructor simplification and omega before deriving return-path fee bounds
 restores the isolated proof at 428,297,037 raw heartbeats. No contract was
-changed. The first report records the regression honestly; broad validation
-did not start. The corrected complete checkpoint below is recorded in
-`/tmp/pool-final-checkpoint.log` (session 14303, terminal 0).
+changed.
 
 The corrected complete benchmark preserves 30 verified + one expected AMM
 rejection at **15,061,197,787 total raw heartbeats**, down 4.03% from the preceding
@@ -2775,3 +2769,439 @@ What the 40 needed proofs stand in for:
   witnesses over literal vectors (`test_contains`), map keys and loops
   (`ordered_map`, the VerexSL examples), `capability::acquire`, and folds
   over specification lambdas (`specialize_generic_caller`).
+
+## Variant splits after the deciders that need none (2026-10-16)
+
+A leaf used to be split on the variants of every local its hypotheses test
+(`variantName x`) at its first substitution, before any decider ran. Four
+iterator results in `big_ordered_map`'s `test_verify_iter_next`, three
+cases each, made 81 copies of a leaf about the map's length that no case
+needs, at about 90M heartbeats each.
+
+The split is now its own step (`verex_split_variants`), taken where it
+pays:
+
+- In the prepared decider (`verex_decide_prepared_goal`), after `omega`,
+  instances, and literal ranges, before `grind`; each case is then a leaf
+  of its own (`verex_leaf`). The tests a leaf states as `testVariants` of
+  an encoding become `variantName` tests only in normal form, so the split
+  belongs after the preparation.
+- In the leaf chain, after the prepared decider, for leaves it does not
+  take (`verex_prepared_applies`, `verex_has_atoms`); a leaf testing no
+  local fails the step at the cost of a scan.
+- `verex_prepare`, for authored proofs, still returns a case per variant;
+  `verex_split` splits variants first, the pipeline's conditional split
+  (`verex_split_conditional`) does not.
+
+Measured against the state before (all four suites, both Prover gates
+pass):
+
+| | before | after |
+|---|---|---|
+| `DenotePerformance` typed heartbeats | 144.78M | 144.74M |
+| `ordered_map` + `big_ordered_map` (`move prove --lean`) | 806 s | 809 s |
+| `big_ordered_map` targets failing | 37 | 36 |
+| `test_verify_iter_next` walk | 1.24G | 0.63G |
+
+Two placements were rejected on these numbers. Splitting after a second
+full preparation at the leaf level cost `shifted` 26% and the storage
+targets 11–15%: a leaf testing nothing paid the preparation to find out.
+Deciding each split case with the prepared deciders only, instead of the
+whole leaf, lost `ordered_map`'s `test_verify_iter_borrow_mut_symbolic`.
+
+A `vector::spec_contains(keys, 3)` leaf is the closed goal `∃ x, (∃ i, 0 ≤ i
+∧ i < 3 ∧ ∃ h, [1, 2, 3][i.toNat] = x) ∧ x.val = 3`. The prepared decider
+now expands such an existential over a few literal positions (at most four,
+each over at most eight) into the disjunction of its instances, which the
+normalization computes (`verex_expand_goal_ranges`), before it splits
+variants. The `spec_contains(keys, k)` failures in `big_ordered_map` went
+from 12 to 7.
+
+Which locals a leaf splits matters once the cases multiply. Where the goal
+tests a local, the split takes those; where it tests none, the locals the
+hypotheses test that a hypothesis relates to the most of the goal's
+variables, and a case left undecided splits the rest as a leaf of its own.
+With the witnesses (`move prove --lean`, `ordered_map` filter):
+
+| split | time | failing |
+|---|---|---|
+| every tested local, without witnesses | 809 s, 942 s | 36 |
+| every tested local | 1051 s | 36 |
+| the goal's tested locals only | 1260 s | 36 |
+| the goal's, else the most related | 903 s | 36 |
+
+The same build ran 809 s and 942 s: whole runs vary by 15%, budget-bound
+targets by ±8 s each. Heartbeats do not vary; summed over the targets of
+both modules they are 35.46G without the witnesses and 35.25G with them and
+the related split. `VEREX_OPTIONS=verex.stageLog=<file>` on the Move CLI
+logs each target's stages with its heartbeats and outcome, the way to
+compare runs per target.
+
+## The unit literal: shared views, compact locations (2026-10-16)
+
+The stage log showed a one-time cost after the first verified target of a
+module: 37 s in `big_ordered_map`, 5 s in `ordered_map`, outside the
+theorem's elaboration. It was the axiom audit of the artifacts
+(`requireNativeArtifacts`) reading the constants of the unit's definition,
+whose value was `toExpr unit`: a tree of 18.2M objects for
+`big_ordered_map`, 0.81M once hash-consed.
+
+Two things made it large. Every namespace of a validated unit caches views
+of the unit's tables and value orders (`ValidatedNamespace.tables`,
+`orders`), so the derived quotation copied the tables once per namespace,
+and the tables are mostly locations. And a location's byte offsets and file
+index were numerals, nine nodes each where the kernel's raw literal is one;
+about 1.5M of the unit's 1.6M numerals were provenance, which no proof
+computes on.
+
+`VerexSL.Quote.quoteUnit` now quotes the unit's tables and orders once and
+shares the term with each namespace whose view equals them; source ranges
+quote their offsets as raw literals, and a location's absent parts are one
+shared term each. The quoted value is the same.
+
+| | before | after |
+|---|---|---|
+| `big_ordered_map` unit, objects | 18.2M | 1.96M |
+| its constant walk | 35.2 s | 1.7 s |
+| post-verification time, both modules (`move prove --lean`) | 48.5 s | 4.5 s |
+
+The compact locations alone took the unit to 9.5M objects and its constant
+walk from 35 s to 17 s; the shared views did the rest. Hash-consing the
+finished literal instead (`ShareCommon`) costs as much as the walk it
+saves, 23 s. `DenotePerformance` does not move (144.73M typed heartbeats):
+its units are small. The whole run went from 942 s to 807 s, within the
+noise above.
+
+## Maps built from literals; undecided conditions in the normal-form cache (2026-10-17)
+
+Four changes against `big_ordered_map`'s blockers:
+
+- A map role's contract is the map model and the preconditions the role
+  declares; the hash and serialization facts its unverified body would
+  assume are no longer stated of it (`Contract.lean`). Callers owed
+  `0 < len(bcs::serialize(keys))` for literal vectors at every `new_from`
+  and `upsert`.
+- A map built from vector literals over the empty map computes where its
+  keys are integer or boolean literals (`updateAllLiteral`, `setPairs`,
+  and the `ordSet`, `seqSet`, `keyAt`, `rank`, and `get` steps that fire
+  only on a decided comparison, `Maps.lean`). With a symbolic key the map
+  keeps its `updateAll` form and the laws reading it.
+- `verex_map_positions` read hypotheses outside the goal's context where a
+  literal construction equation applied ("unknown free variable"); no leaf
+  reached that path before.
+- The witness decider runs in the leaf chain too, before `cheap`: a leaf
+  whose reads compute observes no map, so the prepared decider no longer
+  takes it.
+
+The normal-form cache (`normalForms`) kept only results whose side
+conditions the discharger all decided, so a hypothesis with a conditional
+it could not decide was simplified again at every call of a walk. A result
+now keeps its undecided conditions, instantiated when the discharger fails
+(a failed rewrite's assignments are rolled back), and is taken again while
+the context decides none of them. `test_verify_iter_next`'s walk:
+
+| | before | after |
+|---|---|---|
+| walk heartbeats | 700M | 366M |
+| context normalization | 537M | 203M |
+| cache hits / misses | 66 / 563 | 496 / 133 |
+
+On `ordered_map` + `big_ordered_map` (`move prove --lean`):
+
+| | before | after |
+|---|---|---|
+| `big_ordered_map` targets verified (of 43) | 2 | 8 |
+| heartbeats, both modules | 30.99G | 29.16G |
+| `DenotePerformance` typed heartbeats | 144.73M | 145.31M |
+
+Newly verified: `test_aborts_if_new_from_1`, `test_verify_borrow_front_key`,
+`test_verify_borrow_back_key`, `test_verify_iter_across_upsert`,
+`test_verify_remove`, `test_verify_upsert`. A lemma deciding `keyAt` at a
+negative index for every map was dropped: it asked the discharger at every
+`keyAt` and cost `ordered_map`'s walks 4%.
+
+## Automatic against authored: the leaves of a walk (2026-10-17)
+
+`ordered_map`'s `test_verify_iter_walk_mut_symbolic`, run as a `verify!` item
+with the solver's debug timing, heartbeats:
+
+| | cost |
+|---|---|
+| symbolic execution of the body, 23 leaves | 52M |
+| the 21 ordinary leaves, automatic | 450M (20M to 80M each) |
+| `invariant_6_step`, automatic | 770M |
+| `invariant_3_step`, automatic | 624M |
+| `invariant_6_step`, authored, with `verex_prepare` | 28M (proof alone about 3M) |
+| `invariant_3_step`, authored, with `verex_prepare` | 35M (proof alone about 2M) |
+
+The walk is cheap; the leaves cost everything. The prepared context has 52
+hypotheses and 31K term nodes, the owner's spelled-out type 15% of them
+and the ordering-table literal 33%, but generalizing the ordering table
+away left the decider's cost unchanged (472M against 473M): the cost is the
+decider cascade, each pass over all hypotheses, rerun per case, not the
+term size. `grind` alone decides 13 of the 23 leaves, after `verex_prepare`
+21, at 10M to 130M each, and fails both hard leaves even given the map
+laws. The authored proofs are the six-to-twelve-line arguments a Move author
+has in mind (`proof-strategy.md`). Of their cost, `verex_prepare` is the
+larger part; a prepared context shared across a target's leaves would
+remove most of it.
+
+## Abstract maps: positions read as ranks (2026-10-17)
+
+With every intrinsic map owner abstract (`intrinsic-maps.md`, "Abstract
+representation", A1), a map built by role calls reaches a leaf as a chain
+of equations, `m₀ = empty`, `m₁ = update m₀ k₁ v₁`, …, each between a
+fresh carrier's encoding and a model operation. `verex_map_positions`
+rewrites such chains into literal maps where the leaf reads a position
+(`keyAt`); a leaf reading a key's position (`rank`) is the same kind of
+read and now runs the step too (`InsertionMap`: `rank(result, 20) == 0`
+over two `add`s). A specification's equality compares values through their
+identities (`NTy.identityRuntime`) only where the type holds a part that
+bears one: an owner identified by its handle, a ghost slot, a function
+value. An owner without a handle (`SimpleMap`, `OrderedMap`, the Prover's
+placeholder maps) compares by its contents, so `m == spec_fold(…, old(m),
+0)` at a loop's entry is the equation the fold's base case states
+(`folds_of_map_intrinsic`), where the identity wrapper left
+`identityRuntime … (Maps.empty …)` unreduced. `NRow.ownsHandle` is computed
+by a lemma per leading field without a side condition, which the
+normalizer's discharger does not decide. Open: a leaf comparing a map's
+identity after a role's update (`t == set(old(t), k, v)`,
+`WrappedTables.insert`) states
+`t_final.fst = t_inner` from `encode t_final = update … t_entry k v`; the
+solver does not project an equation between a nominal literal and a model
+operation onto its fields (`field_zero_update`), so the clause stays
+undecided, as it was before the abstraction.
+
+The framework's `ordered_map` (`move prove --lean … -f ordered_map`, 52
+targets of its `#[verify_only]` use-case tests, budget 1000M) before and
+after A1: 32 verified, 15 budget, 5 failed at 22.0G heartbeats
+(2026-10-16); 31 verified, 14 budget, 7 failed at 19.3G (2026-10-17). The
+role-based targets cost the same to within noise; the flips
+(`drain_symbolic`, `iter_walk_mut_symbolic` worse; `back_key_rank_symbolic`,
+`next_key_scan`, `insert_shift` better) are decider effects, not the
+representation's: the cost is the leaf cascade (`proof-strategy.md`).
+
+After A2 (2026-10-18): the carrier of an abstract map is bounded
+(`SpecEntries`, as `SpecVector`), and a leaf reading an abstract map's size
+gets its `2^64` bounds as a fact (`size_nominal_encode_table_bounds`): the
+aborts leaf of `drain_symbolic`, whose `u64` count needs the bound the
+physical vector gave, is arithmetic again, and its authored proof closes.
+The fact is stated at the encoding's family, which no instance search
+finds; emitted by `mkAppM`, it threw, and every leaf whose preparation
+read a size failed (`AbstractOwners`, `drain_symbolic`). With the family
+passed, `ordered_map` is back at 29 verified of 29 (3.33G, the pre-A1
+cost), `drain_symbolic` and `iter_walk_mut_symbolic` included;
+`big_ordered_map` stays at 10 verified, 9 failed, 19 budget (23.0G).
+
+P2 (2026-10-18): `test_verify_iter_walk_mut_symbolic` with its two hard
+leaves authored (`ordered_map.proof.lean`, nine and four lines over the
+source-named context) and the rest to `verex_solve`: 384M, against 918M
+automatic; `ordered_map` at 29 of 29 for 2.78G (3.36G before).
+
+
+### Authored map proofs
+
+Direct scripts use selected variant cases and explicit map laws. Lightweight
+preparation preserves carrier size and typed-key certificates while omitting
+speculative position facts and automatic call-result enumeration. Dropping
+initial iterator facts once a loop invariant describes the path avoids
+normalizing obsolete state.
+
+Restricting normalization's arithmetic discharge to arithmetic propositions
+and facts reduced a focused leaf-sum proof from 487M to 347M heartbeats. In that
+profile, broad `simp_all` still cost 127M, preparation 72M and symbolic execution
+59M. A forward iterator profile spent 89M in symbolic execution, 83M in
+preparation and 40M in cheap deciders. These profiles motivate targeted
+preparation changes, not a larger search budget.
+
+Rejected alternatives:
+
+- Clearing unused `SelfFamily`, `Satisfies`, `InvokeMeaning` and `Comp`
+  declarations saved less than 1% on collection.
+- Traversing encoded-map terms as a DAG alone changed collection from 132.15M
+  to 132.43M and pop-rank from 303.77M to 305.11M. Sharing full simplifier state
+  or cross-target normal forms also gave negligible gains.
+- A 2M cap including preparation failed ordinary table-read smoke fixtures.
+- Skipping map naming slowed concrete proofs. Narrowing concrete-map
+  simplification without supplying missing reductions caused recursive
+  simplification or proof failures.
+
+### Automatic leaf cap: 100M versus 75M
+
+A comparison before consolidation of the automatic budget used
+`verex.leafHeartbeats` values of `100000` and `75000`:
+
+| Target | Proof | 100M cap | 75M cap |
+|---|---|---:|---:|
+| OrderedMap `test_verify_iter_collect_symbolic` | automatic | 198,102,126 | 198,102,478 |
+| OrderedMap `test_verify_iter_sum_symbolic` | automatic | 154,549,617 | 154,548,854 |
+| BigOrderedMap `test_verify_leaf_walk_sum_symbolic` | authored | 347,263,942 | 347,261,173 |
+
+All six probes verified with effectively unchanged costs. These are matched
+interpreted replays, not native module totals. At that point a separate 20M
+fallback cap already limited the expensive search, and authored deciders did
+not read the outer leaf option. Lowering a cap only affects attempts that reach
+it; it cannot reduce the cost of a direct authored proof.
+
+### One automatic cap and focused authored proofs
+
+One **20M raw-heartbeat** cap now covers the complete automatic leaf attempt,
+including call observations, deciders and preparation. There is no additional
+full-fallback wrapper. The overall target budget remains; `verify f by …`
+generates obligations without first attempting automatic solving.
+
+Do not put `verex_leaf_cheap` before `verex_leaf`: the latter already tries cheap
+deciders. The duplicate pass regressed CompositionPerformance by 15–32%,
+DenotePerformance's `shifted` by 24% and storage `record` by 12%, and exhausted a
+25M state-label witness target. The observation shortcut must also clear the
+goal list on success: `closesBy` restores that list even when the proof succeeds.
+
+Two focused BigOrderedMap changes avoid speculative work:
+
+- Deriving a borrowed leaf map's validity from its parent before splitting
+  iterator variants reduced leaf-sum from 347.26M to 292.62M.
+- Routing clauses known to need normalization directly to preparation reduced
+  forward iteration from 272.20M to 243.92M.
+
+Adding substitution and projection reduction broadly to the authored cheap
+decider cost 3.927G versus 3.852G across 38 interpreted proofs and was rejected.
+
+The constant-list read simproc must retain `List.length` in its bound rather
+than expecting the application builder to reduce it to a numeral. It must defer
+skolem-family conversion until literal element and list types reduce together.
+`simple_vector_client` covers these cases in smoke.
+
+### Corpus proof arguments
+
+The companion files use direct arguments for these obligations:
+
+- `features.apply_diff` and `simple_map.add_all`: rewrite reads after removal
+  of the last vector element and instantiate the prefix invariant.
+- `acl.remove`: use the successful search and the original uniqueness invariant
+  to exclude the removed value and preserve index uniqueness.
+- `pool_u64.balance`: substitute the shares result and use scalar bounds to
+  relate truncating and Euclidean division on a nonnegative product.
+- `pool_u64.buy_in` and `redeem_shares`: specialize callee scalar summaries and
+  membership cases before checking overflow.
+- Nested-loop duplicate witnesses, structured table-key reads and concrete
+  count-even folds: construct the witness or instantiate the relevant invariant
+  instead of rerunning the general solver.
+
+`buy_in`'s conditional typed-map equality must be handled before
+`verex_name_maps`: carrier cleanup can discard a needed fact that mentions the
+original carrier without an encoded-map application. That clause keeps a
+preparation path without map naming; tightening cleanup is an open improvement.
+
+### Typed companion cleanup and context grouping
+
+The authored boundary offers runtime-independent `SpecMap K V` laws, proved
+encoding transport, and selective `verex_lift_maps only [facts]`. The former
+optional syntax binder parsed `only [...]` without applying its selection;
+explicit elaborators reduced insertion lifting from roughly 18–21M to
+0.45–0.67M heartbeats. Regressions check that unrelated maps are untouched,
+aggregate carriers need no global `Inhabited` instance, integer observations
+are distinguished from aggregate values, and `values`/`typed` remain contextual
+keywords rather than reserved identifiers.
+
+General mathematical and encoding laws belong in shared modules. Removing
+obsolete normalization hints and moving reusable laws eliminated 16 OrderedMap
+and 32 BigOrderedMap local helpers. OrderedMap has no explicit `RuntimeValue`
+references; BigOrderedMap retains raw observations for some aggregate leaf
+values and concrete walks. Capability's function-level transport equalities
+remain necessary under `Array.map`; pointwise rules do not replace them.
+
+Matched interpreted comparisons, not native module totals:
+
+| Argument | Before | Retained proof |
+|---|---:|---:|
+| BigOrderedMap predecessor loop | 247.45M | 215.56M |
+| BigOrderedMap leaf-sum loop | 296.1M | 250.64M |
+| BigOrderedMap sum loop | 116.4M | 105.79M |
+| BigOrderedMap symbolic removal with shifts | 89.0M | 84.82M |
+| BigOrderedMap symbolic removal | 88.7M | 86.00M |
+| Pool redeem_shares | 407.4M | 214.7M |
+
+`verex_group_contexts` shares preparation for contexts equal up to local names.
+Each original goal receives a projection of a universally quantified conjunction
+applied to its own locals. Preserve declaration kinds, local instances and
+auxiliary declaration names during reintroduction; missing auxiliary names
+caused Lean panics. Regression fixtures cover path assumptions, local definitions
+and instances. The tactic is opt-in and follows clause-specific routing.
+Pool's improvement instead restricts conditional simplification to relevant
+arithmetic facts, avoiding unrestricted omega over the entire callee context.
+
+The native BigOrderedMap module total after this cleanup was 3.617844005G,
+slightly above the preceding 3.590696572G. A matched native predecessor probe
+improved from 238.33M to 207.79M with grouping. A local improvement therefore
+does not establish a module-wide improvement.
+
+Rejected alternatives include blanket arithmetic-first preparation, replacing
+concrete `simp_all` by a single pass, and filtered arithmetic on every omega
+call. The first saved less than 1%; the others broke enumeration, pop,
+predecessor or next-key-scan proofs. Grouping every `upsert` obligation cost
+264,307,769 versus 264,024,416 heartbeats for its explicit clause groups.
+
+OrderedMap `remove_or_none` needs one targeted `simp only ... at *` pass before
+map-equation rewriting; unrestricted contextual simplification looped after
+helper removal. The targeted proof measured 86.04M, versus 104.64M for the typed
+alternative. This does not justify replacing normalization in other proofs.
+
+### Sharing preparation before clause splitting
+
+Repeated iterator cases, simplification, bounds and map lifting after logical
+splitting cost more than the splitting alone. Matched OrderedMap mutable-walk
+replays grouped before that common block measured 151,378,319 heartbeats versus
+190,413,752 without grouping, a 20.5% saving. Moving the clause's index binder
+before grouping gave no further saving.
+
+The walker splits conjunctions and introduces binders; `combineLeaves` then
+rebuilds per-clause conjunctions that `verex_paths` can split again.
+`forall_and` also distributes quantified conjunctions during normalization.
+Disabling only that rule left predecessor, leaf-sum and upsert with 21, 25 and
+33 raw leaves. Generation costs fell from 26.73M/59.58M/63.22M to
+25.31M/54.46M/62.70M, but leaf-sum lost expected clause names and failed.
+The rule change was rejected.
+
+`verex_obligations preparing` accepts an indented block that runs once per
+completed symbolic path before its logical clauses split. Children inherit
+the prepared context. The walker first introduces path results and assumptions
+and executes folded continuations; a syntactic `wp` check alone misses local
+continuation definitions. Preparation retains target clause markers while
+unwrapping marked hypotheses, including contradictions. Map-lifting annotations
+are removed before structural traversal resumes.
+
+Retained proofs share iterator cases, normalization, bounds and typed-map
+lifting. OrderedMap also derives present-key and preserved-size facts once per
+path. All these matched interpreted replays verify:
+
+| Target | Existing proof | Shared preparation | Reduction |
+|---|---:|---:|---:|
+| OrderedMap mutable iterator walk | 190,076,706 | 135,365,253 | 28.8% |
+| BigOrderedMap predecessor loop | 215,981,129 | 177,696,333 | 17.7% |
+
+The predecessor control already uses late context grouping. Preparing before
+clause splitting avoids part of the cost that regrouping afterwards still pays.
+`VerexSL/Tests/SharedPreparation.lean` covers clause names, quantified clauses,
+case children, marked contradictions, annotated targets, false residual
+conjuncts and call/loop metadata. It is included in smoke. Plain obligation
+generation and automatic budgets keep their behavior.
+
+Native reference measurements for the same preparation change:
+
+| Module | Coverage | Before | Shared preparation |
+|---|---|---:|---:|
+| OrderedMap | 29/29 | 1,480,631,272 | 1,430,479,730 |
+| BigOrderedMap | 38/38 supported | 3,617,844,005 | 3,582,087,580 |
+
+The native mutable walk fell from 179,599,312 to 129,444,516 heartbeats, and the
+predecessor from 204,852,414 to 168,458,738. BigOrderedMap has five separate
+unsupported diagnostics. The goal below roughly 1.9G remains open.
+
+The complete 31-problem benchmark measured **9,787,642,404 heartbeats**, versus
+9,834,593,835 before this change (−0.48%), with 30 verified problems and AMM's
+expected rejection. Summed wall time was 339.132 s versus 329.655 s (+2.9%);
+this comparison establishes a heartbeat saving, not a wall-time improvement.
+Against main `89fbb57f27` ([CI run 39184497367](https://github.com/aptos-labs/aptos-core/actions/runs/39184497367)),
+the same 31 problems used 14,646,181,616 heartbeats: the combined reduction is
+**33.2%**, with `ordered_map` improving from failed to verified. BigOrderedMap
+is outside this manifest and must be measured separately.

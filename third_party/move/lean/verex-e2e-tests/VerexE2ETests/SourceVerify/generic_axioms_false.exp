@@ -1,2 +1,8 @@
 VerexE2ETests/SourceVerify/generic_axioms_false.move:18:9: error: the specification clause `ensures result == (a != b)` is not established
-VerexE2ETests/SourceVerify/generic_axioms_false.move:17:5: error: verex verification failed: the automatic verification of `distinct` failed; provide a proof: `verify distinct by …` in `VerexE2ETests/SourceVerify/generic_axioms_false.proof.lean` (`verify distinct by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/generic_axioms_false.move:17:5: error: verex verification failed: the automatic verification of `distinct` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_axioms_false.proof.lean`:
+  verify distinct by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

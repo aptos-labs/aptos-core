@@ -48,4 +48,45 @@ pub struct StateSnapshotBackup {
     /// `EpochStateBackup` recovered prior to this to the DB; Requiring it to be in the same epoch
     /// limits the requirement on such `EpochStateBackup` to no older than the same epoch.
     pub proof: FileHandle,
+    /// Native-position state at the same version, present when the transaction info at
+    /// `version` commits a position state root. Proved by the same `proof` above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub positions: Option<PositionSnapshotBackup>,
+}
+
+/// The native-position section of a state snapshot backup.
+#[derive(Deserialize, Serialize)]
+pub struct PositionSnapshotBackup {
+    /// Hash of the position tree root, as committed by the transaction info at the
+    /// snapshot's version.
+    pub root_hash: HashValue,
+    /// All positions in chunks; empty for the empty tree.
+    pub chunks: Vec<StateSnapshotChunk>,
+}
+
+/// Which tree a snapshot chunk belongs to; selects the backup service endpoints.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SnapshotKind {
+    State,
+    Position,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum SnapshotEndpoint {
+    ItemCount,
+    Chunk,
+    RangeProof,
+}
+
+impl SnapshotKind {
+    pub(crate) fn endpoint(self, endpoint: SnapshotEndpoint) -> &'static str {
+        match (self, endpoint) {
+            (Self::State, SnapshotEndpoint::ItemCount) => "state_item_count",
+            (Self::State, SnapshotEndpoint::Chunk) => "state_snapshot_chunk",
+            (Self::State, SnapshotEndpoint::RangeProof) => "state_range_proof",
+            (Self::Position, SnapshotEndpoint::ItemCount) => "position_state_item_count",
+            (Self::Position, SnapshotEndpoint::Chunk) => "position_state_snapshot_chunk",
+            (Self::Position, SnapshotEndpoint::RangeProof) => "position_state_range_proof",
+        }
+    }
 }

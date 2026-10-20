@@ -95,6 +95,33 @@ def SpecVector.map (f : α → β) (vector : SpecVector α) : SpecVector β :=
 @[simp] theorem SpecVector.map_values (f : α → β) (vector : SpecVector α) :
     (vector.map f).values = vector.values.map f := rfl
 
+/-- The entries of an intrinsic map, as many as a Move vector holds: the
+map's representation keeps them in vectors, whose unsigned-64 length bound
+the abstract map inherits. -/
+structure SpecEntries (α : Type) where
+  entries : List α
+  bounded : entries.length < 2 ^ 64
+
+@[ext, grind ext] theorem SpecEntries.ext {a b : SpecEntries α} (h : a.entries = b.entries) :
+    a = b := by
+  cases a
+  cases b
+  cases h
+  rfl
+
+instance : Inhabited (SpecEntries α) := ⟨⟨[], by change 0 < 2 ^ 64; decide⟩⟩
+
+/-- The entries' images: entries of twins viewed natively one by one. -/
+def SpecEntries.map (f : α → β) (entries : SpecEntries α) : SpecEntries β :=
+  ⟨entries.entries.map f, by simpa using entries.bounded⟩
+
+@[simp] theorem SpecEntries.map_entries (f : α → β) (entries : SpecEntries α) :
+    (entries.map f).entries = entries.entries.map f := rfl
+
+theorem SpecEntries.eq_iff_entries (left right : SpecEntries α) :
+    left = right ↔ left.entries = right.entries :=
+  ⟨fun h => h ▸ rfl, SpecEntries.ext⟩
+
 /-! ## Field codecs
 
 A generated twin's `decode?` composes these per-primitive decoders, one per
@@ -162,6 +189,14 @@ def decodeUnit? : RuntimeValue → Option Unit
   | _ => none
 
 @[simp] theorem decodeUnit?_unit : decodeUnit? .unit = some () := rfl
+
+/-- A ghost slot's decoder: its contents' (`designs/ghost-fields.md`). -/
+def decodeGhost? {α : Type} (decode : RuntimeValue → Option α) : RuntimeValue → Option α
+  | .ghost contents => decode contents
+  | _ => none
+
+@[simp] theorem decodeGhost?_ghost {α : Type} (decode : RuntimeValue → Option α)
+    (contents : RuntimeValue) : decodeGhost? decode (.ghost contents) = decode contents := rfl
 
 /-! Successful canonical scalar decoding determines the runtime shape.
 These are stronger than an arbitrary codec's `decode_encode` law: only

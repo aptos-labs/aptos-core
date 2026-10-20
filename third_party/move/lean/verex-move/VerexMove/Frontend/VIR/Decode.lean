@@ -230,6 +230,32 @@ mutual
         let genericTypes ← genericTypeArguments context.ns instantiations
         return (.mk (← ty context.ns resultType) sourceLoc
           (.call (.select ownerName fieldName.name) genericTypes [base] none), resultType)
+    | .ghostField base _ field => do
+        -- A ghost field is read as Move reads it, a field selection.
+        let (base, baseType) ← projectionBaseExpression context sourceLoc base
+        let .nominal owner instantiations ← requireSome
+            context.ns.tables.types[baseType.index]?
+            s!"invalid ghost field-place base type {baseType.index}"
+          | fail "validated ghost field place has a non-nominal base"
+        let fieldName ← requireSome context.ns.tables.names[field.index]?
+          s!"invalid ghost field-place name {field.index}"
+        let resultType ← match expected with
+          | some expected => pure expected
+          | none => do
+              let declaration ← requireSome
+                (context.ns.structs.find? fun declaration => declaration.name == owner)
+                "cannot infer an intermediate dependency ghost field-place type"
+              let ghostTypes := declaration.ghosts.filterMap fun ghost => do
+                let name ← context.ns.tables.names[ghost.name.index]?
+                if name.name == fieldName.name then some ghost.type else none
+              requireSome
+                (VerexIR.Validation.instantiatedCommonPlaceTypeId?
+                  context.ns instantiations ghostTypes)
+                "cannot infer an intermediate generic ghost field-place type"
+        let ownerName ← MoveNames.qualifiedName context.ns.tables owner
+        let genericTypes ← genericTypeArguments context.ns instantiations
+        return (.mk (← ty context.ns resultType) sourceLoc
+          (.call (.select ownerName fieldName.name) genericTypes [base] none), resultType)
     | .index base index => do
         let (base, baseType) ← projectionBaseExpression context sourceLoc base
         let resultType ← match expected with
@@ -359,7 +385,7 @@ mutual
                     | _ => pure arguments
                 | _, _, _ => pure arguments
               let operation ← match dataOperation with
-                | .select type field =>
+                | .select type field | .selectGhost type field =>
                     let target ← MoveNames.qualifiedRef context.ns.tables type
                     pure <| Xast.Operation.select target field
                 | .selectVariants type fields =>

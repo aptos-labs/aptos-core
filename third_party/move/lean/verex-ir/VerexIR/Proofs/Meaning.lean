@@ -5,6 +5,8 @@ import VerexIR.Proofs.Contract
 import VerexIR.Proofs.Interpreter
 import VerexIR.Proofs.Completeness
 import VerexIR.Semantics.Typing
+import VerexIR.Semantics.MapViews
+import VerexIR.Semantics.StateTyping
 
 /-!
 # Relational function meaning
@@ -29,19 +31,54 @@ argument and result value rows. -/
 abbrev FunctionContract :=
   Contract RuntimeState Failure (Array RuntimeValue) (Array RuntimeValue)
 
+/-- A typed representation of a function's inputs at an instantiation: a
+typed start and arguments typed at the function's parameter types under
+every environment faithful to the instantiation, normalizing to the inputs
+(`SemanticOperations.normalize`). The runtime runs the Move representation
+of every value; the function meaning reads its runs at the abstract values
+the representation normalizes to (`designs/intrinsic-maps.md`, "Abstract
+representation"). -/
+structure Represents (unit : ValidatedUnit) (function : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId)) (start : RuntimeState)
+    (arguments : Array RuntimeValue) (initial : RuntimeState) (inputs : Array RuntimeValue) :
+    Prop where
+  start_eq : start.normalize unit = initial
+  arguments_eq : arguments.map (SemanticOperations.normalize unit) = inputs
+  typed : ∃ (loans : LoanTypes) (inert : Nat), TypedState unit loans inert start ∧
+    ∀ (ns : ValidatedNamespace) (declaration : FunctionDecl FunctionBody) (semantic : Array SemArg)
+      (parameters results : List SemTy),
+      unit.namespaces[function.namespaceId.index]? = some ns →
+      ns.functions[function.functionId.index]? = some declaration →
+      FrameInstantiation ns (requiredAt unit function) typeInstantiation
+        (frameEnv declaration.signature.generics semantic) →
+      StaticTyping.signatureTypes? ns declaration (frameEnv declaration.signature.generics semantic) =
+        some (parameters, results) →
+      HasTypes unit loans arguments.toList parameters
+
+/-- A run of a function at an instantiation, read up to normalization: a
+run from a typed representation of the start on a typed representation of
+the arguments, its exit and outcome normalized. -/
+def functionRuns {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (function : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId))
+    (initial : RuntimeState) (inputs : Array RuntimeValue) (final : RuntimeState)
+    (outcome : Outcome) : Prop :=
+  ∃ start arguments exit returned,
+    Represents unit function typeInstantiation start arguments initial inputs ∧
+    exit.normalize unit = final ∧ returned.normalize unit = outcome ∧
+    BigStep.EvalFunction executable function typeInstantiation start arguments exit returned
+
 /-- Relational meaning of one VIR function invoked under a type
-instantiation, derived from the big-step judgment. -/
+instantiation: its runs (`functionRuns`), the returning ones as successes,
+the throwing ones as failures with the final state quantified away. -/
 def functionSpecAt {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     (function : FunctionHandle)
     (typeInstantiation : Array (TypeId × TypeId)) (arguments : Array RuntimeValue) :
     Spec RuntimeState Failure (Array RuntimeValue) where
   ok := fun initial results final =>
-    BigStep.EvalFunction executable function typeInstantiation initial arguments final
-      (.returned results)
+    functionRuns executable function typeInstantiation initial arguments final (.returned results)
   aborts := fun initial failure =>
-    ∃ final,
-      BigStep.EvalFunction executable function typeInstantiation initial arguments final
-        (.threw failure.1 failure.2)
+    ∃ final, functionRuns executable function typeInstantiation initial arguments final
+      (.threw failure.1 failure.2)
 
 /-- Relational meaning of one VIR function, derived from the big-step
 judgment. -/
@@ -75,69 +112,75 @@ def SatisfiesFunctionAt {unit : ValidatedUnit} (executable : ExecutableUnit unit
     (contract : FunctionContract) : Prop :=
   Satisfies (functionSpecAt executable function typeInstantiation) contract
 
-/-- A returning interpreter run witnesses the relational success. -/
+/-- A returning interpreter run from a typed representation witnesses the
+relational success at the inputs it represents. -/
 theorem functionSpec_ok_of_run {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {fuel : Nat}
-    {function : FunctionHandle} {arguments results : Array RuntimeValue}
-    {state finalState : RuntimeState} {outcome : LocatedOutcome}
+    {function : FunctionHandle} {arguments inputs results : Array RuntimeValue}
+    {state initial finalState : RuntimeState} {outcome : LocatedOutcome}
+    (represents : Represents unit function #[] state arguments initial inputs)
     (execution : VerexIR.Interpreter.run executable fuel function arguments state
       = .ok (finalState, outcome))
     (returned : outcome.value = .returned results) :
-    (functionSpec executable function arguments).ok state results finalState := by
+    (functionSpec executable function inputs).ok initial
+      (results.map (SemanticOperations.normalize unit)) (finalState.normalize unit) := by
   have sound := VerexIR.Proofs.Interpreter.run_sound executable fuel function arguments state
     finalState outcome execution
   rw [returned] at sound
-  exact sound
+  exact ⟨state, arguments, finalState, .returned results, represents, rfl, rfl, sound⟩
 
-/-- A throwing interpreter run witnesses the relational failure. -/
+/-- A throwing interpreter run from a typed representation witnesses the
+relational failure at the inputs it represents. -/
 theorem functionSpec_aborts_of_run {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {fuel : Nat}
-    {function : FunctionHandle} {arguments : Array RuntimeValue}
-    {state finalState : RuntimeState} {outcome : LocatedOutcome}
+    {function : FunctionHandle} {arguments inputs : Array RuntimeValue}
+    {state initial finalState : RuntimeState} {outcome : LocatedOutcome}
     {kind : ThrowKind} {values : Array RuntimeValue}
+    (represents : Represents unit function #[] state arguments initial inputs)
     (execution : VerexIR.Interpreter.run executable fuel function arguments state
       = .ok (finalState, outcome))
     (threw : outcome.value = .threw kind values) :
-    (functionSpec executable function arguments).aborts state (kind, values) := by
+    (functionSpec executable function inputs).aborts initial
+      (kind, values.map (SemanticOperations.normalize unit)) := by
   have sound := VerexIR.Proofs.Interpreter.run_sound executable fuel function arguments state
     finalState outcome execution
   rw [threw] at sound
-  exact ⟨finalState, sound⟩
+  exact ⟨finalState.normalize unit, state, arguments, finalState, .threw kind values, represents, rfl,
+    rfl, sound⟩
 
-/-- Every relational success is reached by the interpreter at some fuel. -/
+/-- Every relational success is reached by the interpreter at some fuel,
+from a typed representation of the start on one of the arguments. -/
 theorem run_of_functionSpec_ok {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    {function : FunctionHandle} {arguments results : Array RuntimeValue}
-    {state finalState : RuntimeState}
-    (h : (functionSpec executable function arguments).ok state results finalState) :
-    ∃ fuel outcome,
-      VerexIR.Interpreter.run executable fuel function arguments state
-        = .ok (finalState, outcome) ∧
-      outcome.value = .returned results :=
-  Completeness.run_complete h
+    {function : FunctionHandle} {inputs results : Array RuntimeValue}
+    {initial final : RuntimeState}
+    (h : (functionSpec executable function inputs).ok initial results final) :
+    ∃ start arguments exit returned fuel outcome,
+      Represents unit function #[] start arguments initial inputs ∧
+      exit.normalize unit = final ∧
+      returned.map (SemanticOperations.normalize unit) = results ∧
+      VerexIR.Interpreter.run executable fuel function arguments start = .ok (exit, outcome) ∧
+      outcome.value = .returned returned := by
+  obtain ⟨start, arguments, exit, outcome, represents, exitEq, outcomeEq, step⟩ := h
+  obtain ⟨returned, rfl, resultsEq⟩ := Outcome.normalize_eq_returned outcomeEq
+  obtain ⟨fuel, located, execution, value⟩ := Completeness.run_complete step
+  exact ⟨start, arguments, exit, returned, fuel, located, represents, exitEq, resultsEq, execution,
+    value⟩
 
-/-- Every relational failure is reached by the interpreter at some fuel. -/
+/-- Every relational failure is reached by the interpreter at some fuel,
+from a typed representation of the start on one of the arguments. -/
 theorem run_of_functionSpec_aborts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    {function : FunctionHandle} {arguments : Array RuntimeValue}
-    {state : RuntimeState} {failure : Failure}
-    (h : (functionSpec executable function arguments).aborts state failure) :
-    ∃ fuel finalState outcome,
-      VerexIR.Interpreter.run executable fuel function arguments state
-        = .ok (finalState, outcome) ∧
-      outcome.value = .threw failure.1 failure.2 := by
-  obtain ⟨finalState, step⟩ := h
-  obtain ⟨fuel, outcome, execution, value⟩ := Completeness.run_complete step
-  exact ⟨fuel, finalState, outcome, execution, value⟩
-
-/-- The relational meaning cannot both return and throw from one state:
-big-step evaluation is deterministic. -/
-theorem functionSpec_ok_aborts_exclusive {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    {function : FunctionHandle} {arguments results : Array RuntimeValue}
-    {state finalState : RuntimeState} {failure : Failure}
-    (ok : (functionSpec executable function arguments).ok state results finalState)
-    (aborts : (functionSpec executable function arguments).aborts state failure) :
-    False := by
-  obtain ⟨threwState, threw⟩ := aborts
-  obtain ⟨-, outcome_eq⟩ := Completeness.evalFunction_deterministic ok threw
-  cases outcome_eq
+    {function : FunctionHandle} {inputs : Array RuntimeValue}
+    {initial : RuntimeState} {failure : Failure}
+    (h : (functionSpec executable function inputs).aborts initial failure) :
+    ∃ start arguments payload fuel finalState outcome,
+      Represents unit function #[] start arguments initial inputs ∧
+      payload.map (SemanticOperations.normalize unit) = failure.2 ∧
+      VerexIR.Interpreter.run executable fuel function arguments start = .ok (finalState, outcome) ∧
+      outcome.value = .threw failure.1 payload := by
+  obtain ⟨final, start, arguments, finalState, outcome, represents, -, outcomeEq, step⟩ := h
+  obtain ⟨payload, rfl, payloadEq⟩ := Outcome.normalize_eq_threw outcomeEq
+  obtain ⟨fuel, located, execution, value⟩ := Completeness.run_complete step
+  exact ⟨start, arguments, payload, fuel, finalState, located, represents, payloadEq, execution,
+    value⟩
 
 end VerexIR.Proofs

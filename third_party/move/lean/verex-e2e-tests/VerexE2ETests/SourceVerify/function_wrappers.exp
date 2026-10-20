@@ -1,3 +1,9 @@
 VerexE2ETests/SourceVerify/function_wrappers.move:20:9: error: the data invariant `invariant ∀ (value : u64; result : u64),
         ensures_of<this.0>(value, result) ==> result == 0` does not hold where a value is constructed
-VerexE2ETests/SourceVerify/function_wrappers.move:41:5: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof: `verify invalid by …` in `VerexE2ETests/SourceVerify/function_wrappers.proof.lean` (`verify invalid by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/function_wrappers.move:41:5: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof in `VerexE2ETests/SourceVerify/function_wrappers.proof.lean`:
+  verify invalid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

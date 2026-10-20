@@ -265,8 +265,9 @@ mutual
     if fuel == 0 || state.places.contains id then state else
     let state := { state with places := state.places.push id }
     match ns.places[id.index]? with
-    | some (.deref base) | some (.field base ..) | some (.subslice base ..) |
-        some (.downcast base _) => sourcePlaceReachability ns base state (fuel - 1)
+    | some (.deref base) | some (.field base ..) | some (.ghostField base ..) |
+        some (.subslice base ..) | some (.downcast base _) =>
+        sourcePlaceReachability ns base state (fuel - 1)
     | some (.index base index) =>
         sourceExpressionReachability ns index
           (sourcePlaceReachability ns base state (fuel - 1)) (fuel - 1)

@@ -57,22 +57,22 @@ private def unitType : HeldM TypeId := do
 discarded value or a wildcard, bound by `pattern`, which is recorded as its
 holder. The `$` keeps the names out of the source's reach, and the printer
 spells the holders back as the source does. -/
-private def holdIn (pattern : PatternId) (typeId : TypeId) (loc : LocId) (holding : Holding) :
-    HeldM LocalId :=
+private def holdIn (pattern : PatternId) (typeId : TypeId) (loc : LocId) (holding : Holding)
+    (mutable : Bool := false) : HeldM LocalId :=
   modifyGet fun state =>
     let localId : LocalId := ⟨state.locals.size⟩
     let name := s!"{if holding == .read then "$held" else "$dropped"}{localId.index}"
-    let declaration : LocalDecl := { id := localId, name, type := { typeId, loc }, loc }
+    let declaration : LocalDecl := { id := localId, name, type := { typeId, loc }, mutable, loc }
     (localId, { state with
       locals := state.locals.push declaration
       patterns := state.patterns.modify pattern.index ({ · with kind := .variable localId })
       holders := state.holders.push (pattern, holding) })
 
 /-- A fresh pattern binding a fresh local (`holdIn`). -/
-private def holderPattern (typeId : TypeId) (loc : LocId) (holding : Holding) :
-    HeldM (LocalId × PatternId) := do
+private def holderPattern (typeId : TypeId) (loc : LocId) (holding : Holding)
+    (mutable : Bool := false) : HeldM (LocalId × PatternId) := do
   let pattern ← pushPattern loc typeId .wildcard
-  return (← holdIn pattern typeId loc holding, pattern)
+  return (← holdIn pattern typeId loc holding mutable, pattern)
 
 private def isMutableReference (typeId : TypeId) : HeldM Bool := do
   return match (← get).types[typeId.index]? with
@@ -108,9 +108,10 @@ private def effectFree (expression : Expr) : Bool :=
   | _ => false
 
 /-- Bind a value to a fresh local around a body: `let local := value; body`. -/
-private def bindAround (value : ExprId) (body : ExprId) : HeldM (LocalId × ExprId) := do
+private def bindAround (value : ExprId) (body : ExprId) (mutable : Bool := false) :
+    HeldM (LocalId × ExprId) := do
   let node ← exprAt value
-  let (localId, pattern) ← holderPattern node.typeId node.loc .read
+  let (localId, pattern) ← holderPattern node.typeId node.loc .read mutable
   let bodyNode ← exprAt body
   let bound ← pushExpr node.loc bodyNode.typeId (.letDecl pattern (some value) body)
   return (localId, bound)
@@ -219,14 +220,42 @@ private def pathRoot? (id : ExprId) : HeldM (Option (ExprId × ExprId)) := do
 
 /-- A value-level borrow of a path through a mutable reference no local
 holds, `&mut f(x).field`: the reference is bound to a fresh local the path
-starts at, so the borrow reborrows from it. -/
+starts at, so the borrow reborrows from it. A mutable borrow of a path
+through a computed value, `&mut (x + 1)`, borrows a fresh mutable local
+holding the value, as Move compiles a borrow of a temporary. -/
 private def borrowThroughHeld (id : ExprId) : HeldM ExprId := do
   let node ← exprAt id
-  let .operation (.reference (.borrow _)) _ #[path] _ := node.kind | return id
-  let some (root, parent) ← pathRoot? path | return id
+  let .operation (.reference (.borrow kind)) _ #[path] _ := node.kind | return id
+  let (root, parent) := (← pathRoot? path).getD (path, id)
   let rootNode ← exprAt root
-  unless (← produced root) && (← isMutableReference rootNode.typeId) do return id
-  let (localId, bound) ← bindAround root id
+  let throughReference := (← produced root) && (← isMutableReference rootNode.typeId)
+  let temporary := kind == .mutable && !(rootNode.kind matches .localVar _) &&
+    !(← isReference rootNode.typeId)
+  unless throughReference || temporary do return id
+  -- A computed index of the path is bound after the root, in evaluation
+  -- order, as a place index reads a local.
+  let mut indexed : Array (ExprId × ExprId) := #[]
+  let mut current := path
+  for _ in [0:(← get).expressions.size] do
+    if current == root then break
+    match (← exprAt current).kind with
+    | .operation (.primitive .index) _ #[base, index] _ =>
+        unless (← exprAt index).kind matches .value .. | .localVar _ do
+          indexed := indexed.push (current, index)
+        current := base
+    | .operation _ _ arguments _ => match arguments[0]? with
+        | some base => current := base
+        | none => break
+    | _ => break
+  let mut body := id
+  for (node, index) in indexed do
+    let (indexLocal, boundIndex) ← bindAround index body
+    let indexNode ← exprAt index
+    let read ← pushExpr indexNode.loc indexNode.typeId (.localVar indexLocal)
+    let .operation operation instantiations arguments surface := (← exprAt node).kind | continue
+    setKind node (.operation operation instantiations (arguments.set! 1 read) surface)
+    body := boundIndex
+  let (localId, bound) ← bindAround root body (mutable := temporary)
   let read ← pushExpr rootNode.loc rootNode.typeId (.localVar localId)
   let .operation operation instantiations arguments surface := (← exprAt parent).kind | return id
   setKind parent (.operation operation instantiations (arguments.set! 0 read) surface)

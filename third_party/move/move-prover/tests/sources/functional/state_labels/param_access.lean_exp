@@ -1,5 +1,17 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/param_access.move:72:9: error: the specification clause `ensures result == global<Data>(addr).value * global<Index>(addr).pos` is not established
-tests/sources/functional/state_labels/param_access.move:70:5: error: verex verification failed: the automatic verification of `test_reads_of_wrong` failed; provide a proof: `verify test_reads_of_wrong by …` in `tests/sources/functional/state_labels/param_access.proof.lean` (`verify test_reads_of_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/state_labels/param_access.move:70:5: error: verex verification failed: the automatic verification of `test_reads_of_wrong` failed; provide a proof in `tests/sources/functional/state_labels/param_access.proof.lean`:
+  verify test_reads_of_wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/state_labels/param_access.move:129:9: error: the specification clause `ensures result == 0` is not established
-tests/sources/functional/state_labels/param_access.move:127:5: error: verex verification failed: the automatic verification of `test_writes_modifies_of_wrong` failed; provide a proof: `verify test_writes_modifies_of_wrong by …` in `tests/sources/functional/state_labels/param_access.proof.lean` (`verify test_writes_modifies_of_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/state_labels/param_access.move:127:5: error: verex verification failed: the automatic verification of `test_writes_modifies_of_wrong` failed; provide a proof in `tests/sources/functional/state_labels/param_access.proof.lean`:
+  verify test_writes_modifies_of_wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

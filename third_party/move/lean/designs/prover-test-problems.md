@@ -1,38 +1,15 @@
 # Move Prover tests under Verex: problem registry
 
-Status: 2026-10-07, with the Move Prover's `lean` test feature. C1, C3,
-C4, C5, C7, C9, C10, C13, C14, C15, and C19 are fixed, and V9, V17, and V19
-no longer occur. G6 (in-body assertions not checked) and G7 (in-body assumptions not
-used) are fixed: a function's theorem takes that its assumptions hold
-([`denotation.md`](denotation.md), "Assumption ledger"). Since the
-static memory ([`static-memory.md`](static-memory.md)), V5 and V13 no
-longer occur, and V4, V8, and V12 are fixed. G9 (signers not assumed
-transaction signers) is fixed. G5 is fixed: a data invariant is owed where
-a value is constructed and where a mutation of a local ends, at the death of
-its loan or after a write into it, as the Prover checks it. A module
-invariant is owed after each write of memory it reads and after each call
-of a callee that leaves it to its callers, and the invariants of every
-module of the file (the package) concern a function, not only those of the
-modules it uses. A unit's type table holds
-every type its generic frames require (V14's second cause, fixed
-2026-10-03). A specification reads a field at its physical type where the
-consumer asks for it, as a vector element does, so V11, which followed from
-such a mismatch in `std::ascii`, no longer occurs. Intrinsic `vector` functions are read as VIR
-operations ([`source-verification.md`](source-verification.md), "Move
-vector intrinsics"). Matches and destructuring bindings over values are
-carried, and a value no pattern fits aborts with Move's incomplete-match
-code ([G13](#g13-a-destructuring-that-does-not-fit-aborts-with-the-match-code)).
-V24 is fixed: a loan no later operand uses dies before the next operand of
-the same operation. V14 is fixed: a pattern through a reference is rewritten
-into the variant tests and field borrows Move's compiler emits for it, so the
-enum tests fail the functions the Prover fails.
+The Move Prover's unit tests under `third_party/move/move-prover/tests/sources`
+run with the Verex verifier through the `lean` test feature
+([`source-verification.md`](source-verification.md), "From the Move Prover").
+This registry records unsupported constructs, proof gaps and diagnostic
+differences from the `.lean_exp` baselines beside the tests. Entries describe
+symptoms and identify causes where known.
 
-The Move Prover's unit tests (`third_party/move/move-prover/tests/sources`,
-437 files) run with the Verex verifier through the test feature `lean`
-([`source-verification.md`](source-verification.md), "From the Move
-Prover"). This registry lists every problem that run shows, read from the
-`.lean_exp` baselines beside the tests. Entries record symptoms. A cause is
-named only where it is known.
+A baseline match is not a proof-success count: the suite includes intended
+negative specifications and unsupported cases. Use the fixture output for
+individual verdicts and the test runner's summary for the number of tests run.
 
 ## Updating the registry
 
@@ -47,537 +24,6 @@ entry's message, and the entry once no test does. Identifiers stay stable:
 a new problem takes the next free number of its section. Test paths are
 relative to `tests/sources`.
 
-## Summary
-
-Tables as owned values (2026-10-13): a table owner's value holds its
-entries, and every executable and specification role is available for table
-layouts ([`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table values").
-`bitwise_table` and `bitwise_table_mixed_instances` verify; `verify_table`
-and `data_invariant_in_map` fail the functions the Prover fails;
-`vector_theory_*::f2` reaches its clauses, where the Prover's run is
-rejected by Boogie. `mut_ref::call_return_ref_different_path_vec2`
-verifies, as appends of literal vectors are folded; a cut's hypothesis is
-normalized again after the substitutions that fix its values, so
-`call_return_ref_different_path_vec2_incorrect` fails at the mutation end
-only, as in the Prover.
-
-Budget (2026-10-12): the registry runs with the verifier's default budget,
-1000 thousand `maxHeartbeats` (about thirty seconds), instead of 25
-thousand. Nineteen functions that exhausted the old budget verify, and five
-tests verify completely; four functions still exceed the budget
-(`bitwise_features::disable_feature_flags`, `folds_of_wrapper_mut::set_both`,
-`math8::sqrt`, `math_fixed8::pow_raw`), and the others fail within it at
-the clause they do not establish. Among those that verify is V20's
-`discarded_mut_ref_result::run`, at 43.5M heartbeats. "Functions left
-unproved" is updated accordingly.
-
-Functions without a contract (2026-10-12): a function with a body that
-declares no contract and plays no map or table role claims no frame; it is
-verified for the invariants it writes, and its callers inline it.
-`lambda_captured_fun_loop::wrap2` verifies; the Prover fails the file on the
-lambda's inferred contract, which Verex does not infer.
-
-Callers of failed callees (2026-10-09, user decision): a callee used
-through its contract that has no theorem, its verification failed or not
-run, is assumed by its callers, as the Prover verifies callers against
-their callees' specifications; the callee's failure stays reported.
-`opaque_caller`, `split_nibbles`, `math_fixed8::exp`, `test_replace` and
-`test_inc` verify; `behavioral_predicate_cycle::use_f` and
-`contains_opaque_test_found` fail where the Prover does; the other former
-refusals reach verification (budget or solver gaps).
-
-Behaviors of capturing closures (2026-10-09): a closure capturing some of
-its target's arguments is compared by its woven arguments with the function
-value naming the target. `behavioral_target_two_masks::pending` verifies.
-
-Leaf recipes folded (2026-10-10): an invocation of a native function value
-states its behavior at the value's encoding, the prepared leaf tries an
-instance, and a local of a one-value type is its value.
-`behavioral_predicates_examples::contains`, `contains_opaque`, `index`,
-`index_opaque` and `mut_ref::call_return_ref_different_path_vec` verify.
-
-BCS serialization facts (2026-10-09): a Move function applying
-`bcs::serialize` or `bcs::to_bytes` states of its parameters what the
-Prover's prelude states of every value: serializations are injective and
-not empty, and addresses serialize to one length.
-`serialized_addresses_same_len` and `bcs_test1` verify; the two incorrect
-functions fail as the Prover's do.
-
-Struct and enum arguments of runs, loop store frames (2026-10-09): a
-literal closure's run is read at struct and enum arguments in their
-unfolded variant form, and a loop's frame ignores its specification blocks
-and the function values built there. `lambda_variant_field_access`
-verifies its two functions the Prover verifies (V20).
-
-Behavioral predicates under a state label (2026-10-09): an existential
-over a label whose body states behavioral predicates is witnessed at the
-first program point where its target's contract decides every conjunct.
-`bp_requires_aborts_labeled_mut` verifies (V20).
-
-A literal closure's run per conjunction (2026-10-09): a run of a literal
-closure whose target the proof inlines is read once for all conjuncts of a
-conjunction, before it splits, rather than once per conjunct.
-`lambda_spec_global_memory` verifies (V20). The baseline of
-`lambda_variant_field_access`, not refreshed with the `&mut` predicates,
-now shows its two functions the Prover verifies failing (V20).
-
-Mutable-reference behavioral predicates (2026-10-09): `aborts_of`,
-`ensures_of` and `result_of` of a function value with `&mut` parameters are
-carried: the invocation lends each `&mut` argument under a loan of its own
-and `ensures_of<f>(inputs, results, finals)` names the final value the run
-exports for it, as the Prover lays the arguments out; a `&mut` input is read
-at the pre-state (the Prover's `old`), a final value at the post-state. Of a
-literal closure, these are runs of the target's prophetic meaning at the
-references' entry and final values, read by the target's contract or body.
-Three of the four `drive` tests verify; `lambda_spec_global_memory`
-verifies at a 200k budget and exceeds the native one (V20 keeps it and the
-rest).
-
-Generic module invariants (2026-10-09): `invariant<T>` holds at the
-instantiations unifying a resource type it reads (directly or through the
-specification functions it applies) with the memory a function uses, as the
-Prover's global invariant analysis monomorphizes it; a write that leaves a
-type parameter undetermined owes it at a ghost type parameter, the function
-then proved over every frame. `uninst_global_invariant` and
-`mono_after_global_invariant` fail where the Prover does, and
-`write_back_local_type_inst` verifies. `generic_invariants`,
-`generic_aliasing_ghost_main` and `generic_aliasing_ghost_pair` fail as the
-Prover does, by exhausting the budget on the failing aliasing cases;
-`generic_aliasing_ghost_params` verifies within the default budget (2026-10-12).
-
-Callee preconditions (2026-10-09): a caller owes the `requires` of a callee
-whose body it inlines and which it calls directly, where the callee starts,
-as the Prover asserts a callee's preconditions at every call; before, only a
-callee used through its contract had them checked. A function without a
-specification is verified when it calls a function with a precondition. The
-precondition owed is the one callers see (an `[abstract]` clause, not a
-`[concrete]` one, as in the Prover). `schema_apply`, `is_txn_signer::f7_incorrect` and
-`behavioral_predicates_examples::apply_no_abort_test_fail` fail at the
-callee's precondition as the Prover does. A clause applying `requires_of`
-is not owed this way (it reads the module's table of declared
-preconditions), nor is the precondition of a closure's target, which its
-invocation owes through `requires_of`. Four `drive` functions reached V20
-(three verify since the `&mut` predicates, above).
-
-Inline specifications (2026-10-08): a non-opaque inline function with a
-specification of its own is verified against it, as the Prover verifies it;
-before, the importer dropped it with the calls it had expanded, and its
-specification was never checked. `inline_spec_no_opaque` fails `bad_inc` as
-the Prover does.
-
-Loop invariant placement (2026-10-08): a loop takes the leading run of
-`invariant`s of the specification blocks its header begins with, as the
-Prover's loop analysis does (`fat_loop.rs`); any other loop invariant is an
-error at its location and nothing is verified (`Frontend.LoopInvariants`).
-`loop_invariant_invalid` reports the Prover's four errors. Consecutive
-specification blocks of a header are joined into one by the importer, and
-all annotations of one loop form its specification
-(`Contract.loopSpecifications`): before, a loop's second annotation
-silently replaced its first, whose invariants were neither checked nor
-assumed. The Prover's exemption of declarations in unreachable code is not
-modeled; no test has one.
-
-Generic axioms (2026-10-08): `axiom<T>` is assumed at the instantiations a
-verification applies (V1), `num` is a type argument of specification
-functions (V2), a module's abort strictness holds for its functions, and
-`TRACE(e)` reads as `e`. `axiom_generic`, `axioms`, `mono_on_axiom_spec_type`
-and `opaque_native` verify; `performance_200511` reaches verification.
-
-Axioms and bitwise follow-up (2026-10-08): a module axiom over values is
-assumed by every verification, as the Prover assumes its axioms globally, and
-the rendering prints it as an axiom; the export includes the modules
-specifications read; an arbitrary value takes no type arguments; an `int2bv`
-of a literal through casts is folded; an equality compares at its operands'
-type when a schema's inclusion gave them another; the solver relates a
-conjunction's two operand orders and reads a nonnegative shift's truncating
-remainder as its remainder. `abort_in_fun`, `bitwise_operators`,
-`bv_internal` and `defines` now verify,
-`bv_aborts` fails its clause as the Prover does, and `bitwise_features` keeps
-two budget failures of four (G14, V2).
-
-The Prover's bit-vector representation is no longer modeled (G14, decided
-2026-10-07): the representation guard and the scalar wrapping lowering described
-in the older paragraphs below are retired, `int2bv`/`bv2int` are imported
-exactly, and the former representation-guard files reach verification.
-
-Closed scalar-package lowering now restores `regression/test_bitvector` to
-verification success and makes `regression/bv_mul_overflow` reject the required
-arithmetic abort, matching MVP. Seven new scalar arithmetic controls pass both
-backends; seven existing source negatives (including a concrete internal clause)
-now fail during verification rather than import. Representation rejections fall
-from 29 to 27. Full Move/E2E suites and all 437 normal registry checks pass after the two
-intended baseline updates (`/tmp/bv-scalar-registry-final.log`).
-The benchmark/main HTML was regenerated first: 24 verified, one expected AMM
-rejection, six unchanged import failures, 9,509,422,287 raw heartbeats.
-
-The XAST v10 literal-metadata checkpoint passes 59 exchange tests, full
-Move/E2E suites and all 437 registry checks without baseline updates
-(`/tmp/bv-literals-validation.log`, exit 0). It supplies a missing source fact
-for C17's future width inference; it does not change registry coverage. The
-regenerated main-relative benchmark has 24 verified problems, one expected
-AMM rejection, six unchanged import failures and 9,509,559,974 raw heartbeats.
-
-The scalar `bv_internal` checkpoint passes full Move/E2E suites and all 437
-registry checks without baseline updates (`/tmp/bv-internal-validation.log`,
-exit 0). `bv_internal_wrapping` now verifies its valid function and rejects
-its deliberately false contract. The other changed registry baseline is
-`bv_internal`, whose remaining concrete clause is diagnosed explicitly.
-There are now 29 representation rejections. The full benchmark/main-relative
-HTML was regenerated before the suites: 24 verified, one expected AMM rejection,
-six unchanged import failures, 9,509,276,380 raw heartbeats. Reference casts
-also now read their operands correctly; positive and negative source tests
-agree with MVP. General bit-vector propagation remains open.
-
-The expanded representation-seed guard has refreshed measured benchmark data
-and main-relative HTML: 24 verified, one expected AMM rejection, six import
-failures, 9,509,557,743 raw heartbeats. The reduced coverage must not be counted
-as a speed improvement. Its registry refresh passes all 437 files; C17 now
-covers 30 rejected files, including 10 with previously empty baselines. The
-full Move/E2E suites and normal 437-file registry recheck pass without baseline
-updates. `/tmp/bv-seeds-validation.py` completed with exit 0 (2026-10-07).
-
-The bit-vector soundness checkpoint (2026-10-07) passes the full Move/E2E
-suites and all 437 registry checks without baseline updates after regeneration
-(`/tmp/bv-guard-validation.log`). The source importer now rejects conversions
-whose previous erasure allowed false overflow proofs (C17), and reports
-import failures without an uncaught exception (G1). Five registry files hit
-this boundary. The measured benchmark/main-relative HTML was refreshed first:
-27 verified, one expected AMM rejection, three import failures, 13,664,061,946
-raw heartbeats. The smaller total reflects missing verification work in
-`features`, `ristretto255`, and `ed25519`; it is not a speed improvement.
-Restoring their representation semantics remains open.
-
-The conditional-range checkpoint (2026-10-07) passes all four full suites and
-all 437 registry baseline checks without refresh
-(`/tmp/conditional-range-full-tests.log`, exit 0). The new fallback handles
-split conditionals in range invariants; its positive and rejection tests pass.
-`count_even_concrete` still exceeds native 25k, so no registry success is
-claimed for it. The full benchmark and generated main-relative HTML were
-refreshed before broad testing: 30 verified + one expected AMM rejection,
-15,066,137,470 raw heartbeats (+0.0328% from the pool checkpoint).
-
-The pool performance checkpoint (2026-10-07) passes all four full suites and
-all 437 registry baseline checks without refresh. It includes the product-fold
-endpoint guard below. The benchmark preserves 30 verified + one expected AMM
-rejection at 15,061,197,787 raw heartbeats (4.03% below the preceding full run);
-measured JSON and main-relative HTML are refreshed before the suites. See
-`/tmp/pool-final-checkpoint.log` (exit 0) and `historical/handoff-2026-10.md`. Matching registry
-baselines does not mean all registry specifications are verified: the remaining
-unsupported constructs, intended rejections and timeouts below remain open.
-
-Product-fold range-bound follow-up (2026-10-07):
-`vector_hofs_fold::product_concrete` now verifies at native 25k. The range
-instance solver tries congruence (`grind only`) at the new endpoint, so an
-accumulator equality also transports a multiplication bound. Previous
-normalization fallbacks remain. ArithmeticContext includes a positive case
-and rejects the same inference without either the current bound or the
-accumulator equality. The original solver fails the positive regression.
-The installed whole typed proof costs **23,960,945 raw heartbeats**, 22,596
-objects, transport 282,210. Native refresh removes only the product timeout;
-`count_even_concrete` is the sole remaining failure in this fold module.
-Core/Move builds and the focused checks pass. The first broad registry check
-exposed two regressions; restricting endpoint congruence to symbolic products
-restores their original behavior. The subsequent pool checkpoint passes all four
-full suites and all 437 registry checks without refresh, retaining this product
-improvement (`/tmp/pool-final-checkpoint.log`).
-
-Optional integer reads and sum folds (2026-10-07):
-The literal certified-read normalizer now also handles optional reads,
-preserving signed values and the actual fallback. Its certificate uses
-`val_getD_getElem?_map_val`; `Option.bind_fun_some` is normalized as well.
-Registered `LiteralOptionalReads` covers unsigned/signed nonzero fallbacks
-and a symbolic stored value. The native `vector_hofs_fold` runner now verifies
-`sum_concrete`, `sum_inferred`, and `sum_scaled` at the unchanged 25k budget.
-Their companion unfolds recursive specifications, rewrites the goal using
-context equations, then decides finite index cases. Whole typed artifacts
-cost 27,897,980 / 27,332,778 / 27,979,895 raw heartbeats respectively; those
-include work outside the native verification-budget scope. No residual-search
-or acceptance-budget change is installed. The owning runner removed exactly
-these three obsolete timeout sections; product and even-count still time out.
-Core/Move builds, both cost gates, optional-read, call-range, and labeled-memory
-fixtures pass. The full benchmark preserves 30 verified + one expected rejection at
-15,688,482,526 raw heartbeats (-0.0493% versus aliasing). Measured JSON and
-main-relative HTML are refreshed, without type_info. All 437 registry
-baselines match without refresh (`/tmp/fold-optional-checkpoint.log`, exit 0). All four full suites passed
-at the preceding aliasing checkpoint; they have not been rerun for this increment.
-
-`state_labels/aliasing` now fully verifies at native 25k (2026-10-07).
-The remaining `different_addr_global` proof costs 19.833M typed raw heartbeats.
-Updated-memory equality uses reflexivity for opaque empty row tails, and the
-context simplifier excludes conditional self-referential equations from its
-rewrite rules while retaining their facts. A registered opaque-caller test
-verifies using only the labeled contract (11.577M typed heartbeats); a wrong
-update remains rejected. The owning runner removed the obsolete baseline;
-both cost gates and all focused label checks pass. The refreshed benchmark
-retains 30 verified + one expected rejection at 15,696,214,192 raw heartbeats.
-All four full suites and all 437 registry checks subsequently pass (`historical/handoff-2026-10.md`).
-
-`intermediate_states::test_config_preserved` now verifies at native 25k
-(2026-10-07), with 8.794M typed raw heartbeats. Conditional equalities for
-both Boolean outcomes are compared after identifying unchanged memories.
-The bounded attempt introduces no branch assumptions without case analysis.
-The two negative siblings retain their original clause diagnostics; the
-owning runner removes only this positive's obsolete failure. Both cost gates
-and four focused label fixtures pass. AMM create_pool also matches its
-original baseline again after restricting call-observation eligibility to
-direct facts. All four full suites passed just before these follow-ups;
-the subsequent benchmark preserves 30 verified + one expected rejection at
-15,676,741,907 raw heartbeats, and the full registry matches 437/437 baselines
-(`historical/handoff-2026-10.md`).
-
-`aborts_if_at_state_label::caller` and `aliasing::remove_then_try_read` now
-verify at the native 25k limit (2026-10-07). A bounded attempt consumes existing
-call observations before reconstructing runs or re-deriving contracts. The
-first target uses 20.251M typed raw heartbeats; the registered fixture covers
-an opaque caller and an intended false-postcondition rejection. Both cost
-gates and decoding/witness fixtures pass. At that checkpoint test_config_preserved
-stopped timing out but still left its result equality; the follow-up above
-resolves it. Owning-runner baselines are refreshed (`historical/handoff-2026-10.md`).
-
-`spec_fun_old_param_labeled_with_memory` now verifies at the native 25k limit
-(2026-10-07). Constructive/context witnesses precede the program-point search,
-reducing the typed proof from 30.912M to 24.132M heartbeats with unchanged
-proof size. The owning runner removes its timeout baseline; the ordinary
-30-file state-label check, registered 25k fixture, and both cost gates pass.
-The refreshed benchmark retains 30 verified + one expected rejection at
-15,647,293,919 heartbeats (+0.00105%). Main-relative JSON/HTML are current;
-all four builds/full suites and 437/437 registry checks subsequently pass.
-
-`two_state_labels` now fully verifies at the unchanged native 25k limit
-(2026-10-07). Its timeout baseline was removed by the owning runner; all 30
-state-label registry baseline checks pass afterward. The solver exposes known
-memory/decoder results before reducing integer range checks; it also consumes
-isSome facts from an opaque callee's state-change contract. The new registered
-IR test verifies the opaque caller and rejects missing-resource/overflowing
-state updates. Both cost gates pass. Whole typed proof cost is 18,269,904 raw
-heartbeats. The regular benchmark passes with 30 verified + one expected
-rejection at 15,647,129,560 heartbeats (+0.0013%); main-relative JSON/HTML are
-refreshed. No newer full-suite result is claimed than the preceding Table
-checkpoint below.
-
-`table_option` is now fully verified at the unchanged native 25k setting
-(2026-10-07). The owning runner removed its obsolete failure baseline and its
-ordinary recheck passes (`/tmp/table-option-fixed-registry-recheck.log`). Exact
-lookup transport and selective aggregate normalization reduce its whole typed
-theorem from 28.690M to 25.254M raw heartbeats. All Table invariant tests,
-identity rejection guards and both cost gates pass. The first benchmark exposed
-an ordered-map regression, so broad validation did not start. The original
-call-range eligibility guard is restored. Native table_option and both cost
-gates pass; the corrected benchmark has 30 verified plus one expected AMM
-rejection, no timeouts, and 15,646,929,683 heartbeats. Measured JSON and
-main-relative HTML were refreshed before the full suites. All four builds
-and full suites pass; the complete registry matches 437/437 baselines without
-refresh (`/tmp/table-restored-registry-check.log`). The final Table theorem
-cost with the guard restored is 26,045,418 raw heartbeats; native 25k acceptance
-is independently confirmed. Earlier checkpoint results below remain historical.
-
-The call-range eligibility checkpoint (2026-10-07) passes all four full suites
-and all 437 ordinary registry baseline checks without any baseline changes
-(`/tmp/call-range-checkpoint-full-tests.log`,
-`/tmp/call-range-checkpoint-registry-check.log`). This validates the preceding
-snapshot optimization too. `table_option` remains a timeout: its full typed
-theorem costs 28,686,998 raw heartbeats, although solver-only work is 24,405k.
-The benchmark was refreshed before the suites: 30 verified, one expected AMM
-rejection and 15,624,166,021 heartbeats (−0.6439% from the snapshot checkpoint).
-A subsequent computed-index range-detection fix passes 16 positive fixture
-proofs, two rejection guards, both cost gates and unchanged table_option and
-verify_vector registry checks. Its fresh benchmark preserves all outcomes at
-15,646,803,818 heartbeats (+0.1449%); the full-suite result above predates that
-increment. A further Table normalization batch is building. No new whole-file registry success is
-claimed.
-
-The Table stored-invariant batch (2026-10-07) passes all four full suites,
-131 Check fixtures and both cost gates. The full registry matches 435/437
-baselines (`/tmp/table-invariants-registry-check.log`). The two differences
-reduce diagnostics: `different_addr_global` finishes with an ordinary failure
-instead of timing out, while `verify_remove_with_unroll` still times out with
-one fewer clause message. Both reviewed baselines were refreshed by the owning
-runner and pass ordinary focused rechecks (`/tmp/table-invariants-aliasing-recheck.log`,
-`/tmp/table-invariants-vector-recheck.log`). Neither is a new verified target. `table_option`
-remains over the unchanged 25k limit. The benchmark and generated main-relative
-HTML were refreshed before broad checks: 30 verified, one expected AMM
-rejection, 15,725,534,459 raw heartbeats. The subsequent snapshot-equality
-optimization preserves these outcomes at 15,725,421,251 heartbeats. It reduces
-`table_option` solver work to 24.87M, but the entire typed theorem remains
-29.14M and still times out at 25k; no new registry pass is claimed.
-
-The element-quantifier batch (2026-10-07) passes all four full suites, 130 Check
-fixtures and both cost gates. The full registry run matches 436/437 baselines;
-its only difference is that `moved_local_in_loop` now verifies at the unchanged
-25k budget. Its obsolete timeout baseline was regenerated with the owning runner
-and the ordinary focused recheck passes. Evidence:
-`/tmp/element-final-full-tests.log`, `/tmp/element-final-registry-check.log`,
-and `/tmp/element-final-moved-local-recheck.log`. The benchmark and generated
-main-relative HTML were refreshed first: 30 verified problems, one expected AMM
-rejection, and 15,744,282,692 raw heartbeats (+0.1096% over certified reads).
-Baseline matches include intended negatives and are not parity counts.
-
-The certified-read/continuation-alias batch passes all four full suites,
-including 129 Check fixtures and both cost gates. The subsequent full registry
-check matches 432 of 437 baselines. A stale `count_all` companion was repaired
-and passes unchanged; four reviewed diagnostic baselines pass ordinary checks
-after regeneration. `folds_of_callee_ensures::count_small` now verifies at its
-unchanged 25k budget. No previously verified target remains regressed. Evidence:
-`/tmp/certified-read-full-tests.log`, `/tmp/certified-read-registry-check.log`,
-`/tmp/certified-read-pure-callee-recheck.log`,
-`/tmp/certified-read-registry-refresh.log`, and
-`/tmp/certified-read-registry-audit.json`. Benchmark data and main-relative HTML
-were refreshed first: 30 verified problems plus the expected AMM rejection,
-15,727,043,391 raw heartbeats (0.5148% lower than the preceding local run).
-
-The full 2026-10-06 resumed run discovers 437 files. All four Verex packages build
-and pass their full suites, including the 123 Check fixtures, both cost
-gates, source verification, MonoVM, and differential tests. Logs:
-`/tmp/vector-resumed-<package>-{build,test}.log`.
-
-The owning Move Prover test runner refreshed all 437 baselines successfully
-(`/tmp/vector-resumed-prover-refresh.log`). The diagnostic audit finds no
-new failed targets. Besides the scoped `remove_all_found` improvement,
-`verify_vector` has more specific residuals and two normal rejections instead
-of timeouts; its failed target names are unchanged
-(`/tmp/vector-resumed-registry-audit.{json,log}`). `bp_pure_callee::count_all` now proves
-at 25k with its fold-equation companion. The resumed vector follow-up now
-also proves `remove_all_found` automatically at the unchanged 25k budget;
-its scoped baseline retains only the two expected fold-derivation warnings.
-The subsequent focused checks also prove `verify_swap_remove`,
-`verify_model_swap_remove`, and `verify_index_of` with an authored companion
-at 25k. The model-call swap-remove proof costs 21.313M raw heartbeats, and
-the index search proof costs 22.520M; neither raises the acceptance budget.
-Their core residual-attempt cap now passes all four full suites and the
-437-file registry audit, with no new failed targets
-(`/tmp/vector-residual-<package>-{build,test}.log`,
-`/tmp/vector-residual-registry-audit.{json,log}`).
-Returned-reference freezing
-and quantifier lexical scope now let both C16 files reach verification; two
-previously blocked `bp_forwarding` targets prove. The generic-caller companion
-closes `specialize_generic_caller::use_concrete` at 25k, leaving only its existing
-compiler warning. The subsequent opaque-inline frontend fix passes its Move package suite and
-all 437 registry baseline checks. Only its three intended baselines change:
-one now has no diagnostics and two reach their deliberate negative cases. No
-previously verified target regresses (`/tmp/opaque-inline-registry-audit.{json,log}`).
-The literal-swap-read optimization also passes all four full suites and all
-437 registry checks, with no baseline changes
-(`/tmp/literal-swap-registry-audit.{json,log}`).
-The Table call-agreement extension also passes all 437 ordinary baseline
-checks with no diagnostic changes (`/tmp/table-call-prover-check.log`). It
-extends storage encoding, loan independence, and labeled post-state uniqueness;
-The following result-aware frame/returned-storage extension also passes all
-437 ordinary checks (`/tmp/returned-storage-prover-check.log`). Table native
-contracts remain disabled, so V7 outcomes are unchanged.
-The native-collection carrier follow-up also passes all four full suites,
-including 124 E2E Check fixtures and both cost gates, plus all 437 registry
-checks with no baseline changes (`/tmp/table-contents-full-tests.log`,
-`/tmp/table-contents-prover-check.log`). It removes the unintended Move-vector
-size bound from Table contents and fixes reversed resource-argument substitution
-in expanded generic specifications. Its new generic-resource regression covers
-both argument positions and generic callers. The generated benchmark remains
-30 verified plus the expected AMM rejection at 15,807,436,992 raw heartbeats,
-relative to main; native Table frontend roles remain disabled, so V7 is unchanged.
-The following Table snapshot integration now proves `table_contais_to_length`
-at its original budget. Its obsolete baseline was removed by the owning runner,
-and a normal filtered recheck passes. The new source checks preserve old/nested
-observations, caller-side state labels and different functional contents for the
-same identity. The full benchmark passes 30 samples plus one expected AMM rejection at
-15,807,887,568 raw heartbeats (+0.0029% from the preceding local checkpoint).
-All four full suites pass, including both cost gates and 125 E2E Check fixtures.
-The full registry check exposes a second newly verified fixture,
-`map_equality_encoding`; six other Table fixtures now reach native-operation
-or mutable-reference denotation gaps. Their seven baselines were regenerated
-and reviewed; all 437 normal checks pass on recheck. No previously verified
-target regressed. Logs: `/tmp/snapshot-routing-full-tests.log`,
-`/tmp/snapshot-routing-prover-recheck.log`,
-`/tmp/snapshot-routing-registry-audit.{json,log}`.
-
-The subsequent shared-Table-read increment enables membership and shared lookup
-through explicit intrinsic-contract assumptions. Its five new source proofs pass,
-and an incorrect lookup claim is rejected. `table_option` now reaches its assertion
-but still exceeds its unchanged 25,000 maxHeartbeats: snapshot projection
-normalization and the nested Option's data invariant remain missing. The bitwise
-and verify_table fixtures advance to mutation natives. Three changed baselines
-were regenerated by the owning runner and all five scoped normal rechecks pass
-(`/tmp/table-read-registry-refresh.log`, `/tmp/table-read-registry-recheck.log`).
-Those baseline matches are not new verified fixtures. The subsequent full run
-passes all 437 registry baseline checks and all four suites (127 Check fixtures
-and both cost gates). The complete audit retains the counts below unchanged:
-`/tmp/table-reads-prover-check.log`, `/tmp/table-reads-registry-audit.json`,
-`/tmp/table-reads-full-tests.log`.
-
-The aggregate-projection follow-up passes both cost gates and six scoped Table
-registry baseline checks, after regenerating `table_option`'s changed diagnostic
-baseline. The official fixture still times out at 25000; it is not newly verified.
-Diagnostic source probes must set both `maxHeartbeats` and
-`verex.verifyHeartbeats` to reproduce that budget. The new aggregate payload
-source proof passes, and a false payload length bound is rejected. Logs:
-`/tmp/table-projections-check.log`, `/tmp/table-projections-option-recheck.log`.
-The preceding 437-test run remains the latest complete registry checkpoint.
-
-The historical Table-read checkpoint diagnostics were:
-
-| Outcome | Files |
-|---|---:|
-| No diagnostics | 122 |
-| Warnings/notes only | 5 |
-| Rejected before verification | 47 |
-| Verification diagnostics | 231 |
-| Compiler/other errors | 32 |
-
-These are diagnostic categories, not parity counts. Many fixtures deliberately
-contain invalid specifications. In particular, abort-code and constant-vector
-fixes expose their intended negative cases; an empty baseline is not the
-expected result for those files. A subsequent stored-field-frame batch now
-reaches verification in `stored_fun_values` (33/42 targets prove in the scoped
-run; see V26). The nominal function-field quantifier restriction remains a
-soundness guard, not a proved positive case.
-The C18 resource-projection fix moves one more file from preverification
-rejection to verification diagnostics. Field-update normalization and the
-cross-resource companion plus prepared-call-fact simplification now prove all
-six positive targets at 25k. These changes
-are included in the full suites above. The full registry audit additionally
-finds `anchor_mutation_pre_state::valid_derived_claim` now proves, while its
-wrong attached claim still fails. No previously proved target regressed.
-`state_labels/aliasing` reports an extra unresolved clause before its existing
-timeout; its failed target names are unchanged. Audit:
-`/tmp/update-normalization-registry-audit.{json,log}`.
-The function ledger below tracks known positive obligations still unproved;
-it is being reconciled as previously rejected files reach verification.
-
-The latest regular benchmark was regenerated before its broad suites, with
-HTML generated against main CI run 37250691414 (`ea4ecc43e7`). The full run
-`/tmp/verex-benchmark-table-routing.json` has 30 verified samples, one expected
-AMM rejection, and no unexpected failures or timeouts. It uses 15,826,709,038
-raw heartbeats (−0.0012% from the returned-storage checkpoint). All four full
-suites and all 437 registry checks pass (`/tmp/table-routing-full-tests.log`),
-with no baseline changes. This full E2E run covers the fixed closure-frame
-binder regression and reaches the VM stages. Native Table entry-loan primitives
-are tested, but frontend roles remain disabled and V7 outcomes are unchanged. Framework
-ordered_map is 29/29 at 4.158G, calculator is 8/8 at 1.072G, and pool_u64 is
-22/22 at 3.189G. AMM's six valid targets prove; its noncompliant fee constructor
-is rejected normally at 185.036M heartbeats. All seven AMM targets contribute
-to its 1.548G total. The removed type_info sample remains excluded. Sample
-statuses alone do not establish target-level parity.
-
-The final registry audit found no diagnostic changes after the cost-gate and
-Order proof corrections (`/tmp/short-circuit-final-registry-audit.log`). The
-preceding refresh changed only two diagnostics, with no new failed functions:
-shorter aborts_if residuals and bug_15044 failing normally instead of timing out.
-The run includes generic enums, stored-field frames, implicit function wrappers,
-and the registry AMM constant_product companion. `result_of_old_label` and
-`fun_arg_frame_check_valid` also have no diagnostics.
-
-The generic-caller companion applies the already proved `count_is_len` lemma
-at u64 for the loop entry, exit, and back edge. Inlining intentionally omits the
-callee's proof block, so the caller needs these instances itself. No source
-specification or heartbeat limit changed. Scoped refresh and ordinary baseline
-check pass (`/tmp/specialize-generic-caller-registry-{update,check}.log`); the
-current audit records only that removed failed target and no additions
-(`/tmp/specialize-generic-caller-registry-audit.log`). The full suites above
-precede this proof-only follow-up.
-
-The older 414-file survey found 120 MVP-positive functions/lemmas unproved
-in 43 files. That historical count is no longer a current parity measurement;
-current entries must distinguish unsupported constructs, budget exhaustion,
-and intended negative specifications.
-
 ## General
 
 ### G0. How the test driver runs a test
@@ -590,23 +36,21 @@ standard library and its nursery, and `move-table-extension`
 `run_move_prover_lean`) builds the model with them and exports the target
 file's modules with what they read. Of the flags, it honors the extra
 `--dependency` files (`script`, `script_incorrect`, `exists_only_memory*`)
-and, since 2026-10-08, `--verify-only`: a target function the scope leaves out
+and `--verify-only`: a target function the scope leaves out
 is exported with `pragma verify = false`, one it names with
 `pragma verify = true` (`verex.rs`, `apply_scope`), as the Prover's
 `should_verify` selects them (`verify_only_list` now matches the Prover). The
 Boogie options (`--vector-theory`, `--split-vcs-by-assert`, `--timeout`,
 `--trace`) have no counterpart; `--check-inconsistency` is G11.
 
-Scripts were not verified at all until 2026-10-08: the verifier looked up a
-module by its path's raw spelling, which keeps the quotes of a script's
-`«<SELF>_0»`, found none, and verified nothing. `script_incorrect` now fails
-as in the Prover (`SourceVerify/script_false.move`). The same lookup skipped
-every module whose rendered name is quoted, `std::string` among them.
+Module lookup handles quoted names such as a script's `«<SELF>_0»` and
+`std::string`; otherwise it could silently verify no targets.
+`SourceVerify/script_false.move` checks that an incorrect script is rejected.
 
 ### G1. Import diagnostics — returned as reports; precise locations still open
 
 `SourceVerify.verifySource` now returns VIR import/validation errors as error
-reports rather than throwing an uncaught exception (2026-10-07). This lets
+reports rather than throwing an uncaught exception. This lets
 the benchmark retain the failure and its measured frontend work, and lets
 the source baseline suite continue to subsequent fixtures. The report is
 anchored at the input's first line; embedded byte ranges still need mapping
@@ -626,8 +70,7 @@ normalization.
 In `functional/fixed_point_arithm.move::mul_div`, the obligation has a
 hypothesis named `x`. It hides the parameter `x`, which becomes the
 inaccessible `x✝⁴`, so a hand proof cannot name it; authored proofs work
-around this with `‹…›` patterns. (`mul_div` itself verifies automatically
-since 2026-10-12.)
+around this with `‹…›` patterns. (`mul_div` itself verifies automatically.)
 
 ### G4. A proof file needs a single-module Move file
 
@@ -662,7 +105,7 @@ Tests: `functional/disable_inv.move`, `functional/disable_inv_indirect.move`.
 
 With `pragma unroll = N`, the Move Prover unrolls a loop N times and cuts
 the paths that iterate more often, so it checks the function only for runs
-within N iterations. Verex does not mirror the cut (decided 2026-10-02): a
+within N iterations. Verex does not mirror the cut: a
 theorem states full correctness. It reads the pragma as a sound proof rule
 instead: up to N iterations and the final condition check are exposed, and a
 path that would iterate further must be unreachable. A function whose loop
@@ -701,8 +144,7 @@ Tests: `functional/inconsistency.move` (`assume_false`).
 While a `&mut` loan of a place lives, a specification reading the place
 sees the value the loan ends with, its prophecy; the Move Prover sees the
 value before the write-back. Code cannot observe the place during the
-loan. The difference is inherent to the prophetic model and stays (decided
-2026-10-03).
+loan. The difference is inherent to the prophetic model.
 
 Example (`functional/bug-17117.move`, `test_input_param_as_mut_ref`): after
 `let y = &mut r.x`, an assertion of `r.x` before the write through `y` reads
@@ -714,7 +156,7 @@ Tests: `functional/bug-17117.move` (`test_input_param_as_mut_ref`).
 
 A value no arm of a match fits, one a destructuring `let` or assignment
 does not fit, and an access to a field its variant lacks abort with Move's
-incomplete-match code `0xCA26CBD9BE0B0001` (decided 2026-10-03). The Move
+incomplete-match code `0xCA26CBD9BE0B0001`. The Move
 VM aborts a match, and a selection of a field several variants share, with
 that code too, but a destructuring and a field of one variant with the
 execution failure `STRUCT_VARIANT_MISMATCH`, which the Prover reports as an
@@ -726,7 +168,7 @@ execution failure; the two differ only for `aborts_with`.
 operations induce select the Move Prover's SMT bit-vector encoding. Under it the
 Prover wraps specification arithmetic over encoded values at their width, and a
 narrowing specification cast yields an unspecified value of the target type.
-Verex treats the encoding as a backend choice (decided 2026-10-07):
+Verex treats the encoding as a backend choice:
 specification arithmetic stays mathematical, bitwise operations are exact on
 integers, and executable arithmetic is checked as always. The explicit
 conversions are modeled: `int2bv(e)` wraps `e` into its fixed-width result type,
@@ -744,7 +186,7 @@ cleanly. Of those, `functional/bv_cast.move` differs by the narrowing-cast rule
 (the Prover rejects `(v as u8) == (v as u8)`), and the Prover's errors in
 `functional/bv_internal_invalid.move` and `functional/bv_internal_aggregate.move`
 concern its encoding only. An `int2bv` the compiler types at `num` (e.g.
-`int2bv(value + 1)`) wraps at `u64` (decided 2026-10-08), so
+`int2bv(value + 1)`) wraps at `u64`, so
 `MoveToVerexSL/constants.move` translates again. Open: one at a type
 parameter has no width and is rejected (`functional/bv_signed_generic.move`).
 
@@ -766,7 +208,7 @@ Tests: `functional/bv_cast.move`, `functional/bv_internal_aggregate.move`, `func
 
 A Move specification function is defined where each parameter declared with a
 fixed-width integer type holds a value of that type; elsewhere its value is
-unspecified (decided 2026-10-08). Specification typing lets a caller pass any
+unspecified. Specification typing lets a caller pass any
 integer to such a parameter, and a specification function cannot abort. The
 importer keeps the declared parameter types, and the body reads such a
 parameter as an `Int`. The verifier derives the domain from the types: a
@@ -822,12 +264,12 @@ clause cannot be relied on.
 
 ### C2. Map intrinsic declarations rejected
 
-27 tests (21 also rejected by the Prover, marked †), 173 messages.
+26 tests (21 also rejected by the Prover, marked †), 172 messages.
 
 Messages:
 
 - 114 × `` Move map intrinsic is missing required role `…` ``
-- 30 × `` Move map intrinsic role `…` target has an incompatible physical signature ``
+- 29 × `` Move map intrinsic role `…` target has an incompatible physical signature ``
 - 29 × `` Move map intrinsic role `…` requires `…` ``
 
 Example (`functional/ghost_field_intrinsic_map_data_inv.move`):
@@ -836,19 +278,39 @@ Example (`functional/ghost_field_intrinsic_map_data_inv.move`):
 VIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_del`
 ```
 
-Tests: `functional/ghost_field_intrinsic_map_data_inv.move`, `functional/ghost_field_intrinsic_map_full.move`, `functional/ghost_field_iter_abort_native.move`, `functional/intrinsic_iter_abort_role.move`, `functional/intrinsic_iter_abort_sig_err.move`†, `functional/intrinsic_iter_abort_uninterp.move`, `functional/intrinsic_iter_role_err.move`†, `functional/intrinsic_iter_role_err2.move`†, `functional/intrinsic_iter_role_err3.move`†, `functional/intrinsic_iter_role_err4.move`†, `functional/intrinsic_iter_role_err5.move`†, `functional/intrinsic_iter_role_err6.move`†, `functional/intrinsic_iter_role_err7.move`†, `functional/intrinsic_iter_role_err8.move`†, `functional/intrinsic_map_conv_ghost_err.move`†, `functional/intrinsic_map_enum_err.move`†, `functional/intrinsic_map_field_access_err.move`†, `functional/intrinsic_map_invariant_err.move`†, `functional/intrinsic_map_mut_no_get_err.move`†, `functional/intrinsic_map_native_role_err.move`†, `functional/intrinsic_map_rank_pair_err.move`†, `functional/intrinsic_map_rank_sig_err.move`†, `functional/intrinsic_map_role_sig_err.move`†, `functional/intrinsic_map_spec_pack_err.move`†, `functional/intrinsic_map_update_field_err.move`†, `functional/intrinsic_validity_data_inv_err.move`†, `functional/verify_iterator_validity.move`.
+Tests: `functional/ghost_field_intrinsic_map_data_inv.move`, `functional/ghost_field_intrinsic_map_full.move`, `functional/ghost_field_iter_abort_native.move`, `functional/intrinsic_iter_abort_role.move`, `functional/intrinsic_iter_abort_sig_err.move`†, `functional/intrinsic_iter_abort_uninterp.move`, `functional/intrinsic_iter_role_err.move`†, `functional/intrinsic_iter_role_err2.move`†, `functional/intrinsic_iter_role_err3.move`†, `functional/intrinsic_iter_role_err4.move`†, `functional/intrinsic_iter_role_err5.move`†, `functional/intrinsic_iter_role_err6.move`†, `functional/intrinsic_iter_role_err7.move`†, `functional/intrinsic_iter_role_err8.move`†, `functional/intrinsic_map_conv_ghost_err.move`†, `functional/intrinsic_map_enum_err.move`†, `functional/intrinsic_map_field_access_err.move`†, `functional/intrinsic_map_invariant_err.move`†, `functional/intrinsic_map_mut_no_get_err.move`†, `functional/intrinsic_map_native_role_err.move`†, `functional/intrinsic_map_rank_pair_err.move`†, `functional/intrinsic_map_rank_sig_err.move`†, `functional/intrinsic_map_role_sig_err.move`†, `functional/intrinsic_map_spec_pack_err.move`†, `functional/intrinsic_map_update_field_err.move`†, `functional/intrinsic_validity_data_inv_err.move`†.
 
-### C8. `update` condition must target a spec variable
+### C8. `update` condition must target a spec variable — carried
 
-9 tests, 9 messages.
+Ghost fields and spec variables are carried through the unit's model
+(`ghost-fields.md`); the message no longer occurs. Where the
+tests stand:
 
-Example (`functional/ghost_field.move`):
-
-```text
-an `update` condition must target a spec variable
-```
-
-Tests: `functional/ghost_field.move`, `functional/ghost_field_bp.move`, `functional/ghost_field_closure_equality.move`, `functional/ghost_field_closure_equality_ext.move`, `functional/ghost_field_equality.move`, `functional/ghost_field_invariants.move`, `functional/ghost_field_map_equality.move`, `functional/ghost_field_map_equality_ext.move`, `functional/loop_memory_havoc.move`.
+- `functional/ghost_field.move`, `functional/ghost_field_equality.move`,
+  `functional/ghost_field_invariants.move`,
+  `functional/ghost_field_closure_equality.move`: the Prover's results, but
+  for functions without a specification (`copy_num_to_u8_unbounded`,
+  `ovf_*`: Verex verifies specified functions).
+- `functional/ghost_field_bp.move`,
+  `functional/ghost_field_closure_equality_ext.move`: the Prover's results
+  (G4b: closure targets routed in the model, behavioral predicates and
+  stored-function frames over the model's invocation meaning).
+- `functional/loop_memory_havoc.move`: the Prover's failures, besides
+  Verex's loop frames, which keep only what an unannotated loop's body
+  leaves alone (`untouched_memory_framed`, `ghost_untouched_framed`,
+  `fv_field_untouched_framed`), its residual loop goals
+  (`bump_loop_with_invariant`, `bump_loop_with_old_invariant`), and
+  `fv_forward_depth2_fails`, reported at its loop invariant rather than its
+  postcondition, as without ghosts.
+- `functional/ghost_field_map_equality.move`,
+  `functional/ghost_field_map_equality_ext.move`: C2.
+- `functional/ghost_field_intrinsic_map_ops.move`: the Prover's results
+  (G5: the role contracts state the validity slot), but for the bulk roles'
+  quantified clauses and continuations (`app_disjoint`, `tr`, `rk`), open
+  since the roles' contracts.
+- `functional/verify_iterator_validity.move`: the Prover's thirteen
+  failures (G5: keyed iterators, the role natives' declared preconditions,
+  the iterator's slot read without its variant).
 
 ### C11. Equality operand types differ
 
@@ -871,16 +333,9 @@ Non-opaque declarations already expanded by compiler-v2 remain omitted.
 
 The three positive-gap fixtures now reach verification. `behavioral_predicate_inline_fun`
 verifies completely. `opaque_inline_body_fail` rejects the bad `inc` body and its
-dependent caller, while the explicitly trusted variant verifies. An authored
-companion proves `opaque_inline_loop_sum::sum` and `test_sum_twice` at the unchanged
-25k budget (13.196M and 5.093M raw heartbeats). All positive targets in that file
-verify; only the deliberately wrong `test_sum_wrong` postcondition fails. Since
-2026-10-12 both verify automatically (facts of products of consecutive
-integers), and the companion is removed.
-All three scoped ordinary baseline checks pass. The fresh full benchmark has
-30 verified problems and one expected rejection; its generated main-relative
-report preceded the Move package suite and the 437-file registry audit. Both
-pass, and no previously verified target regresses.
+dependent caller, while the explicitly trusted variant verifies. `opaque_inline_loop_sum::sum` and
+`test_sum_twice` verify automatically using facts about products of consecutive
+integers; the deliberately wrong `test_sum_wrong` postcondition fails.
 
 The remaining 1 test (also rejected by the Prover, marked †) has 4 messages:
 `specification call target … does not resolve to a declared function or specification function`.
@@ -906,10 +361,6 @@ Both affected registry files now reach verification. In `bp_forwarding`,
 `check_keys_bounded` and `check_all_positive` prove; `set_values` and
 `all_values_bounded` still exceed 25k. In `folds_of_wrapper_mut`, `mirror_keys`
 and `set_both` still exceed 25k. Their intentional negative cases remain failures.
-Scoped logs: `/tmp/returned-freeze-{bp_forwarding,folds_of_wrapper_mut}-registry.log`.
-Both cost gates, frontend tests, and new-fixture non-update baseline checks pass.
-The full benchmark/main report, all four suites, and registry refresh completed
-successfully under `/tmp/returned-freeze-validation.py`.
 
 ### C18. Borrow result is not a reference type — resource projection fixed
 
@@ -936,12 +387,8 @@ derivation; preparation drops from 28.437M to 20.974M raw heartbeats. Failed
 speculative attempts restore the original goal and use the existing higher-order
 fallback. The 25k acceptance budget is unchanged. A short companion completes
 the proof. `SourceVerify/behavior_manual_facts` proves three positives and rejects
-the wrong final counter value at both 25k and the suite default. Both cost gates
-pass. Scoped evidence: `/tmp/prepared-behavior-registry-{update,check}.log` and
-`/tmp/behavior-manual-fixture-{check,default}.log`. Fresh benchmark/main HTML, all four full suites, and the 437-file registry
-refresh passed (`/tmp/prepared-behavior-validation.log`). A final literal-closure
-guard bounds failed speculation to two attempts per target; scoped checks and
-both cost gates pass (`/tmp/behavior-guard-two-*.log`).
+the wrong final counter value at both 25k and the suite default. A
+literal-closure guard bounds failed speculation to two attempts per target.
 
 `functional/closures/bp_mut_ref_selector.move` remains rejected. Its projected
 field borrow also needs the behavioral predicate's implicit pre/post argument
@@ -963,35 +410,12 @@ Both printer stages quote numeric field-frame targets (`modifies_of<«0»>`).
 rejects its invalid implicit pack. The frontend formatting test checks addressed
 and wildcard positional frames through two formatting passes.
 
-The scoped registry run now reaches verification. A follow-up combines pure
-short-circuit guards whose branches leave identical environments, avoiding
-repeated verification of their continuations. `constant_product` now proves at
-25k with its arithmetic companion (`/tmp/short-circuit-registry-amm.log`), as
-`create_pool` already did. Its solver is 15.1M raw heartbeats and 17 leaves,
-versus exhaustion before the manual proof in the earlier 25k run.
-The two fee functions, `swap`, and `create_constant_product_pool` still exceed
-25k; the other two constructors depend on the unproved fee functions. The
-full three-function arithmetic candidate remains only in
-`/tmp/registry-amm-arithmetic-candidate.proof.lean`. No budget was raised.
-
-A bounded arithmetic-only omega attempt now precedes the full-context solver
-in the cheap bound decider when memory-dependent hypotheses are present. It avoids preprocessing unrelated memory and
-closure facts; `ArithmeticContext.lean` checks both the fast path and fallback.
-The final regular AMM benchmark retains its six valid targets:
-`constant_product` is 16.1M heartbeats (previous 26.8M, down 39.8%). Total
-AMM is 2.86G versus 2.87G. An earlier unrestricted fast-path experiment reduced
-the non-compliant pricing function by 51%, but grew proof terms on the core
-cost gate; the final memory-context guard does not retain that pricing gain.
-Both cost gates now pass without baseline changes. `Scalars/Order::ordered3`
-introduces both comparison premises after guard fusion.
-The fresh full benchmark `/tmp/verex-benchmark-returned-freeze-final.json`
-retains 28/32 passing samples and all previously proved targets. The HTML was
-regenerated against main before the full suites. The controller is
-`/tmp/short-circuit-final-validation.py`; all four suites and the 437-file
-registry refresh passed. The final registry audit found no changed diagnostics.
-The first 437-file refresh introduced no failed functions; its diagnostic changes
-were shorter aborts_if residuals and bug_15044 failing normally instead of timing
-out (`/tmp/short-circuit-registry-audit.log`).
+Pure short-circuit guards whose branches leave identical environments share
+their continuation. The `constant_product` companion supplies the arithmetic
+argument directly. A bounded arithmetic-only omega attempt precedes the
+full-context bound solver when memory-dependent hypotheses are present;
+`ArithmeticContext.lean` covers the fast path and fallback. An unrestricted
+variant grew proof terms on the core cost gate and was rejected.
 
 The focused probes also exposed open-generic closure-frame and state-labelled
 `result_of`/wildcard-frame proof gaps. The checked regression covers concrete
@@ -999,17 +423,11 @@ generic instantiation and `ensures_of` invariants; it does not claim those broad
 proof gaps are solved. This scoped follow-up is after the full 437-file counts
 above (one pre-verification rejection now reaches verification).
 
-### C21. Field selection not on every variant
+### C21. Field selection not on every variant — no longer occurs
 
-1 test, 2 messages.
-
-Example (`functional/uninterpreted_spec_fun_congruence.move`):
-
-```text
-VIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3413, 3420)
-```
-
-Tests: `functional/uninterpreted_spec_fun_congruence.move`.
+The selection was of a ghost field (`input.proof`), which the unit model
+carries (`ghost-fields.md`). The test now reaches
+verification and shows V27.
 
 ### C23. Spec variable with an initializer
 
@@ -1045,16 +463,13 @@ Tests: `functional/state_labels/nonlinear_cfg_error.move`.
 
 ### V1. Rendering outside the VerexSL parser
 
-12 tests, 12 messages (2026-10-05 refresh; generic axioms parse since
-2026-10-08).
-
 Messages:
 
 - 2 × `` condition kind `…` is outside the current VerexSL parser ``
 - 3 × `this quantifier kind is outside the current VerexSL parser`
 - 1 × `` in-body specification condition `…` with N properties and N auxiliary expressions is outside the current VerexSL parser ``
 
-Generic module invariants are carried since 2026-10-09 (Summary);
+Generic module invariants are supported;
 `type_param_bug_121721` now stops at a quantifier kind.
 
 Example (`functional/emits.move`):
@@ -1086,16 +501,11 @@ argument of its own (`SpecTypeArgument.integer`). A module's
 `pragma aborts_if_is_strict` (and `_partial`) now holds for its functions. So
 `axiom_generic`, `axioms`, `mono_on_axiom_spec_type` and `opaque_native`
 verify (`SourceVerify/generic_axioms{,_false}.move`,
-`SourceVerify/inherited_strictness{,_false}.move`). Generic module invariants
-remain open.
+`SourceVerify/inherited_strictness{,_false}.move`). Generic module invariants are also supported.
 
 Tests: `functional/choice.move`, `functional/emits.move`, `functional/loop_unroll.move`, `functional/mono.move`, `regression/type_param_bug_121721.move`.
 
 ### V2. Construct not supported in generated contracts
-
-4 tests, 6 messages (2026-10-05 refresh; `abort_in_fun`, `bv_aborts`,
-`defines` and `performance_200511` reach verification since 2026-10-08,
-`discarded_mut_ref_result` since 2026-10-09, V20).
 
 Messages:
 
@@ -1106,7 +516,7 @@ Messages:
 
 The state-change predicates `publish`, `remove`, and `update` now translate
 in contracts, including labels they define (S2b of
-[`state-labels.md`](state-labels.md), 2026-10-05).
+[`state-labels.md`](state-labels.md)).
 
 An arbitrary value (`__verex_arbitrary_…`, the value of a specification
 function's aborting call) takes no type arguments, so `abort_in_fun` verifies.
@@ -1155,17 +565,42 @@ no denotation for `test_type_info_symbolic`: a literal of this type is not carri
 
 Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `functional/type_reflection.move`, `regression/fun_type_arity_injectivity.move`.
 
-### V7. Intrinsic map representation not carried
+### V7. Intrinsic map representation not carried — placeholder layouts carried
 
-5 tests, 31 messages.
+The abstract map owners the Prover's tests declare (`struct Map<K, V> {}`,
+whose one field is the Boolean placeholder `dummy_field` the compilers give
+an empty struct) are placeholder layouts of the table view: their entries
+are the owner's hidden contents field, their identity is their entries, and
+every role, the bulk roles included, is available to them
+([`intrinsic-maps.md`](intrinsic-maps.md), "Views", "Laws of the bulk
+roles"). `intrinsic_map_rank`, `intrinsic_map_rank_bulk` and
+`intrinsic_map_insertion_order` fail exactly the functions the Prover fails
+(`rank_wrong`, `build_wrong`, `same_entries_not_equal` and `canary`).
+
+Still failing, 2 tests, 22 messages:
+
+- `ghost_field_intrinsic_map_ops.move`: `map_spec_iter_preserved` is not
+  carried (3 messages; iterator validity is stage 3 of the design), so
+  `borrow_write`, `add_preserved_bad` and `addall_preserved_bad` are not
+  verified, where the Prover fails the latter two; `app_disjoint`'s
+  `aborts_if ∃ k: u64 …` needs the existential over a map's keys read at
+  the key type; `tr` does not establish that the trimmed map and the
+  returned rest are disjoint, and `rk` (`replace_key_inplace` under
+  `aborts_if_is_partial`) does not establish its continuation. The other
+  nine functions verify.
+- `closures/inline/folds_of_map_intrinsic.move`: the `spec_fold` loop
+  invariants over `spec_set` and `spec_remove` are not preserved by an
+  iteration (`collect`, `collect_distinct`, `remove_all`,
+  `remove_all_must_exist`, and the canary `collect_wrong`, which the Prover
+  fails too).
 
 Example (`functional/ghost_field_intrinsic_map_ops.move:6`):
 
 ```text
-the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+the intrinsic map role `map_spec_iter_preserved` is not carried
 ```
 
-Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/ghost_field_intrinsic_map_ops.move`, `functional/intrinsic_map_insertion_order.move`, `functional/intrinsic_map_rank.move`, `functional/intrinsic_map_rank_bulk.move`.
+Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/ghost_field_intrinsic_map_ops.move`.
 
 ### V10. Other elaboration errors in the rendering
 
@@ -1196,16 +631,13 @@ range syntax, but still exceeds 25k. Its intentionally false +2 postcondition
 has not become provable. A probe retaining only its valid postconditions also
 times out: loop setup consumes about 7.6M raw heartbeats, and normalization of
 the unchanged-tail invariant after a mutable element write exhausts the
-remaining budget before the authored tactic runs
-(`/tmp/vector-ranges-foreach-{positive,debug}.log`). The owning runner refreshed that diagnostic baseline
-(`/tmp/vector-ranges-registry-update.log`); no new whole-file success is claimed.
+remaining budget before the authored tactic runs.
 
 The follow-up clears unused continuation alias chains and normalizes encoded
 integer reads to certified values, preserving signed/unsigned bounds even for
 computed optional reads. Four `CertifiedReads` positives pass at 25k, and a
 false signed nonnegativity claim remains rejected. The same instrumented
-positive-only `foreach` diagnostic drops from 48.483M to 36.190M raw heartbeats
-(`/tmp/foreach-auto-diagnostic.log`, `/tmp/certified-read-foreach-profile.log`).
+positive-only `foreach` diagnostic drops from 48.483M to 36.190M raw heartbeats.
 Those profiling runs use a diagnostic 100k allowance; the ordinary 25k probe
 still times out. This is a preparation-cost improvement, not a fixed fixture.
 
@@ -1237,10 +669,10 @@ Tests: `functional/recursive_move_funs_multi_hop.move`.
 
 ### V20. Behavioral predicates with mutable-reference parameters
 
-3 tests, 3 messages (2026-10-09).
+3 tests, 3 messages.
 
 `aborts_of`, `ensures_of` and `result_of` over function values with `&mut`
-parameters are carried (2026-10-09; `AbortsOfMut`, `EnsuresOfMut`,
+parameters are carried (`AbortsOfMut`, `EnsuresOfMut`,
 `ResultOfMut`, [`higher-order-functions.md`](higher-order-functions.md),
 "Behavioral predicates"): `lambda_spec_discarded_result`,
 `lambda_spec_loop_anchor` and `lambda_spec_two_state_specfun` verify (the
@@ -1269,7 +701,7 @@ Tests: `functional/state_labels/closure_bp_post_sub_pre_only.move`.
 
 The invocation-label increment moves `aborting_result_definition` to its
 intended no-abort clause failures. `aborts_if_at_state_label::caller` now
-verifies at the native 25k budget (2026-10-07): reuse call observations
+verifies at the native 25k budget: reuse call observations
 before reconstructing runs or re-deriving contracts. The timeout baseline
 is removed by the owning runner.
 
@@ -1308,32 +740,26 @@ The former V22 resource certificate error is fixed: open generic entries are
 frame templates, not concrete runtime keys. Encoding, unnamed-memory agreement,
 and the resource typing certificate share the closed-key lookup; frame
 coherence retains the template lookup. All eight intentionally invalid claims
-in `generic_aliasing_write_routes` remain rejected. Scoped refresh log:
-`/tmp/registry-resource-targets.log`.
+in `generic_aliasing_write_routes` remain rejected.
 
 `functional/nonlinear_arithm.move::mul5` now has a proof companion: its
 five increasing unsigned factors yield zero or a product of at least 120,
 so the result is not 72. The deliberately invalid `mul5_incorrect` and other
-negative cases remain rejected (`/tmp/registry-nonlinear-target.log`).
+negative cases remain rejected.
 
-The proof companion for `functional/invariants_with_quant.move` now proves
-all four quantified postconditions at the existing 25k budget by enumerating
-the three valid indices and computing the vector reads. The file has no
-remaining diagnostics (`/tmp/registry-quant-vector-target.log`). Since
-2026-10-12 it verifies automatically, and the companion is removed.
+`functional/invariants_with_quant.move` verifies its four quantified
+postconditions automatically by enumerating the three valid indices and
+computing the vector reads.
 All eleven positives in `for_loop_invariants.move` now verify. Its three
 triangular-sum proofs use a proved conversion from truncating to Euclidean
 division: `i * (i - 1)` is nonnegative for every integer. This prevents costly
 absolute-value case splits during preparation, retaining the 25k budget.
-Both intentionally incorrect loop invariants remain rejected
-(`/tmp/registry-for-loops-final.log`).
+Both intentionally incorrect loop invariants remain rejected.
 
 `functional/simple_vector_client.move` now verifies completely. Its companion
 normalizes literal list spines before branch exploration and supplies the
-four membership witnesses for `test_contains`. `test_index_of` and
-`option_type` close by simplification at the unchanged 25k budget
-(`/tmp/registry-simple-vector-target.log`). Since 2026-10-12 `option_type`
-verifies automatically, and its proof is removed.
+four membership witnesses for `test_contains`. `test_index_of` closes by simplification at the unchanged 25k budget;
+`option_type` verifies automatically.
 
 ### V26. Stored write frames and global invariant preservation
 
@@ -1358,10 +784,9 @@ invariants of all other resources. Two MVP-positive targets remain:
   time. This discrepancy needs a specification/validity decision rather than
   an unchecked proof shortcut.
 
-Scoped evidence: `/tmp/stored-frames-prover-followup.log`. The formerly expensive
-`increment_counter` and `use_transformer` use 7.95M and 5.13M solver heartbeats,
-respectively, after computing resource-invariant dispatch locally. All four
-suites passed. Dependency interfaces still omit field contracts; explicit write
+`increment_counter` and `use_transformer` measured 7.95M and 5.13M solver
+heartbeats, respectively, after computing resource-invariant dispatch locally.
+Dependency interfaces still omit field contracts; explicit write
 frames are therefore rejected at that boundary rather than silently becoming
 empty frames. Owned declarations retain their frames.
 
@@ -1370,8 +795,7 @@ empty frames. Owned declarations retain their frames.
 `functional/specs_in_fun_ref.move::simple7` fails its in-body `assert x == y`
 after `let a = x; *a = y`. The denotation consumes `x` with `Term.take`;
 `assertionConditions`/`overDefined` then requires that emptied slot to be defined.
-The residual is `False`, not budget exhaustion. Reproduction at the registry's
-25k cap: `/tmp/specs-in-fun-ref-residual.{lean,log}`.
+The residual is `False`, not budget exhaustion.
 
 The Move observation needs the current value held by `a`. Substituting the
 function-entry value or the final prophecy is incorrect: a later write can
@@ -1416,13 +840,48 @@ with the same type or prophecy value would be unsound.
 The functions are marked as follows:
 
 - No mark: the automatic verification failed within its budget.
-- (budget): the function exceeds the default budget of 1000 thousand
-  `maxHeartbeats` (about thirty seconds), which the registry runs with
-  since 2026-10-12 (before: 25 thousand).
+- (budget): the function exceeds the default target budget of 1000 thousand
+  `maxHeartbeats` used by the registry.
 - (lemma): a `spec lemma` whose theorem is not established
   ([`lemmas.md`](lemmas.md)).
 
 A function can fail because of a V entry of the same test.
+
+### V27. A ghost-sensitive function's theorem is not assembled
+
+1 test. The theorem of a function whose in-body assumptions are carried
+(`satisfies_of_assumptions`) and whose contract reads a ghost field through
+an axiom is assembled without the `verexInvoke` binder its behavioral
+predicates need:
+
+```text
+functional/uninterpreted_spec_fun_congruence.move:9:1: error: Unknown identifier `verexInvoke`
+functional/uninterpreted_spec_fun_congruence.move:9:1: error: don't know how to synthesize implicit argument `assumed`
+```
+
+Tests: `functional/uninterpreted_spec_fun_congruence.move`
+(`ghost_sensitive_function_is_not_move_congruent`). The cause is in the
+assembly of the public theorem.
+
+### V28. Function value equality up to ghosts does not carry a frame
+
+2 tests. A function value's equality erases ghost slots
+(`ghost-fields.md`): `result == p` of a function-valued result is
+`(encode result).eraseGhosts = (encode p).eraseGhosts`. The data invariant
+of a function-typed field (`KeepsMemoryAt`, the default read-only frame)
+owed where `Box { f: id(p) }` is constructed is known of `p` and not
+transferred to `result`, which the erased equality no longer identifies with
+`p` syntactically:
+
+```text
+regression/fun_value_equality.move:58:5: error: the data invariant `f : Fn(u64) -> u64 has Copy, Drop` does not hold where a value is constructed
+```
+
+Tests: `regression/fun_value_equality.move`, `regression/fun_value_equality_ext.move`
+(`boxed_equal`). The frame of a
+function value does not depend on its captures' ghost slots, which the
+runtime ignores, so a lemma transferring `KeepsMemoryAt` along
+`eraseGhosts`-equality is the fix.
 
 ## Outside the unit tests
 

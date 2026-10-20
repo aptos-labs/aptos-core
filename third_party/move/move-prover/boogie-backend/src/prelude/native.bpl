@@ -547,8 +547,13 @@ procedure {:inline 2} {{impl.fun_new_with_config}}{{S}}(inner_max_degree: int, l
 {%- if impl.fun_destroy_empty != "" %}
 procedure {:inline 2} {{impl.fun_destroy_empty}}{{S}}(t: {{Self}}) {
     if (LenTable(t{{U}}) != 0) {
-        call $Abort($StdError(1/*INVALID_STATE*/, 102/*ENOT_EMPTY*/));
+        call $Abort($CanonicalError(3/*INVALID_STATE*/, 102/*ENOT_EMPTY*/));
     }
+}
+{%- endif %}
+
+{%- if impl.fun_destroy_unchecked != "" %}
+procedure {:inline 2} {{impl.fun_destroy_unchecked}}{{S}}(t: {{Self}}) {
 }
 {%- endif %}
 

@@ -13696,6 +13696,7 @@ dependencies = [
  "move-stackless-bytecode",
  "once_cell",
  "serde",
+ "sha2 0.9.9",
  "shell-words",
  "tempfile",
  "toml 0.7.8",

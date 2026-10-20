@@ -71,6 +71,10 @@ inductive RuntimeValue where
   | tuple (elements : Array RuntimeValue)
   | nominal (source : StructHandle) (variant : Option String)
       (fields : Array RuntimeValue)
+  /-- A ghost field's slot in a nominal value, after its declared fields
+  (`designs/ghost-fields.md`). The runtime holds `.unit` in it; the
+  denotation holds the ghost's value, and its equality reads none. -/
+  | ghost (value : RuntimeValue)
   /-- A function value: its target, the mask of the parameters it
   captures, the type instantiation its construction fixed, and the
   captured values. -/
@@ -115,12 +119,13 @@ def RuntimeValue.beq : RuntimeValue → RuntimeValue → Bool
       leftFunction == rightFunction && leftMask == rightMask &&
         leftInstantiation == rightInstantiation &&
         RuntimeValue.beqList leftCaptures.toList rightCaptures.toList
+  | .ghost left, .ghost right => RuntimeValue.beq left right
   | .borrow leftLoan leftCurrent, .borrow rightLoan rightCurrent =>
       leftLoan == rightLoan && RuntimeValue.beq leftCurrent rightCurrent
   | .loanHole left, .loanHole right => left == right
   | _, _ => false
 termination_by left right => sizeOf left + sizeOf right
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- Structural equality of two value lists, elementwise. -/
 def RuntimeValue.beqList : List RuntimeValue → List RuntimeValue → Bool
@@ -172,6 +177,10 @@ private theorem RuntimeValue.eq_of_beq_below : (bound : Nat) →
           obtain ⟨rfl, current⟩ := h
           simp only [RuntimeValue.borrow.sizeOf_spec] at small
           rw [values _ _ (by omega) current]
+        case ghost.ghost left right =>
+          simp only [RuntimeValue.beq] at h
+          simp only [RuntimeValue.ghost.sizeOf_spec] at small
+          rw [values _ _ (by omega) h]
       · intro lefts rights small h
         cases lefts <;> cases rights
         case nil.nil => rfl
@@ -210,6 +219,10 @@ private theorem RuntimeValue.beq_self_below : (bound : Nat) →
         case borrow loan current =>
           simp only [RuntimeValue.borrow.sizeOf_spec] at small
           simp only [RuntimeValue.beq, beq_self_eq_true, Bool.true_and]
+          exact values _ (by omega)
+        case ghost value =>
+          simp only [RuntimeValue.ghost.sizeOf_spec] at small
+          simp only [RuntimeValue.beq]
           exact values _ (by omega)
       · intro list small
         cases list
@@ -282,6 +295,7 @@ def RuntimeValue.kindRank : RuntimeValue → Nat
   | .closure .. => 11
   | .borrow .. => 12
   | .loanHole _ => 13
+  | .ghost _ => 14
 
 /-- What the order of runtime values reads from the unit: each enum
 variant's declaration position, and each function's position in the order
@@ -350,9 +364,10 @@ def RuntimeValue.orderPayload (rank : ValueRanks) :
   | .borrow leftLoan leftCurrent, .borrow rightLoan rightCurrent =>
       (compare leftLoan rightLoan).then (RuntimeValue.order rank leftCurrent rightCurrent)
   | .loanHole left, .loanHole right => compare left right
+  | .ghost left, .ghost right => RuntimeValue.order rank left right
   | _, _ => .eq
 termination_by left right => sizeOf left + sizeOf right
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- The lexicographic order of two value lists. -/
 def RuntimeValue.orderList (rank : ValueRanks) :
@@ -370,7 +385,8 @@ end
 mutual
 /-- The value a comparison reads: a mutable borrow as its current value, as
 Move and Rust compare references by what they refer to, and the hole of a
-loan as unit, so that no comparison reads a loan's identity. -/
+loan as unit, so that no comparison reads a loan's identity. A ghost slot
+holds unit at runtime, so comparisons read no ghost. -/
 def RuntimeValue.observe : RuntimeValue → RuntimeValue
   | .vector elements => .vector (RuntimeValue.observeList elements.toList).toArray
   | .tuple elements => .tuple (RuntimeValue.observeList elements.toList).toArray
@@ -378,6 +394,7 @@ def RuntimeValue.observe : RuntimeValue → RuntimeValue
       .nominal source variant (RuntimeValue.observeList fields.toList).toArray
   | .closure function mask typeInstantiation captures =>
       .closure function mask typeInstantiation (RuntimeValue.observeList captures.toList).toArray
+  | .ghost contents => .ghost contents.observe
   | .borrow _ current => current.observe
   | .loanHole _ => .unit
   | .unit => .unit
@@ -389,7 +406,7 @@ def RuntimeValue.observe : RuntimeValue → RuntimeValue
   | .string value => .string value
   | .bytes value => .bytes value
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- Each value of a list as a comparison reads it. -/
 def RuntimeValue.observeList : List RuntimeValue → List RuntimeValue
@@ -916,78 +933,25 @@ structure RuntimeFrame where
   typeInstantiation : Array (TypeId × TypeId) := #[]
   deriving Repr, BEq, Inhabited
 
-/-- Native Table storage, separate from physical Table values and key-resource
-globals. The allocation history persists after destruction, so a later
-allocation must be fresh relative to every earlier handle. Contents slots are
-keyed by the closed Table type and handle, and contain encoded entry vectors.
-The Table native contracts and storage agreement determine their meaning. -/
-structure NativeTableStorage where
-  contents : GlobalMap := {}
-  allocated : Array String := #[]
-  deriving Repr, BEq, Inhabited
-
-/-- A loan's owning storage slot. Ordinary globals and native Table contents
-have distinct identities even when their family and key are identical. -/
-inductive LoanTarget where
-  | global (key : GlobalKey)
-  | table (key : GlobalKey)
-  deriving Repr, BEq, DecidableEq, Inhabited
-
 /-- Whole runtime state threaded through expressions and calls.  `nextLoan`
-mints dynamic loan instances.  `storageLoans` registers each live mutable
-loan into globals or native Table contents with its tagged owning slot, so
-the loan's death writes back directly without searching either store — the
+mints dynamic loan instances.  `globalLoans` registers each live mutable
+borrow of a global slot with the key whose slot holds its hole, so the
+loan's death writes back by key instead of searching global memory — the
 certified exclusivity of a live loan is what makes the recorded key the
 hole's location.  `pending` carries loan write-backs whose holes live in an
 ancestor frame: a callee's dying borrow exports its current value here, and
-every caller applies what becomes visible at its call site. -/
+every caller applies what becomes visible at its call site.  A table is a
+value, its entries in its owner's last field; `tableHandles` are the handles
+allocated so far, which a destroyed table keeps, so that a table's identity,
+its handle, is never taken again (`designs/intrinsic-maps.md`, "Tables in
+the runtime semantics"). -/
 structure RuntimeState where
   globals : GlobalMap := {}
-  storageLoans : List (Nat × LoanTarget) := []
+  globalLoans : List (Nat × GlobalKey) := []
   nextLoan : Nat := 0
   pending : Array (Nat × RuntimeValue) := #[]
-  tables : NativeTableStorage := {}
+  tableHandles : Array String := #[]
   deriving Repr, BEq, Inhabited
-
-/-- Read the storage slot to which a mutable loan must return. -/
-def RuntimeState.loanValue? (state : RuntimeState) : LoanTarget → Option RuntimeValue
-  | .global key => state.globals.lookup key
-  | .table key => state.tables.contents.lookup key
-
-/-- Replace one storage slot, retaining the other store and allocation history. -/
-def RuntimeState.writeLoanValue (state : RuntimeState) (target : LoanTarget)
-    (value : RuntimeValue) : RuntimeState :=
-  match target with
-  | .global key => { state with globals := state.globals.insert key value }
-  | .table key => { state with tables.contents := state.tables.contents.insert key value }
-
-@[simp] theorem RuntimeState.loanValue?_global (state : RuntimeState) (key : GlobalKey) :
-    state.loanValue? (.global key) = state.globals.lookup key := rfl
-@[simp] theorem RuntimeState.loanValue?_table (state : RuntimeState) (key : GlobalKey) :
-    state.loanValue? (.table key) = state.tables.contents.lookup key := rfl
-@[simp] theorem RuntimeState.writeLoanValue_global (state : RuntimeState) (key : GlobalKey)
-    (value : RuntimeValue) :
-    state.writeLoanValue (.global key) value =
-      { state with globals := state.globals.insert key value } := rfl
-@[simp] theorem RuntimeState.writeLoanValue_table (state : RuntimeState) (key : GlobalKey)
-    (value : RuntimeValue) :
-    state.writeLoanValue (.table key) value =
-      { state with tables.contents := state.tables.contents.insert key value } := rfl
-
-@[simp] theorem RuntimeState.loanValue?_write_self (state : RuntimeState)
-    (target : LoanTarget) (value : RuntimeValue) :
-    (state.writeLoanValue target value).loanValue? target = some value := by
-  cases target <;> simp
-
-theorem RuntimeState.loanValue?_write_other (state : RuntimeState)
-    (written query : LoanTarget) (value : RuntimeValue) (distinct : query ≠ written) :
-    (state.writeLoanValue written value).loanValue? query = state.loanValue? query := by
-  cases written <;> cases query <;> simp_all
-
-@[simp] theorem RuntimeState.writeLoanValue_allocated (state : RuntimeState)
-    (target : LoanTarget) (value : RuntimeValue) :
-    (state.writeLoanValue target value).tables.allocated = state.tables.allocated := by
-  cases target <;> rfl
 
 /-- Source location paired with the namespace whose location table owns it. -/
 structure RuntimeLocation where
@@ -1059,10 +1023,11 @@ def RuntimeValue.holeFree? : RuntimeValue → Bool
   | .vector elements | .tuple elements | .nominal _ _ elements | .closure _ _ _ elements =>
       RuntimeValue.holeFreeList? elements.toList
   | .loanHole _ => false
+  | .ghost value => value.holeFree?
   | .borrow .. | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _
   | .string _ | .bytes _ => true
 termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
 
 /-- Whether no value of a list holds a loan hole outside a borrow. -/
 def RuntimeValue.holeFreeList? : List RuntimeValue → Bool
