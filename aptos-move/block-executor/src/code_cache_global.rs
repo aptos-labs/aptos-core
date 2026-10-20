@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::counters::GLOBAL_LAYOUT_CACHE_MISSES;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::PanicError, state_store::state_value::StateValue, vm::modules::AptosModuleExtension,
@@ -101,6 +102,8 @@ pub struct GlobalModuleCache<K, D, V, E> {
     /// Maximum value of the sum of estimated sizes (in bytes) of all cached layouts. If inserting
     /// a new layout exceeds it, the layout cache is flushed first.
     max_layout_cache_size_in_bytes: usize,
+    /// True while a thread is flushing the layout cache, so that only one thread flushes at a time.
+    layout_cache_flush_in_progress: AtomicBool,
 }
 
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
@@ -117,6 +120,7 @@ where
             struct_layouts: DashMap::new(),
             layout_cache_size_estimate_in_bytes: AtomicUsize::new(0),
             max_layout_cache_size_in_bytes: DEFAULT_MAX_LAYOUT_CACHE_SIZE_IN_BYTES,
+            layout_cache_flush_in_progress: AtomicBool::new(false),
         }
     }
 
@@ -193,15 +197,35 @@ where
     /// gas charging and read sets), so flushing cannot change the result of executing a
     /// transaction. Must never be called while holding a reference or entry guard of the cache,
     /// as that would deadlock.
-    pub fn flush_layout_cache(&self) {
+    ///
+    /// Only one thread flushes at a time: if a flush is already in progress, returns false
+    /// without flushing. Returns true otherwise.
+    pub fn flush_layout_cache(&self) -> bool {
+        if self
+            .layout_cache_flush_in_progress
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            return false;
+        }
+
         // Remove entries one by one, so that the size estimate stays exact even if there are
-        // concurrent insertions.
+        // concurrent insertions. Removed entries are kept alive and dropped asynchronously, so
+        // that freeing their memory happens off the execution's critical path and outside of the
+        // shard locks.
+        let mut removed = Vec::with_capacity(self.struct_layouts.len());
         self.struct_layouts.retain(|_, entry| {
             self.layout_cache_size_estimate_in_bytes
                 .fetch_sub(entry.size_estimate_in_bytes(), Ordering::Relaxed);
+            removed.push(entry.clone());
             false
         });
         self.struct_layouts.shrink_to_fit();
+        self.layout_cache_flush_in_progress
+            .store(false, Ordering::Release);
+
+        DEFAULT_DROPPER.schedule_drop(removed);
+        true
     }
 
     /// Returns layout entry if it exists in global cache.
@@ -227,8 +251,11 @@ where
         let current_size_estimate_in_bytes = self.layout_cache_size_estimate_in_bytes();
         if current_size_estimate_in_bytes.saturating_add(size_estimate_in_bytes)
             > self.max_layout_cache_size_in_bytes
+            && !self.flush_layout_cache()
         {
-            self.flush_layout_cache();
+            // Another thread is flushing the cache: do not cache this layout, so that the cache
+            // does not grow while the flush is in progress.
+            return Ok(());
         }
 
         if let dashmap::Entry::Vacant(e) = self.struct_layouts.entry(*key) {
@@ -329,6 +356,7 @@ where
                 self.layout_cache_size_estimate_in_bytes(),
             ),
             max_layout_cache_size_in_bytes: self.max_layout_cache_size_in_bytes,
+            layout_cache_flush_in_progress: AtomicBool::new(false),
         }
     }
 }
@@ -520,6 +548,41 @@ mod test {
         assert!(cache
             .get_struct_layout_entry(&layout_cache_key(0))
             .is_none());
+    }
+
+    #[test]
+    fn test_layout_cache_flush_in_progress_skips_flush_and_insert() {
+        let mut cache = mock_cache();
+        cache.set_max_layout_cache_size_in_bytes(100);
+        store_layout(&cache, 0, 60);
+
+        // Simulate a flush in progress on another thread.
+        cache
+            .layout_cache_flush_in_progress
+            .store(true, Ordering::Relaxed);
+        assert!(!cache.flush_layout_cache());
+        assert_eq!(cache.num_cached_layouts(), 1);
+
+        // Does not fit and cannot flush, so the new layout is not cached.
+        store_layout(&cache, 1, 60);
+        assert_eq!(cache.num_cached_layouts(), 1);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 60);
+        assert!(cache
+            .get_struct_layout_entry(&layout_cache_key(1))
+            .is_none());
+
+        // Fits, so it is cached without flushing.
+        store_layout(&cache, 2, 40);
+        assert_eq!(cache.num_cached_layouts(), 2);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 100);
+
+        // Once the other flush is done, flushing works again.
+        cache
+            .layout_cache_flush_in_progress
+            .store(false, Ordering::Relaxed);
+        assert!(cache.flush_layout_cache());
+        assert_eq!(cache.num_cached_layouts(), 0);
+        assert_eq!(cache.layout_cache_size_estimate_in_bytes(), 0);
     }
 
     #[test]
