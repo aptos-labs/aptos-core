@@ -30,6 +30,9 @@ inductive SemTy where
   /-- A rigid type parameter: a generic body is typed once, under its
   parameters, for every instantiation. -/
   | param (index : Nat)
+  /-- A ghost field's slot in a nominal value (`designs/ghost-fields.md`):
+  a value of the field's type, which no equality reads. -/
+  | ghost (slot : SemTy)
 /-- A generic argument as values see it: a type, a constant, or an argument
 that does not shape a value. -/
 inductive SemArg where
@@ -52,6 +55,7 @@ private def SemTy.describe : SemTy → String
   | .reference .mutable referent => s!"&mut {referent.describe}"
   | .profile value => s!"profile {value.tag}"
   | .param index => s!"#{index}"
+  | .ghost slot => s!"ghost {slot.describe}"
 private def SemTy.describeList : List SemTy → String
   | [] => ""
   | [type] => type.describe
@@ -74,6 +78,7 @@ mutual
 def SemTy.beq : SemTy → SemTy → Bool
   | .unit, .unit | .never, .never | .bool, .bool | .character, .character | .string, .string
   | .bytes, .bytes | .address, .address | .signer, .signer => true
+  | .ghost x, .ghost y => SemTy.beq x y
   | .integer w s, .integer w' s' => decide (w = w') && s == s'
   | .tuple xs, .tuple ys => SemTy.beqList xs ys
   | .vector x l, .vector y l' => SemTy.beq x y && decide (l = l')
@@ -119,6 +124,9 @@ theorem SemTy.beq_iff : ∀ a b : SemTy, SemTy.beq a b = true ↔ a = b
       cases b <;> simp only [SemTy.beq, Bool.false_eq_true, reduceCtorEq, SemTy.reference.injEq,
         Bool.and_eq_true, decide_eq_true_eq]
       rw [SemTy.beq_iff]
+  | .ghost x, b => by
+      cases b <;> simp only [SemTy.beq, Bool.false_eq_true, reduceCtorEq, SemTy.ghost.injEq]
+      exact SemTy.beq_iff _ _
   | .unit, b | .never, b | .bool, b | .character, b | .string, b | .bytes, b | .address, b
   | .signer, b | .integer _ _, b | .profile _, b | .param _, b => by
       cases b <;> simp [SemTy.beq]
@@ -155,6 +163,7 @@ def SemTy.subst (arguments : Array SemArg) : SemTy → SemTy
   | .function parameters result =>
       .function (SemTy.substList arguments parameters) (result.subst arguments)
   | .reference kind referent => .reference kind (referent.subst arguments)
+  | .ghost slot => .ghost (slot.subst arguments)
   | .param index => match arguments[index]? with
       | some (.type type) => type
       | _ => .param index

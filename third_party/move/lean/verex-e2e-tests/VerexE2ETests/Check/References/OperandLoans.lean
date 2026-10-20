@@ -26,7 +26,7 @@ verex module 0x42::operand_loans where
     pragma aborts_if_is_partial
     ensures result == s.v + s.v
 
-  fun write_then_move(s : S) -> u64 := do
+  fun write_then_move(mut s : S) -> u64 := do
     let r := &mut s.v
     *r := 5
     let (a, b) := (*r, s)
@@ -34,7 +34,7 @@ verex module 0x42::operand_loans where
   spec write_then_move where
     ensures result == 10
 
-  fun write_then_move_incorrect(s : S) -> u64 := do
+  fun write_then_move_incorrect(mut s : S) -> u64 := do
     let r := &mut s.v
     *r := 5
     let (a, b) := (*r, s)

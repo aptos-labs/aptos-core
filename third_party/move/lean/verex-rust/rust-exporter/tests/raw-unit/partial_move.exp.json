@@ -304,6 +304,7 @@
             }
           ],
           "generics": [],
+          "ghosts": [],
           "loc": {
             "index": 5
           },
@@ -366,6 +367,7 @@
             }
           ],
           "generics": [],
+          "ghosts": [],
           "loc": {
             "index": 7
           },
@@ -637,6 +639,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 5
+    "minor": 6
   }
 }

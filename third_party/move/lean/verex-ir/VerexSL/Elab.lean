@@ -212,7 +212,7 @@ private def isModifierSyntax (stx : Syntax) : Bool :=
 private def isClauseSyntax (stx : Syntax) : Bool :=
   [``verexLetPreClause, ``verexLetPostClause,
     ``verexRequiresClause, ``verexEnsuresClause,
-    ``verexAbortsIfClause, ``verexAbortsWithClause, ``verexInvariantClause,
+    ``verexAbortsIfClause, ``verexAbortsWithClause, ``verexInvariantClause, ``verexGhostClause,
     ``verexModifiesClause, ``verexLooseModifiesClause, ``verexModifiesAllClause,
     ``verexModifiesOfClause, ``verexModifiesOfAllClause,
     ``verexReadsClause, ``verexReadsAllClause].contains stx.getKind
@@ -898,9 +898,16 @@ private partial def specStatementsOf (stx : Syntax) :
     child.isOfKind ``verexAssumeStatement ||
     child.isOfKind ``verexLoopInvariantStatement ||
     child.isOfKind ``verexApplyStatement ||
-    child.isOfKind ``verexSplitStatement) stx
+    child.isOfKind ``verexSplitStatement ||
+    child.isOfKind ``verexUpdateStatement) stx
     |>.qsort fun left right => (spanOf left).startByte < (spanOf right).startByte
   statements.mapM fun statement => do
+    if statement.isOfKind ``verexUpdateStatement then
+      let #[assignment] := exprChildren statement
+        | throw "an `update` assigns a ghost field a value"
+      let assignment@(.assignExpression ..) ← expressionOf assignment
+        | throw "an `update` assigns a ghost field a value"
+      return (SpecificationConditionKind.update, assignment)
     let some condition := (exprChildren statement)[0]?
       | throw "an in-body specification member must contain an expression"
     let kind ← if statement.isOfKind ``verexSpecLetStatement then
@@ -1747,6 +1754,11 @@ private def clauseOf (stx : Syntax) : Except String ContractClause := do
     let targets ← (exprChildren stx).mapM expressionOf
     if targets.isEmpty then throw "a `modifies_of` clause names a target"
     return .modifiesOf parameter formals targets span
+  if stx.isOfKind ``verexGhostClause then
+    let some name := stx.getArgs.find? (·.isIdent) | throw "a ghost field must have a name"
+    let some type := (typeChildren stx)[0]? | throw s!"ghost field `{name.getId}` requires a type"
+    return .ghost name.getId.getString! (← typeOf type)
+      (← (exprChildren stx)[0]?.mapM expressionOf) span
   if stx.isOfKind ``verexReadsAllClause then return .readsAll span
   if stx.isOfKind ``verexReadsClause then
     let some type := (typeChildren stx)[0]? | throw "a reads clause requires a type"

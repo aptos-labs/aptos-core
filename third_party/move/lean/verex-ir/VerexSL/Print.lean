@@ -175,7 +175,8 @@ private def operationReferencedNames (operation : Operation) : Array NameId :=
     | .call (.function reference) | .call (.constructor reference _) |
         .call (.destructor reference _) | .call (.closure reference _) => #[reference]
     | .call (.extension _ targets) | .profile _ targets => targets
-    | .data (.select reference _) | .data (.selectVariants reference _) |
+    | .data (.select reference _) | .data (.selectGhost reference _) |
+        .data (.selectVariants reference _) |
         .data (.testVariants reference _) | .data (.discriminant reference) |
         .data (.updateField reference _) => #[reference]
     | .specification (.functionCall reference _) | .specification (.lemma reference _) =>
@@ -373,7 +374,7 @@ private def referencedNames (unit : ValidatedUnit)
           match place with
           | .localVar .. => pure ()
           | .deref base | .subslice base .. => places := places.push base
-          | .field base .. | .downcast base _ => places := places.push base
+          | .field base .. | .ghostField base .. | .downcast base _ => places := places.push base
           | .index base index =>
               places := places.push base
               expressions := expressions.push index
@@ -825,7 +826,7 @@ private partial def placeLocal? (ns : ValidatedNamespace) (id : PlaceId) (fuel :
   if fuel == 0 then none else
   match ns.places[id.index]? with
   | some (.localVar localId) => some localId
-  | some (.deref base) | some (.field base ..) | some (.index base _) |
+  | some (.deref base) | some (.field base ..) | some (.ghostField base ..) | some (.index base _) |
     some (.subslice base ..) | some (.downcast base _) => placeLocal? ns base (fuel - 1)
   | none => none
 
@@ -1254,10 +1255,22 @@ Constants and temporaries consumed only as values remain safe to unfold. -/
 private def requiresTemporaryStorage (context : Context) (localId : LocalId) : Bool :=
   context.ns.places.any fun place =>
     let base? := match place with
-      | .deref base | .field base .. | .index base _ | .subslice base .. |
+      | .deref base | .field base .. | .ghostField base .. | .index base _ | .subslice base .. |
           .downcast base _ => some base
       | .localVar _ => none
     base?.any fun base => context.ns.places[base.index]? == some (.localVar localId)
+
+/-- The reborrow `&mut *local` of a local that holds a mutable reference:
+how validation spells a mutable reference copied into a call, which the
+source spells as the bare local. -/
+private def reborrowedLocal? (context : Context) (id : ExprId) : Option LocalId := do
+  let node ← context.ns.expressions[id.index]?
+  let .operation (.borrow .mutable place) _ _ _ := node.kind | none
+  let .deref base ← context.ns.places[place.index]? | none
+  let .localVar localId ← context.ns.places[base.index]? | none
+  let declaration ← context.locals[localId.index]?
+  let .reference reference ← context.unit.tables.types[declaration.type.typeId.index]? | none
+  if reference.kind == .mutable then some localId else none
 
 private def temporaryConstant? (context : Context) (pattern : PatternId)
     (value : ExprId) : Except String (Option (LocalId × String)) := do
@@ -1284,7 +1297,8 @@ private def temporaryConstant? (context : Context) (pattern : PatternId)
               let .localVar source ← context.ns.places[place.index]? | none
               some source
         | _ => none
-      let some source := sourceLocal? | return none
+      -- A copied mutable reference is the reborrow of its local.
+      let some source := sourceLocal? <|> reborrowedLocal? context value | return none
       let some sourceDecl := context.locals[source.index]? | return none
       if sourceDecl.mutable then return none
       -- A `$t` temporary exists only to sequence a value before the index
@@ -1423,6 +1437,7 @@ private partial def observesCheckedElement (context : Context) (collection index
       placeUnderCheck context collection index place
   | some (.operation (.reference .dereference) _ #[inner] _)
   | some (.operation (.data (.select _ _)) _ #[inner] _)
+  | some (.operation (.data (.selectGhost _ _)) _ #[inner] _)
   | some (.operation (.data (.selectVariants _ _)) _ #[inner] _) =>
       observesCheckedElement context collection index inner
   | some (.operation (.primitive .index) _ #[inner, i] _) =>
@@ -1546,6 +1561,7 @@ private partial def collectionIndexesElided (context : Context) (fuel : Nat)
     -- `items[i].values`, holds the check on `items` at `i`.
     | .operation (.reference .dereference) _ #[inner] _
     | .operation (.data (.select _ _)) _ #[inner] _
+    | .operation (.data (.selectGhost _ _)) _ #[inner] _
     | .operation (.data (.selectVariants _ _)) _ #[inner] _ =>
         collectionIndexesElided context fuel inner
     | .operation (.primitive .index) _ #[inner, i] _ =>
@@ -1721,7 +1737,7 @@ private partial def placeText (context : Context)
         | some (.localVar _) => baseText
         | _ => s!"({baseText})"
       pure s!"*{baseText}"
-  | .field base owner field =>
+  | .field base owner field | .ghostField base owner field =>
       -- Move names the variant a field several variants give different
       -- types is reached through.
       if let (some .move, some (.downcast inner variant)) :=
@@ -1791,6 +1807,7 @@ private partial def selectsFieldThroughReference (context : Context) (id : ExprI
   match context.ns.expressions[id.index]? with
   | some { kind := .localVar localId, .. } => context.fieldAliasLocals.contains localId
   | some { kind := .operation (.data (.select ..)) _ _ _, .. }
+  | some { kind := .operation (.data (.selectGhost ..)) _ _ _, .. }
   | some { kind := .operation (.data (.selectVariants ..)) _ _ _, .. } => true
   | some { kind := .operation (.reference (.freeze _)) _ #[operand] _, .. } =>
       selectsFieldThroughReference context operand
@@ -1802,21 +1819,28 @@ private def implicitDerefReceiverText (value : String) : String :=
   else if value.startsWith "*" then value.drop 1 |>.toString
   else value
 
+/-- Whether a place selects fields through a local mutable reference: the
+place a Move field expression through such a reference reads (`self.value`). -/
+private partial def fieldThroughMutableReference (context : Context) (place : PlaceId)
+    (fuel : Nat := context.ns.places.size + 1) : Bool :=
+  let mutableLocal (localId : LocalId) : Bool :=
+    (context.locals[localId.index]?).any fun declaration =>
+      context.ns.tables.types[declaration.type.typeId.index]? matches
+        some (.reference { kind := .mutable, .. })
+  match fuel, context.ns.places[place.index]? with
+  | fuel + 1, some (.field base _ _) =>
+      match context.ns.places[base.index]? with
+      | some (.deref inner) =>
+          (context.ns.places[inner.index]?).any fun
+            | .localVar localId => mutableLocal localId
+            | _ => false
+      | some (.field ..) => fieldThroughMutableReference context base fuel
+      | _ => false
+  | _, _ => false
+
 private def localPlace? (ns : ValidatedNamespace) (id : PlaceId) : Option LocalId := do
   let .localVar localId ← ns.places[id.index]? | none
   pure localId
-
-/-- The reborrow `&mut *local` of a local that holds a mutable reference:
-how validation spells a mutable reference copied into a call, which the
-source spells as the bare local. -/
-private def reborrowedLocal? (context : Context) (id : ExprId) : Option LocalId := do
-  let node ← context.ns.expressions[id.index]?
-  let .operation (.borrow .mutable place) _ _ _ := node.kind | none
-  let .deref base ← context.ns.places[place.index]? | none
-  let .localVar localId ← context.ns.places[base.index]? | none
-  let declaration ← context.locals[localId.index]?
-  let .reference reference ← context.unit.tables.types[declaration.type.typeId.index]? | none
-  if reference.kind == .mutable then some localId else none
 
 /-- Recover the declaration-local read by the two equivalent local-access
 forms admitted by VIR. Compiler-v2 commonly uses a place load where authored
@@ -2678,7 +2702,8 @@ private def holderUnused (context : Context) (holder : LocalId) :
           match place with
           | .localVar localId => localId != holder && next rest
           | .index base index => next (.inr base :: .inl index :: rest)
-          | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
+          | .deref base | .field base .. | .ghostField base .. | .subslice base .. |
+              .downcast base _ =>
               next (.inr base :: rest)
   termination_by pending _ _ fuel => (fuel, pending.length)
   decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
@@ -2761,13 +2786,15 @@ private partial def expressionText (context : Context) (id : ExprId)
   if fuel == 0 then throw "cyclic expression reached the VerexSL source backend"
   let some expression := context.ns.expressions[id.index]?
     | throw s!"VerexSL source references missing expression {id.index}"
-  -- A call argument: a mutable reference copied into the call is the
-  -- reborrow of the local that holds it, which the source spells as the
-  -- bare local; anything else prints as the expression it is.
-  let callArgumentText (argument : ExprId) (fuel : Nat) : Except String String :=
-    match reborrowedLocal? context argument with
-    | some localId => localValueText context localId
-    | none => expressionText context argument fuel
+  -- A value copied into a call, a binding, or an assignment: a mutable
+  -- reference copied by name is the reborrow of the local that holds it,
+  -- which the source spells as the bare local; anything else prints as the
+  -- expression it is.
+  let copiedValueText (active : Context) (value : ExprId) (fuel : Nat) : Except String String :=
+    match reborrowedLocal? active value with
+    | some localId => localValueText active localId
+    | none => expressionText active value fuel
+  let callArgumentText := copiedValueText context
   if let some iterator := context.forIterator then
     if incrementedContinue? context.ns iterator id then return "continue"
   if let some range := forRangeShape? context id then
@@ -2842,6 +2869,7 @@ private partial def expressionText (context : Context) (id : ExprId)
             throw "place loads cannot print explicit generic arguments"
           if let some localId := localPlace? context.ns place then
             return ← localValueText context localId
+          let readPlace := place
           let place ← placeText context
             (fun index => expressionText context index (fuel - 1)) place
           -- Re-imported Rust indexing and tuple projection uses the neutral
@@ -2851,6 +2879,9 @@ private partial def expressionText (context : Context) (id : ExprId)
           -- `core.read(value[index])`.
           if context.ns.profile == some .rust &&
               rustImplicitCopyType context expression.typeId then
+            return cancelBorrowedPlaceText place
+          -- A Move field expression through a mutable reference reads its place.
+          if context.ns.profile == some .move && fieldThroughMutableReference context readPlace then
             return cancelBorrowedPlaceText place
           pure s!"core.read({cancelBorrowedPlaceText place})"
       | .drop place =>
@@ -3203,7 +3234,7 @@ private partial def expressionText (context : Context) (id : ExprId)
             pure <| if value == fieldName then fieldName
               else s!"{fieldName} := {value}"
           pure <| "new " ++ constructor ++ " { " ++ commaSep entries ++ " }"
-      | .data (.select reference field) =>
+      | .data (.select reference field) | .data (.selectGhost reference field) =>
           if arguments.isEmpty then
             unless context.nominalOwner == some reference.name do
               throw "an implicit field selection occurs outside its nominal contract"
@@ -3787,10 +3818,10 @@ private partial def expressionText (context : Context) (id : ExprId)
           body (fuel - 1) tailPosition statementPosition
       if let some assigned := hiddenReferenceMutation? context pattern body then
         return referenceMutationText context value
-          (← expressionText context value (fuel - 1))
+          (← copiedValueText context value (fuel - 1))
           (← expressionText context assigned (fuel - 1))
       if let some holder := hiddenPlaceMutation? context pattern body then
-        let referenceText ← expressionText context value (fuel - 1)
+        let referenceText ← copiedValueText context value (fuel - 1)
         return ← expressionText
           { context with constantLocals := context.constantLocals.push (holder, referenceText) }
           body (fuel - 1) tailPosition statementPosition
@@ -3823,7 +3854,7 @@ private partial def expressionText (context : Context) (id : ExprId)
         let mutableIds := (localIds.zip localMutabilities).filterMap fun entry =>
           if entry.2 then some entry.1 else none
         let active := if uniform then active else { active with mutableBindings := mutableIds }
-        let valueText ← expressionText active value (fuel - 1)
+        let valueText ← copiedValueText active value (fuel - 1)
         -- A declaration whose value ends with an indented block needs no
         -- separator: a semicolon there would attach to that block's own last
         -- entry rather than to the declaration around it.
@@ -3859,7 +3890,7 @@ private partial def expressionText (context : Context) (id : ExprId)
             else if (hiddenReferenceMutation? active pattern body).isSome then
               pure (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
             else if let some holder := hiddenPlaceMutation? active pattern body then
-              let referenceText ← expressionText active value (fuel - 1)
+              let referenceText ← copiedValueText active value (fuel - 1)
               collectTail { active with
                 constantLocals := active.constantLocals.push (holder, referenceText) }
                 body (fuel - 1)
@@ -4092,9 +4123,9 @@ private partial def expressionText (context : Context) (id : ExprId)
           !placeIndexesElided context (context.ns.places.size + 1) place then
         return s!"core.assignPlace({← placeText context
           (fun index => expressionText context index (fuel - 1)) place}, \
-          {← expressionText context value (fuel - 1)})"
+          {← copiedValueText context value (fuel - 1)})"
       pure s!"{← placeText context (fun index => expressionText context index (fuel - 1)) place} := \
-        {← expressionText context value (fuel - 1)}"
+        {← copiedValueText context value (fuel - 1)}"
   | .assignPattern pattern value => do
       let some patternNode := context.ns.patterns[pattern.index]?
         | throw s!"pattern assignment references missing pattern {pattern.index}"
@@ -4157,6 +4188,24 @@ private partial def expressionText (context : Context) (id : ExprId)
         specification := true
         logicalLocals := context.locals.map (fun declaration => declaration.id) }
       let conditions ← block.conditions.mapM fun condition => do
+        -- An update assigns the ghost field its target names.
+        if condition.kind == .update && condition.properties.isEmpty then
+          match condition.auxiliary with
+          | #[("updateTarget", target)] =>
+              -- The target is the place its read names.
+              let targetText ← match context.ns.expressions[target.index]? with
+                | some { kind := .operation (.read place) #[] #[] _, .. } =>
+                    cancelBorrowedPlaceText <$> placeText specContext
+                      (fun index => expressionText specContext index (fuel - 1)) place
+                | _ => expressionText specContext target (fuel - 1)
+              -- The value's injection into the field's type is implicit.
+              let value := match context.ns.expressions[condition.expression.index]? with
+                | some { kind := .operation (.specification .intToBitVector) _ #[inner] _, .. } =>
+                    inner
+                | _ => condition.expression
+              return s!"update {targetText} := \
+                {← expressionText specContext value (fuel - 1)};"
+          | _ => pure ()
         unless condition.properties.isEmpty && condition.auxiliary.isEmpty do
           throw s!"in-body specification condition `{repr condition.kind}` with \
             {condition.properties.size} properties and {condition.auxiliary.size} auxiliary \
@@ -4322,13 +4371,21 @@ private def nominalContractText? (unit : ValidatedUnit) (ns : PrintNamespace)
   unless contract.conditions.all (·.kind == .structInvariant) do
     throw "non-invariant nominal conditions are outside the current VerexSL printer"
   if contract.conditions.isEmpty && contract.pragmas.isEmpty &&
-      contract.parameterFrames.isEmpty then return none
+      contract.parameterFrames.isEmpty && declaration.ghosts.isEmpty then return none
   let context : Context := {
     unit, ns, locals := declaration.locals
     localNames := declarationLocalNames ns declaration.locals 0 none
     binders := declaration.generics
     nominalOwner := some declaration.name, specification := true }
-  let entries ← conditionTexts context contract.conditions
+  -- The ghost fields, each with the value a pack gives it.
+  let ghosts ← declaration.ghosts.mapM fun ghost => do
+    let type ← typeText unit ns declaration.generics ghost.type.typeId
+    let declared := s!"ghost {← nameAt unit ghost.name} : {type}"
+    match ghost.initializer with
+    | none => pure s!"{declared};"
+    | some initializer =>
+        pure s!"{declared} := {← expressionText context initializer (ns.expressions.size + 1)};"
+  let entries := ghosts ++ (← conditionTexts context contract.conditions)
   let entries := entries ++ (← frameTexts context contract)
   let pragmas ← contract.pragmas.mapM pragmaText
   let entries := entries ++ pragmas.map fun pragma => s!"pragma {pragma};"

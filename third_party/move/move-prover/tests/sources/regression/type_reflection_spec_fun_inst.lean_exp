@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/type_reflection_spec_fun_inst.move:46:29: error: the specification clause `ensures info::<Vector<T> >() != info::<Vector<u64> >()` is not established
-tests/sources/regression/type_reflection_spec_fun_inst.move:46:5: error: verex verification failed: the automatic verification of `differs_from_u64` failed; provide a proof: `verify differs_from_u64 by …` in the module (`verify differs_from_u64 by verex_obligations` lists its obligations)
+tests/sources/regression/type_reflection_spec_fun_inst.move:46:5: error: verex verification failed: the automatic verification of `differs_from_u64` failed; provide a proof in the module:
+  verify differs_from_u64 by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -552,6 +552,11 @@ private partial def placeType? (context : Context) (id : PlaceId)
       let .nominal name _ ← context.unit.tables.types[baseType.index]? | none
       let declaration ← context.ns.structs.find? (·.name == name)
       (declaration.fields.find? (·.name == field)).map (·.type.typeId)
+  | fuel + 1, some (.ghostField base _ field) => do
+      let baseType ← placeType? context base fuel
+      let .nominal name _ ← context.unit.tables.types[baseType.index]? | none
+      let declaration ← context.ns.structs.find? (·.name == name)
+      (declaration.ghosts.find? (·.name == field)).map (·.type.typeId)
 
 private def directLocalPlace? (ns : ValidatedNamespace) (id : PlaceId) : Option LocalId := do
   let .localVar localId ← ns.places[id.index]? | none
@@ -674,7 +679,8 @@ mutual
     | some place =>
         let value := match place with
           | .localVar _ => value
-          | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
+          | .deref base | .field base .. | .ghostField base .. | .subslice base ..
+          | .downcast base _ =>
               markPlaceTree context base sourceLoc value (fuel - 1)
           | .index base index =>
               markExpressionTree context index
@@ -750,6 +756,8 @@ mutual
     | .deref base => pure s!"(*{← placeText context loops base sourceLoc (fuel - 1)})"
     | .field base _ field =>
         pure s!"({← placeText context loops base sourceLoc (fuel - 1)}).{← fieldSelector context.unit.tables field}"
+    -- The Rust profile declares no ghost fields (`designs/ghost-fields.md`).
+    | .ghostField .. => throw "a ghost field place has no Rust source"
     | .index base index =>
         let baseText ← placeText context loops base sourceLoc (fuel - 1)
         let indexText ← exprText context loops index (fuel - 1)

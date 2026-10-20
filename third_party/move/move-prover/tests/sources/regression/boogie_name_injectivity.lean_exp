@@ -1,5 +1,17 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/boogie_name_injectivity.move:72:9: error: the specification clause `ensures result == true` is not established
-tests/sources/regression/boogie_name_injectivity.move:71:5: error: verex verification failed: the automatic verification of `confuse` failed; provide a proof: `verify confuse by …` in the module (`verify confuse by verex_obligations` lists its obligations)
+tests/sources/regression/boogie_name_injectivity.move:71:5: error: verex verification failed: the automatic verification of `confuse` failed; provide a proof in the module:
+  verify confuse by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/boogie_name_injectivity.move:82:9: error: the specification clause `ensures result == true` is not established
-tests/sources/regression/boogie_name_injectivity.move:81:5: error: verex verification failed: the automatic verification of `no_collision_control` failed; provide a proof: `verify no_collision_control by …` in the module (`verify no_collision_control by verex_obligations` lists its obligations)
+tests/sources/regression/boogie_name_injectivity.move:81:5: error: verex verification failed: the automatic verification of `no_collision_control` failed; provide a proof in the module:
+  verify no_collision_control by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -171,8 +171,19 @@ Each function's verification gets the default budget, as on the command
 line; a function that verifies but needs more raises its own
 with `pragma heartbeats`, and a function the automation does not prove, where
 the Prover reads a Move `proof` block or proves nonlinear arithmetic, is
-proved in `foo.proof.lean`. The tests are skipped where the verifier is not
-built.
+proved in `foo.proof.lean`.
+
+The run builds the verifier (`lake build verex-move`) and takes a private
+copy of its executable and import closure under `target/tmp`. The build and
+copy must observe unchanged source and artifact inventories and Lake environments; a concurrent
+modification discards the copy and retries. Later `lake` builds cannot change
+what a running test loads. Listing tests or selecting no tests skips this
+preparation; multiple `MVP_TEST_FILTERS` share one snapshot. A `VEREX_MOVE_EXE` the caller sets is run as is, and the tests
+are skipped where the verifier's package is not found. A failure of the
+harness, including a crash after printing diagnostics, fails its test and is
+never written as a baseline. Exit code 1 is a verification result only with
+the CLI's explicit completion marker; other failure exits are harness failures.
+A missing toolchain or failed build fails an explicitly requested Lean gate.
 [`prover-test-problems.md`](prover-test-problems.md) registers the problems
 the run shows.
 
@@ -273,12 +284,72 @@ A specification is established in one of three ways, tried in this order:
    `verex_solve` do first. A leaf is one path and one clause, whose own
    conditionals, such as a specification function's cases, stay in it
    (`verex_split` splits them). `verex_prepare` states a leaf in source
-   form; `verex_decide` tries the bounded deciders on every path and fails
+   form, its context named from the source: a parameter or local by its Move
+   name (`m`, `count`, `it`), a parameter's entry value `old_m` where a
+   later value shadows it, a map a callee writes back `m'`, a variant's
+   payload `it_Position`, a callee's result `iter_next_result`; a clause
+   assumed is named by the clause (`invariant_3`, `requires_1`, a callee's
+   `iter_next_ensures_1`), a bound against a literal `count_upper`,
+   `m_size_upper`, a map's validity `m_valid`, and an equation defining a
+   value `m'_eq`; its maps are values named after their Move locals (`m`,
+   `m'`), their keys reading back as themselves (`m_keys`), so a leaf reads
+   `(valueAt m' (keyAt m' i)).asInt = 7`. The map laws are stated under the
+   module's own specification function names, `spec_get_set`,
+   `spec_len_remove`, `spec_contains_key_key_at`, `spec_key_at_eq_iff`, …,
+   one theorem per intrinsic map owner and law, each the `VerexIR.Maps` law
+   it names. `verex_prepare only` performs source naming, normalization and
+   type bounds without speculative map facts or variant enumeration. Use
+   `verex_cases it, iter_next_result` to split selected outer variants and
+   their product payloads while retaining variant-valued fields. Preparation
+   recognizes general abstract-map layouts, including handle and validity
+   fields before the entries; it does not select framework modules by name.
+   A named map retains its size bounds, scalar key round trips, and typed
+   key witnesses (`m_keys_encoded`). `Maps.encoded_keyAt` recovers a source
+   key and its range certificate at an in-bounds position, for instantiating
+   a callee's quantified contract.
+   `verex_prepare typed` instead presents maps as `SpecMap K V`, using
+   mathematical integers for integer keys and values, and native carriers
+   for aggregate values. Its laws live in `SpecMap`; a value lookup reads
+   `SpecMap.valueAt m (SpecMap.keyAt m i)` without runtime decoding. For a
+   narrow argument, use `verex_prepare values`, specialize the needed callee
+   facts, then `verex_lift_maps only [fact₁, fact₂]`. This lifts only those
+   facts and the goal, retaining the hidden representation proof.
+   `verex_obligations preparing` followed by an indented tactic block runs
+   that block on each completed symbolic path before splitting its proof
+   conjunctions and quantified clauses. Use it for shared value preparation,
+   selected iterator cases, type bounds and map lifting; `verex_on` then
+   routes the remaining clauses as usual. Standard preparation retains source
+   markers inside the block so clause names survive. The block runs once per
+   path and its logical children, with no implicit automatic proof attempt.
+   Program steps are still traversed before preparation; a newly exposed
+   computation can reach another preparation point. Plain
+   `verex_obligations` keeps its existing behavior.
+   `verex_group observations := assert_1, assert_2` joins selected clauses
+   with identical contexts into one conjunction, allowing preparation, case
+   analysis, and intermediate facts to be shared. Each original obligation
+   receives its projection of that conjunction; no obligation is dropped.
+   The supplied name can be selected with `verex_on`. Clauses on different
+   paths must be grouped separately.
+   `verex_group_contexts` groups all remaining obligations whose contexts
+   agree up to local variable names. Use it after clause-specific routing;
+   perform shared preparation and case analysis, then split the resulting
+   conjunctions. It preserves each path's assumptions and instantiates the
+   shared proof with that path's own values. It performs no proof search.
+   A failed automatic verification prints the proof it asks for:
+   `verex_obligations`, then `verex_on` with one alternative per leaf it left
+   undecided and `_ => verex_decide` for the rest. Named alternatives run
+   their authored steps directly, without an automatic attempt first; omitted
+   alternatives try only `verex_decide`. `verex_decide` tries the bounded deciders on every path and fails
    where one stays open; `verex_solve` decides a leaf as the automatic
    verification does, or reports its clause. `verex_on | ensures_1,
    aborts_if_2 => tac | _ => tac'` proves each clause by the first
    alternative naming it, `_` taking the others; an alternative's failure is
-   reported at its goal. The automatic verification is `verex_obligations`
+   reported at its goal, by the failing step where it stands (the
+   alternative runs without recovery, so that `all_goals` over a `first`
+   does not drop the error and abort), and a bullet that leaves its goal
+   open, which admits it without a report when not recovering, is reported
+   as such: inside an alternative, split cases with `rcases … with a | b`
+   and `all_goals` rather than bullets. The automatic verification is `verex_obligations`
    followed by `verex_solve` on every leaf. As Lean's tactics do, each of Verex's acts on the main goal and
    keeps the others; `verex_bounded`, `verex_inheriting`, `verex_settle`,
    `verex_saturate_round` and `verex_canonical_families` act on every
@@ -288,6 +359,17 @@ A specification is established in one of three ways, tried in this order:
    `pragma verify = manual` on the spec block states that the function is
    established this way: it is not attempted automatically, and a missing
    `verify f by …` is an error. The Move Prover reads it as `verify = true`.
+   A leaf of the automatic verification may be given its own budget,
+   `pragma leaf_heartbeats = N` on the spec block or the option
+   `verex.leafHeartbeats`, in thousands of heartbeats, twenty million by
+   default. One cap covers the complete automatic attempt: call observations,
+   cheap deciders, preparation and fallback share it. Past it the leaf is
+   reported for the proof file, however much of the function's budget is left
+   (`designs/proof-strategy.md`, P3). An authored proof starts directly and
+   `verex_obligations` hands every obligation to its script without attempting
+   the automatic leaf solver. The leaf cap applies there only if the script
+   explicitly requests automatic solving with `verex_solve`; the overall
+   function budget still bounds the whole authored proof.
 3. **By raising the budget.** `pragma heartbeats = N` on the spec block,
    for a function the solver proves given more time.
 
@@ -314,6 +396,7 @@ reports at its tactic in the proof file, and the function's summary says
 the proof does not establish its specification.
 
 In the editor, an open file's `verify` items are skipped with a message,
+and its automatic targets without one,
 since every change would run them again, except `verify! f` items, which
 run (`verex.skip_verify`: unset, it holds in the language server only, which
 the command line tells apart by `internal.cmdlineSnapshots`; the verification

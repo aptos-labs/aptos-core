@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/derived_binder_capture.move:36:9: error: the specification clause `ensures same_as_old_renamed(old(c), c)` is not established
-tests/sources/regression/derived_binder_capture.move:34:5: error: verex verification failed: the automatic verification of `increment_renamed` failed; provide a proof: `verify increment_renamed by …` in `tests/sources/regression/derived_binder_capture.proof.lean` (`verify increment_renamed by verex_obligations` lists its obligations)
+tests/sources/regression/derived_binder_capture.move:34:5: error: verex verification failed: the automatic verification of `increment_renamed` failed; provide a proof in `tests/sources/regression/derived_binder_capture.proof.lean`:
+  verify increment_renamed by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

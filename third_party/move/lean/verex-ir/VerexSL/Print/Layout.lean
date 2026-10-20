@@ -996,6 +996,12 @@ mutual
   private partial def specificationMemberDocs
       (conditions : Array (SpecificationConditionKind × Expr)) : Except String (Array Doc) :=
     conditions.mapM fun (kind, expression) => do
+      -- An update assigns a ghost field.
+      if kind matches .update then
+        let .assignExpression target value _ := expression
+          | throw "an `update` assigns a ghost field a value"
+        return text "update " ++ (← expressionDoc target) ++ text " := " ++
+          (← expressionDoc value)
       let memberPrefix := match kind with
         | .let_ name => s!"let {identifier name} := "
         | .assertion => "assert "
@@ -1003,6 +1009,7 @@ mutual
         | .loopInvariant => "invariant "
         | .apply => "apply "
         | .split => "split "
+        | .update => "update "
       pure <| text memberPrefix ++ (← expressionDoc expression)
 
   private partial def negate : Expr → Expr
@@ -1127,6 +1134,11 @@ private def clauseDoc : ContractClause → Except String Doc
       pure <| text s!"modifies_of<{frameIdentifier parameter}>" ++
         delimited "(" ")" (formals.map parameterDoc) ++ text " " ++ commaSep targets
   | .modifiesOfAll parameter _ => pure <| text s!"modifies_of<{frameIdentifier parameter}> *"
+  | .ghost name type initializer _ => do
+      let declared := text s!"ghost {identifier name} : {typeText type.value}"
+      match initializer with
+      | none => pure declared
+      | some initializer => pure <| declared ++ text " := " ++ (← expressionDoc initializer)
 where
   propertyDoc (property : Pragma) : Except String Doc := do
     let name := text (identifier property.name)

@@ -146,7 +146,7 @@ verex module aptos_std::smart_table where
   Aborts if it's not empty.
   -/
   @[map_destroy_empty (SmartTable)]
-  public fun destroy_empty {K} {V}(self : SmartTable<K, V>) -> Unit := do
+  public fun destroy_empty {K} {V}(mut self : SmartTable<K, V>) -> Unit := do
     assert!(self.size == 0, invalid_argument(ENOT_EMPTY))
     for i in 0..self.num_buckets do
       core.prim.destroyEmptyVector(

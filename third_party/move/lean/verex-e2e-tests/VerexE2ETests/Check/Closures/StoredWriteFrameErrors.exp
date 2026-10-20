@@ -1,8 +1,32 @@
 VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:43:4: error: the specification clause `ensures global<Config>(owner) == old(global<Config>(owner))` is not established
-VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:40:7: error: verex verification failed: the automatic verification of `wrong_frame` failed; provide a proof: `verify wrong_frame by …` in the module (`verify wrong_frame by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:40:7: error: verex verification failed: the automatic verification of `wrong_frame` failed; provide a proof in the module:
+  verify wrong_frame by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:51:4: error: the specification clause `ensures global<Counter>(owner) == old(global<Counter>(owner))` is not established
-VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:48:7: error: verex verification failed: the automatic verification of `wrong_slot` failed; provide a proof: `verify wrong_slot by …` in the module (`verify wrong_slot by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:48:7: error: verex verification failed: the automatic verification of `wrong_slot` failed; provide a proof in the module:
+  verify wrong_slot by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:12:4: error: the data invariant `action : Fn(Address, u64) -> u64 has Copy, Drop, Store` does not hold where a value is constructed
-VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:26:6: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof: `verify invalid by …` in the module (`verify invalid by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:26:6: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof in the module:
+  verify invalid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:12:4: error: the specification clause `action : Fn(Address, u64) -> u64 has Copy, Drop, Store` is not established
-VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:29:6: error: verex verification failed: the automatic verification of `invalid_replacement` failed; provide a proof: `verify invalid_replacement by …` in the module (`verify invalid_replacement by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Closures/StoredWriteFrameErrors.lean:29:6: error: verex verification failed: the automatic verification of `invalid_replacement` failed; provide a proof in the module:
+  verify invalid_replacement by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -284,7 +284,7 @@ impl UnitMapper {
                 origins,
                 types: self.types.types,
             },
-            version: Version { major: 1, minor: 5 },
+            version: Version { major: 1, minor: 6 },
         })
     }
 }
@@ -523,6 +523,7 @@ fn map_structs(
                 doc: String::new(),
                 fields,
                 generics,
+                ghosts: vec![],
                 loc,
                 locals: vec![],
                 name: adt.name,

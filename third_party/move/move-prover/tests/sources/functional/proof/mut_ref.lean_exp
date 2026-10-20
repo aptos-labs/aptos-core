@@ -6,4 +6,10 @@ warning: proof uses trusted assumption
     │             ^^^^^^^^^^^^^^^^^^^^^^
 
 tests/sources/functional/proof/mut_ref.move:152:14: error: the assertion `c.value == old(c.value)` does not hold
-tests/sources/functional/proof/mut_ref.move:149:5: error: verex verification failed: the automatic verification of `set_to_zero` failed; provide a proof: `verify set_to_zero by …` in `tests/sources/functional/proof/mut_ref.proof.lean` (`verify set_to_zero by verex_obligations` lists its obligations)
+tests/sources/functional/proof/mut_ref.move:149:5: error: verex verification failed: the automatic verification of `set_to_zero` failed; provide a proof in `tests/sources/functional/proof/mut_ref.proof.lean`:
+  verify set_to_zero by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

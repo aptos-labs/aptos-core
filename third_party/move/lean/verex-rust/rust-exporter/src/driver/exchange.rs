@@ -702,6 +702,7 @@ pub(super) struct StructDecl {
     pub doc: String,
     pub fields: Vec<FieldDecl>,
     pub generics: Vec<GenericBinder>,
+    pub ghosts: Vec<UnsupportedNode>,
     pub loc: LocId,
     pub locals: Vec<UnsupportedNode>,
     pub name: NameId,

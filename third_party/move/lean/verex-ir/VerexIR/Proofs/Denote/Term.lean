@@ -114,6 +114,14 @@ def variantName : (names : List String) → (rows : NRows) → variantCarrier na
     variantName (name :: names) (.cons fields rest) (.inr value) = variantName names rest value :=
   rfl
 
+/-- A one-variant enum has its declared tag without inspecting its payload. -/
+@[simp, vir_denote_norm] theorem variantName_singleton (name : String) (fields : NRow)
+    (value : variantCarrier [name] (.cons fields .nil)) :
+    variantName [name] (.cons fields .nil) value = name := by
+  cases value with
+  | inl _ => rfl
+  | inr empty => cases empty
+
 /-- An encoded variant value is a nominal value of its declaration, tagged
 with the variant it holds. -/
 theorem variantEncode_nominal (source : StructHandle) : (names : List String) → (rows : NRows) →
@@ -280,6 +288,8 @@ inductive Proj : NTy → NTy → Type where
   | variant {source : StructHandle} {arguments : NRow} {names : List String} {rows : NRows}
       {distinct : names.Nodup} {σ τ : NTy} (choices : Choices names rows σ) (rest : Proj σ τ) :
       Proj (.enum source arguments names rows distinct) τ
+  /-- A ghost slot's contents (`designs/ghost-fields.md`). -/
+  | ghost {τ σ : NTy} (rest : Proj τ σ) : Proj (.ghost τ) σ
 
 /-- Replace the component of a row at a position. -/
 def Var.update : {Γ : NRow} → {τ : NTy} → Var Γ τ → τ.carrier → HList Γ → HList Γ
@@ -361,6 +371,7 @@ def Proj.get? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → τ.
         value.values[index]?.bind fun element => rest.get? env element
   | _, _, .variant choices rest, value =>
       (choices.select? value).bind fun field => rest.get? env field
+  | _, _, .ghost rest, value => rest.get? env value
 
 /-- The value with the component a path reaches replaced. -/
 def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.carrier → τ.carrier →
@@ -377,6 +388,7 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
   | _, _, .variant choices rest, replacement, value =>
       (choices.select? value).bind fun field =>
         (rest.set? env replacement field).bind fun updated => choices.update? updated value
+  | _, _, .ghost rest, replacement, value => rest.set? env replacement value
 
 @[simp] theorem Proj.get?_nil {Γ : NRow} (env : HEnv Γ) {τ : NTy} (value : τ.carrier) :
     (Proj.nil : Proj τ τ).get? env value = some value := rfl
@@ -397,6 +409,11 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
     (value : (NTy.enum source arguments names rows distinct).carrier) :
     (Proj.variant choices rest).get? env value =
       (choices.select? value).bind fun field => rest.get? env field := rfl
+@[simp] theorem Proj.get?_ghost {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (rest : Proj τ σ)
+    (value : (NTy.ghost τ).carrier) : (Proj.ghost rest).get? env value = rest.get? env value := rfl
+@[simp] theorem Proj.set?_ghost {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (rest : Proj τ σ)
+    (replacement : σ.carrier) (value : (NTy.ghost τ).carrier) :
+    (Proj.ghost rest).set? env replacement value = rest.set? env replacement value := rfl
 @[simp] theorem Proj.set?_nil {Γ : NRow} (env : HEnv Γ) {τ : NTy} (replacement value : τ.carrier) :
     (Proj.nil : Proj τ τ).set? env replacement value = some replacement := rfl
 @[simp] theorem Proj.set?_deref {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (rest : Proj τ σ)
@@ -631,6 +648,12 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       (left right : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ .bool
   /-- Structural equality, or its negation. -/
   | equal {Γ : NRow} {τ : NTy} (negated : Bool) (left right : Term unit ρ Γ τ) : Term unit ρ Γ .bool
+  /-- Equality of the runtime encodings with ghost contents dropped, or its
+  negation: in a unit declaring ghosts, at a type mentioning a type
+  parameter, whose values' own equality ignores their ghosts only once
+  instantiated (`designs/ghost-fields.md`). -/
+  | equalErased {Γ : NRow} {τ : NTy} (negated : Bool) (left right : Term unit ρ Γ τ) :
+      Term unit ρ Γ .bool
   | not {Γ : NRow} (operand : Term unit ρ Γ .bool) : Term unit ρ Γ .bool
   /-- Boolean conjunction (`true`) or disjunction (`false`) of evaluated operands. -/
   | logical {Γ : NRow} (conjunction : Bool) (left right : Term unit ρ Γ .bool) : Term unit ρ Γ .bool
@@ -691,7 +714,6 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       (sharing : closureShared unit handle weave.mask = shared)
       (closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true)
       (faithful : closureFaithful unit handle #[] = true)
-      (plain : captured.tableFree = true)
       (captures : Args unit ρ Γ captured) :
       Term unit ρ Γ (.function supplied shared results)
   /-- A closure with type arguments: the weave of the target's own
@@ -703,7 +725,6 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
       (sharing : closureShared unit handle weave.mask = shared)
       (below : closureSignatureBelow unit handle = true)
-      (plain : captured.tableFree = true)
       (captures : Args unit ρ Γ (NRow.subst θ.1 captured)) :
       Term unit ρ Γ (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
   /-- An invocation of a function value on evaluated arguments, after the
@@ -826,6 +847,22 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   /-- An in-body assumption, at its site: a run continues where the
   condition the meanings read for the site holds (`Meanings.assumption`). -/
   | assume {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
+  /-- Any value of its type: a ghost field fresh at a pack, whose runtime
+  value is one of them (`designs/ghost-fields.md`). -/
+  | arbitrary {Γ : NRow} {τ : NTy} : Term unit ρ Γ τ
+  /-- The value a ghost write takes at its site, an `update`'s: the
+  meanings' for the site (`Meanings.ghost`), or any value of its type. -/
+  | ghostValue {Γ : NRow} {τ : NTy} (site : Nat) : Term unit ρ Γ τ
+  /-- A value with the ghost slot a path reaches set from the value as the
+  meanings give it for the site, an initializer's at a pack
+  (`Meanings.ghostInit`); unchanged where they give none, the slot holding
+  any value already. -/
+  | ghostInit {Γ : NRow} {τ σ : NTy} (site : Nat) (path : Proj τ (.ghost σ))
+      (value : Term unit ρ Γ τ) : Term unit ρ Γ τ
+  /-- A value held in a ghost slot. -/
+  | ghostSlot {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ τ) : Term unit ρ Γ (.ghost τ)
+  /-- A ghost slot's contents. -/
+  | ghostRead {Γ : NRow} {τ : NTy} (slot : Term unit ρ Γ (.ghost τ)) : Term unit ρ Γ τ
   /-- The end of a mutation of a local whose type carries a data invariant,
   at its site: no effect, so that verification can owe the invariant there. -/
   | mutationEnd {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
@@ -855,6 +892,11 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   /-- A write of global memory has ended at its site: no effect, so that
   verification can owe there the invariants of the memory written. -/
   | memoryWritten {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
+  /-- A spec variable's write: the ghost resource at a key replaced, which
+  only the model's memory holds (`designs/ghost-fields.md`). The memory
+  before the write is anchored at `site`. -/
+  | ghostStore {Γ : NRow} {κ τ : NTy} (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ)
+      (value : Term unit ρ Γ τ) : Term unit ρ Γ .unit
 
 /-- An argument row, evaluated left to right.  A reborrowed argument is a
 borrow like any other: the callee receives the reference and resolves its
@@ -915,31 +957,31 @@ mutual
 /-- The runtime value of a native value whose outermost mutable references
 are lent under loans taken in order.  A reference passes its current value,
 or with `prophecies` its prophecy, under its loan; a tuple lends its
-components; any other value is its physical value (`NTy.erase`): the runtime
-keeps a map's contents in native storage, not in the value.  Returns the
-unused loans. -/
+components; any other value is its encoding.  Returns the unused loans. -/
 def NTy.lend : (τ : NTy) → Bool → τ.carrier → List Nat → Option (RuntimeValue × List Nat)
   | .ref σ, prophecies, value, loan :: loans =>
-      some (.borrow loan (σ.erase (if prophecies then value.2 else value.1)), loans)
+      some (.borrow loan (σ.encode (if prophecies then value.2 else value.1)), loans)
   | .ref _, _, _, [] => none
   | .tuple elements, prophecies, values, loans =>
       (NRow.lend elements prophecies values loans).map fun lent => (.tuple lent.1.toArray, lent.2)
-  | .unit, _, value, loans => some (NTy.erase .unit value, loans)
-  | .bool, _, value, loans => some (NTy.erase .bool value, loans)
-  | .int width signed, _, value, loans => some (NTy.erase (.int width signed) value, loans)
-  | .address, _, value, loans => some (NTy.erase .address value, loans)
-  | .signer, _, value, loans => some (NTy.erase .signer value, loans)
-  | .string, _, value, loans => some (NTy.erase .string value, loans)
-  | .bytes, _, value, loans => some (NTy.erase .bytes value, loans)
+  | .unit, _, value, loans => some (NTy.encode .unit value, loans)
+  | .bool, _, value, loans => some (NTy.encode .bool value, loans)
+  | .int width signed, _, value, loans => some (NTy.encode (.int width signed) value, loans)
+  | .num, _, value, loans => some (NTy.encode .num value, loans)
+  | .address, _, value, loans => some (NTy.encode .address value, loans)
+  | .signer, _, value, loans => some (NTy.encode .signer value, loans)
+  | .string, _, value, loans => some (NTy.encode .string value, loans)
+  | .bytes, _, value, loans => some (NTy.encode .bytes value, loans)
   | .struct source arguments fields, _, value, loans =>
-      some (NTy.erase (.struct source arguments fields) value, loans)
+      some (NTy.encode (.struct source arguments fields) value, loans)
   | .enum source arguments names rows distinct, _, value, loans =>
-      some (NTy.erase (.enum source arguments names rows distinct) value, loans)
-  | .vector element, _, value, loans => some (NTy.erase (.vector element) value, loans)
-  | .table key value, _, entries, loans => some (NTy.erase (.table key value) entries, loans)
-  | .param index, _, value, loans => some (NTy.erase (.param index) value, loans)
+      some (NTy.encode (.enum source arguments names rows distinct) value, loans)
+  | .vector element, _, value, loans => some (NTy.encode (.vector element) value, loans)
+  | .table key value, _, entries, loans => some (NTy.encode (.table key value) entries, loans)
+  | .ghost slot, _, value, loans => some (NTy.encode (.ghost slot) value, loans)
+  | .param index, _, value, loans => some (NTy.encode (.param index) value, loans)
   | .function parameters shared results, _, value, loans =>
-      some (NTy.erase (.function parameters shared results) value, loans)
+      some (NTy.encode (.function parameters shared results) value, loans)
 
 /-- The runtime values of a row lent under loans taken in order. -/
 def NRow.lend : (row : NRow) → Bool → HList row → List Nat →
@@ -980,9 +1022,9 @@ def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array Runtime
       (match exportedRaw? loan exports with
         | some exported =>
             VerexIR.SemanticOperations.resolveReturnedBorrows returned exported =
-              σ.erase values.1.2
+              σ.encode values.1.2
         | none => ∃ entry ∈ returned.toList,
-            (loan, σ.erase values.1.2) ∈
+            (loan, σ.encode values.1.2) ∈
               (VerexIR.SemanticOperations.outermostBorrows entry).toList) ∧
       argumentsResolve rest values.2 loans returned exports
   | .cons (.ref _) _, _, [], _, _ => False
@@ -991,6 +1033,8 @@ def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array Runtime
   | .cons .bool rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.int _ _) rest, values, loans, returned, exports =>
+      argumentsResolve rest values.2 loans returned exports
+  | .cons .num rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons .address rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
@@ -1003,6 +1047,8 @@ def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array Runtime
   | .cons (.tuple _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.struct _ _ _) rest, values, loans, returned, exports =>
+      argumentsResolve rest values.2 loans returned exports
+  | .cons (.ghost _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.enum _ _ _ _ _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
@@ -1021,8 +1067,8 @@ identifiers beyond the frontier. -/
 def Admissible (state : VerexIR.RuntimeState) (loans : List Nat) : Prop :=
   loans.Nodup ∧
     (∀ loan ∈ loans, loan < state.nextLoan ∧
-      VerexIR.SemanticOperations.storageLoanTargetIn? state.storageLoans loan = none) ∧
-    VerexIR.SemanticOperations.FreshStorageLoanIds state
+      VerexIR.SemanticOperations.globalLoanKeyIn? state.globalLoans loan = none) ∧
+    VerexIR.SemanticOperations.FreshGlobalLoanIds state
 
 /-- What a call denotes, for every callee handle and signature. -/
 abbrev CalleeMeaning : Type :=
@@ -1044,33 +1090,28 @@ def propheticRun {unit : VerexIR.Validation.ValidatedUnit}
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans arguments results exit returnedLoans prophecyRow,
-      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      ReturnedEncloses unit final exit prophecyRow
-        (HList.tables true σs args ++ shape.tables true result) ∧
-      AgreeUnnamed unit final initial
+      StorageEncodesReturned unit final exit prophecyRow ∧ AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans arguments,
-      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).aborts start error
   undefined := fun initial =>
     ∃ start loans arguments results exit,
-      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       ¬∃ result, ∃ returnedLoans, ∃ resolved : HList σs,
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some arguments ∧
-        TableMemory.TablesIn unit (HList.tables false σs resolved) start.tables ∧
-        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending) ∧
-        TableMemory.TablesIn unit (HList.tables true σs resolved ++ shape.tables true result)
-          (exit.resolveReturned results).tables
+        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending)
 
 /-- The prophetic meaning of a callee at a frame: its run, where the frame
 agrees with the runtime type instantiation on the types the callee reads
@@ -1109,15 +1150,14 @@ def closureOf (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array 
   ⟨handle, mask, typeInstantiation, (HList.encode captures).toArray,
     fun capture member => rowCodec_plain _ captures capture (by simpa [HList.encode] using member)⟩
 
-/-- A frame's values of a row without map contents encode as runtime values
-of the row's resolution, which admit them: their encodings are their physical
-values. -/
-theorem HList.admits_resolved (row : NRow) (plain : row.tableFree = true) (values : HList row) :
+/-- A frame's values of a row encode as runtime values of the row's
+resolution, which admit it. -/
+theorem HList.admits_resolved (row : NRow) (values : HList row) :
     NRow.admits unit row.resolved (HList.encode values) = true := by
-  rw [← HList.encode_toRuntime row values,
-    ← @HList.erase_eq_encode (Carriers.runtime unit) row.resolved (NRow.resolved_tableFree row plain)
-      (HList.toRuntime row values)]
-  exact NRow.admits_erase unit row.resolved (HList.toRuntime row values)
+  have encoded := HList.encode_toRuntime row values
+  simp only [HList.encode] at encoded ⊢
+  rw [← encoded]
+  exact NRow.admits_encode unit row.resolved (HList.toRuntime row values)
 
 /-- A closure of a target without type parameters, at its own rows
 (`closureRows?`), is typed there: its captures are typed by their
@@ -1127,7 +1167,7 @@ theorem closureOf_typed {handle : FunctionHandle} {mask : Nat} {captured supplie
     (rows : closureRows? unit handle mask = some (captured, supplied, results))
     (sharing : closureShared unit handle mask = shared)
     (closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true)
-    (faithful : closureFaithful unit handle #[] = true) (plain : captured.tableFree = true)
+    (faithful : closureFaithful unit handle #[] = true)
     (captures : HList captured) :
     Carriers.closureTyped supplied shared results (closureOf handle mask #[] captures) := by
   simp only [Bool.and_eq_true] at closed
@@ -1142,7 +1182,7 @@ theorem closureOf_typed {handle : FunctionHandle} {mask : Nat} {captured supplie
   simp only [closureRowsIn?, rows, sharing, faithful, Option.map_some,
     NRow.substWith_paramFree _ _ capturedFree, NRow.substWith_paramFree _ _ suppliedFree,
     NRow.substWith_paramFree _ _ resultsFree, beq_self_eq_true, Bool.true_and]
-  have admitted := HList.admits_resolved captured plain captures
+  have admitted := HList.admits_resolved captured captures
   rwa [NRow.resolved_paramFree captured capturedFree] at admitted
 
 omit [Skolems unit] in
@@ -1210,7 +1250,7 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans supplied arguments results exit returnedLoans prophecyRow,
-      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1219,12 +1259,10 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      ReturnedEncloses unit final exit prophecyRow
-        (HList.tables true σs args ++ shape.tables true result) ∧
-      AgreeUnnamed unit final initial
+      StorageEncodesReturned unit final exit prophecyRow ∧ AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans supplied arguments,
-      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1232,7 +1270,7 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
         start error
   undefined := fun initial =>
     ∃ start loans supplied arguments results exit,
-      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1242,10 +1280,7 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some supplied ∧
-        TableMemory.TablesIn unit (HList.tables false σs resolved) start.tables ∧
-        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending) ∧
-        TableMemory.TablesIn unit (HList.tables true σs resolved ++ shape.tables true result)
-          (exit.resolveReturned results).tables
+        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending)
 
 omit [Skolems unit] in
 /-- The type instantiation of a callee's frame, computed from the caller's
@@ -1331,25 +1366,43 @@ def closedGeneric {unit : VerexIR.Validation.ValidatedUnit}
     @propheticMeaning _ executable (Skolems.instantiate θ ‹_›)
       (frameInstantiation unit handle typeInstantiation typeArgs) handle σs shape args
 
+/-- What invoking a function value denotes, at every supplied row and
+result shape. -/
+abbrev InvokeMeaning : Type :=
+  ClosureValue → (σs : NRow) → (shape : ResultShape) → HList σs → Comp unit shape.carrier
+
 /-- What calls denote: a call without type arguments, and a call with them
 at the family they induce. -/
 structure Meanings {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit] where
   call : CalleeMeaning
   generic : GenericMeaning
+  /-- What invoking a function value means: its target's big-step run, or,
+  in a unit verified through its model, the target's meaning
+  (`designs/ghost-fields.md`). -/
+  invoke : InvokeMeaning := closureMeaning executable
   /-- The frame's type instantiation, which keys its generic families. -/
   typeInstantiation : Array (TypeId × TypeId)
   /-- The condition of the in-body assumption at a site, over the locals of
   its function and the state: none where a run assumes nothing there. -/
   assumption : Nat → Option ((Γ : NRow) × (HEnv Γ → Memory unit → Prop))
+  /-- The value an `update` at a site writes, over the locals of its
+  function and the state: none where it writes any value of its type
+  (`designs/ghost-fields.md`). -/
+  ghost : Nat → Option ((Γ : NRow) × (τ : NTy) × (HEnv Γ → Memory unit → Option τ.carrier)) :=
+    fun _ => none
+  /-- The value an initializer gives a ghost slot of a value packed at a
+  site, over the packed value and the state. -/
+  ghostInit : Nat → Option ((τ : NTy) × (σ : NTy) × (τ.carrier → Memory unit → Option σ.carrier)) :=
+    fun _ => none
 
 /-- Every call its callee's prophetic meaning, a call with type arguments
 under the instantiation its frame computes from `typeInstantiation`. -/
 @[reducible] def closedMeanings {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) : Meanings executable :=
-  ⟨propheticMeaning executable #[], closedGeneric executable typeInstantiation, typeInstantiation,
-    fun _ => none⟩
+  ⟨propheticMeaning executable #[], closedGeneric executable typeInstantiation,
+    closureMeaning executable, typeInstantiation, fun _ => none, fun _ => none, fun _ => none⟩
 
 /-- The outcome of a closed computation, back in the enclosing locals. -/
 def Flow.rebase {ρ : ResultShape} {Γ : NRow} {α : Type} (env : HEnv Γ) :
@@ -1409,6 +1462,89 @@ def assumptionOf {Γ : NRow} (entry : Option ((Γ' : NRow) × (HEnv Γ' → Memo
     assumptionOf (some ⟨Γ, holds⟩) env = holds env := by
   simp [assumptionOf]
 
+/-- Any value of a type. -/
+def arbitraryIn {ρ : ResultShape} {Γ : NRow} {τ : NTy} (entry : HEnv Γ) :
+    Comp unit (Flow ρ Γ τ.carrier) :=
+  Spec.bind Spec.choose fun value => Spec.pure (.value value entry)
+
+/-- The value the meanings give a ghost write at a site, read in the
+locals and state there: none where the entry is for other locals or
+another type. -/
+def ghostValueOf {Γ : NRow} {τ : NTy}
+    (entry : Option ((Γ' : NRow) × (τ' : NTy) × (HEnv Γ' → Memory unit → Option τ'.carrier)))
+    (env : HEnv Γ) (state : Memory unit) : Option τ.carrier :=
+  match entry with
+  | some ⟨Γ', τ', value⟩ =>
+      if same : Γ = Γ' ∧ τ = τ' then
+        (value (same.1 ▸ env) state).map (cast (congrArg NTy.carrier same.2.symm))
+      else none
+  | none => none
+
+@[simp] theorem ghostValueOf_none {Γ : NRow} {τ : NTy} (env : HEnv Γ) (state : Memory unit) :
+    ghostValueOf (τ := τ) none env state = none := rfl
+
+@[simp] theorem ghostValueOf_same {Γ : NRow} {τ : NTy}
+    (value : HEnv Γ → Memory unit → Option τ.carrier) (env : HEnv Γ) (state : Memory unit) :
+    ghostValueOf (some ⟨Γ, τ, value⟩) env state = value env state := by
+  simp only [ghostValueOf, and_self, dite_true, cast_eq]
+  cases value env state <;> rfl
+
+/-- A ghost write's value, marked with its site: the value the meanings
+give it there. That they give one — the value is in the field type's
+domain — is owed, as the Move Prover asserts it. -/
+def ghostAt {ρ : ResultShape} {Γ : NRow} {τ : NTy} (_site : Nat)
+    (chosen : Memory unit → Option τ.carrier) (entry : HEnv Γ) :
+    Comp unit (Flow ρ Γ τ.carrier) :=
+  Spec.bind (Spec.certifyState fun state => (chosen state).isSome) fun _ =>
+  Spec.bind Spec.get fun state => Spec.bind Spec.choose fun value =>
+    Spec.bind (Spec.assume (chosen state = some value)) fun _ =>
+      Spec.pure (.value value entry)
+
+/-- The initializer the meanings give a pack's site, at the packed value's
+type and its slot's: none where the entry is for other types. -/
+def ghostInitOf {τ σ : NTy}
+    (entry : Option ((τ' : NTy) × (σ' : NTy) × (τ'.carrier → Memory unit → Option σ'.carrier))) :
+    Option (τ.carrier → Memory unit → Option σ.carrier) :=
+  match entry with
+  | some ⟨τ', σ', initializer⟩ =>
+      if same : τ = τ' ∧ σ = σ' then
+        some fun value state =>
+          (initializer (cast (congrArg NTy.carrier same.1) value) state).map
+            (cast (congrArg NTy.carrier same.2.symm))
+      else none
+  | none => none
+
+@[simp] theorem ghostInitOf_none {τ σ : NTy} :
+    ghostInitOf (τ := τ) (σ := σ) none = none := rfl
+
+@[simp] theorem ghostInitOf_same {τ σ : NTy}
+    (initializer : τ.carrier → Memory unit → Option σ.carrier) :
+    ghostInitOf (some ⟨τ, σ, initializer⟩) = some initializer := by
+  simp only [ghostInitOf, and_self, dite_true, cast_eq, Option.some.injEq]
+  funext value state
+  cases initializer value state <;> rfl
+
+/-- A packed value with the slot a path reaches set by an initializer,
+marked with its site; unchanged without one. -/
+def ghostInitAt {ρ : ResultShape} {Γ : NRow} {τ σ : NTy} (_site : Nat) (env : HEnv Γ)
+    (initializer : Option (τ.carrier → Memory unit → Option σ.carrier)) (path : Proj τ (.ghost σ))
+    (value : τ.carrier) : Comp unit (Flow ρ Γ τ.carrier) :=
+  Spec.bind Spec.get fun state =>
+    Spec.pure (.value (match initializer.bind fun given => given value state with
+      | some slot => ((path.set? env slot value).getD value)
+      | none => value) env)
+
+/-- A computation of a value read as one of a ghost slot holding it: the
+slot's carrier is its type's. -/
+@[reducible] def ghostSlotted {ρ : ResultShape} {Γ : NRow} {τ : NTy}
+    (value : Comp unit (Flow ρ Γ τ.carrier)) : Comp unit (Flow ρ Γ (NTy.ghost τ).carrier) :=
+  value
+
+/-- A ghost slot's computation read as its contents'. -/
+@[reducible] def ghostContents {ρ : ResultShape} {Γ : NRow} {τ : NTy}
+    (slot : Comp unit (Flow ρ Γ (NTy.ghost τ).carrier)) : Comp unit (Flow ρ Γ τ.carrier) :=
+  slot
+
 /-- An in-body assumption, marked with its site: the runs on which the
 condition holds there. -/
 def assumeAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (holds : Memory unit → Prop)
@@ -1466,7 +1602,7 @@ theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Ar
     (shape : ResultShape) {handle : FunctionHandle} {shared : List Bool}
     (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
     (sharing : closureShared unit handle weave.mask = shared)
-    (below : closureSignatureBelow unit handle = true) (plain : captured.tableFree = true)
+    (below : closureSignatureBelow unit handle = true)
     (frame : @ClosureFrame unit (Skolems.instantiate θ ‹_›) handle
       (frameInstantiation unit handle outer typeArgs))
     (captures : HList (NRow.subst θ.1 captured)) :
@@ -1483,8 +1619,7 @@ theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Ar
   unfold NTy.admits
   rw [atFrame]
   simp only [frame.2, sharing, beq_self_eq_true, Bool.true_and]
-  exact HList.admits_resolved (NRow.subst θ.1 captured) (NRow.tableFree_subst θ captured plain)
-    captures
+  exact HList.admits_resolved (NRow.subst θ.1 captured) captures
 
 /-- The outcome of a variant mismatch: the profile's throw, or none. -/
 def mismatchOutcome {α : Type} : Option Failure → Comp unit α
@@ -1522,6 +1657,11 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
       Flow.bind (left.denote meanings env) fun l env =>
         Flow.bind (right.denote meanings env) fun r env =>
           Spec.pure (.value (if negated then !NTy.eqb _ l r else NTy.eqb _ l r) env)
+  | _, _, @Term.equalErased _ _ _ τ negated left right, env =>
+      Flow.bind (left.denote meanings env) fun l env =>
+        Flow.bind (right.denote meanings env) fun r env =>
+          let same := decide ((τ.encode l).eraseGhosts = (τ.encode r).eraseGhosts)
+          Spec.pure (.value (if negated then !same else same) env)
   | _, _, .not operand, env =>
       Flow.bind (operand.denote meanings env) fun b env => Spec.pure (.value (!(b : Bool)) env)
   | _, _, .logical conjunction left right, env =>
@@ -1571,13 +1711,13 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
             (HList.toSkolem θ _ values))) fun result =>
           Spec.pure (.value ((shape.subst θ.1).toBody (ResultShape.ofSkolem θ shape result)) env)
   | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
-      plain captures, env =>
+      captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
         Spec.pure (.value (typedClosure supplied shared results
           (closureOf handle weave.mask #[] values)
-          (closureOf_typed rows sharing closed faithful plain values)) env)
+          (closureOf_typed rows sharing closed faithful values)) env)
   | _, _, .closureGeneric (supplied := supplied) handle weave typeArgs θ shape shared rows sharing
-      below plain captures, env =>
+      below captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
         Spec.given (@ClosureFrame unit (Skolems.instantiate θ ‹_›) handle
             (frameInstantiation unit handle meanings.typeInstantiation typeArgs)) fun frame =>
@@ -1585,11 +1725,11 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
               (closureOfGeneric unit meanings.typeInstantiation typeArgs θ weave shape handle
                 values)
               (closureOfGeneric_typed meanings.typeInstantiation typeArgs θ weave shape rows
-                sharing below plain frame values)) env)
+                sharing below frame values)) env)
   | _, _, .invoke shape function arguments, env =>
       Flow.bind (function.denote meanings env) fun closure env =>
         Flow.bind (arguments.denote meanings env) fun values env =>
-          Spec.bind (closureMeaning executable closure.val _ shape values) fun result =>
+          Spec.bind (meanings.invoke closure.val _ shape values) fun result =>
             Spec.pure (.value (shape.toBody result) env)
   | _, _, .tuple elements, env =>
       Flow.bind (elements.denote meanings env) fun values env => Spec.pure (.value values env)
@@ -1770,6 +1910,13 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
   | _, _, .assertion site, env => assertAt site env
   | _, _, .anchor site, env => anchorAt site env
   | _, _, .assume site, env => assumeAt site (assumptionOf (meanings.assumption site) env) env
+  | _, _, .arbitrary, env => arbitraryIn env
+  | _, _, .ghostValue site, env => ghostAt site (ghostValueOf (meanings.ghost site) env) env
+  | _, _, .ghostInit site path value, env =>
+      Flow.bind (value.denote meanings env) fun packed env =>
+        ghostInitAt site env (ghostInitOf (meanings.ghostInit site)) path packed
+  | _, _, .ghostSlot value, env => ghostSlotted (value.denote meanings env)
+  | _, _, .ghostRead slot, env => ghostContents (slot.denote meanings env)
   | _, _, .mutationEnd site, env => mutationEndAt site env
   | _, _, .memoryWritten site, env => memoryWrittenAt site env
   | _, _, .constructed site value, env =>
@@ -1806,6 +1953,14 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
                 Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
                     (κ.encode k).storageKey (some (Skolems.toRuntime τ v))))
                   fun _ => Spec.pure (.value () env)
+  | _, _, @Term.ghostStore _ _ _ κ τ site arguments key value, env =>
+      Flow.bind (key.denote meanings env) fun k env =>
+        Flow.bind (value.denote meanings env) fun v env =>
+        Flow.bind (anchorAt site env) fun _ env =>
+          Spec.bind Spec.get fun memory =>
+            Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
+                (κ.encode k).storageKey (some (Skolems.toRuntime τ v))))
+              fun _ => Spec.pure (.value () env)
   | _, τ, @Term.globalTake _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
       Flow.bind (anchorAt site env) fun _ env =>
@@ -2053,7 +2208,9 @@ def cycleMeanings {unit : VerexIR.Validation.ValidatedUnit}
   @Meanings.mk _ executable (familySkolems slot.family)
     (cycleCalls slot.family (@propheticMeaning _ executable (familySkolems slot.family) #[]) members self)
     (cycleGenericsAt executable members typeInstantiation self slot.family)
-    (familyInstantiation typeInstantiation slot.family) (fun _ => none)
+    (@closureMeaning _ executable (familySkolems slot.family))
+    (familyInstantiation typeInstantiation slot.family) (fun _ => none) (fun _ => none)
+    (fun _ => none)
 
 omit [Skolems unit] in
 /-- The weakest precondition through a verified callee: what its theorem
@@ -2293,6 +2450,23 @@ theorem wp_constructedAt {ρ : ResultShape} {Γ : NRow} {α : Type} (site : Nat)
   unfold constructedAt
   exact (wp_pure _ _ _ _).mpr (continues holds)
 
+/-- A ghost write as a cut: its value is defined — in the field type's
+domain — and what follows takes the value the meanings give. -/
+theorem wp_ghostAt {ρ : ResultShape} {Γ : NRow} {τ : NTy} (site : Nat)
+    (chosen : Memory unit → Option τ.carrier) (entry : HEnv Γ)
+    (ensures : Flow ρ Γ τ.carrier → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (defined : (chosen initial).isSome)
+    (continues : ∀ value, chosen initial = some value → ensures (.value value entry) initial) :
+    wp (ghostAt site chosen entry) ensures aborts initial := by
+  unfold ghostAt
+  rw [wp_bind, wp_certifyState]
+  refine ⟨defined, ?_⟩
+  rw [wp_bind_get, wp_bind, wp_choose]
+  intro value
+  rw [wp_bind, wp_assume]
+  intro chosenValue
+  exact (wp_pure _ _ _ _).mpr (continues value chosenValue)
+
 /-- A state anchor: no step. -/
 theorem wp_anchorAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ)
     (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
@@ -2330,8 +2504,9 @@ attribute [vir_denote] Term.denote Args.denote Arms.denote Function.denote Resul
   ResultShape.finish Flow.iterate Flow.rebase Flow.bind_pure_value Flow.bind_pure_return
   Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort finish_value finish_return finish_break
   finish_continue Mutables.resolve_nil Mutables.resolve_cons Option.bind_some Option.bind_none
-  Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_index Proj.get?_variant
-  Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_index Proj.set?_variant
+  Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_index Proj.get?_variant Proj.get?_ghost
+  Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_index Proj.set?_variant Proj.set?_ghost
+  arbitraryIn ghostInitAt
   Choices.update?_nil Choices.update?_cons PlaceIndex.resolve?_literal
   PlaceIndex.resolve?_slot PlaceIndex.resolve?_fromEnd HEnv.slotInt?_int_zero HEnv.slotInt?_succ
   HList.toListOf_zero HList.toListOf_succ Var.update_here Var.update_there
@@ -2353,6 +2528,7 @@ attribute [vir_denote] Term.denote Args.denote Arms.denote Function.denote Resul
 /-- A readable rendering of a literal. -/
 def describeValue : {τ : NTy} → τ.groundCarrier → String
   | .int _ _, value => toString value.val
+  | .num, value => toString value.val
   | .bool, value => toString (value : Bool)
   | .unit, _ => "()"
   | .address, value => s!"@{(value : String)}"
@@ -2363,7 +2539,8 @@ def describeValue : {τ : NTy} → τ.groundCarrier → String
   | .struct _ _ _, _ => "{..}"
   | .enum _ _ _ _ _, _ => "variant{..}"
   | .vector _, value => s!"[{value.values.size} elements]"
-  | .table _ _, value => s!"[{value.length} entries]"
+  | .table _ _, value => s!"[{value.entries.length} entries]"
+  | .ghost _, _ => "ghost(..)"
   | .ref _, _ => "&mut(..)"
   | .param index, _ => s!"T{index}"
   | .function _ _ _, value => s!"closure of function {value.val.function.functionId.index}"
@@ -2403,6 +2580,8 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .compare op left right => s!"({left.describe} {repr op} {right.describe})"
   | _, _, .equal negated left right =>
       s!"({left.describe} {if negated then "!=" else "=="} {right.describe})"
+  | _, _, .equalErased negated left right =>
+      s!"({left.describe} {if negated then "!=" else "=="}ᵍ {right.describe})"
   | _, _, .not operand => s!"!{operand.describe}"
   | _, _, .logical conjunction left right =>
       s!"({left.describe} {if conjunction then "&&" else "||"} {right.describe})"
@@ -2425,10 +2604,10 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .loop site body => s!"loop@{site} {body.describe}"
   | _, _, .call _ handle _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}({arguments.describe})"
-  | _, _, .closure handle weave _ _ _ _ _ _ _ captures =>
+  | _, _, .closure handle weave _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index} mask {weave.mask}\
         ({captures.describe})"
-  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ _ captures =>
+  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types> \
         mask {weave.mask}({captures.describe})"
   | _, _, .invoke _ function arguments =>
@@ -2478,6 +2657,11 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .assertion site => s!"assert@{site}"
   | _, _, .anchor site => s!"anchor@{site}"
   | _, _, .assume site => s!"assume@{site}"
+  | _, _, .arbitrary => "arbitrary"
+  | _, _, .ghostValue site => s!"ghost@{site}"
+  | _, _, .ghostInit site _ value => s!"ghostInit@{site}({value.describe})"
+  | _, _, .ghostSlot value => s!"ghostSlot({value.describe})"
+  | _, _, .ghostRead slot => s!"ghostRead({slot.describe})"
   | _, _, .mutationEnd site => s!"mutationEnd@{site}"
   | _, _, .constructed site value => s!"constructed@{site}({value.describe})"
   | _, τ, .globalRead _ key => s!"global[{repr τ}]({key.describe})"
@@ -2487,6 +2671,8 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
       s!"publish[{repr τ}]({key.describe}, {value.describe})"
   | _, τ, .globalTake _ _ key => s!"take[{repr τ}]({key.describe})"
   | _, _, .memoryWritten site => s!"memoryWritten@{site}"
+  | _, _, @Term.ghostStore _ _ _ _ τ _ _ key value =>
+      s!"ghostStore[{repr τ}]({key.describe}, {value.describe})"
 
 partial def Args.describe {ρ : ResultShape} : {Γ σs : NRow} → Args unit ρ Γ σs → String
   | _, _, .nil => ""

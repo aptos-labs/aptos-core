@@ -6,7 +6,7 @@ testDriver = "VerexIRTests"
 name = "VerexIR"
 # Equation lemmas of the denotation (`Term.denote`, some seventy cases) are
 # realized under the package default budget, which the file cannot raise.
-leanOptions = { maxHeartbeats = 400000 }
+leanOptions = { maxHeartbeats = 800000 }
 
 [[lean_lib]]
 name = "VerexSL"
@@ -15,5 +15,5 @@ roots = ["VerexSL", "VerexSL.SourceVerify"]
 
 [[lean_lib]]
 name = "VerexIRTests"
-roots = ["VerexIR.Tests.Validation", "VerexIR.Tests.Json", "VerexIR.Tests.Interpreter", "VerexIR.Tests.Primitives", "VerexIR.Tests.References", "VerexIR.Tests.Closures", "VerexIR.Tests.Globals", "VerexIR.Tests.Data", "VerexIR.Tests.NominalPlaces", "VerexIR.Tests.Generics", "VerexIR.Tests.Abilities", "VerexIR.Tests.Control", "VerexIR.Tests.Declarations", "VerexIR.Tests.Intrinsics", "VerexIR.Tests.Representation", "VerexIR.Tests.StaticTyping", "VerexIR.Tests.ReturnedStorage", "VerexIR.Tests.TableLoans", "VerexSL.Tests.Frontend", "VerexSL.Tests.ArithmeticContext", "VerexSL.Tests.LoopUnroll", "VerexSL.Tests.LiteralOptionalReads", "VerexSL.Tests.ContinuationCleanup", "VerexSL.Tests.CallRangeResults", "VerexSL.Tests.StateLabelDecoding",
+roots = ["VerexIR.Tests.Validation", "VerexIR.Tests.Json", "VerexIR.Tests.Interpreter", "VerexIR.Tests.Primitives", "VerexIR.Tests.References", "VerexIR.Tests.Closures", "VerexIR.Tests.Globals", "VerexIR.Tests.Data", "VerexIR.Tests.NominalPlaces", "VerexIR.Tests.Generics", "VerexIR.Tests.Abilities", "VerexIR.Tests.Control", "VerexIR.Tests.Declarations", "VerexIR.Tests.Intrinsics", "VerexIR.Tests.Representation", "VerexIR.Tests.StaticTyping", "VerexIR.Tests.ReturnedStorage", "VerexIR.Tests.TableRoles", "VerexSL.Tests.Frontend", "VerexSL.Tests.ArithmeticContext", "VerexSL.Tests.SharedPreparation", "VerexSL.Tests.LoopUnroll", "VerexSL.Tests.LiteralOptionalReads", "VerexSL.Tests.LiteralMaps", "VerexSL.Tests.TypedMaps", "VerexSL.Tests.ContinuationCleanup", "VerexSL.Tests.CallRangeResults", "VerexSL.Tests.StateLabelDecoding",
   "VerexSL.Tests.StateLabelWitnesses", "VerexSL.Tests.StateLabelCallObservations", "VerexSL.Tests.StateLabelBooleanObservations", "VerexSL.Tests.StateLabelMemoryEquality", "VerexSL.Tests.StoredTableInvariantErrors", "VerexSL.Tests.InvocationTypes", "VerexSL.Tests.LooseFrame", "VerexSL.Tests.Reserved", "VerexSL.Tests.AddressAliases", "VerexSL.Tests.Link", "VerexSL.Tests.Behavior", "VerexSL.Tests.SpecTypes", "VerexSL.Tests.CompositionPerformance", "VerexSL.Tests.DenotePerformance", "VerexSL.Tests.DenoteCache", "VerexSL.Tests.DenoteCacheImport"]

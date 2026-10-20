@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/signer_display.move:7:13: error: the assertion `account.address == @0x1` does not hold
-tests/sources/functional/signer_display.move:5:5: error: verex verification failed: the automatic verification of `f_incorrect` failed; provide a proof: `verify f_incorrect by …` in `tests/sources/functional/signer_display.proof.lean` (`verify f_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/signer_display.move:5:5: error: verex verification failed: the automatic verification of `f_incorrect` failed; provide a proof in `tests/sources/functional/signer_display.proof.lean`:
+  verify f_incorrect by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

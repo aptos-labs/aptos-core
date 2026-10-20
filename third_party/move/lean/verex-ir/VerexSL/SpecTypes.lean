@@ -46,11 +46,17 @@ inductive FieldRep where
   /-- The hidden contents field of a table owner: its entries, each a key and
   a value (`designs/intrinsic-maps.md`, "Owned Table values"). -/
   | table (key value : FieldRep)
+  /-- A ghost field's slot: a value of its type (`designs/ghost-fields.md`). -/
+  | ghost (slot : FieldRep)
   deriving Repr, BEq, Inhabited
 
-/-- The name of a table owner's hidden contents field in its twin: no Move
+/-- The name of a map owner's hidden contents field in its twin: no Move
 field is spelled with a space. -/
 def tableContentsField : String := "table contents"
+
+/-- The name of the handle field of a map owner's twin whose Move value
+holds table storage behind its declared fields. -/
+def tableHandleField : String := "table handle"
 
 /-- One represented enum variant and its payload row. -/
 structure VariantInfo where
@@ -127,13 +133,14 @@ private partial def structSupported (unit : ValidatedUnit)
   match structOf? unit qualified with
   | none => false
   | some (namespaceIndex, _, declaration) =>
-      let fields := declaration.fields ++
-        declaration.variants.flatMap fun variant => variant.fields
+      let types := (declaration.fields ++
+        declaration.variants.flatMap fun variant => variant.fields).map (·.type) ++
+        declaration.ghosts.map (·.type)
       declaration.generics.all (fun binder => binder.kind == .typeArg) &&
-        fields.all fun field =>
+        types.all fun type =>
           (fieldRep? unit (fun _ => Name.anonymous)
             (structSupported unit · (qualified :: visiting))
-            field.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))).isSome
+            type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))).isSome
 
 /-- The generated Lean name of a struct's twin under the registered path:
 its simple name, or, when the unit declares several structs of that name in
@@ -172,34 +179,47 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
             (fun nested => emitted.contains nested ∨ nested == qualified)
             field.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))
           some (name.name, rep)
-        -- A table owner's twin carries its hidden contents field, as its
-        -- native type does (`structNTy`).
-        let tableOwner := declaration.variants.isEmpty && declaration.generics.size == 2 &&
-          (unit.namespaces[namespaceIndex]?).any (fun ns => ns.intrinsics.any fun intrinsic =>
-            intrinsic.model == "map" && intrinsic.owner == declaration.name) &&
-          match (declaration.fields.toList.mapM fun field =>
-              unit.tables.types[field.type.typeId.index]? : Option (List VerexIR.Ty)) with
-          | some [] | some [.address] | some [.address, .integer (.bits 64) false] => true
-          | _ => false
+        -- An intrinsic map owner's twin is its abstract value's, as its
+        -- native type is (`structNTy`): its leading fields, its ghost slots,
+        -- and its hidden contents field; its declaration's fields and
+        -- variants are no part of it (`designs/intrinsic-maps.md`,
+        -- "Abstract representation").
+        let abstractLayout := VerexIR.Validation.abstractLayout? unit ⟨namespaceIndex⟩ structIndex
+        -- After the declared fields of a struct or variant, a slot per ghost
+        -- field, as its native type has (`structNTy`).
+        let ghosts := declaration.ghosts.filterMap fun ghost => do
+          let name ← nameOf? unit ghost.name
+          let rep ← fieldRep? unit twinName
+            (fun nested => emitted.contains nested ∨ nested == qualified)
+            ghost.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))
+          some (name.name, FieldRep.ghost rep)
         let declared := representFields declaration.fields
-        let fields := if tableOwner then
-            declared.push (tableContentsField, .table (.parameter 0) (.parameter 1))
-          else declared
-        let variants := declaration.variants.filterMap fun variant => do
+        let fields := match abstractLayout with
+          | some layout =>
+              let leading := match layout.shape with
+                | .table _ => declared
+                | .entries | .wrapped | .tree .. =>
+                    if layout.canonical.handle then #[(tableHandleField, FieldRep.address)] else #[]
+              leading ++ ghosts |>.push (tableContentsField, .table (.parameter 0) (.parameter 1))
+          | none => declared ++ ghosts
+        let variants := if abstractLayout.isSome then #[] else
+          declaration.variants.filterMap fun variant => do
           let name ← nameOf? unit variant.name
           let fields := representFields variant.fields
           guard (fields.size == variant.fields.size)
-          some { name := name.name, fields }
-        let allFields := declaration.fields ++
-          declaration.variants.flatMap fun variant => variant.fields
+          some { name := name.name, fields := fields ++ ghosts }
+        let allTypes := (declaration.fields ++
+          declaration.variants.flatMap fun variant => variant.fields).map (·.type) ++
+          declaration.ghosts.map (·.type)
         -- Nested twins must already be emitted; self-reference is impossible
         -- in an acyclic unit, so a missing dependency just waits a round.
-        let ready := allFields.all fun field =>
-          match unit.tables.types[field.type.typeId.index]? with
+        let ready := allTypes.all fun type =>
+          match unit.tables.types[type.typeId.index]? with
           | some (.nominal nested _) =>
               (nameOf? unit nested).any emitted.contains
           | _ => true
         if ready && declared.size == declaration.fields.size &&
+            ghosts.size == declaration.ghosts.size &&
             variants.size == declaration.variants.size then
           ordered := ordered.push {
             name := qualified.name, qualified
@@ -254,7 +274,8 @@ partial def FieldRep.typeSyntax (parameters : Array Ident := #[]) :
       if arguments.isEmpty then return rootIdent twin
       ``($(rootIdent twin) $arguments*)
   | .table key value => do
-      ``(List ($(← key.typeSyntax parameters) × $(← value.typeSyntax parameters)))
+      ``(VerexIR.SpecEntries ($(← key.typeSyntax parameters) × $(← value.typeSyntax parameters)))
+  | .ghost slot => slot.typeSyntax parameters
 
 /-- Whether this representation depends on the surrounding declaration's
 type parameters. -/
@@ -263,6 +284,7 @@ partial def FieldRep.mentionsParameter : FieldRep → Bool
   | .vector element _ => element.mentionsParameter
   | .nominal _ arguments => arguments.any mentionsParameter
   | .table key value => key.mentionsParameter || value.mentionsParameter
+  | .ghost slot => slot.mentionsParameter
   | _ => false
 
 /-- Number of surrounding carrier slots needed to interpret a
@@ -273,6 +295,7 @@ partial def FieldRep.parameterCount : FieldRep → Nat
   | .nominal _ arguments =>
       arguments.foldl (fun count argument => max count argument.parameterCount) 0
   | .table key value => max key.parameterCount value.parameterCount
+  | .ghost slot => slot.parameterCount
   | _ => 0
 
 /-- Substitute the represented arguments of a nominal use into one of the
@@ -282,6 +305,7 @@ partial def FieldRep.instantiate (arguments : Array FieldRep) : FieldRep → Fie
   | .vector element bounded => .vector (element.instantiate arguments) bounded
   | .nominal twin nested => .nominal twin (nested.map (instantiate arguments))
   | .table key value => .table (key.instantiate arguments) (value.instantiate arguments)
+  | .ghost slot => .ghost (slot.instantiate arguments)
   | rep => rep
 
 /-- Meta-level native type of a represented field. -/
@@ -308,7 +332,9 @@ partial def FieldRep.leanType (rep : FieldRep) (carrier? : Option Lean.Expr) :
       arguments.foldlM (init := mkConst twin) fun type argument =>
         return mkApp type (← argument.leanType carrier?)
   | .table key value =>
-      mkAppM ``List #[← mkAppM ``Prod #[← key.leanType carrier?, ← value.leanType carrier?]]
+      mkAppM ``VerexIR.SpecEntries
+        #[← mkAppM ``Prod #[← key.leanType carrier?, ← value.leanType carrier?]]
+  | .ghost slot => slot.leanType carrier?
 
 /-- Meta-level codec of a represented field. -/
 partial def FieldRep.codec (rep : FieldRep) (codecs? : Option Lean.Expr) :
@@ -334,6 +360,7 @@ partial def FieldRep.codec (rep : FieldRep) (codecs? : Option Lean.Expr) :
       mkAppM (twin ++ `codec) argumentCodecs
   | .table key value =>
       mkAppM ``VerexIR.Proofs.Denote.Codec.entries #[← key.codec codecs?, ← value.codec codecs?]
+  | .ghost slot => mkAppM ``VerexIR.Proofs.Denote.Codec.ghost #[← slot.codec codecs?]
 
 /-- Codec syntax of a represented value. -/
 partial def FieldRep.codecSyntax (codecs : Array Term := #[]) :
@@ -362,6 +389,8 @@ partial def FieldRep.codecSyntax (codecs : Array Term := #[]) :
       ``($(rootIdent (twin ++ `codec)) $arguments*)
   | .table key value => do
       ``(VerexIR.Proofs.Denote.Codec.entries $(← key.codecSyntax codecs) $(← value.codecSyntax codecs))
+  | .ghost slot => do
+      ``(VerexIR.Proofs.Denote.Codec.ghost $(← slot.codecSyntax codecs))
 
 /-- Term syntax of one field's erasure, from its projection. -/
 def FieldRep.eraseSyntax (rep : FieldRep) (projected : Term)
@@ -378,6 +407,9 @@ def FieldRep.eraseSyntax (rep : FieldRep) (projected : Term)
   | .vector _ _ | .table _ _ => do
       let codec ← rep.codecSyntax codecs
       ``(VerexIR.Proofs.Codec.encode $codec $projected)
+  -- A ghost slot holds its contents' erasure, as a declared field would.
+  | .ghost slot => do
+      ``(VerexIR.RuntimeValue.ghost $(← slot.eraseSyntax projected codecs))
   | .parameter index => do
       let some codec := codecs[index]?
         | throwError "a generic twin field has no codec {index}"
@@ -406,6 +438,8 @@ def FieldRep.decodeSyntax (codecs : Array Term := #[]) :
   | .table key value => do
       let codec ← (FieldRep.table key value).codecSyntax codecs
       ``(VerexIR.Proofs.Codec.decode? $codec)
+  | .ghost slot => do
+      ``(VerexIR.decodeGhost? $(← slot.decodeSyntax codecs))
   | .parameter index => do
       let some codec := codecs[index]?
         | throwError "a generic twin field has no decoder codec {index}"
@@ -423,7 +457,8 @@ private def FieldRep.defaultSyntax (parameters : Array Ident := #[]) :
   | .bytes => ``(#[])
   | .unit => ``(())
   | .vector _ bounded => if bounded then ``(default) else ``(#[])
-  | .table _ _ => ``([])
+  | .table _ _ => ``(default)
+  | .ghost slot => slot.defaultSyntax parameters
   | .parameter index => do
       let some parameterType := parameters[index]?
         | throwError "a generic twin default has no type parameter {index}"

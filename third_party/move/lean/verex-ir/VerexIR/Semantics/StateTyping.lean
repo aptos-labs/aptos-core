@@ -576,6 +576,45 @@ theorem HasTypes.length_eq {unit : ValidatedUnit} {loans : LoanTypes} :
   | [], [], .nil => rfl
   | _ :: _, _ :: _, .cons _ rest => by simp [HasTypes.length_eq rest]
 
+theorem HasTypes.append {unit : ValidatedUnit} {loans : LoanTypes} :
+    ∀ {values others : List RuntimeValue} {types otherTypes : List SemTy},
+      HasTypes unit loans values types → HasTypes unit loans others otherTypes →
+        HasTypes unit loans (values ++ others) (types ++ otherTypes)
+  | [], _, [], _, .nil, typed => typed
+  | _ :: _, _, _ :: _, _, .cons head rest, typed => .cons head (HasTypes.append rest typed)
+
+/-- The values a row's trailing types type. -/
+theorem HasTypes.drop_append {unit : ValidatedUnit} {loans : LoanTypes} :
+    ∀ {values : List RuntimeValue} {types rest : List SemTy},
+      HasTypes unit loans values (types ++ rest) →
+        HasTypes unit loans (values.drop types.length) rest
+  | _, [], _, typed => typed
+  | [], _ :: _, _, typed => by cases typed
+  | _ :: values, _ :: types, rest, typed => by
+      cases typed with
+      | cons _ tail =>
+          simpa using HasTypes.drop_append (values := values) (types := types) (rest := rest) tail
+
+/-- The values a row's leading types type. -/
+theorem HasTypes.take_append {unit : ValidatedUnit} {loans : LoanTypes} :
+    ∀ {values : List RuntimeValue} {types rest : List SemTy},
+      HasTypes unit loans values (types ++ rest) →
+        HasTypes unit loans (values.take types.length) types
+  | _, [], _, _ => .nil
+  | [], _ :: _, _, typed => by cases typed
+  | _ :: _, _ :: _, _, typed => by
+      cases typed with
+      | cons head tail => exact .cons head (HasTypes.take_append tail)
+
+/-- Ghost slots holding unit, as the runtime packs them, are typed as slots
+of any types, one each. -/
+theorem HasTypes.unitGhosts {unit : ValidatedUnit} {loans : LoanTypes} {α : Type} :
+    ∀ (slots : List α) (types : List SemTy), slots.length = types.length →
+      HasTypes unit loans (slots.map fun _ => RuntimeValue.ghost .unit) (types.map .ghost)
+  | [], [], _ => .nil
+  | _ :: slots, _ :: types, same =>
+      .cons (.ghost _ _ .unit) (HasTypes.unitGhosts slots types (by simpa using same))
+
 /-- A row of values at one type each is a homogeneous row. -/
 theorem HasTypes.each {unit : ValidatedUnit} {loans : LoanTypes} {type : SemTy} :
     ∀ {values : List RuntimeValue} {types : List SemTy}, HasTypes unit loans values types →
@@ -1255,30 +1294,79 @@ theorem fieldTypes_resolve {targetNs : ValidatedNamespace} {declaration : Struct
   rw [List.mapM_map]
   exact resolved
 
+theorem ResolvesAll.length_eq {tables : Tables} {env : Array SemArg} :
+    ∀ {typeIds : List TypeId} {types : List SemTy}, ResolvesAll tables env typeIds types →
+      typeIds.length = types.length
+  | [], [], .nil => rfl
+  | _ :: _, _ :: _, .cons _ rest => by simp [ResolvesAll.length_eq rest]
+
+/-- The ghost types the checker resolves are the runtime's for the handle. -/
+theorem ghostTypes_resolve {unit : ValidatedUnit} {handle : StructHandle}
+    {targetNs : ValidatedNamespace} {declaration : StructDecl} {arguments : List SemArg}
+    {ghostTypes : List SemTy}
+    (namespace_eq : unit.namespaces[handle.namespaceId.index]? = some targetNs)
+    (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
+    (ghostTypes_eq : StaticTyping.ghostTypes? targetNs declaration arguments = some ghostTypes) :
+    ResolvesAll targetNs.tables arguments.toArray (ghostTypeIds unit handle) ghostTypes := by
+  have ghosts_eq : nominalGhosts unit handle = declaration.ghosts := by
+    simp [nominalGhosts, namespace_eq, declaration_eq]
+  unfold ghostTypeIds
+  rw [ghosts_eq]
+  simp only [StaticTyping.ghostTypes?] at ghostTypes_eq
+  refine ResolvesAll.of_mapM (fuel := targetNs.tables.types.size + 1) ?_
+  rw [List.mapM_map]
+  exact ghostTypes_eq
+
+/-- A declaration with a constructor holds no field beyond its declared ones:
+it is no table owner. -/
+theorem contentsTypes_of_constructorFields {unit : ValidatedUnit} {handle : StructHandle}
+    {variant : Option String} {fields : Array FieldDecl} (arguments : List SemArg)
+    (found : constructorFields? unit handle variant = some fields) :
+    contentsTypes unit handle variant arguments = [] := by
+  unfold contentsTypes
+  cases variant with
+  | some _ => rfl
+  | none =>
+      simp only [constructorFields?, Option.bind_eq_bind, Option.bind_eq_some_iff] at found
+      obtain ⟨ns, -, declaration, -, found⟩ := found
+      split at found
+      · rename_i constructible
+        simp only [Bool.and_eq_true, Option.isNone_iff_eq_none] at constructible
+        simp [constructible.2]
+      · cases found
+
 /-- A constructed nominal value inhabits the nominal type of the arguments
 its fields are typed under. -/
 theorem constructNominal_typed {unit : ValidatedUnit} {loans : LoanTypes}
     {sourceNamespace : NamespaceId} {ns targetNs : ValidatedNamespace}
     {reference : QualifiedRef} {variant : Option String} {fields : Array RuntimeValue}
     {declaration : StructDecl} {spelled : QualifiedName} {arguments : List SemArg}
-    {fieldTypes : List SemTy} {value : RuntimeValue}
+    {fieldTypes ghostTypes : List SemTy} {value : RuntimeValue}
     (ns_eq : unit.namespaces[sourceNamespace.index]? = some ns)
     (target : StaticTyping.structTarget? unit ns reference = some (targetNs, declaration, spelled))
     (fieldTypes_eq : StaticTyping.fieldTypes? targetNs declaration variant arguments =
       some fieldTypes)
+    (ghostTypes_eq : StaticTyping.ghostTypes? targetNs declaration arguments = some ghostTypes)
     (fieldsTyped : HasTypes unit loans fields.toList fieldTypes)
     (construct : constructNominal? unit sourceNamespace reference variant fields = some value) :
     HasType unit loans value (.nominal spelled arguments) := by
   simp only [constructNominal?, Option.bind_eq_bind, Option.bind_eq_some_iff] at construct
-  obtain ⟨handle, resolve, expected, -, construct⟩ := construct
+  obtain ⟨handle, resolve, fields', expected, construct⟩ := construct
   split at construct
   · cases construct
   · simp only [pure, Option.some.injEq] at construct
     subst construct
     obtain ⟨namespace_eq, declaration_eq, name_eq⟩ := structTarget_handle ns_eq target resolve
     obtain ⟨declared, declared_eq, resolved⟩ := fieldTypes_resolve fieldTypes_eq
-    exact .nominal handle variant fields spelled arguments targetNs declared fieldTypes name_eq
-      (fieldsOf_handleFields namespace_eq declaration_eq declared_eq) resolved fieldsTyped
+    have ghostsResolved := ghostTypes_resolve namespace_eq declaration_eq ghostTypes_eq
+    have ghostLength := ResolvesAll.length_eq ghostsResolved
+    simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+    refine .nominal handle variant _ spelled arguments targetNs declared fieldTypes ghostTypes name_eq
+      (fieldsOf_handleFields namespace_eq declaration_eq declared_eq) resolved ghostsResolved ?_
+    rw [contentsTypes_of_constructorFields arguments expected, List.append_nil,
+      Array.toList_append, Array.toList_map]
+    exact HasTypes.append fieldsTyped
+      (HasTypes.unitGhosts (nominalGhosts unit handle).toList ghostTypes (by simpa using ghostLength))
 
 theorem ResolvesAll.unique {tables : Tables} {env : Array SemArg} :
     ∀ {typeIds : List TypeId} {left right : List SemTy}, ResolvesAll tables env typeIds left →
@@ -1293,15 +1381,18 @@ theorem HasType.nominal_fields {unit : ValidatedUnit} {loans : LoanTypes}
     {source : StructHandle} {variant : Option String} {fields : Array RuntimeValue}
     {name : QualifiedName} {arguments : List SemArg}
     (typed : HasType unit loans (.nominal source variant fields) (.nominal name arguments)) :
-    ∃ declaringNamespace declared fieldTypes, structName? unit source = some name ∧
+    ∃ declaringNamespace declared fieldTypes ghostTypes, structName? unit source = some name ∧
       handleFields? unit source variant = some (declaringNamespace, declared) ∧
       ResolvesAll declaringNamespace.tables arguments.toArray
         (declared.toList.map (·.type.typeId)) fieldTypes ∧
-      HasTypes unit loans fields.toList fieldTypes := by
+      ResolvesAll declaringNamespace.tables arguments.toArray
+        (ghostTypeIds unit source) ghostTypes ∧
+      HasTypes unit loans fields.toList
+        (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source variant arguments)) := by
   cases typed with
-  | nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq declaration_eq resolved
-      fieldsTyped => exact ⟨declaringNamespace, declared, fieldTypes, name_eq, declaration_eq,
-        resolved, fieldsTyped⟩
+  | nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq declaration_eq
+      resolved ghostsResolved fieldsTyped => exact ⟨declaringNamespace, declared, fieldTypes,
+        ghostTypes, name_eq, declaration_eq, resolved, ghostsResolved, fieldsTyped⟩
 
 /-- A value at a shared reference type is a value of the referent. -/
 theorem HasType.shared_referent {unit : ValidatedUnit} {loans : LoanTypes}
@@ -1332,22 +1423,30 @@ theorem destructNominal_typed {unit : ValidatedUnit} {loans : LoanTypes}
   split at destruct
   · rename_i actualSource actualVariant actualFields
     simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at destruct
-    obtain ⟨handle, resolve, expected, -, destruct⟩ := destruct
+    obtain ⟨handle, resolve, expected, constructible, destruct⟩ := destruct
     split at destruct
     · rename_i matched
       simp only [Option.some.injEq] at destruct
       subst destruct
       simp only [Bool.and_eq_true, beq_iff_eq] at matched
-      obtain ⟨⟨rfl, rfl⟩, -⟩ := matched
+      obtain ⟨⟨rfl, rfl⟩, sizes⟩ := matched
       obtain ⟨namespace_eq, declaration_eq, -⟩ := structTarget_handle ns_eq target resolve
       obtain ⟨declared, declared_eq, resolved⟩ := fieldTypes_resolve fieldTypes_eq
-      obtain ⟨declaringNamespace, declared', fieldTypes', -, handle_eq, resolved', typed⟩ :=
+      obtain ⟨declaringNamespace, declared', fieldTypes', ghostTypes, -, handle_eq, resolved', ghostsResolved, typed⟩ :=
         operand.nominal_fields
       rw [fieldsOf_handleFields namespace_eq declaration_eq declared_eq] at handle_eq
       simp only [Option.some.injEq, Prod.mk.injEq] at handle_eq
       obtain ⟨rfl, rfl⟩ := handle_eq
       rw [ResolvesAll.unique resolved resolved'] at *
-      exact typed
+      rw [contentsTypes_of_constructorFields arguments constructible, List.append_nil] at typed
+      have lengths := HasTypes.length_eq typed
+      have ghostLength := ResolvesAll.length_eq ghostsResolved
+      simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+      simp only [Array.length_toList, List.length_append, List.length_map] at lengths
+      have taken : expected.size = fieldTypes'.length := by omega
+      simp only [Array.toList_extract, List.extract_eq_drop_take, List.drop_zero, Nat.sub_zero]
+      rw [taken]
+      exact HasTypes.take_append typed
     · cases destruct
   · cases destruct
 
@@ -1566,6 +1665,16 @@ private theorem declared_field_resolves {tables : Tables} {env : Array SemArg}
       Resolves tables env field.type.typeId fieldType :=
   resolved.getId (by simp [field_eq])
 
+/-- A declared field's position reads the declared field types, ahead of a
+table owner's contents. -/
+private theorem declared_field_type {tables : Tables} {env : Array SemArg}
+    {declared : Array FieldDecl} {fieldTypes extra : List SemTy} {index : Nat} {field : FieldDecl}
+    (resolved : ResolvesAll tables env (declared.toList.map (·.type.typeId)) fieldTypes)
+    (field_eq : declared[index]? = some field) :
+    (fieldTypes ++ extra)[index]? = fieldTypes[index]? := by
+  obtain ⟨fieldType, found, -⟩ := declared_field_resolves resolved field_eq
+  rw [List.getElem?_append_left (List.getElem?_eq_some_iff.mp found).1]
+
 /-- The type of a nominal value's field at its position is one of the types
 the checker requires to agree for that field. -/
 private theorem field_type_mem {unit : ValidatedUnit} {targetNs : ValidatedNamespace}
@@ -1615,12 +1724,13 @@ private theorem nominal_field_typed {unit : ValidatedUnit} {loans : LoanTypes}
       (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
     (value_eq : values[index]? = some value) :
     ∃ type, type ∈ types ∧ HasType unit loans value type := by
-  obtain ⟨declaringNamespace, declared, fieldTypes, -, handle_eq, resolved, typed⟩ :=
+  obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, -, handle_eq, resolved, ghostsResolved, typed⟩ :=
     operand.nominal_fields
   rw [handle_eq] at handle_eq'
   simp only [Option.some.injEq, Prod.mk.injEq] at handle_eq'
   obtain ⟨rfl, rfl⟩ := handle_eq'
   obtain ⟨fieldType, fieldType_eq, valueTyped⟩ := typed.get (by simpa using value_eq)
+  rw [declared_field_type resolved field_eq] at fieldType_eq
   obtain ⟨namespace_eq, declaration_eq, -⟩ := structTarget_handle ns_eq target resolve
   exact ⟨fieldType, field_type_mem namespace_eq declaration_eq types_eq handle_eq resolved
     field_eq find_eq fieldType_eq, valueTyped⟩
@@ -1777,12 +1887,13 @@ private theorem nominal_variant_field_typed {unit : ValidatedUnit} {loans : Loan
       (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
     (value_eq : values[index]? = some value) :
     HasType unit loans value fieldType := by
-  obtain ⟨declaringNamespace, declared, fieldTypes, -, handle_eq, resolved, typed⟩ :=
+  obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, -, handle_eq, resolved, ghostsResolved, typed⟩ :=
     operand.nominal_fields
   rw [handle_eq] at handle_eq'
   simp only [Option.some.injEq, Prod.mk.injEq] at handle_eq'
   obtain ⟨rfl, rfl⟩ := handle_eq'
   obtain ⟨fieldType', fieldType'_eq, valueTyped⟩ := typed.get (by simpa using value_eq)
+  rw [declared_field_type resolved field_eq] at fieldType'_eq
   obtain ⟨fieldType'', fieldType''_eq, typeResolves⟩ := declared_field_resolves resolved field_eq
   rw [fieldType'_eq, Option.some.injEq] at fieldType''_eq
   subst fieldType''_eq
@@ -1964,19 +2075,21 @@ theorem updateField_typed {unit : ValidatedUnit} {loans : LoanTypes}
         subst eval
         obtain ⟨_, _, field, handle_eq', field_eq, find_eq⟩ := handleFieldIndex?_find index_eq
         cases typed with
-        | nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq resolved
-            fieldsTyped =>
+        | nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+            resolved ghostsResolved fieldsTyped =>
           rw [handle_eq] at handle_eq'
           simp only [Option.some.injEq, Prod.mk.injEq] at handle_eq'
           obtain ⟨rfl, rfl⟩ := handle_eq'
           rename_i bound
           obtain ⟨fieldType, fieldType_eq, -⟩ := fieldsTyped.get (index := index)
             (value := values[index]) (by simp [bound])
+          have declaredType_eq := fieldType_eq
+          rw [declared_field_type resolved field_eq] at declaredType_eq
           obtain ⟨namespace_eq, declaration_eq, -⟩ := structTarget_handle ns_eq target resolve
           have member := field_type_mem namespace_eq declaration_eq types_eq handle_eq resolved
-            field_eq find_eq fieldType_eq
-          refine .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq
-            resolved ?_
+            field_eq find_eq declaredType_eq
+          refine .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq
+            handle_eq resolved ghostsResolved ?_
           simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
             fieldsTyped.set fieldType_eq (replacement_typed fieldType member)
       · cases eval
@@ -2085,34 +2198,68 @@ theorem PathTyped.snoc {unit : ValidatedUnit} {loans : LoanTypes} {value : Runti
     obtain ⟨written, written_eq, write⟩ := Option.bind_eq_some_iff.mp write
     exact path.write ((step part part_eq).write replacement written_eq) write
 
-theorem PathTyped.field {unit : ValidatedUnit} {loans : LoanTypes} {source : StructHandle}
+/-- A path to one slot of a nominal value's row: a declared field or a
+ghost field's slot. -/
+theorem PathTyped.slot {unit : ValidatedUnit} {loans : LoanTypes} {source : StructHandle}
     {variant : Option String} {fields : Array RuntimeValue} {name : QualifiedName}
     {arguments : List SemArg} {declaringNamespace : ValidatedNamespace}
-    {declared : Array FieldDecl} {fieldTypes : List SemTy} {index : Nat} {fieldType : SemTy}
+    {declared : Array FieldDecl} {fieldTypes ghostTypes : List SemTy} {index : Nat}
+    {slotType : SemTy}
     (name_eq : structName? unit source = some name)
     (handle_eq : handleFields? unit source variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
       (declared.toList.map (·.type.typeId)) fieldTypes)
-    (typed : HasTypes unit loans fields.toList fieldTypes)
-    (fieldType_eq : fieldTypes[index]? = some fieldType) :
+    (ghostsResolved : ResolvesAll declaringNamespace.tables arguments.toArray
+      (ghostTypeIds unit source) ghostTypes)
+    (typed : HasTypes unit loans fields.toList
+      (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source variant arguments)))
+    (slotType_eq : (fieldTypes ++ ghostTypes.map .ghost)[index]? = some slotType) :
     PathTyped unit loans (.nominal source variant fields) (.nominal name arguments)
-      [.field index] fieldType where
+      [.field index] slotType where
   read read := by
     simp only [readProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff] at read
     obtain ⟨part, part_eq, read⟩ := read
     simp only [Option.some.injEq] at read
     subst read
     obtain ⟨type, type_eq, part_typed⟩ := typed.get (by simpa using part_eq)
-    rw [fieldType_eq, Option.some.injEq] at type_eq
+    rw [← List.append_assoc, List.getElem?_append_left (List.getElem?_eq_some_iff.mp slotType_eq).1,
+      slotType_eq, Option.some.injEq] at type_eq
     exact type_eq ▸ part_typed
   write replacement write := by
     simp only [writeProjections?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure,
       Option.some.injEq] at write
     obtain ⟨_, -, _, written_eq, rfl⟩ := write
     subst written_eq
-    exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes name_eq handle_eq resolved
+    have appended :
+        (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source variant arguments))[index]? =
+        some slotType := by
+      rw [← List.append_assoc,
+        List.getElem?_append_left (List.getElem?_eq_some_iff.mp slotType_eq).1]
+      exact slotType_eq
+    exact .nominal _ _ _ _ _ declaringNamespace declared fieldTypes ghostTypes name_eq handle_eq
+      resolved ghostsResolved
       (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
-        typed.set fieldType_eq replacement)
+        typed.set appended replacement)
+
+theorem PathTyped.field {unit : ValidatedUnit} {loans : LoanTypes} {source : StructHandle}
+    {variant : Option String} {fields : Array RuntimeValue} {name : QualifiedName}
+    {arguments : List SemArg} {declaringNamespace : ValidatedNamespace}
+    {declared : Array FieldDecl} {fieldTypes ghostTypes : List SemTy} {index : Nat}
+    {fieldType : SemTy}
+    (name_eq : structName? unit source = some name)
+    (handle_eq : handleFields? unit source variant = some (declaringNamespace, declared))
+    (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
+      (declared.toList.map (·.type.typeId)) fieldTypes)
+    (ghostsResolved : ResolvesAll declaringNamespace.tables arguments.toArray
+      (ghostTypeIds unit source) ghostTypes)
+    (typed : HasTypes unit loans fields.toList
+      (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source variant arguments)))
+    (fieldType_eq : fieldTypes[index]? = some fieldType) :
+    PathTyped unit loans (.nominal source variant fields) (.nominal name arguments)
+      [.field index] fieldType :=
+  PathTyped.slot name_eq handle_eq resolved ghostsResolved typed
+    (by rw [List.getElem?_append_left (List.getElem?_eq_some_iff.mp fieldType_eq).1]
+        exact fieldType_eq)
 
 theorem PathTyped.vectorIndex {unit : ValidatedUnit} {loans : LoanTypes}
     {elements : Array RuntimeValue} {element : SemTy} {length : Option ConstValue} {index : Nat}
@@ -2342,8 +2489,8 @@ theorem PathTyped.fieldAt {unit : ValidatedUnit} {loans : LoanTypes}
     (index_eq : handleFieldIndex? unit handle variant fieldName = some index) :
     PathTyped unit loans (.nominal handle variant fields) (.nominal spelled arguments)
       [.field index] fieldType := by
-  obtain ⟨declaringNamespace, declared, fieldTypes, name_eq, handle_eq, resolved, fieldsTyped⟩ :=
-    typed.nominal_fields
+  obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, name_eq, handle_eq, resolved,
+    ghostsResolved, fieldsTyped⟩ := typed.nominal_fields
   obtain ⟨_, _, field, handle_eq', field_eq, find_eq⟩ := handleFieldIndex?_find index_eq
   rw [handle_eq] at handle_eq'
   simp only [Option.some.injEq, Prod.mk.injEq] at handle_eq'
@@ -2351,7 +2498,7 @@ theorem PathTyped.fieldAt {unit : ValidatedUnit} {loans : LoanTypes}
   have same := handleFields_namespace namespace_eq handle_eq
   subst same
   obtain ⟨fieldType', fieldType'_eq, typeResolves⟩ := declared_field_resolves resolved field_eq
-  refine PathTyped.field name_eq handle_eq resolved fieldsTyped ?_
+  refine PathTyped.field name_eq handle_eq resolved ghostsResolved fieldsTyped ?_
   rw [fieldType'_eq]
   congr 1
   cases staticVariant with
@@ -2605,6 +2752,9 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
               exact same.2.1
           | _ => simp at resolve
       | _ => simp at static
+  | ghostField base owner field =>
+      dsimp only at static
+      cases static
   | index base indexExpression =>
       dsimp only at static resolve
       simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at static

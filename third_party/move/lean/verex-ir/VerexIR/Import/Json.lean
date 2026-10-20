@@ -61,7 +61,7 @@ deriving instance ToJson, FromJson for
   QuantifierKind, MatchArm, QuantifierBinder, ConditionKind, Condition, Frame,
   SpecBlock, ExprKind, Expr, PatternKind, Pattern, BinderKind, GenericBinder,
   Parameter, LocalDecl, Signature, ParameterFrame, FunctionContract, ConstantDecl, FieldDecl,
-  VariantDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
+  VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
   TraitDecl, AssociatedItemValue, AssociatedItemBinding, ImplDecl,
   SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant, IntrinsicBinding,
   IntrinsicDecl, Namespace

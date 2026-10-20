@@ -88,6 +88,7 @@ theorem RuntimeValue.orderPayload_swap (rank : ValueRanks) (a b : RuntimeValue) 
     | (rw [Ordering.swap_then, Ordering.swap_then, ← compare_swap, ← compare_swap,
         ← RuntimeValue.orderList_swap])
     | (rw [Ordering.swap_then, ← compare_swap, ← RuntimeValue.order_swap])
+    | exact RuntimeValue.order_swap rank _ _
     | exact RuntimeValue.orderList_swap rank _ _
     | (simp only [Ordering.swap_then, ← compare_swap, ← compareInstantiation_swap]
        rw [← RuntimeValue.orderList_swap])
@@ -168,6 +169,7 @@ theorem RuntimeValue.eq_of_orderPayload {rank : ValueRanks} (a b : RuntimeValue)
   case borrow.borrow leftLoan leftCurrent rightLoan rightCurrent =>
     rw [eq_of_compare h.1, RuntimeValue.eq_of_order h.2]
   case loanHole.loanHole => rw [eq_of_compare h]
+  case ghost.ghost => rw [RuntimeValue.eq_of_order h]
 termination_by sizeOf a + sizeOf b
 decreasing_by all_goals (simp_wf; (try simp only [sizeOf_array]); omega)
 
@@ -316,6 +318,7 @@ theorem RuntimeValue.orderPayload_isLE_trans (rank : ValueRanks)
     exact lex_isLE_trans_of
       (fun _ _ left right => RuntimeValue.order_isLE_trans rank _ _ _ left right) left right
   case loanHole.loanHole.loanHole => exact Std.TransCmp.isLE_trans left right
+  case ghost.ghost.ghost => exact RuntimeValue.order_isLE_trans rank _ _ _ left right
 termination_by 2 * sizeOf a
 decreasing_by all_goals (simp_wf; (try simp only [sizeOf_array]); omega)
 

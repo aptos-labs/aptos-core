@@ -41,7 +41,10 @@ verex module 0x42::table_global_writes where
   spec three where
     ensures size(result) == 3
     ensures get(result, 1u8) == 2
-  verify three
+  verify three by
+    verex_obligations
+    all_goals verex_prepare only
+    all_goals verex_decide
 
   struct S has Store where
     value : u64
@@ -75,7 +78,13 @@ verex module 0x42::table_global_writes where
 /--
 error: the data invariant `invariant value != 0` does not hold for a value written to memory
 ---
-error: verex verification failed: the automatic verification of `zero` failed; provide a proof: `verify zero by …` in the module (`verify zero by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `zero` failed; provide a proof in the module:
+  verify zero by
+    verex_obligations
+    verex_on
+    | stored_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::table_global_writes::zero
@@ -83,7 +92,13 @@ verify 0x42::table_global_writes::zero
 /--
 error: the data invariant `invariant value != 0` does not hold for a value written to memory
 ---
-error: verex verification failed: the automatic verification of `plain_zero` failed; provide a proof: `verify plain_zero by …` in the module (`verify plain_zero by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `plain_zero` failed; provide a proof in the module:
+  verify plain_zero by
+    verex_obligations
+    verex_on
+    | stored_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::table_global_writes::plain_zero

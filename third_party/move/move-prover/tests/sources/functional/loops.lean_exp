@@ -44,7 +44,7 @@ recursive✝ :
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) Unit)
 state✝ : VerexIR.Proofs.Denote.Memory unit
 i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-left✝ : i.val ≤ 11
+invariant_1 : i.val ≤ 11
 loopHypothesis✝ :
   ∀
     (env :
@@ -66,19 +66,68 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
 a✝ : 10 < i.val
 ⊢ False
-tests/sources/functional/loops.move:57:5: error: verex verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof: `verify iter10_no_abort_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_no_abort_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:57:5: error: verex verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify iter10_no_abort_incorrect by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:88:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/loops.move:86:5: error: verex verification failed: the automatic verification of `iter10_abort_incorrect` failed; provide a proof: `verify iter10_abort_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_abort_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:86:5: error: verex verification failed: the automatic verification of `iter10_abort_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify iter10_abort_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:119:17: error: the loop invariant `x != y` is not preserved by an iteration
-tests/sources/functional/loops.move:134:5: error: verex verification failed: the automatic verification of `nested_loop_outer_invariant_incorrect` failed; provide a proof: `verify nested_loop_outer_invariant_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify nested_loop_outer_invariant_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:134:5: error: verex verification failed: the automatic verification of `nested_loop_outer_invariant_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify nested_loop_outer_invariant_incorrect by
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:145:21: error: the loop invariant `x != y` is not established at entry
 tests/sources/functional/loops.move:145:21: error: the loop invariant `x != y` is not preserved by an iteration
-tests/sources/functional/loops.move:159:5: error: verex verification failed: the automatic verification of `nested_loop_inner_invariant_incorrect` failed; provide a proof: `verify nested_loop_inner_invariant_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify nested_loop_inner_invariant_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:159:5: error: verex verification failed: the automatic verification of `nested_loop_inner_invariant_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify nested_loop_inner_invariant_incorrect by
+    verex_obligations
+    verex_on
+    | invariant_1_entry => verex_prepare; sorry
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:189:17: error: the loop invariant `x < y` is not preserved by an iteration
-tests/sources/functional/loops.move:202:5: error: verex verification failed: the automatic verification of `loop_with_two_back_edges_incorrect` failed; provide a proof: `verify loop_with_two_back_edges_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify loop_with_two_back_edges_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:202:5: error: verex verification failed: the automatic verification of `loop_with_two_back_edges_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify loop_with_two_back_edges_incorrect by
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:234:9: error: the assertion `i <= 11` does not hold
-tests/sources/functional/loops.move:242:5: error: verex verification failed: the automatic verification of `iter10_assert_instead_of_invariant` failed; provide a proof: `verify iter10_assert_instead_of_invariant by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_assert_instead_of_invariant by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:242:5: error: verex verification failed: the automatic verification of `iter10_assert_instead_of_invariant` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify iter10_assert_instead_of_invariant by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:210:17: error: the loop invariant `x != 0` is not established at entry
-tests/sources/functional/loops.move:206:5: error: verex verification failed: the automatic verification of `loop_invariant_base_invalid` failed; provide a proof: `verify loop_invariant_base_invalid by …` in `tests/sources/functional/loops.proof.lean` (`verify loop_invariant_base_invalid by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:206:5: error: verex verification failed: the automatic verification of `loop_invariant_base_invalid` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify loop_invariant_base_invalid by
+    verex_obligations
+    verex_on
+    | invariant_1_entry => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loops.move:223:17: error: the loop invariant `x == 0` is not preserved by an iteration
-tests/sources/functional/loops.move:219:5: error: verex verification failed: the automatic verification of `loop_invariant_induction_invalid` failed; provide a proof: `verify loop_invariant_induction_invalid by …` in `tests/sources/functional/loops.proof.lean` (`verify loop_invariant_induction_invalid by verex_obligations` lists its obligations)
+tests/sources/functional/loops.move:219:5: error: verex verification failed: the automatic verification of `loop_invariant_induction_invalid` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
+  verify loop_invariant_induction_invalid by
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

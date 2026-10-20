@@ -3,6 +3,8 @@ tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: er
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 f :
@@ -24,11 +26,11 @@ assumed :
       VerexIR.Proofs.Denote.NRow.nil)
     f.val
 permitted : True
-fst✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-left✝¹ : 0 ≤ x_value.val
-right✝¹ : x_value.val ≤ 18446744073709551615
-left✝ : 0 ≤ fst✝.val
-right✝ : fst✝.val ≤ 18446744073709551615
+x_final : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+x_value_lower : 0 ≤ x_value.val
+x_value_upper : x_value.val ≤ 18446744073709551615
+x_final_lower : 0 ≤ x_final.val
+x_final_upper : x_final.val ≤ 18446744073709551615
 ⊢ VerexIR.Proofs.wp
     (VerexIR.Proofs.Denote.closureMeaning executable✝ f.val
       (VerexIR.Proofs.Denote.NRow.cons
@@ -37,7 +39,7 @@ right✝ : fst✝.val ≤ 18446744073709551615
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
               VerexIR.Proofs.Denote.NRow.nil)).ref
         VerexIR.Proofs.Denote.NRow.nil)
-      VerexIR.Proofs.Denote.ResultShape.none (((x_value, PUnit.unit), fst✝, PUnit.unit), ()))
+      VerexIR.Proofs.Denote.ResultShape.none (((x_value, PUnit.unit), x_final, PUnit.unit), ()))
     (fun value state =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
@@ -49,7 +51,7 @@ right✝ : fst✝.val ≤ 18446744073709551615
                 fun values env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value (value, values) env))
             fun values env =>
             VerexIR.Proofs.Spec.bind
-              (VerexIR.Proofs.Denote.closureMeaning executable✝ f.val
+              ((VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).invoke f.val
                 (VerexIR.Proofs.Denote.NRow.cons
                   (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
                       VerexIR.Proofs.Denote.NRow.nil
@@ -108,4 +110,10 @@ right✝ : fst✝.val ≤ 18446744073709551615
             (fun failure => True) state)
         (fun failure => True) state)
     (fun failure => True) initialState✝
-tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verex verification failed: the automatic verification of `apply_twice` failed; provide a proof: `verify apply_twice by …` in `tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.proof.lean` (`verify apply_twice by verex_obligations` lists its obligations)
+tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verex verification failed: the automatic verification of `apply_twice` failed; provide a proof in `tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.proof.lean`:
+  verify apply_twice by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
