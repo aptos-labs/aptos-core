@@ -190,6 +190,16 @@ pub static RECEIVED_RESPONSE_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking received data responses that failed verification
+pub static RECEIVED_RESPONSE_VERIFICATION_FAILURE: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_data_streaming_service_received_response_verification_failure",
+        "Counters related to received data responses that failed verification",
+        &["request_type"]
+    )
+    .unwrap()
+});
+
 /// Counter that keeps track of the subscription stream lag (versions)
 pub static SUBSCRIPTION_STREAM_LAG: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

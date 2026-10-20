@@ -12,7 +12,7 @@ use crate::{
         GetAllTransactionsRequest, NotificationAndFeedback, NotificationFeedback, SnapshotKind,
         StreamRequest, StreamingServiceListener, TerminateStreamRequest,
     },
-    tests::utils::{create_ledger_info, initialize_logger},
+    tests::utils::{create_epoch_state, create_ledger_info, initialize_logger},
 };
 use claims::assert_ok;
 use futures::{channel::mpsc, executor::block_on, FutureExt, StreamExt};
@@ -150,13 +150,13 @@ fn test_continuously_stream_transactions() {
 
     // Note the request we expect to receive on the streaming service side
     let known_version = 101;
-    let known_epoch = 2;
+    let known_epoch_state = create_epoch_state(2);
     let include_events = false;
     let target = None;
     let expected_request =
         StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: known_epoch_state.clone(),
             include_events,
             target: target.clone(),
         });
@@ -167,7 +167,7 @@ fn test_continuously_stream_transactions() {
     // Send a continuous transaction stream request and verify we get a data stream listener
     let response = block_on(streaming_service_client.continuously_stream_transactions(
         known_version,
-        known_epoch,
+        known_epoch_state,
         include_events,
         target,
     ));
@@ -182,12 +182,12 @@ fn test_continuously_stream_transaction_outputs() {
 
     // Note the request we expect to receive on the streaming service side
     let request_start_version = 101;
-    let request_start_epoch = 2;
+    let request_start_epoch_state = create_epoch_state(2);
     let target = Some(create_ledger_info(1000, 10, true));
     let expected_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version: request_start_version,
-            known_epoch: request_start_epoch,
+            known_epoch_state: request_start_epoch_state.clone(),
             target: target.clone(),
         },
     );
@@ -199,7 +199,7 @@ fn test_continuously_stream_transaction_outputs() {
     let response = block_on(
         streaming_service_client.continuously_stream_transaction_outputs(
             request_start_version,
-            request_start_epoch,
+            request_start_epoch_state,
             target,
         ),
     );

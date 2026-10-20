@@ -21,12 +21,14 @@ use crate::{
     },
     streaming_service::StreamUpdateNotification,
     tests::utils::{
-        create_data_client_response, create_ledger_info, create_output_list_with_proof,
-        create_random_u64, create_transaction_list_with_proof, get_data_notification,
-        initialize_logger, MockAptosDataClient, NoopResponseCallback, MAX_ADVERTISED_EPOCH_END,
-        MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION, MAX_ADVERTISED_TRANSACTION_OUTPUT,
-        MAX_NOTIFICATION_TIMEOUT_SECS, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
-        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        create_data_client_response, create_epoch_state, create_ledger_info,
+        create_output_list_with_proof, create_random_u64, create_signed_epoch_ending_ledger_info,
+        create_transaction_list_with_proof, create_validators_and_epoch_state,
+        get_data_notification, initialize_logger, MockAptosDataClient, NoopResponseCallback,
+        MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_NOTIFICATION_TIMEOUT_SECS, MAX_RESPONSE_ID,
+        MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES, MIN_ADVERTISED_TRANSACTION,
+        MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -35,7 +37,7 @@ use aptos_config::config::{
 };
 use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
-    interface::{Response, ResponseContext, ResponsePayload},
+    interface::{Response, ResponseCallback, ResponseContext, ResponseError, ResponsePayload},
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
@@ -1327,6 +1329,97 @@ async fn test_continuous_stream_epoch_change_retry() {
         // i.e., a target has been found and we're fetching data up to it.
         verify_num_sent_requests(&mut data_stream, 3);
     }
+}
+
+#[tokio::test]
+async fn test_continuous_stream_epoch_change_verification() {
+    // Create a test streaming service config with dynamic prefetching disabled
+    let max_concurrent_requests = 3;
+    let dynamic_prefetching_config = DynamicPrefetchingConfig {
+        enable_dynamic_prefetching: false,
+        ..Default::default()
+    };
+    let streaming_service_config = DataStreamingServiceConfig {
+        dynamic_prefetching: dynamic_prefetching_config,
+        max_concurrent_requests,
+        ..Default::default()
+    };
+
+    // Create a continuous transaction stream with a trusted validator set
+    let (signers, epoch_state) = create_validators_and_epoch_state(0, MIN_ADVERTISED_EPOCH_END);
+    let stream_request =
+        StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
+            known_version: MIN_ADVERTISED_TRANSACTION,
+            known_epoch_state: epoch_state,
+            include_events: false,
+            target: None,
+        });
+    let (mut data_stream, _stream_listener, _) = create_data_stream(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+        stream_request,
+    );
+
+    // Initialize the data stream and verify an epoch ending ledger info is requested
+    let global_data_summary = create_global_data_summary(1);
+    initialize_data_requests(&mut data_stream, &global_data_summary);
+    verify_num_sent_requests(&mut data_stream, 1);
+    let epoch_ending_request =
+        DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
+            start_epoch: MIN_ADVERTISED_EPOCH_END,
+            end_epoch: MIN_ADVERTISED_EPOCH_END,
+        });
+    assert_eq!(
+        get_pending_client_request(&mut data_stream, 0),
+        epoch_ending_request
+    );
+
+    // Respond with an epoch ending ledger info from a different validator set
+    let (other_signers, next_epoch_state) =
+        create_validators_and_epoch_state(1, MIN_ADVERTISED_EPOCH_END + 1);
+    let epoch_ending_version = MIN_ADVERTISED_TRANSACTION + 100;
+    let reported_errors = Arc::new(Mutex::new(vec![]));
+    set_response_in_queue_with_callback(
+        &mut data_stream,
+        0,
+        ResponsePayload::EpochEndingLedgerInfos(vec![create_signed_epoch_ending_ledger_info(
+            &other_signers,
+            epoch_ending_version,
+            MIN_ADVERTISED_EPOCH_END,
+            next_epoch_state.clone(),
+        )]),
+        reported_errors.clone(),
+    );
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+
+    // Verify the peer was penalized and the epoch ending request was resent
+    assert_eq!(reported_errors.lock().clone(), vec![
+        ResponseError::ProofVerificationError
+    ]);
+    verify_num_sent_requests(&mut data_stream, 1);
+    assert_eq!(
+        get_pending_client_request(&mut data_stream, 0),
+        epoch_ending_request
+    );
+
+    // Respond with an epoch ending ledger info signed by the trusted validators
+    let reported_errors = Arc::new(Mutex::new(vec![]));
+    set_response_in_queue_with_callback(
+        &mut data_stream,
+        0,
+        ResponsePayload::EpochEndingLedgerInfos(vec![create_signed_epoch_ending_ledger_info(
+            &signers,
+            epoch_ending_version,
+            MIN_ADVERTISED_EPOCH_END,
+            next_epoch_state,
+        )]),
+        reported_errors.clone(),
+    );
+    process_data_responses(&mut data_stream, &global_data_summary).await;
+
+    // Verify no peer was penalized and data is now requested up to the target
+    assert!(reported_errors.lock().is_empty());
+    verify_num_sent_requests(&mut data_stream, max_concurrent_requests);
 }
 
 #[tokio::test]
@@ -3359,7 +3452,7 @@ fn create_continuous_transaction_output_stream(
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             target: None,
         },
     );
@@ -3381,7 +3474,7 @@ fn create_continuous_transaction_stream(
     let stream_request =
         StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             include_events: false,
             target: None,
         });
@@ -3403,7 +3496,7 @@ fn create_continuous_transaction_or_output_stream(
     let stream_request = StreamRequest::ContinuouslyStreamTransactionsOrOutputs(
         ContinuouslyStreamTransactionsOrOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             include_events: false,
             target: None,
         },
@@ -3664,6 +3757,35 @@ fn set_epoch_ending_response_in_queue(
         )]),
     )));
     pending_response.lock().client_response = client_response;
+}
+
+/// Sets the client response at the index in the pending queue to the given
+/// payload. Any bad response notifications are recorded in `reported_errors`.
+fn set_response_in_queue_with_callback(
+    data_stream: &mut DataStream<MockAptosDataClient>,
+    index: usize,
+    payload: ResponsePayload,
+    reported_errors: Arc<Mutex<Vec<ResponseError>>>,
+) {
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
+    let pending_response = sent_requests.as_mut().unwrap().get_mut(index).unwrap();
+    let context = ResponseContext::new(
+        create_random_u64(MAX_RESPONSE_ID),
+        Box::new(RecordingResponseCallback { reported_errors }),
+    );
+    pending_response.lock().client_response = Some(Ok(Response::new(context, payload)));
+}
+
+/// A response callback that records all bad response notifications
+#[derive(Debug)]
+struct RecordingResponseCallback {
+    reported_errors: Arc<Mutex<Vec<ResponseError>>>,
+}
+
+impl ResponseCallback for RecordingResponseCallback {
+    fn notify_bad_response(&self, error: ResponseError) {
+        self.reported_errors.lock().push(error);
+    }
 }
 
 /// Sets the client response at the index in the pending queue to contain a

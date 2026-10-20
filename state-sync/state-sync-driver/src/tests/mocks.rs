@@ -398,14 +398,14 @@ mock! {
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
-            start_epoch: Epoch,
+            start_epoch_state: EpochState,
             target: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn continuously_stream_transactions(
             &self,
             start_version: Version,
-            start_epoch: Epoch,
+            start_epoch_state: EpochState,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
@@ -413,7 +413,7 @@ mock! {
         async fn continuously_stream_transactions_or_outputs(
             &self,
             start_version: Version,
-            start_epoch: Epoch,
+            start_epoch_state: EpochState,
             include_events: bool,
             target: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;

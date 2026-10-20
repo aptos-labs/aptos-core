@@ -471,6 +471,19 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 Ok(client_response) => {
                     // Sanity check and process the response
                     if sanity_check_client_response_type(client_request, &client_response) {
+                        // Verify the response before it can affect the stream
+                        if let Err(error) = self
+                            .stream_engine
+                            .verify_client_response(client_request, &client_response.payload)
+                        {
+                            self.handle_verification_failure(
+                                client_request,
+                                &client_response.context,
+                                error,
+                            )?;
+                            break; // We're now head of line blocked on the failed request
+                        }
+
                         // If the response wasn't enough to satisfy the original request (e.g.,
                         // it was truncated), missing data should be requested.
                         let mut head_of_line_blocked = false;
@@ -708,6 +721,28 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             .message("Encountered a client response that failed the sanity checks!"));
 
         self.notify_bad_response(response_context, ResponseError::InvalidPayloadDataType);
+        self.resend_data_client_request(data_client_request)
+    }
+
+    /// Handles a client response that failed verification
+    fn handle_verification_failure(
+        &mut self,
+        data_client_request: &DataClientRequest,
+        response_context: &ResponseContext,
+        error: Error,
+    ) -> Result<(), Error> {
+        warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
+            .stream_id(self.data_stream_id)
+            .event(LogEvent::Error)
+            .error(&error)
+            .message("Encountered a client response that failed verification!"));
+        increment_counter(
+            &metrics::RECEIVED_RESPONSE_VERIFICATION_FAILURE,
+            data_client_request.get_label(),
+        );
+
+        // Penalize the peer, so its advertisements are eventually ignored
+        self.notify_bad_response(response_context, ResponseError::ProofVerificationError);
         self.resend_data_client_request(data_client_request)
     }
 

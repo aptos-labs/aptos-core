@@ -7,7 +7,7 @@ use crate::{
         ContinuouslyStreamTransactionOutputsRequest, GetAllEpochEndingLedgerInfosRequest,
         GetAllStatesRequest, GetAllTransactionsRequest, SnapshotKind, StreamRequest,
     },
-    tests::utils::create_ledger_info,
+    tests::utils::{create_epoch_state, create_ledger_info},
 };
 use aptos_config::config::{DataStreamingServiceConfig, DynamicPrefetchingConfig};
 use aptos_data_client::global_summary::GlobalDataSummary;
@@ -143,7 +143,7 @@ fn create_client_requests_continuous_output_stream() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             target: None,
         },
     );
@@ -198,7 +198,7 @@ fn create_client_requests_continuous_output_stream_optimistic_fetch() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             target: None,
         },
     );
@@ -273,7 +273,7 @@ fn create_client_requests_continuous_output_stream_subscriptions() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             target: None,
         },
     );
@@ -334,7 +334,7 @@ fn create_client_requests_continuous_output_stream_prefetching() {
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
             known_version,
-            known_epoch,
+            known_epoch_state: create_epoch_state(known_epoch),
             target: None,
         },
     );

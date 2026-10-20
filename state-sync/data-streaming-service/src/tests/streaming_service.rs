@@ -11,11 +11,12 @@ use crate::{
     },
     streaming_service::DataStreamingService,
     tests::utils::{
-        create_ledger_info, get_data_notification, initialize_logger, MockAptosDataClient,
-        MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END, MAX_REAL_TRANSACTION,
-        MAX_REAL_TRANSACTION_OUTPUT, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
-        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_STATE_VALUES,
+        create_epoch_state, create_ledger_info, get_data_notification, initialize_logger,
+        MockAptosDataClient, MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES,
+        MAX_ADVERTISED_TRANSACTION, MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END,
+        MAX_REAL_TRANSACTION, MAX_REAL_TRANSACTION_OUTPUT, MIN_ADVERTISED_EPOCH_END,
+        MIN_ADVERTISED_STATES, MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        TOTAL_NUM_STATE_VALUES,
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
@@ -132,7 +133,7 @@ async fn test_notifications_continuous_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await
@@ -151,7 +152,7 @@ async fn test_notifications_continuous_outputs_limited_chunks() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await
@@ -172,7 +173,7 @@ async fn test_notifications_continuous_outputs_target() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             Some(target),
         )
         .await
@@ -226,7 +227,7 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             next_expected_version - 1,
-            next_expected_epoch,
+            create_epoch_state(next_expected_epoch),
             None,
         )
         .await
@@ -273,7 +274,7 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                     stream_listener = streaming_client
                         .continuously_stream_transaction_outputs(
                             next_expected_version - 1,
-                            next_expected_epoch,
+                            create_epoch_state(next_expected_epoch),
                             None,
                         )
                         .await
@@ -299,7 +300,7 @@ async fn test_notifications_continuous_transactions() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -319,7 +320,7 @@ async fn test_notifications_continuous_transactions_limited_chunks() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -341,7 +342,7 @@ async fn test_notifications_continuous_transactions_target() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             Some(target),
         )
@@ -404,7 +405,7 @@ async fn test_notifications_continuous_transactions_multiple_streams() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             next_expected_version - 1,
-            next_expected_epoch,
+            create_epoch_state(next_expected_epoch),
             true,
             None,
         )
@@ -454,7 +455,7 @@ async fn test_notifications_continuous_transactions_multiple_streams() {
                     stream_listener = streaming_client
                         .continuously_stream_transactions(
                             next_expected_version - 1,
-                            next_expected_epoch,
+                            create_epoch_state(next_expected_epoch),
                             true,
                             None,
                         )
@@ -481,7 +482,7 @@ async fn test_notifications_continuous_transactions_or_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -501,7 +502,7 @@ async fn test_notifications_continuous_transactions_or_outputs_limited_chunks() 
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -523,7 +524,7 @@ async fn test_notifications_continuous_transactions_or_outputs_target() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             Some(target),
         )
@@ -609,7 +610,7 @@ async fn test_notifications_continuous_transactions_or_outputs_multiple_streams(
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             next_expected_version - 1,
-            next_expected_epoch,
+            create_epoch_state(next_expected_epoch),
             true,
             None,
         )
@@ -681,7 +682,7 @@ async fn test_notifications_continuous_transactions_or_outputs_multiple_streams(
             stream_listener = streaming_client
                 .continuously_stream_transactions_or_outputs(
                     next_expected_version - 1,
-                    next_expected_epoch,
+                    create_epoch_state(next_expected_epoch),
                     true,
                     None,
                 )
@@ -787,7 +788,7 @@ async fn test_notifications_optimistic_fetch_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await
@@ -808,7 +809,7 @@ async fn test_notifications_optimistic_fetch_transactions() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             false,
             None,
         )
@@ -830,7 +831,7 @@ async fn test_notifications_optimistic_fetch_transactions_or_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             false,
             None,
         )
@@ -852,7 +853,7 @@ async fn test_notifications_subscribe_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await
@@ -887,7 +888,7 @@ async fn test_notifications_subscribe_outputs_small_max() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await
@@ -909,7 +910,7 @@ async fn test_notifications_subscribe_transactions() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             false,
             None,
         )
@@ -945,7 +946,7 @@ async fn test_notifications_subscribe_transactions_small_max() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             false,
             None,
         )
@@ -971,7 +972,7 @@ async fn test_notifications_subscribe_transactions_or_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             false,
             None,
         )
@@ -1007,7 +1008,7 @@ async fn test_notifications_subscribe_transactions_or_outputs_small_max() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions_or_outputs(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             false,
             None,
         )
@@ -1280,7 +1281,7 @@ async fn test_stream_continuous_outputs() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await;
@@ -1290,7 +1291,7 @@ async fn test_stream_continuous_outputs() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 2,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await;
@@ -1300,7 +1301,7 @@ async fn test_stream_continuous_outputs() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             None,
         )
         .await;
@@ -1316,7 +1317,7 @@ async fn test_stream_continuous_outputs_target() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION_OUTPUT,
                 MAX_ADVERTISED_EPOCH_END,
@@ -1332,7 +1333,7 @@ async fn test_stream_continuous_outputs_target() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
                 MAX_ADVERTISED_EPOCH_END,
@@ -1352,7 +1353,7 @@ async fn test_stream_continuous_transactions() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -1363,7 +1364,7 @@ async fn test_stream_continuous_transactions() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 2,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -1374,7 +1375,7 @@ async fn test_stream_continuous_transactions() {
     let result = streaming_client
         .continuously_stream_transactions(
             MAX_ADVERTISED_TRANSACTION + 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             None,
         )
@@ -1391,7 +1392,7 @@ async fn test_stream_continuous_transactions_target() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION,
@@ -1408,7 +1409,7 @@ async fn test_stream_continuous_transactions_target() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH_END,
+            create_epoch_state(MIN_ADVERTISED_EPOCH_END),
             true,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION + 1,

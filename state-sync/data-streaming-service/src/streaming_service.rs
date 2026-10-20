@@ -507,8 +507,8 @@ mod streaming_service_tests {
         tests::{
             streaming_service,
             utils::{
-                get_data_notification, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
-                MIN_ADVERTISED_TRANSACTION_OUTPUT,
+                create_epoch_state, get_data_notification, MIN_ADVERTISED_EPOCH_END,
+                MIN_ADVERTISED_STATES, MIN_ADVERTISED_TRANSACTION_OUTPUT,
             },
         },
     };
@@ -554,7 +554,7 @@ mod streaming_service_tests {
         let mut stream_listener = streaming_client
             .continuously_stream_transaction_outputs(
                 MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-                MIN_ADVERTISED_EPOCH_END,
+                create_epoch_state(MIN_ADVERTISED_EPOCH_END),
                 None,
             )
             .await

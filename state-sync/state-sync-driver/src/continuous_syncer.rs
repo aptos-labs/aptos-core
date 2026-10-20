@@ -15,7 +15,7 @@ use aptos_config::config::ContinuousSyncingMode;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback, NotificationFeedback},
+    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_infallible::Mutex;
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
@@ -104,9 +104,8 @@ impl<
         // Reset the chunk executor to flush any invalid state currently held in-memory
         self.storage_synchronizer.reset_chunk_executor()?;
 
-        // Fetch the highest synced version and epoch (in storage)
-        let (highest_synced_version, highest_synced_epoch) =
-            self.get_highest_synced_version_and_epoch()?;
+        // Fetch the highest synced version (in storage)
+        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
 
         // Fetch the highest epoch state (in storage)
         let highest_epoch_state = utils::fetch_latest_epoch_state(self.storage.clone())?;
@@ -123,7 +122,7 @@ impl<
                 self.streaming_client
                     .continuously_stream_transaction_outputs(
                         highest_synced_version,
-                        highest_synced_epoch,
+                        highest_epoch_state.clone(),
                         sync_request_target,
                     )
                     .await?
@@ -132,7 +131,7 @@ impl<
                 self.streaming_client
                     .continuously_stream_transactions(
                         highest_synced_version,
-                        highest_synced_epoch,
+                        highest_epoch_state.clone(),
                         false,
                         sync_request_target,
                     )
@@ -148,7 +147,7 @@ impl<
                     self.streaming_client
                         .continuously_stream_transaction_outputs(
                             highest_synced_version,
-                            highest_synced_epoch,
+                            highest_epoch_state.clone(),
                             sync_request_target,
                         )
                         .await?
@@ -161,7 +160,7 @@ impl<
                     self.streaming_client
                         .continuously_stream_transactions_or_outputs(
                             highest_synced_version,
-                            highest_synced_epoch,
+                            highest_epoch_state.clone(),
                             false,
                             sync_request_target,
                         )
@@ -261,14 +260,6 @@ impl<
     /// Returns the continuous syncing mode of the node
     fn get_continuous_syncing_mode(&self) -> ContinuousSyncingMode {
         self.driver_configuration.config.continuous_syncing_mode
-    }
-
-    /// Returns the highest synced version and epoch in storage
-    fn get_highest_synced_version_and_epoch(&self) -> Result<(Version, Epoch), Error> {
-        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
-        let highest_synced_epoch = utils::fetch_latest_epoch_state(self.storage.clone())?.epoch;
-
-        Ok((highest_synced_version, highest_synced_epoch))
     }
 
     /// Process a single transaction or transaction output data payload
