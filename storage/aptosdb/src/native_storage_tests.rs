@@ -7,9 +7,9 @@
 
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
-    position_db::PositionDb,
+    native_store::kv_db::PositionDb,
     schema::stale_position_value_index::{StalePositionValueIndex, StalePositionValueIndexSchema},
-    utils::truncation_helper::{get_position_commit_progress, truncate_position_db_shards},
+    utils::truncation_helper::{get_native_commit_progress, truncate_native_kv_db_shards},
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_temppath::TempPath;
@@ -267,11 +267,11 @@ fn truncate_advances_overall_position_commit_progress() {
 
     commit_one(&db, 3, key.clone(), upsert(3));
     commit_one(&db, 7, key.clone(), upsert(7));
-    assert_eq!(get_position_commit_progress(&db).unwrap(), Some(7));
+    assert_eq!(get_native_commit_progress(&db).unwrap(), Some(7));
 
-    truncate_position_db_shards(&db, 3).unwrap();
+    truncate_native_kv_db_shards(&db, 3).unwrap();
     assert_eq!(
-        get_position_commit_progress(&db).unwrap(),
+        get_native_commit_progress(&db).unwrap(),
         Some(3),
         "overall progress marker must reflect the truncated version"
     );
@@ -1288,7 +1288,7 @@ mod reopen {
         {
             let db = open(&dir, true);
             let bundle = db.position().unwrap();
-            crate::utils::truncation_helper::truncate_position_merkle_db(&bundle.merkle_db, 0)
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.merkle_db, 0)
                 .unwrap();
         }
         let db = Arc::new(

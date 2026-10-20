@@ -4,8 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    ledger_db::LedgerDb, position_buffered_state::PositionStateWithSummary,
-    position_merkle_batch_committer::PositionMerkleCommit, position_merkle_db::PositionMerkleDb,
+    ledger_db::LedgerDb,
+    native_store::{
+        buffered_state::NativeStateWithSummary, merkle_batch_committer::NativeMerkleCommit,
+        merkle_db::NativeMerkleDb, NativeStoreSpec,
+    },
 };
 use aptos_storage_interface::{
     state_store::{leaf_entry::leaf_entry_to_jmt_update, sharded_jmt_state::pre_shard_jmt_updates},
@@ -13,19 +16,19 @@ use aptos_storage_interface::{
 };
 
 /// Rendezvous channel.
-pub(crate) const POSITION_BATCH_CHANNEL_SIZE: usize = 0;
+pub(crate) const NATIVE_BATCH_CHANNEL_SIZE: usize = 0;
 
-pub(crate) struct PositionSnapshotToCommit {
-    pub snapshot: PositionStateWithSummary,
+pub(crate) struct NativeSnapshotToCommit {
+    pub snapshot: NativeStateWithSummary,
 }
 
 /// Advances `*last_snapshot` on success.
-pub(crate) fn merklize_position(
-    merkle_db: &PositionMerkleDb,
+pub(crate) fn merklize_native<T: NativeStoreSpec>(
+    merkle_db: &NativeMerkleDb<T>,
     ledger_db: &LedgerDb,
-    last_snapshot: &mut PositionStateWithSummary,
-    snapshot: PositionSnapshotToCommit,
-) -> Result<PositionMerkleCommit> {
+    last_snapshot: &mut NativeStateWithSummary,
+    snapshot: NativeSnapshotToCommit,
+) -> Result<NativeMerkleCommit> {
     let new_state = snapshot.snapshot;
     let version = new_state
         .version()
@@ -53,11 +56,13 @@ pub(crate) fn merklize_position(
             all_updates,
             previous_epoch_ending_version,
         )
-        .map_err(|e| AptosDbError::Other(format!("position JMT merklize_snapshot failed: {e}")))?;
+        .map_err(|e| {
+            AptosDbError::Other(format!("{} JMT merklize_snapshot failed: {e}", T::NAME))
+        })?;
 
     *last_snapshot = new_state.clone();
 
-    Ok(PositionMerkleCommit {
+    Ok(NativeMerkleCommit {
         version,
         root_hash,
         batch: crate::common::MerkleBatch {

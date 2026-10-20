@@ -4,7 +4,7 @@
 use crate::{
     backup::restore_utils,
     ledger_db::LedgerDb,
-    position_state_sync::new_position_snapshot_restore,
+    native_store::state_sync::new_native_snapshot_restore,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
@@ -74,7 +74,7 @@ impl RestoreHandler {
         let position = self.aptosdb.position.as_ref().ok_or_else(|| {
             AptosDbError::Other("native-position storage is not enabled on this DB".into())
         })?;
-        new_position_snapshot_restore(
+        new_native_snapshot_restore(
             &position.kv_db,
             &position.merkle_db,
             version,
