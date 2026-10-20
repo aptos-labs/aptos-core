@@ -28,6 +28,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use move_core_types::ident_str;
 use std::{collections::BTreeSet, sync::Arc};
 
 #[test]
@@ -266,7 +267,12 @@ fn test_epilogue_hotness_survives_state_sync() {
             .unwrap()
             .unwrap();
         let hotness: BTreeSet<_> = write_set.hotness_keys().cloned().collect();
-        assert_eq!(payload.try_get_keys_to_make_hot(), Some(&hotness));
+        let to_make_hot = payload.try_get_keys_to_make_hot().unwrap();
+        assert!(hotness.is_superset(to_make_hot));
+        // Only the epilogue reads it, so it comes from the epilogue's execution, not the payload.
+        let epilogue_read = StateKey::module(&CORE_CODE_ADDRESS, ident_str!("big_ordered_map"));
+        assert!(!to_make_hot.contains(&epilogue_read));
+        assert!(hotness.contains(&epilogue_read));
         hotness
     };
     let expected = epilogue_hotness(&db);
