@@ -27,6 +27,8 @@ pub type NumTypeTagPseudoGasUnits = GasQuantity<TypeTagPseudoGasUnit>;
 pub type AbstractValueSizePerTypeTagPseudoGasUnit =
     GasQuantity<UnitDiv<AbstractValueUnit, TypeTagPseudoGasUnit>>;
 
+pub type AbstractValueSizePerByte = GasQuantity<UnitDiv<AbstractValueUnit, Byte>>;
+
 /// Unit of (external) gas.
 pub enum GasUnit {}
 

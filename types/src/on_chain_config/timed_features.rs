@@ -79,6 +79,10 @@ pub enum TimedFeatureFlag {
     /// Requires variant field handles to list distinct variants that declare the field with
     /// the same type, so the verifier checks each borrow against one variant.
     UniformVariantFieldHandles,
+
+    /// Include the serialized size of a closure's captured layouts in its
+    /// abstract value size, since serialization writes them in full.
+    MeterClosureCapturedLayouts,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -144,7 +148,8 @@ impl TimedFeatureOverride {
                 | MeterValueNodesOnDeserialize
                 | MeterClosureTypeArguments
                 | MeterPackClosureCapturedValues
-                | UniformVariantFieldHandles,
+                | UniformVariantFieldHandles
+                | MeterClosureCapturedLayouts,
             ) => None,
         }
     }
@@ -344,7 +349,6 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
-            // Security fix: charge for the captured values traversed by the closure depth check.
             // Note: Set to a future date so forge's framework-upgrade compat test runs
             // with this feature off (see MeterClosureTypeArguments).
             (MeterPackClosureCapturedValues, TESTING) => Los_Angeles
@@ -367,6 +371,20 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (UniformVariantFieldHandles, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 12, 31, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Rolls out with MeterPackClosureCapturedValues.
+            (MeterClosureCapturedLayouts, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 11, 9, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterClosureCapturedLayouts, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 29, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterClosureCapturedLayouts, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 11, 4, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
