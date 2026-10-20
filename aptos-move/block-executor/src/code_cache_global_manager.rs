@@ -4,9 +4,10 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
-        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
-        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES,
+        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES,
+        NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -170,12 +171,13 @@ where
             self.module_cache.flush_all_caches();
         }
 
-        // If there are too many layouts: flush only them.
-        let num_layout_entries = self.module_cache.num_cached_layouts();
-        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(num_layout_entries as i64);
-        if num_layout_entries > config.max_layout_cache_size {
-            self.module_cache.flush_layout_cache();
-        }
+        // Layout cache size is bounded on every insertion (it is flushed if the new layout does
+        // not fit), here we only set the bound and record metrics.
+        self.module_cache
+            .set_max_layout_cache_size_in_bytes(config.max_layout_cache_size_in_bytes);
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(self.module_cache.num_cached_layouts() as i64);
+        GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES
+            .set(self.module_cache.layout_cache_size_estimate_in_bytes() as i64);
 
         Ok(())
     }
@@ -610,7 +612,7 @@ mod test {
             max_struct_name_index_map_num_entries: 2,
             max_interned_tys: 100,
             max_interned_ty_vecs: 100,
-            max_layout_cache_size: 10,
+            max_layout_cache_size_in_bytes: 1024,
             max_interned_module_ids: 100,
         };
 
