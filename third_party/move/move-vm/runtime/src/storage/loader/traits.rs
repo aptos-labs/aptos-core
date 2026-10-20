@@ -52,15 +52,15 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
         idx: &StructNameIndex,
     ) -> PartialVMResult<Arc<StructType>>;
 
-    /// Returns struct layout from cache if it exists, otherwise [None]. If layout exists, a result
-    /// is returned because loader may charge gas after loading the layout from cache and run out
-    /// of gas.
+    /// Returns struct layout and its serialized size from cache if it exists, otherwise [None].
+    /// If layout exists, a result is returned because loader may charge gas after loading the
+    /// layout from cache and run out of gas.
     fn load_layout_from_cache(
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
         _traversal_context: &mut TraversalContext,
         _key: &LayoutCacheKey,
-    ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
+    ) -> Option<PartialVMResult<(LayoutWithDelayedFields, u64)>> {
         None
     }
 

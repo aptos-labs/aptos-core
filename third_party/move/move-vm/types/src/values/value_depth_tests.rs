@@ -66,6 +66,10 @@ impl AbstractFunction for MockFunction {
     fn ty_args_pseudo_gas_cost(&self) -> u64 {
         0
     }
+
+    fn captured_layouts_size(&self) -> u64 {
+        0
+    }
 }
 
 #[test]

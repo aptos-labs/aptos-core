@@ -133,9 +133,9 @@ fn defining_module_size_estimate_in_bytes(module_id: &ModuleId) -> usize {
     PER_MODULE_FIXED_SIZE_ESTIMATE_IN_BYTES.saturating_add(2 * module_id.name().len())
 }
 
-/// Size of a cached layout regardless of its contents: key, layout and modules.
+/// Size of a cached layout regardless of its contents: key, entry and modules.
 const BASE_SIZE_ESTIMATE_IN_BYTES: usize = std::mem::size_of::<LayoutCacheKey>()
-    + std::mem::size_of::<LayoutWithDelayedFields>()
+    + std::mem::size_of::<LayoutCacheEntry>()
     + std::mem::size_of::<DefiningModules>()
     + 2 * ALLOCATION_OVERHEAD_IN_BYTES;
 
@@ -188,6 +188,11 @@ pub struct LayoutWithDelayedFields {
 }
 
 impl LayoutWithDelayedFields {
+    /// Returns the number of bytes the layout serializes to. Walks the layout.
+    pub(crate) fn serialized_size(&self) -> u64 {
+        self.layout.serialized_size()
+    }
+
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
     pub fn into_layout_when_has_no_delayed_fields(self) -> Option<TriompheArc<MoveTypeLayout>> {
@@ -286,6 +291,40 @@ where
         traversal_context: &mut TraversalContext,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
+        Ok(self
+            .type_to_type_layout_with_delayed_fields_and_cached_size(
+                gas_meter,
+                traversal_context,
+                ty,
+            )?
+            .0)
+    }
+
+    /// Like [Self::type_to_type_layout_with_delayed_fields], but also returns the number of bytes
+    /// the layout serializes to. Cached layouts store their size, so a cache hit does not walk the
+    /// layout.
+    pub(crate) fn type_to_type_layout_with_delayed_fields_and_size(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        ty: &Type,
+    ) -> PartialVMResult<(LayoutWithDelayedFields, u64)> {
+        let (layout, size) = self.type_to_type_layout_with_delayed_fields_and_cached_size(
+            gas_meter,
+            traversal_context,
+            ty,
+        )?;
+        let size = size.unwrap_or_else(|| layout.serialized_size());
+        Ok((layout, size))
+    }
+
+    /// Returns the layout of a type, and its serialized size if the layout is cached.
+    fn type_to_type_layout_with_delayed_fields_and_cached_size(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        ty: &Type,
+    ) -> PartialVMResult<(LayoutWithDelayedFields, Option<u64>)> {
         if self.vm_config().enable_layout_caches {
             if let Some(key) = self.layout_cache_key(ty) {
                 if let Some(result) = self.struct_definition_loader.load_layout_from_cache(
@@ -293,7 +332,7 @@ where
                     traversal_context,
                     &key,
                 ) {
-                    return result;
+                    return result.map(|(layout, size)| (layout, Some(size)));
                 }
 
                 // Otherwise a cache miss, compute the result and store it.
@@ -309,20 +348,22 @@ where
                 if size_estimate_in_bytes <= MAX_CACHED_LAYOUT_SIZE_ESTIMATE_IN_BYTES {
                     let cache_entry =
                         LayoutCacheEntry::new(layout.clone(), modules, size_estimate_in_bytes);
+                    let size = cache_entry.serialized_size();
                     self.struct_definition_loader
                         .store_layout_to_cache(&key, cache_entry)?;
+                    return Ok((layout, Some(size)));
                 }
-                return Ok(layout);
+                return Ok((layout, None));
             }
         }
 
-        self.type_to_type_layout_with_delayed_fields_impl::<false>(
+        let (layout, _) = self.type_to_type_layout_with_delayed_fields_impl::<false>(
             gas_meter,
             traversal_context,
             &mut DefiningModules::new(),
             ty,
-        )
-        .map(|(layout, _)| layout)
+        )?;
+        Ok((layout, None))
     }
 
     /// Returns the decorated layout of a type.
