@@ -47,7 +47,7 @@ impl WeightedVUF for BlsWUF {
     type SecretKey = Scalar;
     type SecretKeyShare = Vec<Scalar>;
 
-    fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn augment_key_pair<R: rand::RngCore + rand::CryptoRng>(
         _pp: &Self::PublicParameters,
         sk: Self::SecretKeyShare,
         pk: Self::PubKeyShare,

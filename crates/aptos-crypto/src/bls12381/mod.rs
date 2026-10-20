@@ -122,7 +122,7 @@
 //! use aptos_crypto::bls12381::bls12381_keys::{PrivateKey, PublicKey};
 //! use aptos_crypto::bls12381::ProofOfPossession;
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
-//! use rand_core::OsRng;
+//! use rand::rngs::OsRng;
 //! use serde::{Serialize, Deserialize};
 //!
 //! let mut rng = OsRng;
@@ -156,7 +156,7 @@
 //! use aptos_crypto::bls12381::bls12381_keys::{PrivateKey, PublicKey};
 //! use aptos_crypto::bls12381::{ProofOfPossession, UnvalidatedPublicKey};
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
-//! use rand_core::OsRng;
+//! use rand::rngs::OsRng;
 //! use serde::{Serialize, Deserialize};
 //! use aptos_crypto::validatable::Validatable;
 //!
@@ -229,7 +229,7 @@
 //! use aptos_crypto::bls12381::bls12381_keys::{PrivateKey, PublicKey};
 //! use aptos_crypto::bls12381::ProofOfPossession;
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
-//! use rand_core::OsRng;
+//! use rand::rngs::OsRng;
 //! use serde::{Serialize, Deserialize};
 //!
 //! // Each signer locally generates their own BLS key-pair with a proof-of-possesion (PoP).
@@ -326,7 +326,7 @@
 //! use aptos_crypto::bls12381::bls12381_keys::{PrivateKey, PublicKey};
 //! use aptos_crypto::bls12381::ProofOfPossession;
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
-//! use rand_core::OsRng;
+//! use rand::rngs::OsRng;
 //! use serde::{Serialize, Deserialize};
 //!
 //! // Each signer locally generates their own BLS key-pair with a proof-of-possesion (PoP).
