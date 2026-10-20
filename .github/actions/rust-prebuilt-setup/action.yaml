@@ -18,7 +18,6 @@ runs:
         export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$PATH"
         python3 - <<'PY'
         import hashlib, json, pathlib
-        # Written by internal-ops/.github/workflows/generate-rust-runner-image.yaml during image creation.
         manifest = json.loads(pathlib.Path('/opt/aptos-rust-image.json').read_text())
         for name, expected in manifest['files'].items():
             actual = hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
