@@ -422,6 +422,14 @@ pub static GLOBAL_LAYOUT_CACHE_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static GLOBAL_LAYOUT_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_layout_cache_size_in_bytes",
+        "Sum of estimated sizes (in bytes) of struct/enum layouts cached in global cache"
+    )
+    .unwrap()
+});
+
 pub static GLOBAL_LAYOUT_CACHE_MISSES: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "global_layout_cache_misses",
