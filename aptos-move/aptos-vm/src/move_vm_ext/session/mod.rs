@@ -641,13 +641,7 @@ fn build_position_writeset(
 ) -> PartialVMResult<BTreeMap<StateKey, WriteOp>> {
     let mut out = BTreeMap::new();
     for (key, maybe_position) in writes {
-        let state_key = match key {
-            TradingNativeKey::Position {
-                exchange,
-                account,
-                market,
-            } => StateKey::position(*exchange, *account, *market),
-        };
+        let state_key = StateKey::trading_native(key.clone());
         let op = match maybe_position {
             Some(pos) => {
                 let bytes = pos.serialize().map_err(|e| {

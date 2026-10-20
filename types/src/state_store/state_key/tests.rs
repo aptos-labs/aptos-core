@@ -3,7 +3,10 @@
 
 use crate::{
     account_config::{AccountResource, ObjectGroupResource},
-    state_store::state_key::StateKey,
+    state_store::state_key::{
+        inner::{StateKeyDecodeErr, StateKeyInner, TradingNativeKey, TradingNativeKeyTag},
+        StateKey,
+    },
 };
 use aptos_crypto::hash::CryptoHash;
 use move_core_types::{account_address::AccountAddress, ident_str, move_resource::MoveStructType};
@@ -89,7 +92,115 @@ fn test_debug() {
     assert_eq!(&format!("{:?}", key), "StateKey::Raw(010203)",);
 }
 
+fn addr(byte: u8) -> AccountAddress {
+    let mut bytes = [0u8; AccountAddress::LENGTH];
+    bytes[AccountAddress::LENGTH - 1] = byte;
+    AccountAddress::new(bytes)
+}
+
+/// Sub-tag ordinals are part of the on-disk key format.
+#[test]
+fn test_trading_native_sub_tags_pinned() {
+    assert_eq!(TradingNativeKeyTag::Position as u8, 0);
+    assert_eq!(TradingNativeKeyTag::Order as u8, 1);
+    assert_eq!(TradingNativeKeyTag::BulkOrder as u8, 2);
+}
+
+#[test]
+fn test_order_key_encoding() {
+    let order_id = 0x0102_0304_0506_0708_090A_0B0C_0D0E_0F10_u128;
+    let key = StateKey::order(addr(5), addr(2), order_id);
+
+    let mut expected = vec![2u8, TradingNativeKeyTag::Order as u8];
+    expected.extend_from_slice(addr(5).as_ref());
+    expected.extend_from_slice(addr(2).as_ref());
+    expected.extend_from_slice(&order_id.to_be_bytes());
+    assert_eq!(key.encoded().as_ref(), expected.as_slice());
+    assert_eq!(key.size(), 1 + AccountAddress::LENGTH * 2 + 16);
+    assert_eq!(StateKey::decode(key.encoded()).unwrap(), key);
+}
+
+#[test]
+fn test_bulk_order_key_encoding() {
+    let key = StateKey::bulk_order(addr(5), addr(2), addr(0x34));
+
+    let mut expected = vec![2u8, TradingNativeKeyTag::BulkOrder as u8];
+    expected.extend_from_slice(addr(5).as_ref());
+    expected.extend_from_slice(addr(2).as_ref());
+    expected.extend_from_slice(addr(0x34).as_ref());
+    assert_eq!(key.encoded().as_ref(), expected.as_slice());
+    assert_eq!(key.size(), 1 + AccountAddress::LENGTH * 3);
+    assert_eq!(StateKey::decode(key.encoded()).unwrap(), key);
+}
+
+#[test]
+fn test_trading_native_keys_are_distinct() {
+    // Same addresses under different sub-tags never collide.
+    let position = StateKey::position(addr(5), addr(2), addr(0x34));
+    let bulk_order = StateKey::bulk_order(addr(5), addr(2), addr(0x34));
+    assert_ne!(position, bulk_order);
+    assert_ne!(position.crypto_hash_ref(), bulk_order.crypto_hash_ref());
+}
+
+#[test]
+fn test_trading_native_decode_rejects_bad_input() {
+    let order = StateKey::order(addr(5), addr(2), 7);
+    let bytes = order.encoded();
+    assert!(matches!(
+        StateKey::decode(&bytes[..bytes.len() - 1]),
+        Err(StateKeyDecodeErr::NotEnoughBytes { .. })
+    ));
+    let mut long = bytes.to_vec();
+    long.push(0);
+    assert!(matches!(
+        StateKey::decode(&long),
+        Err(StateKeyDecodeErr::NotEnoughBytes { .. })
+    ));
+    let mut unknown = bytes.to_vec();
+    unknown[1] = 0xFF;
+    assert!(matches!(
+        StateKey::decode(&unknown),
+        Err(StateKeyDecodeErr::UnknownTradingNativeSubTag {
+            unknown_sub_tag: 0xFF
+        })
+    ));
+}
+
+#[test]
+fn test_trading_native_constructor_matches_typed() {
+    let key = TradingNativeKey::Order {
+        exchange: addr(5),
+        market: addr(2),
+        order_id: 7,
+    };
+    assert_eq!(
+        StateKey::trading_native(key.clone()),
+        StateKey::order(addr(5), addr(2), 7)
+    );
+    assert_eq!(
+        StateKey::trading_native(key.clone()).inner(),
+        &StateKeyInner::TradingNative(key)
+    );
+}
+
+#[test]
+fn test_trading_native_debug() {
+    assert_eq!(
+        format!("{:?}", StateKey::order(addr(5), addr(2), 7)),
+        "StateKey::TradingNative::Order { exchange: 0x5, market: 0x2, order_id: 7 }",
+    );
+    assert_eq!(
+        format!("{:?}", StateKey::bulk_order(addr(5), addr(2), addr(3))),
+        "StateKey::TradingNative::BulkOrder { exchange: 0x5, market: 0x2, account: 0x3 }",
+    );
+}
+
 proptest! {
+    #[test]
+    fn test_encode_decode_round_trip(key in any::<StateKey>()) {
+        prop_assert_eq!(StateKey::decode(key.encoded()).unwrap(), key);
+    }
+
     #[test]
     fn test_shard_order(
         key1 in any::<StateKey>(),
