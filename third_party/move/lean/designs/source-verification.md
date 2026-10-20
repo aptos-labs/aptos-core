@@ -160,7 +160,7 @@ it, as for its own command.
 `--heartbeats` sets the default budget.
 
 The Prover's unit tests (`move-prover/tests/sources`) run this way as the
-test feature `lean`, only on request and not in CI:
+test feature `lean`, on request, as the Lean CI workflow does:
 
 ```bash
 MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite [<path part>]

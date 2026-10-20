@@ -76,7 +76,8 @@ Currently, the following features are available:
 - `no_opaque`: runs tests in a special mode where the `opaque` pragma is ignored. This increases the load on the prover,
   and functions as a stress test.
 - `cvc5`: runs tests configured to use the cvc5 solver as a backend.
-- `lean`: runs tests with the Lean-based Verex verifier (`--lean`), only on request and not in CI. See below.
+- `lean`: runs tests with the Lean-based Verex verifier (`--lean`), only on request; CI requests it in the Lean
+  workflow. See below.
 
 ## Conventions
 
