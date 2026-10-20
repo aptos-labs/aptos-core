@@ -25,7 +25,7 @@ use aptos_crypto::{
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::iter::repeat_with;
 

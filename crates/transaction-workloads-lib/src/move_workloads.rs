@@ -26,8 +26,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use once_cell::sync::Lazy;
-use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
-use rand_core::RngCore;
+use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,

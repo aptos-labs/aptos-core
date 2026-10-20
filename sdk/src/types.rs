@@ -246,7 +246,7 @@ impl LocalAccount {
 
     pub fn generate_for_testing<R1>(rng: &mut R1, keyless_mode: bool) -> Self
     where
-        R1: Rng + rand_core::CryptoRng,
+        R1: Rng + rand::CryptoRng,
     {
         if keyless_mode {
             let config = keyless::Configuration::new_for_testing();
@@ -339,7 +339,7 @@ impl LocalAccount {
     /// account locally.
     pub fn generate<R>(rng: &mut R) -> Self
     where
-        R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+        R: ::rand::RngCore + ::rand::CryptoRng,
     {
         let key = AccountKey::generate(rng);
         let address = key.authentication_key().account_address();
@@ -729,7 +729,7 @@ pub struct AccountKey {
 impl AccountKey {
     pub fn generate<R>(rng: &mut R) -> Self
     where
-        R: rand_core::RngCore + rand_core::CryptoRng,
+        R: rand::RngCore + rand::CryptoRng,
     {
         let private_key = Ed25519PrivateKey::generate(rng);
         Self::from_private_key(private_key)

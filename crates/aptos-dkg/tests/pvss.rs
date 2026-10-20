@@ -30,8 +30,7 @@ use aptos_dkg::pvss::{
 };
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
-use rand::{rngs::StdRng, thread_rng};
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, thread_rng, CryptoRng, RngCore, SeedableRng};
 use std::time::Instant;
 
 // TODO: Add a test for public parameters serialization roundtrip?
