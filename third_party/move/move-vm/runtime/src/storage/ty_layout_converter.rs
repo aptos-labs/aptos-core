@@ -185,27 +185,9 @@ impl LayoutConstructionCounter {
 pub struct LayoutWithDelayedFields {
     layout: TriompheArc<MoveTypeLayout>,
     contains_delayed_fields: bool,
-    /// Estimated number of bytes this layout and its defining modules occupy in memory.
-    size_estimate_in_bytes: usize,
 }
 
 impl LayoutWithDelayedFields {
-    /// Returns the estimated number of bytes this layout (and the modules used to construct it)
-    /// occupy in memory.
-    pub fn size_estimate_in_bytes(&self) -> usize {
-        self.size_estimate_in_bytes
-    }
-
-    /// Returns a dummy layout with the specified size estimate. Used for tests only.
-    #[cfg(any(test, feature = "testing"))]
-    pub(crate) fn new_for_testing(size_estimate_in_bytes: usize) -> Self {
-        Self {
-            layout: TriompheArc::new(MoveTypeLayout::U8),
-            contains_delayed_fields: false,
-            size_estimate_in_bytes,
-        }
-    }
-
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
     pub fn into_layout_when_has_no_delayed_fields(self) -> Option<TriompheArc<MoveTypeLayout>> {
@@ -221,6 +203,19 @@ impl LayoutWithDelayedFields {
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
     pub fn unpack(self) -> (TriompheArc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
+    }
+}
+
+// Defined here because only this module can construct a [LayoutWithDelayedFields].
+#[cfg(any(test, feature = "testing"))]
+impl LayoutCacheEntry {
+    /// Returns an entry with a dummy layout of the specified size estimate. Used for tests only.
+    pub fn new_for_testing(size_estimate_in_bytes: usize) -> Self {
+        let layout = LayoutWithDelayedFields {
+            layout: TriompheArc::new(MoveTypeLayout::U8),
+            contains_delayed_fields: false,
+        };
+        Self::new(layout, DefiningModules::new(), size_estimate_in_bytes)
     }
 }
 
@@ -303,15 +298,17 @@ where
 
                 // Otherwise a cache miss, compute the result and store it.
                 let mut modules = DefiningModules::new();
-                let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
-                    gas_meter,
-                    traversal_context,
-                    &mut modules,
-                    ty,
-                )?;
+                let (layout, size_estimate_in_bytes) = self
+                    .type_to_type_layout_with_delayed_fields_impl::<false>(
+                        gas_meter,
+                        traversal_context,
+                        &mut modules,
+                        ty,
+                    )?;
                 // Do not cache layouts that are too large, to keep cache memory bounded.
-                if layout.size_estimate_in_bytes() <= MAX_CACHED_LAYOUT_SIZE_ESTIMATE_IN_BYTES {
-                    let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
+                if size_estimate_in_bytes <= MAX_CACHED_LAYOUT_SIZE_ESTIMATE_IN_BYTES {
+                    let cache_entry =
+                        LayoutCacheEntry::new(layout.clone(), modules, size_estimate_in_bytes);
                     self.struct_definition_loader
                         .store_layout_to_cache(&key, cache_entry)?;
                 }
@@ -325,6 +322,7 @@ where
             &mut DefiningModules::new(),
             ty,
         )
+        .map(|(layout, _)| layout)
     }
 
     /// Returns the decorated layout of a type.
@@ -342,6 +340,7 @@ where
             &mut DefiningModules::new(),
             ty,
         )
+        .map(|(layout, _)| layout)
     }
 
     /// Returns the VM config used in the system.
@@ -420,13 +419,15 @@ where
     }
 
     /// Entrypoint into layout construction. Additionally, measures the time taken to construct it.
+    /// Returns the layout and the estimated number of bytes it (and its defining modules) occupy
+    /// in memory when cached.
     fn type_to_type_layout_with_delayed_fields_impl<const ANNOTATED: bool>(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         modules: &mut DefiningModules,
         ty: &Type,
-    ) -> PartialVMResult<LayoutWithDelayedFields> {
+    ) -> PartialVMResult<(LayoutWithDelayedFields, usize)> {
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
         let mut count = LayoutConstructionCounter::new();
@@ -442,11 +443,11 @@ where
             1,
             &mut struct_layout_cache,
         )?;
-        Ok(LayoutWithDelayedFields {
+        let layout = LayoutWithDelayedFields {
             layout: TriompheArc::new(layout),
             contains_delayed_fields,
-            size_estimate_in_bytes: count.size_estimate_in_bytes,
-        })
+        };
+        Ok((layout, count.size_estimate_in_bytes))
     }
 
     /// Converts [Type] to [MoveTypeLayout]. Fails if there is not enough gas to account for module
@@ -1096,7 +1097,6 @@ mod tests {
             // Dummy layout.
             layout: TriompheArc::new(MoveTypeLayout::U8),
             contains_delayed_fields,
-            size_estimate_in_bytes: 0,
         };
         assert_eq!(
             layout.layout_when_contains_delayed_fields().is_some(),
@@ -1113,7 +1113,17 @@ mod tests {
         layout_converter: &LayoutConverter<MockStructDefinitionLoader>,
         ty: &Type,
     ) -> usize {
-        assert_ok!(construct_layout_for_test(layout_converter, ty, false)).size_estimate_in_bytes()
+        let mut gas_meter = UnmeteredGasMeter;
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+        let result = layout_converter.type_to_type_layout_with_delayed_fields_impl::<false>(
+            &mut gas_meter,
+            &mut traversal_context,
+            &mut DefiningModules::new(),
+            ty,
+        );
+        let (_, size_estimate_in_bytes) = assert_ok!(result);
+        size_estimate_in_bytes
     }
 
     fn module_size_estimate(name: &str) -> usize {

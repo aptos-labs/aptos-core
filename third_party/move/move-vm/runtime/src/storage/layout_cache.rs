@@ -73,28 +73,26 @@ impl DefiningModules {
 pub struct LayoutCacheEntry {
     layout: LayoutWithDelayedFields,
     modules: TriompheArc<DefiningModules>,
+    /// Estimated number of bytes this entry (layout and defining modules) occupies in memory.
+    size_estimate_in_bytes: usize,
 }
 
 impl LayoutCacheEntry {
-    pub(crate) fn new(layout: LayoutWithDelayedFields, modules: DefiningModules) -> Self {
+    pub(crate) fn new(
+        layout: LayoutWithDelayedFields,
+        modules: DefiningModules,
+        size_estimate_in_bytes: usize,
+    ) -> Self {
         Self {
             layout,
             modules: TriompheArc::new(modules),
+            size_estimate_in_bytes,
         }
-    }
-
-    /// Returns an entry with a dummy layout of the specified size estimate. Used for tests only.
-    #[cfg(any(test, feature = "testing"))]
-    pub fn new_for_testing(size_estimate_in_bytes: usize) -> Self {
-        Self::new(
-            LayoutWithDelayedFields::new_for_testing(size_estimate_in_bytes),
-            DefiningModules::new(),
-        )
     }
 
     /// Returns the estimated number of bytes this entry occupies in memory.
     pub fn size_estimate_in_bytes(&self) -> usize {
-        self.layout.size_estimate_in_bytes()
+        self.size_estimate_in_bytes
     }
 
     pub(crate) fn unpack(self) -> (LayoutWithDelayedFields, TriompheArc<DefiningModules>) {
