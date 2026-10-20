@@ -26,7 +26,7 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 #[cfg(feature = "testing")]
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
 

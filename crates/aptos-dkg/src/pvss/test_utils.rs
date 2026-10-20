@@ -21,8 +21,7 @@ use aptos_crypto::{
 use ark_ec::pairing::Pairing;
 use ark_ff::{FftField, Fp, FpConfig};
 use num_traits::Zero;
-use rand::{prelude::ThreadRng, thread_rng};
-use rand_core::{CryptoRng, RngCore};
+use rand::{prelude::ThreadRng, thread_rng, CryptoRng, RngCore};
 use serde::Serialize;
 use std::ops::AddAssign;
 
@@ -95,7 +94,7 @@ pub fn setup_dealing<T: Transcript, R: RngCore + CryptoRng>(
 pub fn setup_dealing_weighted<
     F: FftField,
     T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     sc: &T::SecretSharingConfig,
     mut rng: &mut R,
@@ -254,7 +253,7 @@ where
     (d1, d2, d3, d4)
 }
 
-pub fn generate_keys_and_secrets<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
+pub fn generate_keys_and_secrets<T: Transcript, R: rand::RngCore + rand::CryptoRng>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     rng: &mut R,
@@ -482,7 +481,7 @@ pub fn reconstruct_dealt_secret_key_randomly<R, T: TranscriptCore>(
     pp: &T::PublicParameters,
 ) -> <T as TranscriptCore>::DealtSecretKey
 where
-    R: rand_core::RngCore,
+    R: rand::RngCore,
 {
     // Test reconstruction from t random shares
     let players_and_shares = sc

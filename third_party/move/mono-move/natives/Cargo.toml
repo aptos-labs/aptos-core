@@ -31,7 +31,7 @@ mono-move-core = { workspace = true }
 move-core-types = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
-rand_core = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 ripemd = { workspace = true }
 sha2 = { workspace = true }
 # `crypto_algebra`'s hash-to-curve needs sha2 0.10, while the rest of this crate
@@ -45,4 +45,4 @@ tiny-keccak = { workspace = true }
 # Enables the test-only natives (crypto key generation, signing, PoP creation,
 # insecure randomness, event queries). See the TODO(security) in src/lib.rs:
 # this gate should become an explicit runtime flag.
-testing = ["aptos-crypto/fuzzing", "ark-std", "rand_core"]
+testing = ["aptos-crypto/fuzzing", "ark-std", "rand"]
