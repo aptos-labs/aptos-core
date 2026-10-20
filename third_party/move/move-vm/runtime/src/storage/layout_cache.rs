@@ -83,6 +83,20 @@ impl LayoutCacheEntry {
         }
     }
 
+    /// Returns an entry with a dummy layout of the specified size estimate. Used for tests only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_for_testing(size_estimate_in_bytes: usize) -> Self {
+        Self::new(
+            LayoutWithDelayedFields::new_for_testing(size_estimate_in_bytes),
+            DefiningModules::new(),
+        )
+    }
+
+    /// Returns the estimated number of bytes this entry occupies in memory.
+    pub fn size_estimate_in_bytes(&self) -> usize {
+        self.layout.size_estimate_in_bytes()
+    }
+
     pub(crate) fn unpack(self) -> (LayoutWithDelayedFields, TriompheArc<DefiningModules>) {
         (self.layout, self.modules)
     }
