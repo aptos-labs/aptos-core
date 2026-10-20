@@ -26,6 +26,8 @@ use std::{
 const VEREX_MOVE_EXE_ENV: &str = "VEREX_MOVE_EXE";
 const VEREX_MOVE_HOME_ENV: &str = "VEREX_MOVE_HOME";
 const LAKE_EXE_ENV: &str = "LAKE";
+/// Set where the verifier must be available, so tests fail instead of skip.
+const VEREX_MOVE_REQUIRED_ENV: &str = "VEREX_MOVE_REQUIRED";
 /// The Lean package of the verifier within an Aptos Core checkout.
 const VEREX_MOVE_PACKAGE: &str = "third_party/move/lean/verex-move";
 /// The verifier's executable within its built Lean package.
@@ -405,11 +407,19 @@ pub fn runner(source: &Path) -> Result<Runner> {
     })
 }
 
-/// Whether the verifier can be run from here; tests skip when it cannot.
+/// Whether the verifier can be run from here; tests skip when it cannot,
+/// unless `VEREX_MOVE_REQUIRED` is set.
 pub fn verifier_available() -> bool {
-    std::env::current_dir()
-        .map(|dir| runner(&dir).is_ok())
-        .unwrap_or(false)
+    let available = std::env::current_dir()
+        .map_err(anyhow::Error::from)
+        .and_then(|dir| runner(&dir));
+    match available {
+        Ok(_) => true,
+        Err(err) if std::env::var_os(VEREX_MOVE_REQUIRED_ENV).is_some() => {
+            panic!("{} is set: {:#}", VEREX_MOVE_REQUIRED_ENV, err)
+        },
+        Err(_) => false,
+    }
 }
 
 /// The modules of `source` whose source file name contains `filter`: for a
