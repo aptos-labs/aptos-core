@@ -338,7 +338,8 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                             fun,
                             *mask,
                         )
-                    })?,
+                    })?
+                    .map(|(layouts, _)| layouts),
                 },
             },
         )

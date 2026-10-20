@@ -68,10 +68,12 @@ impl DefiningModules {
     }
 }
 
-/// An entry into layout cache: layout and a set of modules used to construct it.
+/// An entry into layout cache: layout, the number of bytes it serializes to, and a set of modules
+/// used to construct it.
 #[derive(Debug, Clone)]
 pub struct LayoutCacheEntry {
     layout: LayoutWithDelayedFields,
+    serialized_size: u64,
     modules: TriompheArc<DefiningModules>,
     /// Estimated number of bytes this entry (layout and defining modules) occupies in memory.
     size_estimate_in_bytes: usize,
@@ -84,6 +86,7 @@ impl LayoutCacheEntry {
         size_estimate_in_bytes: usize,
     ) -> Self {
         Self {
+            serialized_size: layout.serialized_size(),
             layout,
             modules: TriompheArc::new(modules),
             size_estimate_in_bytes,
@@ -95,8 +98,12 @@ impl LayoutCacheEntry {
         self.size_estimate_in_bytes
     }
 
-    pub(crate) fn unpack(self) -> (LayoutWithDelayedFields, TriompheArc<DefiningModules>) {
-        (self.layout, self.modules)
+    pub(crate) fn serialized_size(&self) -> u64 {
+        self.serialized_size
+    }
+
+    pub(crate) fn unpack(self) -> (LayoutWithDelayedFields, u64, TriompheArc<DefiningModules>) {
+        (self.layout, self.serialized_size, self.modules)
     }
 }
 

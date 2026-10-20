@@ -10,12 +10,12 @@ use crate::{
     ver::gas_feature_versions::{RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_50},
 };
 use aptos_gas_algebra::{
-    AbstractValueSize, AbstractValueSizePerArg, AbstractValueSizePerTypeTagPseudoGasUnit,
-    NumTypeTagPseudoGasUnits,
+    AbstractValueSize, AbstractValueSizePerArg, AbstractValueSizePerByte,
+    AbstractValueSizePerTypeTagPseudoGasUnit, NumTypeTagPseudoGasUnits,
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::NumArgs,
+    gas_algebra::{NumArgs, NumBytes},
     int256::{I256, U256},
     vm_status::StatusCode,
 };
@@ -55,6 +55,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { RELEASE_V1_50.. => "closure_per_ty_tag_unit" },
             1
         ],
+        [
+            closure_per_captured_layout_byte: AbstractValueSizePerByte,
+            { RELEASE_V1_50.. => "closure_per_captured_layout_byte" },
+            1
+        ],
         [vector: AbstractValueSize, "vector", 40],
         [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
@@ -88,7 +93,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
 const CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50: AbstractValueSizePerTypeTagPseudoGasUnit =
     AbstractValueSizePerTypeTagPseudoGasUnit::new(1);
 
+// Same for `MeterClosureCapturedLayouts` and `closure_per_captured_layout_byte`.
+const CLOSURE_PER_CAPTURED_LAYOUT_BYTE_BEFORE_V1_50: AbstractValueSizePerByte =
+    AbstractValueSizePerByte::new(1);
+
 /// Returns the abstract size of a closure value node itself, excluding the captured arguments.
+/// It includes the captured layouts, which serialization writes in full for every closure.
 ///
 /// Invariant: every `visit_closure` must get the size from here. The memory tracker charges quota
 /// with one visitor and releases it with another, so two visitors that disagree would leak quota.
@@ -96,12 +106,18 @@ fn closure_abstract_size(
     params: &AbstractValueSizeGasParameters,
     feature_version: u64,
     ty_args_pseudo_gas_cost: u64,
+    captured_layouts_size: u64,
 ) -> AbstractValueSize {
     let units = NumTypeTagPseudoGasUnits::new(ty_args_pseudo_gas_cost);
+    let layout_bytes = NumBytes::new(captured_layouts_size);
     if feature_version >= RELEASE_V1_50 {
-        params.closure_v2 + params.closure_per_ty_tag_unit * units
+        params.closure_v2
+            + params.closure_per_ty_tag_unit * units
+            + params.closure_per_captured_layout_byte * layout_bytes
     } else {
-        params.closure + CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50 * units
+        params.closure
+            + CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50 * units
+            + CLOSURE_PER_CAPTURED_LAYOUT_BYTE_BEFORE_V1_50 * layout_bytes
     }
 }
 
@@ -366,6 +382,7 @@ impl ValueVisitor for AbstractValueSizeVisitor<'_> {
             self.params,
             self.feature_version,
             fun.ty_args_pseudo_gas_cost(),
+            fun.captured_layouts_size(),
         );
         Ok(true)
     }
@@ -679,6 +696,7 @@ impl AbstractValueSizeGasParameters {
                     self.params,
                     self.feature_version,
                     fun.ty_args_pseudo_gas_cost(),
+                    fun.captured_layouts_size(),
                 ));
                 Ok(false)
             }
@@ -925,6 +943,7 @@ impl AbstractValueSizeGasParameters {
                     self.params,
                     self.feature_version,
                     fun.ty_args_pseudo_gas_cost(),
+                    fun.captured_layouts_size(),
                 ));
                 Ok(false)
             }
@@ -1111,21 +1130,29 @@ mod tests {
         let params = AbstractValueSizeGasParameters::initial();
 
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_49, 0),
+            closure_abstract_size(&params, RELEASE_V1_49, 0, 0),
             AbstractValueSize::new(40)
         );
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_49, 1000),
+            closure_abstract_size(&params, RELEASE_V1_49, 1000, 0),
             AbstractValueSize::new(1040)
+        );
+        assert_eq!(
+            closure_abstract_size(&params, RELEASE_V1_49, 1000, 30_000),
+            AbstractValueSize::new(31_040)
         );
 
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_50, 0),
+            closure_abstract_size(&params, RELEASE_V1_50, 0, 0),
             AbstractValueSize::new(200)
         );
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_50, 1000),
+            closure_abstract_size(&params, RELEASE_V1_50, 1000, 0),
             AbstractValueSize::new(1200)
+        );
+        assert_eq!(
+            closure_abstract_size(&params, RELEASE_V1_50, 1000, 30_000),
+            AbstractValueSize::new(31_200)
         );
     }
 }

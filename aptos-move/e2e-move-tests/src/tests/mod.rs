@@ -13,6 +13,7 @@ mod any;
 mod attributes;
 mod bcs;
 mod chain_id;
+mod closure_captured_layout_metering;
 mod closure_stale_generic_ability;
 mod code_publishing;
 mod common;

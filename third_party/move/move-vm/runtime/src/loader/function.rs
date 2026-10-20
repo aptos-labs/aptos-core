@@ -251,6 +251,9 @@ pub(crate) struct LazyLoadedFunction {
     /// reading it never takes a borrow: values are visited while `as_resolved` may hold a mutable
     /// one. Re-resolution reuses the same type argument tags, so the memo stays valid.
     pub(crate) ty_args_pseudo_gas_cost: u64,
+    /// Number of bytes the captured layouts serialize to, or 0 if not metered. Kept outside the
+    /// `RefCell` for the same reason. Resolution keeps the captured layouts, so it stays valid.
+    pub(crate) captured_layouts_size: u64,
 }
 
 #[derive(Clone)]
@@ -299,10 +302,12 @@ impl LazyLoadedFunction {
     pub(crate) fn new_unresolved(
         data: SerializedFunctionData,
         ty_args_pseudo_gas_cost: u64,
+        captured_layouts_size: u64,
     ) -> Self {
         Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved { data })),
             ty_args_pseudo_gas_cost,
+            captured_layouts_size,
         }
     }
 
@@ -325,7 +330,7 @@ impl LazyLoadedFunction {
         // arguments. This way layouts always exist for storable closures and there is no need to
         // construct them at serialization time. This makes loading and metering logic much simpler
         // while adding layout construction overhead only for storable closures.
-        let captured_layouts = fun
+        let captured = fun
             .function
             .is_persistent()
             .then(|| {
@@ -344,6 +349,10 @@ impl LazyLoadedFunction {
                 })
             })
             .transpose()?;
+        let (captured_layouts, captured_layouts_size) = match captured {
+            Some((layouts, size)) => (Some(layouts), size),
+            None => (None, 0),
+        };
 
         // Record the version (hash) of the defining module so that later calls can detect if the
         // module was republished within the same transaction, and re-resolve. Only needed for
@@ -370,6 +379,7 @@ impl LazyLoadedFunction {
                 module_hash,
             })),
             ty_args_pseudo_gas_cost,
+            captured_layouts_size,
         })
     }
 
@@ -396,49 +406,53 @@ impl LazyLoadedFunction {
                 module_hash,
             })),
             ty_args_pseudo_gas_cost,
+            captured_layouts_size: 0,
         })
     }
 
-    /// For a given function and a mask, constructs a vector of layouts for the captured arguments.
-    /// Returns [None] if there are any captured delayed fields in the layouts (i.e., the captured
-    /// values are not serializable not "displayable"). For all other failures, an error is
-    /// returned.
+    /// For a given function and a mask, constructs a vector of layouts for the captured arguments,
+    /// together with the number of bytes they serialize to if closures are metered by it (0
+    /// otherwise). Returns [None] if there are any captured delayed fields in the layouts (i.e.,
+    /// the captured values are not serializable not "displayable"). For all other failures, an
+    /// error is returned.
     pub(crate) fn construct_captured_layouts(
         layout_converter: &LayoutConverter<impl Loader>,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         fun: &LoadedFunction,
         mask: ClosureMask,
-    ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
-        let ty_builder = &layout_converter
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        mask.extract(fun.param_tys(), true)
-            .into_iter()
-            .map(|ty| {
-                let layout = if fun.ty_args.is_empty() {
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        ty,
-                    )?
-                } else {
-                    let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        &ty,
-                    )?
-                };
+    ) -> PartialVMResult<Option<(Vec<MoveTypeLayout>, u64)>> {
+        let vm_config = layout_converter.runtime_environment().vm_config();
+        let ty_builder = &vm_config.ty_builder;
+        let mut layouts = vec![];
+        let mut size = 0u64;
+        for ty in mask.extract(fun.param_tys(), true) {
+            let (layout, layout_size) = if fun.ty_args.is_empty() {
+                layout_converter.type_to_type_layout_with_delayed_fields_and_size(
+                    gas_meter,
+                    traversal_context,
+                    ty,
+                )?
+            } else {
+                let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                layout_converter.type_to_type_layout_with_delayed_fields_and_size(
+                    gas_meter,
+                    traversal_context,
+                    &ty,
+                )?
+            };
+            if vm_config.meter_closure_captured_layouts {
+                size = size.saturating_add(layout_size);
+            }
 
-                // Do not allow delayed fields to be serialized.
-                // TODO(layouts): consider not cloning layouts for captured arguments.
-                Ok(layout
-                    .into_layout_when_has_no_delayed_fields()
-                    .map(|l| l.as_ref().clone()))
-            })
-            .collect::<PartialVMResult<Option<Vec<_>>>>()
+            // Do not allow delayed fields to be serialized.
+            // TODO(layouts): consider not cloning layouts for captured arguments.
+            match layout.into_layout_when_has_no_delayed_fields() {
+                Some(layout) => layouts.push(layout.as_ref().clone()),
+                None => return Ok(None),
+            }
+        }
+        Ok(Some((layouts, size)))
     }
 
     pub(crate) fn expect_this_impl(
@@ -641,6 +655,10 @@ impl AbstractFunction for LazyLoadedFunction {
 
     fn ty_args_pseudo_gas_cost(&self) -> u64 {
         self.ty_args_pseudo_gas_cost
+    }
+
+    fn captured_layouts_size(&self) -> u64 {
+        self.captured_layouts_size
     }
 
     fn to_canonical_string(&self) -> String {

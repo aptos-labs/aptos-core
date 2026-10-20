@@ -217,9 +217,9 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         key: &LayoutCacheKey,
-    ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
+    ) -> Option<PartialVMResult<(LayoutWithDelayedFields, u64)>> {
         let entry = self.module_storage.get_struct_layout(key)?;
-        let (layout, modules) = entry.unpack();
+        let (layout, serialized_size, modules) = entry.unpack();
 
         let mut module_sizes = Vec::with_capacity(modules.iter().count());
         for (module_id, stored_hash) in modules.iter() {
@@ -264,7 +264,7 @@ where
                 }
             }
         }
-        Some(Ok(layout))
+        Some(Ok((layout, serialized_size)))
     }
 
     fn store_layout_to_cache(
