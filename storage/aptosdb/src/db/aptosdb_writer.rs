@@ -101,6 +101,7 @@ impl DbWriter for AptosDB {
                 // target when state sync has folded further.
                 bundle.position_base.fold(target);
             }
+            self.observe_position_overlay();
             Ok(Some(bundle.position_base.layers()))
         })
     }
@@ -492,6 +493,7 @@ impl AptosDB {
                 }
             },
         }
+        self.observe_position_overlay();
 
         // Advance the position pipeline (merklize + persist + advance the base).
         // Flag on: the summary comes from execution on the chunk; off: compute

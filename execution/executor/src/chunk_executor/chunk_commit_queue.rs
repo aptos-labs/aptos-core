@@ -85,6 +85,17 @@ impl ChunkCommitQueue {
             position_state_summary,
             positions,
         } = db.get_pre_committed_ledger_summary()?;
+        // Read under separate locks from state. The overlay may lag state (a
+        // replayed gap with no position writes doesn't extend it) but never
+        // lead it, or the first chunk would extend positions past its parent.
+        if let Some(positions) = positions.as_ref() {
+            ensure!(
+                positions.next_version() <= state.next_version(),
+                "Position overlay at next version {} is ahead of state at {}.",
+                positions.next_version(),
+                state.next_version(),
+            );
+        }
         CHUNK_PARTIAL_BLOCK_TXNS.set(0);
 
         Ok(Self {
