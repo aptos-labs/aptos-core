@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install contract-test dependencies
         run: python3 -m pip install --user PyYAML==6.0.3
-      - name: Test fallback, archive packaging and complete coverage
+      - name: Test fallback and static package coverage
         run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
   hosted-full-suite:
     if: ${{ !contains(github.base_ref, '-release-') }}

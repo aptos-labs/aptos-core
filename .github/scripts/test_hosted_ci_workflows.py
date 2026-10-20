@@ -63,14 +63,8 @@ class WorkflowTests(unittest.TestCase):
                 job["if"],
             )
         shards = self.reusable["jobs"]["unit-test-shards"]
-        self.assertEqual(shards["strategy"]["matrix"]["shard"], ["1", "2", "3", "4"])
+        self.assertEqual(len(shards["strategy"]["matrix"]["include"]), 4)
         self.assertEqual(shards["strategy"]["max-parallel"], "4")
-        setup = next(
-            step
-            for step in shards["steps"]
-            if step.get("uses") == "./.github/actions/rust-prebuilt-setup"
-        )
-        self.assertEqual(setup["with"]["save-cache"], "false")
         self.assertEqual(set(self.reusable["on"]), {"workflow_call"})
 
     def test_migrated_actions_use_node24_release_pins(self):
@@ -88,15 +82,15 @@ class WorkflowTests(unittest.TestCase):
         jobs = self.reusable["jobs"]
         self.assertEqual(
             set(jobs["verify-results"]["needs"]),
-            {"vm-and-doc-tests", "build-archive", "unit-test-shards"},
+            {"vm-and-doc-tests", "unit-test-shards"},
         )
         checks = "\n".join(
             step.get("run", "") for step in jobs["vm-and-doc-tests"]["steps"]
         )
         self.assertIn("--features check-vm-features -p aptos-node", checks)
         self.assertIn("--doc --workspace", checks)
-        archive = "\n".join(
-            step.get("run", "") for step in jobs["build-archive"]["steps"]
+        run = "\n".join(
+            step.get("run", "") for step in jobs["unit-test-shards"]["steps"]
         )
         for package in [
             "smoke-test",
@@ -104,7 +98,26 @@ class WorkflowTests(unittest.TestCase):
             "aptos-keyless-circuit",
             "aptos-batch-encryption",
         ]:
-            self.assertIn(f"--exclude {package}", archive)
+            self.assertIn(f"--exclude {package}", run)
+        groups = jobs["unit-test-shards"]["strategy"]["matrix"]["include"]
+        import shlex
+
+        assigned = []
+        remaining = []
+        for group in groups:
+            args = shlex.split(group["packages"])
+            if group["group"] == "remaining":
+                remaining = [
+                    args[i + 1] for i, arg in enumerate(args) if arg == "--exclude"
+                ]
+                self.assertIn("--workspace", args)
+            else:
+                assigned.extend(
+                    args[i + 1] for i, arg in enumerate(args) if arg == "-p"
+                )
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(set(assigned), set(remaining))
+        self.assertNotIn("--partition", run)
         self.assertIn("rust-targeted-unit-tests", self.parent["jobs"])
         self.assertIn(
             "runs-on,cpu=64", self.parent["jobs"]["rust-targeted-unit-tests"]["runs-on"]

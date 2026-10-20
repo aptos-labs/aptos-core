@@ -1,5 +1,5 @@
 name: Rust Unit Tests
-'on':
+on:
   workflow_call:
     inputs:
       provider:
@@ -11,213 +11,114 @@ name: Rust Unit Tests
 permissions:
   contents: read
 env:
-  CARGO_INCREMENTAL: '0'
+  CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
 jobs:
   vm-and-doc-tests:
-    runs-on: ${{ '64cpu-aptos-image-ubuntu22-x64' }}
+    if: ${{ inputs.provider == 'hosted' }}
+    runs-on: 64cpu-aptos-image-ubuntu22-x64
     timeout-minutes: 180
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: 'false'
-    - uses: ./.github/actions/rust-prebuilt-setup
-      with:
-        cache-key: hosted-rust-unit-tests
-        save-cache: 'true'
-    - name: Check VM features
-      run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
-    - name: Run doc tests
-      run: cargo test --profile ci --locked --doc --workspace
-    if: ${{ inputs.provider == 'hosted' }}
-  build-archive:
-    runs-on: ${{ '64cpu-aptos-image-ubuntu22-x64' }}
-    timeout-minutes: 180
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: 'false'
-    - uses: ./.github/actions/rust-prebuilt-setup
-      with:
-        cache-key: hosted-rust-unit-tests
-        save-cache: 'true'
-    - name: Build unit-test archive
-      run: |
-        cargo nextest archive --profile ci --cargo-profile ci --locked --workspace \
-          --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit \
-          --exclude aptos-batch-encryption --archive-file unit-tests.tar.zst --zstd-level 6
-        ls -lh unit-tests.tar.zst
-    - name: Record eligible test inventory
-      run: |
-        cargo nextest list --archive-file unit-tests.tar.zst --extract-to "$GITHUB_WORKSPACE" \
-          --extract-overwrite --workspace-remap . --profile ci --message-format json > expected.json
-    - name: Package stripped shard runtime copies
-      run: |
-        for shard in 1 2 3 4; do
-          cargo nextest list --binaries-metadata target/nextest/binaries-metadata.json \
-            --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . \
-            --profile ci --partition "hash:$shard/4" --message-format json > "build-inventory-$shard.json"
-        done
-        python3 .github/scripts/package_hosted_shards.py unit-tests.tar.zst \
-          build-inventory-{1,2,3,4}.json
-    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      with:
-        name: hosted-unit-test-archive-1
-        path: shard-archives/unit-tests-1.tar.zst
-        compression-level: 0
-        retention-days: 3
-        if-no-files-found: error
-    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      with:
-        name: hosted-unit-test-archive-2
-        path: shard-archives/unit-tests-2.tar.zst
-        compression-level: 0
-        retention-days: 3
-        if-no-files-found: error
-    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      with:
-        name: hosted-unit-test-archive-3
-        path: shard-archives/unit-tests-3.tar.zst
-        compression-level: 0
-        retention-days: 3
-        if-no-files-found: error
-    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      with:
-        name: hosted-unit-test-archive-4
-        path: shard-archives/unit-tests-4.tar.zst
-        compression-level: 0
-        retention-days: 3
-        if-no-files-found: error
-    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      with:
-        name: hosted-unit-test-inventory
-        path: expected.json
-        retention-days: 3
-        if-no-files-found: error
-    if: ${{ inputs.provider == 'hosted' }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-prebuilt-setup
+        with:
+          cache-key: hosted-rust-doc-tests
+      - name: Check VM features
+        run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
+      - name: Run doc tests
+        run: cargo test --profile ci --locked --doc --workspace
+
   unit-test-shards:
-    needs: build-archive
-    runs-on: ${{ '64cpu-aptos-image-ubuntu22-x64' }}
+    if: ${{ inputs.provider == 'hosted' }}
+    runs-on: 64cpu-aptos-image-ubuntu22-x64
     timeout-minutes: 180
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
-        shard:
-        - 1
-        - 2
-        - 3
-        - 4
+        include:
+          - group: compiler
+            packages: "-p move-compiler-v2 -p move-compiler-v2-transactional-tests"
+          - group: mono-move
+            packages: "-p mono-move-testsuite"
+          - group: move-e2e
+            packages: "-p e2e-move-tests"
+          - group: remaining
+            packages: "--workspace --exclude move-compiler-v2 --exclude move-compiler-v2-transactional-tests --exclude mono-move-testsuite --exclude e2e-move-tests"
     env:
-      SHARD: ${{ matrix.shard }}
+      PACKAGES: ${{ matrix.packages }}
+      PACKAGE_GROUP: ${{ matrix.group }}
       INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      RUST_MIN_STACK: '4297152'
-      MVP_TEST_ON_CI: 'true'
+      RUST_MIN_STACK: "4297152"
+      MVP_TEST_ON_CI: "true"
       Z3_EXE: /home/runner/bin/z3
       CVC5_EXE: /home/runner/bin/cvc5
       DOTNET_ROOT: /home/runner/.dotnet
       BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: 'false'
-    - uses: ./.github/actions/rust-prebuilt-setup
-      with:
-        cache-key: hosted-rust-unit-tests
-        save-cache: 'false'
-    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-      with:
-        name: hosted-unit-test-archive-${{ matrix.shard }}
-    - name: Start private Postgres
-      run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-    - name: Restore archive into original build paths
-      run: |
-        cargo nextest list --archive-file "unit-tests-$SHARD.tar.zst" --extract-to "$GITHUB_WORKSPACE" \
-          --extract-overwrite --workspace-remap . --profile ci --message-format json > restored.json
-        test -x target/ci/aptos-cargo-cli
-        cargo fetch --locked --target x86_64-unknown-linux-gnu
-    - name: List shard inventory
-      run: |
-        cargo nextest list --binaries-metadata target/nextest/binaries-metadata.json \
-          --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . \
-          --profile ci --partition "hash:$SHARD/4" --message-format json > "inventory-$SHARD.json"
-    - name: Run shard
-      run: |
-        set -o pipefail
-        cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json \
-          --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . \
-          --profile ci --partition "hash:$SHARD/4" --retries 3 --no-fail-fast \
-          2>&1 | tee "tests-$SHARD.log"
-    - name: Preserve shard JUnit
-      if: ${{ always() }}
-      run: |
-        if test -f target/nextest/ci/junit.xml; then
-          cp target/nextest/ci/junit.xml "junit-$SHARD.xml"
-        fi
-    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-      if: ${{ always() }}
-      with:
-        name: hosted-unit-test-results-${{ matrix.shard }}
-        path: |
-          inventory-${{ matrix.shard }}.json
-          tests-${{ matrix.shard }}.log
-          junit-${{ matrix.shard }}.xml
-        retention-days: 3
-        if-no-files-found: error
-    if: ${{ inputs.provider == 'hosted' }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-prebuilt-setup
+        with:
+          cache-key: hosted-rust-${{ matrix.group }}
+      - name: Start private Postgres
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - name: Run package group
+        shell: bash
+        run: |
+          read -r -a packages <<< "$PACKAGES"
+          if [[ "$PACKAGE_GROUP" == remaining ]]; then
+            packages+=(--exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --exclude aptos-batch-encryption)
+          fi
+          cargo nextest run "${packages[@]}" --profile ci --cargo-profile ci --locked \
+            --retries 3 --no-fail-fast
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() }}
+        with:
+          name: hosted-unit-test-results-${{ matrix.group }}
+          path: target/nextest/ci/junit.xml
+          retention-days: 3
+          if-no-files-found: error
+
   verify-results:
-    needs:
-    - vm-and-doc-tests
-    - build-archive
-    - unit-test-shards
+    needs: [vm-and-doc-tests, unit-test-shards]
     if: ${{ always() && inputs.provider == 'hosted' }}
-    runs-on: ${{ '2cpu-gh-ubuntu24-x64' }}
+    runs-on: 2cpu-gh-ubuntu24-x64
     timeout-minutes: 10
     env:
       CHECKS_RESULT: ${{ needs.vm-and-doc-tests.result }}
-      BUILD_RESULT: ${{ needs.build-archive.result }}
       SHARDS_RESULT: ${{ needs.unit-test-shards.result }}
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: 'false'
-    - name: Require every phase to succeed
-      run: |
-        test "$CHECKS_RESULT" = success
-        test "$BUILD_RESULT" = success
-        test "$SHARDS_RESULT" = success
-    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-      with:
-        name: hosted-unit-test-inventory
-        path: expected
-    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-      with:
-        pattern: hosted-unit-test-results-*
-        path: results
-        merge-multiple: true
-    - name: Verify complete disjoint test execution
-      run: |
-        set -o pipefail
-        python3 .github/scripts/verify_hosted_shards.py expected/expected.json results \
-          | tee -a "$GITHUB_STEP_SUMMARY"
-    - name: Upload test analytics
-      if: ${{ !cancelled() && env.HAS_TRUNK_TOKEN == 'true' }}
-      env:
-        HAS_TRUNK_TOKEN: ${{ secrets.TRUNK_API_TOKEN != '' }}
-      uses: trunk-io/analytics-uploader@main
-      with:
-        junit-paths: results/junit-*.xml
-        org-slug: aptoslabs
-        token: ${{ secrets.TRUNK_API_TOKEN }}
-      continue-on-error: true
+      - name: Require every phase to succeed
+        run: |
+          test "$CHECKS_RESULT" = success
+          test "$SHARDS_RESULT" = success
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: hosted-unit-test-results-*
+          path: results
+      - name: Upload test analytics
+        if: ${{ !cancelled() && env.HAS_TRUNK_TOKEN == 'true' }}
+        env:
+          HAS_TRUNK_TOKEN: ${{ secrets.TRUNK_API_TOKEN != '' }}
+        uses: trunk-io/analytics-uploader@main
+        with:
+          junit-paths: results/**/junit.xml
+          org-slug: aptoslabs
+          token: ${{ secrets.TRUNK_API_TOKEN }}
+        continue-on-error: true
+
   aws-unit-tests:
     if: ${{ inputs.provider == 'aws' }}
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     timeout-minutes: 180
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-    - name: Install Move Prover tools
-      run: scripts/dev_setup.sh -b -y
-    - uses: ./.github/actions/rust-unit-tests
-      with:
-        TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Move Prover tools
+        run: scripts/dev_setup.sh -b -y
+      - uses: ./.github/actions/rust-unit-tests
+        with:
+          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
