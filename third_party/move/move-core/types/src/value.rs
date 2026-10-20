@@ -314,6 +314,13 @@ impl MoveTypeLayout {
     pub fn unfolded_node_count(&self) -> u64 {
         layout_unfolded_node_count(self, &mut LayoutCountCache::new())
     }
+
+    /// Returns the number of bytes the layout serializes to with BCS. Serialization unfolds
+    /// shared `Arc<MoveStructLayout>` occurrences, so each one counts in full, but the size of
+    /// a shared layout is computed only once. Saturates at `u64::MAX`.
+    pub fn serialized_size(&self) -> u64 {
+        self.serialized_size_cached(&mut LayoutCountCache::new())
+    }
 }
 
 type LayoutCountCache = HashMap<*const MoveStructLayout, u64>;
@@ -362,6 +369,108 @@ fn struct_layout_unfolded_node_count(
             .fold(0u64, |acc, f| {
                 acc.saturating_add(layout_unfolded_node_count(&f.layout, cache))
             }),
+    }
+}
+
+/// Returns the number of bytes of `value` as ULEB128, which BCS uses for sequence lengths and
+/// variant indices.
+pub fn size_u32_as_uleb128(mut value: usize) -> usize {
+    let mut len = 1;
+    while value >= 0x80 {
+        // 7 (lowest) bits of data get written in a single byte.
+        len += 1;
+        value >>= 7;
+    }
+    len
+}
+
+/// Returns the number of bytes of a BCS byte array of the given length.
+pub fn bcs_size_of_byte_array(length: usize) -> usize {
+    size_u32_as_uleb128(length) + length
+}
+
+/// BCS serialized size, memoized for shared struct layouts.
+trait SerializedSize {
+    fn serialized_size_cached(&self, cache: &mut LayoutCountCache) -> u64;
+}
+
+impl<T: SerializedSize> SerializedSize for Vec<T> {
+    fn serialized_size_cached(&self, cache: &mut LayoutCountCache) -> u64 {
+        self.iter()
+            .fold(size_u32_as_uleb128(self.len()) as u64, |acc, x| {
+                acc.saturating_add(x.serialized_size_cached(cache))
+            })
+    }
+}
+
+impl SerializedSize for Identifier {
+    fn serialized_size_cached(&self, _cache: &mut LayoutCountCache) -> u64 {
+        bcs_size_of_byte_array(self.len()) as u64
+    }
+}
+
+impl SerializedSize for StructTag {
+    fn serialized_size_cached(&self, _cache: &mut LayoutCountCache) -> u64 {
+        bcs::serialized_size(self).map_or(u64::MAX, |size| size as u64)
+    }
+}
+
+impl SerializedSize for MoveFieldLayout {
+    fn serialized_size_cached(&self, cache: &mut LayoutCountCache) -> u64 {
+        self.name
+            .serialized_size_cached(cache)
+            .saturating_add(self.layout.serialized_size_cached(cache))
+    }
+}
+
+impl SerializedSize for MoveVariantLayout {
+    fn serialized_size_cached(&self, cache: &mut LayoutCountCache) -> u64 {
+        self.name
+            .serialized_size_cached(cache)
+            .saturating_add(self.fields.serialized_size_cached(cache))
+    }
+}
+
+// The variant indices of `MoveTypeLayout`, `MoveStructLayout` and `IdentifierMappingKind` are
+// below 128, so each serializes to a single byte.
+impl SerializedSize for MoveStructLayout {
+    fn serialized_size_cached(&self, cache: &mut LayoutCountCache) -> u64 {
+        use MoveStructLayout::*;
+        let body = match self {
+            Runtime(fields) => fields.serialized_size_cached(cache),
+            RuntimeVariants(variants) => variants.serialized_size_cached(cache),
+            WithFields(fields) => fields.serialized_size_cached(cache),
+            WithTypes { type_, fields } => type_
+                .serialized_size_cached(cache)
+                .saturating_add(fields.serialized_size_cached(cache)),
+            WithVariants { type_, variants } => type_
+                .serialized_size_cached(cache)
+                .saturating_add(variants.serialized_size_cached(cache)),
+        };
+        1u64.saturating_add(body)
+    }
+}
+
+impl SerializedSize for MoveTypeLayout {
+    fn serialized_size_cached(&self, cache: &mut LayoutCountCache) -> u64 {
+        use MoveTypeLayout::*;
+        match self {
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer | Function => 1,
+            Vector(inner) => 1u64.saturating_add(inner.serialized_size_cached(cache)),
+            Native(_, inner) => 2u64.saturating_add(inner.serialized_size_cached(cache)),
+            Struct(inner) => {
+                let ptr = Arc::as_ptr(inner);
+                match cache.get(&ptr) {
+                    Some(cached) => *cached,
+                    None => {
+                        let size = 1u64.saturating_add(inner.serialized_size_cached(cache));
+                        cache.insert(ptr, size);
+                        size
+                    },
+                }
+            },
+        }
     }
 }
 
@@ -1372,6 +1481,129 @@ mod unfolded_node_count_tests {
         for n in 0..10 {
             let layout = build(n);
             assert_eq!(layout.unfolded_node_count(), 3u64 * (1u64 << n) - 1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod serialized_size_tests {
+    use super::*;
+    use arbitrary::{Arbitrary, Unstructured};
+    use proptest::{collection::vec, prelude::*};
+
+    fn assert_matches_bcs(layout: &MoveTypeLayout) {
+        assert_eq!(
+            layout.serialized_size(),
+            bcs::serialized_size(layout).unwrap() as u64
+        );
+    }
+
+    fn empty_variants_enum(num_variants: usize) -> MoveTypeLayout {
+        MoveTypeLayout::new_struct(MoveStructLayout::RuntimeVariants(vec![
+            vec![];
+            num_variants
+        ]))
+    }
+
+    #[test]
+    fn primitives_and_containers() {
+        assert_matches_bcs(&MoveTypeLayout::U8);
+        assert_matches_bcs(&MoveTypeLayout::Function);
+        assert_matches_bcs(&MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Address)));
+        assert_matches_bcs(&MoveTypeLayout::Native(
+            IdentifierMappingKind::Snapshot,
+            Box::new(MoveTypeLayout::U64),
+        ));
+    }
+
+    /// An enum with empty variants is a single node but serializes to a byte per variant.
+    #[test]
+    fn empty_variants() {
+        let layout = empty_variants_enum(VARIANT_COUNT_MAX as usize);
+        assert_eq!(layout.unfolded_node_count(), 1);
+        assert_eq!(layout.serialized_size(), 3 + VARIANT_COUNT_MAX);
+        assert_matches_bcs(&layout);
+    }
+
+    /// Lengths of 128 and more take more than one byte.
+    #[test]
+    fn multi_byte_lengths() {
+        for len in [127, 128, 16_383, 16_384] {
+            assert_matches_bcs(&MoveTypeLayout::new_struct(MoveStructLayout::Runtime(
+                vec![MoveTypeLayout::Bool; len],
+            )));
+        }
+    }
+
+    /// Builds layouts for
+    /// ```text
+    /// enum E { V0, .., V126 }
+    /// struct S_0 { l: E, r: E }
+    /// struct S_i { l: S_{i - 1}, r: S_{i - 1} }  // for i > 0
+    /// ```
+    /// sharing each `S_i` in the DAG, which serialization unfolds.
+    #[test]
+    fn shared_layouts_count_in_full() {
+        let mut current = empty_variants_enum(VARIANT_COUNT_MAX as usize);
+        for n in 0..12 {
+            current =
+                MoveTypeLayout::new_struct(MoveStructLayout::Runtime(vec![current.clone(); 2]));
+            assert_matches_bcs(&current);
+            assert_eq!(current.serialized_size(), 266 * (1u64 << n) - 3);
+        }
+    }
+
+    #[test]
+    fn decorated_layouts() {
+        let tag = StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new("S").unwrap(),
+            type_args: vec![TypeTag::Vector(Box::new(TypeTag::U8))],
+        };
+        let field = |name: &str, layout: MoveTypeLayout| {
+            MoveFieldLayout::new(Identifier::new(name).unwrap(), layout)
+        };
+        let fields = vec![
+            field("a", MoveTypeLayout::U8),
+            field("bb", MoveTypeLayout::Bool),
+        ];
+        let with_fields = MoveTypeLayout::new_struct(MoveStructLayout::WithFields(fields.clone()));
+        let with_types = MoveTypeLayout::new_struct(MoveStructLayout::WithTypes {
+            type_: tag.clone(),
+            fields: vec![field("inner", with_fields.clone())],
+        });
+        let with_variants = MoveTypeLayout::new_struct(MoveStructLayout::WithVariants {
+            type_: tag,
+            variants: vec![
+                MoveVariantLayout {
+                    name: Identifier::new("V0").unwrap(),
+                    fields: vec![],
+                },
+                MoveVariantLayout {
+                    name: Identifier::new("V1").unwrap(),
+                    fields: vec![
+                        field("t", with_types.clone()),
+                        field("f", with_fields.clone()),
+                    ],
+                },
+            ],
+        });
+        assert_matches_bcs(&with_fields);
+        assert_matches_bcs(&with_types);
+        assert_matches_bcs(&with_variants);
+    }
+
+    proptest! {
+        #[test]
+        fn arbitrary_layouts(bytes in vec(any::<u8>(), 0..4096)) {
+            let mut u = Unstructured::new(&bytes);
+            if let Ok(layout) = MoveTypeLayout::arbitrary(&mut u) {
+                // Layouts nested too deeply for BCS are not serializable.
+                if let Ok(expected) = bcs::serialized_size(&layout) {
+                    prop_assert_eq!(layout.serialized_size(), expected as u64);
+                }
+            }
         }
     }
 }

@@ -319,6 +319,9 @@ pub fn aptos_prod_vm_config(
         meter_closure_ty_args: timed_features
             .is_enabled(TimedFeatureFlag::MeterClosureTypeArguments)
             || gas_feature_version >= RELEASE_V1_50,
+        meter_closure_captured_layouts: timed_features
+            .is_enabled(TimedFeatureFlag::MeterClosureCapturedLayouts)
+            || gas_feature_version >= RELEASE_V1_50,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
