@@ -408,6 +408,19 @@ impl PositionOverlay {
         (0..NUM_POSITION_SHARDS).all(|shard| self.tops[shard].is_descendant_of(&layers[shard]))
     }
 
+    /// Layers between `floor` and the top, i.e. chunks not yet folded into a
+    /// base at `floor`.
+    pub fn layers_above(&self, floor: &ShardedPositionLayers) -> u64 {
+        (0..NUM_POSITION_SHARDS)
+            .map(|shard| {
+                self.tops[shard]
+                    .layer()
+                    .saturating_sub(floor[shard].layer())
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Writes above `floor` — what the overlay shadows when read over a
     /// base at `floor`. Walks layers only, so it is safe inside
     /// `PositionBase::read`.
@@ -998,6 +1011,25 @@ mod tests {
             Some(3),
             "the newest write must be the surviving one"
         );
+    }
+
+    #[test]
+    fn layers_above_counts_unfolded_chunks() {
+        let base = base_with(Vec::new());
+        let floor = base.layers();
+        let overlay = base
+            .new_overlay()
+            .extend(&floor, 1, vec![(key(2, 9), Some(position(1)))])
+            .extend(&floor, 2, Vec::new())
+            .extend(&floor, 3, vec![(key(5, 1), Some(position(3)))]);
+        assert_eq!(overlay.layers_above(&floor), 3);
+
+        let mid = base
+            .new_overlay()
+            .extend(&floor, 1, vec![(key(2, 9), Some(position(1)))]);
+        let overlay = mid.extend(&floor, 2, Vec::new());
+        assert!(base.fold(&mid));
+        assert_eq!(overlay.layers_above(&base.layers()), 1);
     }
 
     /// The per-exchange range scan depends on this ordering.
