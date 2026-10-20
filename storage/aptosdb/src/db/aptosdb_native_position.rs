@@ -6,17 +6,21 @@ use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
     native_state_reader::InMemoryNativeStateReader,
     native_state_store::{position_key_of, PositionBase, PositionOverlay, PositionWrites},
-    position_buffered_state::{
-        new_empty_position_state, position_state_at_version, PositionLedgerStateWithSummary,
-        PositionPersistedState, PositionProofReader, PositionSlot,
-        MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT,
+    native_store::{
+        buffered_state::{
+            native_state_at_version, new_empty_native_state, NativePersistedState,
+            NativeProofReader, PositionLedgerStateWithSummary, PositionSlot,
+            MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
+        },
+        kv_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
+        merkle_db::PositionMerkleDb,
+        pruner::PositionPruner,
+        state_store::PositionStateStore,
+        state_sync::NativeStoreReader,
+        PositionStore,
     },
-    position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
-    position_merkle_db::PositionMerkleDb,
-    position_pruner::PositionPruner,
-    position_state_store::PositionStateStore,
     utils::truncation_helper::{
-        get_position_commit_progress, truncate_position_db_shards, truncate_position_merkle_db,
+        get_native_commit_progress, truncate_native_kv_db_shards, truncate_native_merkle_db,
     },
 };
 use aptos_config::config::{
@@ -41,8 +45,8 @@ use aptos_types::{
 use std::{collections::HashMap, sync::Arc};
 
 pub struct PositionBundle {
-    pub kv_db: Arc<PositionDb>,
-    pub merkle_db: Arc<PositionMerkleDb>,
+    pub(crate) kv_db: Arc<PositionDb>,
+    pub(crate) merkle_db: Arc<PositionMerkleDb>,
     /// Pruner managers (value + merkle), the analog of main state's
     /// `StatePruner`. `None` in readonly mode. Held as `Arc` so the
     /// position merkle batch committer shares it; the value pruner is
@@ -77,7 +81,7 @@ pub struct PositionBundle {
     /// version). Advanced by the merkle batch committer as snapshots
     /// persist, so the proof base tracks the JMT forward and the
     /// in-memory tree sheds nodes below it. `None` in readonly mode.
-    pub(crate) persisted: Option<PositionPersistedState>,
+    pub(crate) persisted: Option<NativePersistedState>,
 }
 
 impl AptosDB {
@@ -88,6 +92,20 @@ impl AptosDB {
     pub fn native_state_committer(&self) -> Option<NativeStateCommitter> {
         let bundle = self.position.as_ref()?;
         Some(NativeStateCommitter::new(bundle.kv_db.clone()))
+    }
+
+    /// The position store's state-sync producers. Errors if native-position
+    /// storage isn't attached.
+    pub(crate) fn position_store_reader(&self) -> Result<NativeStoreReader<'_, PositionStore>> {
+        let bundle = self.position.as_ref().ok_or_else(|| {
+            AptosDbError::Other("native-position subsystem is not enabled".into())
+        })?;
+        Ok(NativeStoreReader {
+            kv_db: &bundle.kv_db,
+            merkle_db: &bundle.merkle_db,
+            pruner: bundle.position_pruner.as_deref(),
+            ledger_metadata_db: self.ledger_db.metadata_db(),
+        })
     }
 
     pub fn native_state_reader(&self) -> Option<InMemoryNativeStateReader> {
@@ -197,14 +215,14 @@ impl AptosDB {
             let last_snapshot = match merkle_progress {
                 Some(version) => {
                     let root_hash = merkle_db.get_root_hash(version)?;
-                    position_state_at_version(version, root_hash)
+                    native_state_at_version::<PositionStore>(version, root_hash)
                 },
-                None => new_empty_position_state(),
+                None => new_empty_native_state::<PositionStore>(),
             };
             // Seed the persisted base with the exact snapshot used for
             // `current_state` so the first rebase freezes against an
             // in-family ancestor (the chain descends from this seed).
-            let persisted = PositionPersistedState::new(last_snapshot.clone());
+            let persisted = NativePersistedState::new(last_snapshot.clone());
             let store = Arc::new(PositionStateStore::new_at_snapshot(
                 Arc::clone(&merkle_db),
                 Arc::clone(&self.ledger_db),
@@ -262,7 +280,7 @@ impl AptosDB {
         // means nothing to recover — a fast-synced node whose target
         // carried no positions.
         let snapshot_next_version = snapshot_version.map_or(0, |v| v + 1);
-        if let Some(kv_progress) = get_position_commit_progress(&bundle.kv_db)?
+        if let Some(kv_progress) = get_native_commit_progress(&bundle.kv_db)?
             && snapshot_next_version <= v_overall
         {
             self.replay_position_after_snapshot(
@@ -415,7 +433,7 @@ impl AptosDB {
             store.reset_at_snapshot(
                 Arc::clone(&bundle.merkle_db),
                 Arc::clone(&self.ledger_db),
-                position_state_at_version(version, expected_root_hash),
+                native_state_at_version::<PositionStore>(version, expected_root_hash),
                 Arc::clone(
                     bundle
                         .position_pruner
@@ -447,7 +465,7 @@ impl AptosDB {
     ) -> Result<Option<Version>> {
         let v_overall = self.ledger_db.metadata_db().get_synced_version()?;
 
-        if let Some(v_kv) = get_position_commit_progress(position_db)? {
+        if let Some(v_kv) = get_native_commit_progress(position_db)? {
             let target = v_overall.map_or(0, |v| std::cmp::min(v_kv, v));
             if v_kv != target {
                 info!(
@@ -457,7 +475,7 @@ impl AptosDB {
                     "Truncating position_db down to chain's OverallCommitProgress."
                 );
             }
-            truncate_position_db_shards(position_db, target)?;
+            truncate_native_kv_db_shards(position_db, target)?;
         }
 
         // Look for a tree root rather than reading `StateMerkleCommitProgress`,
@@ -469,7 +487,7 @@ impl AptosDB {
         // `commit_ledger()`.
         let ceiling = v_overall.unwrap_or(Version::MAX);
         let Some(target) = merkle_db.latest_snapshot_version_at_or_before(ceiling)? else {
-            // `truncate_position_merkle_db` peels down to an older snapshot
+            // `truncate_native_merkle_db` peels down to an older snapshot
             // and cannot empty the DB, so a lone snapshot above the chain
             // tip has to be refused rather than cleaned up. Cold-loading an
             // empty base beside it would leave the index and the durable
@@ -483,7 +501,7 @@ impl AptosDB {
             );
             return Ok(None);
         };
-        truncate_position_merkle_db(merkle_db, target)?;
+        truncate_native_merkle_db(merkle_db, target)?;
         Ok(Some(target))
     }
 
@@ -524,13 +542,13 @@ impl AptosDB {
         // entire history.
         let gap = num_transactions.saturating_sub(snapshot_next_version);
         ensure!(
-            gap <= MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT,
+            gap <= MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
             "Too many versions to replay after position snapshot. snapshot_next_version: {}, \
              num_transactions: {}, gap: {}, max: {}",
             snapshot_next_version,
             num_transactions,
             gap,
-            MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT,
+            MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
         );
 
         let write_sets = self
@@ -589,7 +607,7 @@ impl AptosDB {
         let snapshot_version = pipeline_latest.version();
 
         let updates: Vec<_> = pending_leaf_updates.into_iter().collect();
-        let proof_reader = PositionProofReader {
+        let proof_reader = NativeProofReader {
             merkle_db: Arc::clone(merkle_db),
             version: snapshot_version,
         };

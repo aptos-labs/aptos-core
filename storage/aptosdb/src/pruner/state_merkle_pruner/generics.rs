@@ -6,13 +6,9 @@
 //! (`StaleNodeIndex`) is shared by every implementor; only the column
 //! family, progress keys, and name differ.
 
-use crate::{
-    position_merkle_db::PositionMerkleDb,
-    pruner::state_merkle_pruner::state_merkle_pruner_manager::StateMerklePrunerManager,
-    schema::{
-        db_metadata::DbMetadataKey, stale_node_index::StaleNodeIndexSchema,
-        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-    },
+use crate::schema::{
+    db_metadata::DbMetadataKey, stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
 };
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_schemadb::schema::Schema;
@@ -115,8 +111,3 @@ impl MerklePrunerSchema for PositionEpochSnapshot {
         DbMetadataKey::PositionEpochSnapshotPrunerProgress
     }
 }
-
-pub(crate) type PositionStateMerklePrunerManager =
-    StateMerklePrunerManager<PositionStateMerkle, PositionMerkleDb>;
-pub(crate) type PositionEpochSnapshotPrunerManager =
-    StateMerklePrunerManager<PositionEpochSnapshot, PositionMerkleDb>;

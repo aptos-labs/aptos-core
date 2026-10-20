@@ -6,9 +6,12 @@
 use crate::{
     common::{run_batch_committer_loop, CommitMessage, MerkleBatch},
     metrics::OTHER_TIMERS_SECONDS,
-    position_buffered_state::{PositionPersistedState, PositionStateWithSummary},
-    position_merkle_db::PositionMerkleDb,
-    position_pruner::PositionPruner,
+    native_store::{
+        buffered_state::{NativePersistedState, NativeStateWithSummary},
+        merkle_db::NativeMerkleDb,
+        pruner::NativeStorePruner,
+        NativeStoreSpec,
+    },
     pruner::PrunerManager,
 };
 use aptos_crypto::HashValue;
@@ -17,34 +20,34 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::Version;
 use std::sync::{mpsc::Receiver, Arc};
 
-pub(crate) struct PositionMerkleCommit {
+pub(crate) struct NativeMerkleCommit {
     pub version: Version,
     pub root_hash: HashValue,
     pub batch: MerkleBatch,
     /// The real in-memory snapshot whose JMT nodes this batch persists.
     /// Published to `persisted` after the commit so the in-memory chain
-    /// can rebase onto it (see [`PositionPersistedState`]).
-    pub snapshot: PositionStateWithSummary,
+    /// can rebase onto it (see [`NativePersistedState`]).
+    pub snapshot: NativeStateWithSummary,
 }
 
-pub(crate) struct PositionMerkleBatchCommitter {
-    merkle_db: Arc<PositionMerkleDb>,
-    receiver: Receiver<CommitMessage<PositionMerkleCommit>>,
-    position_pruner: Arc<PositionPruner>,
-    persisted: PositionPersistedState,
+pub(crate) struct NativeMerkleBatchCommitter<T: NativeStoreSpec> {
+    merkle_db: Arc<NativeMerkleDb<T>>,
+    receiver: Receiver<CommitMessage<NativeMerkleCommit>>,
+    pruner: Arc<NativeStorePruner<T>>,
+    persisted: NativePersistedState,
 }
 
-impl PositionMerkleBatchCommitter {
+impl<T: NativeStoreSpec> NativeMerkleBatchCommitter<T> {
     pub fn new(
-        merkle_db: Arc<PositionMerkleDb>,
-        receiver: Receiver<CommitMessage<PositionMerkleCommit>>,
-        position_pruner: Arc<PositionPruner>,
-        persisted: PositionPersistedState,
+        merkle_db: Arc<NativeMerkleDb<T>>,
+        receiver: Receiver<CommitMessage<NativeMerkleCommit>>,
+        pruner: Arc<NativeStorePruner<T>>,
+        persisted: NativePersistedState,
     ) -> Self {
         Self {
             merkle_db,
             receiver,
-            position_pruner,
+            pruner,
             persisted,
         }
     }
@@ -53,12 +56,13 @@ impl PositionMerkleBatchCommitter {
         let Self {
             merkle_db,
             receiver,
-            position_pruner,
+            pruner,
             persisted,
         } = self;
+        let timer_label = format!("{}_batch_committer_work", T::NAME);
         run_batch_committer_loop(receiver, |commit| {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["position_batch_committer_work"]);
-            let PositionMerkleCommit {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&timer_label]);
+            let NativeMerkleCommit {
                 version,
                 root_hash,
                 batch,
@@ -66,18 +70,18 @@ impl PositionMerkleBatchCommitter {
             } = commit;
             merkle_db
                 .commit(version, batch.top_levels_batch, batch.batches_for_shards)
-                .expect("Position merkle commit failed.");
+                .unwrap_or_else(|e| panic!("{} merkle commit failed: {e}", T::NAME));
             info!(
                 version = version,
                 root_hash = %root_hash,
-                "Position merkle snapshot committed."
+                store = T::NAME,
+                "Native merkle snapshot committed."
             );
-            // Activate the position merkle pruners now that a snapshot
-            // has persisted.
-            position_pruner
+            // Activate the merkle pruners now that a snapshot has persisted.
+            pruner
                 .state_merkle_pruner
                 .maybe_set_pruner_target_db_version(version);
-            position_pruner
+            pruner
                 .epoch_snapshot_pruner
                 .maybe_set_pruner_target_db_version(version);
             // Advance the persisted base only now that the JMT nodes at
@@ -85,6 +89,9 @@ impl PositionMerkleBatchCommitter {
             // are serviceable.
             persisted.set(snapshot);
         });
-        trace!("Position merkle batch committing thread exit.");
+        trace!(
+            store = T::NAME,
+            "Native merkle batch committing thread exit."
+        );
     }
 }

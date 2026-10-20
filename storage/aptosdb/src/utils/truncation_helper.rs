@@ -6,8 +6,11 @@ use crate::{
         ledger_metadata_db::LedgerMetadataDb, transaction_db::TransactionDb, LedgerDb,
         LedgerDbSchemaBatches,
     },
-    position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
-    position_merkle_db::{PositionMerkleDb, NUM_POSITION_MERKLE_SHARDS},
+    native_store::{
+        kv_db::{NativeKvDb, NUM_NATIVE_VALUE_SHARDS},
+        merkle_db::NativeMerkleDb,
+        NativeStoreSpec,
+    },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
@@ -35,6 +38,7 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
+use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
@@ -43,7 +47,10 @@ use aptos_schemadb::{
     DB,
 };
 use aptos_storage_interface::Result;
-use aptos_types::{proof::position::Position, transaction::Version};
+use aptos_types::{
+    proof::position::Position, state_store::state_value::StaleStateValueByKeyHashIndex,
+    transaction::Version,
+};
 use claims::assert_ge;
 use rayon::prelude::*;
 use status_line::StatusLine;
@@ -71,108 +78,46 @@ pub(crate) fn get_state_merkle_commit_progress(
     )
 }
 
-pub(crate) fn get_position_commit_progress(position_db: &PositionDb) -> Result<Option<Version>> {
-    get_progress(
-        position_db.metadata_db(),
-        &DbMetadataKey::PositionCommitProgress,
-    )
+pub(crate) fn get_native_commit_progress<T: NativeStoreSpec>(
+    kv_db: &NativeKvDb<T>,
+) -> Result<Option<Version>> {
+    get_progress(kv_db.metadata_db(), &T::commit_progress_key())
 }
 
-/// Walk position merkle snapshots back to `target_version`, peeling
-/// one snapshot at a time. Each iteration deletes the top-level
-/// nodes and stale indices at-or-after the current snapshot, commits
-/// the top-levels batch at the previous snapshot version, then
-/// truncates the per-shard DBs down to that previous version.
-pub(crate) fn truncate_position_merkle_db(
-    position_merkle_db: &PositionMerkleDb,
+/// Walk a native store's merkle snapshots back to `target_version`.
+pub(crate) fn truncate_native_merkle_db<T: NativeStoreSpec>(
+    merkle_db: &NativeMerkleDb<T>,
     target_version: Version,
 ) -> Result<()> {
-    loop {
-        let current_version =
-            find_closest_node_version_at_or_before(position_merkle_db.metadata_db(), Version::MAX)?
-                .expect("position_merkle_db must have at least one snapshot before truncation");
-        assert!(current_version >= target_version);
-        if current_version == target_version {
-            break;
-        }
-
-        let version_before = find_closest_node_version_at_or_before(
-            position_merkle_db.metadata_db(),
-            current_version - 1,
-        )?
-        .expect("position_merkle_db must have a snapshot before the current one");
-
-        let mut top_levels_batch = SchemaBatch::new();
-        delete_nodes_and_stale_indices_at_or_after_version(
-            position_merkle_db.metadata_db(),
-            current_version,
-            /* shard_id = */ None,
-            &mut top_levels_batch,
-        )?;
-        position_merkle_db.commit_top_levels(version_before, top_levels_batch)?;
-        truncate_position_merkle_db_shards(position_merkle_db, version_before)?;
-    }
-    Ok(())
+    truncate_sharded_merkle_db(merkle_db, target_version, |_| {})
 }
 
-fn truncate_position_merkle_db_shards(
-    position_merkle_db: &PositionMerkleDb,
-    target_version: Version,
-) -> Result<()> {
-    (0..NUM_POSITION_MERKLE_SHARDS)
-        .into_par_iter()
-        .try_for_each(|shard_id| {
-            let mut batch = SchemaBatch::new();
-            delete_nodes_and_stale_indices_at_or_after_version(
-                position_merkle_db.db_shard(shard_id),
-                target_version + 1,
-                Some(shard_id),
-                &mut batch,
-            )?;
-            position_merkle_db.db_shard(shard_id).write_schemas(batch)
-        })
-}
-
-pub(crate) fn truncate_position_db_shards(
-    position_db: &PositionDb,
+pub(crate) fn truncate_native_kv_db_shards<T: NativeStoreSpec>(
+    kv_db: &NativeKvDb<T>,
     target_version: Version,
 ) -> Result<()> {
     (0..NUM_NATIVE_VALUE_SHARDS)
         .into_par_iter()
         .try_for_each(|shard_id| {
-            truncate_position_db_single_shard(position_db, shard_id, target_version)
+            truncate_native_kv_db_single_shard(kv_db, shard_id, target_version)
         })?;
     // Overall progress marker is the source of truth for restart;
     // per-shard commits above only update the per-shard markers.
-    position_db.write_progress(target_version)
+    kv_db.write_progress(target_version)
 }
 
-fn truncate_position_db_single_shard(
-    position_db: &PositionDb,
+fn truncate_native_kv_db_single_shard<T: NativeStoreSpec>(
+    kv_db: &NativeKvDb<T>,
     shard_id: usize,
     target_version: Version,
 ) -> Result<()> {
     let mut batch = SchemaBatch::new();
-    delete_position_value_and_index(position_db.shard(shard_id), target_version + 1, &mut batch)?;
-    position_db.commit_single_shard(target_version, shard_id, Some(batch))
-}
-
-fn delete_position_value_and_index(
-    db_shard: &DB,
-    start_version: Version,
-    batch: &mut SchemaBatch,
-) -> Result<()> {
-    // The stale-index is keyed by `stale_since_version` BE; forward
-    // seek lands on the first row to delete. Every kv write has a
-    // paired stale-index row (first writes use `NO_PREV_VERSION`).
-    let mut iter = db_shard.iter::<StalePositionValueIndexSchema>()?;
-    iter.seek(&start_version)?;
-    for row in iter {
-        let (index, _) = row?;
-        batch.delete::<StalePositionValueIndexSchema>(&index)?;
-        batch.delete::<PositionValueSchema>(&(index.state_key_hash, index.stale_since_version))?;
-    }
-    Ok(())
+    delete_value_and_index::<StalePositionValueIndexSchema, PositionValueSchema>(
+        kv_db.shard(shard_id),
+        target_version + 1,
+        &mut batch,
+    )?;
+    kv_db.commit_single_shard(target_version, shard_id, Some(batch))
 }
 
 pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {
@@ -237,12 +182,20 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     target_version: Version,
 ) -> Result<()> {
     let mut batch = SchemaBatch::new();
-    delete_state_value_and_index(
-        state_kv_db.db_shard(shard_id),
-        target_version + 1,
-        &mut batch,
-        state_kv_db.is_hot(),
-    )?;
+    let db_shard = state_kv_db.db_shard(shard_id);
+    if state_kv_db.is_hot() {
+        delete_value_and_index::<StaleStateValueIndexByKeyHashSchema, HotStateValueByKeyHashSchema>(
+            db_shard,
+            target_version + 1,
+            &mut batch,
+        )?;
+    } else {
+        delete_value_and_index::<StaleStateValueIndexByKeyHashSchema, StateValueByKeyHashSchema>(
+            db_shard,
+            target_version + 1,
+            &mut batch,
+        )?;
+    }
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -251,41 +204,50 @@ pub(crate) fn truncate_state_merkle_db(
     target_version: Version,
 ) -> Result<()> {
     let status = StatusLine::new(Progress::new("Truncating State Merkle DB.", target_version));
+    truncate_sharded_merkle_db(state_merkle_db, target_version, |current_version| {
+        status.set_current_version(current_version)
+    })
+}
 
+/// Walks merkle snapshots back to `target_version`, peeling one snapshot
+/// at a time: deletes the top-level nodes and stale indices at or after
+/// the current snapshot, commits the top levels at the previous snapshot
+/// version, then truncates the shards down to it.
+fn truncate_sharded_merkle_db(
+    merkle_db: &ShardedJmtMerkleDb,
+    target_version: Version,
+    on_progress: impl Fn(Version),
+) -> Result<()> {
     loop {
-        let current_version = get_current_version_in_state_merkle_db(state_merkle_db)?
-            .expect("Current version of state merkle db must exist.");
-        status.set_current_version(current_version);
+        let current_version =
+            find_closest_node_version_at_or_before(merkle_db.metadata_db(), Version::MAX)?
+                .expect("Current version of merkle db must exist.");
+        on_progress(current_version);
         assert_ge!(current_version, target_version);
         if current_version == target_version {
             break;
         }
 
-        let version_before = find_closest_node_version_at_or_before(
-            state_merkle_db.metadata_db(),
-            current_version - 1,
-        )?
-        .expect("Must exist.");
+        let version_before =
+            find_closest_node_version_at_or_before(merkle_db.metadata_db(), current_version - 1)?
+                .expect("Must exist.");
 
         let mut top_levels_batch = SchemaBatch::new();
-
         delete_nodes_and_stale_indices_at_or_after_version(
-            state_merkle_db.metadata_db(),
+            merkle_db.metadata_db(),
             current_version,
             None, // shard_id
             &mut top_levels_batch,
         )?;
-
-        state_merkle_db.commit_top_levels(version_before, top_levels_batch)?;
-
-        truncate_state_merkle_db_shards(state_merkle_db, version_before)?;
+        merkle_db.commit_top_levels(version_before, top_levels_batch)?;
+        truncate_state_merkle_db_shards(merkle_db, version_before)?;
     }
 
     Ok(())
 }
 
 pub(crate) fn truncate_state_merkle_db_shards(
-    state_merkle_db: &StateMerkleDb,
+    state_merkle_db: &ShardedJmtMerkleDb,
     target_version: Version,
 ) -> Result<()> {
     (0..state_merkle_db.num_shards())
@@ -296,7 +258,7 @@ pub(crate) fn truncate_state_merkle_db_shards(
 }
 
 pub(crate) fn truncate_state_merkle_db_single_shard(
-    state_merkle_db: &StateMerkleDb,
+    state_merkle_db: &ShardedJmtMerkleDb,
     shard_id: usize,
     target_version: Version,
 ) -> Result<()> {
@@ -656,26 +618,26 @@ fn delete_event_data(
     Ok(())
 }
 
-fn delete_state_value_and_index(
-    state_kv_db_shard: &DB,
+/// Deletes every value row written at or after `start_version`, with its
+/// stale-index row. Every value write has a paired stale-index row (first
+/// writes use `NO_PREV_VERSION`), so the stale index reaches them all.
+fn delete_value_and_index<StaleIndex, Value>(
+    db_shard: &DB,
     start_version: Version,
     batch: &mut SchemaBatch,
-    is_hot: bool,
-) -> Result<()> {
-    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
+) -> Result<()>
+where
+    StaleIndex: Schema<Key = StaleStateValueByKeyHashIndex>,
+    Value: Schema<Key = (HashValue, Version)>,
+    Version: SeekKeyCodec<StaleIndex>,
+{
+    let mut iter = db_shard.iter::<StaleIndex>()?;
     iter.seek(&start_version)?;
-
     for item in iter {
         let (index, _) = item?;
-        batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
-        let db_key = (index.state_key_hash, index.stale_since_version);
-        if is_hot {
-            batch.delete::<HotStateValueByKeyHashSchema>(&db_key)?;
-        } else {
-            batch.delete::<StateValueByKeyHashSchema>(&db_key)?;
-        }
+        batch.delete::<StaleIndex>(&index)?;
+        batch.delete::<Value>(&(index.state_key_hash, index.stale_since_version))?;
     }
-
     Ok(())
 }
 

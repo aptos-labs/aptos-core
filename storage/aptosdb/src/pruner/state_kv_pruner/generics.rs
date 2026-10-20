@@ -7,16 +7,11 @@
 //! (`(HashValue, Version)`) are shared by every implementor; only the
 //! column families and progress keys differ.
 
-use crate::{
-    position_db::PositionDb,
-    pruner::state_kv_pruner::state_kv_pruner_manager::StateKvPrunerManager,
-    schema::{
-        db_metadata::DbMetadataKey, hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
-        position_value::PositionValueSchema,
-        stale_position_value_index::StalePositionValueIndexSchema,
-        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
-        state_value_by_key_hash::StateValueByKeyHashSchema,
-    },
+use crate::schema::{
+    db_metadata::DbMetadataKey, hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
+    position_value::PositionValueSchema, stale_position_value_index::StalePositionValueIndexSchema,
+    stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+    state_value_by_key_hash::StateValueByKeyHashSchema,
 };
 use aptos_crypto::HashValue;
 use aptos_schemadb::schema::Schema;
@@ -103,6 +98,3 @@ impl StateValuePrunerSchema for PositionValue {
         DbMetadataKey::PositionValuePrunerProgress
     }
 }
-
-/// The native-position value pruner manager.
-pub(crate) type PositionValuePrunerManager = StateKvPrunerManager<PositionValue, PositionDb>;

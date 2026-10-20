@@ -4,12 +4,11 @@
 //! Tests for the `PositionValue` instantiation of the KV pruner.
 
 use super::{
-    generics::{PositionValue, PositionValuePrunerManager},
-    StateKvPruner,
+    generics::PositionValue, state_kv_pruner_manager::StateKvPrunerManager, StateKvPruner,
 };
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
-    position_db::PositionDb,
+    native_store::kv_db::PositionDb,
     pruner::{db_pruner::DBPruner, pruner_manager::PrunerManager},
     schema::{
         position_value::PositionValueSchema,
@@ -192,12 +191,15 @@ fn position_manager_drives_pruning() {
     commit_at(&db, 0, vec![(key.clone(), upsert(100))]);
     commit_at(&db, 5, vec![(key.clone(), upsert(105))]);
 
-    let manager = PositionValuePrunerManager::new(Arc::clone(&db), LedgerPrunerConfig {
-        enable: true,
-        prune_window: 0,
-        batch_size: 1,
-        user_pruning_window_offset: 0,
-    });
+    let manager = StateKvPrunerManager::<PositionValue, PositionDb>::new(
+        Arc::clone(&db),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
     manager.wake_and_wait_pruner(5).unwrap();
 
     assert!(!value_exists(&db, hash, 0), "v0 collected by the worker");
