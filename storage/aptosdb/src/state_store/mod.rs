@@ -37,7 +37,7 @@ use crate::{
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig};
 use aptos_crypto::{
-    hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
@@ -63,9 +63,9 @@ use aptos_storage_interface::{
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
             cached_state_view::{ShardedStateCache, StateCacheShard},
-            hot_state_view::HotStateView,
+            hot_state_view::{EmptyHotState, HotStateView},
         },
-        state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+        state_with_summary::LedgerStateWithSummary,
         versioned_state_value::StateUpdateRef,
         HotStateShardUpdates, HotStateUpdates,
     },
@@ -1013,7 +1013,8 @@ impl StateStore {
 
     /// Without the executor and execution pipeline, the State and StateSummary for both the
     /// latest version and the last checkpoint version need to be calculated before committing
-    /// to the DB. This is useful for the db-restore tooling and tests.
+    /// to the DB.
+    #[cfg(test)]
     pub fn calculate_state_and_put_updates(
         &self,
         state_update_refs: &StateUpdateRefs,
@@ -1038,6 +1039,36 @@ impl StateStore {
         )?;
 
         Ok((new_state, hot_state_updates))
+    }
+
+    /// Applies `state_update_refs` on top of `base` and puts the resulting state values, usage and
+    /// stale indices into the batches. Used by KV replay in restore, which skips merklization and
+    /// hot state.
+    pub fn replay_kv(
+        &self,
+        base: &LedgerState,
+        state_update_refs: &StateUpdateRefs,
+        ledger_batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    ) -> Result<LedgerState> {
+        let (new_state, reads, _hot_state_updates) = base.update_with_db_reader(
+            base.last_checkpoint(),
+            Arc::new(EmptyHotState),
+            state_update_refs,
+            self.state_db.clone(),
+        )?;
+
+        self.put_stats_and_indices(
+            base.latest(),
+            &new_state,
+            &state_update_refs.per_version,
+            &reads,
+            ledger_batch,
+            sharded_state_kv_batches,
+        )?;
+        self.put_state_values(&state_update_refs.per_version, sharded_state_kv_batches)?;
+
+        Ok(new_state)
     }
 
     pub fn put_state_updates(
@@ -1524,51 +1555,6 @@ impl StateStore {
             keys.extend(all_rows.into_iter().map(|(k, _v)| k).collect::<Vec<_>>());
         }
         Ok(keys)
-    }
-
-    pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
-        let usage = self.get_usage(version)?;
-        let state = State::new_at_version(version, usage, HotStateConfig::default());
-        let ledger_state = LedgerState::new(state.clone(), state);
-        self.set_state_ignoring_summary(ledger_state);
-
-        Ok(())
-    }
-
-    pub fn set_state_ignoring_summary(&self, ledger_state: LedgerState) {
-        let hot_smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
-        let smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
-        let last_checkpoint_summary = StateSummary::new_at_version(
-            ledger_state.last_checkpoint().version(),
-            hot_smt.clone(),
-            smt.clone(),
-            HotStateConfig::default(),
-        );
-        let summary = StateSummary::new_at_version(
-            ledger_state.version(),
-            hot_smt,
-            smt,
-            HotStateConfig::default(),
-        );
-
-        let last_checkpoint = StateWithSummary::new(
-            ledger_state.last_checkpoint().clone(),
-            last_checkpoint_summary.clone(),
-        );
-        let latest = StateWithSummary::new(ledger_state.latest().clone(), summary);
-        let current = LedgerStateWithSummary::from_latest_and_last_checkpoint(
-            latest,
-            last_checkpoint.clone(),
-        );
-
-        self.persisted_state.install_snapshot(
-            LoadedHotState::empty(last_checkpoint.state().clone()),
-            last_checkpoint_summary,
-        );
-        *self.current_state_locked() = current;
-        self.buffered_state
-            .lock()
-            .force_last_snapshot(last_checkpoint);
     }
 }
 

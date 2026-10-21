@@ -277,7 +277,7 @@ impl DbWriter for AptosDB {
                     &mut sharded_kv_batch,
                     &mut state_kv_metadata_batch,
                 )),
-                false,
+                None,
             )?;
 
             // Save the epoch ending ledger infos
