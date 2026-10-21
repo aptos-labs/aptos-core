@@ -136,6 +136,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
 
 [[package]]
+name = "aligned-vec"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc890384c8602f339876ded803c97ad529f3842aba97f6392b3dba0dd171769b"
+dependencies = [
+ "equator",
+]
+
+[[package]]
 name = "alloc-no-stdlib"
 version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -424,7 +433,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-runtimes",
  "aptos-storage-interface",
- "aptos-system-utils 0.1.0",
+ "aptos-system-utils",
  "aptos-types",
  "bcs 0.1.4",
  "futures-channel",
@@ -1650,7 +1659,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-node-resource-metrics",
- "aptos-profiler 0.1.0",
+ "aptos-profiler",
  "aptos-protos 1.3.1",
  "aptos-push-metrics",
  "aptos-sdk",
@@ -2562,7 +2571,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-system-utils 0.1.0",
+ "aptos-system-utils",
  "async-trait",
  "backtrace",
  "clap 4.5.60",
@@ -2682,7 +2691,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-transaction-stream",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=d181eb37ea0681d5248cd9aa7a536dd3787f03e8)",
- "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=d181eb37ea0681d5248cd9aa7a536dd3787f03e8)",
+ "aptos-system-utils",
  "aptos-transaction-filter 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=d181eb37ea0681d5248cd9aa7a536dd3787f03e8)",
  "async-trait",
  "autometrics",
@@ -3923,17 +3932,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-profiler"
-version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=d181eb37ea0681d5248cd9aa7a536dd3787f03e8#d181eb37ea0681d5248cd9aa7a536dd3787f03e8"
-dependencies = [
- "anyhow",
- "pprof",
- "regex",
- "tikv-jemalloc-sys",
-]
-
-[[package]]
 name = "aptos-proptest-helpers"
 version = "0.1.0"
 dependencies = [
@@ -4588,27 +4586,7 @@ name = "aptos-system-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0",
- "async-mutex",
- "http 0.2.11",
- "hyper 0.14.28",
- "lazy_static",
- "mime",
- "pprof",
- "regex",
- "rstack-self",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "aptos-system-utils"
-version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=d181eb37ea0681d5248cd9aa7a536dd3787f03e8#d181eb37ea0681d5248cd9aa7a536dd3787f03e8"
-dependencies = [
- "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=d181eb37ea0681d5248cd9aa7a536dd3787f03e8)",
+ "aptos-profiler",
  "async-mutex",
  "http 0.2.11",
  "hyper 0.14.28",
@@ -6664,7 +6642,7 @@ dependencies = [
  "cfg-if",
  "constant_time_eq 0.4.2",
  "cpufeatures 0.3.0",
- "memmap2 0.9.9",
+ "memmap2",
  "rayon-core",
 ]
 
@@ -9161,6 +9139,26 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "equator"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4711b213838dfee0117e3be6ac926007d7f433d7bbe33595975d4190cb07e6fc"
+dependencies = [
+ "equator-macro",
+]
+
+[[package]]
+name = "equator-macro"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44f23cf4b44bfce11a86ace86f8a73ffdec849c9fd00a386a53d278bd9e81fb3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -12697,15 +12695,6 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "memmap2"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "memmap2"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
@@ -14823,7 +14812,7 @@ dependencies = [
  "opentelemetry 0.21.0",
  "opentelemetry_sdk 0.21.2",
  "prometheus 0.13.3",
- "protobuf",
+ "protobuf 2.28.0",
 ]
 
 [[package]]
@@ -15901,10 +15890,11 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "pprof"
-version = "0.11.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "196ded5d4be535690899a4631cc9f18cdc41b7ebf24a79400f46f48e49a11059"
+checksum = "38a01da47675efa7673b032bf8efd8214f1917d89685e07e395ab125ea42b187"
 dependencies = [
+ "aligned-vec",
  "backtrace",
  "cfg-if",
  "findshlibs",
@@ -15913,13 +15903,13 @@ dependencies = [
  "log",
  "nix 0.26.4",
  "once_cell",
- "parking_lot 0.12.5",
- "protobuf",
- "protobuf-codegen-pure",
+ "protobuf 3.7.2",
+ "protobuf-codegen",
  "smallvec",
+ "spin 0.10.1",
  "symbolic-demangle",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -16250,7 +16240,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "parking_lot 0.12.5",
- "protobuf",
+ "protobuf 2.28.0",
  "thiserror 1.0.69",
 ]
 
@@ -16461,22 +16451,54 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
-name = "protobuf-codegen"
-version = "2.28.0"
+name = "protobuf"
+version = "3.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "033460afb75cf755fcfc16dfaed20b86468082a2ea24e05ac35ab4a099a017d6"
+checksum = "d65a1d4ddae7d8b5de68153b48f6aa3bba8cb002b243dbdbc55a5afbc98f99f4"
 dependencies = [
- "protobuf",
+ "once_cell",
+ "protobuf-support",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "protobuf-codegen-pure"
-version = "2.28.0"
+name = "protobuf-codegen"
+version = "3.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95a29399fc94bcd3eeaa951c715f7bea69409b2445356b00519740bcd6ddd865"
+checksum = "5d3976825c0014bbd2f3b34f0001876604fe87e0c86cd8fa54251530f1544ace"
 dependencies = [
- "protobuf",
- "protobuf-codegen",
+ "anyhow",
+ "once_cell",
+ "protobuf 3.7.2",
+ "protobuf-parse",
+ "regex",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "protobuf-parse"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4aeaa1f2460f1d348eeaeed86aea999ce98c1bded6f089ff8514c9d9dbdc973"
+dependencies = [
+ "anyhow",
+ "indexmap 2.7.0",
+ "log",
+ "protobuf 3.7.2",
+ "protobuf-support",
+ "tempfile",
+ "thiserror 1.0.69",
+ "which",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e36c2f31e0a47f9280fb347ef5e461ffcd2c52dd520d8e216b52f93b0b0d7d6"
+dependencies = [
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -16660,9 +16682,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.35"
+version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef"
+checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
 ]
@@ -18867,6 +18889,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "023a211cb3138dbc438680b32560ad89f699977624c9f8dbb95a47d5b4c07dd3"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "spki"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19144,21 +19175,21 @@ dependencies = [
 
 [[package]]
 name = "symbolic-common"
-version = "10.2.1"
+version = "12.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b55cdc318ede251d0957f07afe5fed912119b8c1bc5a7804151826db999e737"
+checksum = "332615d90111d8eeaf86a84dc9bbe9f65d0d8c5cf11b4caccedc37754eb0dcfd"
 dependencies = [
  "debugid",
- "memmap2 0.5.10",
+ "memmap2",
  "stable_deref_trait",
  "uuid 1.11.0",
 ]
 
 [[package]]
 name = "symbolic-demangle"
-version = "10.2.1"
+version = "12.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79be897be8a483a81fff6a3a4e195b4ac838ef73ca42d348b3f722da9902e489"
+checksum = "912017718eb4d21930546245af9a3475c9dccf15675a5c215664e76621afc471"
 dependencies = [
  "cpp_demangle",
  "rustc-demangle",
@@ -20695,7 +20726,7 @@ checksum = "1953f8d8a98ac7883c230963291acb65c7ed6ae3e2e4c99d5c65f4e65cc9db38"
 dependencies = [
  "dof",
  "goblin",
- "memmap2 0.9.9",
+ "memmap2",
  "serde",
  "usdt-attr-macro",
  "usdt-impl",
