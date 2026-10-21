@@ -73,6 +73,20 @@ impl Drop for Entry {
                 } => REGISTRY
                     .position((*exchange, *account), market)
                     .maybe_remove(&(*exchange, *account), market),
+                TradingNativeKey::Order {
+                    exchange,
+                    market,
+                    order_id,
+                } => REGISTRY
+                    .order((*exchange, *market), order_id)
+                    .maybe_remove(&(*exchange, *market), order_id),
+                TradingNativeKey::BulkOrder {
+                    exchange,
+                    market,
+                    account,
+                } => REGISTRY
+                    .bulk_order((*exchange, *market), account)
+                    .maybe_remove(&(*exchange, *market), account),
             },
         }
     }
@@ -210,6 +224,8 @@ const NUM_TABLE_ITEM_SHARDS: usize = 32;
 const NUM_RAW_SHARDS: usize = 4;
 // Positions are bounded by a single exchange's universe so the shard count is modest.
 const NUM_POSITION_SHARDS: usize = 8;
+const NUM_ORDER_SHARDS: usize = 8;
+const NUM_BULK_ORDER_SHARDS: usize = 8;
 
 #[derive(Default)]
 pub struct StateKeyRegistry {
@@ -222,6 +238,13 @@ pub struct StateKeyRegistry {
     /// (exchange, account) -> market -> Entry.
     position_shards: [CachePadded<TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress>>;
         NUM_POSITION_SHARDS],
+    /// (exchange, market) -> order_id -> Entry.
+    order_shards:
+        [CachePadded<TwoKeyRegistry<(AccountAddress, AccountAddress), u128>>; NUM_ORDER_SHARDS],
+    /// (exchange, market) -> account -> Entry.
+    bulk_order_shards: [CachePadded<
+        TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress>,
+    >; NUM_BULK_ORDER_SHARDS],
 }
 
 impl StateKeyRegistry {
@@ -289,5 +312,31 @@ impl StateKeyRegistry {
         hasher.write_u8(account.as_ref()[AccountAddress::LENGTH - 1]);
         hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
         &self.position_shards[hasher.finish() as usize % self.position_shards.len()]
+    }
+
+    pub(crate) fn order(
+        &self,
+        key1: (AccountAddress, AccountAddress),
+        order_id: &u128,
+    ) -> &TwoKeyRegistry<(AccountAddress, AccountAddress), u128> {
+        let (exchange, market) = key1;
+        let mut hasher = fxhash::FxHasher::default();
+        hasher.write_u8(exchange.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u128(*order_id);
+        &self.order_shards[hasher.finish() as usize % self.order_shards.len()]
+    }
+
+    pub(crate) fn bulk_order(
+        &self,
+        key1: (AccountAddress, AccountAddress),
+        account: &AccountAddress,
+    ) -> &TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress> {
+        let (exchange, market) = key1;
+        let mut hasher = fxhash::FxHasher::default();
+        hasher.write_u8(exchange.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u8(account.as_ref()[AccountAddress::LENGTH - 1]);
+        &self.bulk_order_shards[hasher.finish() as usize % self.bulk_order_shards.len()]
     }
 }

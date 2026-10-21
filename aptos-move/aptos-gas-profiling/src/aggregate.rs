@@ -124,6 +124,16 @@ impl ExecutionAndIOCosts {
                         account,
                         market,
                     } => format!("position<{},{},{}>", exchange, account, market),
+                    TradingNativeKey::Order {
+                        exchange,
+                        market,
+                        order_id,
+                    } => format!("order<{},{},{}>", exchange, market, order_id),
+                    TradingNativeKey::BulkOrder {
+                        exchange,
+                        market,
+                        account,
+                    } => format!("bulk_order<{},{},{}>", exchange, market, account),
                 },
             };
 
