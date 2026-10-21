@@ -1529,6 +1529,16 @@ impl StateStore {
     pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
         let usage = self.get_usage(version)?;
         let state = State::new_at_version(version, usage, HotStateConfig::default());
+        // Installed only once, as later checkpoints carry hot items an empty hot state can't back.
+        self.persisted_state.install_snapshot(
+            LoadedHotState::empty(state.clone()),
+            StateSummary::new_at_version(
+                version,
+                SparseMerkleTree::new(*CORRUPTION_SENTINEL),
+                SparseMerkleTree::new(*CORRUPTION_SENTINEL),
+                HotStateConfig::default(),
+            ),
+        );
         let ledger_state = LedgerState::new(state.clone(), state);
         self.set_state_ignoring_summary(ledger_state);
 
@@ -1553,7 +1563,7 @@ impl StateStore {
 
         let last_checkpoint = StateWithSummary::new(
             ledger_state.last_checkpoint().clone(),
-            last_checkpoint_summary.clone(),
+            last_checkpoint_summary,
         );
         let latest = StateWithSummary::new(ledger_state.latest().clone(), summary);
         let current = LedgerStateWithSummary::from_latest_and_last_checkpoint(
@@ -1561,10 +1571,6 @@ impl StateStore {
             last_checkpoint.clone(),
         );
 
-        self.persisted_state.install_snapshot(
-            LoadedHotState::empty(last_checkpoint.state().clone()),
-            last_checkpoint_summary,
-        );
         *self.current_state_locked() = current;
         self.buffered_state
             .lock()
