@@ -69,6 +69,12 @@ pub fn test_execution_with_storage_impl_inner(
     let (aptos_db, db, executor, waypoint) =
         create_db_and_executor(db_path, &genesis_txn, force_sharding);
 
+    // Same as consensus, so tools re-executing the chain reproduce the committed outputs.
+    let features = Features::fetch_config(&db.reader.state_view_at_version(Some(0)).unwrap())
+        .unwrap()
+        .expect("Genesis must write Features.");
+    let onchain_config = TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG.with_features(&features);
+
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,
@@ -194,7 +200,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
                 .into(),
             parent_block_id,
-            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            onchain_config,
         )
         .unwrap();
     let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, std::slice::from_ref(&signer));
@@ -311,7 +317,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
                 .into(),
             epoch2_genesis_id,
-            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            onchain_config,
         )
         .unwrap();
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, std::slice::from_ref(&signer));
@@ -337,7 +343,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
                 .into(),
             epoch3_genesis_id,
-            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            onchain_config,
         )
         .unwrap();
     let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, &[signer]);
