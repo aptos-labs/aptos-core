@@ -124,8 +124,8 @@ private partial def placeRoot? (ns : ValidatedNamespace) (placeId : PlaceId)
   | fuel + 1, some (.deref base) => do
       let (localId, _) ← placeRoot? ns base fuel
       some (localId, true)
-  | fuel + 1, some (.field base _ _) | fuel + 1, some (.index base _) |
-      fuel + 1, some (.subslice base ..) |
+  | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _) |
+      fuel + 1, some (.index base _) | fuel + 1, some (.subslice base ..) |
       fuel + 1, some (.downcast base _) => do
       let (localId, _) ← placeRoot? ns base fuel
       some (localId, true)
@@ -135,7 +135,7 @@ private partial def localStaticPath? (ns : ValidatedNamespace) (placeId : PlaceI
   match fuel, ns.places[placeId.index]? with
   | 0, _ | _, none => none
   | _ + 1, some (.localVar localId) => some (localId, #[])
-  | fuel + 1, some (.field base _ field) => do
+  | fuel + 1, some (.field base _ field) | fuel + 1, some (.ghostField base _ field) => do
       let (localId, path) ← localStaticPath? ns base fuel
       some (localId, path.push (.field field))
   | fuel + 1, some (.index base indexExpression) => do
@@ -154,8 +154,9 @@ private partial def ownedLocalRoot? (ns : ValidatedNamespace) (placeId : PlaceId
   match fuel, ns.places[placeId.index]? with
   | 0, _ | _, none => none
   | _ + 1, some (.localVar localId) => some localId
-  | fuel + 1, some (.field base _ _) | fuel + 1, some (.index base _) |
-      fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+  | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _) |
+      fuel + 1, some (.index base _) | fuel + 1, some (.subslice base ..) |
+      fuel + 1, some (.downcast base _) =>
       ownedLocalRoot? ns base fuel
   | _, some (.deref _) => none
 
@@ -164,7 +165,8 @@ private partial def placeIndexDiagnostics (ns : ValidatedNamespace) (state : Ini
   match fuel, ns.places[placeId.index]? with
   | 0, _ | _, none | _, some (.localVar _) => #[]
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
-      fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+      fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
+      fuel + 1, some (.downcast base _) =>
       placeIndexDiagnostics ns state loc base fuel
   | fuel + 1, some (.index base index) =>
       let baseErrors := placeIndexDiagnostics ns state loc base fuel

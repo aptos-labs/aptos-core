@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/arbitrary.move:26:13: error: the assertion `arbitrary_u8_1(range) == arbitrary_u8_2(range)` does not hold
-tests/sources/functional/arbitrary.move:20:5: error: verex verification failed: the automatic verification of `call_arbitrary_u8` failed; provide a proof: `verify call_arbitrary_u8 by …` in `tests/sources/functional/arbitrary.proof.lean` (`verify call_arbitrary_u8 by verex_obligations` lists its obligations)
+tests/sources/functional/arbitrary.move:20:5: error: verex verification failed: the automatic verification of `call_arbitrary_u8` failed; provide a proof in `tests/sources/functional/arbitrary.proof.lean`:
+  verify call_arbitrary_u8 by
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

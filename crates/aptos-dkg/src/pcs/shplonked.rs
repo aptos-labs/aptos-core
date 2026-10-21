@@ -974,7 +974,7 @@ where
     // This is not ideal, but we need some of the SRS in order to verify the sigma protocol proof.
     type WitnessField = E::ScalarField;
 
-    fn setup<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn setup<R: rand::RngCore + rand::CryptoRng>(
         degree_bounds: Vec<usize>,
         rng: &mut R,
     ) -> (Self::CommitmentKey, Self::VerificationKey) {
@@ -1125,9 +1125,7 @@ where
         )
     }
 
-    fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(
-        rng: &mut R,
-    ) -> Self::WitnessField {
+    fn random_witness<R: rand::RngCore + rand::CryptoRng>(rng: &mut R) -> Self::WitnessField {
         sample_field_element::<E::ScalarField, _>(rng)
     }
 
@@ -1157,7 +1155,7 @@ mod tests {
     use aptos_crypto::arkworks::random::sample_field_element;
     use ark_bn254::{Bn254, Fr};
     use ark_poly::Polynomial;
-    use rand_core::OsRng;
+    use rand::rngs::OsRng;
 
     /// Minimal batch open/verify: two polynomials, one or two hidden points per set.
     #[test]

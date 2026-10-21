@@ -8,7 +8,7 @@ use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use blstrs::Scalar;
 use ff::Field;
 use num_traits::Zero;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::ops::{Add, AddAssign};
 
 /// The *input secret* that will be given as input to the PVSS dealing algorithm. This will be of a

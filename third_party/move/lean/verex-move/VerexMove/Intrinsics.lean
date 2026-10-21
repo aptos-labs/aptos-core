@@ -18,23 +18,10 @@ open VerexIR
 open VerexIR.Import
 open VerexIR.Validation
 
-inductive MapRole where
-  | addAll | addNoOverride | addOverrideIfExists | append | appendDisjoint
-  | backKey | borrow | borrowBack | borrowFront | borrowMut
-  | borrowMutWithDefault | borrowWithDefault | delMustExist | delReturnKey
-  | destroyEmpty | frontKey | get | hasKey | isEmpty | iterBorrowMut | keys
-  | len | new_ | newFrom | newWithConfig | nextKey | popBack | popFront
-  | prevKey | removeOrNone | replaceKeyInplace | toOrderedMap | toVecPair
-  | trim | upsert | upsertAll | values
-  | specAbortsAdd | specAbortsAddAll | specAbortsAppendDisjoint
-  | specAbortsBorrow | specAbortsDel | specAbortsDestroyEmpty | specAbortsEmpty
-  | specAbortsIterBorrowMut | specAbortsNewFrom | specAbortsNewWithConfig
-  | specAbortsReplaceKeyInplace | specAbortsTrim | specAbortsUpsertAll
-  | specDel | specGet | specHasKey | specIterPreserved | specIterValid
-  | specInsertionKeyAt | specInsertionRank
-  | specKeyAt | specLeafIterValid | specLeafOffset | specLen | specNew
-  | specRank | specSet
-  deriving Repr, BEq, DecidableEq, Inhabited
+-- The roles are the shared vocabulary of the intrinsic (`VerexIR.MapRole`);
+-- this profile owns their presence, dependencies, owner shape, and physical
+-- signatures.
+export VerexIR (MapRole MapOperation MapSpecRole)
 
 inductive TargetKind where
   | executable
@@ -67,6 +54,9 @@ inductive TypePattern where
   | tuple (elements : Array TypePattern)
   | reference (kind : ReferenceKind) (referent : TypePattern)
   | nominal (scope : NominalScope) (name : String) (arguments : Array TypePattern)
+  /-- Any nominal declared in the owner's namespace: the iterator of a validity
+  predicate, whose shape the predicate's own binding fixes. -/
+  | ownerNominal
   deriving Repr, BEq, Inhabited
 
 structure SignaturePattern where
@@ -97,7 +87,7 @@ private abbrev optionKey := TypePattern.nominal (.namespace "0x1" "option") "Opt
 private abbrev optionValue := TypePattern.nominal (.namespace "0x1" "option") "Option" #[.value]
 private abbrev iterator := TypePattern.nominal .ownerNamespace "IteratorPtr" #[]
 private abbrev keyIterator := TypePattern.nominal .ownerNamespace "IteratorPtr" #[.key]
-private abbrev leafIterator := TypePattern.nominal .ownerNamespace "LeafNodeIteratorPtr" #[]
+private abbrev anyIterator := TypePattern.ownerNominal
 private abbrev orderedMap :=
   TypePattern.nominal (.namespace "0x1" "ordered_map") "OrderedMap" #[.key, .value]
 
@@ -106,7 +96,7 @@ Specification-function positions use Move's logical integer domain, so direct
 fixed-width integer parameters are represented by `num`. The two alternatives
 on lookup-like roles encode the intentional difference between handles which
 copy keys and containers which borrow them. -/
-def signaturePatterns : MapRole → Array SignaturePattern
+def operationSignatures : MapOperation → Array SignaturePattern
   | .addAll => #[signature #[mutOwner, keys, values] unit]
   | .addNoOverride | .addOverrideIfExists => #[signature #[mutOwner, key, value] unit]
   | .append | .appendDisjoint => #[signature #[mutOwner, owner] unit]
@@ -128,7 +118,7 @@ def signaturePatterns : MapRole → Array SignaturePattern
   | .delReturnKey => #[
       signature #[mutOwner, refKey] (.tuple #[key, value]),
       signature #[mutOwner, key] (.tuple #[key, value])]
-  | .destroyEmpty => #[signature #[owner] unit]
+  | .destroyEmpty | .destroyUnchecked => #[signature #[owner] unit]
   | .get => #[signature #[refOwner, refKey] optionValue]
   | .hasKey => #[
       signature #[refOwner, refKey] bool,
@@ -152,152 +142,143 @@ def signaturePatterns : MapRole → Array SignaturePattern
   | .upsert => #[signature #[mutOwner, key, value] optionValue]
   | .upsertAll => #[signature #[mutOwner, keys, values] unit]
   | .values => #[signature #[refOwner] values]
-  | .specAbortsAdd => #[signature #[owner, key, value] bool]
-  | .specAbortsAddAll => #[signature #[owner, keys, values] bool]
-  | .specAbortsAppendDisjoint => #[signature #[owner, owner] bool]
-  | .specAbortsBorrow | .specAbortsDel => #[signature #[owner, key] bool]
-  | .specAbortsDestroyEmpty | .specAbortsEmpty => #[signature #[owner] bool]
-  | .specAbortsIterBorrowMut => #[
+
+def specSignatures : MapSpecRole → Array SignaturePattern
+  | .abortsAdd => #[signature #[owner, key, value] bool]
+  | .abortsAddAll => #[signature #[owner, keys, values] bool]
+  | .abortsAppendDisjoint => #[signature #[owner, owner] bool]
+  | .abortsBorrow | .abortsDel => #[signature #[owner, key] bool]
+  | .abortsDestroyEmpty | .abortsEmpty | .isEmpty => #[signature #[owner] bool]
+  | .abortsIterBorrowMut => #[
       signature #[iterator, owner] bool,
       signature #[keyIterator, owner] bool]
-  | .specAbortsNewFrom => #[signature #[keys, values] bool]
-  | .specAbortsNewWithConfig => #[signature #[num, num, bool] bool]
-  | .specAbortsReplaceKeyInplace => #[signature #[owner, key, key] bool]
-  | .specAbortsTrim => #[signature #[owner, num] bool]
-  | .specAbortsUpsertAll => #[signature #[owner, keys, values] bool]
-  | .specDel => #[signature #[owner, key] owner]
-  | .specGet => #[signature #[owner, key] value]
-  | .specHasKey => #[signature #[owner, key] bool]
-  | .specIterPreserved => #[signature #[owner, owner] bool]
-  | .specIterValid => #[signature #[keyIterator, owner] bool]
-  | .specKeyAt | .specInsertionKeyAt => #[signature #[owner, num] key]
-  | .specLeafIterValid => #[signature #[leafIterator, owner] bool]
-  | .specLeafOffset => #[signature #[leafIterator, owner] num]
-  | .specLen => #[signature #[owner] num]
-  | .specNew => #[signature #[] owner]
-  | .specRank | .specInsertionRank => #[signature #[owner, key] num]
-  | .specSet => #[signature #[owner, key, value] owner]
+  | .abortsNewFrom => #[signature #[keys, values] bool]
+  | .abortsNewWithConfig => #[signature #[num, num, bool] bool]
+  | .abortsReplaceKeyInplace => #[signature #[owner, key, key] bool]
+  | .abortsTrim => #[signature #[owner, num] bool]
+  | .abortsUpsertAll => #[signature #[owner, keys, values] bool]
+  | .del => #[signature #[owner, key] owner]
+  | .get => #[signature #[owner, key] value]
+  | .hasKey => #[signature #[owner, key] bool]
+  | .iterPreserved => #[signature #[owner, owner] bool]
+  | .iterValid => #[signature #[anyIterator, owner] bool]
+  | .keyAt | .insertionKeyAt => #[signature #[owner, num] key]
+  | .leafIterValid => #[signature #[anyIterator, owner] bool]
+  | .leafOffset => #[signature #[anyIterator, owner] num]
+  | .len => #[signature #[owner] num]
+  | .new_ => #[signature #[] owner]
+  | .rank | .insertionRank => #[signature #[owner, key] num]
+  | .set => #[signature #[owner, key, value] owner]
+
+def signaturePatterns : MapRole → Array SignaturePattern
+  | .executable operation => operationSignatures operation
+  | .specification role => specSignatures role
 
 structure RoleSchema where
   role : MapRole
-  sourceName : String
-  kind : TargetKind
   presence : Presence := .optional
-  dependencies : Array MapRole := #[]
+  /-- The logical observations needed to interpret a bound role. -/
+  dependencies : Array MapSpecRole := #[]
   signatures : Array SignaturePattern
   deriving Repr, BEq, Inhabited
 
-private def executable (role : MapRole) (sourceName : String)
-    (dependencies : Array MapRole := #[]) : RoleSchema :=
-  { role, sourceName, kind := .executable, dependencies,
-    signatures := signaturePatterns role }
+def RoleSchema.kind (schema : RoleSchema) : TargetKind :=
+  match schema.role with
+  | .executable _ => .executable
+  | .specification _ => .specification
 
-private def specification (role : MapRole) (sourceName : String)
-    (presence : Presence := .optional)
-    (dependencies : Array MapRole := #[]) : RoleSchema :=
-  { role, sourceName, kind := .specification, presence, dependencies,
-    signatures := signaturePatterns role }
+def RoleSchema.sourceName (schema : RoleSchema) : String := schema.role.name
+
+private def executable (operation : MapOperation)
+    (dependencies : Array MapSpecRole := #[]) : RoleSchema :=
+  { role := .executable operation, dependencies,
+    signatures := operationSignatures operation }
+
+private def specification (role : MapSpecRole) (presence : Presence := .optional) : RoleSchema :=
+  { role := .specification role, presence, signatures := specSignatures role }
 
 /-- The complete role vocabulary transported by the six Aptos map fixtures.
 Dependencies name logical observations needed to interpret a bound executable
 role; optional abort predicates refine summaries but are not prerequisites. -/
 def roleSchemas : Array RoleSchema := #[
-  executable .addAll "map_add_all" #[.specHasKey, .specSet],
-  executable .addNoOverride "map_add_no_override" #[.specHasKey, .specSet],
-  executable .addOverrideIfExists "map_add_override_if_exists" #[.specSet],
-  executable .append "map_append" #[.specHasKey, .specSet],
-  executable .appendDisjoint "map_append_disjoint" #[.specHasKey, .specSet],
-  executable .backKey "map_back_key" #[.specKeyAt, .specLen],
-  executable .borrow "map_borrow" #[.specGet],
-  executable .borrowBack "map_borrow_back" #[.specGet, .specKeyAt, .specLen],
-  executable .borrowFront "map_borrow_front" #[.specGet, .specKeyAt],
-  executable .borrowMut "map_borrow_mut" #[.specGet, .specSet],
-  executable .borrowMutWithDefault "map_borrow_mut_with_default" #[.specGet, .specSet],
-  executable .borrowWithDefault "map_borrow_with_default" #[.specGet],
-  executable .delMustExist "map_del_must_exist" #[.specHasKey, .specDel],
-  executable .delReturnKey "map_del_return_key" #[.specHasKey, .specDel],
-  executable .destroyEmpty "map_destroy_empty",
-  executable .frontKey "map_front_key" #[.specKeyAt],
-  executable .get "map_get" #[.specGet],
-  executable .hasKey "map_has_key" #[.specHasKey],
-  executable .isEmpty "map_is_empty" #[.specLen],
-  executable .iterBorrowMut "map_iter_borrow_mut" #[.specGet, .specSet],
-  executable .keys "map_keys" #[.specKeyAt, .specLen],
-  executable .len "map_len" #[.specLen],
-  executable .new_ "map_new",
-  executable .newFrom "map_new_from" #[.specHasKey, .specSet],
-  executable .newWithConfig "map_new_with_config",
-  executable .nextKey "map_next_key" #[.specKeyAt, .specRank],
-  executable .popBack "map_pop_back" #[.specGet, .specDel, .specKeyAt, .specLen],
-  executable .popFront "map_pop_front" #[.specGet, .specDel, .specKeyAt],
-  executable .prevKey "map_prev_key" #[.specKeyAt, .specRank],
-  executable .removeOrNone "map_remove_or_none" #[.specHasKey, .specDel],
-  executable .replaceKeyInplace "map_replace_key_inplace" #[.specHasKey, .specDel, .specSet],
-  executable .toOrderedMap "map_to_ordered_map" #[.specGet, .specKeyAt, .specLen],
-  executable .toVecPair "map_to_vec_pair" #[.specGet, .specKeyAt, .specLen],
-  executable .trim "map_trim" #[.specDel, .specLen],
-  executable .upsert "map_upsert" #[.specSet],
-  executable .upsertAll "map_upsert_all" #[.specSet],
-  executable .values "map_values" #[.specGet, .specKeyAt, .specLen],
-  specification .specAbortsAdd "map_spec_aborts_add",
-  specification .specAbortsAddAll "map_spec_aborts_add_all",
-  specification .specAbortsAppendDisjoint "map_spec_aborts_append_disjoint",
-  specification .specAbortsBorrow "map_spec_aborts_borrow",
-  specification .specAbortsDel "map_spec_aborts_del",
-  specification .specAbortsDestroyEmpty "map_spec_aborts_destroy_empty",
-  specification .specAbortsEmpty "map_spec_aborts_empty",
-  specification .specAbortsIterBorrowMut "map_spec_aborts_iter_borrow_mut",
-  specification .specAbortsNewFrom "map_spec_aborts_new_from",
-  specification .specAbortsNewWithConfig "map_spec_aborts_new_with_config",
-  specification .specAbortsReplaceKeyInplace "map_spec_aborts_replace_key_inplace",
-  specification .specAbortsTrim "map_spec_aborts_trim",
-  specification .specAbortsUpsertAll "map_spec_aborts_upsert_all",
-  specification .specDel "map_spec_del" .required,
-  specification .specGet "map_spec_get" .required,
-  specification .specHasKey "map_spec_has_key" .required,
-  specification .specIterPreserved "map_spec_iter_preserved",
-  specification .specIterValid "map_spec_iter_valid",
-  specification .specInsertionKeyAt "map_spec_insertion_key_at",
-  specification .specInsertionRank "map_spec_insertion_rank",
-  specification .specKeyAt "map_spec_key_at",
-  specification .specLeafIterValid "map_spec_leaf_iter_valid",
-  specification .specLeafOffset "map_spec_leaf_offset",
-  specification .specLen "map_spec_len",
-  specification .specNew "map_spec_new",
-  specification .specRank "map_spec_rank",
-  specification .specSet "map_spec_set" .required
-]
-
-def allRoles : Array MapRole := #[
-  .addAll, .addNoOverride, .addOverrideIfExists, .append, .appendDisjoint,
-  .backKey, .borrow, .borrowBack, .borrowFront, .borrowMut,
-  .borrowMutWithDefault, .borrowWithDefault, .delMustExist, .delReturnKey,
-  .destroyEmpty, .frontKey, .get, .hasKey, .isEmpty, .iterBorrowMut, .keys,
-  .len, .new_, .newFrom, .newWithConfig, .nextKey, .popBack, .popFront,
-  .prevKey, .removeOrNone, .replaceKeyInplace, .toOrderedMap, .toVecPair,
-  .trim, .upsert, .upsertAll, .values,
-  .specAbortsAdd, .specAbortsAddAll, .specAbortsAppendDisjoint,
-  .specAbortsBorrow, .specAbortsDel, .specAbortsDestroyEmpty, .specAbortsEmpty,
-  .specAbortsIterBorrowMut, .specAbortsNewFrom, .specAbortsNewWithConfig,
-  .specAbortsReplaceKeyInplace, .specAbortsTrim, .specAbortsUpsertAll,
-  .specDel, .specGet, .specHasKey, .specIterPreserved, .specIterValid,
-  .specInsertionKeyAt, .specInsertionRank,
-  .specKeyAt, .specLeafIterValid, .specLeafOffset, .specLen, .specNew,
-  .specRank, .specSet
+  executable .addAll #[.hasKey, .set],
+  executable .addNoOverride #[.hasKey, .set],
+  executable .addOverrideIfExists #[.set],
+  executable .append #[.hasKey, .set],
+  executable .appendDisjoint #[.hasKey, .set],
+  executable .backKey #[.keyAt, .len],
+  executable .borrow #[.get],
+  executable .borrowBack #[.get, .keyAt, .len],
+  executable .borrowFront #[.get, .keyAt],
+  executable .borrowMut #[.get, .set],
+  executable .borrowMutWithDefault #[.get, .set],
+  executable .borrowWithDefault #[.get],
+  executable .delMustExist #[.hasKey, .del],
+  executable .delReturnKey #[.hasKey, .del],
+  executable .destroyEmpty,
+  executable .destroyUnchecked,
+  executable .frontKey #[.keyAt],
+  executable .get #[.get],
+  executable .hasKey #[.hasKey],
+  executable .isEmpty #[.len],
+  executable .iterBorrowMut #[.get, .set],
+  executable .keys #[.keyAt, .len],
+  executable .len #[.len],
+  executable .new_,
+  executable .newFrom #[.hasKey, .set],
+  executable .newWithConfig,
+  executable .nextKey #[.keyAt, .rank],
+  executable .popBack #[.get, .del, .keyAt, .len],
+  executable .popFront #[.get, .del, .keyAt],
+  executable .prevKey #[.keyAt, .rank],
+  executable .removeOrNone #[.hasKey, .del],
+  executable .replaceKeyInplace #[.hasKey, .del, .set],
+  executable .toOrderedMap #[.get, .keyAt, .len],
+  executable .toVecPair #[.get, .keyAt, .len],
+  executable .trim #[.del, .len],
+  executable .upsert #[.set],
+  executable .upsertAll #[.set],
+  executable .values #[.get, .keyAt, .len],
+  specification .abortsAdd,
+  specification .abortsAddAll,
+  specification .abortsAppendDisjoint,
+  specification .abortsBorrow,
+  specification .abortsDel,
+  specification .abortsDestroyEmpty,
+  specification .abortsEmpty,
+  specification .abortsIterBorrowMut,
+  specification .abortsNewFrom,
+  specification .abortsNewWithConfig,
+  specification .abortsReplaceKeyInplace,
+  specification .abortsTrim,
+  specification .abortsUpsertAll,
+  specification .del .required,
+  specification .get .required,
+  specification .hasKey .required,
+  specification .iterPreserved,
+  specification .iterValid,
+  specification .insertionKeyAt,
+  specification .insertionRank,
+  specification .isEmpty,
+  specification .keyAt,
+  specification .leafIterValid,
+  specification .leafOffset,
+  specification .len,
+  specification .new_,
+  specification .rank,
+  specification .set .required
 ]
 
 def roleSchema? (name : String) : Option RoleSchema :=
-  roleSchemas.find? (fun schema => schema.sourceName == name)
+  (MapRole.ofName? name).bind fun role => roleSchemas.find? (·.role == role)
 
 def registryComplete : Bool :=
-  roleSchemas.size == 64 && allRoles.size == 64 &&
-    roleSchemas.all (fun schema => allRoles.contains schema.role) &&
+  roleSchemas.size == MapRole.all.size &&
+    MapRole.all.all (fun role => roleSchemas.countP (fun schema => schema.role == role) == 1) &&
     roleSchemas.all (fun schema => !schema.signatures.isEmpty) &&
-    allRoles.all (fun role => roleSchemas.countP (fun schema => schema.role == role) == 1) &&
-    roleSchemas.all (fun schema =>
-      roleSchemas.countP (fun other => other.sourceName == schema.sourceName) == 1) &&
-    roleSchemas.countP (fun schema => schema.kind == .executable) == 37 &&
-    roleSchemas.countP (fun schema => schema.kind == .specification) == 27
+    (MapRole.all.map (·.name)).toList.Nodup &&
+    roleSchemas.countP (fun schema => schema.kind == .executable) == MapOperation.all.size &&
+    roleSchemas.countP (fun schema => schema.kind == .specification) == MapSpecRole.all.size
 
 private def diagnostic (code message : String) (loc : LocId) : Array Diagnostic :=
   #[.at code message loc]
@@ -357,6 +338,8 @@ private partial def matchesType (unit : RawUnit) (ownerName : NameId)
               matchesScope scope actualName && actualName.name == expected &&
                 matchesArguments arguments actualArguments
           | none => false
+      | .ownerNominal, .nominal name _ =>
+          (unit.tables.names[name.index]?).any (matchesScope .ownerNamespace ·)
       | _, _ => false
 
 /-- A parameter matches its pattern; a fixed-width integer one matches `num`,
@@ -440,12 +423,10 @@ private def checkRequiredRoles (intrinsic : IntrinsicDecl)
 private def checkDependencies (bound : Array BoundRole) : Array Diagnostic :=
   bound.foldl (fun ds present =>
     present.schema.dependencies.foldl (fun ds dependency =>
-      if bound.any (fun candidate => candidate.schema.role == dependency) then ds
+      if bound.any (fun candidate => candidate.schema.role == .specification dependency) then ds
       else
-        let dependencyName := (roleSchemas.find? (fun candidate =>
-          candidate.role == dependency)).map (·.sourceName) |>.getD (repr dependency)
         ds ++ diagnostic "VIR-MOVE-INTRINSIC-ROLE-DEPENDENCY"
-          s!"Move map intrinsic role `{present.schema.sourceName}` requires `{dependencyName}`"
+          s!"Move map intrinsic role `{present.schema.sourceName}` requires `{dependency.name}`"
           present.loc) ds) #[]
 
 def check (unit : RawUnit) (ns : RawNamespace)

@@ -15,8 +15,7 @@ use aptos_dkg::{
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},
 };
 use aptos_runtimes::spawn_rayon_thread_pool;
-use rand::{rngs::StdRng, thread_rng};
-use rand_core::SeedableRng;
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use sha3::{Digest, Sha3_256};
 
 #[test]
@@ -92,7 +91,7 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
         PubKeyShare = T::DealtPubKeyShare,
         SecretKeyShare = T::DealtSecretKeyShare,
     >,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 >(
     wc: &WeightedConfigBlstrs,
     sk: &T::DealtSecretKey,

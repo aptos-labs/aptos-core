@@ -63,7 +63,13 @@ verex module 0x42::element_quantifiers where
 /--
 error: the specification clause `ensures result < 5` is not established
 ---
-error: verex verification failed: the automatic verification of `too_strong` failed; provide a proof: `verify too_strong by …` in the module (`verify too_strong by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `too_strong` failed; provide a proof in the module:
+  verify too_strong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::element_quantifiers::too_strong
@@ -71,7 +77,13 @@ verify 0x42::element_quantifiers::too_strong
 /--
 error: the specification clause `ensures v[0] > 0` is not established
 ---
-error: verex verification failed: the automatic verification of `missing_entry` failed; provide a proof: `verify missing_entry by …` in the module (`verify missing_entry by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `missing_entry` failed; provide a proof in the module:
+  verify missing_entry by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::element_quantifiers::missing_entry

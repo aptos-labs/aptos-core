@@ -1,12 +1,12 @@
 # Roadmap and test ledger
 
-Status: 2026-09-28. This is the one place for project status: what is
-still open across the designs, in priority order, and the ledger of the
+This is the one place for project status: what is still open across the
+designs, in priority order, and the ledger of the
 acceptance fixtures that measures it ([Tests](#tests)). Each linked design
 stays authoritative for its own scope and rationale; when a status
 changes, update it here, not in the design. Done work is named in one line
-per track so the open items read in context; the history lives in
-[`historical/`](historical/).
+per track so the open items read in context. Superseded design analyses
+live in [`historical/`](historical/); session history stays in version control.
 
 The design documents inside `v0/` (`move/`, `move-model/`, `transpiler/`)
 describe the deprecated stack. Nothing is scheduled from them; they are
@@ -15,466 +15,72 @@ ledger below.
 
 ## 1. Verification of validated VIR
 
-Callers of failed callees (2026-10-09, user decision): a callee used
-through its contract without a theorem is assumed by its callers, as in the
-Prover, unless its verification is still in progress (`denotation.md`). New
-fixture: `Check/Calls/FailedCallees.lean`.
+Designs: [`denotation.md`](denotation.md),
+[`prophetic-references.md`](prophetic-references.md), and
+[`proof-strategy.md`](proof-strategy.md).
 
-Behaviors of capturing closures (2026-10-09): at a leaf, `aborts_of` and
-`ensures_of` of a literal closure that captures values read as those of the
-function value naming its target at the woven arguments
-(`abortsOf_closureOf_captured`, `verex_woven_behaviors`). New
-fixture: `Check/Closures/WovenBehaviors.lean`.
+Implemented: one denotation of validated VIR into `Spec`, compiled per target
+and checked by the kernel. It covers control flow, invariant-based loops,
+prophetic references, storage and resource invariants, vectors, generics,
+recursion and cycles of calls. Calls are inlined unless native, opaque or on a
+cycle. Callers may assume a callee's contract without its theorem; a callee
+still being verified is refused, and a failed callee remains reported.
 
-BCS serialization facts (2026-10-09): what the Prover's prelude states of
-`bcs::serialize` (injective, never empty, one length for addresses) is
-stated of a function's parameters, as the hashes' collision freedom is
-(`source-verification.md`). New fixture: `Check/Calls/BcsSerialization.lean`.
+[`lemmas.md`](lemmas.md) describes specification lemmas, well-founded recursion,
+and in-body `assert`, `assume`, `apply` and `split` steps. Assumptions used by a
+lemma remain hypotheses of its theorem. Generic module axioms and invariants
+are instantiated at the types a verification uses. Partial specification
+functions retain the domains induced by their declared types; see
+[`prover-test-problems.md`](prover-test-problems.md), G14–G15, for numeric
+semantics and unsupported conversions.
 
-Named runs through a contract (2026-10-09): a call through its target's
-contract marks the run and abort it names read, so the contract is not
-derived from them again at every leaf. Benchmark −0.089%.
+Open work:
 
-Struct and enum arguments of runs, loop store frames (2026-10-09): a run of
-a literal closure is read at struct and enum arguments in their unfolded
-variant form (`nativeOf?`), and a loop's memory frame ignores its
-specification blocks and the closures built there (`mayTouchStore`). New
-fixtures: `SourceVerify/behavior_nominal_arguments.move`,
-`SourceVerify/loop_closure_frame.move`.
-
-Behavioral predicates under a state label (2026-10-09): a label's
-existential over `requires_of`/`aborts_of`/`ensures_of` of a literal
-closure is witnessed at the first program point its target's verified
-contract decides (`state-labels.md`, S3b). New fixture:
-`SourceVerify/behavior_label_witness.move`.
-
-A closure's run per conjunction (2026-10-09): a literal closure's run is
-read once for all conjuncts of a conjunction, not once per conjunct.
-Benchmark −0.80%, same outcomes.
-
-Generic module invariants (2026-10-09): `invariant<T>` (VerexSL
-`invariant {T}`) is monomorphized as the Prover does, by unifying the memory
-it reads with a function's, with ghost type parameters for what a write
-leaves undetermined. New fixtures:
-`SourceVerify/generic_invariants_false.move`,
-`SourceVerify/generic_invariant_ghosts_false.move`.
-
-Callee preconditions (2026-10-09): an inlined callee's `requires` is owed
-where it starts (`Contract.startPrecondition`, the solver's `requiring`
-table), and a function without a specification calling one is verified.
-Benchmark +0.15% (`ordered_map`, `GenericStorage`), same outcomes.
-
-Inline specifications (2026-10-08): a non-opaque inline function with its
-own specification is verified against it, as in the Prover; its calls stay
-expanded. New fixture: `SourceVerify/inline_spec_false.move`.
-
-Loop invariant placement (2026-10-08): a loop invariant no loop header
-begins with is an error, as in the Prover (`loop_invariant_invalid`); a
-loop's annotations together form its specification, where a second one had
-silently replaced the first. New fixtures:
-`SourceVerify/loop_invariant_placement{,_false}.move`, and a case in
-`Check/Control/LoopInvariantErrors`.
-
-Test-driver parity (2026-10-08): `--verify-only` selects the verified
-functions under `--lean`; Move scripts, and any module whose rendered name is
-quoted (`std::string`), are verified again: the verifier had looked them up
-by their quoted spelling and silently verified nothing. The general
-pipeline's stages are timed (`pipe-…`). New fixture:
-`SourceVerify/script_false.move`.
-
-Generic module axioms (2026-10-08): `axiom<T>` (VerexSL `axiom {T} e`) is
-assumed at the instantiations a verification applies, as the Prover
-monomorphizes it; `num` is a specification function's type argument of its
-own; a module's abort strictness holds for its functions. Four more registry
-files verify; benchmark unchanged. New fixtures:
-`SourceVerify/generic_axioms{,_false}.move`,
-`SourceVerify/inherited_strictness{,_false}.move`.
-
-Registry follow-up (2026-10-08): module axioms over values are assumed by
-every verification and printed as axioms; the export follows specifications'
-module references; arbitrary values, `int2bv` of literals and schema
-equalities import exactly; the solver relates a conjunction's operand orders
-and a nonnegative shift's two remainders. `abort_in_fun`, `bitwise_operators`,
-`bv_internal` and `defines` verify; the benchmark keeps every outcome at
--0.58% heartbeats. New fixtures: `SourceVerify/module_axioms{,_false}.move`,
-`SourceVerify/schema_equality.move`.
-
-Partial specification functions (2026-10-08, user decisions): an `int2bv` the
-compiler types at `num` wraps at `u64`, so `MoveToVerexSL/constants.move`
-translates again; one at a type parameter is still rejected. A specification
-function is defined where its parameters fit their declared fixed-width types
-and unspecified elsewhere (G15): the importer keeps the declared types, the
-body reads them as `Int`, and the verifier derives the domain, guarding
-recursive definitions and expansions alike. The solver treats a domain guard as
-transparent when it decides unfoldings. Full registry, all four suites and both
-cost gates pass with no regressed function; the benchmark keeps every outcome
-at a heartbeat cost recorded in the handoff. New fixtures:
-`SourceVerify/spec_fun_domain{,_false}.move`,
-`Check/Specifications/SpecFunctionDomain{s,Errors}.lean`.
-
-Scalar specification calls (2026-10-07): nonrecursive scalar helpers now share
-representation slots across callers, preserve `num` sinks, and check that the
-signature does not depend on traversal order. Three positive source roots and
-two false-clause controls agree with MVP. Substituting literal scalar inputs
-before arithmetic search fixes a nested-spec-call timeout: 763,888 raw heartbeats
-instead of exhausting approximately 1.5G. All four full Lean suites pass,
-including performance gates. `math_fixed8` gets past import but still exhausts
-the registry's proof budget; the then-ignored unroll pragma is corrected in the
-focused checkpoint described in `historical/handoff-2026-10.md`, with performance still open. Representation
-guards decrease from 27 to 26. The benchmark/main HTML was refreshed first:
-24 verified, one expected rejection, six import failures, 9,516,016,778 raw
-heartbeats. All 437 normal registry checks pass after recording the newly exposed
-math_fixed8 timeout; this is not a claim that its three functions verify.
-The remaining obligation-preparation issue is recorded in `historical/handoff-2026-10.md`.
-The Move Prover's bit-vector representation is no longer modeled (user
-decision 2026-10-07, G14): spec arithmetic stays mathematical and `int2bv` is
-exact. The representation guard is gone and all six affected benchmark modules
-verify again (30 verified, one expected rejection). Width-less `int2bv`
-reads `num` as `u64` since 2026-10-08; at a type parameter it awaits a decision
-(see the handoff), and the registry gaps it exposed are in
-`prover-test-problems.md`.
-
-The subsequent checkpoint adds sound bounded unrolling. Literal arithmetic
-results are no longer named, so ground nested unrolling verifies at 25k; an
-outrun bound is reported as such and ends the attempt. All four suites, the
-registry and the benchmark pass (24 verified, one expected rejection, six C17
-import failures, −0.48% heartbeats). `math_fixed8` and unbounded vector loops
-with `pragma unroll` remain open; see the handoff.
-
-Closed scalar-package integration (2026-10-07): production import now connects
-classification, physical binding widths and mathematical rewriting across all
-owned/dependency scalar functions and their derived spec bodies. Unsupported
-declaration families and dynamic narrowing stay guarded. Seven new source
-controls pass both MVP and Verex; the six false representation regressions now
-reach verification and fail their postconditions. Checked multiplication still
-aborts. Focused analysis/lowering checks and full Move/E2E suites pass. `test_bitvector`
-verifies again, and `bv_mul_overflow` rejects its false no-abort contract;
-representation rejections fall from 29 to 27. The final normal registry recheck passes all 437 tests
-without updates (`/tmp/bv-scalar-registry-final.log`). Benchmark/main HTML was regenerated first: 24 verified, one expected
-rejection, six unchanged import failures, 9,509,422,287 raw heartbeats.
-Recursive/stateful spec-function calls, fields/containers, generics, inline specs/proofs and
-independent arbitrary narrowing declarations remain open.
-
-Numeric lowering builders (2026-10-07): unsigned specification operations now
-have explicit mathematical expansions, including negative-input conversion,
-SMT division/remainder by zero, shift-count widths, and arbitrary-overflow
-narrowing casts. Twenty-four focused guards include 4,116 BitVec comparisons;
-a kernel proof covers conversion for every integer. Six generated backend
-verification controls pass and two false claims are rejected. The production
-importer still needs representation/width integration and independent arbitrary
-declarations before these builders can restore guarded registry cases. Reports
-remain at the last full checkpoint; see `numeric-representation.md`.
-
-Numeric analysis infrastructure (2026-10-07): scalar function classification now
-has shared call slots, distinct body/integer-contract slots and occurrence
-identities. A following width pass resolves nested bitwise spec arithmetic and
-compiler-defaulted literals, retaining explicit suffix/range mismatch errors.
-All 66 focused guards/kernel examples pass; seven exported source regressions
-and the two-module literal registry example additionally exercise the assembled
-analysis. This remains outside the production importer: no new registry
-verification success or benchmark change is claimed. Whole-package collection,
-binder/physical-local widths and representation-aware lowering remain open;
-see `numeric-representation.md` and `/tmp/bv-width-tests.log`.
-
-Table representation (2026-10-13): a table is an owned value of its handle
-and contents, the contents a hidden last field of the owner's type in the
-denotation, erased at the runtime boundary and related to native storage
-there; all table roles have contracts, and identity equality compares
-handles. Tables behind type parameters are not carried; tables are to become
-values in the runtime semantics as well (decision 2026-10-13); see
-`intrinsic-maps.md`, "Owned Table values".
-
-Scalar internal bit-vector support (2026-10-07): opaque `bv_internal` bodies
-can use scalar executable bitwise operations without classifying their ordinary
-contracts or callers. The wrapping registry example now verifies its valid
-function and rejects its false postcondition; general representation propagation
-remains open. Mutable-reference contracts additionally exposed and fixed a
-missing implicit read before specification casts. Positive current/old reference
-checks and a false-postcondition regression agree with MVP. Outgoing calls,
-aggregates/generics, inline specs, concrete clauses and proof blocks remain
-guarded. See C17 in `prover-test-problems.md`.
-Full Move/E2E suites and all 437 registry checks pass without baseline updates
-(`/tmp/bv-internal-validation.log`, exit 0). Benchmark JSON/main HTML was
-regenerated first: 24 verified, one expected rejection, six unchanged import
-failures, 9,509,276,380 raw heartbeats. Core/Rust were unchanged.
-
-Numeric representation follow-up: XAST version 10 now retains the compiler's
-defaulted numeric literal marker, so width inference can distinguish `3` from
-explicit `3u256`. The producer/consumer tests cover this and schema expansion.
-[`numeric-representation.md`](numeric-representation.md) specifies the remaining
-whole-source analysis and lowering. Narrowing bitvector specification casts need
-arbitrary out-of-range values, unlike wrapping `int2bv`; a new source regression
-has positive and negative MVP controls. These are prerequisites for restoring
-the guarded modules, not additional verified registry cases.
-This checkpoint passes 59 exchange tests, full Move/E2E suites and all 437
-registry checks without baseline updates (`/tmp/bv-literals-validation.log`,
-exit 0). Benchmark JSON/main HTML was regenerated before the broad Lean checks:
-24 verified, one expected rejection, six unchanged import failures,
-9,509,559,974 raw heartbeats. The ci CLI and registry executable were rebuilt
-for XAST v10. General representation analysis and lowering remain open.
-
-Source bit-vector soundness correction (2026-10-07): the importer now rejects
-numeric bitwise operators, `bv`/`bv_ret` pragmas and `int2bv`/`bv2int` instead
-of erasing their representation semantics. MVP rejects
-the unsigned overflow claims that Verex previously accepted. Both conversion
-truncation and subsequent arithmetic wrapping need explicit modeling, including
-generic instantiation. This reopens `features` and affected importing modules;
-restoring them is a priority. See C17 in `prover-test-problems.md` and the
-`SourceVerify/bv_representation_overflow.move` and `bv_representation_arithmetic.move`
-regressions, plus implicit/operator/pragma propagation cases. The expanded
-seed preflight passes full Move/E2E suites and all 437 registry baseline checks
-without updates (`/tmp/bv-seeds-validation.log`, exit 0). The measured benchmark
-has 24 verified, one expected rejection and six import failures at 9.510G raw
-heartbeats. This reflects reduced coverage, not a speed improvement. The
-affected modules are `features`, `cmp`, `math_fixed`, `ristretto255`, `ed25519`
-and framework `ordered_map`; authored VerexSL `OrderedMap` still verifies.
-Thirty registry files now stop at this boundary. See `historical/handoff-2026-10.md`.
-
-Preceding validation (2026-10-07): all four full suites and all 437 registry
-baseline checks pass after the conditional-range change. That benchmark had
-30 verified + one expected rejection at 15.066G raw heartbeats; measured JSON
-and main-relative HTML were refreshed before the suites. Remaining registry
-failures are tracked in `prover-test-problems.md`; baseline agreement is not a
-claim of full MVP parity. See `/tmp/conditional-range-full-tests.log`.
-
-Design: [`denotation.md`](denotation.md), with the reference model of
-[`prophetic-references.md`](prophetic-references.md).
-
-Done: one `denote` of validated VIR into `Spec`, compiled per target and
-certified by the kernel (D0–D6: control, loops with invariants, references
-as prophecies, storage and resource invariants, vectors, Move generics,
-recursion and cycles of calls). Calls follow the Move Prover: callees are
-inlined unless native, opaque, or on a cycle; contracts have `[abstract]`
-and `[concrete]` views; `pragma bv` restates bit arithmetic over bit
-vectors for `bv_decide`. Every Check fixture passes ([Tests](#tests)).
-Lemmas and proof blocks ([`lemmas.md`](lemmas.md), L1–L4 done
-2026-10-03): `spec lemma`s are theorems over their statements, recursion
-groups by well-founded recursion on their measure; a proof's steps are
-in-body `assert`, `assume`, `apply`, and `split` statements, an `assume`
-in a lemma's proof a hypothesis of every theorem using it. Mutually
-recursive specification functions are defined together. A lemma
-parameter or quantifier binder of an aggregate type ranges over the
-values of its native type.
-
-Open:
-
-- **Static global memory** ([`static-memory.md`](static-memory.md),
-  decided 2026-10-02; S1–S5 done 2026-10-02). The denotation's global
-  memory is one typed memory per resource type, related to runtime globals
-  once, in the agreement; nothing about memory typing is proved per
-  function. Open: proving `GlobalsPreserved`, which the public theorem
-  takes, from `preservation`, and the gaps the design's status lists.
-- **The agreement theorem.** `compileFunction_agrees` and
-  `compileFunction_least_cycle` are axioms by decision; proving them by
-  induction over `compileFunction` removes the last project-specific
-  assumptions besides the natively checked `bv_decide` certificates.
-- **Quantifier automation.** Specification quantifiers over types, ranges,
-  and vectors (by index, as in the Move Prover) translate. A leaf whose
-  deciders fail on a quantified or conditional goal is retried at an
-  arbitrary instance, within its own heartbeat budget, and a lookup after
-  a vector write is resolved where omega tells the positions apart or
-  equal: frames over a write verify (`bit_vector::set`, `unset`). A goal
-  one position past a quantified hypothesis's range splits on the open
-  range premise and is decided at the bound, which extends a range
-  invariant by one iteration, in an authored proof and in automatic mode
-  alike (the instance deciders see a goal whose binders the loop step
-  introduced, and see through `Obligation` markers). A lookup at a
-  position the context does not tell apart from a written one splits on
-  the positions being equal, reads the written element or the array
-  before the write in each case, and pins the variable the read position
-  offsets to the written one (`verex_split_write`); a lookup into
-  an array with an element removed or inserted reads the array before
-  where omega places the position (`verex_lookups_after_writes`).
-  A quantified equation among the hypotheses rewrites the goal once at an
-  instance whose premises omega proves (`verex_rewrite_instance`;
-  bounded, unlike rewriting with the equations as rules, which cycles).
-  Existing call observations are tried before reconstructing behavioral facts:
-  `aborts_if_at_state_label::caller` and `aliasing::remove_then_try_read` verify
-  at native 25k. The registered StateLabelCallObservations fixture includes
-  an opaque caller and a rejected false postcondition. Focused cost/label
-  gates pass; all four full suites subsequently pass. The registry exposed
-  a constructor-budget regression; restricting eligibility to direct invocation
-  facts restores AMM create_pool's original baseline. The follow-up Boolean
-  observer also verifies intermediate_states::test_config_preserved at 25k
-  (8.794M typed heartbeats), preserving its two intended negative siblings.
-  StateLabelBooleanObservations registers conditional-read coverage. Its
-  refreshed benchmark preserves 30 verified + one expected rejection, and the
-  full registry matches 437/437 baselines. The subsequent aliasing fix makes
-  the complete native aliasing module verify at 25k. StateLabelMemoryEquality
-  checks sequential writes, an opaque caller with only labeled contract facts,
-  and rejection of a wrong update. Conditional self-referential frames remain
-  facts but cannot drive recursive simplification. Focused cost/label checks
-  pass. The refreshed benchmark preserves 30 verified + one expected rejection
-  at 15,696,214,192 raw heartbeats (+0.1242%). All four full suites and all 437
-  registry baseline checks subsequently pass (`historical/handoff-2026-10.md`).
-  Optional certified integer reads now normalize with their actual fallback.
-  LiteralOptionalReads covers signed/unsigned and symbolic values. The native
-  vector_hofs_fold sum_concrete, sum_inferred, and sum_scaled verify at 25k
-  using companion proofs; their benchmark and all 437 registry checks pass.
-  The following range-bound congruence fix also verifies product_concrete
-  (23.961M whole typed heartbeats); even-count remains open. Positive and
-  missing-premise regressions and both cost gates pass; its benchmark/registry
-  refresh is running (`historical/handoff-2026-10.md`).
-  An existential is witnessed by the hypothesis stating its body, by a
-  context variable, by a written position, or by a position a lookup fact
-  reads, its premises decided by the context (`verex_witness`,
-  in the cheap deciders and the pipeline).
-  The result of a vector search (`contains`, `index_of`) is split into
-  "nothing" and "a position", the latter characterized by its bound, the
-  element there, and every element before it (`verex_split_search`,
-  `findIndex?_eq_some_iff`); a lookup into an array with an element
-  removed or inserted splits on which side of that position it reads
-  (`verex_split_write`, at integer positions); an in-bounds lookup
-  the context states nothing about names its element
-  (`verex_name_lookups`); and, last, the hypotheses quantified
-  over positions that read an array are instantiated at every position
-  the context reads, bounds closed by a hypothesis or omega, the equations
-  left as premises, and the instances rewritten by the context
-  (`verex_instantiate_positions`, at most 64 instances per
-  hypothesis). Membership and search results normalize to one form, the
-  position of the element (`mem_iff_exists_int_index`,
-  `forall_imp_ne_iff`). `acl` verifies with this (its injectivity
-  invariant over two indices, through a push and a removal). Open: the
-  instantiation is the costly step (the rewriting of each instance by the
-  context, a third of a million heartbeats each), and it fires at every
-  read position rather than at the patterns of the hypothesis.
-- **Not carried by `denote`:** signed bitwise operations, `bytes` and
-  fixed-length vectors, the generic residuals of D3 (aliasing instances), unspecified pure callees used as summaries, references
-  inside an aggregate, and nested destructuring patterns.
-- **Cost** (measurement notes, rejected experiments, and leads:
-  [`perf-notes.md`](perf-notes.md)). Across the Check fixtures the solver spends 2.5G heartbeats:
-  leaves 0.8G, loop exits 0.5G, binds 0.45G. A step normalizes only the
-  structure it creates: the parts a rule rearranges, the values a
-  continuation is applied to, and the conditions a folded continuation
-  passes on are normal already, and the continuation a bind rule builds is
-  normalized where it is applied (binds −55%, exits −18%). Leaves share
-  their bounds: a bound asserted on a goal is not asserted again on the
-  goals it leaves, and a saturation round that only reorders hypotheses
-  has reached the fixed point (leaves −17%). Two costs now lead and
-  heartbeats do not show the first:
-  - kernel checking, the largest part of the slowest fixtures (31s of
-    `ReturnedMutRefs`, 16s of `VectorOperations`, 11s of `OrderedMap`).
-    The denotation rewrites by its equations, which the kernel checks by
-    instantiation instead of reducing `Term.denote`'s 61-way recursion
-    (kernel −14%, solver −20% across the fixtures). The preparation
-    certificates, which the kernel checks by evaluating the validation
-    passes, avoid array indexing, which the kernel pays for by walking a
-    list: loan marking iterates lists, an arena index is built in one
-    traversal, and the erasure analysis reads places and types through
-    arena indexes (kernel −19%, then `ReturnedMutRefs` 47s to 31s;
-    `marked_eq` 19s to 2s, the erasure chunks 10s to 2s). What remains: a
-    `compiled_eq` per function (up to 1s), which does not come from
-    deriving native types (a per-view table of them saves 1% of its
-    unfolds and costs more to certify than it saves), and the proofs
-    themselves;
-  - the price of a `simp` step: every lookup reduces the reducible carriers
-    in implicit type arguments (`NTy.carrier`, `HEnv`) by smart unfolding,
-    about half of each normalization.
-
-  A leaf no decider closes costs most: each saturation round over a large
-  context costs 8–18M heartbeats. A leaf therefore tries the prepared
-  deciders (`verex_decide_prepared`: one normalization pass, then
-  the instance, lookup, and write-split deciders, and last core `grind`,
-  whose congruence closure omega lacks) before the saturating
-  pipeline, where its context holds a quantified hypothesis or a written
-  vector; the normalization pass skips the hypotheses a pass of this
-  target already left normal, up to the names of their free variables
-  (`normalHypotheses`), and a loop step reduces the entry row's
-  projections structurally before normalizing. Every target runs under a
-  budget (`verex.verifyHeartbeats`, 1G heartbeats by default since
-  2026-10-12: about thirty seconds), so a target that does not verify fails within it, and the
-  failure asks for a proof in the source's proof file or a larger budget
-  (`pragma heartbeats = N`; see `source-verification.md`, Proofs;
-  2026-09-28). The costliest standard-library targets verify within the
-  default: `bit_vector::shift_left_for_verification_only` (284M),
-  `features::change_feature_flags_for_next_epoch` (215M),
-  `change_feature_flags_internal` (391M), and `apply_diff` (714M); their
-  cost is in the inlined `set`'s loop and the many-slot rows of the
-  `for_each` expansion, and it grew during the acl round (see
-  `perf-notes.md`, the open lead).
-- **Closed (2026-09-29): frame-instantiation certificates on large units.**
-  A generic call at the runtime family is certified by the kernel; read
-  through the namespace's view (2026-09-29) the certificate no longer
-  stalled but cost 25–30 s each on `aptos-stdlib`'s crypto modules
-  (`ristretto255::multi_scalar_mul`: three of them). Now a witness
-  certificate: a key map over the callee namespace's types decided once
-  per namespace, a witness per type checked with logarithmic reads
-  (`denotation.md`, "Instantiation certificates by witness";
-  `perf-notes.md`, kernel calibration). The three certificates of
-  `multi_scalar_mul` and its solver cost 17 s together.
-- **Closed (2026-09-29): the whole-package `prove --lean` of `aptos-stdlib`
-  exceeded 30 minutes** while its module extracts summed to 20. The cause
-  was the namespace command's comment scanner, quadratic in the file and
-  run twice per module; it is linear now and the package's module commands
-  elaborate in under a second each (`perf-notes.md`, "Stage log").
-- **Closed (2026-09-30): importing a large module stalled.** A module
-  importing `ordered_map` did not finish in 5 minutes: the dependency's
-  interface spelling walked the namespace per printed name. It renders in
-  6 ms now, generic frame certificates are shared per unit, and the bound
-  collectors walk shared terms once (`perf-notes.md`, "Modules,
-  generic frames, and shared terms").
-- **Closed (2026-09-30): the preparation certificates.** Every module and
-  every importer replayed loan-death marking and shared-reference erasure
-  in the kernel, 14 s before a module's first target. The semantics reads
-  the validated unit now: loan deaths end at their anchors, and shared
-  references are decided in place (`perf-notes.md`, "No preparation to
-  certify"; `prophetic-references.md`, P1 and P6).
-- **Open (2026-09-29): natives without a specification.** The verifier now
-  mirrors the Prover: a native with a Move specification uses it, one
-  without uses the model the Boogie prelude gives it, registered by the
-  Move profile (`VerexSL/Profile.lean`: `hash::sha2_256`, `sha3_256` as
-  uninterpreted 32-byte functions), and any other is rejected. Still
-  unmodelled and needed by `aptos-stdlib`: the `table` natives (`add_box`,
-  `remove_box`, `borrow_box`, …; the prelude's `table_module`), on which
-  `big_vector`, `smart_table`, `smart_vector`, `storage_slots_allocator`
-  and `pool_u64*` wait, together with an `Inhabited` twin for structs
-  holding a table; and the hashes' injectivity axiom.
-  Tables (2026-10-13, [`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table
-  values"): a table is an owned value of its handle and contents, so the
-  `table` natives are reached through the roles their module binds, with
-  the map model's contracts; `new` allocates a handle the allocation history
-  lacks. The snapshot carrier, the separate contents memory and its slot
-  modules, and the stored collection invariants are replaced by the hidden
-  contents field and the erasing runtime boundary (`StorageEncodes`,
-  `Encloses`). Open: tables behind type parameters (nested tables, roles at
-  table-bearing instances), on which `smart_table`, `big_vector`,
-  `smart_vector`, `storage_slots_allocator`, `pool_u64_unbound` and
-  `big_ordered_map` wait.
-- **Closed (2026-09-30): discarded statement values.** A Move branch that
-  discards a value (`v.remove(index);` in `capability::remove_element`,
-  `pool_u64::deduct_shares`) failed with VEREX-TYPE-MISMATCH. The exchange
-  and the VIR keep the source's unit; the canonical rendering writes the
-  branch as an `if` without `else`, whose branch value VerexSL discards
-  where the `if` supplies none, but lowering checked that branch against
-  the expected unit first. It now lowers such a branch without an expected
-  type (test `discarded_branches` in `VerexSL/Tests/Frontend.lean`).
-- **Closed (2026-09-30): `math128::sqrt` exceeded its budget in
-  normalization.** `aptos_std::math128` now verifies completely, `sqrt`
-  included, in 9 s for the module (`verex-move verify` of `aptos-stdlib`
-  with `--modules aptos_std::math128`). `ristretto255::scalar_invert`
-  verifies in 50s.
-- **Closed (2026-09-29): opaque specification functions under generic
-  callees.** `Contract.opaqueSpec` keyed a call by its qualified name with
-  the type arguments rendered as text, so a generic native's contract named
-  `<parameter 0, …>` where its caller named the concrete types. The type
-  arguments are now native types under the contract's family
-  (`Skolems.type`, `NTy.substWith`), which the instantiation resolves
-  (`perf-notes.md`, "multi_scalar_mul"; fixture
-  `Check/Calls/OpaqueGeneric`). `ristretto255` verifies completely.
-  With the view certificate `ristretto255` completes in 399s (25 targets;
-  `scalar_invert` alone 514M heartbeats). Its targets returning
-  `Option<Scalar>` through the trusted `option::some`/`none`
-  (`new_scalar_from_bytes` and two more) had failed with a kernel
-  application type mismatch: the solver's encoding facts took their
-  `Skolems` instance from the context (the runtime family) rather than
-  from the hypothesis (the callee's instantiated family), which the
-  elaborator's unifier let pass and the kernel refused; and the transport
-  of a trusted callee's value into the caller's carriers
-  (`NTy.ofSkolem`, `variantCarrier.ofSkolem`) had no reduction lemmas, so a
-  variant name or field read through it was undecidable. Both fixed
-  (2026-09-29; `Check/Calls/TrustedGeneric.lean`). Also open there: the encoded-vector-literal equality
-  (`scalar_is_zero`), the byte-vector `spec fun` shape of every crypto
-  module.
+- **Proof strategy.** P1 (abstract maps) and P2 (source-named goals and laws)
+  are implemented. The typed `SpecMap K V` laws and selective lifting support
+  authored map proofs without local encoding helpers. P3 remains open: a
+  complete automatic leaf attempt has a 20M heartbeat cap, and authored proofs
+  bypass automatic search unless they request it. Opt-in context grouping and
+  `verex_obligations preparing` share work before proof clauses split;
+  `VerexSL/Tests/SharedPreparation.lean` covers clause names and soundness.
+  Preparation is still expensive. P4's goal is all 38 supported BigOrderedMap
+  targets below roughly 1.9G total native heartbeats, including authored proofs.
+  The measured 3.582G result does not meet it; see the map measurements in
+  [`perf-notes.md`](perf-notes.md). The implementation stages in
+  [`shared-obligations.md`](shared-obligations.md) are planned: measure repeated
+  work, share bounded automatic preparation, delay splitting, and add formula,
+  proof or theory-state sharing where measurements justify it.
+- **Agreement and typing assumptions.** Discharge the assumptions listed in
+  [`denotation.md`](denotation.md), including the compilation agreement and
+  the connection between native storage and verification values. The denotation
+  uses typed global memory; deriving the remaining global-preservation
+  hypotheses is tracked in [`static-memory.md`](static-memory.md) and
+  [`static-typing.md`](static-typing.md).
+- **Quantifier automation.** Range instances, writes, search results and
+  constructive witnesses have bounded deciders. Existing call observations
+  precede reconstruction of behavioral facts. Conditional self-referential
+  equations remain facts but cannot drive recursive simplification.
+  Instantiating every position read in a context is still costly; target
+  relevant patterns and share preparation without enlarging search budgets.
+- **Cost.** Incremental normalization and cached normal forms avoid repeating
+  work across proof steps. Kernel certificate checking and code generation
+  also matter; heartbeat totals alone do not measure all elapsed work.
+  [`perf-notes.md`](perf-notes.md) records measurement methods, comparisons and
+  rejected experiments. Keep automatic search cheap and use authored arguments
+  for obligations it cannot decide within the existing budgets.
+- **Native models and maps.** Verification reads intrinsic maps as abstract
+  values; table roles execute over native handle storage at runtime. Their
+  agreement and representation assumptions are explicit. `SmartTable` is
+  deprecated and excluded from the gates. A0–A3 of
+  [`intrinsic-maps.md`](intrinsic-maps.md) are implemented; A4 and the remaining
+  construction, representation-reading and identity-update obligations are
+  open. BigOrderedMap's unsupported iterator models and mutable-reference
+  behavioral predicates remain separate from the cost of its supported proofs.
+- **Unsupported source and contract forms.** The registry in
+  [`prover-test-problems.md`](prover-test-problems.md) identifies the remaining
+  denotation, native-model, generic-aliasing and closure gaps. Preserve explicit
+  unsupported diagnostics and intended negative specifications while adding
+  support.
 
 ## 2. Verification across modules
 
@@ -499,49 +105,26 @@ Open:
 
 ## 3. The Move standard library as the verification corpus
 
-Design: [`source-verification.md`](source-verification.md).
+Designs: [`source-verification.md`](source-verification.md) and
+[`proof-file-editing.md`](proof-file-editing.md).
 
-The package verifies module by module; the baseline
-`verex-e2e-tests/VerexE2ETests/SourceVerify/MoveStdlib.exp` lists what
-does not verify yet, and is absent while everything verifies. The former full
-verification claim is superseded by the source bit-vector soundness correction
-above (2026-10-07). Open:
+`move prove --lean` (or `aptos move prove --lean`) exports a package's typed
+AST and runs `verex-move verify --export`. The e2e `verify` suite verifies the
+framework's `move-stdlib` in place; the copy under `MoveToVerexSL/MoveStdlib`
+serves the source round-trip baselines. The suite's `SourceVerify/MoveStdlib.exp`
+records expected diagnostics when present; its absence requires empty output.
 
-- `features` is now rejected at import because `spec_contains` uses `int2bv`.
-  Its earlier verification erased the conversion semantics and is not a valid
-  completion claim. `bit_vector` still verifies. The earlier measurement for
-  both modules was within the default budget,
-  `apply_diff`, `change_feature_flags_internal`, and
-  `shift_left_for_verification_only` included: 59 s for the two modules
-  (`verex-move verify` of the framework's `move-stdlib` with
-  `--modules std::bit_vector,std::features`, 2026-09-30).
-- `acl` verifies (2026-09-28). The exchange maps `vector::contains`,
-  `index_of`, and `remove` to the primitives the denotation states
-  directly, as the Move Prover treats them, so their loops are not
-  inlined and the search result is characterized rather than unrolled.
-  Since 2026-10-02 every intrinsic `vector` function with an VIR
-  counterpart is mapped so (source-verification.md, "Move vector
-  intrinsics").
-- A residual obligation that no clause marker locates is reported at the
-  module header, not at the function.
-- **Verification in the Move CLI.** `move prove --lean` (and `aptos move
-  prove --lean`) verifies a package with Verex instead of Boogie: the
-  framework's `ProverOptions::prove` exports the package's typed AST and
-  runs `verex-move verify --export` on it, so a framework package is
-  verified in place with the usual tool set, from the CLI and from the
-  framework's prover tests alike (2026-09-28; see
-  [`source-verification.md`](source-verification.md)), and
-  `move_stdlib_lean_prover_tests` verifies the standard library in place.
-  A function the automatic verification does not establish within its
-  budget is proved in the proof file beside its Move file
-  (`foo.proof.lean`); the failure message names the file (2026-09-28). The
-  proof file is a Lean file whose header loads its module's context: the
-  driver elaborates it after registering the module, the editor after
-  loading the module from its rendering (2026-10-12,
-  [`proof-file-editing.md`](proof-file-editing.md), P1–P3). The e2e `verify` suite verifies the framework's
-  `move-stdlib` in place (2026-09-30); the copy under
-  `MoveToVerexSL/MoveStdlib` serves only the Move-to-VerexSL
-  baselines.
+A function that automation does not establish within its budget gets an authored
+proof in `foo.proof.lean` beside `foo.move`. The file's header loads its module
+context for both the driver and the editor. The corpus includes direct proofs
+for `features.apply_diff`, `acl.remove`, `simple_map.add_all`, pool operations,
+and the ordered-map use cases. Intrinsic vector operations use their semantic
+models and contracts instead of inlining their implementation loops.
+
+Open: reducing proof and context-preparation costs, reusing imported proofs,
+and locating residual obligations that have no clause marker at the function
+rather than the module header. Unsupported constructs and remaining proof gaps
+are tracked in [`prover-test-problems.md`](prover-test-problems.md).
 
 ## 4. Shared checking
 
@@ -561,8 +144,8 @@ Open:
   aggregate alias propagation, nominal variance, use-site region solving.
   A holder overwritten whole (an assignment or a binding of the local) no
   longer keeps its loans live, and an assignment ends the loans neither its
-  place nor what follows uses once its value is produced, before the write
-  (2026-10-02); a unit with a rejected function is not verified.
+  place nor what follows uses once its value is produced, before the write;
+  a unit with a rejected function is not verified.
 - Strict external JSON compatibility of RawUnit and the full staged API.
 
 ## 5. Runtime semantics
@@ -570,21 +153,21 @@ Open:
 Design: [`elaboration-design.md`](elaboration-design.md) (runtime model,
 big-step semantics, interpreter).
 
-Done, 2026-10-01: preservation of runtime typing for prepared units
+Done: preservation of runtime typing for prepared units
 (`Semantics/Preservation.lean`, [`static-typing.md`](static-typing.md)), and
 loan independence: runs from starts differing in their loan bookkeeping
 agree up to the loans they mint (`Semantics/LoanIndependence.lean`).
 
-Done, 2026-10-09: a mutable reference a call returns that no local holds
+Done: a mutable reference a call returns that no local holds
 keeps its current value until it dies: validation binds it to a local of
 its own (`holdMutableReferences`, [`prophetic-references.md`](prophetic-references.md),
 "Unheld results"). Before, the lender kept the hole at run time.
 
-Done, 2026-10-10: a mutable borrow of a place that dies unheld reads the
+Done: a mutable borrow of a place that dies unheld reads the
 place: checked as a mutable borrow, it is then read as a shared one
 ([`prophetic-references.md`](prophetic-references.md), "Unheld results").
 
-Done, 2026-10-10: loan independence for lent starts and injective
+Done: loan independence for lent starts and injective
 renamings (`StateRenamed`, `StateRenamed.ofLent`, `evalFunction_agree`),
 with comparisons reading references as their referents
 (`RuntimeValue.observe`), so runs lending references agree up to loan
@@ -620,7 +203,7 @@ Designs: [`verex-sl.md`](verex-sl.md) and
 [`vir-design.md`](vir-design.md) Phases 4, 6, 7.
 
 Done: validated VIR lowers to XIR, and compiler-v2 compiles `.lean`
-sources through it (2026-09-25).
+sources through it.
 
 Open: the VerexSL forms still stated as target language (`core.*`,
 `spec.*`, extension and dependency forms); retiring the NSIR bridge;
@@ -632,7 +215,7 @@ emitted bytecode.
 
 Design: [`higher-order-functions.md`](higher-order-functions.md).
 
-Done, 2026-09-30: H1, closures at run time (masks, instantiations fixed at
+Done: H1, closures at run time (masks, instantiations fixed at
 construction, capture validation, `invoke` in the borrow analysis, name
 ordering); H2, the Move path (closure construction in the exchange, the
 Move persistence rule, VerexSL mask and generic-target spellings, XIR
@@ -640,14 +223,14 @@ lowering, MonoVM differential and compiler-v2 transactional fixtures); H3,
 the denotation (function values as closures, invocations of known closures
 verified through their targets' contracts, generic targets included).
 
-Done, 2026-10-01: H4a, the behavioral predicates in contracts; of H4c, the
+Done: H4a, the behavioral predicates in contracts; of H4c, the
 dispatch of a literal closure's predicates to its target's precondition and
-theorem. Done, 2026-10-09: of H4d, `&mut` arguments of behavioral predicates
+theorem. Done: of H4d, `&mut` arguments of behavioral predicates
 (`AbortsOfMut`, `EnsuresOfMut`, `ResultOfMut`), read of literal closures by
 their targets' contracts and bodies; open there: a state label witnessed by
 `&mut` predicates of an inlined target, invoking an unseen function value
 with `&mut` parameters, and labels defined by such invocations
-(`prover-test-problems.md`, V20). Done, 2026-10-10: results that are
+(`prover-test-problems.md`, V20). Done: results that are
 mutable references read as their referents' values at return
 (`mutableResults`, `readResults`), `result_of` of lent invocations unique,
 and a call lending references or returning one named as a run of the
@@ -661,10 +244,10 @@ next the typing hypotheses, the solver rule, and the callers' discharge),
 the rule for
 invoking an unknown closure and the closed-world theorem (H4c), state
 labels, frames, and `&mut` arguments (H4d) — then H5, the re-entrancy lock.
-A function type gets a typed carrier, as `u64` has one (decided
-2026-10-04, "Closures in memory: a typed carrier", milestones C1–C4): no
+A function type gets a typed carrier, as `u64` has one ("Closures in memory:
+a typed carrier", milestones C1–C4): no
 function value needs reasoning about types, and memory with a
-function-typed field is typed for free. Done, 2026-10-04: C1 (families,
+function-typed field is typed for free. Done: C1 (families,
 memory, and executable units at a unit), C2a (compiled code at its unit),
 C2b1 (closures of targets without type parameters typed in native types,
 their nodes carrying their rows), C2b2 (closures of generic targets typed at
@@ -690,7 +273,7 @@ State labels (`..S |~ …`, `exists S in *`) have their own design,
 [`state-labels.md`](state-labels.md): labels as `Memory` variables, defined by
 state-change predicates or quantified over all memories, milestones S1–S4
 (round trip, contracts, the solver's witnesses, the rest of the
-`state_labels` directory). Done, 2026-10-05: S1, labels named in the
+`state_labels` directory). Done: S1, labels named in the
 exchange, bound at state-domain binders in VIR, spelled in VerexSL
 (`S |~`, `..S |~`, `S.. |~`, `S..T |~`, `∃ (S : StateDomain)`, `publish`,
 `remove`, `update`), validated; every `state_labels` test re-elaborates.
@@ -707,46 +290,38 @@ state-change and invocation-defined labels are memory expressions in
 contracts, including when an opaque callee's contract replaces a call.
 Presence and success conditions remain proof obligations (`DefinedStateLabels`,
 `DefinedStateLabelErrors`, `InvocationStateLabels`, `InvocationStateLabelErrors`).
-The decoded-state follow-up (2026-10-07) verifies `two_state_labels::two_increments`
-at the native 25k limit (18.270M typed heartbeats). Known memory and decoder
-values are normalized before integer range checks. The registered IR fixture
-`StateLabelDecoding` covers an opaque caller without callee program points,
-missing-resource rejection and overflowing-update rejection. All 30 labeled
-registry baselines and both cost gates pass. The regular benchmark passes with
-30 verified + one expected rejection at 15,647,129,560 heartbeats (+0.0013%).
-Main-relative JSON/HTML are refreshed; the prior checkpoint is the latest
-full-suite validation (`historical/handoff-2026-10.md`).
-The witness-search follow-up verifies `spec_fun_old_param_labeled_with_memory`
-at 25k (24.132M typed heartbeats, down from 30.912M). Constructive/context
-witnesses precede program points; `StateLabelWitnesses`, all 30 state-label
-registry checks and both cost gates pass. The benchmark retains 30 verified
-+ one expected rejection at 15,647,293,919 heartbeats (+0.00105%). Main-relative
-JSON/HTML were refreshed before all four builds/full suites and 437/437
-registry checks passed (`historical/handoff-2026-10.md`).
-Open: the proof budget of `aborts_if_at_state_label::caller`, reads of removed
-resource contents (`unmodified_memory_at_label::swap`, see the design), S4.
+State-label decoding normalizes known memory and decoder results before
+integer range checks. Constructive and context witnesses precede program-point
+search. `StateLabelDecoding`, `StateLabelWitnesses`,
+`StateLabelCallObservations`, `StateLabelBooleanObservations` and
+`StateLabelMemoryEquality` cover these routes, including opaque callers and
+false updates. Open: reads of removed resource contents
+(`unmodified_memory_at_label::swap`) and the remaining S4 cases in the design.
 
 ## Tests
 
 ### Gates
 
-| Gate | Result |
-|---|---|
-| `verex-ir` build and `lake test`, with the `DenotePerformance` and `CompositionPerformance` cost gates | PASS |
-| `verex-move`, `verex-rust` builds and tests | PASS |
-| `verex-e2e-tests` `lake test`: suites `move`, `rust`, `verify`, `check`, `monodiff` | PASS |
-| Check fixtures | 122 of 122 pass exactly (2026-10-06) |
-| Move-to-VerexSL corpus round trip | every module is a typed fixed point |
-| Move Prover unit tests, `MVP_TEST_FEATURE=lean` (not in CI) | Full 437-file baseline refresh passes (2026-10-06), after all four full Verex suites: 119 without diagnostics, 4 with warnings only, 50 preverification rejections, 232 verification diagnostics, 32 other errors. Returned-reference freezing and quantifier scope fixes expose both C16 files; two previously blocked positives prove. Cross-resource labels prove 6/6 positives, bp_pure_callee::count_all proves with a companion at 25k, and anchor_mutation_pre_state’s valid derived claim now proves; intended negatives remain rejected. Fresh benchmark/main HTML precedes suites: 28/32, no newly failed targets. Logs: `/tmp/registry-prepared-behavior-<package>-{build,test}.log`, `/tmp/behavior-guard-prover-refresh.log`. The final small guard passed focused checks, both cost gates, a fresh benchmark, and the full registry refresh; the full suites passed immediately before it. Work paused at user request. Intentional negatives remain; see [`prover-test-problems.md`](prover-test-problems.md). |
+Run focused targets and `scripts/smoke.sh` between edit batches. At an
+implementation checkpoint, run the full gates below. Record each run's results
+in the PR or CI artifacts rather than maintaining dated snapshots here.
 
-The `verify` suite verifies the staged Move standard library; its baseline
-records what does not verify yet (section 3).
+| Gate | Required coverage |
+|---|---|
+| `verex-ir`: `lake build && lake test` | IR and verifier fixtures, including `DenotePerformance` and `CompositionPerformance` |
+| `verex-move`, `verex-rust`: `lake build && lake test` | Profile, frontend and backend fixtures |
+| `verex-e2e-tests`: `lake build && lake test` | Source round trips, source verification, Check fixtures, MonoVM and differential execution |
+| Move Prover: `MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite` | All discovered fixtures, with unchanged baselines unless an update is intended and reviewed |
+
+A passing registry run means its diagnostics match the baselines; it does not
+mean every specification is proved. Intended negatives and unsupported cases
+are documented in [`prover-test-problems.md`](prover-test-problems.md).
 
 ### Check ledger
 
 Each name is a `.lean` file under
 [`verex-e2e-tests/VerexE2ETests/Check/<Folder>/`](../verex-e2e-tests/VerexE2ETests/Check/).
-Every file passes: its whole output matches the adjacent `.exp` at the
+Each file must match the whole output in its adjacent `.exp` at the
 driver's caps (180k verification heartbeats per target). Notes name what
 a file covers beyond its title: intended negatives, authored proofs, and
 files without `verify` targets.
@@ -759,11 +334,11 @@ files without `verify` targets.
 | Vectors | `CertifiedReads`, `ElementQuantifiers`, `VectorBounds`, `VectorOperations`, `Vectors`, `GenericSwapRemove` | `CertifiedReads`: signed/unsigned bounds through total integer reads, zero for missing entries, and rejection of a false signed nonnegativity claim at 25k. `ElementQuantifiers`: element-wise preconditions establish indexed-read properties for value/reference vectors, signed integers, Booleans and generic equality predicates; stronger bounds and a missing-entry claim remain rejected at 25k. A target whose guards stay undecided exhausts heartbeats rather than failing fast. |
 | Control | `Aborts`, `ControlForms`, `LiteralLoops`, `LoopControlErrors`, `LoopInvariantErrors`, `LoopInvariants`, `Loops`, `LoopVerification` | `Aborts`: a false contract (intended). `LiteralLoops`: loops over literal vectors with recursive specification functions in their invariants, and a nested loop with a nonlinear invariant; a wrong value fails (intended). `LoopInvariantErrors`: an invariant not established at entry and at an iteration, and one of a loop's two annotations (a `where` region and a following `spec`), both of which form its specification. |
 | References | `BorrowCertificates`, `BorrowChecker`, `BorrowErrors`, `BorrowGlobalErrors`, `CorePrimitives`, `Freeze`, `Loans`, `MutableTemporaries`, `OperandLoans`, `PlaceReadErrors`, `PlaceReads`, `Prophecies`, `ReferenceComparisons`, `ReferencePatterns`, `References`, `ReturnedMutRefErrors`, `ReturnedMutRefs` | `PlaceReads`: mutable place borrows that die unheld (dereferenced, read through, compared, discarded) read their places, run and verified; one intended failure. `PlaceReadErrors`: such a borrow in conflict with a live shared loan is rejected. `ReferenceComparisons`: `==` and `!=` of mutable references compare referents at run time. `BorrowCertificates` asserts certificates, no `verify`. `MutableTemporaries`: `&mut` results discarded, matched by a wildcard, read or borrowed through, run and verified; one intended failure. `BorrowChecker`: twelve rejections at preparation, the accepted programs verified. |
-| Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GenericSpecResourceArguments`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors`, `TableAllocation`, `TableReads`, `TableStorageKeys`, `TableStoredInvariants` | `TableAllocation`: tables allocated at fresh handles and filled, emptied and read through their roles, a duplicate-key abort, vector values, and a false value rejection; the callers' frames leave the allocation history open. `TableGlobalWrites`: entries added to and updated in a stored table owe their data invariants, as a plain stored field does, with one false write rejected for each, and a cached length after additions to a fresh table. `TableStoredInvariants`: eight stored-entry proofs at 25k, including phantom arguments, computed keys and both handle layouts, two false-claim rejections, and a nested table rejected as not carried (`intrinsic-maps.md`, "Stages"). `TableReads`: membership, scalar and generic lookup, opaque caller old-state contract, aggregate payloads, false-lookup and false-bound rejections, and a nested table rejected as not carried. `TableStorageKeys`: canonical Table slots across caller/callee namespaces, reference exclusion and distinct handles. `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
+| Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GenericSpecResourceArguments`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors`, `TableAllocation`, `TableGlobalWrites`, `TableReads`, `TableStoredInvariants`, `WrappedTables` | `TableAllocation`: tables allocated at fresh handles and filled, emptied and read through their roles, a duplicate-key abort, vector values, and a false value rejection; the callers' frames leave the allocation history open. `TableGlobalWrites`: entries added to and updated in a stored table owe their data invariants, as a plain stored field does, with one false write rejected for each, and a cached length after additions to a fresh table. `TableStoredInvariants`: eight stored-entry proofs at 25k, including phantom arguments, computed keys and both handle layouts, two false-claim rejections, and a nested table. `TableReads`: membership, scalar and generic lookup, opaque caller old-state contract, aggregate payloads, a variant's field of a read enum value, false-lookup and false-bound rejections, and a nested table; the read roles run on table values in the interpreter. `WrappedTables`: a `TableWithLength` read through the table it holds (its roles' contracts, a functional update, a widened value, a false size rejection), its role bodies run by the interpreter. `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
 | Calls | `AbstractClauses`, `BcsSerialization`, `Callees`, `Calls`, `Composition`, `FailedCallees`, `InlinedCallees`, `Modules`, `OpaqueGeneric`, `PreludeNatives`, `Summaries` | `FailedCallees`: a caller verified against a callee whose own specification fails (both reported as intended). Intended negatives: a caller does not see a `[concrete]` result (`AbstractClauses`), an opaque callee's body (`InlinedCallees`), a postcondition a callee of another module refutes (`Modules`), one serialized length for values of a type other than addresses (`BcsSerialization`). |
-| Generics | `GenericCycles`, `GenericFunctions`, `GenericScalarCalls`, `Generics`, `GenericStorage` | `Generics`: a generic function's public theorem applied at a concrete instantiation, coherent by evaluation. |
+| Generics | `GenericCycles`, `GenericFunctions`, `GenericScalarCalls`, `Generics`, `GenericStorage` | `Generics`: a generic function's public theorem applied at a concrete instantiation, coherent by evaluation. `GenericScalarCalls`: scalar callers reuse the generic callee's theorem; a callee's integer result at an instance carries its type's range. |
 | Closures | `Carriers`, `Frames`, `GenericHofs`, `GenericResources`, `InvariantBehavior`, `Known`, `MutableResults`, `StoredFrames`, `StoredFrameErrors`, `StoredWriteFrames`, `StoredWriteFrameErrors`, `WovenBehaviors` | `MutableResults`: a discarded `&mut` result of a call is the run its `ensures_of`, `result_of` (the value at return), and absence of aborts state; a wrong result fails (intended). `WovenBehaviors`: a leading and a trailing capture behave as the target at the woven arguments; exchanged arguments fail (intended). `StoredWriteFrames`: addressed and wildcard frames, generic resource instantiation, opaque results, and captured owners. `StoredWriteFrameErrors`: wrong resource, replacement, and false preservation claims are rejected.  `InvariantBehavior`: construction checks quantified behavioral invariants. `StoredFrames`: default function-field frames survive publication, removal, and invocation. `StoredFrameErrors`: packing and replacement reject memory-writing closures. `Carriers`: a function value the proof does not see is typed by its carrier, without a typing assumption, in a unit declaring a phantom type parameter and resources with function-typed fields; a wrong result fails (intended). `Known`: known closures invoked through their targets' contracts, a generic target included, at a concrete caller and at a generic caller's own parameters, beside a function type over those parameters; a wrong postcondition fails (intended). `Frames`: function-valued parameters keep memory, established from a target's theorem or body, over memory holding an enum resource and an instance of a generic declaration; a closure that changes memory fails (intended). `GenericHofs`: generic higher-order functions invoking a function value over their type parameters, callers at type arguments, and a value passed through; a wrong result fails (intended). |
-| Specifications | `AssertionErrors`, `Assertions`, `CapturedFunctionValues`, `ContractErrors`, `DefinedStateLabelErrors`, `DefinedStateLabels`, `DomainQuantifiers`, `EncodedVectors`, `FieldUpdate`, `GenericEnumPayload`, `Increment`, `InsertionMap`, `InvocationStateLabelErrors`, `InvocationStateLabels`, `Lemmas`, `RecursiveSpecFunctions`, `SpecFunctionDomainErrors`, `SpecFunctionDomains`, `SpecFunctionErrors`, `SpecFunctions`, `SpecTuples`, `StateLabels`, `TableSnapshots`, `VectorRanges`, `VectorSlices`, `WrongIncrement` | `SpecFunctionDomains`: a fixed-width parameter type is the function's domain; expansions and a recursive definition inside it verify, and the body computes beyond the width. `SpecFunctionDomainErrors`: claims at arguments outside the domain fail (intended). `VectorRanges`: vector index domains in universal/existential quantifiers and slices, shared generic values, empty/nonempty vectors, old versus current mutable values, and an excluded-upper-endpoint rejection at 25k. `TableSnapshots`: old/nested observations, caller-side quantified state labels, and functional snapshots with equal identity but different contents in one vector. `GenericEnumPayload`: a generic opaque callee returns a concrete enum; its index bound supports caller-side arithmetic after payload and carrier-family normalization. `CapturedFunctionValues`: leading and trailing captures compare executable closures with specification literals. `InsertionMap`: insertion-position roles preserve descending sequence order, with both key/rank clauses and implicit validity verified. `InvocationStateLabels`: forward and chained invocation labels, opaque callers of both projections, and invocation through a function-valued parameter. `InvocationStateLabelErrors`: a labeled projection cannot assume that an aborting call succeeds. `DefinedStateLabels`: publication, removal, update, chained definitions, generic resources, lexical lets across clauses, and opaque callers using labeled contracts without callee program points. `DefinedStateLabelErrors`: negation, implication antecedents, and an aborting removal do not supply assumptions (intended failures). `AssertionErrors`: an in-body assertion that does not hold, in a function with and without a specification, a loop body, an inlined callee, a generic function, and over a state anchor. `DomainQuantifiers`: an existential no index satisfies and one over an empty vector (intended); a frame over a vector write verifies; quantifiers over a vector type bind vectors of its element type. `EncodedVectors`: specification functions comparing vectors with literals and with each other, and a quantifier over a literal range, all verify. `Lemmas`: `spec lemma`s, a recursive one by its integer parameters and one by `decreases` with a `split`, applied in functions (`apply`, `∀ … apply`), and a proof's steps at entry and before a return; a false lemma, a false recursive lemma, an unmet premise, and an argument out of a parameter's range are reported (intended); a lemma not established gives no fact, so a function needing its conclusion fails (intended); a lemma over a vector whose induction needs its elements' bounds, and a function needing it fails without it (intended). `RecursiveSpecFunctions`: a lemma by induction and a `verify … by` using it; mutually recursive functions with lemmas recursing through each other; Boolean parameters of a function and a lemma; mutually recursive functions reading storage. `StateLabels`: a quantified state label — an existential split of a two-state specification function over two opaque calls, witnessed at the program point after the first, a one-state read at the label, and the split over two inlined calls through a `&mut` parameter, witnessed by the parameter's value at the point between them; the splits over one call fail (intended). |
+| Specifications | `AssertionErrors`, `Assertions`, `CapturedFunctionValues`, `ContractErrors`, `DefinedStateLabelErrors`, `DefinedStateLabels`, `DomainQuantifiers`, `EncodedVectors`, `FieldUpdate`, `GenericEnumPayload`, `Increment`, `InsertionMap`, `OptionalMapResults`, `InvocationStateLabelErrors`, `InvocationStateLabels`, `Lemmas`, `RecursiveSpecFunctions`, `SpecFunctionDomainErrors`, `SpecFunctionDomains`, `SpecFunctionErrors`, `SpecFunctions`, `SpecTuples`, `StateLabels`, `TableSnapshots`, `VectorRanges`, `VectorSlices`, `WrongIncrement` | `SpecFunctionDomains`: a fixed-width parameter type is the function's domain; expansions and a recursive definition inside it verify, and the body computes beyond the width. `SpecFunctionDomainErrors`: claims at arguments outside the domain fail (intended). `VectorRanges`: vector index domains in universal/existential quantifiers and slices, shared generic values, empty/nonempty vectors, old versus current mutable values, and an excluded-upper-endpoint rejection at 25k. `TableSnapshots`: old/nested observations, caller-side quantified state labels, and functional snapshots with equal identity but different contents in one vector. `GenericEnumPayload`: a generic opaque callee returns a concrete enum; its index bound supports caller-side arithmetic after payload and carrier-family normalization. `CapturedFunctionValues`: leading and trailing captures compare executable closures with specification literals. `InsertionMap`: insertion-position roles preserve descending sequence order, with both key/rank clauses and implicit validity verified. `OptionalMapResults`: optional map result contracts and execution agree for enum tags/payloads and the legacy vector wrapper. `InvocationStateLabels`: forward and chained invocation labels, opaque callers of both projections, and invocation through a function-valued parameter. `InvocationStateLabelErrors`: a labeled projection cannot assume that an aborting call succeeds. `DefinedStateLabels`: publication, removal, update, chained definitions, generic resources, lexical lets across clauses, and opaque callers using labeled contracts without callee program points. `DefinedStateLabelErrors`: negation, implication antecedents, and an aborting removal do not supply assumptions (intended failures). `AssertionErrors`: an in-body assertion that does not hold, in a function with and without a specification, a loop body, an inlined callee, a generic function, and over a state anchor. `DomainQuantifiers`: an existential no index satisfies and one over an empty vector (intended); a frame over a vector write verifies; quantifiers over a vector type bind vectors of its element type. `EncodedVectors`: specification functions comparing vectors with literals and with each other, and a quantifier over a literal range, all verify. `Lemmas`: `spec lemma`s, a recursive one by its integer parameters and one by `decreases` with a `split`, applied in functions (`apply`, `∀ … apply`), and a proof's steps at entry and before a return; a false lemma, a false recursive lemma, an unmet premise, and an argument out of a parameter's range are reported (intended); a lemma not established gives no fact, so a function needing its conclusion fails (intended); a lemma over a vector whose induction needs its elements' bounds, and a function needing it fails without it (intended). `RecursiveSpecFunctions`: a lemma by induction and a `verify … by` using it; mutually recursive functions with lemmas recursing through each other; Boolean parameters of a function and a lemma; mutually recursive functions reading storage. `StateLabels`: a quantified state label — an existential split of a two-state specification function over two opaque calls, witnessed at the program point after the first, a one-state read at the label, and the split over two inlined calls through a `&mut` parameter, witnessed by the parameter's value at the point between them; the splits over one call fail (intended). |
 | Modules | `Attributes`, `EmptyModule`, `IntrinsicErrors`, `LoweringErrors`, `Rust` | `Attributes` and `EmptyModule` have no `verify` targets. |
 | Examples | `Account`, `Corpus`, `OrderedMap`, `Quicksort` | `OrderedMap` and `Quicksort` verify through authored lemmas over arrays; `Quicksort`'s `partition` runs at a raised cap of 400k heartbeats (277M in total). |
 
@@ -796,6 +371,15 @@ regenerated diff is reviewed.
   bytecode.
 
 ## Out-of-band items
+
+- Abstract maps (`intrinsic-maps.md`, A2–A4): functions of an owner's module
+  reading its representation through their specifications, or rejected;
+  the refinement assumptions `RunsAgree` and `OwnersRepresentable` in the
+  ledger and discharged automatically for units without owners;
+  `big_ordered_map`'s use-case tests and their cost. Solver: an equation
+  between a nominal literal and a model operation projected onto its
+  fields (identity after a role's update; `perf-notes.md`, "Abstract maps:
+  positions read as ranks").
 
 - **Upstream rustc ask, filed.** The two Rustc Public API gaps blocking
   the Rust M0 gate (`FnDef` exposes no predicates; no const-fn binder type

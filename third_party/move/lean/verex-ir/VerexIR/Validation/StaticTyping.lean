@@ -306,6 +306,12 @@ def fieldType? (targetNs : ValidatedNamespace) (declaration : StructDecl)
     (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)
   resolveIn targetNs arguments.toArray field.type.typeId
 
+/-- The types of a declaration's ghost fields under arguments: a constructor
+takes their values after its fields (`designs/ghost-fields.md`). -/
+def ghostTypes? (targetNs : ValidatedNamespace) (declaration : StructDecl)
+    (arguments : List SemArg) : Option (List SemTy) :=
+  declaration.ghosts.toList.mapM fun ghost => resolveIn targetNs arguments.toArray ghost.type.typeId
+
 /-- The types of all fields of a variant (or structure) under arguments. -/
 def fieldTypes? (targetNs : ValidatedNamespace) (declaration : StructDecl)
     (variant : Option String) (arguments : List SemArg) : Option (List SemTy) := do
@@ -455,6 +461,8 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
           let fieldName ← context.ns.tables.names[field.index]?
           let fieldType ← fieldTypeAt? targetNs declaration variant arguments fieldName.name
           some (fieldType, none)
+    -- A ghost field is the verification model's alone (`designs/ghost-fields.md`).
+    | some (.ghostField ..) => none
     | some (.index base index) => do
         let (type, _) ← context.placeType fuel base
         match type with
@@ -617,11 +625,13 @@ def checkCall (context : Context) (result : SemTy) : CallKind → Array GenericA
           resolveArguments context.ns context.env instantiations with
       | none, _ => (declarationTarget? context.unit context.ns reference).isNone
       | some (targetNs, declaration, spelled), some arguments =>
-          match fieldTypes? targetNs declaration variant arguments.toList with
-          | some fields => operands.size == fields.length &&
+          -- The ghost slots the pack appends are typed at the resolved ghost types.
+          match fieldTypes? targetNs declaration variant arguments.toList,
+              ghostTypes? targetNs declaration arguments.toList with
+          | some fields, some _ => operands.size == fields.length &&
               (operands.toList.zip fields).all (fun (operand, field) =>
                 context.flows operand field) && result == .nominal spelled arguments.toList
-          | none => false
+          | _, _ => false
       | _, _ => false
   | .destructor reference variant, instantiations, operands =>
       match structTarget? context.unit context.ns reference,
@@ -690,6 +700,8 @@ def checkData (context : Context) (result : SemTy) : DataOperation → Array Exp
               | none => false
           | none => false
       | _, _ => false
+  -- A ghost field is the verification model's alone (`designs/ghost-fields.md`).
+  | .selectGhost _ _, _ => false
   | .selectVariants reference fields, operands =>
       match structTarget? context.unit context.ns reference, operands.toList with
       | some (targetNs, declaration, spelled), [operand] =>
@@ -765,7 +777,11 @@ def checkOperation (context : Context) (result : SemTy) (operation : Operation)
       | .mutate, [reference, value] => match context.exprType reference with
           | some (.reference .mutable referent) => context.flows value referent && packs [] result
           | _ => false
-      -- A value borrow has no runtime evaluation.
+      -- A shared borrow of a computed value is that value.
+      | .borrow .immutable, [value] => match context.exprType value with
+          | some type => result == .reference .shared type
+          | none => false
+      -- Any other value borrow has no runtime evaluation.
       | .borrow _, _ => true
       | _, _ => false
   | .data operation => context.checkData result operation operands

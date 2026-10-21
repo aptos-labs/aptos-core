@@ -120,12 +120,22 @@ verex module 0x42::mutable_temporaries where
   spec run_pair where
     pragma verify = false
 
+  -- A mutable borrow of a computed value borrows a temporary holding it.
+  fun bump_temporary(x : u64) -> u64 := do
+    let r := &mut (x + 1)
+    *r := *r + 1
+    *r
+  spec bump_temporary where
+    aborts_if x + 2 > MAX_U64
+    ensures result == x + 2
+
 -- The interpreter writes the results back as the verifier proves them.
 open VerexIR VerexE2ETests.CheckSupport in
 run_cmd assertRuns `«0x42».mutable_temporaries #[
   ⟨"run_discarded", #[], .returned #[.integer 5], {}⟩,
   ⟨"run_read", #[], .returned #[.integer 545], {}⟩,
   ⟨"run_borrowed", #[], .returned #[.integer 14], {}⟩,
-  ⟨"run_pair", #[], .returned #[.integer 35], {}⟩]
+  ⟨"run_pair", #[], .returned #[.integer 35], {}⟩,
+  ⟨"bump_temporary", #[.integer 4], .returned #[.integer 6], {}⟩]
 
 end VerexSL.Tests.Check.References.MutableTemporaries

@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/data_invariant_in_map.move:8:9: error: the data invariant `invariant value != 0` does not hold for a value written to memory
-tests/sources/functional/data_invariant_in_map.move:20:5: error: verex verification failed: the automatic verification of `violation_1` failed; provide a proof: `verify violation_1 by …` in `tests/sources/functional/data_invariant_in_map.proof.lean` (`verify violation_1 by verex_obligations` lists its obligations)
+tests/sources/functional/data_invariant_in_map.move:20:5: error: verex verification failed: the automatic verification of `violation_1` failed; provide a proof in `tests/sources/functional/data_invariant_in_map.proof.lean`:
+  verify violation_1 by
+    verex_obligations
+    verex_on
+    | stored_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

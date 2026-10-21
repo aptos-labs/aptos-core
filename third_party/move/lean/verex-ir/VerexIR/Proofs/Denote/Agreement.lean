@@ -220,37 +220,33 @@ def _root_.VerexIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [Skolems uni
     (shape : ResultShape) (contract : Contract (Memory unit) Failure (HList σs) shape.carrier) :
     FunctionContract where
   requires := fun arguments initial =>
-    (∃ memory loans args, Admissible initial loans ∧ lendArguments σs args loans = some arguments ∧
-      Encloses unit memory initial (HList.tables false σs args)) ∧
-      ∀ memory loans args, Encloses unit memory initial (HList.tables false σs args) →
-        lendArguments σs args loans = some arguments → contract.requires args memory
+    (∃ loans args, Admissible initial loans ∧ lendArguments σs args loans = some arguments) ∧
+      (∃ memory, StorageEncodes unit memory initial) ∧
+      ∀ memory, StorageEncodes unit memory initial →
+        ∀ loans args, lendArguments σs args loans = some arguments → contract.requires args memory
   assumes := fun arguments initial =>
-    ∀ memory loans args, Encloses unit memory initial (HList.tables false σs args) →
-      lendArguments σs args loans = some arguments → contract.assumes args memory
+    ∀ memory, StorageEncodes unit memory initial →
+      ∀ loans args, lendArguments σs args loans = some arguments → contract.assumes args memory
   ensures := fun arguments initial results final =>
     ∃ memory memory' loans args result returnedLoans,
-      Encloses unit memory initial (HList.tables false σs args) ∧
-      ReturnedEncloses unit memory' final results
-        (HList.tables true σs args ++ shape.tables true result) ∧
+      StorageEncodes unit memory initial ∧ StorageEncodesReturned unit memory' final results ∧
       lendArguments σs args loans = some arguments ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some results ∧
       argumentsResolve σs args loans results (exportsAfter initial.pending final.pending) ∧
       contract.ensures args memory result memory'
   aborts := fun arguments initial error =>
-    ∃ memory loans args, Encloses unit memory initial (HList.tables false σs args) ∧
+    ∃ memory loans args, StorageEncodes unit memory initial ∧
       lendArguments σs args loans = some arguments ∧ contract.aborts args memory error
   mayAbort := fun arguments initial =>
-    ∃ memory loans args, Encloses unit memory initial (HList.tables false σs args) ∧
+    ∃ memory loans args, StorageEncodes unit memory initial ∧
       lendArguments σs args loans = some arguments ∧ contract.mayAbort args memory
   mustAbort := fun arguments initial =>
-    ∀ memory loans args, Encloses unit memory initial (HList.tables false σs args) →
-      lendArguments σs args loans = some arguments → contract.mustAbort args memory
+    ∀ memory, StorageEncodes unit memory initial →
+      ∀ loans args, lendArguments σs args loans = some arguments → contract.mustAbort args memory
   frame := fun arguments initial results final =>
-    ∃ memory memory' loans args result returnedLoans,
-      Encloses unit memory initial (HList.tables false σs args) ∧
-      ReturnedEncloses unit memory' final results
-        (HList.tables true σs args ++ shape.tables true result) ∧
+    ∃ memory memory' loans args result returnedLoans, StorageEncodes unit memory initial ∧
+      StorageEncodesReturned unit memory' final results ∧
       lendArguments σs args loans = some arguments ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some results ∧
@@ -274,49 +270,39 @@ theorem satisfies_run_at {unit : ValidatedUnit} (executable : ExecutableUnit uni
       (contract.prophetic unit σs shape) := by
   letI : Skolems unit := Skolems.runtime unit
   intro arguments initial assumed permitted
-  obtain ⟨⟨memory, loans, args, admissible, lent, enclosed⟩, required⟩ := permitted
-  have established := verified args memory (assumed memory loans args enclosed lent)
-    (required memory loans args enclosed lent)
+  obtain ⟨⟨loans, args, admissible, lent⟩, ⟨memory, encoded⟩, required⟩ := permitted
+  have established := verified args memory (assumed memory encoded loans args lent)
+    (required memory encoded loans args lent)
   refine ⟨?_, ?_, fun obligation => obligation⟩
   · intro results final execution
-    obtain ⟨memory', encoded', agree⟩ := preserved handle typeInstantiation initial arguments
-      results final memory enclosed.stores execution
+    obtain ⟨memory', encoded', agree⟩ :=
+      preserved handle typeInstantiation initial arguments results final memory encoded execution
     have view : ∃ result returnedLoans, ∃ resolved : HList σs,
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some arguments ∧
-        TableMemory.TablesIn unit (HList.tables false σs resolved) initial.tables ∧
-        argumentsResolve σs resolved loans results (exportsAfter initial.pending final.pending) ∧
-        TableMemory.TablesIn unit (HList.tables true σs resolved ++ shape.tables true result)
-          (final.resolveReturned results).tables := by
+        argumentsResolve σs resolved loans results (exportsAfter initial.pending final.pending) := by
       refine Classical.byContradiction fun none => established.2.2 ?_
-      exact ⟨initial, loans, arguments, results, final, enclosed, admissible, lent, execution,
+      exact ⟨initial, loans, arguments, results, final, encoded, admissible, lent, execution,
         none⟩
-    obtain ⟨result, returnedLoans, resolved, lentCurrent, lentProphecy, lentResolved, heldStart,
-      resolves, heldExit⟩ := view
-    have enclosedResolved : Encloses unit memory initial (HList.tables false σs resolved) :=
-      ⟨enclosed.stores, heldStart⟩
-    have enclosedExit : ReturnedEncloses unit memory' final results
-        (HList.tables true σs resolved ++ shape.tables true result) :=
-      Encloses.mk encoded' heldExit
+    obtain ⟨result, returnedLoans, resolved, lentCurrent, lentProphecy, lentResolved, resolves⟩ :=
+      view
     have outcome :
         (propheticRun executable typeInstantiation handle σs shape resolved).ok memory result
           memory' :=
-      ⟨initial, loans, arguments, results, final, returnedLoans, results, enclosedResolved,
-        admissible, lentResolved, execution, lentCurrent, lentProphecy, resolves, enclosedExit,
-        agree⟩
+      ⟨initial, loans, arguments, results, final, returnedLoans, results, encoded, admissible,
+        lentResolved, execution, lentCurrent, lentProphecy, resolves, encoded', agree⟩
     obtain ⟨ensured, framed, notMust⟩ :=
-      (verified resolved memory (assumed memory loans resolved enclosedResolved lentResolved)
-        (required memory loans resolved enclosedResolved lentResolved)).1 result _ outcome
-    refine ⟨fun notMay => ?_, ⟨memory, memory', loans, resolved, result, returnedLoans,
-        enclosedResolved, enclosedExit, lentResolved, lentCurrent, lentProphecy, framed⟩,
-      fun must => notMust (must memory loans resolved enclosedResolved lentResolved)⟩
-    exact ⟨memory, memory', loans, resolved, result, returnedLoans, enclosedResolved, enclosedExit,
-      lentResolved, lentCurrent, lentProphecy, resolves,
-      ensured fun may => notMay ⟨memory, loans, resolved, enclosedResolved, lentResolved, may⟩⟩
+      (verified resolved memory (assumed memory encoded loans resolved lentResolved)
+        (required memory encoded loans resolved lentResolved)).1 result _ outcome
+    refine ⟨fun notMay => ?_, ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
+        lentCurrent, lentProphecy, framed⟩, fun must => notMust (must memory encoded loans resolved lentResolved)⟩
+    exact ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
+      lentCurrent, lentProphecy, resolves,
+      ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩
   · intro error failed
-    exact ⟨memory, loans, args, enclosed, lent,
-      established.2.1 error ⟨initial, loans, arguments, enclosed, admissible, lent, failed⟩⟩
+    exact ⟨memory, loans, args, encoded, lent,
+      established.2.1 error ⟨initial, loans, arguments, encoded, admissible, lent, failed⟩⟩
 
 /-- A contract satisfied by the prophetic meaning at the runtime frame and
 the empty instantiation holds of the big-step meaning in its runtime form,

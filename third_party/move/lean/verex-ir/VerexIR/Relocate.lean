@@ -24,7 +24,7 @@ deriving instance Remap for
   MemoryRange, TraceKind, BehaviorKind, SpecOperation, Operation, Place, QuantifierKind,
   MatchArm, QuantifierBinder, ConditionKind, Condition, Frame, SpecBlock, ExprKind, Expr,
   PatternKind, Pattern, BinderKind, GenericBinder, Parameter, LocalDecl, Signature,
-  ParameterFrame, FunctionContract, ConstantDecl, FieldDecl, VariantDecl, StructDecl, FunctionDecl,
+  ParameterFrame, FunctionContract, ConstantDecl, FieldDecl, VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl,
   AssociatedItemKind, AssociatedItemDecl, TraitDecl, AssociatedItemValue,
   AssociatedItemBinding, ImplDecl, SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant,
   IntrinsicBinding, IntrinsicDecl, Namespace

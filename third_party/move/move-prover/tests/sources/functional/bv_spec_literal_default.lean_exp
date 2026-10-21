@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bv_spec_literal_default.move:27:9: error: the specification clause `ensures result == x & (x | 3)` is not established
-tests/sources/functional/bv_spec_literal_default.move:25:5: error: verex verification failed: the automatic verification of `or_suffixed` failed; provide a proof: `verify or_suffixed by …` in the module (`verify or_suffixed by verex_obligations` lists its obligations)
+tests/sources/functional/bv_spec_literal_default.move:25:5: error: verex verification failed: the automatic verification of `or_suffixed` failed; provide a proof in the module:
+  verify or_suffixed by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

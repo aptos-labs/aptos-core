@@ -8,7 +8,7 @@ use crate::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
         BACKUP_TXN_VERSION,
     },
-    position_state_sync::get_position_state_item_count,
+    native_store::{state_sync::NativeStoreReader, PositionStore},
     state_store::StateStore,
 };
 use aptos_crypto::hash::HashValue;
@@ -211,23 +211,22 @@ impl BackupHandler {
         })
     }
 
-    /// Position snapshots are taken sparsely; the one at or before `version`
-    /// carries the same root as `version`. `None` when no position state was
-    /// ever committed, i.e. the empty tree.
-    fn position_snapshot_version(&self, version: Version) -> Result<Option<Version>> {
-        self.position()?
-            .merkle_db
-            .latest_snapshot_version_at_or_before(version)
+    /// Positions are read at the latest snapshot at or before the requested
+    /// version, which carries the same root. No pruning check: backup only
+    /// serves retained versions.
+    fn position_store_reader(&self) -> Result<NativeStoreReader<'_, PositionStore>> {
+        let position = self.position()?;
+        Ok(NativeStoreReader {
+            kv_db: &position.kv_db,
+            merkle_db: &position.merkle_db,
+            pruner: None,
+            ledger_metadata_db: self.ledger_db.metadata_db(),
+        })
     }
 
     /// Gets the number of positions in the snapshot at `version`.
     pub fn get_position_state_item_count(&self, version: Version) -> Result<usize> {
-        match self.position_snapshot_version(version)? {
-            Some(snapshot_version) => {
-                get_position_state_item_count(&self.position()?.merkle_db, snapshot_version)
-            },
-            None => Ok(0),
-        }
+        self.position_store_reader()?.item_count(version)
     }
 
     /// Iterate through positions in the snapshot at `version`.
@@ -237,16 +236,8 @@ impl BackupHandler {
         start_idx: usize,
         limit: usize,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
-        let Some(snapshot_version) = self.position_snapshot_version(version)? else {
-            return Ok(Box::new(std::iter::empty()));
-        };
-        let position = self.position()?;
-        Ok(Box::new(position.merkle_db.iter_active_leaves_chunk(
-            Arc::clone(&position.kv_db),
-            snapshot_version,
-            start_idx,
-            limit,
-        )?))
+        self.position_store_reader()?
+            .value_chunk_iter(version, start_idx, limit)
     }
 
     /// Gets the proof that proves a range of positions.
@@ -255,14 +246,8 @@ impl BackupHandler {
         rightmost_key: HashValue,
         version: Version,
     ) -> Result<SparseMerkleRangeProof> {
-        let snapshot_version = self.position_snapshot_version(version)?.ok_or_else(|| {
-            AptosDbError::NotFound(format!(
-                "no native-position snapshot at or before version {version}"
-            ))
-        })?;
-        self.position()?
-            .merkle_db
-            .get_range_proof(rightmost_key, snapshot_version)
+        self.position_store_reader()?
+            .range_proof(rightmost_key, version)
     }
 
     /// Gets the epoch, committed version, and synced version of the DB.

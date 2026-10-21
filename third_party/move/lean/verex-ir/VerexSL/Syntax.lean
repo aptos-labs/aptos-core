@@ -78,6 +78,7 @@ private def kwAssert := Lean.Parser.nonReservedSymbol "assert" true
 private def kwAssertBang := Lean.Parser.nonReservedSymbol "assert!" true
 private def kwAssume := Lean.Parser.nonReservedSymbol "assume" true
 private def kwInvariant := Lean.Parser.nonReservedSymbol "invariant" true
+private def kwGhost := Lean.Parser.nonReservedSymbol "ghost" true
 private def kwApply := Lean.Parser.nonReservedSymbol "apply" true
 private def kwSplit := Lean.Parser.nonReservedSymbol "split" true
 private def kwLemma := Lean.Parser.nonReservedSymbol "lemma" true
@@ -621,6 +622,10 @@ syntax (name := verexApplyStatement)
 /-- Splits cases on a Boolean or an enum's variant. -/
 syntax (name := verexSplitStatement)
   kwSplit verexExpr (";")? : verexSpecStatement
+/-- Updates a ghost field of a local or of a mutable reference's referent: an
+assignment to the field. -/
+syntax (name := verexUpdateStatement)
+  kwUpdate verexExpr (";")? : verexSpecStatement
 @[verexExpr_parser] def verexSpecBlockExpr := leading_parser
   kwSpec >> kwDo >>
     Lean.Parser.withPosition (Lean.Parser.manyIndent
@@ -824,6 +829,10 @@ syntax (name := verexAbortsWithClause)
   kwAbortsWith (verexConditionProperties)? verexExpr ("," verexExpr)* (";")? : verexClause
 syntax (name := verexInvariantClause)
   kwInvariant (verexConditionProperties)? verexExpr (";")? : verexClause
+/-- A ghost field of every value of the struct or enum, with the value a pack
+gives it (`designs/ghost-fields.md`). -/
+syntax (name := verexGhostClause)
+  kwGhost verexIdentifier ":" verexType (":=" verexExpr)? (";")? : verexClause
 syntax (name := verexModifiesClause) kwModifies verexExpr (";")? : verexClause
 syntax (name := verexLooseModifiesClause) kwModifies verexExpr "," "*" (";")? : verexClause
 syntax (name := verexModifiesAllClause) kwModifies "*" (";")? : verexClause

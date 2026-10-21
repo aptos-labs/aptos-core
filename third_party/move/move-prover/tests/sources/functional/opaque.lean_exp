@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/opaque.move:14:9: error: the specification clause `ensures result == 2` is not established
-tests/sources/functional/opaque.move:12:5: error: verex verification failed: the automatic verification of `opaque_incorrect` failed; provide a proof: `verify opaque_incorrect by …` in `tests/sources/functional/opaque.proof.lean` (`verify opaque_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/opaque.move:12:5: error: verex verification failed: the automatic verification of `opaque_incorrect` failed; provide a proof in `tests/sources/functional/opaque.proof.lean`:
+  verify opaque_incorrect by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -16,8 +16,7 @@ use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc::{self, Receiver};
 use once_cell::sync::Lazy;
-use rand::Rng;
-use rand_core::OsRng;
+use rand::{rngs::OsRng, Rng};
 use reqwest::Url;
 use std::{
     collections::BTreeMap,

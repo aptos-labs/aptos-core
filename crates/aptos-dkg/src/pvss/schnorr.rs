@@ -32,7 +32,7 @@ struct Challenge<Gr> {
 pub fn pok_prove<Gr, R>(a: &Scalar, g: &Gr, pk: &Gr, rng: &mut R) -> PoK<Gr>
 where
     Gr: Serialize + Group + for<'a> Mul<&'a Scalar, Output = Gr>,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: rand::RngCore + rand::CryptoRng,
 {
     debug_assert!(g.mul(a).eq(pk));
 

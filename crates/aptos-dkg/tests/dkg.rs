@@ -9,8 +9,7 @@ use aptos_dkg::pvss::{
     traits::{transcript::AggregatableTranscript, TranscriptCore},
     weighted::generic_weighting::GenericWeighting,
 };
-use rand::{rngs::StdRng, thread_rng};
-use rand_core::SeedableRng;
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
 
 #[test]
 fn test_dkg_all_unweighted() {

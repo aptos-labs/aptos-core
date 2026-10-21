@@ -215,23 +215,21 @@ example {unit : Validation.ValidatedUnit} (executable : Validation.ExecutableUni
     (typeInstantiation : Array (TypeId × TypeId)) (value : RuntimeValue) (initial : RuntimeState) :
     («0x42».language_generics.identity.contract executable ⟨.cons (.param 0) .nil, rfl⟩
         typeInstantiation).requires #[value] initial ↔
-        SemanticOperations.FreshStorageLoanIds initial ∧ SemanticOperations.Plain value ∧
+        SemanticOperations.FreshGlobalLoanIds initial ∧ SemanticOperations.Plain value ∧
           ∃ memory, StorageEncodes unit memory initial := by
   simp only [«0x42».language_generics.identity.contract, Contract.prophetic, Contract.ofSkolem,
     Admissible, lendArguments, NRow.subst, NTy.subst, NRow.getD, NRow.lend, NTy.lend, NTy.encode,
     NTy.codec]
   constructor
-  · rintro ⟨⟨memory, loans, ⟨raw, _⟩, ⟨-, -, fresh⟩, lent, ⟨stores, -⟩⟩, -⟩
+  · rintro ⟨⟨loans, ⟨raw, _⟩, ⟨-, -, fresh⟩, lent⟩, encoded, -⟩
     cases loans with
     | nil =>
         simp at lent
-        exact ⟨fresh, lent ▸ raw.property, memory, stores⟩
+        exact ⟨fresh, lent ▸ raw.property, encoded⟩
     | cons => simp at lent
-  · rintro ⟨fresh, plain, memory, encoded⟩
-    refine ⟨⟨memory, [], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, rfl, ?_⟩,
+  · rintro ⟨fresh, plain, encoded⟩
+    exact ⟨⟨[], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, rfl⟩, encoded,
       fun _ _ _ _ _ => trivial⟩
-    refine @Encloses.mk _ ?_ _ _ _ encoded fun table member => ?_
-    simp [HList.tables, NTy.tables] at member
 
 -- A generic function's public theorem holds of its runs at the instantiation a
 -- call at type arguments gives it, coherent by evaluation with the frame

@@ -1,27 +1,105 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/arithm.move:129:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:128:5: error: verex verification failed: the automatic verification of `div_by_zero_u64_incorrect` failed; provide a proof: `verify div_by_zero_u64_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify div_by_zero_u64_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:128:5: error: verex verification failed: the automatic verification of `div_by_zero_u64_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify div_by_zero_u64_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:149:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:148:5: error: verex verification failed: the automatic verification of `overflow_u8_add_incorrect` failed; provide a proof: `verify overflow_u8_add_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u8_add_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:148:5: error: verex verification failed: the automatic verification of `overflow_u8_add_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u8_add_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:165:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:164:5: error: verex verification failed: the automatic verification of `overflow_u16_add_incorrect` failed; provide a proof: `verify overflow_u16_add_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u16_add_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:164:5: error: verex verification failed: the automatic verification of `overflow_u16_add_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u16_add_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:181:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:180:5: error: verex verification failed: the automatic verification of `overflow_u32_add_incorrect` failed; provide a proof: `verify overflow_u32_add_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u32_add_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:180:5: error: verex verification failed: the automatic verification of `overflow_u32_add_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u32_add_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:197:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:196:5: error: verex verification failed: the automatic verification of `overflow_u64_add_incorrect` failed; provide a proof: `verify overflow_u64_add_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u64_add_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:196:5: error: verex verification failed: the automatic verification of `overflow_u64_add_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u64_add_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:213:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:212:5: error: verex verification failed: the automatic verification of `overflow_u128_add_incorrect` failed; provide a proof: `verify overflow_u128_add_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u128_add_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:212:5: error: verex verification failed: the automatic verification of `overflow_u128_add_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u128_add_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:229:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:228:5: error: verex verification failed: the automatic verification of `overflow_u256_add_incorrect` failed; provide a proof: `verify overflow_u256_add_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u256_add_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:228:5: error: verex verification failed: the automatic verification of `overflow_u256_add_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u256_add_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:250:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:249:5: error: verex verification failed: the automatic verification of `overflow_u8_mul_incorrect` failed; provide a proof: `verify overflow_u8_mul_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u8_mul_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:249:5: error: verex verification failed: the automatic verification of `overflow_u8_mul_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u8_mul_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:266:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:265:5: error: verex verification failed: the automatic verification of `overflow_u16_mul_incorrect` failed; provide a proof: `verify overflow_u16_mul_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u16_mul_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:265:5: error: verex verification failed: the automatic verification of `overflow_u16_mul_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u16_mul_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:282:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:281:5: error: verex verification failed: the automatic verification of `overflow_u32_mul_incorrect` failed; provide a proof: `verify overflow_u32_mul_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u32_mul_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:281:5: error: verex verification failed: the automatic verification of `overflow_u32_mul_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u32_mul_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:298:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:297:5: error: verex verification failed: the automatic verification of `overflow_u64_mul_incorrect` failed; provide a proof: `verify overflow_u64_mul_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u64_mul_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:297:5: error: verex verification failed: the automatic verification of `overflow_u64_mul_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u64_mul_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:313:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:312:5: error: verex verification failed: the automatic verification of `overflow_u128_mul_incorrect` failed; provide a proof: `verify overflow_u128_mul_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u128_mul_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:312:5: error: verex verification failed: the automatic verification of `overflow_u128_mul_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u128_mul_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/arithm.move:328:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/arithm.move:327:5: error: verex verification failed: the automatic verification of `overflow_u256_mul_incorrect` failed; provide a proof: `verify overflow_u256_mul_incorrect by …` in `tests/sources/functional/arithm.proof.lean` (`verify overflow_u256_mul_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/arithm.move:327:5: error: verex verification failed: the automatic verification of `overflow_u256_mul_incorrect` failed; provide a proof in `tests/sources/functional/arithm.proof.lean`:
+  verify overflow_u256_mul_incorrect by
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

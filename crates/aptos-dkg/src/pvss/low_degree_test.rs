@@ -76,7 +76,7 @@ impl<'a> LowDegreeTest<'a> {
     }
 
     /// Creates a new LDT by picking a random polynomial `f` of expected degree `n-t-1`.
-    pub fn random<R: rand_core::RngCore + rand_core::CryptoRng>(
+    pub fn random<R: rand::RngCore + rand::CryptoRng>(
         mut rng: &mut R,
         t: usize,
         n: usize,

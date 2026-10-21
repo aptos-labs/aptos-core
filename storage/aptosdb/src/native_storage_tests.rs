@@ -7,9 +7,9 @@
 
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
-    position_db::PositionDb,
+    native_store::kv_db::PositionDb,
     schema::stale_position_value_index::{StalePositionValueIndex, StalePositionValueIndexSchema},
-    utils::truncation_helper::{get_position_commit_progress, truncate_position_db_shards},
+    utils::truncation_helper::{get_native_commit_progress, truncate_native_kv_db_shards},
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_temppath::TempPath;
@@ -267,11 +267,11 @@ fn truncate_advances_overall_position_commit_progress() {
 
     commit_one(&db, 3, key.clone(), upsert(3));
     commit_one(&db, 7, key.clone(), upsert(7));
-    assert_eq!(get_position_commit_progress(&db).unwrap(), Some(7));
+    assert_eq!(get_native_commit_progress(&db).unwrap(), Some(7));
 
-    truncate_position_db_shards(&db, 3).unwrap();
+    truncate_native_kv_db_shards(&db, 3).unwrap();
     assert_eq!(
-        get_position_commit_progress(&db).unwrap(),
+        get_native_commit_progress(&db).unwrap(),
         Some(3),
         "overall progress marker must reflect the truncated version"
     );
@@ -1288,7 +1288,7 @@ mod reopen {
         {
             let db = open(&dir, true);
             let bundle = db.position().unwrap();
-            crate::utils::truncation_helper::truncate_position_merkle_db(&bundle.merkle_db, 0)
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.merkle_db, 0)
                 .unwrap();
         }
         let db = Arc::new(
@@ -1315,5 +1315,64 @@ mod reopen {
         assert_eq!(position_root(&db), root);
         assert_eq!(size_of(&db, 1), Some(11));
         assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// A readonly open loads the index: the snapshot cold-loads and the tail
+    /// past it replays into the overlay, so readers see every position.
+    #[test]
+    fn readonly_open_loads_the_index() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[(position_key(2), 20)]);
+            commit(&db, 2, &[(position_key(1), 11), (position_key(3), 30)]);
+        }
+        // Leave the tail past version 0 un-merklized.
+        {
+            let db = open(&dir, true);
+            crate::utils::truncation_helper::truncate_native_merkle_db(
+                &db.position().unwrap().merkle_db,
+                0,
+            )
+            .unwrap();
+        }
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            true, /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig {
+                delete_on_restart: false,
+                ..Default::default()
+            },
+        )
+        .expect("readonly open");
+        assert_eq!(size_of(&db, 1), Some(11));
+        assert_eq!(size_of(&db, 2), Some(20));
+        assert_eq!(size_of(&db, 3), Some(30));
+    }
+
+    /// Both replays past a position snapshot refuse a gap they would have to
+    /// materialize whole, rather than allocating without bound.
+    #[test]
+    fn replay_refuses_an_unbounded_gap() {
+        use crate::native_store::buffered_state::MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT;
+
+        let dir = TempPath::new();
+        let db = open(&dir, true);
+        let err = db
+            .position_write_sets_after_snapshot(0, MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT + 1)
+            .expect_err("gap above the limit");
+        assert!(
+            err.to_string().contains("Too many versions to replay"),
+            "{err}"
+        );
     }
 }

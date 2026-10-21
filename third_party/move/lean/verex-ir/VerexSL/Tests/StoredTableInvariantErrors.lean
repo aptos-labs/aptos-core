@@ -39,7 +39,13 @@ verex module 0x42::stored_table_identity where
 /--
 error: the specification clause `ensures result == p.right.length` is not established
 ---
-error: verex verification failed: the automatic verification of `wrong` failed; provide a proof: `verify wrong by …` in the module (`verify wrong by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
+  verify wrong by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::stored_table_identity::wrong

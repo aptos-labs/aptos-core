@@ -14,7 +14,7 @@ private def emptyUnit : RawUnit where
   namespaces := #[]
 
 private def emptyUnitJson : String :=
-  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":5}}"
+  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":6}}"
 
 #guard encodeJson emptyUnit == emptyUnitJson
 
@@ -31,8 +31,8 @@ private def jsonWithUnknownTopLevelField : String :=
 
 private def jsonWithUnknownNestedField : String :=
   (encodeJson emptyUnit).replace
-    "\"version\":{\"major\":1,\"minor\":5}"
-    "\"version\":{\"major\":1,\"minor\":5,\"patch\":0}"
+    "\"version\":{\"major\":1,\"minor\":6}"
+    "\"version\":{\"major\":1,\"minor\":6,\"patch\":0}"
 
 #guard match decodeJson jsonWithUnknownNestedField with
   | .error message => message == "unknown raw VIR JSON field `$.version.patch`"
@@ -40,13 +40,13 @@ private def jsonWithUnknownNestedField : String :=
 
 #guard match decodeJson
     ((encodeJson emptyUnit).replace
-      "\"version\":{\"major\":1,\"minor\":5}"
-      "\"version\":{\"major\":1,\"major\":1,\"minor\":5}") with
+      "\"version\":{\"major\":1,\"minor\":6}"
+      "\"version\":{\"major\":1,\"major\":1,\"minor\":6}") with
   | .error message => message.contains "duplicate JSON object field `major`"
   | .ok _ => false
 
 #guard match decodeJson
-    ("{\"version\":{\"major\":1,\"minor\":5}," ++ (encodeJson emptyUnit).drop 1) with
+    ("{\"version\":{\"major\":1,\"minor\":6}," ++ (encodeJson emptyUnit).drop 1) with
   | .error message => message.contains "duplicate JSON object field `version`"
   | .ok _ => false
 
@@ -80,8 +80,8 @@ private def malformedDocuments : Array String := #[
   (encodeJson emptyUnit).replace "\"tables\":{" "\"tables\":[",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":-1",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":1.5",
-  (encodeJson emptyUnit).replace "\"minor\":5" "\"minor\":\"0\"",
-  (encodeJson emptyUnit).replace "\"minor\":5" "\"patch\":0",
+  (encodeJson emptyUnit).replace "\"minor\":6" "\"minor\":\"0\"",
+  (encodeJson emptyUnit).replace "\"minor\":6" "\"patch\":0",
   (encodeJson profiledUnit).replace "\"profile\":\"rust\"" "\"profile\":\"unknown\""
 ]
 
@@ -373,6 +373,7 @@ private def classifyPlace : Place → Nat
   | .index _ _ => 3
   | .subslice _ _ _ _ => 4
   | .downcast _ _ => 5
+  | .ghostField _ _ _ => 6
 
 private def classifyPatternKind : PatternKind → Nat
   | .wildcard => 0
@@ -451,7 +452,8 @@ private def allPlaces : Array Place := #[
   .field ⟨0⟩ { namespaceId := ⟨0⟩, name := ⟨0⟩ } ⟨0⟩,
   .index ⟨0⟩ ⟨0⟩,
   .subslice ⟨0⟩ 1 2 false,
-  .downcast ⟨0⟩ ⟨0⟩]
+  .downcast ⟨0⟩ ⟨0⟩,
+  .ghostField ⟨0⟩ { namespaceId := ⟨0⟩, name := ⟨0⟩ } ⟨0⟩]
 
 private def allPatterns : Array Pattern := #[
   { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .wildcard },
@@ -543,7 +545,7 @@ private def coreConstructorUnit : RawUnit := {
 #guard #[AttributeValue.constant .unit, .name none "item", .qualifiedName "wire::item"].map
   classifyAttributeValue == Array.range 3
 #guard allAttributes.map classifyAttribute == Array.range 2
-#guard allPlaces.map classifyPlace == Array.range 6
+#guard allPlaces.map classifyPlace == Array.range 7
 #guard allPatterns.map (classifyPatternKind ·.kind) == Array.range 6
 #guard allBinderKinds.map (classifyBinderKind ·.kind) == Array.range 4
 
@@ -655,6 +657,7 @@ private def classifyDataOperation : DataOperation → Nat
   | .testVariants _ _ => 2
   | .discriminant _ => 3
   | .updateField _ _ => 4
+  | .selectGhost _ _ => 5
 
 private def classifyTraceKind : TraceKind → Nat
   | .user => 0
@@ -823,7 +826,8 @@ private def allDataOperations : Array DataOperation := #[
   .selectVariants qref #[("Left", "left"), ("Right", "right")],
   .testVariants qref #["Variant"],
   .discriminant qref,
-  .updateField qref "field"]
+  .updateField qref "field",
+  .selectGhost qref "ghost"]
 
 private def allSpecOperations : Array SpecOperation := #[
   .functionCall qref { pre := some 0, post := some 1 },
@@ -931,7 +935,7 @@ private def operationConstructorUnit : RawUnit :=
 #guard allPrimitiveOperations.map classifyPrimitiveOperation ==
   Array.range 46 ++ #[62, 63, 64, 65, 66, 67, 68, 69, 70, 71]
 #guard allReferenceOperations.map classifyReferenceOperation == Array.range 4
-#guard allDataOperations.map classifyDataOperation == Array.range 5
+#guard allDataOperations.map classifyDataOperation == Array.range 6
 #guard #[TraceKind.user, .automatic, .subAutomatic].map classifyTraceKind == Array.range 3
 #guard #[BehaviorKind.requiresOf, .abortsOf, .ensuresOf, .resultOf,
     .unchangedOf, .foldsOf, .writeOf 1].map classifyBehaviorKind == Array.range 7

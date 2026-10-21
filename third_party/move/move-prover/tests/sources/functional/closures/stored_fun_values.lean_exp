@@ -6,6 +6,8 @@ executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 modifier_addr : VerexIR.Proofs.Denote.NTy.address.carrier
@@ -184,7 +186,7 @@ x✝ :
               VerexIR.Proofs.Denote.NRow.nil)
             VerexIR.Proofs.Denote.NRow.nil))
         VerexIR.Proofs.Denote.NRow.nil))
-right✝¹ : VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) initialState✝
+permitted_2 : VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) initialState✝
 fst✝ :
   (VerexIR.Proofs.Denote.NTy.function
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) [true]
@@ -203,7 +205,7 @@ heq✝ :
         arguments := VerexIR.Proofs.Denote.NRow.nil }
       (VerexIR.StorageKey.address modifier_addr) =
     some (fst✝, PUnit.unit)
-left✝ :
+stored_1 :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (quantified_2 : String),
     ¬VerexIR.Proofs.AbortsOf executable✝
         ((VerexIR.Proofs.Denote.NTy.function
@@ -211,7 +213,7 @@ left✝ :
               VerexIR.Proofs.Denote.NRow.nil).encode
           fst✝)
         [VerexIR.RuntimeValue.signer quantified_2] memory
-right✝ :
+stored_2 :
   VerexIR.Proofs.FramedAt executable✝
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
     (fun invocation pre post =>
@@ -327,7 +329,14 @@ x :
     true
 ⊢ VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) verexFinal
 tests/sources/functional/closures/stored_fun_values.move:422:9: error: the specification clause `ensures global<Counter>(s.address) == old(global<Counter>(s.address))` is not established
-tests/sources/functional/closures/stored_fun_values.move:419:5: error: verex verification failed: the automatic verification of `use_counter_modifier_wrong` failed; provide a proof: `verify use_counter_modifier_wrong by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_counter_modifier_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:419:5: error: verex verification failed: the automatic verification of `use_counter_modifier_wrong` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify use_counter_modifier_wrong by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:504:5: error: verification failed with a residual obligation:
 case returns.left
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -335,6 +344,8 @@ executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 modifier_addr : VerexIR.Proofs.Denote.NTy.address.carrier
@@ -470,7 +481,7 @@ x✝ :
               VerexIR.Proofs.Denote.NRow.nil)
             VerexIR.Proofs.Denote.NRow.nil))
         VerexIR.Proofs.Denote.NRow.nil))
-right✝¹ : VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) initialState✝
+permitted_2 : VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) initialState✝
 fst✝ :
   (VerexIR.Proofs.Denote.NTy.function
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) [true]
@@ -489,7 +500,7 @@ heq✝ :
         arguments := VerexIR.Proofs.Denote.NRow.nil }
       (VerexIR.StorageKey.address modifier_addr) =
     some (fst✝, PUnit.unit)
-left✝ :
+stored_1 :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (quantified_2 : String),
     ¬VerexIR.Proofs.AbortsOf executable✝
         ((VerexIR.Proofs.Denote.NTy.function
@@ -497,7 +508,7 @@ left✝ :
               VerexIR.Proofs.Denote.NRow.nil).encode
           fst✝)
         [VerexIR.RuntimeValue.signer quantified_2] memory
-right✝ : True
+stored_2 : True
 verexResult : VerexIR.Proofs.Denote.ResultShape.none.carrier
 verexFinal : VerexIR.Proofs.Denote.Memory unit
 verexEnsures :
@@ -547,7 +558,13 @@ a✝ :
         (VerexIR.StorageKey.address modifier_addr)).isSome =
     true
 ⊢ VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) verexFinal
-tests/sources/functional/closures/stored_fun_values.move:504:5: error: verex verification failed: the automatic verification of `use_any_modifier` failed; provide a proof: `verify use_any_modifier by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_any_modifier by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:504:5: error: verex verification failed: the automatic verification of `use_any_modifier` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify use_any_modifier by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:514:5: error: verification failed with a residual obligation:
 case returns.right.left
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -555,6 +572,8 @@ executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 modifier_addr : VerexIR.Proofs.Denote.NTy.address.carrier
@@ -733,7 +752,7 @@ x✝ :
               VerexIR.Proofs.Denote.NRow.nil)
             VerexIR.Proofs.Denote.NRow.nil))
         VerexIR.Proofs.Denote.NRow.nil))
-right✝¹ : VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) initialState✝
+permitted_2 : VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) initialState✝
 fst✝ :
   (VerexIR.Proofs.Denote.NTy.function
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) [true]
@@ -752,7 +771,7 @@ heq✝ :
         arguments := VerexIR.Proofs.Denote.NRow.nil }
       (VerexIR.StorageKey.address modifier_addr) =
     some (fst✝, PUnit.unit)
-left✝ :
+stored_1 :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (quantified_2 : String),
     ¬VerexIR.Proofs.AbortsOf executable✝
         ((VerexIR.Proofs.Denote.NTy.function
@@ -760,7 +779,7 @@ left✝ :
               VerexIR.Proofs.Denote.NRow.nil).encode
           fst✝)
         [VerexIR.RuntimeValue.signer quantified_2] memory
-right✝ : True
+stored_2 : True
 verexResult : VerexIR.Proofs.Denote.ResultShape.none.carrier
 verexFinal : VerexIR.Proofs.Denote.Memory unit
 verexEnsures :
@@ -811,18 +830,61 @@ x :
     true
 ⊢ VerexIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) verexFinal
 tests/sources/functional/closures/stored_fun_values.move:517:9: error: the specification clause `ensures global<Counter>(s.address) == old(global<Counter>(s.address))` is not established
-tests/sources/functional/closures/stored_fun_values.move:514:5: error: verex verification failed: the automatic verification of `use_any_modifier_wrong` failed; provide a proof: `verify use_any_modifier_wrong by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_any_modifier_wrong by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:514:5: error: verex verification failed: the automatic verification of `use_any_modifier_wrong` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify use_any_modifier_wrong by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:20:9: error: the data invariant `invariant ∀ (x : u64), !aborts_of<f>(x)` does not hold where a value is constructed
-tests/sources/functional/closures/stored_fun_values.move:47:5: error: verex verification failed: the automatic verification of `create_invalid` failed; provide a proof: `verify create_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_invalid by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:47:5: error: verex verification failed: the automatic verification of `create_invalid` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify create_invalid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:73:9: error: the data invariant `invariant ∀ (x : u64; r : u64), ensures_of<f>(x, r) ==> r >= x` does not hold where a value is constructed
-tests/sources/functional/closures/stored_fun_values.move:92:5: error: verex verification failed: the automatic verification of `create_monotone_invalid` failed; provide a proof: `verify create_monotone_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_monotone_invalid by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:92:5: error: verex verification failed: the automatic verification of `create_monotone_invalid` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify create_monotone_invalid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:116:9: error: the data invariant `invariant ∀ (x : u64), result_of<f>(x) == 2 * x` does not hold where a value is constructed
 tests/sources/functional/closures/stored_fun_values.move:115:9: error: the data invariant `invariant ∀ (x : u64), !aborts_of<f>(x)` does not hold where a value is constructed
-tests/sources/functional/closures/stored_fun_values.move:128:5: error: verex verification failed: the automatic verification of `create_doubler_unsafe` failed; provide a proof: `verify create_doubler_unsafe by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_doubler_unsafe by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:128:5: error: verex verification failed: the automatic verification of `create_doubler_unsafe` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify create_doubler_unsafe by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:145:9: error: the data invariant `invariant ∀ (a : Address), !aborts_of<f>(a)` does not hold where a value is constructed
-tests/sources/functional/closures/stored_fun_values.move:160:5: error: verex verification failed: the automatic verification of `create_reader_invalid` failed; provide a proof: `verify create_reader_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_reader_invalid by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:160:5: error: verex verification failed: the automatic verification of `create_reader_invalid` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify create_reader_invalid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:195:5: error: the data invariant `f : Fn(&Signer) -> Unit has Copy, Drop, Store` does not hold where a value is constructed
 tests/sources/functional/closures/stored_fun_values.move:199:9: error: the data invariant `invariant ∀ (s : Signer), !aborts_of<f>(s)` does not hold where a value is constructed
-tests/sources/functional/closures/stored_fun_values.move:218:5: error: verex verification failed: the automatic verification of `create_modifier_invalid` failed; provide a proof: `verify create_modifier_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_modifier_invalid by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:218:5: error: verex verification failed: the automatic verification of `create_modifier_invalid` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify create_modifier_invalid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:195:5: error: the data invariant `f : Fn(&Signer) -> Unit has Copy, Drop, Store` does not hold where a value is constructed
-tests/sources/functional/closures/stored_fun_values.move:241:5: error: verex verification failed: the automatic verification of `create_modifier_valid` failed; provide a proof: `verify create_modifier_valid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_modifier_valid by verex_obligations` lists its obligations)
+tests/sources/functional/closures/stored_fun_values.move:241:5: error: verex verification failed: the automatic verification of `create_modifier_valid` failed; provide a proof in `tests/sources/functional/closures/stored_fun_values.proof.lean`:
+  verify create_modifier_valid by
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

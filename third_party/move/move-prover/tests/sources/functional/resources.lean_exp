@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/resources.move:39:6: error: the specification clause `ensures exists<R>(account.address)` is not established
-tests/sources/functional/resources.move:37:5: error: verex verification failed: the automatic verification of `create_resource_incorrect` failed; provide a proof: `verify create_resource_incorrect by …` in `tests/sources/functional/resources.proof.lean` (`verify create_resource_incorrect by verex_obligations` lists its obligations)
+tests/sources/functional/resources.move:37:5: error: verex verification failed: the automatic verification of `create_resource_incorrect` failed; provide a proof in `tests/sources/functional/resources.proof.lean`:
+  verify create_resource_incorrect by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -3,6 +3,7 @@
 
 import VerexIR.Validation.StaticTyping
 import VerexIR.Semantics.Typing
+import VerexIR.Semantics.Focus
 
 /-!
 # Typing values at semantic types
@@ -59,6 +60,40 @@ def SemTy.unshared : SemTy → SemTy
   | .reference .shared referent => referent.unshared
   | type => type
 
+/-- The semantic types of the fields a nominal value holds beyond its declared
+ones: a table owner's entries, pairs of its key and value type arguments
+(`designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
+def contentsTypes (unit : Validation.ValidatedUnit) (source : StructHandle)
+    (variant : Option String) (arguments : List SemArg) : List SemTy :=
+  match variant, Validation.tableLayout? unit source.namespaceId source.structId, arguments with
+  | none, some _, [.type key, .type value] => [.vector (.tuple [key, value]) none]
+  | _, _, _ => []
+
+/-- A table owner's contents read at substituted type arguments are its
+contents' types substituted. -/
+theorem contentsTypes_substList (unit : Validation.ValidatedUnit) (source : StructHandle)
+    (variant : Option String) (substitution : Array SemArg) (arguments : List SemArg) :
+    contentsTypes unit source variant (SemArg.substList substitution arguments) =
+      (contentsTypes unit source variant arguments).map (·.subst substitution) := by
+  unfold contentsTypes
+  cases variant with
+  | some _ => rfl
+  | none =>
+      cases Validation.tableLayout? unit source.namespaceId source.structId with
+      | none => rfl
+      | some _ =>
+          rcases arguments with _ | ⟨first, _ | ⟨second, _ | ⟨third, rest⟩⟩⟩
+          · rfl
+          · cases first <;> rfl
+          · cases first <;> cases second <;>
+              simp [SemArg.substList, SemArg.subst, SemTy.subst, SemTy.substList]
+          · cases first <;> cases second <;> rfl
+
+/-- The declared types of a nominal value's ghost fields, whose slots follow
+its declared fields (`designs/ghost-fields.md`). -/
+def ghostTypeIds (unit : Validation.ValidatedUnit) (source : StructHandle) : List TypeId :=
+  (SemanticOperations.nominalGhosts unit source).toList.map (·.type.typeId)
+
 mutual
   /-- A value inhabits a semantic type, its loans typed by `loans`. -/
   inductive HasType (unit : Validation.ValidatedUnit) (loans : LoanTypes) :
@@ -84,18 +119,28 @@ mutual
         (elements : HasTypeEach unit loans values.toList element) :
         HasType unit loans (.vector values) (.vector element length)
     /-- A nominal value inhabits its declaration's type at generic arguments
-    under which each field inhabits its declared type. -/
+    under which each field inhabits its declared type, followed by its ghost
+    slots at their declared types and a table owner's entries at their key and
+    value types. -/
     | nominal (source : StructHandle) (variant : Option String) (fields : Array RuntimeValue)
         (name : QualifiedName) (arguments : List SemArg)
         (declaringNamespace : Validation.ValidatedNamespace) (declared : Array FieldDecl)
-        (fieldTypes : List SemTy)
+        (fieldTypes ghostTypes : List SemTy)
         (name_eq : SemanticOperations.structName? unit source = some name)
         (declaration_eq : SemanticOperations.handleFields? unit source variant =
           some (declaringNamespace, declared))
         (fieldTypes_resolve : ResolvesAll declaringNamespace.tables arguments.toArray
           (declared.toList.map (·.type.typeId)) fieldTypes)
-        (fields_typed : HasTypes unit loans fields.toList fieldTypes) :
+        (ghostTypes_resolve : ResolvesAll declaringNamespace.tables arguments.toArray
+          (ghostTypeIds unit source) ghostTypes)
+        (fields_typed : HasTypes unit loans fields.toList
+          (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source variant arguments))) :
         HasType unit loans (.nominal source variant fields) (.nominal name arguments)
+    /-- A ghost field's slot, whose contents the runtime ignores: the
+    verification model alone gives them meaning (`designs/ghost-fields.md`);
+    they hold no loan. -/
+    | ghost (contents : RuntimeValue) (slot : SemTy) (plain : SemanticOperations.Plain contents) :
+        HasType unit loans (.ghost contents) (.ghost slot)
     /-- A closure inhabits the function type of its target's open
     parameters and packed results, under the semantic arguments its
     instantiation is faithful to; its captures inhabit the captured
@@ -187,9 +232,10 @@ theorem HasType.weaken {unit : Validation.ValidatedUnit} {smaller larger : LoanT
   | .vector values element length length_matches elements =>
       .vector values element length length_matches (HasTypeEach.weaken extends_ elements)
   | .nominal source variant fields name arguments declaringNamespace declared fieldTypes
-      name_eq declaration_eq fieldTypes_resolve fields_typed =>
+      ghostTypes name_eq declaration_eq fieldTypes_resolve ghostTypes_resolve fields_typed =>
       .nominal source variant fields name arguments declaringNamespace declared fieldTypes
-        name_eq declaration_eq fieldTypes_resolve (HasTypes.weaken extends_ fields_typed)
+        ghostTypes name_eq declaration_eq fieldTypes_resolve ghostTypes_resolve
+        (HasTypes.weaken extends_ fields_typed)
   | .closure function mask instantiation captures parameters result targetNs declaration
       arguments allParameters results namespace_eq declaration_eq signature_eq faithful
       mask_bound captures_typed parameters_eq packs =>
@@ -205,6 +251,7 @@ theorem HasType.weaken {unit : Validation.ValidatedUnit} {smaller larger : LoanT
       .hole loan referent type (extends_ loan referent loan_eq) same inhabited
   | .unitEmptyTuple => .unitEmptyTuple
   | .emptyTupleUnit => .emptyTupleUnit
+  | .ghost contents slot plain => .ghost contents slot plain
 
 theorem HasTypes.weaken {unit : Validation.ValidatedUnit} {smaller larger : LoanTypes}
     (extends_ : larger.Extends smaller) {values : List RuntimeValue} {types : List SemTy} :
@@ -231,6 +278,6 @@ theorem HasType.inhabited {unit : Validation.ValidatedUnit} {loans : LoanTypes}
   | _, .unit | _, .bool _ | _, .character _ _ | _, .string _ | _, .bytes _
   | _, .integer _ _ _ _ | _, .address _ | _, .signer _ | _, .tuple _ _ _
   | _, .vector _ _ _ _ _ | _, .nominal .. | _, .closure .. | _, .borrow .. | _, .dead _
-  | _, .unitEmptyTuple | _, .emptyTupleUnit => by simp [SemTy.unshared]
+  | _, .unitEmptyTuple | _, .emptyTupleUnit | _, .ghost _ _ _ => by simp [SemTy.unshared]
 
 end VerexIR

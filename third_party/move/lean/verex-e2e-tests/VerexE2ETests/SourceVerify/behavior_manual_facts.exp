@@ -3,12 +3,14 @@ case ensures_3
 executable✝ : Validation.ExecutableUnit unit
 nativesTyped : NativesTyped executable✝
 nativesShift : NativesShift executable✝
+runsAgree : Proofs.RunsAgree executable✝
+ownersRepresentable : Proofs.OwnersRepresentable unit
 verexAgree : Proofs.TypesAgree unit
 verexResources : Proofs.ResourcesTyped unit
 addr : Proofs.Denote.NTy.address.carrier
 initialState✝ : Proofs.Denote.Memory unit
 assumed permitted : True
-a✝⁵ :
+a✝⁷ :
   ¬(initialState✝
           {
             type :=
@@ -28,18 +30,18 @@ a✝⁵ :
                     (StorageKey.address addr))).getD
               RuntimeValue.unit).asInt +
           1)
-a✝⁴ :
+a✝⁶ :
   ¬Proofs.AbortsOf executable✝
       (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
           Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
       [RuntimeValue.address addr] initialState✝
-a✝³ :
+a✝⁵ :
   Proofs.ResultOf executable✝
       (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
           Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
       [RuntimeValue.address addr] initialState✝ =
     #[]
-a✝² :
+a✝⁴ :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf executable✝
@@ -59,7 +61,7 @@ a✝² :
                 (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil }
           key
-a✝¹ :
+a✝³ :
   ∀ (resource : Proofs.Denote.ResourceType),
     ¬resource =
           {
@@ -72,7 +74,7 @@ a✝¹ :
               Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
           [RuntimeValue.address addr] initialState✝ resource =
         initialState✝ resource
-a✝ :
+a✝² :
   Proofs.Denoted
     (Proofs.EnsuresOf executable✝
       (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
@@ -82,7 +84,7 @@ a✝ :
         (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
             Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
         [RuntimeValue.address addr] initialState✝))
-x✝⁵ :
+x✝² :
   (Proofs.StateOf executable✝
         (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
             Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
@@ -94,7 +96,7 @@ x✝⁵ :
           arguments := Proofs.Denote.NRow.nil }
         (StorageKey.address addr)).isSome =
     true
-x✝⁴ :
+x✝¹ :
   ¬Proofs.AbortsOf executable✝
       (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
           Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
@@ -103,7 +105,7 @@ x✝⁴ :
         (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
             Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
         [RuntimeValue.address addr] initialState✝)
-x✝³ :
+x✝ :
   Proofs.ResultOf executable✝
       (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
           Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
@@ -113,7 +115,7 @@ x✝³ :
             Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
         [RuntimeValue.address addr] initialState✝) =
     #[]
-x✝² :
+a✝¹ :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf executable✝
@@ -140,7 +142,7 @@ x✝² :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil }
           key
-x✝¹ :
+a✝ :
   ∀ (resource : Proofs.Denote.ResourceType),
     ¬resource =
           {
@@ -161,7 +163,7 @@ x✝¹ :
           (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
               Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
           [RuntimeValue.address addr] initialState✝ resource
-x✝ :
+x :
   Proofs.Denoted
     (Proofs.EnsuresOf executable✝
       (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
@@ -179,7 +181,7 @@ x✝ :
           (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
               Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
           [RuntimeValue.address addr] initialState✝)))
-consumed :
+increment_ensures_1 :
   ((Option.map (fun value => RuntimeValue.integer value.fst.val)
             (Proofs.StateOf executable✝
               (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
@@ -202,7 +204,7 @@ consumed :
                 (StorageKey.address addr))).getD
           RuntimeValue.unit).asInt +
       1
-x :
+flip_flag_ensures_1 :
   (Proofs.StateOf executable✝
           (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
               Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode

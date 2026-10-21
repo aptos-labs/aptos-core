@@ -28,7 +28,7 @@ use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::{PrimeField, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use homomorphism::tuple::TupleHomomorphism;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, marker::PhantomData};
 
 /// Witness for the Shplonked opening sigma protocol: (rho, evals, u) such that

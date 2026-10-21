@@ -1,3 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/spec_fun_mixed_memory.move:63:9: error: the specification clause `ensures increased_within_limit(addr)` is not established
-tests/sources/functional/state_labels/spec_fun_mixed_memory.move:61:5: error: verex verification failed: the automatic verification of `increment_and_lower_limit` failed; provide a proof: `verify increment_and_lower_limit by …` in `tests/sources/functional/state_labels/spec_fun_mixed_memory.proof.lean` (`verify increment_and_lower_limit by verex_obligations` lists its obligations)
+tests/sources/functional/state_labels/spec_fun_mixed_memory.move:61:5: error: verex verification failed: the automatic verification of `increment_and_lower_limit` failed; provide a proof in `tests/sources/functional/state_labels/spec_fun_mixed_memory.proof.lean`:
+  verify increment_and_lower_limit by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

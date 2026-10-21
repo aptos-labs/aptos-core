@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/map_destruction.move:57:9
+   │
+57 │         ensures result == 8; // error: unchecked destruction returns normally, so this postcondition is false
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/map_destruction.move:52: unchecked_incorrect
+   =     at tests/sources/functional/map_destruction.move:33: nonempty
+   =         m = <redacted>
+   =     at tests/sources/functional/map_destruction.move:34: nonempty
+   =         m = <redacted>
+   =     at tests/sources/functional/map_destruction.move:35: nonempty
+   =     at tests/sources/functional/map_destruction.move:32: nonempty
+   =         result = <redacted>
+   =     at tests/sources/functional/map_destruction.move:53: unchecked_incorrect
+   =     at tests/sources/functional/map_destruction.move:51: unchecked_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/map_destruction.move:56: unchecked_incorrect (spec)
+   =     at tests/sources/functional/map_destruction.move:57: unchecked_incorrect (spec)

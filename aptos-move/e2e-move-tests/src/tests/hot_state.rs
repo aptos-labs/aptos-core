@@ -10,7 +10,8 @@
 //! resources, resource-group members, table items, modules, on-chain configs) plus the `exists`
 //! behavior and discard handling, and — for each write kind enumerated by `storage_keys_written`
 //! (plain resources, resource groups, aggregator v1 materializations/deltas, in-place delayed
-//! fields, and modules) — that a written slot is excluded from promotion.
+//! fields, and modules) — that a written slot is excluded from promotion. On top of `to_make_hot`,
+//! the epilogue's write set also promotes the slots the epilogue itself reads.
 
 use crate::{aggregator, assert_success, tests::common, MoveHarness};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -47,13 +48,15 @@ use std::collections::BTreeSet;
 const HELPER_ADDR: &str = "0xcafe";
 
 /// Executes the block against the harness state (without applying it) and returns the per-txn
-/// statuses, the epilogue's `to_make_hot` set, and all keys the block's outputs value-write.
+/// statuses, the epilogue's `to_make_hot` set, the hotness of the epilogue's write set, and all keys
+/// the block's outputs value-write.
 fn execute_and_get_hot_state_promotions(
     h: &MoveHarness,
     txns: Vec<Transaction>,
     concurrency_level: usize,
 ) -> (
     Vec<TransactionStatus>,
+    BTreeSet<StateKey>,
     BTreeSet<StateKey>,
     BTreeSet<StateKey>,
 ) {
@@ -99,15 +102,21 @@ fn execute_and_get_hot_state_promotions(
             .clone(),
         txn => panic!("Expected block epilogue, got: {:?}", txn),
     };
-    let epilogue_hotness: BTreeSet<_> = outputs
+    let epilogue_write_set = outputs
         .last()
         .expect("Block epilogue output must exist")
-        .write_set()
-        .hotness_keys()
-        .cloned()
-        .collect();
-    assert_eq!(epilogue_hotness, to_make_hot);
-    (statuses, to_make_hot, written_keys)
+        .write_set();
+    let epilogue_hotness: BTreeSet<_> = epilogue_write_set.hotness_keys().cloned().collect();
+    assert!(epilogue_hotness.is_superset(&to_make_hot));
+    // What the epilogue adds comes from its own reads, excluding its writes.
+    for key in epilogue_hotness.difference(&to_make_hot) {
+        assert!(
+            epilogue_write_set.get_write_op(key).is_none(),
+            "the epilogue promotes {:?}, which it writes",
+            key,
+        );
+    }
+    (statuses, to_make_hot, epilogue_hotness, written_keys)
 }
 
 /// Executes `txns` as a block at sequential (concurrency 1) and parallel (concurrency 4) settings,
@@ -122,13 +131,32 @@ fn promotions(
     BTreeSet<StateKey>,
     BTreeSet<StateKey>,
 ) {
-    let (statuses, sequential, written) = execute_and_get_hot_state_promotions(h, txns.clone(), 1);
-    let (_, parallel, _) = execute_and_get_hot_state_promotions(h, txns, 4);
+    let (statuses, to_make_hot, _, written) = promotions_with_epilogue_hotness(h, txns);
+    (statuses, to_make_hot, written)
+}
+
+/// Like [`promotions`], but also returns the hotness of the epilogue's write set.
+fn promotions_with_epilogue_hotness(
+    h: &MoveHarness,
+    txns: Vec<Transaction>,
+) -> (
+    Vec<TransactionStatus>,
+    BTreeSet<StateKey>,
+    BTreeSet<StateKey>,
+    BTreeSet<StateKey>,
+) {
+    let (statuses, sequential, sequential_hotness, written) =
+        execute_and_get_hot_state_promotions(h, txns.clone(), 1);
+    let (_, parallel, parallel_hotness, _) = execute_and_get_hot_state_promotions(h, txns, 4);
     assert_eq!(
         sequential, parallel,
         "sequential and parallel execution must promote the same keys",
     );
-    (statuses, sequential, written)
+    assert_eq!(
+        sequential_hotness, parallel_hotness,
+        "sequential and parallel execution must produce the same epilogue hotness",
+    );
+    (statuses, sequential, sequential_hotness, written)
 }
 
 fn assert_all_success(statuses: &[TransactionStatus]) {
@@ -711,4 +739,36 @@ fn test_block_promotions_cover_reads_and_exclude_writes() {
         "Promoted keys also written in the block: {:?}",
         promoted_and_written,
     );
+}
+
+/// The payload is computed before the epilogue runs, so keys only the epilogue reads are not in
+/// `to_make_hot`. The epilogue's write set must still promote them.
+#[test]
+fn test_epilogue_reads_are_promoted() {
+    let mut h = MoveHarness::new();
+    let alice = h.new_account_with_key_pair();
+    let bob = h.new_account_with_key_pair();
+    let txns = vec![Transaction::UserTransaction(h.create_transaction_payload(
+        &alice,
+        aptos_stdlib::aptos_account_transfer(*bob.address(), 100),
+    ))];
+
+    let (statuses, to_make_hot, epilogue_hotness, written) =
+        promotions_with_epilogue_hotness(&h, txns);
+    assert_all_success(&statuses);
+
+    // Fee distribution reads `PendingTransactionFee`, which holds a `BigOrderedMap`. With no fees to
+    // record, it doesn't write it.
+    for key in [
+        StateKey::module(&AccountAddress::ONE, ident_str!("big_ordered_map")),
+        StateKey::resource(
+            &AccountAddress::ONE,
+            &parse_struct_tag("0x1::stake::PendingTransactionFee").unwrap(),
+        )
+        .unwrap(),
+    ] {
+        assert!(!to_make_hot.contains(&key), "{:?} is in the payload", key);
+        assert!(epilogue_hotness.contains(&key), "{:?} is not promoted", key);
+        assert!(!written.contains(&key));
+    }
 }

@@ -302,6 +302,16 @@ theorem fieldType?_subst {targetNs : ValidatedNamespace} {declaration : StructDe
   have := resolveIn_subst arguments resolved
   simpa using this
 
+theorem ghostTypes?_subst {targetNs : ValidatedNamespace} {declaration : StructDecl}
+    {nominalArguments : List SemArg} {types : List SemTy}
+    (found : ghostTypes? targetNs declaration nominalArguments = some types) :
+    ghostTypes? targetNs declaration (nominalArguments.map (·.subst arguments)) =
+      some (types.map (·.subst arguments)) := by
+  simp only [ghostTypes?] at found ⊢
+  refine List.mapM_subst found fun ghost type found => ?_
+  have := resolveIn_subst arguments found
+  simpa using this
+
 theorem fieldTypes?_subst {targetNs : ValidatedNamespace} {declaration : StructDecl}
     {variant : Option String} {nominalArguments : List SemArg} {types : List SemTy}
     (found : fieldTypes? targetNs declaration variant nominalArguments = some types) :
@@ -515,6 +525,7 @@ theorem placeType_subst {context : Context} :
               obtain ⟨fieldName, fieldName_eq, fieldType, fieldType_eq, rfl, rfl⟩ := found
               exact ⟨fieldName, fieldName_eq, _, fieldTypeAt?_subst fieldType_eq, rfl, rfl⟩
           | _ => simp at found
+      | ghostField base owner field => cases found
       | index base index =>
           simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at found ⊢
           obtain ⟨⟨baseType, baseVariant⟩, base_eq, found⟩ := found
@@ -695,8 +706,9 @@ theorem checkCall_subst {context : Context} {result : SemTy} {kind : CallKind}
       · rename_i targetNs declaration spelled resolved target_eq resolved_eq
         rw [target_eq, resolveArguments_subst (arguments := arguments) resolved_eq]
         split at checked
-        · rename_i fields fields_eq
-          simp only [Array.toList_map, fieldTypes?_subst (arguments := arguments) fields_eq]
+        · rename_i fields ghosts fields_eq ghosts_eq
+          simp only [Array.toList_map, fieldTypes?_subst (arguments := arguments) fields_eq,
+            ghostTypes?_subst (arguments := arguments) ghosts_eq]
           simp only [Bool.and_eq_true, beq_iff_eq, List.length_map] at checked ⊢
           obtain ⟨⟨size_eq, all⟩, rfl⟩ := checked
           exact ⟨⟨size_eq, zip_all_subst (fun operand field flowing => flows_subst flowing) all⟩,
@@ -796,6 +808,7 @@ theorem checkData_subst {context : Context} {result : SemTy} {operation : DataOp
           · cases checked
         · cases checked
       · cases checked
+  | selectGhost reference field => simp [checkData] at checked
   | selectVariants reference fields =>
       simp only [checkData, subst_unit, subst_ns] at checked ⊢
       split at checked
@@ -939,6 +952,14 @@ theorem checkOperation_subst {context : Context} {result : SemTy} {operation : O
           rw [exprType_subst reference_eq]
           simp only [SemTy.subst, Bool.and_eq_true] at checked ⊢
           exact ⟨flows_subst checked.1, by simpa using packs_subst checked.2⟩
+        · cases checked
+      · rename_i value operands_eq
+        split at checked
+        · rename_i type value_eq
+          rw [exprType_subst value_eq]
+          simp only [beq_iff_eq] at checked ⊢
+          subst checked
+          rfl
         · cases checked
       · rfl
       · cases checked

@@ -149,7 +149,7 @@ verex module aptos_std::table where
   Table cannot know if it is empty or not, so this method is not public,
   and can be used only in modules that know by themselves that table is empty.
   -/
-  @[map_destroy_empty (Table)]
+  @[map_destroy_unchecked (Table)]
   friend fun destroy_known_empty_unsafe {K has Copy, Drop} {V}(
     self : Table<K, V>
   ) -> Unit := do

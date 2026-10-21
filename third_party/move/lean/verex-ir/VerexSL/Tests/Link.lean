@@ -16,7 +16,10 @@ namespace VerexSL.Tests.Link
 
 open Lean Elab Command VerexIR.Validation
 
+-- The module calls `vector::contains`, which no namespace of the unit
+-- declares, so it states no theorems: they would be vacuous.
 verex module 0x42::linked where
+  pragma verify = false
   use std::vector
 
   struct Counter has Key, Drop where

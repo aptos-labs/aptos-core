@@ -693,6 +693,7 @@
               "type": null
             }
           ],
+          "ghosts": [],
           "loc": {
             "index": 12
           },
@@ -1065,6 +1066,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 5
+    "minor": 6
   }
 }

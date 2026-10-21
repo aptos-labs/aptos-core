@@ -7,12 +7,11 @@ use crate::{
         aptosdb_internal::{error_if_too_many_requested, gauged_api},
         AptosDB,
     },
-    position_buffered_state::{PositionLedgerStateWithSummary, PositionStateWithSummary},
+    native_store::buffered_state::{PositionLedgerStateWithSummary, PositionStateWithSummary},
     pruner::PrunerManager,
     schema::block_info::BlockInfoSchema,
 };
 use aptos_crypto::HashValue;
-use aptos_jellyfish_merkle::JellyfishMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
@@ -122,8 +121,9 @@ impl DbReader for AptosDB {
                      min available version is {min_readable}",
                 );
             }
-            let tree = JellyfishMerkleTree::new(bundle.merkle_db.as_ref());
-            let (_value, proof) = tree.get_with_proof_ext(key_hash, version, root_depth)?;
+            let (_value, proof) = bundle
+                .merkle_db
+                .get_with_proof_ext(key_hash, version, root_depth)?;
             Ok(proof)
         })
     }
@@ -854,26 +854,7 @@ impl DbReader for AptosDB {
                     .get_usage(version)
                     .map(|usage| usage.items())
             },
-            StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                // Position snapshots are sparse; resolve to the latest at or
-                // before `version`. `None` means no snapshot yet => empty.
-                match position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                {
-                    Some(snapshot_version) => {
-                        crate::position_state_sync::get_position_state_item_count(
-                            &position.merkle_db,
-                            snapshot_version,
-                        )
-                    },
-                    None => Ok(0),
-                }
-            },
+            StateKind::Position => self.position_store_reader()?.item_count(version),
         })
     }
 
@@ -890,28 +871,11 @@ impl DbReader for AptosDB {
                 self.state_store
                     .get_value_chunk_with_proof(version, first_index, chunk_size)
             },
-            StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                let snapshot_version = position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                    .ok_or_else(|| {
-                        AptosDbError::Other(format!(
-                            "no native-position snapshot at or before version {version}"
-                        ))
-                    })?;
-                let position_db = Arc::clone(&position.kv_db);
-                crate::state_value_chunk::value_chunk_with_proof(
-                    Arc::clone(&position.merkle_db),
-                    snapshot_version,
-                    first_index,
-                    chunk_size,
-                    move |key, version| position_db.expect_value_by_version(key, version),
-                )
-            },
+            StateKind::Position => self.position_store_reader()?.value_chunk_with_proof(
+                version,
+                first_index,
+                chunk_size,
+            ),
         })
     }
 
@@ -934,30 +898,12 @@ impl DbReader for AptosDB {
                     >)
             },
             StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                match position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                {
-                    Some(snapshot_version) => {
-                        let iter = position.merkle_db.iter_active_leaves_chunk(
-                            position.kv_db.clone(),
-                            snapshot_version,
-                            first_index,
-                            chunk_size,
-                        )?;
-                        Ok(Box::new(iter)
-                            as Box<
-                                dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_,
-                            >)
-                    },
-                    // No snapshot at or before `version` => empty position state.
-                    None => Ok(Box::new(std::iter::empty())
-                        as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>),
-                }
+                let iter = self.position_store_reader()?.value_chunk_iter(
+                    version,
+                    first_index,
+                    chunk_size,
+                )?;
+                Ok(iter as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
             },
         })
     }
@@ -975,26 +921,11 @@ impl DbReader for AptosDB {
                 self.state_store
                     .get_value_chunk_proof(version, first_index, state_key_values)
             },
-            StateKind::Position => {
-                self.error_if_position_pruned("Native-position state merkle", version)?;
-                let position = self.position.as_ref().ok_or_else(|| {
-                    AptosDbError::Other("native-position subsystem is not enabled".into())
-                })?;
-                let snapshot_version = position
-                    .merkle_db
-                    .latest_snapshot_version_at_or_before(version)?
-                    .ok_or_else(|| {
-                        AptosDbError::Other(format!(
-                            "no native-position snapshot at or before version {version}"
-                        ))
-                    })?;
-                crate::state_value_chunk::build_value_chunk_proof(
-                    position.merkle_db.as_ref(),
-                    snapshot_version,
-                    first_index,
-                    state_key_values,
-                )
-            },
+            StateKind::Position => self.position_store_reader()?.value_chunk_proof(
+                version,
+                first_index,
+                state_key_values,
+            ),
         })
     }
 

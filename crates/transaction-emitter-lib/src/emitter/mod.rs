@@ -41,9 +41,8 @@ use once_cell::sync::Lazy;
 use rand::{
     rngs::StdRng,
     seq::{IteratorRandom, SliceRandom},
-    Rng,
+    Rng, SeedableRng,
 };
-use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
     collections::{HashMap, HashSet},

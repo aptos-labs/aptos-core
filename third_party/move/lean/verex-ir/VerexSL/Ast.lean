@@ -190,6 +190,9 @@ inductive SpecificationConditionKind where
   | apply
   /-- Splits cases on a Boolean or an enum's variant. -/
   | split
+  /-- Updates a ghost field: the condition's expression assigns the field
+  (`designs/ghost-fields.md`). -/
+  | update
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Canonical primitive operation names. Surface operators elaborate to these
@@ -512,13 +515,17 @@ inductive ContractClause where
       (span : Span := {})
   /-- `modifies_of<f> *`: an invocation of `f` may change any global memory. -/
   | modifiesOfAll (parameter : String) (span : Span := {})
+  /-- A ghost field of every value of a struct or enum, with the value a pack
+  gives it over the fields (`designs/ghost-fields.md`). -/
+  | ghost (name : String) (type : Located Ty) (initializer : Option Expr) (span : Span := {})
   deriving Repr, BEq, Inhabited
 
 def ContractClause.span : ContractClause → Span
   | .letPre _ _ _ span | .letPost _ _ _ span |
       .requires _ _ span | .ensures _ _ span | .abortsIf _ _ _ span | .abortsWith _ _ _ span |
       .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
-      .reads _ span | .readsAll span | .modifiesOf _ _ _ span | .modifiesOfAll _ span => span
+      .reads _ span | .readsAll span | .modifiesOf _ _ _ span | .modifiesOfAll _ span |
+      .ghost _ _ _ span => span
 
 /-- Literal or unresolved name assigned in declaration metadata. -/
 inductive SourceAttributeValue where

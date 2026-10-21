@@ -83,45 +83,30 @@ theorem Weave.compose_split : {full captured supplied : NRow} →
 /-! ## Lending -/
 
 mutual
-/-- A value without references lends as its physical value, taking no loan. -/
+/-- A value without references lends as its encoding, taking no loan. -/
 theorem NTy.lend_refFree : (τ : NTy) → τ.refFree = true → (prophecies : Bool) →
-    (value : τ.carrier) → (loans : List Nat) → τ.lend prophecies value loans = some (τ.erase value, loans)
+    (value : τ.carrier) → (loans : List Nat) → τ.lend prophecies value loans = some (τ.encode value, loans)
   | .ref _, free, _, _, _ => by simp [NTy.refFree] at free
   | .tuple elements, free, prophecies, values, loans => by
       simp only [NTy.refFree] at free
       simp only [NTy.lend, NRow.lend_refFree elements free prophecies values loans, Option.map_some,
-        NTy.erase]
-  | .unit, _, _, _, _ | .bool, _, _, _, _ | .int _ _, _, _, _, _ | .address, _, _, _, _
+        NTy.encode_tuple, HList.encode]
+  | .unit, _, _, _, _ | .bool, _, _, _, _ | .int _ _, _, _, _, _ | .num, _, _, _, _ | .address, _, _, _, _
   | .signer, _, _, _, _ | .string, _, _, _, _ | .bytes, _, _, _, _ | .struct _ _ _, _, _, _, _
   | .enum _ _ _ _ _, _, _, _, _ | .vector _, _, _, _, _ | .table _ _, _, _, _, _
-  | .param _, _, _, _, _ | .function _ _ _, _, _, _, _ => rfl
+  | .ghost _, _, _, _, _ | .param _, _, _, _, _ | .function _ _ _, _, _, _, _ => rfl
 
-/-- A row without references lends as its physical values, taking no loan.
-A row of arguments or results has no hidden field, so every value lends. -/
+/-- A row without references lends as its encoding, taking no loan. -/
 theorem NRow.lend_refFree : (row : NRow) → row.refFree = true → (prophecies : Bool) →
     (values : HList row) → (loans : List Nat) →
-    NRow.lend row prophecies values loans = some (HList.erase row values, loans)
+    NRow.lend row prophecies values loans = some (HList.encode values, loans)
   | .nil, _, _, _, _ => rfl
   | .cons τ rest, free, prophecies, values, loans => by
       simp only [NRow.refFree, Bool.and_eq_true] at free
       simp only [NRow.lend, NTy.lend_refFree τ free.1 prophecies values.1 loans, Option.bind_some,
         NRow.lend_refFree rest free.2 prophecies values.2 loans, Option.map_some,
-        HList.erase_cons]
+        HList.encode_cons]
 end
-
-/-- A type whose values lend as their encodings lends them so, taking no loan. -/
-theorem NTy.lend_lendsEncoded (τ : NTy) (plain : τ.lendsEncoded = true) (prophecies : Bool)
-    (value : τ.carrier) (loans : List Nat) :
-    τ.lend prophecies value loans = some (τ.encode value, loans) := by
-  rw [NTy.lend_refFree τ (NTy.refFree_of_lendsEncoded plain),
-    NTy.erase_eq_encode τ (NTy.tableFree_of_lendsEncoded plain)]
-
-/-- A row whose values lend as their encodings lends them so, taking no loan. -/
-theorem NRow.lend_lendsEncoded (row : NRow) (plain : row.lendsEncoded = true) (prophecies : Bool)
-    (values : HList row) (loans : List Nat) :
-    NRow.lend row prophecies values loans = some (HList.encode values, loans) := by
-  rw [NRow.lend_refFree row (NRow.refFree_of_lendsEncoded plain),
-    HList.erase_eq_encode row (NRow.tableFree_of_lendsEncoded plain)]
 
 /-- A reference-free result has the same current and prophecy row. -/
 theorem ResultShape.lend_refFree_view (shape : ResultShape) (free : shape.row.refFree = true)
@@ -135,27 +120,26 @@ theorem ResultShape.lend_refFree_view (shape : ResultShape) (free : shape.row.re
       simp only [ResultShape.lend, NTy.lend_refFree τ plain]
 
 /-- Lending a woven row lends the supplied arguments and places the captures'
-encodings among them: a closure's captures hold no reference and no map
-contents (the compiler carries no other), so they lend as their encodings. -/
+encodings among them. -/
 theorem Weave.lend_compose : {full captured supplied : NRow} →
-    (weave : Weave full captured supplied) → captured.lendsEncoded = true →
+    (weave : Weave full captured supplied) → captured.refFree = true →
     (captures : HList captured) → (args : HList supplied) → (loans : List Nat) →
     NRow.lend full false (weave.compose captures args) loans =
       (NRow.lend supplied false args loans).map fun lent =>
         (weave.composeList (HList.encode captures) lent.1, lent.2)
   | _, _, _, .nil, _, _, _, _ => rfl
-  | _, _, _, .captured rest, plain, captures, args, loans => by
-      rw [NRow.lendsEncoded_cons] at plain
-      simp only [Weave.compose, NRow.lend, NTy.lend_lendsEncoded _ plain.1 false captures.1 loans,
-        Option.bind_some, rest.lend_compose plain.2 captures.2 args loans, Option.map_map,
+  | _, _, _, .captured rest, free, captures, args, loans => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      simp only [Weave.compose, NRow.lend, NTy.lend_refFree _ free.1 false captures.1 loans,
+        Option.bind_some, rest.lend_compose free.2 captures.2 args loans, Option.map_map,
         HList.encode_cons, Weave.composeList]
       rfl
-  | _, _, _, .supplied rest, plain, captures, args, loans => by
+  | _, _, _, .supplied rest, free, captures, args, loans => by
       simp only [Weave.compose, NRow.lend]
       cases (NTy.lend _ false args.1 loans) with
       | none => rfl
       | some head =>
-          simp only [Option.bind_some, rest.lend_compose plain captures args.2 head.2,
+          simp only [Option.bind_some, rest.lend_compose free captures args.2 head.2,
             Option.map_map]
           rfl
 
@@ -349,10 +333,99 @@ theorem closureOf_captures (handle : FunctionHandle) (mask : Nat)
     (closureOf handle mask typeInstantiation captures).captures.toList = HList.encode captures := by
   simp [closureOf]
 
+@[simp] theorem closureOf_function (handle : FunctionHandle) (mask : Nat)
+    (typeInstantiation : Array (TypeId × TypeId)) {σs : NRow} (captures : HList σs) :
+    (closureOf handle mask typeInstantiation captures).function = handle := rfl
+
+@[simp] theorem closureOf_mask (handle : FunctionHandle) (mask : Nat)
+    (typeInstantiation : Array (TypeId × TypeId)) {σs : NRow} (captures : HList σs) :
+    (closureOf handle mask typeInstantiation captures).mask = mask := rfl
+
+/-! ## Invoking a routed target
+
+In a unit verified through its model (`designs/ghost-fields.md`), a
+function value of a target the proof routes invokes the target's meaning:
+the captures decoded at the captured positions of the target's parameters,
+woven with the supplied arguments. -/
+
+omit [Skolems unit] in
+/-- The weave of a mask over a parameter row (`Weave.ofMask` over a list). -/
+def Weave.ofMaskRow : Nat → (full : NRow) → Σ captured supplied : NRow, Weave full captured supplied
+  | _, .nil => ⟨.nil, .nil, .nil⟩
+  | mask, .cons τ rest =>
+      let ⟨taken, given, weave⟩ := Weave.ofMaskRow (mask / 2) rest
+      if mask % 2 == 1 then ⟨.cons τ taken, given, .captured weave⟩
+      else ⟨taken, .cons τ given, .supplied weave⟩
+
+omit [Skolems unit] in
+/-- A weave is the one its mask reads off its row. -/
+theorem Weave.ofMaskRow_mask : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) →
+    Weave.ofMaskRow weave.mask full = ⟨captured, supplied, weave⟩
+  | _, _, _, .nil => rfl
+  | _, _, _, .captured rest => by
+      have half : (2 * rest.mask + 1) / 2 = rest.mask := by omega
+      have odd : (2 * rest.mask + 1) % 2 = 1 := by omega
+      show Weave.ofMaskRow (2 * rest.mask + 1) _ = _
+      unfold Weave.ofMaskRow
+      rw [half, odd, Weave.ofMaskRow_mask rest]
+      rfl
+  | _, _, _, .supplied rest => by
+      have half : 2 * rest.mask / 2 = rest.mask := by omega
+      have even : 2 * rest.mask % 2 = 0 := by omega
+      show Weave.ofMaskRow (2 * rest.mask) _ = _
+      unfold Weave.ofMaskRow
+      rw [half, even, Weave.ofMaskRow_mask rest]
+      rfl
+
+/-- Invoking a function value of a target without type parameters by the
+target's meaning: the captures decoded at the captured positions of the
+target's parameters, woven with the supplied arguments. A value not of the
+target, at other rows or another shape, or whose captures do not decode,
+has no outcome and is undefined. -/
+def invokeAt (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
+    (self : HList π → Comp unit ρ.carrier) : InvokeMeaning :=
+  fun closure σs shape args =>
+    if routed : closure.function = handle ∧ shape = ρ then
+      match Weave.ofMaskRow closure.mask π with
+      | ⟨captured, supplied, weave⟩ =>
+          if rows : σs = supplied then
+            match (rowCodec captured).decode? closure.captures.toList with
+            | some captures => routed.2 ▸ self (weave.compose captures (rows ▸ args))
+            | none => Spec.stuck
+          else Spec.stuck
+    else Spec.stuck
+
+/-- A literal closure of the routed target invokes it on the woven
+arguments. -/
+@[simp] theorem invokeAt_closureOf (handle : FunctionHandle) {π captured supplied : NRow}
+    (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
+    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
+    (captures : HList captured) (args : HList supplied) :
+    invokeAt handle π ρ self (closureOf handle weave.mask typeInstantiation captures) supplied ρ
+        args =
+      self (weave.compose captures args) := by
+  have mask : (closureOf handle weave.mask typeInstantiation captures).mask = weave.mask := rfl
+  unfold invokeAt
+  rw [dif_pos (show (closureOf handle weave.mask typeInstantiation captures).function = handle ∧
+    ρ = ρ from ⟨rfl, rfl⟩), mask, Weave.ofMaskRow_mask weave]
+  simp only [closureOf_captures, HList.encode, Codec.decode_encode, dite_true]
+
+/-- An invocation of a literal closure of the routed target at another shape
+is stuck. -/
+theorem invokeAt_closureOf_shape (handle : FunctionHandle) {π captured supplied : NRow}
+    (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
+    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
+    (captures : HList captured) {σs : NRow} {shape : ResultShape} (args : HList σs)
+    (other : shape ≠ ρ) :
+    invokeAt handle π ρ self (closureOf handle weave.mask typeInstantiation captures) σs shape
+      args = Spec.stuck := by
+  simp [invokeAt, other]
+
 /-- Lending a woven row is lending the supplied arguments and composing the
 captures' encodings among them by the weave's mask. -/
 theorem Weave.lendArguments_compose {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (plain : captured.lendsEncoded = true)
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
     (captures : HList captured) (args : HList supplied) (loans : List Nat)
     (arguments : Array RuntimeValue) :
     lendArguments full (weave.compose captures args) loans = some arguments ↔
@@ -360,7 +433,7 @@ theorem Weave.lendArguments_compose {full captured supplied : NRow}
         ClosureMask.compose weave.mask (HList.encode captures) lent.toList =
           some arguments.toList := by
   unfold lendArguments
-  rw [weave.lend_compose plain captures args loans]
+  rw [weave.lend_compose free captures args loans]
   constructor
   · intro h
     cases lent : NRow.lend supplied false args loans with
@@ -433,42 +506,26 @@ theorem Weave.lendArguments_compose_injective {full captured supplied : NRow}
     (Option.some.inj (composes.trans composes'.symm))
   exact ⟨HList.encode_injective sameCaptures, Array.toList_inj.mp sameLent⟩
 
-/-- A woven row holds the tables of the supplied arguments: the captures hold
-none. -/
-theorem Weave.tables_compose : {full captured supplied : NRow} →
-    (weave : Weave full captured supplied) → captured.tableFree = true → (prophecies : Bool) →
-    (captures : HList captured) → (args : HList supplied) →
-    HList.tables prophecies full (weave.compose captures args) =
-      HList.tables prophecies supplied args
-  | _, _, _, .nil, _, _, _, _ => rfl
-  | _, _, _, .captured rest, plain, prophecies, captures, args => by
-      simp only [NRow.tableFree, Bool.and_eq_true] at plain
-      simp only [Weave.compose, HList.tables, NTy.tables_eq_nil prophecies _ plain.1 captures.1,
-        List.nil_append, rest.tables_compose plain.2 prophecies captures.2 args]
-  | _, _, _, .supplied rest, plain, prophecies, captures, args => by
-      simp only [Weave.compose, HList.tables, rest.tables_compose plain prophecies captures args.2]
-
 /-- Invoking a closure whose target, weave, and captures are known is running
 the target on the captures and the supplied arguments woven into its
 parameter row. -/
 theorem closureMeaning_closureOf {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (handle : FunctionHandle) {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (plain : captured.lendsEncoded = true)
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
     (shape : ResultShape) (args : HList supplied) :
     closureMeaning executable (closureOf handle weave.mask typeInstantiation captures) supplied shape args =
       propheticRun executable typeInstantiation handle full shape (weave.compose captures args) := by
-  have lend := weave.lendArguments_compose plain
-  have resolve := weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded plain)
-  have tables := weave.tables_compose (NRow.tableFree_of_lendsEncoded plain)
+  have lend := weave.lendArguments_compose free
+  have resolve := weave.argumentsResolve_compose free
   simp only [closureMeaning, propheticRun, closureOf_captures]
   have mask : (closureOf handle weave.mask typeInstantiation captures).mask = weave.mask := rfl
   have function : (closureOf handle weave.mask typeInstantiation captures).function = handle := rfl
   have instantiation :
       (closureOf handle weave.mask typeInstantiation captures).typeInstantiation =
         typeInstantiation := rfl
-  simp only [mask, function, instantiation, tables]
+  simp only [mask, function, instantiation]
   congr 1
   · funext initial result final
     apply propext
@@ -502,26 +559,22 @@ theorem closureMeaning_closureOf {unit : VerexIR.Validation.ValidatedUnit}
         composes, runs, unresolved⟩
       refine ⟨start, loans, arguments.toArray, results, exit, globals, admissible,
         (lend captures args loans _).mpr ⟨lent, lends, composes⟩, runs, ?_⟩
-      rintro ⟨result, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, heldValues,
-        resolves, heldExit⟩
-      rw [← weave.compose_split values] at lendsValues heldValues resolves heldExit
-      rw [tables] at heldValues heldExit
+      rintro ⟨result, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, resolves⟩
+      rw [← weave.compose_split values] at lendsValues resolves
       obtain ⟨lent', lends', composes'⟩ := (lend _ _ loans _).mp lendsValues
       obtain ⟨rfl, rfl⟩ := weave.lendArguments_compose_injective (arguments := arguments.toArray)
         lends lends' composes composes'
       exact unresolved ⟨result, returnedLoans, (weave.split values).2, lendsResult, lendsProphecy,
-        lends', heldValues, (resolve _ _ loans _ _).mp resolves, heldExit⟩
+        lends', (resolve _ _ loans _ _).mp resolves⟩
     · rintro ⟨start, loans, arguments, results, exit, globals, admissible, lends, runs,
         unresolved⟩
       obtain ⟨lent, lends', composes⟩ := (lend captures args loans arguments).mp lends
       refine ⟨start, loans, lent, arguments.toList, results, exit, globals, admissible,
         lends', composes, by simpa using runs, ?_⟩
-      rintro ⟨result, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, heldValues,
-        resolves, heldExit⟩
+      rintro ⟨result, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, resolves⟩
       exact unresolved ⟨result, returnedLoans, weave.compose captures values, lendsResult,
         lendsProphecy, (lend captures values loans arguments).mpr ⟨lent, lendsValues, composes⟩,
-        by rw [tables]; exact heldValues, (resolve captures values loans _ _).mpr resolves,
-        by rw [tables]; exact heldExit⟩
+        (resolve captures values loans _ _).mpr resolves⟩
 
 /-! ## Generic targets
 
@@ -567,7 +620,7 @@ theorem NTy.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : N
       NTy.lend (τ.subst θ.1) prophecies value loans
   | .ref referent, prophecies, value, loan :: loans => by
       cases prophecies <;>
-        simp only [NTy.lend, NTy.toSkolem, NTy.erase_toSkolem, Bool.false_eq_true,
+        simp only [NTy.lend, NTy.toSkolem, NTy.encode_toSkolem, Bool.false_eq_true,
           ite_false, ite_true]
   | .ref _, _, _, [] => rfl
   | .tuple elements, prophecies, values, loans => by
@@ -575,12 +628,12 @@ theorem NTy.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : N
   | .param index, prophecies, value, loans => by
       rw [NTy.lend_refFree ((NTy.param index).subst θ.1)
         (NRow.getD_refFree θ.1 free index _ rfl) prophecies value loans]
-      simp only [NTy.lend, NTy.erase_toSkolem]
-  | .unit, _, _, _ | .bool, _, _, _ | .int _ _, _, _, _ | .address, _, _, _
+      simp only [NTy.lend, NTy.encode_toSkolem]
+  | .unit, _, _, _ | .bool, _, _, _ | .int _ _, _, _, _ | .num, _, _, _ | .address, _, _, _
   | .signer, _, _, _ | .string, _, _, _ | .bytes, _, _, _ | .struct _ _ _, _, _, _
   | .enum _ _ _ _ _, _, _, _ | .vector _, _, _, _ | .table _ _, _, _, _
-  | .function _ _ _, _, _, _ => by
-      simp only [NTy.lend, NTy.subst, NTy.erase_toSkolem]
+  | .ghost _, _, _, _ | .function _ _ _, _, _, _ => by
+      simp only [NTy.lend, NTy.subst, NTy.encode_toSkolem]
 
 /-- A row lends at the target's family as at the caller's types. -/
 theorem NRow.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (row : NRow) →
@@ -609,7 +662,7 @@ theorem argumentsResolve_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
           | nil => simp only [argumentsResolve]
           | cons loan loans =>
               simp only [argumentsResolve, NTy.subst, HList.toSkolem, NTy.toSkolem,
-                NTy.erase_toSkolem, later]
+                NTy.encode_toSkolem, later]
       | param index =>
           refine Iff.trans ?_ (argumentsResolve_cons_refFree (τ := (NTy.param index).subst θ.1)
             (rest := NRow.subst θ.1 rest) (NRow.getD_refFree θ.1 free index _ rfl) values loans
@@ -647,15 +700,6 @@ theorem NTy.toSkolem_ofSkolem_shape (θ : TypeArgs) : (shape : ResultShape) →
   | .none, _ => rfl
   | .one τ, value => NTy.toSkolem_ofSkolem θ τ value
 
-/-- Transport keeps a result's tables, their owners read at the type arguments. -/
-theorem ResultShape.tables_toSkolem (θ : TypeArgs) (prophecies : Bool) : (shape : ResultShape) →
-    (value : (shape.subst θ.1).carrier) →
-    (@ResultShape.tables (Skolems.instantiate θ Θ).toCarriers prophecies shape
-        (ResultShape.toSkolem θ shape value)).map (tableSubst θ) =
-      ResultShape.tables prophecies (shape.subst θ.1) value
-  | .none, _ => rfl
-  | .one τ, value => NTy.tables_toSkolem θ prophecies τ value
-
 theorem lendArguments_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow)
     (args : HList (NRow.subst θ.1 σs)) (loans : List Nat) :
     @lendArguments _ (Skolems.instantiate θ Θ) σs (HList.toSkolem θ σs args) loans =
@@ -682,17 +726,7 @@ theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit}
           (ResultShape.toSkolem θ shape value) loans := by
     conv => lhs; rw [← ResultShape.ofSkolem_toSkolem θ shape value]
     exact ResultShape.lend_ofSkolem θ free shape prophecies _ loans
-  -- The tables of transported values, their owners read at the type arguments.
-  have held (prophecies : Bool) (values : HList (NRow.subst θ.1 σs)) :=
-    HList.tables_toSkolem (Θ := Θ.toCarriers) θ prophecies σs values
-  have heldResult (prophecies : Bool)
-      (value : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
-      (@ResultShape.tables (Skolems.instantiate θ Θ).toCarriers prophecies shape value).map
-          (tableSubst θ) =
-        ResultShape.tables prophecies (shape.subst θ.1) (ResultShape.ofSkolem θ shape value) := by
-    rw [← ResultShape.tables_toSkolem (Θ := Θ) θ prophecies shape, NTy.toSkolem_ofSkolem_shape]
-  simp only [propheticRun, Spec.bind, Spec.pure, Encloses.instantiate, ReturnedEncloses.instantiate,
-    TableMemory.TablesIn.instantiate, List.map_append, held, heldResult]
+  simp only [propheticRun, Spec.bind, Spec.pure]
   congr 1
   · funext initial value final
     apply propext
@@ -702,8 +736,8 @@ theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit}
       refine ⟨ResultShape.toSkolem θ shape value, final,
         ⟨start, loans, arguments, results, exit, returnedLoans, prophecyRow, globals, admissible,
           by rw [lend]; exact lends, runs, by rw [← result]; exact lendsResult,
-          by rw [← result]; exact lendsProphecy, (resolve args loans _ _).mpr resolves,
-          by rw [ResultShape.ofSkolem_toSkolem]; exact encoded, agree⟩,
+          by rw [← result]; exact lendsProphecy, (resolve args loans _ _).mpr resolves, encoded,
+          agree⟩,
         (ResultShape.ofSkolem_toSkolem θ shape value).symm, rfl⟩
     · rintro ⟨value', middle, ⟨start, loans, arguments, results, exit, returnedLoans, prophecyRow,
         globals, admissible, lends, runs, lendsResult, lendsProphecy, resolves, encoded, agree⟩,
@@ -728,28 +762,22 @@ theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit}
     · rintro ⟨start, loans, arguments, results, exit, globals, admissible, lends, runs, unresolved⟩
       refine ⟨start, loans, arguments, results, exit, globals, admissible,
         by rw [lend]; exact lends, runs, ?_⟩
-      rintro ⟨value', returnedLoans, values, lendsResult, lendsProphecy, lendsValues, heldValues,
-        resolves, heldExit⟩
+      rintro ⟨value', returnedLoans, values, lendsResult, lendsProphecy, lendsValues, resolves⟩
       apply unresolved
       refine ⟨ResultShape.ofSkolem θ shape value', returnedLoans, HList.ofSkolem θ σs values,
-        ?_, ?_, ?_, ?_, ?_, ?_⟩
+        ?_, ?_, ?_, ?_⟩
       · rw [result, NTy.toSkolem_ofSkolem_shape]; exact lendsResult
       · rw [result, NTy.toSkolem_ofSkolem_shape]; exact lendsProphecy
       · rw [← lend, HList.toSkolem_ofSkolem]; exact lendsValues
-      · rw [← held, HList.toSkolem_ofSkolem]; exact heldValues
       · rw [← resolve, HList.toSkolem_ofSkolem]; exact resolves
-      · rw [← held, HList.toSkolem_ofSkolem]; exact heldExit
     · rintro ⟨start, loans, arguments, results, exit, globals, admissible, lends, runs, unresolved⟩
       refine ⟨start, loans, arguments, results, exit, globals, admissible,
         by rw [← lend]; exact lends, runs, ?_⟩
-      rintro ⟨value, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, heldValues,
-        resolves, heldExit⟩
+      rintro ⟨value, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, resolves⟩
       apply unresolved
       exact ⟨ResultShape.toSkolem θ shape value, returnedLoans, HList.toSkolem θ σs values,
         by rw [← result]; exact lendsResult, by rw [← result]; exact lendsProphecy,
-        by rw [lend]; exact lendsValues, by rw [held]; exact heldValues,
-        (resolve values loans _ _).mpr resolves,
-        by rw [held, ResultShape.ofSkolem_toSkolem]; exact heldExit⟩
+        by rw [lend]; exact lendsValues, (resolve values loans _ _).mpr resolves⟩
 
 /-- An invocation of a function value at the family a call's type arguments
 induce is its invocation at the caller's types, read in the callee's view. -/
@@ -773,20 +801,7 @@ theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
       @ResultShape.lend _ (Skolems.instantiate θ Θ) shape prophecies value loans =
         (shape.subst θ.1).lend prophecies (ResultShape.ofSkolem θ shape value) loans :=
     (ResultShape.lend_ofSkolem θ free shape prophecies value loans).symm
-  -- The tables of values read at the induced frame, their owners at the type
-  -- arguments, are those of the values read at the caller's frame.
-  have held (prophecies : Bool) (values : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
-      (@HList.tables (Skolems.instantiate θ Θ).toCarriers prophecies σs values).map (tableSubst θ) =
-        HList.tables prophecies (NRow.subst θ.1 σs) (HList.ofSkolem θ σs values) := by
-    rw [← HList.tables_toSkolem (Θ := Θ.toCarriers) θ prophecies σs, HList.toSkolem_ofSkolem]
-  have heldResult (prophecies : Bool)
-      (value : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
-      (@ResultShape.tables (Skolems.instantiate θ Θ).toCarriers prophecies shape value).map
-          (tableSubst θ) =
-        ResultShape.tables prophecies (shape.subst θ.1) (ResultShape.ofSkolem θ shape value) := by
-    rw [← ResultShape.tables_toSkolem (Θ := Θ) θ prophecies shape, NTy.toSkolem_ofSkolem_shape]
-  simp only [closureMeaning, Spec.bind, Spec.pure, Encloses.instantiate, ReturnedEncloses.instantiate,
-    TableMemory.TablesIn.instantiate, List.map_append, held, heldResult]
+  simp only [closureMeaning, Spec.bind, Spec.pure]
   congr 1
   · funext initial value final
     apply propext
@@ -804,11 +819,10 @@ theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
         prophecyRow, globals, admissible, lends, composes, runs, lendsResult, lendsProphecy,
         resolves, encoded, agree⟩, rfl, rfl⟩
       refine ⟨start, loans, supplied, arguments, results, exit, returnedLoans, prophecyRow, globals,
-        admissible, by rw [← lend]; exact lends, composes, runs, ?_, ?_, ?_, ?_, agree⟩
+        admissible, by rw [← lend]; exact lends, composes, runs, ?_, ?_, ?_, encoded, agree⟩
       · rw [result, ResultShape.ofSkolem_toSkolem]; exact lendsResult
       · rw [result, ResultShape.ofSkolem_toSkolem]; exact lendsProphecy
       · rw [← HList.toSkolem_ofSkolem θ σs args, resolve]; exact resolves
-      · rw [ResultShape.ofSkolem_toSkolem]; exact encoded
   · funext initial error
     apply propext
     try simp only [and_false, exists_false, or_false]
@@ -827,30 +841,24 @@ theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
         runs, unresolved⟩
       refine ⟨start, loans, supplied, arguments, results, exit, globals, admissible,
         by rw [lend]; exact lends, composes, runs, ?_⟩
-      rintro ⟨value', returnedLoans, values, lendsResult, lendsProphecy, lendsValues, heldValues,
-        resolves, heldExit⟩
+      rintro ⟨value', returnedLoans, values, lendsResult, lendsProphecy, lendsValues, resolves⟩
       apply unresolved
-      refine ⟨ResultShape.toSkolem θ shape value', returnedLoans, HList.toSkolem θ σs values,
+      exact ⟨ResultShape.toSkolem θ shape value', returnedLoans, HList.toSkolem θ σs values,
         by rw [result, ResultShape.ofSkolem_toSkolem]; exact lendsResult,
         by rw [result, ResultShape.ofSkolem_toSkolem]; exact lendsProphecy,
-        by rw [lendAt]; exact lendsValues, ?_, (resolve values loans _ _).mpr resolves, ?_⟩
-      · rw [HList.ofSkolem_toSkolem]; exact heldValues
-      · rw [HList.ofSkolem_toSkolem, ResultShape.ofSkolem_toSkolem]; exact heldExit
+        by rw [lendAt]; exact lendsValues, (resolve values loans _ _).mpr resolves⟩
     · rintro ⟨start, loans, supplied, arguments, results, exit, globals, admissible, lends, composes,
         runs, unresolved⟩
       refine ⟨start, loans, supplied, arguments, results, exit, globals, admissible,
         by rw [← lend]; exact lends, composes, runs, ?_⟩
-      rintro ⟨value, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, heldValues,
-        resolves, heldExit⟩
+      rintro ⟨value, returnedLoans, values, lendsResult, lendsProphecy, lendsValues, resolves⟩
       apply unresolved
       refine ⟨ResultShape.ofSkolem θ shape value, returnedLoans, HList.ofSkolem θ σs values,
-        ?_, ?_, ?_, ?_, ?_, ?_⟩
+        ?_, ?_, ?_, ?_⟩
       · rw [← result]; exact lendsResult
       · rw [← result]; exact lendsProphecy
       · rw [← lendAt, HList.toSkolem_ofSkolem]; exact lendsValues
-      · exact heldValues
       · rw [← resolve, HList.toSkolem_ofSkolem]; exact resolves
-      · exact heldExit
 
 /-- A contract at the frame type arguments induce, read in the caller's
 view. -/
@@ -922,7 +930,10 @@ theorem NTy.refFree_subst (θ : NRow) (free : θ.refFree = true) : (τ : NTy) �
       simp only [NTy.refFree, Bool.and_eq_true] at typeFree
       simp [NTy.refFree, NTy.refFree_subst θ free key typeFree.1,
         NTy.refFree_subst θ free value typeFree.2]
-  | .unit, _ | .bool, _ | .int _ _, _ | .address, _ | .signer, _ | .string, _ | .bytes, _
+  | .ghost slot, typeFree => by
+      simp only [NTy.refFree] at typeFree
+      simp only [NTy.refFree, NTy.refFree_subst θ free slot typeFree]
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _
   | .function _ _ _, _ => rfl
 
 theorem NRow.refFree_subst (θ : NRow) (free : θ.refFree = true) : (row : NRow) →
@@ -942,20 +953,6 @@ theorem NRows.refFree_subst (θ : NRow) (free : θ.refFree = true) : (rows : NRo
         NRows.refFree_subst θ free rest rowsFree.2, Bool.and_self]
 end
 
-/-- A type whose values lend as their encodings keeps that at reference-free
-type arguments. -/
-theorem NTy.lendsEncoded_subst (θ : TypeArgs) (free : θ.1.refFree = true) (τ : NTy)
-    (plain : τ.lendsEncoded = true) : (τ.subst θ.1).lendsEncoded = true := by
-  simp only [NTy.lendsEncoded, Bool.and_eq_true]
-  exact ⟨NTy.refFree_subst θ.1 free τ (NTy.refFree_of_lendsEncoded plain),
-    NTy.tableFree_subst θ τ (NTy.tableFree_of_lendsEncoded plain)⟩
-
-theorem NRow.lendsEncoded_subst (θ : TypeArgs) (free : θ.1.refFree = true) (row : NRow)
-    (plain : row.lendsEncoded = true) : (NRow.subst θ.1 row).lendsEncoded = true := by
-  simp only [NRow.lendsEncoded, Bool.and_eq_true]
-  exact ⟨NRow.refFree_subst θ.1 free row (NRow.refFree_of_lendsEncoded plain),
-    NRow.tableFree_subst θ row (NRow.tableFree_of_lendsEncoded plain)⟩
-
 /-- Invoking a known closure with type arguments is calling its target at the
 family they induce, read back in the caller's view, where that frame is
 coherent with the closure's instantiation: the form of a direct call with
@@ -963,7 +960,7 @@ type arguments. -/
 theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (θ : TypeArgs) (free : θ.1.refFree = true) {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (capturedPlain : captured.lendsEncoded = true)
+    (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
     (shape : ResultShape) (handle : FunctionHandle) (outer : Array (TypeId × TypeId))
     (typeArgs : Array TypeUse)
     (coherent : @Coherent unit (Skolems.instantiate θ Θ) handle
@@ -976,7 +973,7 @@ theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit
         fun result => Spec.pure (ResultShape.ofSkolem θ shape result) := by
   rw [closureOfGeneric, ← weave.mask_subst θ.1,
     closureMeaning_closureOf executable handle (weave.subst θ.1)
-      (NRow.lendsEncoded_subst θ free captured capturedPlain) _ captures,
+      (NRow.refFree_subst θ.1 free captured capturedFree) _ captures,
     propheticRun_subst executable _ handle θ free full shape]
   simp only [closedGeneric]
   rw [@propheticMeaning_of_coherent _ _ (Skolems.instantiate θ Θ) _ _ coherent]
@@ -989,7 +986,7 @@ direct call, whose callee theorem a proof applies. -/
 theorem closureMeaning_closureOf_nil {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit)
     (handle : FunctionHandle) {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (plain : captured.lendsEncoded = true)
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
     (captures : @HList (Carriers.runtime unit) captured) (shape : ResultShape)
     (args : @HList (Carriers.runtime unit) supplied) :
     letI : Skolems unit := Skolems.runtime unit
@@ -997,13 +994,11 @@ theorem closureMeaning_closureOf_nil {unit : VerexIR.Validation.ValidatedUnit}
       propheticMeaning executable #[] handle full shape (weave.compose captures args) := by
   letI : Skolems unit := Skolems.runtime unit
   rw [propheticMeaning_of_coherent (coherent_runtime unit handle)]
-  exact closureMeaning_closureOf executable handle weave plain #[] captures shape args
+  exact closureMeaning_closureOf executable handle weave free #[] captures shape args
 
 -- An invocation of a known closure is its target's call: the normalizer
--- weaves the arguments and decides that the captures hold no reference and
--- no map contents.
+-- weaves the arguments and decides that the captures hold no reference.
 attribute [vir_denote] closureMeaning_closureOf_nil Weave.compose Weave.subst NTy.refFree
-  NTy.lendsEncoded NRow.lendsEncoded NTy.tableFree NRow.tableFree NRows.tableFree
   NRow.refFree NRows.refFree
 
 -- An invocation inside a callee inlined at type arguments is the

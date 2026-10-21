@@ -1,4 +1,16 @@
 VerexE2ETests/SourceVerify/bounds_errors.spec.lean:17:3: error: the specification clause `ensures low <= result && result <= high` is not established
-VerexE2ETests/SourceVerify/bounds_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `clamp` failed; provide a proof: `verify clamp by …` in the module (`verify clamp by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/bounds_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `clamp` failed; provide a proof in the module:
+  verify clamp by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/bounds_errors.spec.lean:21:3: error: the specification clause `ensures slot == floor` is not established
-VerexE2ETests/SourceVerify/bounds_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `raise` failed; provide a proof: `verify raise by …` in the module (`verify raise by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/bounds_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `raise` failed; provide a proof in the module:
+  verify raise by
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -143,9 +143,20 @@ targetPointerWidth = true`: a theorem quantifying over a prepared unit gets
 the facts without kernel evaluation. A refused unit is not prepared
 (`VIR-STATIC-TYPE`, naming each failing node with its type and its
 operands'), and verification refuses to state theorems about it, which
-would be vacuous (`ensureUnitDefinition`).
+would be vacuous (`ensureUnitDefinition`). So it refuses a unit execution
+preparation rejects under every registry (`executionRefusals`, 2026-10-14):
+a node no registry runs, such as a mutable borrow of a computed value, or a
+call that does not resolve. A function the runtime provides, a native by
+the host or a table role by the map model (`BigStep.runtimeProvided`), has
+no body to prepare, and a declaration's field types matter only where a
+body builds or reads its values (a specification variable's ghost
+resource holds a number).
 
 Rules worth noting:
+
+- A shared borrow of a computed value (`&f(x).field`) is that value, as a
+  shared reference is the value it observes; the denotation reads it so too.
+  A mutable borrow of a computed value has no run.
 
 - An expression stops — it diverges (`diverts`: control transfer, a part
   evaluated first stopping, a loop no `break` targets) or has type `never`

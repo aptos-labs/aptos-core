@@ -79,7 +79,13 @@ verex module 0x42::state_label_call_observations where
 /--
 error: the specification clause `ensures result == 1` is not established
 ---
-error: verex verification failed: the automatic verification of `wrong_result` failed; provide a proof: `verify wrong_result by …` in the module (`verify wrong_result by verex_obligations` lists its obligations)
+error: verex verification failed: the automatic verification of `wrong_result` failed; provide a proof in the module:
+  verify wrong_result by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::state_label_call_observations::wrong_result

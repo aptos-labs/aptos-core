@@ -57,7 +57,7 @@ use aptos_crypto::{
     ValidCryptoMaterial, VerifyingKey,
 };
 use num_traits::Zero;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 

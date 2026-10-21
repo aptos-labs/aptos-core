@@ -6,22 +6,7 @@ import VerexMove.Proofs
 verex proofs for "simple_vector_client.move"
 verex proofs where
 
--- Keep literal list spines computational while preparing vector obligations.
--- These hints belong to this fixture; each theorem is kernel checked.
-@[vir_denote_norm] theorem literal_nil_append {α : Type} (xs : List α) :
-    [] ++ xs = xs := List.nil_append xs
-@[vir_denote_norm] theorem literal_cons_append {α : Type} (x : α) (xs ys : List α) :
-    (x :: xs) ++ ys = x :: (xs ++ ys) := rfl
-@[vir_denote_norm] theorem literal_length_cons {α : Type} (x : α) (xs : List α) :
-    (x :: xs).length = xs.length + 1 := rfl
-@[vir_denote_norm] theorem literal_length_nil {α : Type} :
-    ([] : List α).length = 0 := rfl
-@[vir_denote_norm] theorem literal_get_zero {α : Type} (x : α) (xs : List α) :
-    (x :: xs)[0] = x := rfl
-@[vir_denote_norm] theorem literal_get_succ {α : Type} (x : α) (xs : List α)
-    (i : Nat) (h : i + 1 < (x :: xs).length) :
-    (x :: xs)[i + 1] = xs[i]'(by simpa using h) := rfl
-
+-- Literal list normalization is supplied by the shared proof library.
 verify test_contains by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))

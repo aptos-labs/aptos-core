@@ -157,64 +157,28 @@ theorem GlobalMap.resolveReturned_plain (results : Array RuntimeValue)
 /-- Observe returned loan holes at the current or prophecy row supplied by a call. -/
 def RuntimeState.resolveReturned (results : Array RuntimeValue) (state : RuntimeState) :
     RuntimeState :=
-  { state with
-    globals := state.globals.resolveReturned results
-    tables := { state.tables with contents := state.tables.contents.resolveReturned results } }
+  { state with globals := state.globals.resolveReturned results }
 
 def Proofs.Denote.StorageEncodesReturned (unit : Validation.ValidatedUnit)
     (memory : Proofs.Denote.Memory unit) (state : RuntimeState)
     (results : Array RuntimeValue) : Prop :=
   Proofs.Denote.StorageEncodes unit memory (state.resolveReturned results)
 
-/-- A run's exit, its returned loans resolved at the row supplied: stores
-encoding the final memory, and the tables the results and the arguments'
-prophecies hold in native storage. -/
-def Proofs.Denote.ReturnedEncloses (unit : Validation.ValidatedUnit) [Proofs.Denote.Skolems unit]
-    (memory : Proofs.Denote.Memory unit) (state : RuntimeState) (results : Array RuntimeValue)
-    (tables : List (Proofs.Denote.NTy × String × RuntimeValue)) : Prop :=
-  Proofs.Denote.Encloses unit memory (state.resolveReturned results) tables
-
-theorem Proofs.Denote.ReturnedEncloses.stores {unit : Validation.ValidatedUnit}
-    [Proofs.Denote.Skolems unit] {memory : Proofs.Denote.Memory unit} {state : RuntimeState}
-    {results : Array RuntimeValue} {tables : List (Proofs.Denote.NTy × String × RuntimeValue)}
-    (held : Proofs.Denote.ReturnedEncloses unit memory state results tables) :
-    Proofs.Denote.StorageEncodesReturned unit memory state results :=
-  Proofs.Denote.Encloses.stores held
-
-theorem Proofs.Denote.ReturnedEncloses.of_nil {unit : Validation.ValidatedUnit}
-    [Proofs.Denote.Skolems unit] {memory : Proofs.Denote.Memory unit} {state : RuntimeState}
-    {results : Array RuntimeValue}
-    (stores : Proofs.Denote.StorageEncodesReturned unit memory state results)
-    {tables : List (Proofs.Denote.NTy × String × RuntimeValue)} (nil : tables = []) :
-    Proofs.Denote.ReturnedEncloses unit memory state results tables :=
-  Proofs.Denote.Encloses.of_nil stores nil
-
-theorem Proofs.Denote.ReturnedEncloses.instantiate {unit : Validation.ValidatedUnit}
-    (θ : Proofs.Denote.TypeArgs) (Θ : Proofs.Denote.Skolems unit) (memory : Proofs.Denote.Memory unit)
-    (state : RuntimeState) (results : Array RuntimeValue)
-    (tables : List (Proofs.Denote.NTy × String × RuntimeValue)) :
-    @Proofs.Denote.ReturnedEncloses unit (Proofs.Denote.Skolems.instantiate θ Θ) memory state results
-        tables ↔
-      @Proofs.Denote.ReturnedEncloses unit Θ memory state results
-        (tables.map (Proofs.Denote.tableSubst θ)) :=
-  Proofs.Denote.Encloses.instantiate θ Θ memory (state.resolveReturned results) tables
-
 theorem RuntimeState.resolveReturned_plain (results : Array RuntimeValue)
     (plain : ∀ result ∈ results, Plain result) (state : RuntimeState) :
     state.resolveReturned results = state := by
   simp only [RuntimeState.resolveReturned, GlobalMap.resolveReturned_plain results plain]
 
+@[simp] theorem RuntimeState.tableHandles_resolveReturned (results : Array RuntimeValue)
+    (state : RuntimeState) : (state.resolveReturned results).tableHandles = state.tableHandles :=
+  rfl
+
 /-- Resolving returned loans commutes with renaming them. -/
 theorem RuntimeState.resolveReturned_rename {ρ : Nat → Nat} (injective : Function.Injective ρ)
     {state state' : RuntimeState} (globals : state'.globals = state.globals.rename ρ)
-    (tables : state'.tables = state.tables.rename ρ) (results : Array RuntimeValue) :
+    (results : Array RuntimeValue) :
     (state'.resolveReturned (results.map (·.rename ρ))).globals =
-        (state.resolveReturned results).globals.rename ρ ∧
-    (state'.resolveReturned (results.map (·.rename ρ))).tables =
-        (state.resolveReturned results).tables.rename ρ := by
-  constructor
-  · simp only [RuntimeState.resolveReturned, globals, GlobalMap.resolveReturned_rename injective]
-  · simp only [RuntimeState.resolveReturned, tables, NativeTableStorage.rename,
-      GlobalMap.resolveReturned_rename injective]
+      (state.resolveReturned results).globals.rename ρ := by
+  simp only [RuntimeState.resolveReturned, globals, GlobalMap.resolveReturned_rename injective]
 
 end VerexIR
