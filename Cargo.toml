@@ -749,7 +749,7 @@ plotters = { version = "0.3.5", default-features = false }
 poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
-pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
+pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 prettydiff = "0.6.2"
@@ -1025,3 +1025,9 @@ ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+
+# `aptos-indexer-processor-sdk` pins an old aptos-core revision whose
+# `aptos-profiler` uses pprof 0.11. Linking it together with our pprof 0.15
+# fails on a duplicate `perf_signal_handler` symbol.
+[patch."https://github.com/aptos-labs/aptos-core.git"]
+aptos-system-utils = { path = "crates/aptos-system-utils" }
