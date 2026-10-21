@@ -21,7 +21,9 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, Result,
+    db_ensure as ensure,
+    state_store::{state::LedgerState, state_update_refs::StateUpdateRefs},
+    Result,
 };
 use aptos_types::{
     account_config::new_block_event_key,
@@ -126,7 +128,7 @@ pub(crate) fn save_transactions(
         &mut ShardedStateKvSchemaBatch,
         &mut SchemaBatch,
     )>,
-    kv_replay: bool,
+    kv_replay_state: Option<&mut LedgerState>,
 ) -> Result<()> {
     if let Some((ledger_db_batch, state_kv_batches, _state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
@@ -140,7 +142,7 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             ledger_db_batch,
             state_kv_batches,
-            kv_replay,
+            kv_replay_state,
         )?;
     } else {
         let mut ledger_db_batch = LedgerDbSchemaBatches::new();
@@ -159,7 +161,7 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             &mut ledger_db_batch,
             &mut sharded_kv_schema_batch,
-            kv_replay,
+            kv_replay_state,
         )?;
         // get the last version and commit to the state kv db
         // commit the state kv before ledger in case of failure happens
@@ -201,7 +203,7 @@ pub(crate) fn save_transactions_impl(
     write_sets: &[WriteSet],
     ledger_db_batch: &mut LedgerDbSchemaBatches,
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
-    kv_replay: bool,
+    kv_replay_state: Option<&mut LedgerState>,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
         ledger_db.transaction_db().put_transaction(
@@ -264,14 +266,16 @@ pub(crate) fn save_transactions_impl(
         )?;
     }
 
-    if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        let (ledger_state, _hot_state_updates) = state_store.calculate_state_and_put_updates(
+    if let Some(state) = kv_replay_state
+        && first_version > 0
+        && state_store.get_usage(Some(first_version - 1)).is_ok()
+    {
+        *state = state_store.replay_kv(
+            state,
             &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), vec![]),
             &mut ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
         )?;
-        // n.b. ideally this is set after the batches are committed
-        state_store.set_state_ignoring_summary(ledger_state);
     }
 
     let last_version = first_version + txns.len() as u64 - 1;

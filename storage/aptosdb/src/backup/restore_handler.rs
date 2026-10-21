@@ -10,8 +10,13 @@ use crate::{
     state_store::StateStore,
     AptosDB,
 };
+use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
-use aptos_storage_interface::{AptosDbError, DbReader, Result};
+use aptos_infallible::Mutex;
+use aptos_storage_interface::{
+    state_store::state::{LedgerState, State},
+    AptosDbError, DbReader, Result,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -28,6 +33,8 @@ pub struct RestoreHandler {
     pub aptosdb: Arc<AptosDB>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
+    /// State advanced by KV replay. It has no summary or hot state since KV replay skips both.
+    kv_replay_state: Arc<Mutex<Option<LedgerState>>>,
 }
 
 impl RestoreHandler {
@@ -36,6 +43,7 @@ impl RestoreHandler {
             ledger_db: Arc::clone(&aptosdb.ledger_db),
             aptosdb,
             state_store,
+            kv_replay_state: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -128,12 +136,15 @@ impl RestoreHandler {
             events,
             write_sets,
             None,
-            false,
+            None,
         )
     }
 
     pub fn force_state_version_for_kv_restore(&self, version: Option<Version>) -> Result<()> {
-        self.state_store.init_state_ignoring_summary(version)
+        let usage = self.state_store.get_usage(version)?;
+        let state = State::new_at_version(version, usage, HotStateConfig::default());
+        *self.kv_replay_state.lock() = Some(LedgerState::new(state.clone(), state));
+        Ok(())
     }
 
     pub fn save_transactions_and_replay_kv(
@@ -145,6 +156,14 @@ impl RestoreHandler {
         events: &[Vec<ContractEvent>],
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
+        let mut kv_replay_state = self.kv_replay_state.lock();
+        let state = kv_replay_state.as_mut().ok_or_else(|| {
+            AptosDbError::Other(
+                "KV replay must start with force_state_version_for_kv_restore.".to_string(),
+            )
+        })?;
+        // Advance the state only once the chunk is committed.
+        let mut new_state = state.clone();
         restore_utils::save_transactions(
             self.state_store.clone(),
             self.ledger_db.clone(),
@@ -155,8 +174,10 @@ impl RestoreHandler {
             events,
             write_sets,
             None,
-            true,
-        )
+            Some(&mut new_state),
+        )?;
+        *state = new_state;
+        Ok(())
     }
 
     pub fn get_next_expected_transaction_version(&self) -> Result<Version> {
