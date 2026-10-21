@@ -573,19 +573,20 @@ impl TransactionRestoreBatchController {
         let arc_restore_handler = Arc::new(restore_handler.clone());
 
         let db_commit_stream = txns_to_execute_stream
-            .try_chunks(BATCH_SIZE)
-            .err_into::<anyhow::Error>()
-            .map_ok(|chunk| {
-                // A batch must not span an epoch boundary.
-                stream::iter(
-                    split_at_epoch_endings(chunk, |(.., events)| {
-                        events.iter().any(ContractEvent::is_new_epoch_event)
-                    })
-                    .into_iter()
-                    .map(Result::<_>::Ok),
-                )
+            .map_ok(Some)
+            .chain(stream::once(future::ok(None)))
+            .scan(BlockBatcher::new(BATCH_SIZE), |batcher, txn| {
+                future::ready(Some(txn.map(|txn| match txn {
+                    Some(txn) => {
+                        let (_, _, txn_info, _, events) = &txn;
+                        let ends_block = txn_info.has_state_checkpoint_hash();
+                        let ends_epoch = events.iter().any(ContractEvent::is_new_epoch_event);
+                        batcher.push(txn, ends_block, ends_epoch)
+                    },
+                    None => batcher.finish(),
+                })))
             })
-            .try_flatten()
+            .try_filter_map(future::ok)
             .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
@@ -808,39 +809,54 @@ impl TransactionRestoreBatchController {
     }
 }
 
-/// Split a batch so no piece crosses an epoch boundary: an epoch-ending txn ends
-/// its piece. KV replay persists `VersionData` only at each piece's last version,
-/// which the first txn of the next epoch reads via `state_storage::on_new_block`.
-fn split_at_epoch_endings<T>(items: Vec<T>, ends_epoch: impl Fn(&T) -> bool) -> Vec<Vec<T>> {
-    let mut batches = Vec::new();
-    let mut batch = Vec::new();
-    for item in items {
-        let ends = ends_epoch(&item);
-        batch.push(item);
-        if ends {
-            batches.push(std::mem::take(&mut batch));
+/// Groups txns into KV replay batches of whole blocks, so the ledger state is at a checkpoint
+/// after each batch. A batch ends at the first block end once it has `min_size` txns, or at an
+/// epoch end: KV replay persists `VersionData` at batch ends, and the first txn of the next epoch
+/// reads it via `state_storage::on_new_block`.
+struct BlockBatcher<T> {
+    min_size: usize,
+    batch: Vec<T>,
+}
+
+impl<T> BlockBatcher<T> {
+    fn new(min_size: usize) -> Self {
+        Self {
+            min_size,
+            batch: Vec::new(),
         }
     }
-    if !batch.is_empty() {
-        batches.push(batch);
+
+    /// Returns the batch `txn` completes, if any.
+    fn push(&mut self, txn: T, ends_block: bool, ends_epoch: bool) -> Option<Vec<T>> {
+        self.batch.push(txn);
+        (ends_epoch || ends_block && self.batch.len() >= self.min_size)
+            .then(|| std::mem::take(&mut self.batch))
     }
-    batches
+
+    /// Returns what's left at the end of the input, which is a partial block only if the restore
+    /// target is in the middle of one.
+    fn finish(&mut self) -> Option<Vec<T>> {
+        (!self.batch.is_empty()).then(|| std::mem::take(&mut self.batch))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{split_at_epoch_endings, TransactionRestoreBatchController};
+    use super::{BlockBatcher, TransactionRestoreBatchController, BATCH_SIZE};
     use crate::{
         storage::local_fs::LocalFs,
         utils::{GlobalRestoreOptions, RestoreRunMode},
     };
     use aptos_db::{get_restore_handler::GetRestoreHandler, AptosDB};
-    use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl_inner;
+    use aptos_executor_test_helpers::{
+        bootstrap_genesis, integration_test_impl::test_execution_with_storage_impl_inner,
+    };
     use aptos_executor_types::VerifyExecutionMode;
-    use aptos_storage_interface::DbReader;
+    use aptos_storage_interface::{DbReader, DbReaderWriter};
     use aptos_temppath::TempPath;
+    use aptos_vm::aptos_vm::AptosVMBlockExecutor;
     use futures::stream;
-    use itertools::izip;
+    use itertools::{izip, Itertools};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -908,16 +924,127 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_split_at_epoch_endings() {
-        // A negative number marks an epoch-ending item.
-        let split = |items: Vec<i32>| split_at_epoch_endings(items, |v| *v < 0);
+    #[tokio::test]
+    async fn test_replay_kv_on_block_boundaries() {
+        let source_path = TempPath::new();
+        let source = test_execution_with_storage_impl_inner(false, source_path.path());
+        let last_version = source.expect_synced_version();
+        let (outputs, persisted_aux_info) = source
+            .get_transaction_outputs(0, last_version + 1, last_version)
+            .unwrap()
+            .into_parts();
+        let mut transactions = izip!(
+            outputs.transactions_and_outputs,
+            persisted_aux_info,
+            outputs.proof.transaction_infos,
+        )
+        .map(|((transaction, output), aux_info, info)| {
+            (
+                transaction,
+                aux_info,
+                info,
+                output.write_set().clone(),
+                output.events().to_vec(),
+            )
+        });
+        let (genesis, ..) = transactions.next().unwrap();
+        let transactions: Vec<_> = transactions.collect();
+        // Multiple blocks, some larger than `BATCH_SIZE`.
+        let block_ends: Vec<_> = transactions
+            .iter()
+            .positions(|(_, _, info, ..)| info.has_state_checkpoint_hash())
+            .collect();
+        assert!(block_ends.len() > 1);
+        assert!(block_ends[0] + 1 > BATCH_SIZE);
 
-        assert!(split(vec![]).is_empty());
-        assert_eq!(split(vec![1, 2, 3]), vec![vec![1, 2, 3]]);
-        assert_eq!(split(vec![1, -2, 3]), vec![vec![1, -2], vec![3]]);
-        // An epoch ending at the end must not yield a trailing empty batch.
-        assert_eq!(split(vec![1, 2, -3]), vec![vec![1, 2, -3]]);
-        assert_eq!(split(vec![-1, -2]), vec![vec![-1], vec![-2]]);
+        // Usage at the version before KV replay starts is required, as with a KV snapshot.
+        let target_path = TempPath::new();
+        let target = Arc::new(AptosDB::new_for_test(target_path.path()));
+        bootstrap_genesis::<AptosVMBlockExecutor>(
+            &DbReaderWriter::from_arc(Arc::clone(&target)),
+            &genesis,
+        )
+        .unwrap();
+        let restore_handler = target.get_restore_handler();
+        let backup_path = TempPath::new();
+        let controller = TransactionRestoreBatchController::new(
+            GlobalRestoreOptions {
+                target_version: last_version,
+                trusted_waypoints: Arc::new(Default::default()),
+                run_mode: Arc::new(RestoreRunMode::Restore {
+                    restore_handler: restore_handler.clone(),
+                }),
+                concurrent_downloads: 1,
+                replay_concurrency_level: 1,
+            },
+            Arc::new(LocalFs::new(backup_path.path().to_path_buf())),
+            vec![],
+            None,
+            Some((1, true)),
+            None,
+            VerifyExecutionMode::NoVerify,
+            None,
+        );
+        controller
+            .replay_kv(
+                &restore_handler,
+                stream::iter(transactions.iter().cloned().map(Ok)),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(target.expect_synced_version(), last_version);
+        assert_eq!(
+            target.get_latest_state_checkpoint_version().unwrap(),
+            Some(last_version),
+        );
+        // The source committed one block at a time, so it has usage at every block end and
+        // nowhere else.
+        for version in 0..=last_version {
+            assert_eq!(
+                target.get_state_storage_usage(Some(version)).ok(),
+                source.get_state_storage_usage(Some(version)).ok(),
+                "version {version}",
+            );
+        }
+        for (_, _, _, write_set, _) in &transactions {
+            for (key, _) in write_set.write_op_iter() {
+                assert_eq!(
+                    target
+                        .get_state_value_by_version(key, last_version)
+                        .unwrap(),
+                    source
+                        .get_state_value_by_version(key, last_version)
+                        .unwrap(),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_block_batcher() {
+        // `|` marks a block end, `!` an epoch end, which is also a block end.
+        let batch = |txns: &str, min_size| {
+            let mut batcher = BlockBatcher::new(min_size);
+            let mut batches: Vec<String> = txns
+                .chars()
+                .filter_map(|c| batcher.push(c, matches!(c, '|' | '!'), c == '!'))
+                .map(String::from_iter)
+                .collect();
+            batches.extend(batcher.finish().map(String::from_iter));
+            batches
+        };
+
+        assert!(batch("", 2).is_empty());
+        assert_eq!(batch("a|bc|", 1), vec!["a|", "bc|"]);
+        // A batch extends to the first block end once it has the min size.
+        assert_eq!(batch("a|b|c|", 3), vec!["a|b|", "c|"]);
+        assert_eq!(batch("abc|de|", 2), vec!["abc|", "de|"]);
+        // An epoch end always ends a batch.
+        assert_eq!(batch("a!b|c|", 4), vec!["a!", "b|c|"]);
+        assert_eq!(batch("!!", 4), vec!["!", "!"]);
+        // What's left at the end of the input is flushed.
+        assert_eq!(batch("ab|cd", 2), vec!["ab|", "cd"]);
+        assert_eq!(batch("ab", 1), vec!["ab"]);
     }
 }
