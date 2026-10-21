@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `h` may modify: the closure's effects are not known
+   ┌─ tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:32:9
+   │
+32 │         op(|y| g(f0, y), before + 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `h` may modify: the closure's effects are not known
+   ┌─ tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:58:9
+   │
+58 │         op(|y| apply(w, y), before + 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
