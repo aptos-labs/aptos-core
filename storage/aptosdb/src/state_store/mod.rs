@@ -65,7 +65,7 @@ use aptos_storage_interface::{
             cached_state_view::{ShardedStateCache, StateCacheShard},
             hot_state_view::{EmptyHotState, HotStateView},
         },
-        state_with_summary::LedgerStateWithSummary,
+        state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
         HotStateShardUpdates, HotStateUpdates,
     },
@@ -812,9 +812,8 @@ impl LiveState {
             SparseMerkleTree::new(latest_snapshot_root_hash),
             hot_state_config,
         );
-        let persisted_state = PersistedState::new_empty(hot_state_config);
-        // Install before starting the snapshot pipeline so its commits use the loaded base.
-        let last_snapshot = persisted_state.install_snapshot(hot_state, summary);
+        let last_snapshot = StateWithSummary::new(hot_state.state().clone(), summary.clone());
+        let persisted_state = PersistedState::new(hot_state, summary);
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_at_checkpoint(
             last_snapshot.clone(),
         )));

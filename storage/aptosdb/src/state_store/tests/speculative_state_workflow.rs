@@ -898,8 +898,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
     let empty = LedgerStateWithSummary::new_empty(TEST_CONFIG);
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
-    let persisted_state = PersistedState::new_empty(TEST_CONFIG);
-    persisted_state.install_snapshot(
+    let persisted_state = PersistedState::new(
         LoadedHotState::empty(empty.state().clone()),
         empty.summary().clone(),
     );
