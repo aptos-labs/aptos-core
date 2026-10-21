@@ -656,7 +656,7 @@ generic-array = { version = "0.14.7", features = ["serde"] }
 get-size = { version = "0.1.4", features = ["derive"] }
 get_if_addrs = "0.5.3"
 getrandom = "0.2.2"
-git2 = "0.16.1"
+git2 = { version = "0.21.0", features = ["https", "ssh"] }
 glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
@@ -731,7 +731,7 @@ opentelemetry = { version = "0.27.0", features = ["trace"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
 ordered-float = "3.9.1"
-ouroboros = "0.15.6"
+ouroboros = "0.18.5"
 owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
 pairing = "0.23"
@@ -749,7 +749,7 @@ plotters = { version = "0.3.5", default-features = false }
 poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
-pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
+pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 prettydiff = "0.6.2"
@@ -790,7 +790,7 @@ reqwest = { version = "0.11.11", features = [
 ] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
-ring = { version = "0.16.20", features = ["std"] }
+ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
@@ -820,7 +820,7 @@ sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
-shadow-rs = "0.16.2"
+shadow-rs = "2.0.0"
 shell-words = "1.0.0"
 signature = "2.1.0"
 siphasher = "0.3.10"
