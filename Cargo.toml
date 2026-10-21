@@ -731,7 +731,7 @@ opentelemetry = { version = "0.27.0", features = ["trace"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
 ordered-float = "3.9.1"
-ouroboros = "0.15.6"
+ouroboros = "0.18.5"
 owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
 pairing = "0.23"
