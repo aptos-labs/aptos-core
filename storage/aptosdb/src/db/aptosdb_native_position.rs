@@ -5,7 +5,7 @@ use crate::{
     db::AptosDB,
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
     native_state_reader::InMemoryNativeStateReader,
-    native_state_store::{position_key_of, PositionBase, PositionOverlay, PositionWrites},
+    native_state_store::{decode_position_writes, PositionBase, PositionOverlay, PositionWrites},
     native_store::{
         buffered_state::{
             native_state_at_version, new_empty_native_state, NativePersistedState,
@@ -19,6 +19,7 @@ use crate::{
         state_sync::NativeStoreReader,
         PositionStore,
     },
+    position_metrics::{POSITION_BASE_LAG_VERSIONS, POSITION_OVERLAY_LAYERS},
     utils::truncation_helper::{
         get_native_commit_progress, truncate_native_kv_db_shards, truncate_native_merkle_db,
     },
@@ -39,10 +40,13 @@ use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
-    state_store::{native_position::NativePosition, state_value::StateValue},
-    transaction::Version,
+    state_store::state_value::StateValue, transaction::Version, write_set::WriteSet,
 };
 use std::{collections::HashMap, sync::Arc};
+
+/// Metric label of the position index's layers, apart from the position
+/// JMT pipeline's (`PositionStore::NAME`).
+const POSITION_INDEX_FAMILY: &str = "position_index";
 
 pub struct PositionBundle {
     pub(crate) kv_db: Arc<PositionDb>,
@@ -85,6 +89,18 @@ pub struct PositionBundle {
 }
 
 impl AptosDB {
+    /// Sets the overlay depth gauges from the published tip and the base.
+    pub(crate) fn observe_position_overlay(&self) {
+        let Some(bundle) = self.position.as_ref() else {
+            return;
+        };
+        let tip = bundle.positions.lock();
+        let floor = bundle.position_base.layers();
+        let base_next_version = bundle.position_base.version().map_or(0, |v| v + 1);
+        POSITION_OVERLAY_LAYERS.set(tip.layers_above(&floor) as i64);
+        POSITION_BASE_LAG_VERSIONS.set(tip.next_version().saturating_sub(base_next_version) as i64);
+    }
+
     pub fn position(&self) -> Option<&Arc<PositionBundle>> {
         self.position.as_ref()
     }
@@ -163,7 +179,12 @@ impl AptosDB {
         // (truncating ahead-of-chain rows from a crash) and find the
         // latest JMT snapshot at or before that point.
         let merkle_progress = if readonly {
-            None
+            let ceiling = self
+                .ledger_db
+                .metadata_db()
+                .get_synced_version()?
+                .unwrap_or(Version::MAX);
+            merkle_db.latest_snapshot_version_at_or_before(ceiling)?
         } else {
             self.sync_position_commit_progress(&position_db, &merkle_db)?
         };
@@ -183,7 +204,11 @@ impl AptosDB {
                     snapshot_version,
                     0,
                 )?;
-                let base = PositionBase::new_from_rows(Some(snapshot_version), "position", iter)?;
+                let base = PositionBase::new_from_rows(
+                    Some(snapshot_version),
+                    POSITION_INDEX_FAMILY,
+                    iter,
+                )?;
                 info!(
                     snapshot_version = snapshot_version,
                     n_accounts = base.read(|view| view.num_accounts()),
@@ -191,7 +216,7 @@ impl AptosDB {
                 );
                 base
             },
-            None => PositionBase::new_empty("position"),
+            None => PositionBase::new_empty(POSITION_INDEX_FAMILY),
         };
         let position_base = Arc::new(position_base);
         let positions = Arc::new(Mutex::new(position_base.new_overlay()));
@@ -247,7 +272,9 @@ impl AptosDB {
             persisted,
         }));
 
-        if !readonly && !for_restore {
+        if readonly {
+            self.catch_up_readonly_positions(merkle_progress)?;
+        } else if !for_restore {
             self.catch_up_position_store(merkle_progress)?;
             self.ensure_position_root_matches_ledger()?;
         }
@@ -295,6 +322,56 @@ impl AptosDB {
             )?;
         }
         Ok(())
+    }
+
+    /// Readonly counterpart of `catch_up_position_store`: replays the tail
+    /// past the snapshot into the overlay only, writing nothing. Main state
+    /// needs no such step readonly because its reads go to the DB by version;
+    /// the position index is resident, so without it the tail is missing.
+    fn catch_up_readonly_positions(&self, snapshot_version: Option<Version>) -> Result<()> {
+        let Some(bundle) = self.position.as_ref() else {
+            return Ok(());
+        };
+        let Some(v_overall) = self.ledger_db.metadata_db().get_synced_version()? else {
+            return Ok(());
+        };
+        let snapshot_next_version = snapshot_version.map_or(0, |v| v + 1);
+        if get_native_commit_progress(&bundle.kv_db)?.is_none() || snapshot_next_version > v_overall
+        {
+            return Ok(());
+        }
+        let write_sets =
+            self.position_write_sets_after_snapshot(snapshot_next_version, v_overall + 1)?;
+        let (writes, _leaves) = position_writes_and_leaves(&write_sets)?;
+        if !writes.is_empty() {
+            let mut positions = bundle.positions.lock();
+            *positions = positions.extend(&bundle.position_base.layers(), v_overall, writes);
+        }
+        Ok(())
+    }
+
+    /// Write sets in `[snapshot_next_version, num_transactions)`, for replaying
+    /// past a position snapshot. Both replays materialize the whole gap, so it
+    /// is bounded like main state's `MAX_WRITE_SETS_AFTER_SNAPSHOT`. With no
+    /// snapshot the gap starts at version 0, i.e. the entire history.
+    pub(crate) fn position_write_sets_after_snapshot(
+        &self,
+        snapshot_next_version: Version,
+        num_transactions: Version,
+    ) -> Result<Vec<WriteSet>> {
+        let gap = num_transactions.saturating_sub(snapshot_next_version);
+        ensure!(
+            gap <= MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
+            "Too many versions to replay after position snapshot. snapshot_next_version: {}, \
+             num_transactions: {}, gap: {}, max: {}",
+            snapshot_next_version,
+            num_transactions,
+            gap,
+            MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
+        );
+        self.ledger_db
+            .write_set_db()
+            .get_write_sets(snapshot_next_version, num_transactions)
     }
 
     /// Bring the position store up to the ledger after a restore saved
@@ -396,9 +473,11 @@ impl AptosDB {
                 NodeKey::new_empty_path(version),
                 Node::Null,
             )]))?;
-            bundle
-                .position_base
-                .reset_from_rows(Some(version), "position", std::iter::empty())?;
+            bundle.position_base.reset_from_rows(
+                Some(version),
+                POSITION_INDEX_FAMILY,
+                std::iter::empty(),
+            )?;
         } else {
             ensure!(
                 bundle
@@ -421,7 +500,7 @@ impl AptosDB {
             )?;
             bundle
                 .position_base
-                .reset_from_rows(Some(version), "position", rows)?;
+                .reset_from_rows(Some(version), POSITION_INDEX_FAMILY, rows)?;
         }
         *tip = bundle.position_base.new_overlay();
         drop(tip);
@@ -533,34 +612,12 @@ impl AptosDB {
             "Replaying position write sets to catch up the in-memory pipeline."
         );
 
-        // Same guard main state applies via `MAX_WRITE_SETS_AFTER_SNAPSHOT`:
-        // the replay path materializes every write set in the gap
-        // into one `Vec`, so unbounded gaps are an OOM risk. A node
-        // enabling trading-native before its first position snapshot
-        // (merkle_progress == None ⇒ snapshot_next_version == 0)
-        // against a long-running chain would otherwise pull the
-        // entire history.
-        let gap = num_transactions.saturating_sub(snapshot_next_version);
-        ensure!(
-            gap <= MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
-            "Too many versions to replay after position snapshot. snapshot_next_version: {}, \
-             num_transactions: {}, gap: {}, max: {}",
-            snapshot_next_version,
-            num_transactions,
-            gap,
-            MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
-        );
-
-        let write_sets = self
-            .ledger_db
-            .write_set_db()
-            .get_write_sets(snapshot_next_version, num_transactions)?;
+        let write_sets =
+            self.position_write_sets_after_snapshot(snapshot_next_version, num_transactions)?;
 
         let committer = NativeStateCommitter::new(Arc::clone(kv_db));
         let mut sharded_kv_batches = new_sharded_kv_batches();
         let mut in_chunk_prior = InChunkPriorVersions::new();
-        let mut pending_leaf_updates: HashMap<HashValue, PositionSlot> = HashMap::new();
-        let mut pending_position_writes = PositionWrites::new();
         for (version, write_set) in (snapshot_next_version..).zip(&write_sets) {
             if version > kv_progress {
                 committer.apply(
@@ -572,26 +629,9 @@ impl AptosDB {
                     &mut in_chunk_prior,
                 )?;
             }
-            for (key, op) in write_set.native_position_iter() {
-                let maybe_value = op.as_write_op().as_state_value_opt().cloned();
-                let value_hash = maybe_value.as_ref().map(StateValue::hash);
-                let position_key = position_key_of(key)?;
-                let typed = match maybe_value.as_ref() {
-                    Some(sv) => Some(NativePosition::deserialize(sv.bytes()).map_err(|e| {
-                        AptosDbError::Other(format!(
-                            "position value decode failed during replay: {e}"
-                        ))
-                    })?),
-                    None => None,
-                };
-                pending_leaf_updates.insert(key.hash(), PositionSlot {
-                    state_key: key.clone(),
-                    value_hash,
-                    value: None,
-                });
-                pending_position_writes.push((position_key, typed));
-            }
         }
+        let (pending_position_writes, pending_leaf_updates) =
+            position_writes_and_leaves(&write_sets)?;
 
         let target_version = num_transactions - 1;
         if target_version > kv_progress {
@@ -642,4 +682,28 @@ impl AptosDB {
         )?;
         Ok(())
     }
+}
+
+/// The position ops of `write_sets`, in order, as overlay writes, plus the
+/// latest-wins JMT leaf update per key.
+fn position_writes_and_leaves(
+    write_sets: &[WriteSet],
+) -> Result<(PositionWrites, HashMap<HashValue, PositionSlot>)> {
+    let ops: Vec<_> = write_sets
+        .iter()
+        .flat_map(WriteSet::native_position_iter)
+        .map(|(key, op)| (key, op.as_write_op().as_state_value_opt()))
+        .collect();
+    let writes = decode_position_writes(ops.iter().copied())?;
+    let leaves = ops
+        .into_iter()
+        .map(|(key, value)| {
+            (key.hash(), PositionSlot {
+                state_key: key.clone(),
+                value_hash: value.map(StateValue::hash),
+                value: None,
+            })
+        })
+        .collect();
+    Ok((writes, leaves))
 }

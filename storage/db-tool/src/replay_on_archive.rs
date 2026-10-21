@@ -21,10 +21,11 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    on_chain_config::{Features, OnChainConfig},
     state_store::NUM_STATE_SHARDS,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, Version,
     },
     write_set::WriteSet,
 };
@@ -441,19 +442,33 @@ impl Verifier {
                 .map(|info| AuxiliaryInfo::new(*info, None))
                 .collect(),
         );
-        let executed_outputs = executor
+        let state_view = self
+            .arc_db
+            .state_view_at_version(current_version.checked_sub(1))?;
+        // Batches end at epoch boundaries, so the parent state's features apply to all of them.
+        let onchain_config = match Features::fetch_config(&state_view)? {
+            Some(features) => {
+                BlockExecutorConfigFromOnchain::new_no_block_limit().with_features(&features)
+            },
+            None => BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        };
+        let mut executed_outputs = executor
             .execute_block(
                 &txns_provider,
-                &self
-                    .arc_db
-                    .state_view_at_version(current_version.checked_sub(1))?,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
+                &state_view,
+                onchain_config,
                 TransactionSliceMetadata::Chunk {
                     begin: *current_version,
                     end: *current_version + cur_txns.len() as u64,
                 },
             )
             .map(BlockOutput::into_transaction_outputs_forced)?;
+        // Same as `DoGetExecutionOutput`, which produced the committed write set hashes.
+        if onchain_config.hotness_in_epilogue() {
+            executed_outputs
+                .iter_mut()
+                .for_each(TransactionOutput::convert_write_set_to_v1);
+        }
         assert_eq!(executed_outputs.len(), cur_txns.len());
 
         for idx in 0..cur_txns.len() {
