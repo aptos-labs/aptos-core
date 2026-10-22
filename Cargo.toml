@@ -656,7 +656,7 @@ generic-array = { version = "0.14.7", features = ["serde"] }
 get-size = { version = "0.1.4", features = ["derive"] }
 get_if_addrs = "0.5.3"
 getrandom = "0.2.2"
-git2 = "0.16.1"
+git2 = { version = "0.21.0", features = ["https", "ssh"] }
 glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
@@ -820,7 +820,7 @@ sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
-shadow-rs = "0.16.2"
+shadow-rs = { version = "0.36.1", default-features = false, features = ["tzdb"] }
 shell-words = "1.0.0"
 signature = "2.1.0"
 siphasher = "0.3.10"
