@@ -5,7 +5,7 @@
 
 //! This module defines traits and representations of domains used in dataflow analysis.
 
-use im::{ordmap, ordset, OrdMap, OrdSet};
+use imbl::{ordmap, ordset, OrdMap, OrdSet};
 use itertools::Itertools;
 use std::{
     borrow::Borrow,
@@ -65,8 +65,8 @@ impl AbstractDomain for bool {
 // ================================================================================================
 // Predefined Domain Types
 
-// As the underlying implementation of the below types we use the collections from the `im`(mutable)
-// crate (`im::OrdSet` and `im::OrdMap`), a representation which supports structure sharing.
+// As the underlying implementation of the below types we use the collections from the `imbl`
+// crate (`imbl::OrdSet` and `imbl::OrdMap`), a representation which supports structure sharing.
 // This is important because in data flow analysis we often refine a set or map
 // value in each step of the analysis, e.g. adding a single element to a larger collection, while
 // the original collection still need to be available at the previous program point.
@@ -133,7 +133,7 @@ impl<E: Ord + Clone> std::iter::FromIterator<E> for SetDomain<E> {
 }
 
 impl<E: Ord + Clone> std::iter::IntoIterator for SetDomain<E> {
-    type IntoIter = im::ordset::ConsumingIter<E>;
+    type IntoIter = <OrdSet<E> as IntoIterator>::IntoIter;
     type Item = E;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -169,7 +169,7 @@ impl<E: Ord + Clone> SetDomain<E> {
 
     /// Implements set difference, which is not following standard APIs for rust sets in OrdSet
     pub fn difference<'a>(&'a self, other: &'a Self) -> impl Iterator<Item = &'a E> {
-        self.iter().filter(move |e| !other.contains(e))
+        self.iter().filter(move |e| !other.contains(*e))
     }
 
     /// Implements is_disjoint which is not available in OrdSet
@@ -247,7 +247,7 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::FromIterator<(K, V)>
 }
 
 impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::IntoIterator for MapDomain<K, V> {
-    type IntoIter = im::ordmap::ConsumingIter<(K, V)>;
+    type IntoIter = <OrdMap<K, V> as IntoIterator>::IntoIter;
     type Item = (K, V);
 
     fn into_iter(self) -> Self::IntoIter {
