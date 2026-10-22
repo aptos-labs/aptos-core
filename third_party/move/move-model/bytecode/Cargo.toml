@@ -17,7 +17,7 @@ abstract-domain-derive = { path = "./abstract_domain_derive" }
 anyhow = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 ethnum = { workspace = true }
-im = { workspace = true }
+imbl = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 move-binary-format = { workspace = true }
