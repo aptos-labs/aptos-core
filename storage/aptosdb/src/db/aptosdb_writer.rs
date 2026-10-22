@@ -25,7 +25,10 @@ use crate::{
     },
     state_store::StateStore,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
@@ -225,6 +228,17 @@ impl DbWriter for AptosDB {
                      native-position storage.",
                     version,
                 );
+            }
+
+            // An empty hot state snapshot streams no values, so nothing has written the root that
+            // later hot state commits build on.
+            if output_with_proof.proof.transaction_infos[0].hot_state_checkpoint_hash()
+                == Some(*SPARSE_MERKLE_PLACEHOLDER_HASH)
+            {
+                StateStore::write_hot_state_null_node(
+                    &self.state_store.hot_state_merkle_db,
+                    version,
+                )?;
             }
 
             // TODO(joshlind): include confirm_or_save_frozen_subtrees in the change set
