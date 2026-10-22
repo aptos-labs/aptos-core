@@ -479,7 +479,7 @@ fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
     .unwrap()
 }
 
-/// Restores cold state so reset can discover the snapshot version.
+/// Restores cold state so reload can discover the snapshot version.
 fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
     let root_hash = src.state_store.get_root_hash(version).unwrap();
     let num_items = src
@@ -590,9 +590,9 @@ fn test_hot_state_restore() {
     // Finalization must activate the restored hot state before returning.
     assert_hot_state_activated(&dst, &expected, root_hash);
 
-    // Retain a base view across a reset and subsequent writes.
+    // Retain a base view across a reload and subsequent writes.
     let (restored_view, restored_state) = dst.get_persisted_state().unwrap();
-    dst.state_store.reset();
+    dst.state_store.reload().unwrap();
     assert_hot_state_activated(&dst, &expected, root_hash);
 
     // Retain this view to keep the next commit's delta from merging into its base.
@@ -617,7 +617,7 @@ fn test_hot_state_restore() {
         std::thread::sleep(Duration::from_millis(1));
     };
     let expected_after_write = collect_paged(&src, version + 1, usize::MAX);
-    dst.state_store.reset();
+    dst.state_store.reload().unwrap();
 
     // Updating a key outside the retained delta must preserve its fall-through reads.
     let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c-new")))]);
@@ -625,7 +625,12 @@ fn test_hot_state_restore() {
         .unwrap();
     dst.save_transactions_for_test(&[txn], version + 2, None, true)
         .unwrap();
-    let hot_state = dst.state_store.persisted_state.get_hot_state();
+    let hot_state = dst
+        .state_store
+        .live()
+        .unwrap()
+        .persisted_state
+        .get_hot_state();
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         let entries = hot_state.get_all_entries(key("c").get_shard_id());
@@ -747,6 +752,33 @@ fn test_hot_state_restore_empty() {
     );
 }
 
+/// A restore-mode open has no in-memory state until `reload` loads the state on disk.
+#[test]
+fn test_restore_mode_loads_state_on_reload() {
+    let tmp = TempPath::new();
+    let version = commit_blocks(&AptosDB::new_for_test(&tmp), vec![
+        vec![(key("a"), Some(val(b"a0")))],
+        vec![(key("b"), Some(val(b"b1")))],
+    ]);
+
+    let db = AptosDB::open_kv_only(
+        StorageDirPaths::from_path(tmp.path()),
+        false, /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None, /* internal_indexer_db */
+    )
+    .unwrap();
+    assert!(db.get_persisted_state().is_err());
+    assert!(db.get_pre_committed_version().is_err());
+
+    db.state_store.reload().unwrap();
+    assert_eq!(db.get_pre_committed_version().unwrap(), Some(version));
+    assert_eq!(db.get_persisted_state().unwrap().1.version(), Some(version));
+}
+
 /// Checks hot entries and the current summary root.
 fn assert_hot_state_activated(
     db: &AptosDB,
@@ -770,6 +802,8 @@ fn assert_hot_state_activated(
     }
     assert_eq!(
         db.state_store
+            .live()
+            .unwrap()
             .current_state_locked()
             .summary()
             .hot_root_hash()

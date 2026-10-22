@@ -221,7 +221,8 @@ impl AptosDB {
                     .hot_state_kv_pruner
                     .maybe_set_pruner_target_db_version(version);
             }
-            if let Some(version) = myself.get_latest_state_checkpoint_version()? {
+            // A restore loads no state checkpoint until it finishes.
+            if !for_restore && let Some(version) = myself.get_latest_state_checkpoint_version()? {
                 myself
                     .state_store
                     .state_pruner
