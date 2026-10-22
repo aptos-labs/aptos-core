@@ -898,7 +898,7 @@ impl StateStore {
     }
 
     /// Writes a null node for the hot state merkle tree at the given version.
-    fn write_hot_state_null_node(db: &StateMerkleDb, version: Version) -> Result<()> {
+    pub(crate) fn write_hot_state_null_node(db: &StateMerkleDb, version: Version) -> Result<()> {
         let tree_update_batch = TreeUpdateBatch {
             node_batch: vec![vec![(NodeKey::new_empty_path(version), Node::Null)]],
             stale_node_index_batch: vec![],

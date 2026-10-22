@@ -1757,8 +1757,7 @@ impl<
                 Error::UnexpectedError(format!("The {:?} ledger info to sync is missing!", kind))
             })?;
         if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
-            // TODO(HotState): an empty hot snapshot should still write its (null)
-            // root node at the version, for later hot state updates to build on.
+            // Storage writes the empty hot state root when finalizing the snapshot.
             self.metadata_storage.update_last_persisted_index(
                 &target_ledger_info,
                 0,
