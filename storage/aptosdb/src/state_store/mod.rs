@@ -700,6 +700,7 @@ impl StateStore {
         state_merkle_db: Arc<StateMerkleDb>,
         hot_state_kv_db: Arc<StateKvDb>,
         state_kv_db: Arc<StateKvDb>,
+        hot_state_config: HotStateConfig,
     ) -> Result<Option<Version>> {
         let state_pruner = StatePruner::builder()
             .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
@@ -718,7 +719,7 @@ impl StateStore {
             skip_usage: false,
         });
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
-            HotStateConfig::default(),
+            hot_state_config,
         )));
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
@@ -726,8 +727,8 @@ impl StateStore {
             /*hack_for_tests=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
-            PersistedState::new_empty(HotStateConfig::default()),
-            HotStateConfig::default(),
+            PersistedState::new_empty(hot_state_config),
+            hot_state_config,
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)

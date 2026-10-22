@@ -66,6 +66,8 @@ impl Cmd {
                     None,
                     /*readonly=*/ false,
                     /*max_num_nodes_per_lru_cache_shard=*/ 0,
+                    // TODO(HotState): This wipes hot state before `truncate_to_version` can
+                    // truncate it.
                     HotStateConfig {
                         delete_on_restart: true,
                         ..HotStateConfig::default()
