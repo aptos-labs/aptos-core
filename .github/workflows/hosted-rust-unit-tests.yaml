@@ -82,6 +82,7 @@ jobs:
           path: target/nextest/ci/junit.xml
           retention-days: 3
           if-no-files-found: error
+          overwrite: true
 
   verify-results:
     needs: [vm-and-doc-tests, unit-test-shards]
@@ -97,6 +98,7 @@ jobs:
           test "$CHECKS_RESULT" = success
           test "$SHARDS_RESULT" = success
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: ${{ !cancelled() }}
         with:
           pattern: hosted-unit-test-results-*
           path: results

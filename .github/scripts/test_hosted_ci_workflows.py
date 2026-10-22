@@ -123,6 +123,66 @@ class WorkflowTests(unittest.TestCase):
             "runs-on,cpu=64", self.parent["jobs"]["rust-targeted-unit-tests"]["runs-on"]
         )
 
+    def test_remaining_jobs_use_provider_with_aws_fallback(self):
+        for name in ["rust-targeted-unit-tests", "rust-check-merge-base"]:
+            job = self.parent["jobs"][name]
+            self.assertEqual(
+                set(job["needs"]), {"file_change_determinator", "rust-ci-provider"}
+            )
+            self.assertIn("64cpu-aptos-image-ubuntu22-x64", job["runs-on"])
+            self.assertIn("runs-on,cpu=64", job["runs-on"])
+            prebuilt = next(
+                s
+                for s in job["steps"]
+                if s.get("uses") == "./.github/actions/rust-prebuilt-setup"
+            )
+            self.assertEqual(
+                prebuilt["if"],
+                "${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}",
+            )
+        targeted = self.parent["jobs"]["rust-targeted-unit-tests"]
+        setup = next(
+            s for s in targeted["steps"] if s.get("name") == "Run dev_setup.sh"
+        )
+        self.assertEqual(
+            setup["if"], "${{ needs.rust-ci-provider.outputs.provider == 'aws' }}"
+        )
+        action = next(
+            s
+            for s in targeted["steps"]
+            if s.get("uses") == "./.github/actions/rust-targeted-unit-tests"
+        )
+        self.assertEqual(
+            action["with"]["BASE_REF"], "origin/${{ github.base_ref || 'main' }}"
+        )
+        self.assertEqual(
+            action["with"]["DETERMINATOR_MODE"],
+            "${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}",
+        )
+
+    def test_rerun_artifacts_and_failure_analytics(self):
+        shards = self.reusable["jobs"]["unit-test-shards"]
+        upload = next(
+            s
+            for s in shards["steps"]
+            if str(s.get("uses", "")).startswith("actions/upload-artifact@")
+        )
+        self.assertEqual(upload["with"]["overwrite"], "true")
+        self.assertEqual(upload["if"], "${{ always() }}")
+        verify = self.reusable["jobs"]["verify-results"]
+        download = next(
+            s
+            for s in verify["steps"]
+            if str(s.get("uses", "")).startswith("actions/download-artifact@")
+        )
+        self.assertEqual(download["if"], "${{ !cancelled() }}")
+        gate = next(
+            s
+            for s in verify["steps"]
+            if s.get("name") == "Require every phase to succeed"
+        )
+        self.assertIn('test "$SHARDS_RESULT" = success', gate["run"])
+
 
 if __name__ == "__main__":
     unittest.main()
