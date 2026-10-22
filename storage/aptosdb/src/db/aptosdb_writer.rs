@@ -231,11 +231,8 @@ impl DbWriter for AptosDB {
             }
 
             // An empty hot state snapshot streams no values, so nothing has written the root that
-            // later hot state commits build on.
-            //
-            // TODO(HotState): Also write the hot KV commit progress. Without it, a node with
-            // `delete_on_restart: false` panics in `sync_commit_progress` if it restarts before
-            // the next commit.
+            // later hot state commits build on, or the hot KV commit progress that a restart
+            // requires.
             if output_with_proof.proof.transaction_infos[0].hot_state_checkpoint_hash()
                 == Some(*SPARSE_MERKLE_PLACEHOLDER_HASH)
             {
@@ -243,6 +240,7 @@ impl DbWriter for AptosDB {
                     &self.state_store.hot_state_merkle_db,
                     version,
                 )?;
+                self.state_store.hot_state_kv_db.write_progress(version)?;
             }
 
             // TODO(joshlind): include confirm_or_save_frozen_subtrees in the change set
