@@ -734,6 +734,11 @@ fn test_hot_state_restore_empty() {
     );
     assert_hot_state_activated(&dst, &[], *SPARSE_MERKLE_PLACEHOLDER_HASH);
 
+    // A restart before the next commit reloads the empty hot state.
+    drop(dst);
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    assert_hot_state_activated(&dst, &[], *SPARSE_MERKLE_PLACEHOLDER_HASH);
+
     // The next hot state commit builds on the empty root.
     let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c1")))]);
     src.save_transactions_for_test(std::slice::from_ref(&txn), version + 1, None, true)

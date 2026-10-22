@@ -306,9 +306,9 @@ impl AptosDB {
     /// `target_version`, truncates all sub-databases to be consistent, and
     /// catches up the state merkle DB by replaying write sets if needed.
     ///
-    /// Hot state is truncated as well. If its history starts at or after `target_version`, e.g. it
-    /// was deleted on a later restart, truncating it would remove all of it, so we simply delete
-    /// it. The regular truncation can't do this since it needs a hot root at or before
+    /// Hot state is truncated as well. If its history starts after `target_version`, e.g. it was
+    /// deleted on a later restart, truncating it would remove all of it, so we simply delete it.
+    /// The regular truncation can't do this since it needs a hot root at or before
     /// `target_version`.
     #[cfg(any(test, feature = "db-debugger"))]
     pub(crate) fn truncate_to_version(
