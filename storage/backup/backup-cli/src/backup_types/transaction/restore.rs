@@ -565,7 +565,6 @@ impl TransactionRestoreBatchController {
         >,
     ) -> Result<()> {
         let (first_version, _) = self.replay_from_version.unwrap();
-        restore_handler.force_state_version_for_kv_restore(first_version.checked_sub(1))?;
 
         let mut base_version = first_version;
         let mut offset = 0u64;
@@ -835,13 +834,15 @@ mod tests {
         utils::{GlobalRestoreOptions, RestoreRunMode},
     };
     use aptos_db::{get_restore_handler::GetRestoreHandler, AptosDB};
-    use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl_inner;
+    use aptos_executor_test_helpers::integration_test_impl::{
+        create_db_and_executor, test_execution_with_storage_impl_inner,
+    };
     use aptos_executor_types::VerifyExecutionMode;
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
     use futures::stream;
     use itertools::izip;
-    use std::sync::Arc;
+    use std::{collections::HashSet, sync::Arc};
 
     #[tokio::test]
     async fn test_replay_commits_partial_block() {
@@ -905,6 +906,87 @@ mod tests {
         assert_eq!(
             target.get_accumulator_root_hash(target_version).unwrap(),
             source.get_accumulator_root_hash(target_version).unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_replay_kv() {
+        let source_path = TempPath::new();
+        let source = test_execution_with_storage_impl_inner(false, source_path.path());
+        let target_version = source.expect_synced_version();
+        let (outputs, persisted_aux_info) = source
+            .get_transaction_outputs(0, target_version + 1, target_version)
+            .unwrap()
+            .into_parts();
+        let transactions: Vec<_> = izip!(
+            outputs.transactions_and_outputs,
+            persisted_aux_info,
+            outputs.proof.transaction_infos,
+        )
+        .map(|((transaction, output), aux_info, info)| {
+            (
+                transaction,
+                aux_info,
+                info,
+                output.write_set().clone(),
+                output.events().to_vec(),
+            )
+        })
+        .collect();
+        let replayed_keys: HashSet<_> = transactions[1..]
+            .iter()
+            .flat_map(|(.., write_set, _)| write_set.write_op_iter().map(|(key, _)| key.clone()))
+            .collect();
+
+        // KV replay needs the state right before the first replayed version in the DB.
+        let target_path = TempPath::new();
+        let (target, ..) = create_db_and_executor(target_path.path(), &transactions[0].0, false);
+        let restore_handler = target.get_restore_handler();
+        let backup_path = TempPath::new();
+        let controller = TransactionRestoreBatchController::new(
+            GlobalRestoreOptions {
+                target_version,
+                trusted_waypoints: Arc::new(Default::default()),
+                run_mode: Arc::new(RestoreRunMode::Restore {
+                    restore_handler: restore_handler.clone(),
+                }),
+                concurrent_downloads: 1,
+                replay_concurrency_level: 1,
+            },
+            Arc::new(LocalFs::new(backup_path.path().to_path_buf())),
+            vec![],
+            None,
+            Some((1, true)),
+            None,
+            VerifyExecutionMode::NoVerify,
+            None,
+        );
+        controller
+            .replay_kv(
+                &restore_handler,
+                stream::iter(transactions.into_iter().skip(1).map(Ok)),
+            )
+            .await
+            .unwrap();
+
+        for key in &replayed_keys {
+            assert_eq!(
+                target
+                    .get_state_value_by_version(key, target_version)
+                    .unwrap(),
+                source
+                    .get_state_value_by_version(key, target_version)
+                    .unwrap(),
+            );
+        }
+        // Usage only matches if each chunk saw the values committed by previous chunks.
+        assert_eq!(
+            target
+                .get_state_storage_usage(Some(target_version))
+                .unwrap(),
+            source
+                .get_state_storage_usage(Some(target_version))
+                .unwrap(),
         );
     }
 
