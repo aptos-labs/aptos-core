@@ -8,10 +8,10 @@ use proptest::prelude::*;
 proptest! {
     #[test]
     fn test_encode_decode(
-        stale_position_value_index in any::<StalePositionValueIndex>(),
+        stale_position_value_index in any::<NativeStaleValueIndex>(),
     ) {
-        assert_encode_decode::<StalePositionValueIndexSchema>(&stale_position_value_index, &());
+        assert_encode_decode::<NativeStaleValueIndexSchema>(&stale_position_value_index, &());
     }
 }
 
-test_no_panic_decoding!(StalePositionValueIndexSchema);
+test_no_panic_decoding!(NativeStaleValueIndexSchema);
