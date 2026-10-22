@@ -8,7 +8,7 @@ use crate::{
     native_store::{NativeStoreSpec, PositionStore},
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
-        position_value::PositionValueSchema,
+        native_value::NativeValueSchema,
     },
     sharded_db_layout::{ShardedDbNames, ShardedDbOpenOptions},
     sharded_kv_db::ShardedKvDb,
@@ -152,7 +152,7 @@ impl<T: NativeStoreSpec> NativeKvDb<T> {
         let shard = ShardedKvDb::shard_of_hash(state_key_hash);
         let mut iter = self
             .shard(shard)
-            .iter_with_opts::<PositionValueSchema>(read_opts)?;
+            .iter_with_opts::<NativeValueSchema>(read_opts)?;
         iter.seek(&(state_key_hash, version))?;
         Ok(iter
             .next()
@@ -182,7 +182,7 @@ impl<T: NativeStoreSpec> NativeKvDb<T> {
         for (state_key_hash, version, maybe_value) in writes {
             let shard = ShardedKvDb::shard_of_hash(state_key_hash);
             let batch = per_shard[shard].get_or_insert_with(SchemaBatch::new);
-            batch.put::<PositionValueSchema>(&(state_key_hash, version), &maybe_value)?;
+            batch.put::<NativeValueSchema>(&(state_key_hash, version), &maybe_value)?;
         }
         Ok(per_shard)
     }
@@ -196,7 +196,7 @@ impl<T: NativeStoreSpec> NativeKvDb<T> {
             return Ok(None);
         }
         let shard = ShardedKvDb::shard_of_hash(state_key_hash);
-        let mut iter = self.shard(shard).iter::<PositionValueSchema>()?;
+        let mut iter = self.shard(shard).iter::<NativeValueSchema>()?;
         // The value schema bit-inverts the version (newest-first); a
         // forward seek lands on the largest version <= at_version-1.
         iter.seek(&(state_key_hash, at_version - 1))?;

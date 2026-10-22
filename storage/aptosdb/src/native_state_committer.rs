@@ -8,8 +8,8 @@ use crate::{
     native_store::kv_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_metrics::POSITION_WRITES,
     schema::{
-        position_value::PositionValueSchema,
-        stale_position_value_index::{StalePositionValueIndex, StalePositionValueIndexSchema},
+        native_stale_value_index::{NativeStaleValueIndex, NativeStaleValueIndexSchema},
+        native_value::NativeValueSchema,
     },
     sharded_kv_db::ShardedKvDb,
 };
@@ -85,17 +85,17 @@ impl NativeStateCommitter {
             // `is_first_write()`. Lets truncation iterate this CF
             // alone to reach every kv row.
             pos_batch
-                .put::<StalePositionValueIndexSchema>(
-                    &StalePositionValueIndex {
+                .put::<NativeStaleValueIndexSchema>(
+                    &NativeStaleValueIndex {
                         stale_since_version: version,
-                        version: prior_v.unwrap_or(StalePositionValueIndex::NO_PREV_VERSION),
+                        version: prior_v.unwrap_or(NativeStaleValueIndex::NO_PREV_VERSION),
                         state_key_hash,
                     },
                     &(),
                 )
                 .map_err(|e| AptosDbError::Other(format!("stale_position_value_index put: {e}")))?;
             pos_batch
-                .put::<PositionValueSchema>(&(state_key_hash, version), &maybe_value)
+                .put::<NativeValueSchema>(&(state_key_hash, version), &maybe_value)
                 .map_err(|e| {
                     AptosDbError::Other(format!("position_value batch put failed: {e}"))
                 })?;

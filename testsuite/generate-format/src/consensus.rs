@@ -134,6 +134,7 @@ pub fn get_registry() -> Result<Registry> {
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<TradingNativeKey>(&samples)?;
+    tracer.trace_type::<write_set::Extension>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchInfoExt>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::round_timeout::RoundTimeoutReason>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchKind>(&samples)?;

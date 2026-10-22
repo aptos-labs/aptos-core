@@ -9,7 +9,7 @@
 
 use crate::schema::{
     db_metadata::DbMetadataKey, hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
-    position_value::PositionValueSchema, stale_position_value_index::StalePositionValueIndexSchema,
+    native_stale_value_index::NativeStaleValueIndexSchema, native_value::NativeValueSchema,
     stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
     state_value_by_key_hash::StateValueByKeyHashSchema,
 };
@@ -79,8 +79,8 @@ impl StateValuePrunerSchema for HotStateKv {
 /// Native-position value pruner.
 pub(crate) enum PositionValue {}
 impl StateValuePrunerSchema for PositionValue {
-    type StaleIndexSchema = StalePositionValueIndexSchema;
-    type ValueSchema = PositionValueSchema;
+    type StaleIndexSchema = NativeStaleValueIndexSchema;
+    type ValueSchema = NativeValueSchema;
 
     fn name() -> &'static str {
         "position_value_pruner"
@@ -96,5 +96,30 @@ impl StateValuePrunerSchema for PositionValue {
 
     fn pruner_progress_key() -> DbMetadataKey {
         DbMetadataKey::PositionValuePrunerProgress
+    }
+}
+
+/// Native-order value pruner.
+// Used once the order store is opened by the write path (PR 6).
+#[allow(dead_code)]
+pub(crate) enum OrderValue {}
+impl StateValuePrunerSchema for OrderValue {
+    type StaleIndexSchema = NativeStaleValueIndexSchema;
+    type ValueSchema = NativeValueSchema;
+
+    fn name() -> &'static str {
+        "order_value_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "order_value"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::OrderValueShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::OrderValuePrunerProgress
     }
 }

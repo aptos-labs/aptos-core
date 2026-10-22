@@ -132,6 +132,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::TransactionInfo>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<TradingNativeKey>(&samples)?;
+    tracer.trace_type::<write_set::Extension>(&samples)?;
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;

@@ -13,8 +13,8 @@ proptest! {
         version in any::<Version>(),
         v in any::<Option<StateValue>>(),
     ) {
-        assert_encode_decode::<PositionValueSchema>(&(state_key_hash, version), &v);
+        assert_encode_decode::<NativeValueSchema>(&(state_key_hash, version), &v);
     }
 }
 
-test_no_panic_decoding!(PositionValueSchema);
+test_no_panic_decoding!(NativeValueSchema);
