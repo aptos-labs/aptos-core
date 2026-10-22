@@ -16,7 +16,10 @@ use crate::{
 #[cfg(any(test, feature = "db-debugger"))]
 use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    utils::truncation_helper::get_current_version_in_state_merkle_db,
+    utils::truncation_helper::{
+        find_tree_root_at_or_before, get_current_version_in_state_merkle_db,
+        get_state_kv_commit_progress,
+    },
 };
 use aptos_config::config::{
     HotStateConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig, StorageDirPaths,
@@ -297,14 +300,14 @@ impl AptosDB {
     /// Opens the raw sub-databases, sets the overall commit progress to
     /// `target_version`, truncates all sub-databases to be consistent, and
     /// catches up the state merkle DB by replaying write sets if needed.
+    ///
+    /// Hot state is truncated along with the rest, or deleted if it can't be.
     #[cfg(any(test, feature = "db-debugger"))]
     pub(crate) fn truncate_to_version(
         db_dir: &StorageDirPaths,
         target_version: Version,
     ) -> Result<()> {
-        // TODO(HotState): Preserve hot state during truncation and pass its config to catch-up.
-        let delete_hot_state_on_restart = true;
-        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
+        let open_dbs = |hot_state_config| {
             Self::open_dbs(
                 db_dir,
                 RocksdbConfigs::default(),
@@ -312,11 +315,30 @@ impl AptosDB {
                 None,  // block_cache
                 false, // readonly
                 0,     // max_num_nodes_per_lru_cache_shard
-                HotStateConfig {
-                    delete_on_restart: delete_hot_state_on_restart,
-                    ..HotStateConfig::default()
-                },
-            )?;
+                hot_state_config,
+            )
+        };
+        let mut hot_state_config = HotStateConfig {
+            delete_on_restart: false,
+            ..HotStateConfig::default()
+        };
+        let mut dbs = open_dbs(hot_state_config)?;
+        let (ledger_db, hot_state_merkle_db, _, hot_state_kv_db, _) = &dbs;
+        if !Self::can_truncate_hot_state(
+            ledger_db,
+            hot_state_merkle_db,
+            hot_state_kv_db,
+            target_version,
+        )? {
+            warn!(
+                target_version = target_version,
+                "Hot state can't be truncated to the target version, deleting it."
+            );
+            drop(dbs);
+            hot_state_config.delete_on_restart = true;
+            dbs = open_dbs(hot_state_config)?;
+        }
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) = dbs;
 
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
@@ -338,7 +360,7 @@ impl AptosDB {
             Arc::clone(&hot_state_kv_db),
             Arc::clone(&hot_state_merkle_db),
             /*crash_if_difference_is_too_large=*/ false,
-            delete_hot_state_on_restart,
+            hot_state_config.delete_on_restart,
         );
 
         if let Some(state_merkle_db_version) =
@@ -351,11 +373,33 @@ impl AptosDB {
                     state_merkle_db,
                     hot_state_kv_db,
                     state_kv_db,
+                    hot_state_config,
                 )?;
             }
         }
 
         Ok(())
+    }
+
+    /// Hot state can only be truncated if it has a root to fall back to. It doesn't when, e.g., it
+    /// was deleted on a restart after `target_version`.
+    #[cfg(any(test, feature = "db-debugger"))]
+    fn can_truncate_hot_state(
+        ledger_db: &LedgerDb,
+        hot_state_merkle_db: &StateMerkleDb,
+        hot_state_kv_db: &StateKvDb,
+        target_version: Version,
+    ) -> Result<bool> {
+        let kv_commit_progress = get_state_kv_commit_progress(hot_state_kv_db)?;
+        let merkle_root_version = find_tree_root_at_or_before(
+            ledger_db.metadata_db(),
+            hot_state_merkle_db,
+            target_version,
+        )?;
+        Ok(
+            kv_commit_progress.is_some_and(|v| v >= target_version)
+                && merkle_root_version.is_some(),
+        )
     }
 
     pub(super) fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
