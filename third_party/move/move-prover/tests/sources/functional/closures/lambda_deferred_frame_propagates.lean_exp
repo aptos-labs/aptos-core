@@ -1,0 +1,18 @@
+Move prover returns: exiting with model building errors
+error: function argument accesses resource `lambda_deferred_frame_propagates::R` which is not declared in `modifies_of`/`reads_of` for `g`
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:32:9
+   │
+32 │         call_g(|z| writer(z), y)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument accesses resource `lambda_deferred_frame_propagates::R` which is not declared in `modifies_of`/`reads_of` for `g`
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:40:9
+   │
+40 │         call_g(|z| writer(z), y)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument accesses resource `lambda_deferred_frame_propagates::R` which is not declared in `modifies_of`/`reads_of` for `g`
+    ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:107:13
+    │
+107 │             call_g(f, before + 1);
+    │             ^^^^^^^^^^^^^^^^^^^^^

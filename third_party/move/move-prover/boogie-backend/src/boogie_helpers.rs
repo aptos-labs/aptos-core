@@ -91,7 +91,7 @@ impl<K: Ord + Clone> EmittedEntities<K> {
 }
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
-pub const MAX_TUPLE_SIZE: usize = 11;
+pub const MAX_TUPLE_SIZE: usize = 20;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";

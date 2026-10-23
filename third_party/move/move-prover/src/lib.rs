@@ -84,6 +84,10 @@ pub fn run_move_prover_v2<W: WriteColor>(
         // solver on spec-function specializations of accumulating HOFs.
         experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
     }
+    // The Boogie pipeline carries a deferred closure's effects into usage summaries and
+    // loop havoc, so it may let a callee leave a closure's frame to the call site. The
+    // Lean backend (above) does not, and keeps every undeclared closure frame empty.
+    experiments.push(Experiment::DEFERRED_CLOSURE_FRAMES.to_string());
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     if options.inference.inference {
         inference::run_spec_inference_with_model(&mut env, error_writer, options, now)

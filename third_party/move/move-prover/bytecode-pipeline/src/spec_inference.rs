@@ -7036,6 +7036,11 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         for called in value.called_spec_funs(env) {
             env.add_used_spec_fun_transitive(called.to_qualified_id());
         }
+        // The spliced value is related to the call's actual result only by
+        // Move equality, as material inlined from a behavioral predicate is,
+        // so its spec functions need the same congruence axioms over
+        // `$IsEqual`.
+        env.mark_move_equality_congruence_spec_funs_in(&value);
         Some(value)
     }
 

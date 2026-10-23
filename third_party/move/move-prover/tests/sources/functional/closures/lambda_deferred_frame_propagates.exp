@@ -1,0 +1,108 @@
+Move prover returns: exiting with verification errors
+warning: opaque call to `lambda_deferred_frame_propagates::write_via_opaque` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:34:5
+   │
+34 │ ╭     spec write_via_opaque {
+35 │ │         pragma opaque;
+36 │ │         pragma aborts_if_is_partial;
+37 │ │     }
+   │ ╰─────^
+
+warning: opaque call to `lambda_deferred_frame_propagates::write_via_opaque2` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:58:5
+   │
+58 │ ╭     spec write_via_opaque2 {
+59 │ │         pragma opaque;
+60 │ │         pragma aborts_if_is_partial;
+61 │ │     }
+   │ ╰─────^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:51:9
+   │
+51 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:44: opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:45: opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:46: opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:47: opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:44: opaque_helper
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:51: opaque_helper (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:70:9
+   │
+70 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:63: nested_opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:64: nested_opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:65: nested_opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:66: nested_opaque_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:63: nested_opaque_helper
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:70: nested_opaque_helper (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:82:9
+   │
+82 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:75: closure_around_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:76: closure_around_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:77: closure_around_helper
+   =         <redacted> = <redacted>
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:78: closure_around_helper
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:75: closure_around_helper
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:82: closure_around_helper (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:98:9
+   │
+98 │         ensures result == old(global<R>(@0x42).v);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:86: opaque_helper_in_loop
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:97: opaque_helper_in_loop (spec)
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:86: opaque_helper_in_loop
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:87: opaque_helper_in_loop
+   =         before = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:88: opaque_helper_in_loop
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:89: opaque_helper_in_loop
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:93: opaque_helper_in_loop
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:86: opaque_helper_in_loop
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:98: opaque_helper_in_loop (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/lambda_deferred_frame_propagates.move:115:9
+    │
+115 │         ensures result == old(global<R>(@0x42).v);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:102: deferred_call_in_loop
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:114: deferred_call_in_loop (spec)
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:102: deferred_call_in_loop
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:103: deferred_call_in_loop
+    =         before = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:104: deferred_call_in_loop
+    =         f = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:105: deferred_call_in_loop
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:106: deferred_call_in_loop
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:110: deferred_call_in_loop
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:102: deferred_call_in_loop
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/lambda_deferred_frame_propagates.move:115: deferred_call_in_loop (spec)

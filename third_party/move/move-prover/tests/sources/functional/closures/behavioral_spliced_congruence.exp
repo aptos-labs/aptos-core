@@ -1,0 +1,29 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_spliced_congruence.move:95:9
+   │
+95 │ ╭         ensures result == spec_settle(
+96 │ │             taker.account, taker.client_id, taker.price,
+97 │ │             maker.account, maker.client_id, maker.price, size + 1
+98 │ │         );
+   │ ╰──────────^
+   │
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:89: run_concrete_wrong
+   =         taker = <redacted>
+   =         maker = <redacted>
+   =         size = <redacted>
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:90: run_concrete_wrong
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:59: callbacks
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:58: callbacks
+   =         result = <redacted>
+   =         cb = <redacted>
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:91: run_concrete_wrong
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:67: run
+   =         cb = <redacted>
+   =         taker = <redacted>
+   =         maker = <redacted>
+   =         size = <redacted>
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:68: run
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_spliced_congruence.move:95: run_concrete_wrong (spec)
