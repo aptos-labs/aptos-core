@@ -302,9 +302,9 @@ impl AptosDB {
     /// catches up the state merkle DB by replaying write sets if needed.
     ///
     /// Hot state is truncated as well. If its history starts after `target_version`, e.g. it was
-    /// deleted on a later restart, truncating it would remove all of it, so we simply delete it.
-    /// The regular truncation can't do this since it needs a hot root at or before
-    /// `target_version`.
+    /// deleted on a later restart, truncating it would remove all of it, so we delete it and let
+    /// the catch-up rebuild it. The regular truncation can't do this since it needs a hot root at
+    /// or before `target_version`.
     #[cfg(any(test, feature = "db-debugger"))]
     pub(crate) fn truncate_to_version(
         db_dir: &StorageDirPaths,
@@ -337,9 +337,6 @@ impl AptosDB {
                 target_version = target_version,
                 "Hot state history starts at or after the target version, deleting it."
             );
-            // TODO(HotState): If catch-up doesn't run below, the hot DBs are left empty and a node
-            // with `delete_on_restart: false` panics on the next start for lack of hot KV commit
-            // progress. Seed the progress and a null hot root at the cold merkle version.
             drop(dbs);
             hot_state_config.delete_on_restart = true;
             dbs = open_dbs(hot_state_config)?;
@@ -369,19 +366,16 @@ impl AptosDB {
             hot_state_config.delete_on_restart,
         );
 
-        if let Some(state_merkle_db_version) =
-            get_current_version_in_state_merkle_db(&state_merkle_db)?
-        {
-            if state_merkle_db_version < target_version {
-                StateStore::catch_up_state_merkle_db(
-                    ledger_db,
-                    hot_state_merkle_db,
-                    state_merkle_db,
-                    hot_state_kv_db,
-                    state_kv_db,
-                    hot_state_config,
-                )?;
-            }
+        // Runs even if the state merkle DB is at `target_version`, to rebuild deleted hot state.
+        if get_current_version_in_state_merkle_db(&state_merkle_db)?.is_some() {
+            StateStore::catch_up_state_merkle_db(
+                ledger_db,
+                hot_state_merkle_db,
+                state_merkle_db,
+                hot_state_kv_db,
+                state_kv_db,
+                hot_state_config,
+            )?;
         }
 
         Ok(())
