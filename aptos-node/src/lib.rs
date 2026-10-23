@@ -592,16 +592,14 @@ where
 
             match env::var("ENABLE_KEYLESS_DEFAULT") {
                 Ok(val) if val.as_str() == "1" => {
-                    let response = ureq::get("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey").call();
-                    let json: Value = response.into_json().expect("Failed to parse JSON");
+                    let json = fetch_json("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey");
                     configure_keyless_with_vk(genesis_config, json).unwrap();
                 },
                 _ => {},
             };
 
             if let Ok(url) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
-                let response = ureq::get(&url).call();
-                let json: Value = response.into_json().expect("Failed to parse JSON");
+                let json = fetch_json(&url);
                 configure_keyless_with_vk(genesis_config, json).unwrap();
             };
 
@@ -634,6 +632,26 @@ where
     node_config.admin_service.enabled = Some(true);
 
     Ok(node_config)
+}
+
+fn fetch_json(url: &str) -> Value {
+    let agent = ureq::Agent::config_builder()
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .provider(ureq::tls::TlsProvider::NativeTls)
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build(),
+        )
+        .proxy(None)
+        .build()
+        .new_agent();
+    agent
+        .get(url)
+        .call()
+        .expect("Failed to fetch JSON")
+        .body_mut()
+        .read_json()
+        .expect("Failed to parse JSON")
 }
 
 fn configure_keyless_with_vk(

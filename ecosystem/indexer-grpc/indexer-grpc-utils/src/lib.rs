@@ -20,10 +20,24 @@ use aptos_protos::{
     internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, transaction::v1::Transaction,
     util::timestamp::Timestamp,
 };
+use aptos_retrier::ExponentWithLimitDelay;
+use futures::FutureExt;
 use prost::Message;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tonic::codec::CompressionEncoding;
 use url::Url;
+
+const CONNECT_RETRY_INITIAL_DELAY: Duration = Duration::from_millis(500);
+const CONNECT_RETRY_MAX_DELAY: Duration = Duration::from_secs(60);
+const CONNECT_RETRY_DEFAULT_MAX_ELAPSED: Duration = Duration::from_secs(15 * 60);
+
+fn connect_retry_strategy(max_elapsed_time: Duration) -> ExponentWithLimitDelay {
+    ExponentWithLimitDelay::new(
+        CONNECT_RETRY_INITIAL_DELAY.as_millis() as u64,
+        CONNECT_RETRY_MAX_DELAY.as_millis() as u64,
+        max_elapsed_time.as_millis() as u64,
+    )
+}
 
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
@@ -35,29 +49,34 @@ pub fn default_file_storage_format() -> compression_util::StorageFormat {
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: Url) -> GrpcClientType {
-    backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
-        match FullnodeDataClient::connect(address.to_string()).await {
-            Ok(client) => {
-                tracing::info!(
-                    address = address.to_string(),
-                    "[Indexer Cache] Connected to indexer gRPC server."
-                );
-                Ok(client
-                    .max_decoding_message_size(usize::MAX)
-                    .max_encoding_message_size(usize::MAX)
-                    .send_compressed(CompressionEncoding::Zstd)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Zstd))
-            },
-            Err(e) => {
-                tracing::error!(
-                    address = address.to_string(),
-                    "[Indexer Cache] Failed to connect to indexer gRPC server: {}",
-                    e
-                );
-                Err(backoff::Error::transient(e))
-            },
+    let strategy = connect_retry_strategy(CONNECT_RETRY_DEFAULT_MAX_ELAPSED);
+    aptos_retrier::retry_async(strategy, || {
+        let address = address.clone();
+        async move {
+            match FullnodeDataClient::connect(address.to_string()).await {
+                Ok(client) => {
+                    tracing::info!(
+                        address = address.to_string(),
+                        "[Indexer Cache] Connected to indexer gRPC server."
+                    );
+                    Ok(client
+                        .max_decoding_message_size(usize::MAX)
+                        .max_encoding_message_size(usize::MAX)
+                        .send_compressed(CompressionEncoding::Zstd)
+                        .accept_compressed(CompressionEncoding::Gzip)
+                        .accept_compressed(CompressionEncoding::Zstd))
+                },
+                Err(e) => {
+                    tracing::error!(
+                        address = address.to_string(),
+                        "[Indexer Cache] Failed to connect to indexer gRPC server: {}",
+                        e
+                    );
+                    Err(e)
+                },
+            }
         }
+        .boxed()
     })
     .await
     .unwrap()
@@ -71,30 +90,32 @@ pub async fn create_data_service_grpc_client(
     address: Url,
     max_elapsed_time: Option<Duration>,
 ) -> Result<GrpcDataServiceClientType> {
-    let mut backoff = backoff::ExponentialBackoff::default();
-    if let Some(max_elapsed_time) = max_elapsed_time {
-        backoff.max_elapsed_time = Some(max_elapsed_time);
-    }
-    let client = backoff::future::retry(backoff, || async {
-        match RawDataClient::connect(address.to_string()).await {
-            Ok(client) => {
-                tracing::info!(
-                    address = address.to_string(),
-                    "[Indexer Cache] Connected to indexer data service gRPC server."
-                );
-                Ok(client
-                    .max_decoding_message_size(usize::MAX)
-                    .max_encoding_message_size(usize::MAX))
-            },
-            Err(e) => {
-                tracing::error!(
-                    address = address.to_string(),
-                    "[Indexer Cache] Failed to connect to indexer data service gRPC server: {}",
-                    e
-                );
-                Err(backoff::Error::transient(e))
-            },
+    let strategy =
+        connect_retry_strategy(max_elapsed_time.unwrap_or(CONNECT_RETRY_DEFAULT_MAX_ELAPSED));
+    let client = aptos_retrier::retry_async(strategy, || {
+        let address = address.clone();
+        async move {
+            match RawDataClient::connect(address.to_string()).await {
+                Ok(client) => {
+                    tracing::info!(
+                        address = address.to_string(),
+                        "[Indexer Cache] Connected to indexer data service gRPC server."
+                    );
+                    Ok(client
+                        .max_decoding_message_size(usize::MAX)
+                        .max_encoding_message_size(usize::MAX))
+                },
+                Err(e) => {
+                    tracing::error!(
+                        address = address.to_string(),
+                        "[Indexer Cache] Failed to connect to indexer data service gRPC server: {}",
+                        e
+                    );
+                    Err(e)
+                },
+            }
         }
+        .boxed()
     })
     .await
     .context("Failed to create data service GRPC client")?;

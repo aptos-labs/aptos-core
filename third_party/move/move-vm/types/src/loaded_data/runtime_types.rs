@@ -9,7 +9,7 @@ use crate::{
     loaded_data::struct_name_indexing::StructNameIndex,
     module_id_interner::{InternedModuleId, InternedModuleIdPool},
 };
-use derivative::Derivative;
+use derive_where::derive_where;
 use itertools::Itertools;
 use move_binary_format::{
     errors::{excess_function_type_abilities_error, PartialVMError, PartialVMResult},
@@ -272,17 +272,11 @@ impl StructType {
 
 // `interned_module_id` is a pool-local cache key, not part of struct identity.
 // Equality, hashing, and ordering use the canonical `(module, name)` pair.
-#[derive(Derivative)]
-#[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[derive(Clone)]
+#[derive_where(Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct StructIdentifier {
     module: ModuleId,
-    #[derivative(
-        Debug = "ignore",
-        PartialEq = "ignore",
-        Hash = "ignore",
-        Ord = "ignore",
-        PartialOrd = "ignore"
-    )]
+    #[derive_where(skip(Debug, EqHashOrd))]
     interned_module_id: InternedModuleId,
     name: Identifier,
 }
@@ -416,23 +410,13 @@ impl<'a> Iterator for TypePreorderTraversalIterWithDepth<'a> {
 }
 
 // Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
-#[derive(Derivative)]
-#[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone)]
+#[derive_where(Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct AbilityInfo {
-    #[derivative(
-        PartialEq = "ignore",
-        Hash = "ignore",
-        Ord = "ignore",
-        PartialOrd = "ignore"
-    )]
+    #[derive_where(skip)]
     base_ability_set: AbilitySet,
 
-    #[derivative(
-        PartialEq = "ignore",
-        Hash = "ignore",
-        Ord = "ignore",
-        PartialOrd = "ignore"
-    )]
+    #[derive_where(skip)]
     phantom_ty_args_mask: SmallBitVec,
 }
 

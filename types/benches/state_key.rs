@@ -11,7 +11,7 @@ use aptos_types::{
     state_store::state_key::{inner::StateKeyInner, registry::StateKeyRegistry, StateKey},
 };
 use criterion::{criterion_group, criterion_main, Criterion};
-use derivative::Derivative;
+use derive_where::derive_where;
 use fxhash::FxHasher;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
@@ -23,16 +23,11 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-#[derive(Clone, Derivative, Eq)]
-#[derivative(Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq)]
+#[derive_where(Hash, PartialEq, PartialOrd, Ord)]
 pub struct UnCached {
     inner: StateKeyInner,
-    #[derivative(
-        Hash = "ignore",
-        Ord = "ignore",
-        PartialEq = "ignore",
-        PartialOrd = "ignore"
-    )]
+    #[derive_where(skip)]
     hash: OnceCell<HashValue>,
 }
 

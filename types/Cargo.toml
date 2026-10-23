@@ -53,7 +53,7 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 crossbeam-utils = { workspace = true }
 dashmap = { workspace = true }
-derivative = { workspace = true }
+derive-where = { workspace = true }
 fail = { workspace = true }
 fixed = { workspace = true }
 fxhash = { workspace = true }
@@ -106,7 +106,6 @@ ciborium = { workspace = true }
 claims = { workspace = true }
 coset = { workspace = true }
 criterion = { workspace = true }
-derivative = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 p256 = { workspace = true }
 passkey-authenticator = { workspace = true }

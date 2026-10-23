@@ -4,14 +4,13 @@
 use crate::{
     get_uri_metadata,
     utils::{
-        constants::{MAX_JSON_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+        constants::{retry_strategy, MAX_JSON_REQUEST_RETRY_SECONDS},
         counters::{
             FAILED_TO_PARSE_JSON_COUNT, PARSE_JSON_INVOCATION_COUNT, SUCCESSFULLY_PARSED_JSON_COUNT,
         },
     },
 };
 use anyhow::Context;
-use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
 use image::ImageFormat;
 use reqwest::Client;
@@ -77,12 +76,7 @@ impl JSONParser {
             .boxed()
         };
 
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
-            ..Default::default()
-        };
-
-        match retry(backoff, op).await {
+        match aptos_retrier::retry_async(retry_strategy(), op).await {
             Ok(result) => {
                 SUCCESSFULLY_PARSED_JSON_COUNT.inc();
                 Ok(result)

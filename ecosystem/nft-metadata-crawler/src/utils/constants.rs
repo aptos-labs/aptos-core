@@ -1,8 +1,25 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_retrier::ExponentWithLimitDelay;
+
 /// Maximum retry time for exponential backoff (2 sec = 3-4 retries)
 pub const MAX_RETRY_TIME_SECONDS: u64 = 2;
+
+/// Initial delay for exponential backoff
+const RETRY_INITIAL_DELAY_MS: u64 = 500;
+
+/// Upper bound on a single backoff delay
+const RETRY_MAX_DELAY_MS: u64 = 60_000;
+
+/// Exponential backoff that gives up after `MAX_RETRY_TIME_SECONDS`
+pub fn retry_strategy() -> ExponentWithLimitDelay {
+    ExponentWithLimitDelay::new(
+        RETRY_INITIAL_DELAY_MS,
+        RETRY_MAX_DELAY_MS,
+        MAX_RETRY_TIME_SECONDS * 1000,
+    )
+}
 
 /// Allocate 15 seconds for a HEAD request
 pub const MAX_HEAD_REQUEST_RETRY_SECONDS: u64 = 15;

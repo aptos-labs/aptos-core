@@ -545,7 +545,6 @@ async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-trait = "0.1.53"
 axum = "0.7.5"
-backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 base64 = "0.13.0"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
@@ -606,7 +605,7 @@ datatest-stable = "0.1.1"
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivation-path = "0.2.0"
-derivative = "2.2.0"
+derive-where = "1.6.0"
 derive_builder = "0.20.0"
 derive_more = { version = "1.0.0", features = ["add", "deref", "deref_mut"] }
 determinator = "0.12.0"
@@ -878,9 +877,9 @@ try_match = "0.4.2"
 trybuild = "1.0.80"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
-ureq = { version = "1.5.4", features = [
+ureq = { version = "3.5.0", features = [
     "json",
-    "native-tls",
+    "native-tls-no-default",
 ], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 usdt = "0.6.0"

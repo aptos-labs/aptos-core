@@ -17,9 +17,9 @@ ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-retrier = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
-backoff = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
