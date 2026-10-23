@@ -281,11 +281,11 @@ fn test_position_key(account: u8) -> StateKey {
     StateKey::position(address(1), address(account), address(1))
 }
 
-/// Block `block_idx` sets accounts `0..=block_idx % 7` and deletes account 3 on every
+/// Block `block_idx` sets accounts `0..=max(1, block_idx % 7)` and deletes account 3 on every
 /// fourth block, so positions accumulate, get overwritten, and get deleted.
 fn add_block_positions(checkpoint: &mut TransactionToCommit, block_idx: usize) {
     let mut positions = BTreeMap::new();
-    for account in 0..=(block_idx % 7) as u8 {
+    for account in 0..=(block_idx % 7).max(1) as u8 {
         let position = NativePosition::PerpV1 {
             size: block_idx as u64 * 100 + account as u64,
             is_long: true,

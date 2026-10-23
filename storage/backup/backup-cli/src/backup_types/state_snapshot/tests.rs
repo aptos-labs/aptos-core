@@ -140,6 +140,15 @@ fn backup_at_epoch(
     backup_dir: &TempPath,
     epoch: u64,
 ) -> (FileHandle, Version) {
+    backup_at_epoch_with_chunk_size(src_db, backup_dir, epoch, 500)
+}
+
+fn backup_at_epoch_with_chunk_size(
+    src_db: Arc<AptosDB>,
+    backup_dir: &TempPath,
+    epoch: u64,
+    max_chunk_size: usize,
+) -> (FileHandle, Version) {
     let store: Arc<dyn BackupStorage> = Arc::new(LocalFs::new(backup_dir.path().to_path_buf()));
     let version = src_db
         .get_epoch_ending_ledger_infos(epoch, epoch + 1)
@@ -160,7 +169,7 @@ fn backup_at_epoch(
             StateSnapshotBackupController::new(
                 StateSnapshotBackupOpt { epoch },
                 GlobalBackupOpt {
-                    max_chunk_size: 500,
+                    max_chunk_size,
                     concurrent_data_requests: 2,
                 },
                 client,
@@ -311,7 +320,15 @@ fn position_restore_resumes() {
     let (_src_db_dir, src_db, _blocks) = tmp_db_with_random_positions();
     let backup_dir = TempPath::new();
     backup_dir.create_as_dir().unwrap();
-    let (manifest_handle, version) = backup(Arc::clone(&src_db), &backup_dir);
+    let epoch = src_db
+        .get_latest_ledger_info()
+        .unwrap()
+        .ledger_info()
+        .next_block_epoch()
+        - 1;
+    // Force one record per chunk so the interruption test always has a later chunk.
+    let (manifest_handle, version) =
+        backup_at_epoch_with_chunk_size(Arc::clone(&src_db), &backup_dir, epoch, 1);
     let expected = positions_at(&src_db, version);
     drop(src_db);
 
