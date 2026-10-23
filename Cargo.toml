@@ -877,9 +877,9 @@ try_match = "0.4.2"
 trybuild = "1.0.80"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
-ureq = { version = "1.5.4", features = [
+ureq = { version = "3.5.0", features = [
     "json",
-    "native-tls",
+    "native-tls-no-default",
 ], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 usdt = "0.6.0"
