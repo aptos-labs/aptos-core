@@ -171,11 +171,16 @@ impl QuorumStoreStorage for QuorumStoreDB {
             .collect::<Result<HashMap<u64, BatchId>>>()?;
         let mut ret = None;
         for (epoch, batch_id) in epoch_batch_id {
-            assert!(current_epoch >= epoch);
-            if epoch < current_epoch {
-                self.delete_batch_id(epoch)?;
-            } else {
+            if epoch == current_epoch {
                 ret = Some(batch_id);
+            } else {
+                if epoch > current_epoch {
+                    warn!(
+                        "QS: discarding batch id {} persisted for newer epoch {} while starting epoch {}",
+                        batch_id, epoch, current_epoch
+                    );
+                }
+                self.delete_batch_id(epoch)?;
             }
         }
         Ok(ret)
