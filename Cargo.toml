@@ -606,7 +606,7 @@ datatest-stable = "0.1.1"
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivation-path = "0.2.0"
-derivative = "2.2.0"
+derive-where = "1.6.0"
 derive_builder = "0.20.0"
 derive_more = { version = "1.0.0", features = ["add", "deref", "deref_mut"] }
 determinator = "0.12.0"

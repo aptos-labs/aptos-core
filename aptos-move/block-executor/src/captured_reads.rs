@@ -32,7 +32,7 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
-use derivative::Derivative;
+use derive_where::derive_where;
 use hashbrown::Equivalent;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -76,8 +76,7 @@ pub(crate) enum ReadKind {
 /// The captured state is fine-grained, e.g. it distinguishes between reading
 /// a full value, and other kinds of reads that may access only the metadata
 /// information, or check whether data exists at a given key.
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""), PartialEq(bound = ""))]
+#[derive_where(Clone, Debug, PartialEq)]
 pub(crate) enum DataRead<V> {
     // Version supersedes V comparison.
     Versioned(
@@ -85,8 +84,8 @@ pub(crate) enum DataRead<V> {
         // Currently, we are conservative and check the version for equality
         // (version implies value equality, but not vice versa). TODO: when
         // comparing the instances of V is cheaper, compare those instead.
-        #[derivative(PartialEq = "ignore", Debug = "ignore")] TriompheArc<V>,
-        #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<TriompheArc<MoveTypeLayout>>,
+        #[derive_where(skip(Debug, EqHashOrd))] TriompheArc<V>,
+        #[derive_where(skip(Debug, EqHashOrd))] Option<TriompheArc<MoveTypeLayout>>,
     ),
     // Metadata and ResourceSize are insufficient to determine each other, but both
     // can be determined from Versioned. When both are available, the information
@@ -374,8 +373,8 @@ impl DataReadComparator {
 /// over the latest contents present in the group, i.e. the respective tags and values (in
 /// this sense, group size is even more speculative than other captured information, as it
 /// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
-#[derive(Derivative, Clone)]
-#[derivative(Default(bound = ""))]
+#[derive(Clone)]
+#[derive_where(Default)]
 pub(crate) struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
     pub(crate) collected_size: Option<ResourceGroupSize>,
@@ -1150,8 +1149,7 @@ where
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Default(bound = "", new = "true"))]
+#[derive_where(Default)]
 pub struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) resource_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,

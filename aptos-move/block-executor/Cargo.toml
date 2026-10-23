@@ -39,7 +39,7 @@ concurrent-queue = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
-derivative = { workspace = true }
+derive-where = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }
 mono-move-aptos-state-view-providers = { workspace = true }

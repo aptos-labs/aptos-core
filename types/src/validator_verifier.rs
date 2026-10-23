@@ -17,7 +17,7 @@ use aptos_crypto::{
     Signature, VerifyingKey,
 };
 use dashmap::DashSet;
-use derivative::Derivative;
+use derive_where::derive_where;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -138,8 +138,8 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 // Note: The "Clone" trait has been removed intentionally for ValidatorVerifier to ensure that the same
 // view of ValidatorVerifier is used across the system. In case a ValidatorVerifier needs to be cloned,
 // please use Arc<ValidatorVerifier> instead.
-#[derive(Debug, Derivative, Serialize)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, Serialize)]
+#[derive_where(PartialEq, Eq)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
     pub validator_infos: Vec<ValidatorConsensusInfo>,
@@ -158,11 +158,11 @@ pub struct ValidatorVerifier {
     /// submitted bad votes that has resulted in having to verify each vote individually. Further votes by these validators
     /// will be verified individually bypassing the optimization.
     #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     pessimistic_verify_set: DashSet<AccountAddress>,
     /// This is the feature flag indicating whether the optimistic signature verification feature is enabled.
     #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     optimistic_sig_verification: bool,
 }
 

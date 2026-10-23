@@ -4,7 +4,7 @@
 use crate::{errors::FilterError, filters::MoveStructTagFilter, traits::Filterable};
 use anyhow::Error;
 use aptos_protos::transaction::v1::{move_type::Content, Event};
-use derivative::Derivative;
+use derive_where::derive_where;
 use memchr::memmem::Finder;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -24,8 +24,8 @@ use serde::{Deserialize, Serialize};
 ///   .build()
 ///   .unwrap();
 /// ```
-#[derive(Clone, Default, Debug, Derivative, Serialize, Deserialize)]
-#[derivative(PartialEq)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive_where(PartialEq)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]
 #[builder(setter(strip_option), default)]
@@ -37,7 +37,7 @@ pub struct EventFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub struct_type: Option<MoveStructTagFilter>,
     #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     data_substring_finder: OnceCell<Finder<'static>>,
 }
 

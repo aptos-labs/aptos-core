@@ -15,7 +15,7 @@ use aptos_types::{
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
     write_set::{NativePositionOp, WriteOp},
 };
-use derivative::Derivative;
+use derive_where::derive_where;
 use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
@@ -32,8 +32,8 @@ use std::{
 ///
 /// **WARNING**: This type should only be used inside the VM. For storage backends,
 /// use `TransactionOutput`.
-#[derive(Derivative)]
-#[derivative(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone)]
+#[derive_where(Debug, Eq, PartialEq)]
 pub struct VMOutput {
     change_set: VMChangeSet,
     module_write_set: ModuleWriteSet,
@@ -43,7 +43,7 @@ pub struct VMOutput {
     hotness: BTreeSet<StateKey>,
     /// Trace of the user transaction payload execution in Move VM. Trace is always created as
     /// empty, and users have to set it manually after execution.
-    #[derivative(PartialEq = "ignore", Debug = "ignore")]
+    #[derive_where(skip(Debug, EqHashOrd))]
     trace: Trace,
 }
 
