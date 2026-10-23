@@ -568,9 +568,6 @@ impl StateStore {
             overall_commit_progress,
             crash_if_difference_is_too_large,
         );
-        // When `delete_on_restart` in config is flipped from true to false, the node will have been
-        // running for a while, so its hot_state_kv_db is extremely unlikely to not have a progress
-        // marker and `sync_state_kv_commit_progress` should work.
         if !delete_hot_state_on_restart {
             Self::sync_state_kv_commit_progress(
                 &hot_state_kv_db,
@@ -693,6 +690,8 @@ impl StateStore {
         }
     }
 
+    /// Rebuilds state from the latest snapshot like a regular open: replays the write sets
+    /// committed after it, and rebuilds hot state if `delete_on_restart` wiped it.
     #[cfg(any(test, feature = "db-debugger"))]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<LedgerDb>,
@@ -851,8 +850,9 @@ impl StateStore {
         {
             // TODO(HotState): this is needed while starting with an empty hot state during
             // development.
-            Self::write_hot_state_null_node(
+            Self::write_empty_hot_state(
                 &state_db.hot_state_merkle_db,
+                &state_db.hot_state_kv_db,
                 snapshot_next_version - 1,
             )?;
         }
@@ -897,20 +897,26 @@ impl StateStore {
         Ok(buffered_state)
     }
 
-    /// Writes a null node for the hot state merkle tree at the given version.
-    pub(crate) fn write_hot_state_null_node(db: &StateMerkleDb, version: Version) -> Result<()> {
+    /// Writes an empty hot state at `version`: the null root that later hot state commits build
+    /// on, and the KV commit progress that a restart with persistent hot state requires.
+    pub(crate) fn write_empty_hot_state(
+        hot_state_merkle_db: &StateMerkleDb,
+        hot_state_kv_db: &StateKvDb,
+        version: Version,
+    ) -> Result<()> {
         let tree_update_batch = TreeUpdateBatch {
             node_batch: vec![vec![(NodeKey::new_empty_path(version), Node::Null)]],
             stale_node_index_batch: vec![],
         };
-        let raw_batch = db.create_jmt_commit_batch_for_shard(
+        let raw_batch = hot_state_merkle_db.create_jmt_commit_batch_for_shard(
             version,
             /* shard_id = */ None,
             &tree_update_batch,
             /* previous_epoch_ending_version = */ None,
         )?;
-        db.commit_top_levels(version, raw_batch)?;
-        info!("Wrote null node for hot state merkle db at version {version}");
+        hot_state_merkle_db.commit_top_levels(version, raw_batch)?;
+        hot_state_kv_db.write_progress(version)?;
+        info!("Wrote empty hot state at version {version}");
         Ok(())
     }
 
