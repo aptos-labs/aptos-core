@@ -10,21 +10,33 @@ use crate::{
 use aptos_types::proptest_types::arb_json_value;
 use proptest::prelude::*;
 use serde_json::Value;
-use ureq::Response;
+use ureq::{http::Response, Body};
 
 const MAX_COLLECTION_SIZE: usize = 100;
+
+fn test_response(status: u16, body: &str) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .body(Body::builder().data(body))
+        .unwrap_or_else(|_| {
+            // Statuses outside 100..=999 are unrepresentable.
+            Response::builder()
+                .status(500)
+                .body(Body::builder().data(body))
+                .unwrap()
+        })
+}
 
 // This generates an arbitrary generic response returned by vault for various API calls.
 prop_compose! {
     pub fn arb_generic_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         value in arb_json_value(),
-    ) -> Response {
+    ) -> Response<Body> {
         let value =
             serde_json::to_string::<Value>(&value).unwrap();
-        Response::new(status, &status_text, &value)
+        test_response(status, &value)
     }
 }
 
@@ -33,16 +45,15 @@ prop_compose! {
     pub fn arb_policy_list_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         policies in prop::collection::vec(any::<String>(), 0..MAX_COLLECTION_SIZE)
-    ) -> Response {
+    ) -> Response<Body> {
         let policy_list = ListPoliciesResponse {
             policies,
         };
 
         let policy_list =
             serde_json::to_string::<ListPoliciesResponse>(&policy_list).unwrap();
-        Response::new(status, &status_text, &policy_list)
+        test_response(status, &policy_list)
     }
 }
 
@@ -51,9 +62,8 @@ prop_compose! {
     pub fn arb_secret_list_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         keys in prop::collection::vec(any::<String>(), 0..MAX_COLLECTION_SIZE),
-    ) -> Response {
+    ) -> Response<Body> {
         let data = ReadSecretListData {
             keys,
         };
@@ -63,7 +73,7 @@ prop_compose! {
 
         let read_secret_list_response =
             serde_json::to_string::<ReadSecretListResponse>(&read_secret_list_response).unwrap();
-        Response::new(status, &status_text, &read_secret_list_response)
+        test_response(status, &read_secret_list_response)
     }
 }
 
@@ -73,13 +83,12 @@ prop_compose! {
     pub fn arb_secret_read_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         data in prop::collection::btree_map(any::<String>(), arb_json_value(), 0..MAX_COLLECTION_SIZE),
         created_time in any::<String>(),
         version in any::<u32>(),
         secret in any::<String>(),
         key in any::<String>(),
-    ) -> (Response, String, String) {
+    ) -> (Response<Body>, String, String) {
         let metadata = ReadSecretMetadata {
             created_time,
             version,
@@ -94,7 +103,7 @@ prop_compose! {
 
         let read_secret_response =
             serde_json::to_string::<ReadSecretResponse>(&read_secret_response).unwrap();
-        let read_secret_response = Response::new(status, &status_text, &read_secret_response);
+        let read_secret_response = test_response(status, &read_secret_response);
 
         (read_secret_response, secret, key)
     }
@@ -105,9 +114,8 @@ prop_compose! {
     pub fn arb_token_create_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         client_token in any::<String>(),
-    ) -> Response {
+    ) -> Response<Body> {
     let auth = CreateTokenAuth {
         client_token,
     };
@@ -117,7 +125,7 @@ prop_compose! {
 
      let create_token_response =
             serde_json::to_string::<CreateTokenResponse>(&create_token_response).unwrap();
-     Response::new(status, &status_text, &create_token_response)
+     test_response(status, &create_token_response)
     }
 }
 
@@ -126,9 +134,8 @@ prop_compose! {
     pub fn arb_token_renew_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         lease_duration in any::<u32>(),
-    ) -> Response {
+    ) -> Response<Body> {
     let auth = RenewTokenAuth {
         lease_duration,
     };
@@ -138,7 +145,7 @@ prop_compose! {
 
      let renew_token_response =
             serde_json::to_string::<RenewTokenResponse>(&renew_token_response).unwrap();
-     Response::new(status, &status_text, &renew_token_response)
+     test_response(status, &renew_token_response)
     }
 }
 
@@ -148,13 +155,12 @@ prop_compose! {
     pub fn arb_transit_create_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         value in arb_json_value(),
         name in any::<String>(),
-    ) -> (Response, String) {
+    ) -> (Response<Body>, String) {
         let value =
             serde_json::to_string::<Value>(&value).unwrap();
-        let create_key_response = Response::new(status, &status_text, &value);
+        let create_key_response = test_response(status, &value);
 
         (create_key_response, name)
     }
@@ -166,12 +172,11 @@ prop_compose! {
     pub fn arb_transit_export_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         keys in prop::collection::btree_map(any::<u32>(), any::<String>(), 0..MAX_COLLECTION_SIZE),
         name in any::<String>(),
         key_name in any::<String>(),
         version in any::<Option<u32>>(),
-    ) -> (Response, String, Option<u32>) {
+    ) -> (Response<Body>, String, Option<u32>) {
         let data = ExportKey {
             name,
             keys,
@@ -182,7 +187,7 @@ prop_compose! {
 
         let export_key_response =
             serde_json::to_string::<ExportKeyResponse>(&export_key_response).unwrap();
-        let export_key_response = Response::new(status, &status_text, &export_key_response);
+        let export_key_response = test_response(status, &export_key_response);
 
         (export_key_response, key_name, version)
     }
@@ -193,9 +198,8 @@ prop_compose! {
     pub fn arb_transit_list_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         keys in prop::collection::vec(any::<String>(), 0..MAX_COLLECTION_SIZE),
-    ) -> Response {
+    ) -> Response<Body> {
         let data = ListKeys {
             keys,
         };
@@ -205,7 +209,7 @@ prop_compose! {
 
         let list_keys_response =
             serde_json::to_string::<ListKeysResponse>(&list_keys_response).unwrap();
-        Response::new(status, &status_text, &list_keys_response)
+        test_response(status, &list_keys_response)
     }
 }
 
@@ -229,12 +233,11 @@ prop_compose! {
     pub fn arb_transit_read_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         keys in prop::collection::btree_map(any::<u32>(), arb_transit_read_key(), 0..MAX_COLLECTION_SIZE),
         name in any::<String>(),
         key_type in any::<String>(),
         key_name in any::<String>(),
-    ) -> (Response, String) {
+    ) -> (Response<Body>, String) {
         let data = ReadKeys {
             keys,
             name,
@@ -246,7 +249,7 @@ prop_compose! {
 
         let read_key_response =
             serde_json::to_string::<ReadKeyResponse>(&read_key_response).unwrap();
-        let read_key_response = Response::new(status, &status_text, &read_key_response);
+        let read_key_response = test_response(status, &read_key_response);
 
         (read_key_response, key_name)
     }
@@ -257,9 +260,8 @@ prop_compose! {
     pub fn arb_transit_sign_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         signature in any::<String>(),
-    ) -> Response {
+    ) -> Response<Body> {
         let data = Signature {
             signature,
         };
@@ -269,7 +271,7 @@ prop_compose! {
 
         let signature_response =
             serde_json::to_string::<SignatureResponse>(&signature_response).unwrap();
-        Response::new(status, &status_text, &signature_response)
+        test_response(status, &signature_response)
     }
 }
 
@@ -278,16 +280,15 @@ prop_compose! {
     pub fn arb_unsealed_response(
     )(
         status in any::<u16>(),
-        status_text in any::<String>(),
         sealed in any::<bool>(),
-    ) -> Response {
+    ) -> Response<Body> {
         let sealed_status_response = SealStatusResponse {
             sealed,
         };
 
         let sealed_status_response =
             serde_json::to_string::<SealStatusResponse>(&sealed_status_response).unwrap();
-        Response::new(status, &status_text, &sealed_status_response)
+        test_response(status, &sealed_status_response)
     }
 }
 

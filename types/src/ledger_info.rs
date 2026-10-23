@@ -18,7 +18,7 @@ use aptos_crypto::{
     CryptoMaterialError,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use derivative::Derivative;
+use derive_where::derive_where;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -395,11 +395,11 @@ impl LedgerInfoWithVerifiedSignatures {
 /// cost, bounding the CPU work a peer-supplied payload can force on the
 /// receiver. The on-wire encoding is byte-identical to storing a
 /// `bls12381::Signature` directly.
-#[derive(Clone, Debug, Derivative)]
-#[derivative(PartialEq, Eq)]
+#[derive(Clone, Debug)]
+#[derive_where(PartialEq, Eq)]
 pub struct SignatureWithStatus {
     signature: LazyBlsSignature,
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     // false if the signature not verified.
     // true if the signature is verified.
     verification_status: Arc<AtomicBool>,

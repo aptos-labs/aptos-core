@@ -24,7 +24,7 @@ better_any = { workspace = true }
 bytes = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
-derivative = { workspace = true }
+derive-where = { workspace = true }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }

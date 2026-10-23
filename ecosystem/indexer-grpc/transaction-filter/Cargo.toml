@@ -15,7 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-protos = { workspace = true }
-derivative = { workspace = true }
+derive-where = { workspace = true }
 derive_builder = { workspace = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }
