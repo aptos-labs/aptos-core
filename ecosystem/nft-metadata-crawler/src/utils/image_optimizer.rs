@@ -4,7 +4,7 @@
 use crate::{
     get_uri_metadata,
     utils::{
-        constants::{MAX_IMAGE_REQUEST_RETRY_SECONDS, MAX_RETRY_TIME_SECONDS},
+        constants::{retry_strategy, MAX_IMAGE_REQUEST_RETRY_SECONDS},
         counters::{
             FAILED_TO_OPTIMIZE_IMAGE_COUNT, OPTIMIZE_IMAGE_INVOCATION_COUNT,
             SUCCESSFULLY_OPTIMIZED_IMAGE_COUNT,
@@ -12,7 +12,6 @@ use crate::{
     },
 };
 use anyhow::Context;
-use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
 use image::{
     imageops::{resize, FilterType},
@@ -91,12 +90,7 @@ impl ImageOptimizer {
             .boxed()
         };
 
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
-            ..Default::default()
-        };
-
-        match retry(backoff, op).await {
+        match aptos_retrier::retry_async(retry_strategy(), op).await {
             Ok(result) => {
                 SUCCESSFULLY_OPTIMIZED_IMAGE_COUNT.inc();
                 Ok(result)

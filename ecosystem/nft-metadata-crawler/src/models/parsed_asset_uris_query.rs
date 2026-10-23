@@ -1,16 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    schema::nft_metadata_crawler::parsed_asset_uris, utils::constants::MAX_RETRY_TIME_SECONDS,
-};
-use backoff::{retry, ExponentialBackoff};
+use crate::{schema::nft_metadata_crawler::parsed_asset_uris, utils::constants::retry_strategy};
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, PooledConnection},
 };
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use tracing::error;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
@@ -41,15 +37,9 @@ impl ParsedAssetUrisQuery {
                 .find(asset_uri)
                 .first::<ParsedAssetUrisQuery>(conn)
                 .optional()
-                .map_err(Into::into)
         };
 
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
-            ..Default::default()
-        };
-
-        retry(backoff, &mut op).unwrap_or_else(|e| {
+        aptos_retrier::retry(retry_strategy(), &mut op).unwrap_or_else(|e| {
             error!(asset_uri = asset_uri, error=?e, "Failed to get_by_asset_uri");
             None
         })
@@ -67,15 +57,9 @@ impl ParsedAssetUrisQuery {
                 .filter(parsed_asset_uris::cdn_image_uri.is_not_null())
                 .first::<ParsedAssetUrisQuery>(conn)
                 .optional()
-                .map_err(Into::into)
         };
 
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
-            ..Default::default()
-        };
-
-        retry(backoff, &mut op).unwrap_or_else(|e| {
+        aptos_retrier::retry(retry_strategy(), &mut op).unwrap_or_else(|e| {
             error!(asset_uri = asset_uri, error=?e, "Failed to get_by_raw_image_uri");
             None
         })
@@ -93,15 +77,9 @@ impl ParsedAssetUrisQuery {
                 .filter(parsed_asset_uris::cdn_animation_uri.is_not_null())
                 .first::<ParsedAssetUrisQuery>(conn)
                 .optional()
-                .map_err(Into::into)
         };
 
-        let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(MAX_RETRY_TIME_SECONDS)),
-            ..Default::default()
-        };
-
-        retry(backoff, &mut op).unwrap_or_else(|e| {
+        aptos_retrier::retry(retry_strategy(), &mut op).unwrap_or_else(|e| {
             error!(asset_uri = asset_uri, error=?e, "Failed to get_by_raw_animation_uri");
             None
         })
