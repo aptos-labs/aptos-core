@@ -67,7 +67,7 @@ impl Cmd {
                     /*readonly=*/ false,
                     /*max_num_nodes_per_lru_cache_shard=*/ 0,
                     HotStateConfig {
-                        delete_on_restart: true,
+                        delete_on_restart: false,
                         ..HotStateConfig::default()
                     },
                 )?;
@@ -126,5 +126,94 @@ impl Cmd {
         println!("Done!");
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::test_helper::arb_blocks_to_commit_with_params;
+    use aptos_config::config::{
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        NO_OP_STORAGE_PRUNER_CONFIG,
+    };
+    use aptos_temppath::TempPath;
+    use aptos_types::transaction::Version;
+    use proptest::prelude::*;
+
+    fn open_db_with_persistent_hot_state(db_dir: &TempPath) -> AptosDB {
+        AptosDB::open(
+            StorageDirPaths::from_path(db_dir.path()),
+            /*readonly=*/ false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs::default(),
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig {
+                delete_on_restart: false,
+                ..HotStateConfig::default()
+            },
+        )
+        .unwrap()
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(5))]
+
+        #[test]
+        fn test_truncate_keeps_hot_state(
+            (input, num_blocks_to_keep) in arb_blocks_to_commit_with_params(
+                50,   /* num_accounts */
+                2,    /* max_user_txns_per_block */
+                4,    /* min_blocks */
+                10,   /* max_blocks */
+                true, /* make_hot_in_epilogue */
+            ).prop_flat_map(|blocks| {
+                let len = blocks.len();
+                (Just(blocks), 1..len)
+            }),
+        ) {
+            let hot_root_hash = |db: &AptosDB| {
+                let state = db.state_store.current_state_locked();
+                let latest = state.latest();
+                (latest.version(), latest.summary().hot_root_hash().unwrap())
+            };
+
+            let tmp_dir = TempPath::new();
+            let db = open_db_with_persistent_hot_state(&tmp_dir);
+            let mut version = 0;
+            let mut expected = None;
+            for (i, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
+                db.save_transactions_for_test(
+                    txns_to_commit,
+                    version,
+                    Some(ledger_info_with_sigs),
+                    true,
+                )
+                .unwrap();
+                version += txns_to_commit.len() as Version;
+                if i + 1 == num_blocks_to_keep {
+                    expected = Some(hot_root_hash(&db));
+                }
+            }
+            drop(db);
+
+            let expected = expected.unwrap();
+            Cmd {
+                db_dir: tmp_dir.path().to_path_buf(),
+                target_version: expected.0.unwrap(),
+                ledger_db_batch_size: 1000,
+                backup_checkpoint_dir: None,
+                opt_out_backup_checkpoint: true,
+            }
+            .run()
+            .unwrap();
+
+            prop_assert_eq!(
+                hot_root_hash(&open_db_with_persistent_hot_state(&tmp_dir)),
+                expected
+            );
+        }
     }
 }

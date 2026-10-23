@@ -93,6 +93,16 @@ impl std::fmt::Display for HumanReadable<&StateKey> {
                     account,
                     market,
                 } => write!(f, "position::{}::{}::{}", exchange, account, market),
+                TradingNativeKey::Order {
+                    exchange,
+                    market,
+                    order_id,
+                } => write!(f, "order::{}::{}::{}", exchange, market, order_id),
+                TradingNativeKey::BulkOrder {
+                    exchange,
+                    market,
+                    account,
+                } => write!(f, "bulk_order::{}::{}::{}", exchange, market, account),
             },
         }
     }
@@ -162,6 +172,20 @@ impl FromStr for HumanReadable<StateKey> {
                 let market = AccountAddress::from_str(market)?;
                 Ok(HumanReadable(StateKey::position(exchange, account, market)))
             },
+            ["order", exchange, market, order_id] => {
+                let exchange = AccountAddress::from_str(exchange)?;
+                let market = AccountAddress::from_str(market)?;
+                let order_id = order_id.parse::<u128>()?;
+                Ok(HumanReadable(StateKey::order(exchange, market, order_id)))
+            },
+            ["bulk_order", exchange, market, account] => {
+                let exchange = AccountAddress::from_str(exchange)?;
+                let market = AccountAddress::from_str(market)?;
+                let account = AccountAddress::from_str(account)?;
+                Ok(HumanReadable(StateKey::bulk_order(
+                    exchange, market, account,
+                )))
+            },
             _ => bail!("Unknown StateKey format: {}", s),
         }
     }
@@ -184,6 +208,8 @@ fn test_state_key_roundtrip() -> Result<()> {
         "raw::aabbccdd",
         "raw::",
         "position::0x5::0x1234::0x2",
+        "order::0x5::0x2::340282366920938463463374607431768211455",
+        "bulk_order::0x5::0x2::0x1234",
     ];
 
     for key in keys {

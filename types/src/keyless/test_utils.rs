@@ -293,7 +293,7 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = &*SAMPLE_JWK_SK;
-    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let mut jwt_sig = vec![0u8; sk.public().modulus_len()];
 
     sk.sign(
         &signature::RSA_PKCS1_SHA256,
@@ -309,7 +309,7 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
 }
 
 pub fn oidc_provider_sign(sk: &RsaKeyPair, msg: &[u8]) -> Vec<u8> {
-    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let mut jwt_sig = vec![0u8; sk.public().modulus_len()];
     let rng = ring::rand::SystemRandom::new();
     sk.sign(
         &signature::RSA_PKCS1_SHA256,
@@ -330,7 +330,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
     let sk = *SAMPLE_JWK_SK;
-    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let mut jwt_sig = vec![0u8; sk.public().modulus_len()];
 
     sk.sign(
         &signature::RSA_PKCS1_SHA256,

@@ -801,6 +801,23 @@ TradingNativeKey:
               TYPENAME: AccountAddress
           - market:
               TYPENAME: AccountAddress
+    1:
+      Order:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
+          - order_id: U128
+    2:
+      BulkOrder:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:

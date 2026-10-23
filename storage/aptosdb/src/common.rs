@@ -310,10 +310,6 @@ where
         }
     }
 
-    pub(crate) fn force_last_snapshot(&mut self, snapshot: S) {
-        self.last_snapshot = snapshot;
-    }
-
     /// Drain + shut down the commit pipeline against the current
     /// `current_state` family. Must run *before* any caller repoints
     /// `current_state` at a new MapLayer family — otherwise the
@@ -414,10 +410,6 @@ where
     pub(crate) fn sync_commit(&mut self) {
         let checkpoint = self.core.current_state.lock().last_checkpoint_snapshot();
         self.maybe_commit(Some(checkpoint), /* sync_commit = */ true);
-    }
-
-    pub(crate) fn force_last_snapshot(&mut self, snapshot: S) {
-        self.core.force_last_snapshot(snapshot);
     }
 
     fn maybe_commit(&mut self, checkpoint: Option<S>, sync_commit: bool) {
