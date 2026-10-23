@@ -236,11 +236,11 @@ impl DbWriter for AptosDB {
             if output_with_proof.proof.transaction_infos[0].hot_state_checkpoint_hash()
                 == Some(*SPARSE_MERKLE_PLACEHOLDER_HASH)
             {
-                StateStore::write_hot_state_null_node(
+                StateStore::write_empty_hot_state(
                     &self.state_store.hot_state_merkle_db,
+                    &self.state_store.hot_state_kv_db,
                     version,
                 )?;
-                self.state_store.hot_state_kv_db.write_progress(version)?;
             }
 
             // TODO(joshlind): include confirm_or_save_frozen_subtrees in the change set
