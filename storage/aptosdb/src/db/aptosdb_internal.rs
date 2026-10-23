@@ -337,9 +337,6 @@ impl AptosDB {
                 target_version = target_version,
                 "Hot state history starts at or after the target version, deleting it."
             );
-            // TODO(HotState): If catch-up doesn't run below, the hot DBs are left empty and a node
-            // with `delete_on_restart: false` panics on the next start for lack of hot KV commit
-            // progress. Seed the progress and a null hot root at the cold merkle version.
             drop(dbs);
             hot_state_config.delete_on_restart = true;
             dbs = open_dbs(hot_state_config)?;
@@ -381,6 +378,14 @@ impl AptosDB {
                     state_kv_db,
                     hot_state_config,
                 )?;
+            } else if hot_state_config.delete_on_restart {
+                // Without catch-up the deleted hot state isn't rebuilt, so seed the KV commit
+                // progress and the root that a restart with persistent hot state requires.
+                StateStore::write_hot_state_null_node(
+                    &hot_state_merkle_db,
+                    state_merkle_db_version,
+                )?;
+                hot_state_kv_db.write_progress(state_merkle_db_version)?;
             }
         }
 

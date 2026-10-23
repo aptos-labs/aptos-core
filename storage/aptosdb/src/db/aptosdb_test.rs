@@ -765,6 +765,10 @@ proptest! {
         AptosDB::truncate_to_version(&StorageDirPaths::from_path(tmp_dir.path()), target_version)
             .unwrap();
 
+        prop_assert_eq!(
+            open_db_with_persistent_hot_state(&tmp_dir).expect_synced_version(),
+            target_version
+        );
         prop_assert_eq!(open_db().expect_synced_version(), target_version);
     }
 }
