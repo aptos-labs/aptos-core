@@ -764,7 +764,6 @@ mod tests {
         max_items_per_shard: 100,
         refresh_interval_versions: 100,
         delete_on_restart: false,
-        compute_root_hash: true,
     };
 
     fn make_hot_slot(key: &StateKey, version: Version, value: &[u8]) -> StateSlot {
