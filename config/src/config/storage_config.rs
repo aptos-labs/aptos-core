@@ -258,9 +258,6 @@ pub struct HotStateConfig {
     pub refresh_interval_versions: u64,
     /// Whether to delete persisted data on disk on restart. Used during development.
     pub delete_on_restart: bool,
-    /// Whether we compute root hashes for hot state in executor and commit the resulting JMT to
-    /// db.
-    pub compute_root_hash: bool,
 }
 
 impl Default for HotStateConfig {
@@ -269,7 +266,6 @@ impl Default for HotStateConfig {
             max_items_per_shard: 250_000,
             refresh_interval_versions: 100_000,
             delete_on_restart: true,
-            compute_root_hash: true,
         }
     }
 }

@@ -586,7 +586,6 @@ mod tests {
         max_items_per_shard: 100,
         refresh_interval_versions: 100,
         delete_on_restart: false,
-        compute_root_hash: true,
     };
 
     /// Refresh interval used by the `apply_one_update` tests. Small so versions stay readable.
