@@ -102,12 +102,20 @@ impl OptProposalMsg {
         opt_qs_v2_enabled: bool,
         max_batch_txns: u64,
         max_batch_bytes: u64,
+        max_num_batch_entries: u64,
     ) -> Result<()> {
         ensure!(
             self.proposer() == sender,
             "OptProposal author {:?} doesn't match sender {:?}",
             self.proposer(),
             sender
+        );
+
+        // Ensure that the proposer is in the validator set
+        ensure!(
+            validator.get_voting_power(&self.proposer()).is_some(),
+            "OptProposal author {:?} is not in the validator set",
+            self.proposer()
         );
 
         let (payload_verify_result, qc_verify_result) = rayon::join(
@@ -119,6 +127,7 @@ impl OptProposalMsg {
                     opt_qs_v2_enabled,
                     max_batch_txns,
                     max_batch_bytes,
+                    max_num_batch_entries,
                 )
             },
             || self.block_data().grandparent_qc().verify(validator),
@@ -227,7 +236,8 @@ mod tests {
                 false,
                 false,
                 100,
-                1024 * 1024
+                1024 * 1024,
+                1000,
             )
             .is_ok());
     }
@@ -248,7 +258,8 @@ mod tests {
                 false,
                 false,
                 100,
-                1024 * 1024
+                1024 * 1024,
+                1000,
             )
             .is_err());
 
@@ -280,7 +291,8 @@ mod tests {
                 false,
                 false,
                 100,
-                1024 * 1024
+                1024 * 1024,
+                1000,
             )
             .is_err());
 
@@ -305,9 +317,40 @@ mod tests {
                 false,
                 false,
                 100,
-                1024 * 1024
+                1024 * 1024,
+                1000,
             )
             .is_err());
+    }
+
+    #[test]
+    fn test_verify_rejects_author_outside_validator_set() {
+        // Create a proposer that is not in the validator set
+        let (_signers, validators) = random_validator_verifier(1, None, false);
+        let outsider = ValidatorSigner::random([0u8; 32]);
+        assert!(
+            validators.get_voting_power(&outsider.author()).is_none(),
+            "test setup: signer must be outside the validator set"
+        );
+
+        // Create a proposal message with the outsider as the proposer
+        let msg = create_opt_proposal_msg(3, 1, &outsider);
+        let proof_cache = ProofCache::new(1024);
+
+        // Verify that the message fails verification due to the proposer not being in the set
+        let error = msg
+            .verify(
+                outsider.author(),
+                &validators,
+                &proof_cache,
+                false,
+                false,
+                100,
+                1024 * 1024,
+                1000,
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("is not in the validator set"),);
     }
 
     #[test]
@@ -327,7 +370,8 @@ mod tests {
                 false,
                 false,
                 100,
-                1024 * 1024
+                1024 * 1024,
+                1000,
             )
             .is_err());
     }
