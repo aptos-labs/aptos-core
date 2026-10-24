@@ -14,15 +14,19 @@ use crate::{
     },
     storage::{BackupStorage, FileHandle},
     utils::{
-        backup_service_client::BackupServiceClient, unix_timestamp_sec, ConcurrentDownloadsOpt,
-        GlobalBackupOpt,
+        backup_service_client::BackupServiceClient, read_record_bytes::ReadRecordBytes,
+        unix_timestamp_sec, ConcurrentDownloadsOpt, GlobalBackupOpt,
     },
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use aptos_db::backup::backup_handler::DbState;
 use aptos_infallible::duration_since_epoch;
 use aptos_logger::prelude::*;
-use aptos_types::transaction::Version;
+use aptos_types::{
+    contract_event::ContractEvent,
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
+};
 use clap::Parser;
 use futures::{stream, Future, StreamExt};
 use std::{
@@ -65,7 +69,8 @@ pub struct BackupCoordinatorOpt {
         to appear in the backup potentially 10 Million versions later. If the net work is running \
         at 1 thousand transactions per second, that is roughly 3 hours. On the other hand, if \
         backups are too frequent and hence small, it slows down loading the backup metadata by too \
-        many small files. "
+        many small files. Each backup is extended to the end of the block it would otherwise end \
+        in."
     )]
     pub transaction_batch_size: usize,
     #[clap(flatten)]
@@ -284,6 +289,7 @@ impl BackupCoordinator {
                 // wait for the next db_state update
                 return Ok(last_transaction_version_in_backup);
             }
+            let last = get_next_block_end(&self.client, last, db_state.committed_version).await?;
 
             TransactionBackupController::new(
                 TransactionBackupOpt {
@@ -499,6 +505,46 @@ fn get_batch_range(last_in_backup: Option<u64>, batch_size: usize) -> (u64, u64)
     })
 }
 
+/// Returns the first block end at or after `version`, so that a transaction backup ends on a block
+/// boundary, and the next one starts on one. `committed_version` bounds the search, as it's the
+/// version of a ledger info, hence a block end.
+async fn get_next_block_end(
+    client: &BackupServiceClient,
+    version: Version,
+    committed_version: Version,
+) -> Result<Version> {
+    ensure!(
+        version <= committed_version,
+        "Version {} is after the committed version {}.",
+        version,
+        committed_version,
+    );
+    // Reading stops at the first block end, which is usually close, so the rest of the response is
+    // dropped.
+    let mut records = client
+        .get_transactions(version, (committed_version - version + 1) as usize)
+        .await?;
+    let mut current_version = version;
+    while let Some(record_bytes) = records.read_record_bytes().await? {
+        let (_, _, txn_info, _, _): (
+            Transaction,
+            PersistedAuxiliaryInfo,
+            TransactionInfo,
+            Vec<ContractEvent>,
+            WriteSet,
+        ) = bcs::from_bytes(&record_bytes)?;
+        if txn_info.has_state_checkpoint_hash() {
+            return Ok(current_version);
+        }
+        current_version += 1;
+    }
+    bail!(
+        "No block end found between versions {} and {}.",
+        version,
+        committed_version,
+    )
+}
+
 fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: usize) -> u64 {
     // We don't try to guarantee snapshots are taken at each applicable interval: when the backup
     // progress can't keep up with the ledger growth, we favor timeliness over completeness.
@@ -518,8 +564,17 @@ fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: u
 
 #[cfg(test)]
 mod tests {
-    use crate::coordinators::backup::{get_batch_range, get_next_snapshot};
+    use crate::{
+        coordinators::backup::{get_batch_range, get_next_block_end, get_next_snapshot},
+        utils::{
+            backup_service_client::BackupServiceClient,
+            test_utils::{start_local_backup_service, tmp_db_with_random_content},
+        },
+    };
     use aptos_db::backup::backup_handler::DbState;
+    use aptos_storage_interface::DbReader;
+    use itertools::Itertools;
+    use std::{sync::Arc, time::Duration};
 
     #[test]
     fn test_get_batch_range() {
@@ -528,6 +583,43 @@ mod tests {
         assert_eq!(get_batch_range(Some(100), 50), (101, 150));
         assert_eq!(get_batch_range(Some(150), 100), (151, 200));
         assert_eq!(get_batch_range(Some(200), 100), (201, 300));
+    }
+
+    #[test]
+    fn test_get_next_block_end() {
+        let (_tmpdir, db, _) = tmp_db_with_random_content();
+        let (rt, port) = start_local_backup_service(Arc::clone(&db));
+        let client = BackupServiceClient::new(format!("http://localhost:{}", port));
+
+        let committed_version = db.get_latest_ledger_info_version().unwrap();
+        let block_ends: Vec<_> = db
+            .get_transaction_info_iterator(0, committed_version + 1)
+            .unwrap()
+            .positions(|txn_info| txn_info.unwrap().has_state_checkpoint_hash())
+            .collect();
+        // Some versions are in the middle of a block.
+        assert!(block_ends.len() as u64 <= committed_version);
+
+        for version in 0..=committed_version {
+            let expected = block_ends
+                .iter()
+                .find(|block_end| **block_end as u64 >= version)
+                .unwrap();
+            assert_eq!(
+                rt.block_on(get_next_block_end(&client, version, committed_version))
+                    .unwrap(),
+                *expected as u64,
+            );
+        }
+        assert!(rt
+            .block_on(get_next_block_end(
+                &client,
+                committed_version + 1,
+                committed_version
+            ))
+            .is_err());
+
+        rt.shutdown_timeout(Duration::from_secs(1));
     }
 
     #[test]
