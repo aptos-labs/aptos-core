@@ -31,7 +31,7 @@ use std::collections::BTreeMap;
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
-        mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender},
+        mpsc::{Receiver, RecvTimeoutError, SyncSender},
         Arc, Weak,
     },
     time::{Duration, Instant},
@@ -196,15 +196,6 @@ impl LoadedHotState {
     }
 }
 
-enum CommitMsg {
-    Commit(State),
-    /// Acknowledged after the new base and matching state are published.
-    InstallSnapshot {
-        snapshot: LoadedHotState,
-        ack: Sender<()>,
-    },
-}
-
 /// Bundles the committed `State` with a `HotStateView` that is consistent with it.
 struct CommittedSnapshot {
     state: State,
@@ -213,16 +204,16 @@ struct CommittedSnapshot {
 
 pub struct HotState {
     committed: Arc<Mutex<CommittedSnapshot>>,
-    commit_tx: SyncSender<CommitMsg>,
-    /// Next version represented by the base, updated after merges and snapshot installation.
-    /// Tests use it to wait before inspecting the base.
+    commit_tx: SyncSender<State>,
+    /// Next version represented by the base, updated after merges. Tests use it to wait before
+    /// inspecting the base.
     #[cfg(test)]
     merged_version: Arc<AtomicU64>,
 }
 
 impl HotState {
-    pub fn new_empty(state: State) -> Self {
-        let LoadedHotState { state, shards } = LoadedHotState::empty(state);
+    pub(crate) fn new(snapshot: LoadedHotState) -> Self {
+        let LoadedHotState { state, shards } = snapshot;
         let base = Arc::new(HotStateBase::from_loaded(shards));
         let view = Arc::new(LayeredHotStateView {
             delta: None,
@@ -248,21 +239,6 @@ impl HotState {
         }
     }
 
-    /// Publishes a snapshot synchronously; existing reader views remain valid.
-    /// Callers must wait for queued commits to be processed and prevent new commits until return.
-    pub(crate) fn install_snapshot(&self, snapshot: LoadedHotState) {
-        let (ack_tx, ack_rx) = std::sync::mpsc::channel();
-        self.commit_tx
-            .send(CommitMsg::InstallSnapshot {
-                snapshot,
-                ack: ack_tx,
-            })
-            .expect("Failed to send snapshot installation to hot state committer.");
-        ack_rx
-            .recv()
-            .expect("Failed to receive snapshot installation ack from hot state committer.");
-    }
-
     pub fn get_committed(&self) -> (Arc<dyn HotStateView>, State) {
         let committed = self.committed.lock();
         (
@@ -275,7 +251,7 @@ impl HotState {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_enqueue_commit"]);
 
         self.commit_tx
-            .send(CommitMsg::Commit(to_commit))
+            .send(to_commit)
             .expect("Failed to queue for hot state commit.")
     }
 
@@ -324,7 +300,7 @@ impl HotState {
 struct Committer {
     base: Arc<HotStateBase>,
     committed: Arc<Mutex<CommittedSnapshot>>,
-    rx: Receiver<CommitMsg>,
+    rx: Receiver<State>,
     total_value_bytes: [usize; NUM_STATE_SHARDS],
     /// Points to the newest entry. `None` if empty.
     heads: [Option<HashValue>; NUM_STATE_SHARDS],
@@ -349,11 +325,13 @@ impl Committer {
         committed: Arc<Mutex<CommittedSnapshot>>,
         initial_state: State,
         merged_version: Arc<AtomicU64>,
-    ) -> SyncSender<CommitMsg> {
+    ) -> SyncSender<State> {
         let (tx, rx) = std::sync::mpsc::sync_channel(MAX_HOT_STATE_COMMIT_BACKLOG);
+        // Built on the caller's thread, so a base inconsistent with its metadata panics there.
+        let mut committer = Self::new(base, committed, rx, initial_state, merged_version);
         std::thread::Builder::new()
             .name("hotstate-commit".to_string())
-            .spawn(move || Self::new(base, committed, rx, initial_state, merged_version).run())
+            .spawn(move || committer.run())
             .expect("Failed to spawn hot state committer thread");
 
         tx
@@ -362,7 +340,7 @@ impl Committer {
     fn new(
         base: Arc<HotStateBase>,
         committed: Arc<Mutex<CommittedSnapshot>>,
-        rx: Receiver<CommitMsg>,
+        rx: Receiver<State>,
         initial_state: State,
         merged_version: Arc<AtomicU64>,
     ) -> Self {
@@ -370,7 +348,7 @@ impl Committer {
         let tails = std::array::from_fn(|i| initial_state.oldest_hot_key(i));
         let total_value_bytes = std::array::from_fn(|i| initial_state.hot_value_bytes(i));
 
-        Self {
+        let committer = Self {
             base,
             committed,
             rx,
@@ -380,7 +358,16 @@ impl Committer {
             merged_state: initial_state,
             old_views: Vec::new(),
             merged_version,
-        }
+        };
+        committer.check_base_matches_metadata();
+        committer.report_size_metrics();
+        committer.report_age_metrics();
+        info!(
+            next_version = committer.merged_state.next_version(),
+            num_items = committer.base.len(),
+            "HotState base loaded.",
+        );
+        committer
     }
 
     fn run(&mut self) {
@@ -443,20 +430,15 @@ impl Committer {
         info!("HotState committer quitting.");
     }
 
-    fn install_snapshot(&mut self, snapshot: LoadedHotState) {
-        let LoadedHotState { state, shards } = snapshot;
-        // Retained views need their original base for keys outside their deltas.
-        self.base = Arc::new(HotStateBase::from_loaded(shards));
-
+    /// Checks that the base rows agree with the LRU metadata in `merged_state`.
+    fn check_base_matches_metadata(&self) {
         for i in 0..NUM_STATE_SHARDS {
-            let head = state.latest_hot_key(i);
-            let tail = state.oldest_hot_key(i);
             assert_eq!(
                 self.base.shards[i].len(),
-                state.num_hot_items(i),
-                "Shard {i}: DashMap/metadata item count mismatch on snapshot installation.",
+                self.merged_state.num_hot_items(i),
+                "Shard {i}: DashMap/metadata item count mismatch.",
             );
-            match (head, tail) {
+            match (self.heads[i], self.tails[i]) {
                 (None, None) => assert_eq!(
                     self.base.shards[i].len(),
                     0,
@@ -480,48 +462,14 @@ impl Committer {
                 },
                 _ => panic!("Shard {i}: head and tail must both be None or both be Some."),
             }
-            self.heads[i] = head;
-            self.tails[i] = tail;
-            self.total_value_bytes[i] = state.hot_value_bytes(i);
         }
-        self.merged_state = state;
-        self.merged_version
-            .store(self.merged_state.next_version(), Ordering::Release);
-        // Views of the old base cannot block merges into the new one.
-        self.old_views.clear();
-
-        {
-            let mut committed = self.committed.lock();
-            committed.state = self.merged_state.clone();
-            // The loaded base already represents this state, so the view needs no delta.
-            committed.view = Arc::new(LayeredHotStateView {
-                delta: None,
-                base: Arc::clone(&self.base),
-            });
-        }
-
-        self.report_size_metrics();
-        self.report_age_metrics();
-        info!(
-            next_version = self.merged_state.next_version(),
-            num_items = self.base.len(),
-            "HotState snapshot installed.",
-        );
     }
 
     fn next_to_commit(&mut self) -> Option<State> {
         // Wait for commits, retrying deferred merges on timeout.
         let first = loop {
             match self.rx.recv_timeout(DEFERRED_MERGE_RETRY_INTERVAL) {
-                Ok(CommitMsg::Commit(state)) => break state,
-                Ok(CommitMsg::InstallSnapshot { snapshot, ack }) => {
-                    assert!(
-                        self.rx.try_recv().is_err(),
-                        "Snapshot installation requires an empty commit queue."
-                    );
-                    self.install_snapshot(snapshot);
-                    let _ = ack.send(());
-                },
+                Ok(state) => break state,
                 Err(RecvTimeoutError::Timeout) => {
                     self.try_merge();
                 },
@@ -532,16 +480,9 @@ impl Committer {
         // Each queued state subsumes earlier commits, so only the newest needs publication.
         let mut ret = first;
         let mut n_backlog = 0;
-        while let Ok(msg) = self.rx.try_recv() {
-            match msg {
-                CommitMsg::Commit(state) => {
-                    n_backlog += 1;
-                    ret = state;
-                },
-                CommitMsg::InstallSnapshot { .. } => {
-                    unreachable!("Snapshot installation requires all commits to finish.");
-                },
-            }
+        while let Ok(state) = self.rx.try_recv() {
+            n_backlog += 1;
+            ret = state;
         }
 
         GAUGE.set_with(&["hot_state_commit_backlog"], n_backlog);
@@ -962,7 +903,7 @@ mod tests {
     #[test]
     fn test_deferred_merge_basic() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new_empty(state0.clone());
+        let hot_state = HotState::new(LoadedHotState::empty(state0.clone()));
 
         let state1 = build_empty_descendant(&state0, &state0, 0);
         hot_state.enqueue_commit(state1);
@@ -975,7 +916,7 @@ mod tests {
     #[test]
     fn test_deferred_merge_with_lingering_reader() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new_empty(state0.clone());
+        let hot_state = HotState::new(LoadedHotState::empty(state0.clone()));
 
         // Grab a view — this reader holds a strong ref to the initial view.
         let (held_view, _) = hot_state.get_committed();
@@ -1022,7 +963,7 @@ mod tests {
     #[test]
     fn test_try_merge_tracks_replaced_view() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new_empty(state0.clone());
+        let hot_state = HotState::new(LoadedHotState::empty(state0.clone()));
 
         // Hold the initial view (V0_clean). This blocks merge while S1 is committed,
         // keeping V1_delta in committed.view long enough for us to grab it.
@@ -1084,7 +1025,7 @@ mod tests {
     #[test]
     fn test_commit_with_advanced_base_layer() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new_empty(state0.clone());
+        let hot_state = HotState::new(LoadedHotState::empty(state0.clone()));
 
         // Hold a view to block all merges (merged_state stays at S0).
         let (held_view, _) = hot_state.get_committed();
@@ -1116,7 +1057,7 @@ mod tests {
     #[test]
     fn test_rapid_commits_with_lingering_reader() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new_empty(state0.clone());
+        let hot_state = HotState::new(LoadedHotState::empty(state0.clone()));
 
         // Grab a view.
         let (held_view, _) = hot_state.get_committed();
