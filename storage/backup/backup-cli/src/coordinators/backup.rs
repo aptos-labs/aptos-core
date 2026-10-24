@@ -388,7 +388,7 @@ impl BackupCompactor {
             if let Some(timestamp) = compaction_timestamps.get(&file.to_string()) {
                 if let Some(time_value) = timestamp {
                     // file is in metadata_compaction_timestamps and expired
-                    if now > (*time_value + self.remove_compacted_files_after_secs) {
+                    if now > time_value.saturating_add(self.remove_compacted_files_after_secs) {
                         expired_files.push(file);
                     } else {
                         to_save_files.insert(file.to_string(), *timestamp);
@@ -407,6 +407,16 @@ impl BackupCompactor {
     }
 
     pub async fn run(self) -> Result<()> {
+        // Validate all compaction factors up front so an invalid one can't leave the metadata
+        // partially compacted.
+        for (name, factor) in [
+            ("epoch ending", self.epoch_ending_file_compact_factor),
+            ("state snapshot", self.state_snapshot_file_compact_factor),
+            ("transaction", self.transaction_file_compact_factor),
+        ] {
+            ensure!(factor > 0, "{} file compact factor must be positive.", name);
+        }
+
         info!("Backup compaction started");
         // sync the metadata from backup storage
         let mut metaview = metadata::cache::sync_and_load(

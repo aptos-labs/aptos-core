@@ -303,13 +303,16 @@ impl TransactionRestoreBatchController {
         }
 
         let mut loaded_chunk_stream = self.loaded_chunk_stream();
-        // If first_version is None, we confirm and save frozen substrees to create a baseline
-        // When first version is not None, it only happens when we already finish first phase of db restore and
-        // we don't need to confirm and save frozen subtrees again.
-        let first_version = self.first_version.unwrap_or(
-            self.confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
-                .await?,
-        );
+        // Always confirm (or save, if missing) the frozen subtrees of the first chunk: the
+        // transaction accumulator can only be extended from a chunk that doesn't start at
+        // version 0 if its left siblings are in the DB (e.g. phase 1 of RestoreCoordinator
+        // passes Some(0) on a fresh DB whose backups start later). This is idempotent when
+        // they are already present. The chunk's first version is the baseline only when the
+        // caller didn't provide one.
+        let first_chunk_version = self
+            .confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
+            .await?;
+        let first_version = self.first_version.unwrap_or(first_chunk_version);
         if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
             ensure!(
                 self.output_transaction_analysis.is_none(),
