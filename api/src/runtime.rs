@@ -49,7 +49,12 @@ pub fn bootstrap(
     port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<Runtime> {
     let max_runtime_workers = get_max_runtime_workers(&config.api);
-    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
+    let max_blocking_threads = get_max_blocking_threads(&config.api);
+    let runtime = aptos_runtimes::spawn_named_runtime_with_blocking_threads(
+        "api".into(),
+        Some(max_runtime_workers),
+        Some(max_blocking_threads),
+    );
 
     let context = Context::new(chain_id, db, mp_sender, config.clone(), indexer_reader);
 
@@ -299,10 +304,16 @@ fn get_max_runtime_workers(api_config: &ApiConfig) -> usize {
         .unwrap_or_else(|| num_cpus::get() * api_config.runtime_worker_multiplier)
 }
 
+fn get_max_blocking_threads(api_config: &ApiConfig) -> usize {
+    api_config
+        .max_blocking_threads
+        .unwrap_or(aptos_runtimes::DEFAULT_MAX_BLOCKING_THREADS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::bootstrap;
-    use crate::runtime::get_max_runtime_workers;
+    use crate::runtime::{get_max_blocking_threads, get_max_runtime_workers};
     use aptos_api_test_context::{new_test_context, TestContext};
     use aptos_config::config::{ApiConfig, NodeConfig};
     use aptos_types::chain_id::ChainId;
@@ -353,6 +364,27 @@ mod tests {
         assert_eq!(
             get_max_runtime_workers(&api_config),
             num_cpus::get() * api_config.runtime_worker_multiplier
+        );
+    }
+
+    #[test]
+    fn test_max_blocking_threads() {
+        let max_blocking_threads = 256;
+        let api_config = ApiConfig {
+            max_blocking_threads: Some(max_blocking_threads),
+            ..Default::default()
+        };
+
+        assert_eq!(get_max_blocking_threads(&api_config), max_blocking_threads);
+
+        let api_config = ApiConfig {
+            max_blocking_threads: None,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            get_max_blocking_threads(&api_config),
+            aptos_runtimes::DEFAULT_MAX_BLOCKING_THREADS
         );
     }
 
