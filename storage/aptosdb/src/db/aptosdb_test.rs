@@ -508,7 +508,8 @@ proptest! {
             version += num_txns as Version;
         }
         let hot_root_hashes = |db: &AptosDB| {
-            let state = db.state_store.current_state_locked();
+            let live = db.state_store.live().unwrap();
+            let state = live.current_state_locked();
             [state.latest(), state.last_checkpoint()]
                 .map(|s| (s.version(), s.summary().hot_root_hash().unwrap()))
         };
