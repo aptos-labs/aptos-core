@@ -18,7 +18,9 @@ above this crate.
   storage fees are none of them charged. The pre-execution checks still bound
   the budget against those costs. Do not treat a gas mismatch against the
   legacy VM as a regression.
-- Past the prologue, a transaction always commits and charges the fee.
+- Past the prologue, a transaction always commits and charges the fee. The one
+  exception is a failure to create the sender's account, which discards as in
+  AptosVM.
 - Materialization is optional. Nothing on the execution path may call into
   `materialize/` -- it is up to the higher-level coordinator to decide when to
   call it.

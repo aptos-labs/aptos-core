@@ -5,6 +5,7 @@
 //! checks, the prologue, the payload, and the epilogue.
 
 use super::{
+    account::{create_account, needs_account_creation},
     entry_func::call_entry_function,
     keyless::validate_keyless_authenticators,
     metadata::TxnMetadata,
@@ -140,14 +141,16 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                     ))
                 })?
         };
-        PreExecutionChecker::new(
+        let checker = PreExecutionChecker::new(
             gas_params,
             self.env.gas_feature_version(),
             approved_gov_scripts.as_ref(),
+            self.env.features(),
             txn_data,
-        )
-        .run_checks()
-        .map_err(DiscardReason::PreExecutionCheck)?;
+        );
+        checker
+            .run_checks()
+            .map_err(DiscardReason::PreExecutionCheck)?;
 
         // TODO(completeness): multisig payloads. Refused for now, since the
         // inner executable must run as the multisig account, not the sender.
@@ -174,6 +177,22 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         let signers = ValidationSigners::new(txn_data);
 
+        // Lazy account creation checks
+        //
+        // The sender's first transaction may come from an address holding no
+        // `Account` resource yet. Decide here whether to create it after the
+        // prologue, and if so, that the budget covers it.
+        let create_sender_account = needs_account_creation(interp, self.symbols, txn_data)
+            .map_err(|e| DiscardReason::Failure {
+                stage: ExecutionStage::AccountCreation,
+                failure: MoveExecutionFailure::RuntimeError(e),
+            })?;
+        if create_sender_account {
+            checker
+                .check_gas_budget_covers_account_creation()
+                .map_err(DiscardReason::PreExecutionCheck)?;
+        }
+
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
         run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
@@ -182,17 +201,29 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 failure,
             }
         })?;
-        // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
+
+        // ========================= Account creation =========================
+        // Create the sender's account if needed. This sits between the prologue
+        // and the checkpoint below, so that it survives the payload's rollback.
+        if create_sender_account {
+            self.run_metered(interp, |interp| {
+                create_account(interp, self.symbols, &txn_data.sender)
+            })
+            .map_err(|failure| DiscardReason::Failure {
+                stage: ExecutionStage::AccountCreation,
+                failure,
+            })?;
+        }
+        // A failed payload rolls back to here, so the prologue's effects (e.g.
+        // nonce insertion) and the created account survive.
         checkpoint(interp)?;
 
         // ========================== User payload ============================
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
-        let payload_result = if self.unmetered {
-            interp.unmetered(|interp| self.execute_payload(interp, txn_data, &executable, ty_args))
-        } else {
+        let payload_result = self.run_metered(interp, |interp| {
             self.execute_payload(interp, txn_data, &executable, ty_args)
-        };
+        });
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
 
@@ -295,6 +326,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         };
 
         call_result(status)
+    }
+
+    /// Runs `f` metered against the transaction's budget, or unmetered if the
+    /// executor was built `without_metering`.
+    fn run_metered<R>(
+        &self,
+        interp: &mut InterpreterContext<'guard>,
+        f: impl FnOnce(&mut InterpreterContext<'guard>) -> R,
+    ) -> R {
+        if self.unmetered {
+            interp.unmetered(f)
+        } else {
+            f(interp)
+        }
     }
 }
 

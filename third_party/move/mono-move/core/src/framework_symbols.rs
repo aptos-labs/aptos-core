@@ -10,6 +10,7 @@ use crate::{
     Interner,
 };
 use aptos_types::{
+    account_config::AccountResource,
     jwks::{FederatedJWKs, PatchedJWKs},
     on_chain_config::{ApprovedExecutionHashes, CurrentTimeMicroseconds, OnChainConfig},
 };
@@ -34,6 +35,13 @@ pub struct FrameworkSymbols {
     pub transaction_validation: InternedModuleId,
     pub versioned_prologue: InternedIdentifier,
     pub versioned_epilogue: InternedIdentifier,
+
+    /// `0x1::account`, which creates the sender's account on its first
+    /// transaction.
+    pub account: InternedModuleId,
+    pub create_account_if_does_not_exist: InternedIdentifier,
+    /// `0x1::account::Account`.
+    pub account_resource: InternedType,
 
     /// `0x1::object`, whose `Object<T>` arguments the VM checks against the
     /// `ObjectCore` and `T` resources under the object's address.
@@ -67,6 +75,12 @@ impl FrameworkSymbols {
             transaction_validation: module(ident_str!("transaction_validation")),
             versioned_prologue: identifier(ident_str!("versioned_prologue")),
             versioned_epilogue: identifier(ident_str!("versioned_epilogue")),
+
+            account: module(ident_str!("account")),
+            create_account_if_does_not_exist: identifier(ident_str!(
+                "create_account_if_does_not_exist"
+            )),
+            account_resource: resource_type::<AccountResource>(interner),
 
             object,
             object_struct: identifier(ident_str!("Object")),
