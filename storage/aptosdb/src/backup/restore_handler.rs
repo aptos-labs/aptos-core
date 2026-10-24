@@ -56,7 +56,7 @@ impl RestoreHandler {
     }
 
     pub fn reset_state_store(&self) -> Result<()> {
-        self.state_store.reset();
+        self.state_store.reload();
         self.aptosdb.reset_position_store_to_ledger()
     }
 
