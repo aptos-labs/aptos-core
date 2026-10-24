@@ -1,13 +1,13 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/folds_of_consuming.move:42:5: error: the loop invariant `sum
         == «spec_fold_idx$lambda$1»(
-          with_state_anchor!(18, old(sum)), n - remaining,
+          with_state_anchor!(16, old(sum)), n - remaining,
           with_state_anchor!(14, old(v)), n
         )
         && (∀ (_j_19 in 0 .. n - remaining),
           !(«spec_fold_idx$lambda$1»(
             with_state_anchor!(
-              18, old(sum)
+              16, old(sum)
             ), _j_19, with_state_anchor!(14, old(v)),
             n
           )
@@ -56,18 +56,18 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:57:5: error: ve
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_consuming.move:62:5: error: the loop invariant `digits
         == «spec_fold_idx$lambda$0»(
-          with_state_anchor!(12, old(digits)), n - remaining,
+          with_state_anchor!(11, old(digits)), n - remaining,
           with_state_anchor!(9, old(v)), n
         )
         && (∀ (_j_13 in 0 .. n - remaining),
           !(«spec_fold_idx$lambda$0»(
-            with_state_anchor!(12, old(digits)), _j_13,
+            with_state_anchor!(11, old(digits)), _j_13,
             with_state_anchor!(9, old(v)), n
           )
             * 10
             > MAX_U64
             || «spec_fold_idx$lambda$0»(
-              with_state_anchor!(12, old(digits)), _j_13,
+              with_state_anchor!(11, old(digits)), _j_13,
               with_state_anchor!(9, old(v)), n
             )
               * 10
@@ -84,13 +84,13 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:70:5: error: ve
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_consuming.move:75:5: error: the loop invariant `sum
         == «spec_fold_idx$lambda$2»(
-          with_state_anchor!(24, old(sum)), n - remaining,
+          with_state_anchor!(22, old(sum)), n - remaining,
           with_state_anchor!(20, old(v)), n
         )
         && (∀ (_j_25 in 0 .. n - remaining),
           !(«spec_fold_idx$lambda$2»(
             with_state_anchor!(
-              24, old(sum)
+              22, old(sum)
             ), _j_25, with_state_anchor!(20, old(v)),
             n
           )

@@ -1,0 +1,30 @@
+Move prover returns: exiting with verification errors
+warning: cannot derive `folds_of` exactly for this lambda argument: the lambda combines captured-variable writes or abort conditions with global state access, whose per-iteration evaluation state is not expressible in a loop invariant; those parts are dropped from it; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/folds_of_projection.move:18:23
+    │
+ 18 │                 invariant folds_of<f>(v, i);
+    │                           ^^^^^^^^^^^^^^^^^
+    ·
+166 │ ╭           each_ref(v, |e| {
+    │ │ ╭─────────────────────'
+167 │ │ │             a = a + *e;
+168 │ │ │             b = b + borrow_global<Config>(@0x42).scale;
+169 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the lambda combines captured-variable writes or abort conditions with global state access, whose per-iteration evaluation state is not expressible in a loop invariant; those parts are dropped from it; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/folds_of_projection.move:18:23
+    │
+ 18 │                 invariant folds_of<f>(v, i);
+    │                           ^^^^^^^^^^^^^^^^^
+    ·
+181 │ ╭           each_ref(v, |e| {
+    │ │ ╭─────────────────────'
+182 │ │ │             a = a + *e;
+183 │ │ │             b = b + borrow_global<Config>(@0x42).scale;
+184 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+tests/sources/functional/closures/inline/.verex/folds_of_projection.move.lean:382:15: error: VEREX-CALL-NAME: unknown function `spec_fold$gen$3`
