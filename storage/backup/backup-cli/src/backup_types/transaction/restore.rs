@@ -571,7 +571,9 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let arc_restore_handler = Arc::new(restore_handler.clone());
 
-        let db_commit_stream = batch_by_blocks(txns_to_execute_stream)
+        // Every batch is committed, so the partial block at the end is left out for the restore to
+        // end at the last block end at or before the target.
+        let db_commit_stream = batch_by_blocks(txns_to_execute_stream, false)
             .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
@@ -652,7 +654,9 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db));
-        let ledger_update_stream = batch_by_blocks(txns_to_execute_stream)
+        // The partial block at the end is still replayed for verification, but the replayer holds it
+        // back and drops it, so the restore ends at the last block end at or before the target.
+        let ledger_update_stream = batch_by_blocks(txns_to_execute_stream, true)
             .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
@@ -700,7 +704,7 @@ impl TransactionRestoreBatchController {
             })
             .try_buffered_x(3, 1);
 
-        let mut total_replayed = db_commit_stream
+        let total_replayed = db_commit_stream
             .and_then(|()| {
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
@@ -727,14 +731,6 @@ impl TransactionRestoreBatchController {
             .try_fold(0, |_prev_total, total| future::ok(total))
             .await?;
 
-        // The restore target can fall inside a block.
-        let replayer = Arc::clone(&chunk_replayer);
-        if let Some(version) =
-            tokio::task::spawn_blocking(move || replayer.commit_partial_block()).await??
-        {
-            total_replayed = version + 1 - first_version;
-            TRANSACTION_REPLAY_VERSION.set(version as i64);
-        }
         // assert all chunks are fully processed and in DB.
         assert!(chunk_replayer.is_empty());
 
@@ -800,13 +796,15 @@ type TxnToReplay = (
     Vec<ContractEvent>,
 );
 
-/// Groups txns to replay into batches with `BlockBatcher`.
+/// Groups txns to replay into batches with `BlockBatcher`. The partial block at the end, if the
+/// restore target is in the middle of one, is a batch only if `with_partial_block`.
 fn batch_by_blocks(
     txns: impl Stream<Item = Result<TxnToReplay>>,
+    with_partial_block: bool,
 ) -> impl Stream<Item = Result<Vec<TxnToReplay>>> {
     txns.map_ok(Some)
         .chain(stream::once(future::ok(None)))
-        .scan(BlockBatcher::new(BATCH_SIZE), |batcher, txn| {
+        .scan(BlockBatcher::new(BATCH_SIZE), move |batcher, txn| {
             future::ready(Some(txn.map(|txn| match txn {
                 Some(txn) => {
                     let (_, _, txn_info, _, events) = &txn;
@@ -814,7 +812,7 @@ fn batch_by_blocks(
                     let ends_epoch = events.iter().any(ContractEvent::is_new_epoch_event);
                     batcher.push(txn, ends_block, ends_epoch)
                 },
-                None => batcher.finish(),
+                None => batcher.finish().filter(|_| with_partial_block),
             })))
         })
         .try_filter_map(future::ok)
@@ -866,73 +864,90 @@ mod tests {
     use aptos_executor_types::VerifyExecutionMode;
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
+    use aptos_types::transaction::Version;
     use futures::stream;
     use itertools::{izip, Itertools};
     use std::{collections::HashSet, sync::Arc};
 
     #[tokio::test]
-    async fn test_replay_commits_partial_block() {
+    async fn test_replay_ends_at_block_end() {
         let source_path = TempPath::new();
         let source = test_execution_with_storage_impl_inner(false, source_path.path());
-        // The block after genesis ends at version 11.
-        let target_version = 10;
+        let source_version = source.expect_synced_version();
         let (outputs, persisted_aux_info) = source
-            .get_transaction_outputs(0, target_version + 1, source.expect_synced_version())
+            .get_transaction_outputs(0, source_version + 1, source_version)
             .unwrap()
             .into_parts();
-        assert!(!outputs
-            .proof
-            .transaction_infos
-            .last()
-            .unwrap()
-            .has_state_checkpoint_hash());
-        let transactions = izip!(
+        let transactions: Vec<_> = izip!(
             outputs.transactions_and_outputs,
             persisted_aux_info,
             outputs.proof.transaction_infos,
         )
         .map(|((transaction, output), aux_info, info)| {
-            Ok((
+            (
                 transaction,
                 aux_info,
                 info,
                 output.write_set().clone(),
                 output.events().to_vec(),
-            ))
-        });
+            )
+        })
+        .collect();
+        let block_ends: Vec<_> = transactions
+            .iter()
+            .positions(|(_, _, info, ..)| info.has_state_checkpoint_hash())
+            .map(|idx| idx as Version)
+            .collect();
+        // A target in the middle of the second block after genesis.
+        let last_block_end = block_ends[1];
+        let target_version = block_ends[2] - 1;
+        assert!(target_version > last_block_end);
 
-        let target_path = TempPath::new();
-        let target = Arc::new(AptosDB::new_for_test(target_path.path()));
-        let restore_handler = target.get_restore_handler();
-        let backup_path = TempPath::new();
-        let controller = TransactionRestoreBatchController::new(
-            GlobalRestoreOptions {
-                target_version,
-                trusted_waypoints: Arc::new(Default::default()),
-                run_mode: Arc::new(RestoreRunMode::Restore {
-                    restore_handler: restore_handler.clone(),
-                }),
-                concurrent_downloads: 1,
-                replay_concurrency_level: 1,
-            },
-            Arc::new(LocalFs::new(backup_path.path().to_path_buf())),
-            vec![],
-            None,
-            Some((0, false)),
-            None,
-            VerifyExecutionMode::NoVerify,
-            None,
-        );
-        controller
-            .replay_transactions(&restore_handler, stream::iter(transactions))
-            .await
-            .unwrap();
+        for kv_only in [false, true] {
+            let target_path = TempPath::new();
+            let target = Arc::new(AptosDB::new_for_test(target_path.path()));
+            let restore_handler = target.get_restore_handler();
+            let backup_path = TempPath::new();
+            let controller = TransactionRestoreBatchController::new(
+                GlobalRestoreOptions {
+                    target_version,
+                    trusted_waypoints: Arc::new(Default::default()),
+                    run_mode: Arc::new(RestoreRunMode::Restore {
+                        restore_handler: restore_handler.clone(),
+                    }),
+                    concurrent_downloads: 1,
+                    replay_concurrency_level: 1,
+                },
+                Arc::new(LocalFs::new(backup_path.path().to_path_buf())),
+                vec![],
+                None,
+                Some((0, kv_only)),
+                None,
+                // Full replay verifies the partial block at the end, without committing it.
+                VerifyExecutionMode::verify_all(),
+                None,
+            );
+            let txns = stream::iter(
+                transactions[..=target_version as usize]
+                    .iter()
+                    .cloned()
+                    .map(Ok),
+            );
+            if kv_only {
+                controller.replay_kv(&restore_handler, txns).await.unwrap();
+            } else {
+                controller
+                    .replay_transactions(&restore_handler, txns)
+                    .await
+                    .unwrap();
+            }
 
-        assert_eq!(target.expect_synced_version(), target_version);
-        assert_eq!(
-            target.get_accumulator_root_hash(target_version).unwrap(),
-            source.get_accumulator_root_hash(target_version).unwrap(),
-        );
+            assert_eq!(target.expect_synced_version(), last_block_end);
+            assert_eq!(
+                target.get_accumulator_root_hash(last_block_end).unwrap(),
+                source.get_accumulator_root_hash(last_block_end).unwrap(),
+            );
+        }
     }
 
     #[tokio::test]
