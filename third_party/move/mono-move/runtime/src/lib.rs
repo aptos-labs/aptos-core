@@ -32,4 +32,4 @@ pub use native_context::{
     ProductionNativeRegistry,
 };
 pub use types::{DEFAULT_HEAP_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use value_conv::bcs::{deserialize_into, serialize};
+pub use value_conv::bcs::{deserialize_into, serialize, unsupported_stored_value};

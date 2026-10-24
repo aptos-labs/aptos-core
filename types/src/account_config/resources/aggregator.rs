@@ -51,6 +51,10 @@ impl AggregatorV1Resource {
         Self { handle, key, limit }
     }
 
+    pub fn limit(&self) -> u128 {
+        self.limit
+    }
+
     /// Helper function to return the state key where the actual value is stored.
     pub fn state_key(&self) -> StateKey {
         StateKey::table_item(&TableHandle(self.handle), self.key.as_ref())
@@ -62,6 +66,12 @@ impl AggregatorV1Resource {
 pub struct IntegerResource {
     pub value: u128,
     limit: u128,
+}
+
+impl IntegerResource {
+    pub fn new(value: u128, limit: u128) -> Self {
+        Self { value, limit }
+    }
 }
 
 /// Rust representation of OptionalAggregator Move struct.
