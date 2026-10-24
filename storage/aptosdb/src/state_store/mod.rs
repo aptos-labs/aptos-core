@@ -175,6 +175,18 @@ pub(crate) struct StateDb {
     pub skip_usage: bool,
 }
 
+/// How `StateStore` initializes its in-memory state on open.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum StateStoreMode {
+    /// Truncates the DBs to the overall commit progress, loads the latest snapshot and replays the
+    /// write sets committed after it.
+    ReadWrite,
+    /// Loads the latest snapshot as is, since truncation and replay both write.
+    ReadOnly,
+    /// Starts from an empty state, since a restore in progress has no consistent state to load.
+    Restore,
+}
+
 pub(crate) struct StateStore {
     pub state_db: Arc<StateDb>,
     /// The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
@@ -454,13 +466,12 @@ impl StateStore {
         state_kv_db: Arc<StateKvDb>,
         state_pruner: StatePruner,
         buffered_state_target_items: usize,
-        hack_for_tests: bool,
-        empty_buffered_state_for_restore: bool,
+        mode: StateStoreMode,
         skip_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
     ) -> Self {
-        if !hack_for_tests && !empty_buffered_state_for_restore {
+        if mode == StateStoreMode::ReadWrite {
             Self::sync_commit_progress(
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
@@ -485,26 +496,27 @@ impl StateStore {
             hot_state_config,
         )));
         let persisted_state = PersistedState::new_empty(hot_state_config);
-        let buffered_state = if empty_buffered_state_for_restore {
-            BufferedState::new_at_snapshot(
+        let buffered_state = match mode {
+            StateStoreMode::ReadWrite | StateStoreMode::ReadOnly => {
+                Self::create_buffered_state_from_latest_snapshot(
+                    &state_db,
+                    buffered_state_target_items,
+                    /*readonly=*/ mode == StateStoreMode::ReadOnly,
+                    /*check_max_versions_after_snapshot=*/ true,
+                    current_state.clone(),
+                    persisted_state.clone(),
+                    hot_state_config,
+                )
+                .expect("buffered state creation failed.")
+            },
+            StateStoreMode::Restore => BufferedState::new_at_snapshot(
                 &state_db,
                 LoadedHotState::empty(State::new_empty(hot_state_config)),
                 StateSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
-            )
-        } else {
-            Self::create_buffered_state_from_latest_snapshot(
-                &state_db,
-                buffered_state_target_items,
-                hack_for_tests,
-                /*check_max_versions_after_snapshot=*/ true,
-                current_state.clone(),
-                persisted_state.clone(),
-                hot_state_config,
-            )
-            .expect("buffered state creation failed.")
+            ),
         };
 
         Self {
@@ -725,7 +737,7 @@ impl StateStore {
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
-            /*hack_for_tests=*/ false,
+            /*readonly=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
             PersistedState::new_empty(hot_state_config),
@@ -740,7 +752,7 @@ impl StateStore {
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
         buffered_state_target_items: usize,
-        hack_for_tests: bool,
+        readonly: bool,
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
@@ -829,8 +841,8 @@ impl StateStore {
             out_persisted_state.clone(),
         );
 
-        // In some backup-restore tests we hope to open the db without consistency check.
-        if hack_for_tests {
+        // Catching up with the ledger below writes to the DB.
+        if readonly {
             return Ok(buffered_state);
         }
 
