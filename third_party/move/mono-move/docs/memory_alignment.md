@@ -274,16 +274,16 @@ Alignment correctness depends on three layers cooperating; if any of them is wro
 
 1. **Specializer.** The compile-time layout pass (`LoweringContext::layout_slots` today, plus equivalent passes for struct bodies, enum variants, and captured-data values) is responsible for emitting offsets that respect each field's alignment. This is where most alignment rules are baked in: every micro-op that names a slot or field offset relies on this layout being correct. Bugs here would directly produce mis-aligned reads.
 
-2. **Static verifier.** The runtime's verifier (`runtime/src/verifier.rs`) checks what it can statically before execution: frame-access bounds, jump targets, descriptor validity, and pointer-offset alignment within descriptors (today it requires 8-byte alignment). Extending the verifier to check that every slot-access micro-op uses an offset compatible with the slot's declared alignment is a natural defense-in-depth — it does not add runtime cost (verification is one-time per function) and would catch specializer bugs.
+2. **Well-formedness checker.** The checker (`core/src/well_formedness.rs`, run by the loader on every lowered function) checks what it can statically before execution: frame-access bounds and alignment, jump targets, descriptor validity, parameter and return slot layout, and pointer-offset alignment within descriptors. Every slot-access micro-op must use an offset aligned as the interpreter's access requires, which catches specializer layout bugs at no runtime cost (the check runs once per lowering).
 
 3. **Runtime invariants.** Three structural invariants do the rest:
    - `MemoryRegion::new` allocates with `MAX_ALIGN`, so the heap and stack base addresses are always sufficiently aligned.
    - The bump allocator ([§3.1](#31-the-heap)) advances by `MAX_ALIGN`-aligned steps, so every object's address satisfies `MAX_ALIGN`.
    - Every `fp` is `MAX_ALIGN`-aligned ([§3.2](#32-the-stack)), so frame-relative offsets composed with `fp` produce aligned addresses.
 
-The combination of (1) computing aligned offsets, (2) verifying them statically, and (3) maintaining aligned base pointers gives end-to-end alignment safety without runtime alignment checks on the hot path.
+The combination of (1) computing aligned offsets, (2) checking them statically, and (3) maintaining aligned base pointers gives end-to-end alignment safety without runtime alignment checks on the hot path.
 
-> TODO: the specializer rounds `pl_sum` up to `MAX_ALIGN` so the callee's `fp` lands on a `MAX_ALIGN`-aligned offset ([§3.2](#32-the-stack)). This is currently a specializer-side convention with no static verifier check — a bug there silently misaligns every callee frame. Either extend the verifier to enforce `(pl_sum + FRAME_METADATA_SIZE) % MAX_ALIGN == 0`, or add a `debug_assert!` on the call path.
+> The specializer rounds `pl_sum` up to `MAX_ALIGN` so the callee's `fp` lands on a `MAX_ALIGN`-aligned offset ([§3.2](#32-the-stack)). The well-formedness checker enforces both `pl_sum % MAX_ALIGN == 0` and `(pl_sum + FRAME_METADATA_SIZE) % MAX_ALIGN == 0`, and additionally checks that every typed slot operand is aligned per the layout convention in `core/src/types.rs` (`int_slot_size_and_align`, `PTR_SLOT`, `REF_SLOT`, `ADDRESS_SLOT`: natural alignment capped at `MAX_ALIGN`); byte copies have no alignment requirement.
 
 ## 7. Optimizations
 

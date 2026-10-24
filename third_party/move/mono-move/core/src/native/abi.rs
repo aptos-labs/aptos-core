@@ -16,6 +16,13 @@ pub struct FrameSlot {
     pub size: u32,
 }
 
+impl FrameSlot {
+    /// One past the slot's last byte.
+    pub fn end(&self) -> u32 {
+        self.offset + self.size
+    }
+}
+
 /// ABI descriptor for a native function: where its arguments and return
 /// values sit in the calling frame, plus a few derived offsets the
 /// interpreter consults on every dispatch.
@@ -65,8 +72,8 @@ impl NativeABI {
         check_well_formed(&args, "arg")?;
         check_well_formed(&returns, "return")?;
         check_sorted(&heap_ptr_offsets)?;
-        let args_end = args.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
-        let returns_end = returns.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
+        let args_end = args.iter().map(FrameSlot::end).max().unwrap_or(0);
+        let returns_end = returns.iter().map(FrameSlot::end).max().unwrap_or(0);
         Ok(Self {
             args,
             returns,
@@ -80,6 +87,11 @@ impl NativeABI {
     /// The `i`-th GC descriptor the native requires.
     pub fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
         self.required_descriptors.get(i).copied()
+    }
+
+    /// All GC descriptors the native requires, in the order it expects.
+    pub fn required_descriptors(&self) -> &[DescriptorId] {
+        &self.required_descriptors
     }
 
     pub fn args(&self) -> &[FrameSlot] {
@@ -110,7 +122,7 @@ fn check_well_formed(slots: &[FrameSlot], kind: &'static str) -> Result<(), Nati
         if curr.offset <= prev.offset {
             return Err(NativeABIError::Unsorted { kind, idx: i });
         }
-        if prev.offset + prev.size > curr.offset {
+        if prev.end() > curr.offset {
             return Err(NativeABIError::Overlap { kind, idx: i });
         }
     }

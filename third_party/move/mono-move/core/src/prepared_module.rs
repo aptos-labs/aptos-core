@@ -380,6 +380,12 @@ impl PreparedModule {
         self.constant_types[idx.0 as usize]
     }
 
+    /// Interned type of the constant at `idx`, or `None` if `idx` is out of
+    /// range of the constant pool.
+    pub fn constant_type(&self, idx: ConstantPoolIndex) -> Option<InternedType> {
+        self.constant_types.get(idx.0 as usize).copied()
+    }
+
     /// Raw (BCS-encoded) bytes of the constant at `idx`.
     pub fn constant_data_at(&self, idx: ConstantPoolIndex) -> &[u8] {
         &self.module.constant_pool()[idx.0 as usize].data
@@ -734,4 +740,23 @@ fn intern_struct_handle(
     let module_id = interner.module_id_of(address, module_name);
     let struct_name = interner.identifier_of(struct_name);
     (module_id, struct_name)
+}
+
+/// The constant pool of the module a function belongs to.
+pub trait ConstantPoolProvider {
+    /// Interned type of constant `idx`, or `None` if it is out of range.
+    fn constant_type(&self, idx: ConstantPoolIndex) -> Option<InternedType>;
+}
+
+impl ConstantPoolProvider for PreparedModule {
+    fn constant_type(&self, idx: ConstantPoolIndex) -> Option<InternedType> {
+        PreparedModule::constant_type(self, idx)
+    }
+}
+
+/// A bare list of constant types, for functions built by hand in tests.
+impl ConstantPoolProvider for [InternedType] {
+    fn constant_type(&self, idx: ConstantPoolIndex) -> Option<InternedType> {
+        self.get(idx.0 as usize).copied()
+    }
 }
