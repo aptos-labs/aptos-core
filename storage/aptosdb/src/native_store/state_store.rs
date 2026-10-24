@@ -47,7 +47,7 @@ impl NativeStateStore {
     }
 
     /// Re-seat the pipeline onto `last_snapshot`, the counterpart of main
-    /// state's `StateStore::reset`, after a fast-sync restore moves the
+    /// state's `StateStore::reload`, after a fast-sync restore moves the
     /// durable store to the target version. Drains and stops the old commit
     /// thread first, so its final `sync_commit` uses the family it was
     /// built on.
