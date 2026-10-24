@@ -131,7 +131,7 @@ impl AptosDB {
             persisted_auxiliary_infos,
         );
 
-        let current = self.state_store.current_state_locked().clone();
+        let current = self.state_store.live()?.current_state_locked().clone();
         let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
         let (new_state, reads, hot_state_updates) = current.ledger_state().update_with_db_reader(
             &persisted_state,
