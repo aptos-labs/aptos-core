@@ -19,7 +19,7 @@ use aptos_types::transaction::authenticator::AuthenticationKey;
 use clap::Parser;
 use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
-use std::{fmt::Display, fs::OpenOptions, path::PathBuf, str::FromStr, time::Duration};
+use std::{fmt::Display, path::PathBuf, str::FromStr, time::Duration};
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -679,13 +679,7 @@ impl SaveFile {
 
     /// Save to the `output_file` with restricted permissions (mode 0600)
     pub fn save_to_file_confidential(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
-        let mut opts = OpenOptions::new();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.mode(0o600);
-        }
-        crate::write_to_file_with_opts(self.output_file.as_path(), name, bytes, &mut opts)
+        crate::write_to_user_only_file(self.output_file.as_path(), name, bytes)
     }
 }
 
