@@ -494,15 +494,48 @@ where
 }
 
 fn get_batch_range(last_in_backup: Option<u64>, batch_size: usize) -> (u64, u64) {
-    // say, 7 is already in backup, and we target batches of size 10, we will return (8, 10) in this
-    // case, so 8, 9, 10 will be in this batch, and next time the backup worker will pass in 10,
-    // and we will return (11, 20). The transaction 0 will be in it's own batch.
-    last_in_backup.map_or((0, 0), |n| {
-        let first = n + 1;
-        let batch = n / batch_size as u64 + 1;
-        let last = batch * batch_size as u64;
-        (first, last)
-    })
+    // Genesis is in its own batch, so the state snapshot at version 0 is usable right away.
+    last_in_backup.map_or((0, 0), |n| (n + 1, n + batch_size as u64))
+}
+
+/// Returns the first block end at or after `version`, so that a transaction backup ends on a block
+/// boundary, and the next one starts on one. `committed_version` bounds the search, as it's the
+/// version of a ledger info, hence a block end.
+async fn get_next_block_end(
+    client: &BackupServiceClient,
+    version: Version,
+    committed_version: Version,
+) -> Result<Version> {
+    ensure!(
+        version <= committed_version,
+        "Version {} is after the committed version {}.",
+        version,
+        committed_version,
+    );
+    // Reading stops at the first block end, which is usually close, so the rest of the response is
+    // dropped.
+    let mut records = client
+        .get_transactions(version, (committed_version - version + 1) as usize)
+        .await?;
+    let mut current_version = version;
+    while let Some(record_bytes) = records.read_record_bytes().await? {
+        let (_, _, txn_info, _, _): (
+            Transaction,
+            PersistedAuxiliaryInfo,
+            TransactionInfo,
+            Vec<ContractEvent>,
+            WriteSet,
+        ) = bcs::from_bytes(&record_bytes)?;
+        if txn_info.has_state_checkpoint_hash() {
+            return Ok(current_version);
+        }
+        current_version += 1;
+    }
+    bail!(
+        "No block end found between versions {} and {}.",
+        version,
+        committed_version,
+    )
 }
 
 /// Returns the first block end at or after `version`, so that a transaction backup ends on a block
@@ -581,7 +614,7 @@ mod tests {
         assert_eq!(get_batch_range(None, 100), (0, 0));
         assert_eq!(get_batch_range(Some(0), 100), (1, 100));
         assert_eq!(get_batch_range(Some(100), 50), (101, 150));
-        assert_eq!(get_batch_range(Some(150), 100), (151, 200));
+        assert_eq!(get_batch_range(Some(150), 100), (151, 250));
         assert_eq!(get_batch_range(Some(200), 100), (201, 300));
     }
 
