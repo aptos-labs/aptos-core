@@ -732,7 +732,7 @@ fn assemble_loaded_function(
         loader.runtime_environment().ty_pool(),
     )
     .map_err(|e| e.finish(module_loc.clone()))?;
-    Type::verify_ty_arg_abilities(loaded.function.ty_param_abilities(), &loaded.ty_args)
+    Type::verify_ty_arg_abilities(loaded.function.ty_param_abilities(), loaded.ty_args())
         .map_err(|e| e.finish(module_loc))?;
     Ok(loaded)
 }

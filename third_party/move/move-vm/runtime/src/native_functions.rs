@@ -181,8 +181,8 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
-    /// Canonical string of the type, memoized on the type node.
-    pub fn type_to_canonical_string(&self, ty: &Type) -> PartialVMResult<TriompheArc<str>> {
+    /// Canonical string of the type's tag.
+    pub fn type_to_canonical_string(&self, ty: &Type) -> PartialVMResult<String> {
         self.module_storage
             .runtime_environment()
             .ty_to_canonical_string(ty)

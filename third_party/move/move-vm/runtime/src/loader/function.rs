@@ -159,8 +159,9 @@ impl LoadedFunctionOwner {
 pub struct LoadedFunction {
     pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
-    // function is not generic, an empty vector.
-    pub ty_args: Vec<Type>,
+    // function is not generic, an empty vector. Private: the instantiated parameter and return
+    // types below are derived from it, so it must not change after construction.
+    ty_args: Vec<Type>,
     // Unique identifier for type arguments.
     pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
