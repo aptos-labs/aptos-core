@@ -282,10 +282,7 @@ impl<TWriteSocket: AsyncWrite> Sink<&MultiplexMessage> for MultiplexMessageSink<
     type Error = WriteError;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project()
-            .framed_write
-            .poll_ready(cx)
-            .map_err(WriteError::IoError)
+        Sink::<Bytes>::poll_ready(self.project().framed_write, cx).map_err(WriteError::IoError)
     }
 
     fn start_send(self: Pin<&mut Self>, message: &MultiplexMessage) -> Result<(), Self::Error> {
@@ -299,16 +296,10 @@ impl<TWriteSocket: AsyncWrite> Sink<&MultiplexMessage> for MultiplexMessageSink<
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project()
-            .framed_write
-            .poll_flush(cx)
-            .map_err(WriteError::IoError)
+        Sink::<Bytes>::poll_flush(self.project().framed_write, cx).map_err(WriteError::IoError)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project()
-            .framed_write
-            .poll_close(cx)
-            .map_err(WriteError::IoError)
+        Sink::<Bytes>::poll_close(self.project().framed_write, cx).map_err(WriteError::IoError)
     }
 }

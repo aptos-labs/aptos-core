@@ -111,3 +111,51 @@ impl MerklePrunerSchema for PositionEpochSnapshot {
         DbMetadataKey::PositionEpochSnapshotPrunerProgress
     }
 }
+
+/// Native-order regular merkle pruner.
+// Used once the order store is opened by the write path (PR 6).
+#[allow(dead_code)]
+pub(crate) enum OrderStateMerkle {}
+impl MerklePrunerSchema for OrderStateMerkle {
+    type StaleIndexSchema = StaleNodeIndexSchema;
+
+    fn name() -> &'static str {
+        "order_state_merkle_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "order_state_merkle"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::OrderStateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::OrderStateMerklePrunerProgress
+    }
+}
+
+/// Native-order epoch-snapshot merkle pruner.
+// Used once the order store is opened by the write path (PR 6).
+#[allow(dead_code)]
+pub(crate) enum OrderEpochSnapshot {}
+impl MerklePrunerSchema for OrderEpochSnapshot {
+    type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
+
+    fn name() -> &'static str {
+        "order_epoch_snapshot_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "order_epoch_snapshot"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::OrderEpochSnapshotShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::OrderEpochSnapshotPrunerProgress
+    }
+}
