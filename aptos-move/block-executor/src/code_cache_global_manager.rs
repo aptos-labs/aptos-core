@@ -784,16 +784,16 @@ mod test {
         // Add 3 types and 3 type vectors.
         runtime_environment
             .ty_pool()
-            .intern_ty_args(&[Type::Vector(triomphe::Arc::new(Type::Signer)), Type::U8]);
+            .intern_ty_args(&[Type::vector(Type::Signer), Type::U8])
+            .unwrap();
         runtime_environment
             .ty_pool()
-            .intern_ty_args(&[Type::U8, Type::Vector(triomphe::Arc::new(Type::Address))]);
-        runtime_environment.ty_pool().intern_ty_args(&[
-            Type::Signer,
-            Type::Vector(triomphe::Arc::new(Type::Vector(triomphe::Arc::new(
-                Type::Address,
-            )))),
-        ]);
+            .intern_ty_args(&[Type::U8, Type::vector(Type::Address)])
+            .unwrap();
+        runtime_environment
+            .ty_pool()
+            .intern_ty_args(&[Type::Signer, Type::vector(Type::vector(Type::Address))])
+            .unwrap();
 
         assert_eq!(runtime_environment.module_id_pool().len(), 3);
         assert_eq!(runtime_environment.struct_name_index_map_size().unwrap(), 3);

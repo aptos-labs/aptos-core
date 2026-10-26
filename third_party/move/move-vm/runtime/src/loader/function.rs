@@ -35,11 +35,12 @@ use move_vm_profiler::ProfilerFunction;
 use move_vm_types::{
     gas::DependencyGasMeter,
     instr::Instruction,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{Type, TypeBuilder},
     module_id_interner::InternedModuleId,
-    ty_interner::TypeVecId,
+    ty_interner::{InternedTypePool, TypeVecId},
     values::{AbstractFunction, SerializedFunctionData},
 };
+use once_cell::unsync::OnceCell;
 use std::{
     cell::RefCell,
     cmp::Ordering,
@@ -50,6 +51,7 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 lazy_static! {
     /// List of native functions that perform a dynamic dispatch via reflection. This was a hack
@@ -163,6 +165,46 @@ pub struct LoadedFunction {
     pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
     pub function: Arc<Function>,
+    // Parameter/return types with `ty_args` applied, computed once so call checks never
+    // re-substitute.
+    cached_instantiated_param_tys: OnceCell<TriompheArc<[Type]>>,
+    cached_instantiated_return_tys: OnceCell<TriompheArc<[Type]>>,
+}
+
+impl LoadedFunction {
+    /// Creates a loaded function, interning `ty_args` in `ty_pool`.
+    pub fn new(
+        owner: LoadedFunctionOwner,
+        ty_args: Vec<Type>,
+        function: Arc<Function>,
+        ty_pool: &InternedTypePool,
+    ) -> PartialVMResult<Self> {
+        let ty_args_id = ty_pool.intern_ty_args(&ty_args)?;
+        Ok(Self::new_with_ty_args_id(
+            owner, ty_args, ty_args_id, function,
+        ))
+    }
+
+    /// Creates a loaded function whose `ty_args` are already interned as `ty_args_id`.
+    pub(crate) fn new_with_ty_args_id(
+        owner: LoadedFunctionOwner,
+        ty_args: Vec<Type>,
+        ty_args_id: TypeVecId,
+        function: Arc<Function>,
+    ) -> Self {
+        Self {
+            owner,
+            ty_args,
+            ty_args_id,
+            function,
+            cached_instantiated_param_tys: OnceCell::new(),
+            cached_instantiated_return_tys: OnceCell::new(),
+        }
+    }
+
+    pub(crate) fn owner(&self) -> &LoadedFunctionOwner {
+        &self.owner
+    }
 }
 
 impl ProfilerFunction for LoadedFunction {
@@ -173,10 +215,6 @@ impl ProfilerFunction for LoadedFunction {
 }
 
 impl LoadedFunction {
-    pub(crate) fn owner(&self) -> &LoadedFunctionOwner {
-        &self.owner
-    }
-
     /// Returns a reference to parent [Script] owning the script's entrypoint function. Returns an
     /// invariant violation error if the function comes from a module.
     pub fn owner_as_script(&self) -> VMResult<&Script> {
@@ -755,6 +793,43 @@ impl LoadedFunction {
     /// Returns return types from the function's definition signature.
     pub fn return_tys(&self) -> &[Type] {
         self.function.return_tys()
+    }
+
+    /// The parameter types with `ty_args` applied, for checking arguments.
+    pub(crate) fn instantiated_param_tys(
+        &self,
+        ty_builder: &TypeBuilder,
+    ) -> PartialVMResult<&[Type]> {
+        if self.ty_args.is_empty() {
+            return Ok(self.function.param_tys());
+        }
+        Ok(self
+            .cached_instantiated_param_tys
+            .get_or_try_init(|| self.instantiate(ty_builder, self.function.param_tys()))?)
+    }
+
+    /// The return types with `ty_args` applied, for checking results.
+    pub(crate) fn instantiated_return_tys(
+        &self,
+        ty_builder: &TypeBuilder,
+    ) -> PartialVMResult<&[Type]> {
+        if self.ty_args.is_empty() {
+            return Ok(self.function.return_tys());
+        }
+        Ok(self
+            .cached_instantiated_return_tys
+            .get_or_try_init(|| self.instantiate(ty_builder, self.function.return_tys()))?)
+    }
+
+    fn instantiate(
+        &self,
+        ty_builder: &TypeBuilder,
+        tys: &[Type],
+    ) -> PartialVMResult<TriompheArc<[Type]>> {
+        tys.iter()
+            .map(|ty| ty_builder.create_ty_with_subst(ty, &self.ty_args))
+            .collect::<PartialVMResult<Vec<_>>>()
+            .map(TriompheArc::from)
     }
 
     /// Returns abilities of type parameters from the function's definition signature.

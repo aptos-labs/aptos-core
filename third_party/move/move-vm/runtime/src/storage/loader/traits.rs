@@ -171,17 +171,13 @@ pub(crate) trait InstantiatedFunctionLoaderHelper: WithRuntimeEnvironment {
 
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module.self_id().clone())))?;
-        let ty_args_id = self
-            .runtime_environment()
-            .ty_pool()
-            .intern_ty_args(&ty_args);
-
-        Ok(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
+        LoadedFunction::new(
+            LoadedFunctionOwner::Module(module),
             ty_args,
-            ty_args_id,
             function,
-        })
+            self.runtime_environment().ty_pool(),
+        )
+        .map_err(|err| err.finish(Location::Undefined))
     }
 
     /// Helper to construct a loaded function instance from script's entrypoint.
@@ -201,17 +197,13 @@ pub(crate) trait InstantiatedFunctionLoaderHelper: WithRuntimeEnvironment {
         let main = script.entry_point();
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
             .map_err(|err| err.finish(Location::Script))?;
-        let ty_args_id = self
-            .runtime_environment()
-            .ty_pool()
-            .intern_ty_args(&ty_args);
-
-        Ok(LoadedFunction {
-            owner: LoadedFunctionOwner::Script(script),
+        LoadedFunction::new(
+            LoadedFunctionOwner::Script(script),
             ty_args,
-            ty_args_id,
-            function: main,
-        })
+            main,
+            self.runtime_environment().ty_pool(),
+        )
+        .map_err(|err| err.finish(Location::Script))
     }
 }
 
