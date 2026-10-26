@@ -56,7 +56,7 @@ impl RestoreHandler {
     }
 
     pub fn reset_state_store(&self) -> Result<()> {
-        self.state_store.reset();
+        self.state_store.reload();
         self.aptosdb.reset_position_store_to_ledger()
     }
 
@@ -130,10 +130,6 @@ impl RestoreHandler {
             None,
             false,
         )
-    }
-
-    pub fn force_state_version_for_kv_restore(&self, version: Option<Version>) -> Result<()> {
-        self.state_store.init_state_ignoring_summary(version)
     }
 
     pub fn save_transactions_and_replay_kv(

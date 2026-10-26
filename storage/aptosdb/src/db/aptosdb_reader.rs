@@ -180,7 +180,7 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            Ok(self.state_store.current_state_locked().version())
+            Ok(self.state_store.live()?.current_state_locked().version())
         })
     }
 
@@ -684,6 +684,7 @@ impl DbReader for AptosDB {
         gauged_api("get_pre_committed_ledger_summary", || {
             let (state, state_summary) = self
                 .state_store
+                .live()?
                 .current_state_locked()
                 .to_state_and_summary();
             let num_txns = state.next_version();
@@ -791,6 +792,7 @@ impl DbReader for AptosDB {
         gauged_api("get_latest_state_checkpoint_version", || {
             Ok(self
                 .state_store
+                .live()?
                 .current_state_locked()
                 .last_checkpoint()
                 .version())

@@ -656,7 +656,7 @@ generic-array = { version = "0.14.7", features = ["serde"] }
 get-size = { version = "0.1.4", features = ["derive"] }
 get_if_addrs = "0.5.3"
 getrandom = "0.2.2"
-git2 = "0.16.1"
+git2 = { version = "0.21.0", features = ["https", "ssh"] }
 glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
@@ -675,8 +675,8 @@ http-body-util = "0.1.1"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-util = { version = "0.1.3", features = ["client-legacy"] }
-im = "15.0.0"
 image = "0.24.5"
+imbl = "7.0.2"
 indexmap = "2.7.0"
 indicatif = "0.17.7"
 indoc = "1.0.6"
@@ -731,7 +731,7 @@ opentelemetry = { version = "0.27.0", features = ["trace"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
 ordered-float = "3.9.1"
-ouroboros = "0.15.6"
+ouroboros = "0.18.5"
 owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
 pairing = "0.23"
@@ -749,7 +749,7 @@ plotters = { version = "0.3.5", default-features = false }
 poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
-pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
+pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 prettydiff = "0.6.2"
@@ -790,7 +790,7 @@ reqwest = { version = "0.11.11", features = [
 ] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
-ring = { version = "0.16.20", features = ["std"] }
+ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
@@ -820,7 +820,7 @@ sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
-shadow-rs = "0.16.2"
+shadow-rs = { version = "0.36.1", default-features = false, features = ["tzdb"] }
 shell-words = "1.0.0"
 signature = "2.1.0"
 siphasher = "0.3.10"
@@ -1025,3 +1025,9 @@ ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+
+# `aptos-indexer-processor-sdk` pins an old aptos-core revision whose
+# `aptos-profiler` uses pprof 0.11. Linking it together with our pprof 0.15
+# fails on a duplicate `perf_signal_handler` symbol.
+[patch."https://github.com/aptos-labs/aptos-core.git"]
+aptos-system-utils = { path = "crates/aptos-system-utils" }

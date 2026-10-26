@@ -26,7 +26,7 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast,
     ast::TempIndex,
-    model::{Parameter, QualifiedInstId, StructId},
+    model::{FunId, Parameter, QualifiedId, QualifiedInstId, StructId},
     pragmas::UNROLL_PRAGMA,
     ty::Type,
 };
@@ -532,6 +532,23 @@ impl FatLoopBuilder<'_> {
         };
         let env = func_target.global_env();
         let code = func_target.get_bytecode();
+        let summary_of = |id: QualifiedId<FunId>| {
+            let fun = env.get_function(id);
+            targets
+                .has_target(&fun, &FunctionVariant::Baseline)
+                .then(|| {
+                    usage_analysis::get_memory_usage(
+                        &targets.get_target(&fun, &FunctionVariant::Baseline),
+                    )
+                    .clone()
+                })
+        };
+        let closures = usage_analysis::closures_with_known_footprint(
+            env,
+            func_target.func_env.get_qualified_id(),
+            code,
+            &summary_of,
+        );
         let mut add = |mem: QualifiedInstId<StructId>| {
             if !env.get_struct_qid(mem.to_qualified_id()).is_intrinsic() {
                 mems.insert(mem);
@@ -607,6 +624,16 @@ impl FatLoopBuilder<'_> {
                         }
                         for mem in usage.invoke_frame.get_all_inst(inst) {
                             add(mem);
+                        }
+                        // A closure the callee leaves to this call site runs on its behalf
+                        // with nothing in the callee's summary: what it writes is written by
+                        // this call, and so by the loop.
+                        for closure in
+                            usage_analysis::deferred_closure_targets(&callee, srcs, &closures)
+                        {
+                            for mem in &closure.writes {
+                                add(mem.clone());
+                            }
                         }
                         // A wildcard `modifies_of<f> *` propagated up from
                         // the callee is not resolved in `invoke_frame` (the

@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: function argument accesses resource `lambda_behavioral_frame_deferral::Counter` which is not declared in `modifies_of`/`reads_of` for `f`
+   ┌─ tests/sources/functional/closures/lambda_behavioral_frame_deferral.move:49:9
+   │
+49 │         apply(c, f)
+   │         ^^^^^^^^^^^

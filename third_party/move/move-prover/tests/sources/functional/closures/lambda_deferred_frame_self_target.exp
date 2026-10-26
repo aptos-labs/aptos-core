@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `g` may modify: `lambda_deferred_frame_self_target::call_g` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_self_target.move:27:17
+   │
+27 │                 call_g(h, before + 1);
+   │                 ^^^^^^^^^^^^^^^^^^^^^

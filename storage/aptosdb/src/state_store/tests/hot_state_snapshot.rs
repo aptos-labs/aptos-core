@@ -8,7 +8,10 @@ use aptos_config::config::{
     HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
 };
@@ -476,7 +479,7 @@ fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
     .unwrap()
 }
 
-/// Restores cold state so reset can discover the snapshot version.
+/// Restores cold state so reload can discover the snapshot version.
 fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
     let root_hash = src.state_store.get_root_hash(version).unwrap();
     let num_items = src
@@ -494,6 +497,31 @@ fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
         receiver.add_chunk(chunk.raw_values, chunk.proof).unwrap();
     }
     receiver.finish_box().unwrap();
+}
+
+/// Finalizes fast syncing `dst` to `src` at `version`.
+fn finalize_fast_sync(src: &AptosDB, dst: &AptosDB, version: Version) {
+    let ledger_info = LedgerInfoWithSignatures::new(
+        LedgerInfo::new(
+            BlockInfo::new(
+                0,
+                0,
+                HashValue::zero(),
+                src.get_accumulator_root_hash(version).unwrap(),
+                version,
+                0,
+                None,
+            ),
+            HashValue::zero(),
+        ),
+        AggregateSignature::empty(),
+    );
+    dst.finalize_state_snapshot(
+        version,
+        src.get_transaction_outputs(version, 1, version).unwrap(),
+        &[ledger_info],
+    )
+    .unwrap();
 }
 
 #[test]
@@ -525,27 +553,7 @@ fn test_hot_state_restore() {
             .unwrap();
     }
     receiver.finish_box().unwrap();
-    let ledger_info = LedgerInfoWithSignatures::new(
-        LedgerInfo::new(
-            BlockInfo::new(
-                0,
-                0,
-                HashValue::zero(),
-                src.get_accumulator_root_hash(version).unwrap(),
-                version,
-                0,
-                None,
-            ),
-            HashValue::zero(),
-        ),
-        AggregateSignature::empty(),
-    );
-    dst.finalize_state_snapshot(
-        version,
-        src.get_transaction_outputs(version, 1, version).unwrap(),
-        &[ledger_info],
-    )
-    .unwrap();
+    finalize_fast_sync(&src, &dst, version);
 
     let pruners = &dst.state_store.state_pruner;
     assert_eq!(
@@ -582,9 +590,9 @@ fn test_hot_state_restore() {
     // Finalization must activate the restored hot state before returning.
     assert_hot_state_activated(&dst, &expected, root_hash);
 
-    // Retain a base view across a reset and subsequent writes.
+    // Retain a base view across a reload and subsequent writes.
     let (restored_view, restored_state) = dst.get_persisted_state().unwrap();
-    dst.state_store.reset();
+    dst.state_store.reload();
     assert_hot_state_activated(&dst, &expected, root_hash);
 
     // Retain this view to keep the next commit's delta from merging into its base.
@@ -609,7 +617,7 @@ fn test_hot_state_restore() {
         std::thread::sleep(Duration::from_millis(1));
     };
     let expected_after_write = collect_paged(&src, version + 1, usize::MAX);
-    dst.state_store.reset();
+    dst.state_store.reload();
 
     // Updating a key outside the retained delta must preserve its fall-through reads.
     let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c-new")))]);
@@ -617,7 +625,12 @@ fn test_hot_state_restore() {
         .unwrap();
     dst.save_transactions_for_test(&[txn], version + 2, None, true)
         .unwrap();
-    let hot_state = dst.state_store.persisted_state.get_hot_state();
+    let hot_state = dst
+        .state_store
+        .live()
+        .unwrap()
+        .persisted_state
+        .get_hot_state();
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         let entries = hot_state.get_all_entries(key("c").get_shard_id());
@@ -674,6 +687,103 @@ fn test_hot_state_restore() {
     assert_hot_state_activated(&reopened, &expected_final, expected_root);
 }
 
+#[test]
+fn test_hot_state_restore_empty() {
+    let tmp_src = TempPath::new();
+    let src = AptosDB::new_for_test(&tmp_src);
+    commit_blocks(&src, vec![vec![
+        (key("a"), Some(val(b"a0"))),
+        (key("b"), Some(val(b"b0"))),
+    ]]);
+    // Reopening wipes the hot state, so the next checkpoint has an empty hot state but a non-empty
+    // cold state.
+    drop(src);
+    let src = AptosDB::new_for_test(&tmp_src);
+    let version = 1;
+    let mut txn = block_epilogue_txn(vec![]);
+    txn.transaction_info = TransactionInfo::builder_v1()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .state_checkpoint_hash(HashValue::random())
+        .hot_state_checkpoint_hash(*SPARSE_MERKLE_PLACEHOLDER_HASH)
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
+    src.save_transactions_for_test(&[txn], version, None, true)
+        .unwrap();
+    assert_eq!(
+        src.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version)
+            .unwrap(),
+        *SPARSE_MERKLE_PLACEHOLDER_HASH
+    );
+
+    // Fast sync never creates a hot state receiver for an empty snapshot.
+    let tmp_dst = TempPath::new();
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    restore_cold_state(&src, &dst, version);
+    finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version)
+            .unwrap(),
+        *SPARSE_MERKLE_PLACEHOLDER_HASH
+    );
+    assert_hot_state_activated(&dst, &[], *SPARSE_MERKLE_PLACEHOLDER_HASH);
+
+    // A restart before the next commit reloads the empty hot state.
+    drop(dst);
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    assert_hot_state_activated(&dst, &[], *SPARSE_MERKLE_PLACEHOLDER_HASH);
+
+    // The next hot state commit builds on the empty root.
+    let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c1")))]);
+    src.save_transactions_for_test(std::slice::from_ref(&txn), version + 1, None, true)
+        .unwrap();
+    dst.save_transactions_for_test(&[txn], version + 1, None, true)
+        .unwrap();
+    assert_eq!(
+        dst.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version + 1)
+            .unwrap(),
+        src.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version + 1)
+            .unwrap()
+    );
+}
+
+/// A restore-mode open has no in-memory state until `reload` loads the state on disk.
+#[test]
+fn test_restore_mode_loads_state_on_reload() {
+    let tmp = TempPath::new();
+    let version = commit_blocks(&AptosDB::new_for_test(&tmp), vec![
+        vec![(key("a"), Some(val(b"a0")))],
+        vec![(key("b"), Some(val(b"b1")))],
+    ]);
+
+    let db = AptosDB::open_kv_only(
+        StorageDirPaths::from_path(tmp.path()),
+        false, /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None, /* internal_indexer_db */
+    )
+    .unwrap();
+    assert!(db.get_persisted_state().is_err());
+    assert!(db.get_pre_committed_version().is_err());
+
+    db.state_store.reload();
+    assert_eq!(db.get_pre_committed_version().unwrap(), Some(version));
+    assert_eq!(db.get_persisted_state().unwrap().1.version(), Some(version));
+}
+
 /// Checks hot entries and the current summary root.
 fn assert_hot_state_activated(
     db: &AptosDB,
@@ -697,6 +807,8 @@ fn assert_hot_state_activated(
     }
     assert_eq!(
         db.state_store
+            .live()
+            .unwrap()
             .current_state_locked()
             .summary()
             .hot_root_hash()

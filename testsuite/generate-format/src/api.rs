@@ -15,7 +15,10 @@ use aptos_types::{
     account_config::{CoinStoreResource, DepositEvent, WithdrawEvent},
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
-    state_store::{state_key::StateKey, state_value::PersistedStateValueMetadata},
+    state_store::{
+        state_key::{inner::TradingNativeKey, StateKey},
+        state_value::PersistedStateValueMetadata,
+    },
     transaction::{
         self,
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
@@ -128,6 +131,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::TransactionInfo>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
+    tracer.trace_type::<TradingNativeKey>(&samples)?;
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;

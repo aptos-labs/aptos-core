@@ -1310,17 +1310,15 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
             }
             if let ExpData::Call(call_id, Operation::MoveFunction(mid, fid), args) = exp {
                 let callee_id = mid.qualified(*fid);
-                let (callee_param_access, callee_params) = {
-                    let callee_env = env.get_function(callee_id);
-                    let access = callee_env.get_fun_param_access_of().to_vec();
-                    // Skip validation only for transparent callees with no declarations.
-                    // For opaque callees, missing declarations means "pure" — validate
-                    // that closures don't access memory.
-                    if access.is_empty() && !callee_env.is_opaque() {
-                        return true;
-                    }
-                    (access, callee_env.get_parameters())
-                };
+                let callee_env = env.get_function(callee_id);
+                let callee_param_access = callee_env.get_fun_param_access_of().to_vec();
+                // Skip validation only for transparent callees with no declarations.
+                // For opaque callees, missing declarations means "pure" — validate
+                // that closures don't access memory.
+                if callee_param_access.is_empty() && !callee_env.is_opaque() {
+                    return true;
+                }
+                let callee_params = callee_env.get_parameters();
 
                 // For each argument, check if it maps to a parameter with access_of
                 for (arg_idx, arg) in args.iter().enumerate() {
@@ -1341,6 +1339,11 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
                         .find(|a| a.fun_param == *param_name)
                     {
                         Some(a) => a,
+                        None if callee_env.leaves_fun_param_frame_to_call_site(*param_name)
+                            && !is_forwarded_param(arg, &caller_params) =>
+                        {
+                            continue
+                        },
                         None => {
                             empty_access = FunParamAccessOf {
                                 loc: Loc::default(),
@@ -1421,6 +1424,17 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
             true
         });
     }
+}
+
+/// Whether the argument is a function-typed parameter of the enclosing function, passed
+/// straight through to the callee.
+///
+/// A callee that defers its frame cannot bound such an argument, and neither can this call
+/// site: the closure was built somewhere else. What does bound it is the enclosing
+/// function's own `modifies_of`/`reads_of` for the parameter, which `compute_arg_memory`
+/// resolves exactly, so forwarding is checked rather than deferred.
+fn is_forwarded_param(arg: &Exp, caller_params: &[Parameter]) -> bool {
+    matches!(arg.as_ref(), ExpData::Temporary(_, idx) if *idx < caller_params.len())
 }
 
 /// Computes the memory footprint of a function-typed argument expression.

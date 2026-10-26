@@ -61,7 +61,6 @@ const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
-    compute_root_hash: true,
 };
 
 #[derive(Clone, Debug)]
@@ -898,8 +897,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
     let empty = LedgerStateWithSummary::new_empty(TEST_CONFIG);
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
-    let persisted_state = PersistedState::new_empty(TEST_CONFIG);
-    persisted_state.install_snapshot(
+    let persisted_state = PersistedState::new(
         LoadedHotState::empty(empty.state().clone()),
         empty.summary().clone(),
     );

@@ -127,6 +127,16 @@ impl Display for Render<'_, StateKey> {
                     account,
                     market,
                 } => write!(f, "position<{},{},{}>", exchange, account, market),
+                TradingNativeKey::Order {
+                    exchange,
+                    market,
+                    order_id,
+                } => write!(f, "order<{},{},{}>", exchange, market, order_id),
+                TradingNativeKey::BulkOrder {
+                    exchange,
+                    market,
+                    account,
+                } => write!(f, "bulk_order<{},{},{}>", exchange, market, account),
             },
         }
     }

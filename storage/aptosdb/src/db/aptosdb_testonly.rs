@@ -11,8 +11,8 @@ use aptos_config::config::{
 use aptos_crypto::hash::CryptoHash;
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, state_store::state_summary::ProvableStateSummary, DbReader,
-    DbWriter, Result,
+    chunk_to_commit::ChunkToCommit, state_store::state_summary::ProvableStateSummary, DbWriter,
+    Result,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -131,15 +131,16 @@ impl AptosDB {
             persisted_auxiliary_infos,
         );
 
-        let current = self.state_store.current_state_locked().clone();
-        let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
+        let live = self.state_store.live()?;
+        let current = live.current_state_locked().clone();
+        let (hot_state, persisted_state) = live.persisted_state().get_state();
         let (new_state, reads, hot_state_updates) = current.ledger_state().update_with_db_reader(
             &persisted_state,
             hot_state,
             transactions_to_keep.state_update_refs(),
             self.state_store.clone(),
         )?;
-        let persisted_summary = self.state_store.get_persisted_state_summary()?;
+        let persisted_summary = live.persisted_state().get_state_summary();
         let new_state_summary = current.ledger_state_summary().update(
             &ProvableStateSummary::new(persisted_summary, self),
             &hot_state_updates,

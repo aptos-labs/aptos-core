@@ -475,7 +475,12 @@ pub fn test_save_blocks_impl(
 
         cur_ver += txns_to_commit.len() as u64;
     }
-    db.state_store.buffered_state().lock().sync_commit();
+    db.state_store
+        .live()
+        .unwrap()
+        .buffered_state()
+        .lock()
+        .sync_commit();
 
     let first_batch = input.first().unwrap().0.clone();
     let first_batch_ledger_info = input.first().unwrap().1.clone();
@@ -500,7 +505,12 @@ pub fn test_save_blocks_impl(
     verify_epochs(&db, &ledger_infos_with_sigs);
 
     // sync the commits and verify the states
-    db.state_store.buffered_state().lock().sync_commit();
+    db.state_store
+        .live()
+        .unwrap()
+        .buffered_state()
+        .lock()
+        .sync_commit();
     verify_snapshots(
         &db,
         0, /* first_version */
@@ -856,7 +866,12 @@ pub fn test_sync_transactions_impl(
     }
 
     // sync the commits and verify the states
-    db.state_store.buffered_state().lock().sync_commit();
+    db.state_store
+        .live()
+        .unwrap()
+        .buffered_state()
+        .lock()
+        .sync_commit();
     verify_snapshots(
         &db,
         0, /* first_version */
