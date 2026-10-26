@@ -66,6 +66,8 @@ mod object_code_deployment;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod orderless_proof_guards;
+mod paranoid_type_check_cost;
+mod paranoid_type_check_scaling;
 mod per_category_gas_limits;
 mod public_const;
 mod public_const_upgrade;

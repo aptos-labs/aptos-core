@@ -293,7 +293,7 @@ impl Module {
             let idx = func_inst.type_parameters.0 as usize;
             let instantiation = signature_table[idx].clone();
             let ty_args_id = if is_fully_instantiated_signature[idx] {
-                Some(ty_pool.intern_ty_args(&instantiation))
+                Some(ty_pool.intern_ty_args(&instantiation)?)
             } else {
                 None
             };
