@@ -67,12 +67,12 @@ pub(crate) fn struct_ty(idx: StructNameIndex) -> Type {
 
 /// Creates a dummy generic struct (or enum) type.
 pub(crate) fn generic_struct_ty(idx: StructNameIndex, ty_args: Vec<Type>) -> Type {
-    Type::StructInstantiation {
+    Type::struct_instantiation(
         idx,
-        ty_args: triomphe::Arc::new(ty_args),
+        ty_args,
         // Below is irrelevant for tests.
-        ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-    }
+        AbilityInfo::struct_(AbilitySet::EMPTY),
+    )
 }
 
 /// Mocks struct definition loading, by holding a cache of [StructType]s and runtime environment.

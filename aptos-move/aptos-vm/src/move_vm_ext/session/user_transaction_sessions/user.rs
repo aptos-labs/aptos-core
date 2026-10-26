@@ -215,14 +215,13 @@ impl<'r> UserSession<'r> {
                         ) {
                             verifier::module_init::verify_init_module_function(&function)?;
 
-                            let ty_args_id =
-                                loader.runtime_environment().ty_pool().intern_ty_args(&[]);
-                            let loaded_function = LoadedFunction {
-                                owner: LoadedFunctionOwner::Module(module),
-                                ty_args: vec![],
-                                ty_args_id,
+                            let loaded_function = LoadedFunction::new(
+                                LoadedFunctionOwner::Module(module),
+                                vec![],
                                 function,
-                            };
+                                loader.runtime_environment().ty_pool(),
+                            )
+                            .map_err(|e| e.finish(Location::Undefined))?;
                             session.execute_loaded_function(
                                 loaded_function,
                                 vec![MoveValue::Signer(destination)
