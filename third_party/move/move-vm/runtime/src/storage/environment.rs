@@ -38,7 +38,6 @@ use move_vm_types::{
     ty_interner::InternedTypePool,
 };
 use std::sync::Arc;
-use triomphe::Arc as TriompheArc;
 
 const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
 const MEM_MODULE_BYTES: &[u8] = include_bytes!("mem.mv");
@@ -344,18 +343,11 @@ impl RuntimeEnvironment {
         ty_tag_builder.ty_to_ty_tag(ty)
     }
 
-    /// Canonical string of the type's tag, cached per interned type in [TypeTagCache].
-    pub fn ty_to_canonical_string(&self, ty: &Type) -> PartialVMResult<TriompheArc<str>> {
-        let ty_id = self.interned_ty_pool.intern_ty(ty);
-        if let Some(name) = ty_id.and_then(|id| self.ty_tag_cache.get_canonical_name(id)) {
-            return Ok(name);
-        }
-        let name: TriompheArc<str> =
-            TriompheArc::from(self.ty_to_ty_tag(ty)?.to_canonical_string().as_str());
-        if let Some(id) = ty_id {
-            self.ty_tag_cache.insert_canonical_name(id, name.clone());
-        }
-        Ok(name)
+    /// Canonical string of the type's tag. Deliberately not cached: `type_name` feeds
+    /// `any::unpack`, so a wrong name would let bytes of one type be decoded as another. Callers
+    /// charge per byte of the result, which covers the rendering.
+    pub fn ty_to_canonical_string(&self, ty: &Type) -> PartialVMResult<String> {
+        Ok(self.ty_to_ty_tag(ty)?.to_canonical_string())
     }
 
     /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
