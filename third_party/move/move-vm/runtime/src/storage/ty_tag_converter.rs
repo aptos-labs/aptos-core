@@ -12,14 +12,13 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex},
-    ty_interner::{TypeId, TypeVecId},
+    ty_interner::TypeVecId,
 };
 use parking_lot::RwLock;
 use std::{
     hash::Hash,
     sync::atomic::{AtomicU64, Ordering},
 };
-use triomphe::Arc as TriompheArc;
 
 struct PseudoGasContext {
     // Parameters for metering type tag construction:
@@ -158,9 +157,6 @@ struct StructKey {
 /// again: the result of executing a transaction stays the same.
 const MAX_TOTAL_PSEUDO_GAS_COST: u64 = 256 * 1024 * 1024;
 
-/// The maximum total length of the canonical names in [TypeTagCache], past which they are flushed.
-const MAX_TOTAL_CANONICAL_NAME_BYTES: u64 = 64 * 1024 * 1024;
-
 /// An entry in [TypeTagCache] that also stores a "cost" of the tag. The cost is proportional to
 /// the size of the tag, which includes the number of inner nodes and the sum of the sizes in bytes
 /// of addresses and identifiers.
@@ -206,11 +202,6 @@ pub struct TypeTagCache {
     total_pseudo_gas_cost: AtomicU64,
     /// Value of `total_pseudo_gas_cost` past which the cache is flushed.
     max_total_pseudo_gas_cost: u64,
-    /// Canonical names of types (for `type_of` / `type_name`), keyed by interned id. Same flush
-    /// rules as `cache`.
-    canonical_names: RwLock<HashMap<TypeId, TriompheArc<str>>>,
-    /// Sum of the lengths of `canonical_names`, only modified under its write lock.
-    total_canonical_name_bytes: AtomicU64,
 }
 
 impl TypeTagCache {
@@ -226,8 +217,6 @@ impl TypeTagCache {
             cache: RwLock::new(HashMap::new()),
             total_pseudo_gas_cost: AtomicU64::new(0),
             max_total_pseudo_gas_cost,
-            canonical_names: RwLock::new(HashMap::new()),
-            total_canonical_name_bytes: AtomicU64::new(0),
         }
     }
 
@@ -240,8 +229,6 @@ impl TypeTagCache {
     /// not, so flushing cannot change the result of executing a transaction.
     pub(crate) fn flush(&self) {
         self.flush_locked(&mut self.cache.write());
-        *self.canonical_names.write() = HashMap::new();
-        self.total_canonical_name_bytes.store(0, Ordering::Relaxed);
     }
 
     /// Same as [Self::flush], but for callers that already hold the write lock.
@@ -272,27 +259,6 @@ impl TypeTagCache {
             .read()
             .get(&StructKey { idx: *idx, ty_args })
             .cloned()
-    }
-
-    /// Returns the cached canonical name of the type with the given interned id.
-    pub(crate) fn get_canonical_name(&self, id: TypeId) -> Option<TriompheArc<str>> {
-        self.canonical_names.read().get(&id).cloned()
-    }
-
-    /// Caches the canonical name of the type with the given interned id.
-    pub(crate) fn insert_canonical_name(&self, id: TypeId, name: TriompheArc<str>) {
-        let len = name.len() as u64;
-        let mut names = self.canonical_names.write();
-        let total = self.total_canonical_name_bytes.load(Ordering::Relaxed);
-        if total.saturating_add(len) > MAX_TOTAL_CANONICAL_NAME_BYTES {
-            *names = HashMap::new();
-            self.total_canonical_name_bytes.store(0, Ordering::Relaxed);
-        }
-        if let Entry::Vacant(entry) = names.entry(id) {
-            entry.insert(name);
-            self.total_canonical_name_bytes
-                .fetch_add(len, Ordering::Relaxed);
-        }
     }
 
     /// Inserts the struct tag and its pseudo-gas cost ([PricedStructTag]) into the cache. Returns
@@ -790,23 +756,6 @@ mod tests {
         assert_none!(runtime_environment
             .ty_tag_cache()
             .get_struct_tag(&idx, empty_args()));
-    }
-
-    #[test]
-    fn test_canonical_name_is_cached_per_type_and_flushed() {
-        let runtime_environment =
-            RuntimeEnvironment::new_with_config(vec![], VMConfig::default_for_test());
-        let ty = || Type::vector(Type::vector(Type::U8));
-
-        let name = assert_ok!(runtime_environment.ty_to_canonical_string(&ty()));
-        assert_eq!(&*name, "vector<vector<u8>>");
-        // A separately built equal type reuses the cached name.
-        let again = assert_ok!(runtime_environment.ty_to_canonical_string(&ty()));
-        assert!(TriompheArc::ptr_eq(&name, &again));
-
-        runtime_environment.ty_tag_cache().flush();
-        let id = runtime_environment.ty_pool().intern_ty(&ty()).unwrap();
-        assert_none!(runtime_environment.ty_tag_cache().get_canonical_name(id));
     }
 
     #[test]

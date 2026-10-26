@@ -1803,7 +1803,7 @@ where
                 .iter()
                 .zip(captured_tys)
                 .filter(|(_, ty)| {
-                    plain_value_depth(ty, &function.ty_args).is_none_or(|depth| depth > limit)
+                    plain_value_depth(ty, function.ty_args()).is_none_or(|depth| depth > limit)
                 })
                 .map(|(v, _)| v);
             gas_meter.charge_pack_closure_captured_values(traversed.clone())?;
