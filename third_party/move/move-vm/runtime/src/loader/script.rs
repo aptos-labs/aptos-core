@@ -94,7 +94,7 @@ impl Script {
                 &struct_names,
             )?;
             let ty_args_id = if is_fully_instantiated {
-                Some(ty_pool.intern_ty_args(&instantiation))
+                Some(ty_pool.intern_ty_args(&instantiation)?)
             } else {
                 None
             };

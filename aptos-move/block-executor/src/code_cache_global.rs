@@ -473,7 +473,7 @@ mod test {
     /// Returns a distinct layout cache key for every `n`: the key of `vector^n<u8>`.
     fn layout_cache_key(n: u32) -> LayoutCacheKey {
         static TY_POOL: Lazy<InternedTypePool> = Lazy::new(InternedTypePool::new);
-        let ty = (0..n).fold(Type::U8, |ty, _| Type::Vector(triomphe::Arc::new(ty)));
+        let ty = (0..n).fold(Type::U8, |ty, _| Type::vector(ty));
         LayoutCacheKey {
             id: TY_POOL.instantiate_and_intern(&ty, &[]),
         }

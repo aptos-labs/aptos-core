@@ -6,7 +6,11 @@
 //! Data structures and caches for interning types as unique compact identifiers. The lifetime of
 //! these caches is tied to the code cache, and is managed externally.
 
-use crate::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
+use crate::loaded_data::{
+    runtime_types::{InternedNode, Type},
+    struct_name_indexing::StructNameIndex,
+};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::ability::AbilitySet;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -235,15 +239,56 @@ impl InternedTypePool {
         self.ty_vec_interner.intern(&[u64_id]);
     }
 
-    /// Given a vector if fully-instantiated type arguments, returns the corresponding [TypeVecId].
-    ///
-    /// Panics if there are non-instantiated type arguments.
-    pub fn intern_ty_args(&self, ty_args: &[Type]) -> TypeVecId {
+    /// Given a vector of fully-instantiated type arguments, returns the corresponding
+    /// [TypeVecId]. Returns an invariant violation if there are non-instantiated type arguments.
+    pub fn intern_ty_args(&self, ty_args: &[Type]) -> PartialVMResult<TypeVecId> {
+        if ty_args.iter().any(|t| t.type_info().has_ty_params()) {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Cannot intern type arguments with type parameters: {:?}",
+                ty_args
+            )));
+        }
         let ty_args = ty_args
             .iter()
             .map(|t| self.instantiate_and_intern(t, &[]))
             .collect::<Vec<_>>();
-        self.ty_vec_interner.intern_vec(ty_args)
+        Ok(self.ty_vec_interner.intern_vec(ty_args))
+    }
+
+    /// Returns `None` for types with type parameters.
+    pub fn intern_ty(&self, ty: &Type) -> Option<TypeId> {
+        if ty.type_info().has_ty_params() {
+            return None;
+        }
+        Some(self.instantiate_and_intern(ty, &[]))
+    }
+
+    /// Fills the id cells of a type so that later equality checks are O(1).
+    pub fn warm_ty(&self, ty: &Type) {
+        use Type::*;
+        match ty {
+            Vector(_) | StructInstantiation(_) | Function(_) => {
+                self.intern_ty(ty);
+            },
+            Reference(node) | MutableReference(node) => self.warm_ty(node.ty()),
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
+            | Address
+            | Signer
+            | Struct { .. }
+            | TyParam(_) => {},
+        }
     }
 
     /// Given a type containing type parameters, and a fully-interned type arguments, performs
@@ -267,46 +312,60 @@ impl InternedTypePool {
             Address => self.ty_interner.intern(TypeRepr::Address),
             Signer => self.ty_interner.intern(TypeRepr::Signer),
             TyParam(idx) => subst[*idx as usize],
-            Vector(elem_ty) => {
-                let id = self.instantiate_and_intern(elem_ty, subst);
+            Vector(node) => self.id_of_node(node.as_ref(), || {
+                let id = self.instantiate_and_intern(node.ty(), subst);
                 self.vec_of(id)
-            },
-            Reference(inner_ty) => {
-                let id = self.instantiate_and_intern(inner_ty, subst);
+            }),
+            // No cell: mutable and immutable references can share one node.
+            Reference(node) => {
+                let id = self.instantiate_and_intern(node.ty(), subst);
                 self.ref_of(id)
             },
-            MutableReference(inner_ty) => {
-                let id = self.instantiate_and_intern(inner_ty, subst);
+            MutableReference(node) => {
+                let id = self.instantiate_and_intern(node.ty(), subst);
                 self.ref_mut_of(id)
             },
             Struct { idx, .. } => self.struct_of(*idx),
-            StructInstantiation { idx, ty_args, .. } => {
-                let ty_args = ty_args
+            StructInstantiation(node) => self.id_of_node(node.as_ref(), || {
+                let ids = node
+                    .ty_args()
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
                     .collect::<Vec<_>>();
-                self.instantiated_struct_of(*idx, ty_args)
-            },
-            Function {
-                args,
-                results,
-                abilities,
-            } => {
-                let args = args
+                self.instantiated_struct_of(node.idx(), ids)
+            }),
+            Function(node) => self.id_of_node(node.as_ref(), || {
+                let args = node
+                    .args()
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
                     .collect::<Vec<_>>();
-                let results = results
+                let results = node
+                    .results()
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
                     .collect::<Vec<_>>();
                 self.ty_interner.intern(TypeRepr::Function {
                     args: self.ty_vec_interner.intern_vec(args),
                     results: self.ty_vec_interner.intern_vec(results),
-                    abilities: *abilities,
+                    abilities: node.abilities(),
                 })
-            },
+            }),
         }
+    }
+
+    /// Reads or fills the node's id cell; generic nodes are never filled.
+    #[inline(always)]
+    fn id_of_node<N: InternedNode>(&self, node: &N, compute: impl FnOnce() -> TypeId) -> TypeId {
+        if node.interned_info().has_ty_params() {
+            return compute();
+        }
+        if let Some(id) = node.cached_id() {
+            return id;
+        }
+        let id = compute();
+        node.fill_id(id);
+        id
     }
 
     fn ref_of(&self, t: TypeId) -> TypeId {
@@ -338,8 +397,159 @@ impl InternedTypePool {
 mod test {
     use super::*;
     use crate::loaded_data::{runtime_types::AbilityInfo, struct_name_indexing::StructNameIndex};
-    use move_core_types::ability::AbilitySet;
-    use std::{collections::HashSet, thread};
+    use move_core_types::ability::{Ability, AbilitySet};
+    use std::{
+        collections::{hash_map::DefaultHasher, HashSet},
+        hash::Hasher,
+        thread,
+    };
+
+    // ---- Invariants of the lazily-interned id cells on compound nodes ----
+
+    fn deep_ty() -> Type {
+        Type::struct_instantiation(
+            StructNameIndex::new(7),
+            vec![Type::vector(Type::vector(Type::U8)), Type::Bool],
+            AbilityInfo::struct_(AbilitySet::EMPTY),
+        )
+    }
+
+    fn hash_of<T: std::hash::Hash>(t: &T) -> u64 {
+        let mut h = DefaultHasher::new();
+        t.hash(&mut h);
+        h.finish()
+    }
+
+    #[test]
+    fn interning_fills_id_cell_and_keeps_eq_hash_consistent() {
+        let ctx = InternedTypePool::new();
+        // Structurally equal, separately allocated; neither interned yet.
+        let a = deep_ty();
+        let b = deep_ty();
+        assert_eq!(a, b);
+        assert_eq!(hash_of(&a), hash_of(&b));
+        assert!(
+            !matches!(&a, Type::StructInstantiation(node) if node.cached_ty_id().is_some()),
+            "id cell must start empty"
+        );
+
+        // Intern only `a`: Eq/Hash must be unaffected by asymmetric interning.
+        let id_a = ctx.instantiate_and_intern(&a, &[]);
+        assert!(
+            matches!(&a, Type::StructInstantiation(node) if node.cached_ty_id() == Some(id_a)),
+            "interning must fill the cell with the returned id"
+        );
+        assert_eq!(a, b);
+        assert_eq!(hash_of(&a), hash_of(&b));
+
+        // Both interned: Eq is now the id comparison.
+        let id_b = ctx.instantiate_and_intern(&b, &[]);
+        assert_eq!(id_a, id_b);
+        assert_eq!(a, b);
+
+        // Re-interning reads the cell: same id, no new entries.
+        let n = ctx.num_interned_tys();
+        assert_eq!(ctx.instantiate_and_intern(&a, &[]), id_a);
+        assert_eq!(ctx.num_interned_tys(), n);
+    }
+
+    #[test]
+    fn interning_does_not_fill_id_cell_for_generic_nodes() {
+        let ctx = InternedTypePool::new();
+        // vector<T>: its id depends on the substitution.
+        let generic = Type::vector(Type::TyParam(0));
+        let Type::Vector(node) = &generic else {
+            panic!("expected a vector")
+        };
+
+        let u8_id = ctx.instantiate_and_intern(&Type::U8, &[]);
+        let bool_id = ctx.instantiate_and_intern(&Type::Bool, &[]);
+        let as_u8 = ctx.instantiate_and_intern(&generic, &[u8_id]);
+        let as_bool = ctx.instantiate_and_intern(&generic, &[bool_id]);
+        assert_ne!(
+            as_u8, as_bool,
+            "different substitutions must intern differently"
+        );
+        assert!(
+            node.cached_ty_id().is_none(),
+            "cell must stay empty for generic nodes"
+        );
+
+        // Same ids as the concrete types.
+        assert_eq!(
+            as_u8,
+            ctx.instantiate_and_intern(&Type::vector(Type::U8), &[])
+        );
+        assert_eq!(
+            as_bool,
+            ctx.instantiate_and_intern(&Type::vector(Type::Bool), &[])
+        );
+
+        // `intern_ty` leaves generic nodes untouched too.
+        ctx.intern_ty(&generic);
+        assert!(node.cached_ty_id().is_none());
+    }
+
+    #[test]
+    fn function_nodes_with_different_abilities_are_distinct() {
+        let ctx = InternedTypePool::new();
+        // Same signature, different abilities: distinct types, nodes and ids.
+        let f_copy = Type::function(
+            vec![Type::U64],
+            vec![Type::U8],
+            AbilitySet::singleton(Ability::Copy),
+        );
+        let f_drop = Type::function(
+            vec![Type::U64],
+            vec![Type::U8],
+            AbilitySet::singleton(Ability::Drop),
+        );
+        assert_ne!(f_copy, f_drop, "abilities are part of the function type");
+        let id_copy = ctx.instantiate_and_intern(&f_copy, &[]);
+        let id_drop = ctx.instantiate_and_intern(&f_drop, &[]);
+        assert_ne!(id_copy, id_drop, "interning must distinguish the two");
+        // Abilities live in the node, so each node caches its own id.
+        let (Type::Function(n1), Type::Function(n2)) = (&f_copy, &f_drop) else {
+            panic!("expected function types")
+        };
+        assert_eq!(n1.cached_ty_id(), Some(id_copy));
+        assert_eq!(n2.cached_ty_id(), Some(id_drop));
+        assert_ne!(n1, n2, "nodes with different abilities are distinct");
+    }
+
+    #[test]
+    fn frozen_reference_equals_separately_constructed_reference_across_interning() {
+        let ctx = InternedTypePool::new();
+
+        // Freeze first, then intern both sides.
+        let mut_ref = Type::mut_reference(Type::vector(Type::U8));
+        let frozen = mut_ref
+            .clone()
+            .paranoid_freeze_ref_ty()
+            .expect("freeze must succeed on a mutable reference");
+        let imm_ref = Type::reference(Type::vector(Type::U8));
+        ctx.intern_ty(&mut_ref);
+        ctx.intern_ty(&frozen);
+        ctx.intern_ty(&imm_ref);
+        assert_eq!(
+            frozen, imm_ref,
+            "frozen and separately built references are equal"
+        );
+
+        // Intern the mutable view first, then freeze.
+        let mut_ref2 = Type::mut_reference(Type::vector(Type::U8));
+        ctx.intern_ty(&mut_ref2);
+        let frozen2 = mut_ref2
+            .paranoid_freeze_ref_ty()
+            .expect("freeze must succeed on a mutable reference");
+        assert_eq!(
+            frozen2, imm_ref,
+            "the frozen view must equal a fresh immutable reference"
+        );
+
+        // The wrappers remain distinct types.
+        assert_ne!(mut_ref, frozen);
+    }
 
     #[test]
     fn test_primitive_types() {
@@ -374,8 +584,8 @@ mod test {
     fn test_vector_types() {
         let ctx = InternedTypePool::new();
 
-        let vec_u8 = Type::Vector(Arc::new(Type::U8));
-        let vec_u64 = Type::Vector(Arc::new(Type::U64));
+        let vec_u8 = Type::vector(Type::U8);
+        let vec_u64 = Type::vector(Type::U64);
 
         let u8_id = ctx.instantiate_and_intern(&Type::U8, &[]);
         let vec_u8_id1 = ctx.instantiate_and_intern(&vec_u8, &[]);
@@ -391,9 +601,9 @@ mod test {
     fn test_reference_types() {
         let ctx = InternedTypePool::new();
 
-        let u64_ref = Type::Reference(Box::new(Type::U64));
-        let u64_mut_ref = Type::MutableReference(Box::new(Type::U64));
-        let u8_ref = Type::Reference(Box::new(Type::U8));
+        let u64_ref = Type::reference(Type::U64);
+        let u64_mut_ref = Type::mut_reference(Type::U64);
+        let u8_ref = Type::reference(Type::U8);
 
         let u64_ref_id1 = ctx.instantiate_and_intern(&u64_ref, &[]);
         let u64_ref_id2 = ctx.instantiate_and_intern(&u64_ref, &[]);
@@ -424,23 +634,23 @@ mod test {
     fn test_structs() {
         let ctx = InternedTypePool::new();
 
-        let struct_ty = Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
-            ty_args: Arc::new(vec![Type::U64, Type::Bool]),
+        let struct_ty = Type::struct_instantiation(
+            StructNameIndex::new(0),
+            vec![Type::U64, Type::Bool],
             // Irrelevant for tests.
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-        };
+            AbilityInfo::struct_(AbilitySet::EMPTY),
+        );
 
         let id1 = ctx.instantiate_and_intern(&struct_ty, &[]);
         let id2 = ctx.instantiate_and_intern(&struct_ty, &[]);
         assert_eq!(id1, id2);
 
-        let struct_inst2 = Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
-            ty_args: Arc::new(vec![Type::Bool, Type::U64]),
+        let struct_inst2 = Type::struct_instantiation(
+            StructNameIndex::new(0),
+            vec![Type::Bool, Type::U64],
             // Irrelevant for tests.
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-        };
+            AbilityInfo::struct_(AbilitySet::EMPTY),
+        );
 
         let id3 = ctx.instantiate_and_intern(&struct_inst2, &[]);
         assert_ne!(id1, id3);
@@ -450,31 +660,23 @@ mod test {
     fn test_function_types() {
         let ctx = InternedTypePool::new();
 
-        let func_ty = Type::Function {
-            args: vec![Type::U64, Type::Bool],
-            results: vec![Type::U8],
-            abilities: AbilitySet::EMPTY,
-        };
+        let func_ty = Type::function(
+            vec![Type::U64, Type::Bool],
+            vec![Type::U8],
+            AbilitySet::EMPTY,
+        );
 
         let id1 = ctx.instantiate_and_intern(&func_ty, &[]);
         let id2 = ctx.instantiate_and_intern(&func_ty, &[]);
 
         assert_eq!(id1, id2);
 
-        let func_ty = Type::Function {
-            args: vec![Type::U64],
-            results: vec![Type::U8],
-            abilities: AbilitySet::EMPTY,
-        };
+        let func_ty = Type::function(vec![Type::U64], vec![Type::U8], AbilitySet::EMPTY);
 
         let id3 = ctx.instantiate_and_intern(&func_ty, &[]);
         assert_ne!(id1, id3);
 
-        let func_ty = Type::Function {
-            args: vec![Type::U64],
-            results: vec![Type::U8],
-            abilities: AbilitySet::ALL,
-        };
+        let func_ty = Type::function(vec![Type::U64], vec![Type::U8], AbilitySet::ALL);
         let id4 = ctx.instantiate_and_intern(&func_ty, &[]);
         assert_ne!(id3, id4);
     }
@@ -485,7 +687,7 @@ mod test {
 
         let mut ty = Type::U64;
         for _ in 0..10 {
-            ty = Type::Vector(Arc::new(ty));
+            ty = Type::vector(ty);
         }
 
         let id1 = ctx.instantiate_and_intern(&ty, &[]);
@@ -503,10 +705,19 @@ mod test {
     }
 
     #[test]
+    fn interning_generic_ty_args_is_an_error() {
+        let ctx = InternedTypePool::new();
+        assert!(ctx.intern_ty_args(&[Type::TyParam(0)]).is_err());
+        assert!(ctx
+            .intern_ty_args(&[Type::vector(Type::TyParam(1))])
+            .is_err());
+    }
+
+    #[test]
     fn test_empty_type_vectors() {
         let ctx = InternedTypePool::new();
-        let id1 = ctx.intern_ty_args(&[]);
-        let id2 = ctx.intern_ty_args(&[]);
+        let id1 = ctx.intern_ty_args(&[]).unwrap();
+        let id2 = ctx.intern_ty_args(&[]).unwrap();
         assert_eq!(id1, id2);
     }
 
@@ -518,12 +729,12 @@ mod test {
         let bool_ty = Type::Bool;
 
         let mut tys = vec![u64_ty, bool_ty];
-        let id1 = ctx.intern_ty_args(&tys);
-        let id2 = ctx.intern_ty_args(&tys);
+        let id1 = ctx.intern_ty_args(&tys).unwrap();
+        let id2 = ctx.intern_ty_args(&tys).unwrap();
         assert_eq!(id1, id2);
 
         tys.reverse();
-        let id3 = ctx.intern_ty_args(&tys);
+        let id3 = ctx.intern_ty_args(&tys).unwrap();
         assert_ne!(id1, id3);
     }
 
@@ -531,7 +742,7 @@ mod test {
     fn test_flush_clears_cache() {
         let ctx = InternedTypePool::new();
 
-        ctx.intern_ty_args(&[Type::U64]);
+        ctx.intern_ty_args(&[Type::U64]).unwrap();
         ctx.instantiate_and_intern(&Type::U64, &[]);
 
         let initial_ty_count = ctx.num_interned_tys();
