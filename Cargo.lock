@@ -3829,6 +3829,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-order-natives"
+version = "0.1.0"
+dependencies = [
+ "aptos-native-interface",
+ "aptos-types",
+ "bcs 0.1.4",
+ "better_any",
+ "bytes",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
+]
+
+[[package]]
 name = "aptos-package-builder"
 version = "0.1.0"
 dependencies = [
@@ -5193,6 +5209,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-native-interface",
+ "aptos-order-natives",
  "aptos-position-natives",
  "aptos-table-natives",
  "aptos-transaction-simulation",
@@ -5249,6 +5266,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-move-stdlib",
  "aptos-native-interface",
+ "aptos-order-natives",
  "aptos-position-natives",
  "aptos-table-natives",
  "aptos-types",

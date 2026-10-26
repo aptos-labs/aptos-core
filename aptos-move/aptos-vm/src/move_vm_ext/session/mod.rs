@@ -18,6 +18,7 @@ use aptos_framework_natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
+use aptos_order_natives::NativeOrderContext;
 use aptos_position_natives::NativePositionContext;
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -629,6 +630,7 @@ where
     extensions.add(NativeObjectContext::default());
 
     extensions.add(NativePositionContext::new());
+    extensions.add(NativeOrderContext::new());
 
     extensions
 }
