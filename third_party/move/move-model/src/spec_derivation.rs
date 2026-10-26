@@ -4002,7 +4002,15 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                 }
             }
         }
-        DerefStrip { env }.rewrite_exp(substituted)
+        let value = DerefStrip { env }.rewrite_exp(substituted);
+        // The spliced value is related to the call's actual result only by
+        // Move equality, exactly as material inlined from a behavioral
+        // predicate is, so the spec functions it applies need the same
+        // congruence axioms over `$IsEqual` (an uninterpreted function of a
+        // value holding a `String` or an `Option` cannot otherwise be matched
+        // across two representations of equal arguments).
+        env.mark_move_equality_congruence_spec_funs_in(&value);
+        value
     }
 
     /// The memoized value summary of the callee's body (source (b) of the

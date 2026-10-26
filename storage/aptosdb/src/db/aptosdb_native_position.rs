@@ -376,7 +376,7 @@ impl AptosDB {
 
     /// Bring the position store up to the ledger after a restore saved
     /// transactions past its snapshot without executing them — what
-    /// `StateStore::reset` does for main state.
+    /// `StateStore::reload` does for main state.
     pub(crate) fn reset_position_store_to_ledger(&self) -> Result<()> {
         let Some(bundle) = self.position.as_ref() else {
             return Ok(());

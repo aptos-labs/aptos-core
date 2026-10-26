@@ -175,7 +175,8 @@ mod tests {
             }),
         ) {
             let hot_root_hash = |db: &AptosDB| {
-                let state = db.state_store.current_state_locked();
+                let live = db.state_store.live().unwrap();
+                let state = live.current_state_locked();
                 let latest = state.latest();
                 (latest.version(), latest.summary().hot_root_hash().unwrap())
             };

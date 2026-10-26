@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `k` may modify: `lambda_deferred_frame_partial_application::apply_k` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_partial_application.move:43:9
+   │
+43 │         apply_k(k, before + 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^

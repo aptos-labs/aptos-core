@@ -78,7 +78,7 @@ impl DbWriter for AptosDB {
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
 
-            self.state_store.buffered_state().lock().update(
+            self.state_store.live()?.buffered_state().lock().update(
                 chunk.result_ledger_state_with_summary(),
                 chunk.hot_state_updates.clone(),
                 chunk.estimated_total_state_updates(),
@@ -175,7 +175,7 @@ impl DbWriter for AptosDB {
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
         gauged_api("get_hot_state_snapshot_receiver", || {
-            // `StateStore::reset()` at finalize discards a restored hot state when this is
+            // `StateStore::reload()` at finalize discards a restored hot state when this is
             // set, and a restart in the middle wipes the partially restored one.
             ensure!(
                 !self.state_store.hot_state_config.delete_on_restart,
@@ -236,11 +236,11 @@ impl DbWriter for AptosDB {
             if output_with_proof.proof.transaction_infos[0].hot_state_checkpoint_hash()
                 == Some(*SPARSE_MERKLE_PLACEHOLDER_HASH)
             {
-                StateStore::write_hot_state_null_node(
+                StateStore::write_empty_hot_state(
                     &self.state_store.hot_state_merkle_db,
+                    &self.state_store.hot_state_kv_db,
                     version,
                 )?;
-                self.state_store.hot_state_kv_db.write_progress(version)?;
             }
 
             // TODO(joshlind): include confirm_or_save_frozen_subtrees in the change set
@@ -351,9 +351,9 @@ impl DbWriter for AptosDB {
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
             info!(
                 version = version,
-                "Finalizing state snapshot restore: pruners seeded, resetting state store."
+                "Finalizing state snapshot restore: pruners seeded, reloading state store."
             );
-            self.state_store.reset();
+            self.state_store.reload();
 
             // After the restored rows are durable.
             if let Some(expected_root_hash) = position_root {
@@ -371,7 +371,11 @@ impl AptosDB {
 
         ensure!(!chunk.is_empty(), "chunk is empty, nothing to save.");
 
-        let next_version = self.state_store.current_state_locked().next_version();
+        let next_version = self
+            .state_store
+            .live()?
+            .current_state_locked()
+            .next_version();
         // Ensure the incoming committing requests are always consecutive and the version in
         // buffered state is consistent with that in db.
         ensure!(
@@ -816,7 +820,7 @@ impl AptosDB {
 
     fn get_and_check_commit_range(&self, version_to_commit: Version) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.state_store.current_state_locked().version();
+        let pre_committed_ver = self.state_store.live()?.current_state_locked().version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",
