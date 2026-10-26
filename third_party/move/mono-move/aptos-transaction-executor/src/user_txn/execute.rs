@@ -19,6 +19,7 @@ use crate::{
     outcome::TxnOutcome,
     providers::read_config,
 };
+use aptos_gas_schedule::HighLimitPricing;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::ApprovedExecutionHashes,
@@ -148,6 +149,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         )
         .run_checks()
         .map_err(DiscardReason::PreExecutionCheck)?;
+        let high_limit_pricing = txn_data.txn_limits_request.as_ref().and_then(|_| {
+            HighLimitPricing::new(self.env.gas_feature_version(), &gas_params.vm.txn)
+        });
 
         // TODO(completeness): multisig payloads. Refused for now, since the
         // inner executable must run as the multisig account, not the sender.
@@ -176,11 +180,16 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
-            DiscardReason::Failure {
-                stage: ExecutionStage::Prologue,
-                failure,
-            }
+        run_prologue(
+            interp,
+            self.symbols,
+            &signers,
+            txn_data,
+            high_limit_pricing.as_ref(),
+        )
+        .map_err(|failure| DiscardReason::Failure {
+            stage: ExecutionStage::Prologue,
+            failure,
         })?;
         // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
         checkpoint(interp)?;
@@ -223,6 +232,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 txn_data,
                 fee_statement,
                 gas_remaining,
+                high_limit_pricing.as_ref(),
             )
         };
         let execution_status = match epilogue(interp) {

@@ -44,6 +44,9 @@ pub type Fee = GasQuantity<Octa>;
 
 pub type FeePerGasUnit = GasQuantity<UnitDiv<Octa, GasUnit>>;
 
+/// A unitless multiplier on gas.
+pub type GasMultiplier = GasQuantity<UnitDiv<GasUnit, GasUnit>>;
+
 /// Unit of storage slot
 pub enum Slot {}
 

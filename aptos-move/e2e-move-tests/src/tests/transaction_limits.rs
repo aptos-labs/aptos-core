@@ -4,27 +4,38 @@
 //! End-to-end tests for staking-backed transaction limits.
 
 use crate::{
-    assert_success,
+    assert_success, assert_vm_status,
     stake::{initialize_staking, join_validator_set, rotate_consensus_key, setup_staking},
+    tests::common,
     MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib::{
-    aptos_coin_transfer, delegation_pool_add_stake, delegation_pool_initialize_delegation_pool,
-    stake_set_delegated_voter,
+    aptos_account_transfer, aptos_coin_transfer, delegation_pool_add_stake,
+    delegation_pool_initialize_delegation_pool, stake_set_delegated_voter,
 };
 use aptos_crypto::HashValue;
+use aptos_gas_algebra::Gas;
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_49;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
+    error::{split_canonical, OUT_OF_RANGE},
+    fee_statement::FeeStatement,
     move_utils::MemberId,
     on_chain_config::{ApprovedExecutionHashes, FeatureFlag, OnChainConfig},
     transaction::{
-        RequestedMultipliers, Script, SignedTransaction, TransactionExecutable,
-        TransactionExtraConfig, TransactionPayload, TransactionPayloadInner, TransactionStatus,
+        validation::ECANT_PAY_GAS_DEPOSIT, EntryFunction, ExecutionStatus, RequestedMultipliers,
+        Script, SignedTransaction, TransactionExecutable, TransactionExtraConfig,
+        TransactionOutput, TransactionPayload, TransactionPayloadInner, TransactionStatus,
         UserTxnLimitsRequest,
     },
 };
-use move_core_types::{ident_str, language_storage::StructTag, vm_status::StatusCode};
+use move_core_types::{
+    ident_str,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag},
+    vm_status::StatusCode,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -86,20 +97,27 @@ fn delegation_pool_delegator(
     }
 }
 
+fn entry_function_with_limits(
+    entry_func: EntryFunction,
+    request: UserTxnLimitsRequest,
+) -> TransactionPayload {
+    TransactionPayload::Payload(TransactionPayloadInner::V1 {
+        executable: TransactionExecutable::EntryFunction(entry_func),
+        extra_config: TransactionExtraConfig::V2 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+            txn_limits_request: Some(request),
+        },
+    })
+}
+
 fn payload_with_limits(
     sender_addr: AccountAddress,
     request: UserTxnLimitsRequest,
 ) -> TransactionPayload {
     match aptos_coin_transfer(sender_addr, 0) {
         TransactionPayload::EntryFunction(entry_func) => {
-            TransactionPayload::Payload(TransactionPayloadInner::V1 {
-                executable: TransactionExecutable::EntryFunction(entry_func),
-                extra_config: TransactionExtraConfig::V2 {
-                    multisig_address: None,
-                    replay_protection_nonce: None,
-                    txn_limits_request: Some(request),
-                },
-            })
+            entry_function_with_limits(entry_func, request)
         },
         _ => unreachable!(),
     }
@@ -111,8 +129,6 @@ fn sign_txn_with_limits_and_gas_unit_price(
     request: UserTxnLimitsRequest,
     gas_unit_price: u64,
 ) -> SignedTransaction {
-    // Override gas unit price because high-limit transactions require
-    // 10x default minimum value.
     h.create_transaction_without_sign(acc, payload_with_limits(*acc.address(), request))
         .gas_unit_price(gas_unit_price)
         .sign()
@@ -123,7 +139,7 @@ fn sign_txn_with_limits(
     acc: &Account,
     request: UserTxnLimitsRequest,
 ) -> SignedTransaction {
-    sign_txn_with_limits_and_gas_unit_price(h, acc, request, 10 * DEFAULT_GAS_UNIT_PRICE)
+    sign_txn_with_limits_and_gas_unit_price(h, acc, request, DEFAULT_GAS_UNIT_PRICE)
 }
 
 fn sign_fee_payer_txn_with_limits(
@@ -137,7 +153,7 @@ fn sign_fee_payer_txn_with_limits(
         .payload(payload_with_limits(*sender.address(), request))
         .sequence_number(h.sequence_number(sender.address()))
         .max_gas_amount(1_000_000)
-        .gas_unit_price(10 * DEFAULT_GAS_UNIT_PRICE)
+        .gas_unit_price(DEFAULT_GAS_UNIT_PRICE)
         .sign_fee_payer()
 }
 
@@ -590,11 +606,308 @@ fn test_approved_gov_script_with_txn_limits_request_rejected() {
         .payload(payload)
         .sequence_number(h.sequence_number(acc.address()))
         .max_gas_amount(1_000_000)
-        .gas_unit_price(10 * DEFAULT_GAS_UNIT_PRICE)
+        .gas_unit_price(DEFAULT_GAS_UNIT_PRICE)
         .sign();
     run_and_assert_discard(
         &mut h,
         txn,
         StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT,
     );
+}
+
+const EXCESS_PRICE_MULTIPLIER: u64 = 10;
+
+// Iterations of `0xbeef::limits::spin` used to set up execution gas above the
+// base limit.
+const SPIN_ITERATIONS: u64 = 50_000;
+
+/// The base execution and IO limits, in gas units.
+struct BaseLimits {
+    execution: u64,
+    io: u64,
+}
+
+fn base_limits(h: &MoveHarness) -> BaseLimits {
+    let (_, params) = h.get_gas_params();
+    let txn = &params.vm.txn;
+    let execution: Gas = txn.max_execution_gas.to_unit_round_up_with_params(txn);
+    let io: Gas = txn.max_io_gas.to_unit_round_up_with_params(txn);
+    BaseLimits {
+        execution: execution.into(),
+        io: io.into(),
+    }
+}
+
+fn beef_entry_function(name: &str, args: Vec<Vec<u8>>) -> EntryFunction {
+    EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::from_hex_literal("0xbeef").unwrap(),
+            ident_str!("limits").to_owned(),
+        ),
+        Identifier::new(name).unwrap(),
+        vec![],
+        args,
+    )
+}
+
+fn spin(n: u64) -> EntryFunction {
+    beef_entry_function("spin", vec![bcs::to_bytes(&n).unwrap()])
+}
+
+fn spin_then_transfer(to: AccountAddress, amount: u64, n: u64) -> EntryFunction {
+    beef_entry_function("spin_then_transfer", vec![
+        bcs::to_bytes(&to).unwrap(),
+        bcs::to_bytes(&amount).unwrap(),
+        bcs::to_bytes(&n).unwrap(),
+    ])
+}
+
+/// Runs the transaction. Returns its status, fee statement, and how much the
+/// payer's balance dropped.
+fn run_and_get_fee(
+    h: &mut MoveHarness,
+    payer: &Account,
+    txn: SignedTransaction,
+) -> (TransactionStatus, FeeStatement, u64) {
+    let before = h.read_aptos_balance(payer.address());
+    let output: TransactionOutput = h.run_raw(txn);
+    let fee_statement = output
+        .try_extract_fee_statement()
+        .expect("fee statement should decode")
+        .expect("kept transaction should emit a fee statement");
+    let paid = before - h.read_aptos_balance(payer.address());
+    (output.status().clone(), fee_statement, paid)
+}
+
+/// The fee at the gas price, and the excess gas units over the base limits.
+fn fee_and_excess(fee_statement: &FeeStatement, base: &BaseLimits) -> (u64, u64) {
+    let excess = (fee_statement
+        .execution_gas_used()
+        .saturating_sub(base.execution)
+        + fee_statement.io_gas_used().saturating_sub(base.io))
+    .min(fee_statement.gas_used());
+    let fee =
+        DEFAULT_GAS_UNIT_PRICE * fee_statement.gas_used() - fee_statement.storage_fee_refund();
+    (fee, excess)
+}
+
+/// The fee for a high-limit transaction: excess gas units cost the multiplier
+/// times the gas price.
+fn high_limit_fee(fee_statement: &FeeStatement, base: &BaseLimits) -> (u64, u64) {
+    let (fee, excess) = fee_and_excess(fee_statement, base);
+    let surcharge = (EXCESS_PRICE_MULTIPLIER - 1) * DEFAULT_GAS_UNIT_PRICE * excess;
+    (fee + surcharge, excess)
+}
+
+/// Sets up a validator and publishes `0xbeef::limits`. Then sets the base
+/// execution limit to two thirds of what `spin(SPIN_ITERATIONS)` uses, so a 2x
+/// request runs it with excess execution gas.
+fn setup_excess_execution(h: &mut MoveHarness) -> (Account, BaseLimits) {
+    let acc = setup_validator(h);
+    let beef = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    assert_success!(h.publish_package(
+        &beef,
+        &common::test_dir_path("transaction_limits.data/pack"),
+    ));
+    h.new_epoch();
+
+    // Measure the execution gas `spin` uses under a limit it cannot reach.
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_execution_gas = params.vm.txn.max_execution_gas_gov;
+    });
+    let txn = h.create_transaction_payload(
+        &acc,
+        TransactionPayload::EntryFunction(spin(SPIN_ITERATIONS)),
+    );
+    let (status, fee_statement, _) = run_and_get_fee(h, &acc, txn);
+    assert_success!(status);
+
+    let base_execution_gas = fee_statement.execution_gas_used() * 2 / 3;
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_execution_gas =
+            Gas::new(base_execution_gas) * params.vm.txn.gas_unit_scaling_factor;
+    });
+    let base = base_limits(h);
+    assert_eq!(base.execution, base_execution_gas);
+    (acc, base)
+}
+
+/// Transfers away most of the account's balance. Returns a max gas amount
+/// whose fee at the gas price is affordable, but not at the multiplier.
+fn max_gas_between_reserves(h: &mut MoveHarness, acc: &Account) -> u64 {
+    let other = h.new_account_with_balance_and_sequence_number(0, 0);
+    let keep = 5_0000_0000;
+    let amount = h.read_aptos_balance(acc.address()) - keep;
+    assert_success!(
+        h.run_transaction_payload(acc, aptos_account_transfer(*other.address(), amount))
+    );
+
+    let balance = h.read_aptos_balance(acc.address());
+    let max_gas_amount = balance / (5 * DEFAULT_GAS_UNIT_PRICE);
+    assert!(DEFAULT_GAS_UNIT_PRICE * max_gas_amount <= balance);
+    assert!(EXCESS_PRICE_MULTIPLIER * DEFAULT_GAS_UNIT_PRICE * max_gas_amount > balance);
+    max_gas_amount
+}
+
+#[test]
+fn test_high_limit_txn_within_base_limits_pays_gas_price() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    let txn = sign_txn_with_limits(&mut h, &acc, stake_pool_owner(200, 200));
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
+    assert_success!(status);
+
+    let (fee, excess) = fee_and_excess(&fee_statement, &base_limits(&h));
+    assert_eq!(excess, 0);
+    assert_eq!(paid, fee);
+}
+
+#[test]
+fn test_high_limit_txn_excess_pays_multiplier() {
+    let mut h = new_test_harness();
+    let (acc, base) = setup_excess_execution(&mut h);
+
+    let payload = entry_function_with_limits(spin(SPIN_ITERATIONS), stake_pool_owner(200, 200));
+    let txn = h.create_transaction_payload(&acc, payload);
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
+    assert_success!(status);
+
+    let (fee, excess) = high_limit_fee(&fee_statement, &base);
+    assert!(excess > 0);
+    assert_eq!(paid, fee);
+}
+
+#[test]
+fn test_high_limit_txn_excess_pays_multiplier_on_failure() {
+    let mut h = new_test_harness();
+    let (acc, base) = setup_excess_execution(&mut h);
+
+    // Spins past the raised execution limit.
+    let payload = entry_function_with_limits(spin(3 * SPIN_ITERATIONS), stake_pool_owner(200, 200));
+    let txn = h.create_transaction_payload(&acc, payload);
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
+    assert_vm_status!(status, StatusCode::EXECUTION_LIMIT_REACHED);
+
+    let (fee, excess) = high_limit_fee(&fee_statement, &base);
+    assert!(excess > 0);
+    assert_eq!(paid, fee);
+}
+
+#[test]
+fn test_normal_txn_above_base_limits_pays_gas_price() {
+    let mut h = new_test_harness();
+    let (acc, base) = setup_excess_execution(&mut h);
+
+    let txn = h.create_transaction_payload(
+        &acc,
+        TransactionPayload::EntryFunction(spin(SPIN_ITERATIONS)),
+    );
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
+    assert_vm_status!(status, StatusCode::EXECUTION_LIMIT_REACHED);
+
+    let (fee, excess) = fee_and_excess(&fee_statement, &base);
+    assert!(excess > 0);
+    assert_eq!(paid, fee);
+}
+
+#[test]
+fn test_high_limit_txn_reserves_max_fee_at_multiplier() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    let max_gas_amount = max_gas_between_reserves(&mut h, &acc);
+    let txn = h
+        .create_transaction_without_sign(
+            &acc,
+            payload_with_limits(*acc.address(), stake_pool_owner(200, 200)),
+        )
+        .max_gas_amount(max_gas_amount)
+        .sign();
+    run_and_assert_discard(
+        &mut h,
+        txn,
+        StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE,
+    );
+}
+
+#[test]
+fn test_high_limit_txn_max_fee_overflow() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    // The max fee fits in u64 at the gas price, but not at the multiplier.
+    let max_gas_amount = 1_000_000;
+    let gas_unit_price = u64::MAX / (EXCESS_PRICE_MULTIPLIER * max_gas_amount) + 1;
+    assert!(gas_unit_price.checked_mul(max_gas_amount).is_some());
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_price_per_gas_unit = gas_unit_price.into();
+    });
+    let txn = h
+        .create_transaction_without_sign(
+            &acc,
+            payload_with_limits(*acc.address(), stake_pool_owner(200, 200)),
+        )
+        .gas_unit_price(gas_unit_price)
+        .max_gas_amount(max_gas_amount)
+        .sign();
+    run_and_assert_discard(&mut h, txn, StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND);
+}
+
+#[test]
+fn test_high_limit_txn_drained_balance_pays_on_failure() {
+    let mut h = new_test_harness();
+    let (acc, base) = setup_excess_execution(&mut h);
+    let recipient = h.new_account_with_balance_and_sequence_number(0, 0);
+
+    // The payload leaves too little to pay the fee, so the success epilogue
+    // fails and the failure epilogue charges against the pre-payload balance.
+    let amount = h.read_aptos_balance(acc.address()) - 1;
+    let payload = entry_function_with_limits(
+        spin_then_transfer(*recipient.address(), amount, SPIN_ITERATIONS),
+        stake_pool_owner(200, 200),
+    );
+    let txn = h.create_transaction_payload(&acc, payload);
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
+    match status {
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort { code, .. }) => {
+            assert_eq!(split_canonical(code), (OUT_OF_RANGE, ECANT_PAY_GAS_DEPOSIT));
+        },
+        status => panic!("Expected the epilogue to abort, got {:?}", status),
+    }
+
+    let (fee, excess) = high_limit_fee(&fee_statement, &base);
+    assert!(excess > 0);
+    assert_eq!(paid, fee);
+    assert_eq!(h.read_aptos_balance(recipient.address()), 0);
+}
+
+#[test]
+fn test_high_limit_txn_before_v1_50_pays_gas_price() {
+    let mut h = new_test_harness();
+    let (acc, base) = setup_excess_execution(&mut h);
+    h.modify_gas_schedule_raw(|gas_schedule| gas_schedule.feature_version = RELEASE_V1_49);
+
+    let payload = entry_function_with_limits(spin(SPIN_ITERATIONS), stake_pool_owner(200, 200));
+    let txn = h.create_transaction_payload(&acc, payload);
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
+    assert_success!(status);
+
+    let (fee, excess) = fee_and_excess(&fee_statement, &base);
+    assert!(excess > 0);
+    assert_eq!(paid, fee);
+
+    // The prologue reserves the max fee at the gas price.
+    let max_gas_amount = max_gas_between_reserves(&mut h, &acc);
+    let txn = h
+        .create_transaction_without_sign(
+            &acc,
+            payload_with_limits(*acc.address(), stake_pool_owner(200, 200)),
+        )
+        .max_gas_amount(max_gas_amount)
+        .sign();
+    assert_success!(h.run(txn));
 }

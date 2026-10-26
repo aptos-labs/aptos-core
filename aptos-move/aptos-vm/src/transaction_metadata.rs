@@ -3,6 +3,7 @@
 
 use crate::AptosVM;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
+use aptos_gas_schedule::HighLimitPricing;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -44,6 +45,9 @@ pub struct TransactionMetadata {
     pub transaction_index_kind: TransactionIndexKind,
     /// Transaction limits request (requested by user or set by the system).
     pub txn_limits: Option<TxnLimitsRequest>,
+    /// Set for a staking-backed limits request, which pays more for gas used
+    /// above the base limits.
+    pub high_limit_pricing: Option<HighLimitPricing>,
 }
 
 impl TransactionMetadata {
@@ -110,6 +114,20 @@ impl TransactionMetadata {
             Some(TxnLimitsRequest::Staking(request.clone()))
         } else {
             None
+        };
+
+        let high_limit_pricing = match &txn_limits {
+            Some(TxnLimitsRequest::Staking(_)) => {
+                let env = vm.environment();
+                let gas_params = env.gas_params().as_ref().map_err(|err| {
+                    VMStatus::error(
+                        StatusCode::VM_STARTUP_FAILURE,
+                        Some(format!("VM Startup Failed. {}", err)),
+                    )
+                })?;
+                HighLimitPricing::new(vm.gas_feature_version(), &gas_params.vm.txn)
+            },
+            Some(TxnLimitsRequest::ApprovedGovernanceScript) | None => None,
         };
 
         Ok(Self {
@@ -202,6 +220,7 @@ impl TransactionMetadata {
             },
             transaction_index_kind: auxiliary_info.transaction_index_kind(),
             txn_limits,
+            high_limit_pricing,
         })
     }
 

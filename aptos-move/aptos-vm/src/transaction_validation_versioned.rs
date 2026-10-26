@@ -63,7 +63,10 @@ impl PrologueBuilder {
                 .iter()
                 .map(|proof| proof.optional_auth_key())
                 .collect(),
-            txn_gas_price: txn_data.gas_unit_price().into(),
+            txn_gas_price: match &txn_data.high_limit_pricing {
+                Some(pricing) => pricing.reserve_price(txn_data.gas_unit_price().into()),
+                None => txn_data.gas_unit_price().into(),
+            },
             txn_max_gas_units: txn_data.max_gas_amount().into(),
             txn_expiration_time: txn_data.expiration_timestamp_secs(),
             chain_id: txn_data.chain_id().id(),
@@ -144,10 +147,20 @@ impl EpilogueBuilder {
         gas_remaining: Gas,
         is_simulation: bool,
     ) -> Self {
+        let max_gas_amount = txn_data.max_gas_amount().into();
+        let txn_max_gas_units = match &txn_data.high_limit_pricing {
+            Some(pricing) => pricing.epilogue_max_gas_units(
+                max_gas_amount,
+                fee_statement.gas_used(),
+                fee_statement.execution_gas_used(),
+                fee_statement.io_gas_used(),
+            ),
+            None => max_gas_amount,
+        };
         Self {
             fee_statement,
             txn_gas_price: txn_data.gas_unit_price().into(),
-            txn_max_gas_units: txn_data.max_gas_amount().into(),
+            txn_max_gas_units,
             gas_units_remaining: gas_remaining.into(),
             is_simulation,
             is_orderless_txn: txn_data.is_orderless(),

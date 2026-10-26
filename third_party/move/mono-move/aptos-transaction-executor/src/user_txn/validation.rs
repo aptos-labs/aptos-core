@@ -11,6 +11,7 @@ use crate::{
     calls::call_system_function_unmetered,
     errors::{call_result, MoveExecutionFailure},
 };
+use aptos_gas_schedule::HighLimitPricing;
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
@@ -60,7 +61,12 @@ pub(crate) fn run_prologue<'a>(
     symbols: &FrameworkSymbols,
     signers: &ValidationSigners,
     txn_data: &TxnMetadata,
+    high_limit_pricing: Option<&HighLimitPricing>,
 ) -> Result<(), MoveExecutionFailure> {
+    let txn_gas_price = match high_limit_pricing {
+        Some(pricing) => pricing.reserve_price(txn_data.gas_unit_price),
+        None => txn_data.gas_unit_price,
+    };
     let args = PrologueArgs::V1 {
         needs_fee_payer_auth_check: txn_data.fee_payer.is_some(),
         txn_sender_public_key: txn_data.sender_auth_key.clone(),
@@ -68,7 +74,7 @@ pub(crate) fn run_prologue<'a>(
         replay_protector: txn_data.replay_protector,
         secondary_signer_addresses: txn_data.secondary_signers.clone(),
         secondary_signer_public_key_hashes: txn_data.secondary_auth_keys.clone(),
-        txn_gas_price: txn_data.gas_unit_price,
+        txn_gas_price,
         txn_max_gas_units: txn_data.max_gas_amount,
         txn_expiration_time: txn_data.expiration_timestamp_secs,
         chain_id: txn_data.chain_id,
@@ -93,11 +99,21 @@ pub(crate) fn run_epilogue<'a>(
     txn_data: &TxnMetadata,
     fee_statement: FeeStatement,
     gas_units_remaining: u64,
+    high_limit_pricing: Option<&HighLimitPricing>,
 ) -> Result<(), MoveExecutionFailure> {
+    let txn_max_gas_units = match high_limit_pricing {
+        Some(pricing) => pricing.epilogue_max_gas_units(
+            txn_data.max_gas_amount,
+            fee_statement.gas_used(),
+            fee_statement.execution_gas_used(),
+            fee_statement.io_gas_used(),
+        ),
+        None => txn_data.max_gas_amount,
+    };
     let args = EpilogueArgs::V1 {
         fee_statement,
         txn_gas_price: txn_data.gas_unit_price,
-        txn_max_gas_units: txn_data.max_gas_amount,
+        txn_max_gas_units,
         gas_units_remaining,
         is_simulation: false,
         is_orderless_txn: txn_data.is_orderless(),
