@@ -7,7 +7,7 @@
 //! same `(stale_since_version, version, state_key_hash)` shape, so
 //! the position pruner reuses
 //! [`aptos_types::state_store::state_value::StaleStateValueByKeyHashIndex`]
-//! directly under the local alias [`StalePositionValueIndex`]. Only
+//! directly under the local alias [`NativeStaleValueIndex`]. Only
 //! the CF and the schema type differ; the byte format is shared and
 //! the [`KeyCodec`] impl below is byte-identical to the main-state
 //! schema's.
@@ -34,19 +34,19 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 };
-pub use aptos_types::state_store::state_value::StaleStateValueByKeyHashIndex as StalePositionValueIndex;
+pub use aptos_types::state_store::state_value::StaleStateValueByKeyHashIndex as NativeStaleValueIndex;
 use aptos_types::transaction::Version;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::{io::Write, mem::size_of};
 
 define_schema!(
-    StalePositionValueIndexSchema,
-    StalePositionValueIndex,
+    NativeStaleValueIndexSchema,
+    NativeStaleValueIndex,
     (),
     STALE_POSITION_VALUE_INDEX_CF_NAME
 );
 
-impl KeyCodec<StalePositionValueIndexSchema> for StalePositionValueIndex {
+impl KeyCodec<NativeStaleValueIndexSchema> for NativeStaleValueIndex {
     fn encode_key(&self) -> Result<Vec<u8>> {
         let mut out = Vec::with_capacity(2 * size_of::<Version>() + HashValue::LENGTH);
         out.write_u64::<BigEndian>(self.stale_since_version)?;
@@ -73,7 +73,7 @@ impl KeyCodec<StalePositionValueIndexSchema> for StalePositionValueIndex {
     }
 }
 
-impl ValueCodec<StalePositionValueIndexSchema> for () {
+impl ValueCodec<NativeStaleValueIndexSchema> for () {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(Vec::new())
     }
@@ -90,7 +90,7 @@ impl ValueCodec<StalePositionValueIndexSchema> for () {
 /// Pruner-side seek key: encodes just the `stale_since_version` so
 /// the pruner can seek to "first row with stale_since_version >= X"
 /// without constructing the full composite key.
-impl SeekKeyCodec<StalePositionValueIndexSchema> for Version {
+impl SeekKeyCodec<NativeStaleValueIndexSchema> for Version {
     fn encode_seek_key(&self) -> Result<Vec<u8>> {
         Ok(self.to_be_bytes().to_vec())
     }

@@ -11,8 +11,7 @@ use crate::{
     native_store::kv_db::PositionDb,
     pruner::{db_pruner::DBPruner, pruner_manager::PrunerManager},
     schema::{
-        position_value::PositionValueSchema,
-        stale_position_value_index::StalePositionValueIndexSchema,
+        native_stale_value_index::NativeStaleValueIndexSchema, native_value::NativeValueSchema,
     },
     sharded_kv_db::ShardedKvDb,
 };
@@ -82,7 +81,7 @@ fn commit_at(db: &Arc<PositionDb>, version: Version, writes: Vec<(StateKey, Writ
 fn value_exists(db: &PositionDb, hash: HashValue, version: Version) -> bool {
     let shard = ShardedKvDb::shard_of_hash(hash);
     db.shard(shard)
-        .get::<PositionValueSchema>(&(hash, version))
+        .get::<NativeValueSchema>(&(hash, version))
         .unwrap()
         .is_some()
 }
@@ -91,7 +90,7 @@ fn stale_versions(db: &PositionDb, hash: HashValue) -> Vec<Version> {
     let shard = ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
     let mut v: Vec<Version> = iter

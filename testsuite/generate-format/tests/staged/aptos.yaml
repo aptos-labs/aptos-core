@@ -488,6 +488,14 @@ Extension:
               TYPENAME: StateKey
             VALUE:
               TYPENAME: WriteOp
+    1:
+      NativeOrder:
+        NEWTYPE:
+          MAP:
+            KEY:
+              TYPENAME: StateKey
+            VALUE:
+              TYPENAME: WriteOp
 FederatedKeylessPublicKey:
   STRUCT:
     - jwk_addr:
