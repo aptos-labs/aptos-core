@@ -571,21 +571,7 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let arc_restore_handler = Arc::new(restore_handler.clone());
 
-        let db_commit_stream = txns_to_execute_stream
-            .map_ok(Some)
-            .chain(stream::once(future::ok(None)))
-            .scan(BlockBatcher::new(BATCH_SIZE), |batcher, txn| {
-                future::ready(Some(txn.map(|txn| match txn {
-                    Some(txn) => {
-                        let (_, _, txn_info, _, events) = &txn;
-                        let ends_block = txn_info.has_state_checkpoint_hash();
-                        let ends_epoch = events.iter().any(ContractEvent::is_new_epoch_event);
-                        batcher.push(txn, ends_block, ends_epoch)
-                    },
-                    None => batcher.finish(),
-                })))
-            })
-            .try_filter_map(future::ok)
+        let db_commit_stream = batch_by_blocks(txns_to_execute_stream)
             .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
@@ -666,9 +652,7 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db));
-        let ledger_update_stream = txns_to_execute_stream
-            .try_chunks(BATCH_SIZE)
-            .err_into::<anyhow::Error>()
+        let ledger_update_stream = batch_by_blocks(txns_to_execute_stream)
             .map_ok(|chunk| {
                 let (txns, persisted_aux_info, txn_infos, write_sets, events): (
                     Vec<_>,
@@ -808,10 +792,39 @@ impl TransactionRestoreBatchController {
     }
 }
 
-/// Groups txns into KV replay batches of whole blocks, as KV replay persists `VersionData` at batch
-/// ends and an interrupted restore resumes after the last batch committed. A batch ends at the
-/// first block end once it has `min_size` txns, or at an epoch end, since the first txn of the next
-/// epoch reads `VersionData` via `state_storage::on_new_block`.
+type TxnToReplay = (
+    Transaction,
+    PersistedAuxiliaryInfo,
+    TransactionInfo,
+    WriteSet,
+    Vec<ContractEvent>,
+);
+
+/// Groups txns to replay into batches with `BlockBatcher`.
+fn batch_by_blocks(
+    txns: impl Stream<Item = Result<TxnToReplay>>,
+) -> impl Stream<Item = Result<Vec<TxnToReplay>>> {
+    txns.map_ok(Some)
+        .chain(stream::once(future::ok(None)))
+        .scan(BlockBatcher::new(BATCH_SIZE), |batcher, txn| {
+            future::ready(Some(txn.map(|txn| match txn {
+                Some(txn) => {
+                    let (_, _, txn_info, _, events) = &txn;
+                    let ends_block = txn_info.has_state_checkpoint_hash();
+                    let ends_epoch = events.iter().any(ContractEvent::is_new_epoch_event);
+                    batcher.push(txn, ends_block, ends_epoch)
+                },
+                None => batcher.finish(),
+            })))
+        })
+        .try_filter_map(future::ok)
+}
+
+/// Groups txns to replay into batches of whole blocks. KV replay persists `VersionData` at batch
+/// ends, and an interrupted restore resumes after the last batch committed. Full replay verifies
+/// each batch by re-executing it, which should start at the beginning of a block. A batch ends at
+/// the first block end once it has `min_size` txns, or at an epoch end, since the first txn of the
+/// next epoch reads `VersionData` via `state_storage::on_new_block`.
 struct BlockBatcher<T> {
     min_size: usize,
     batch: Vec<T>,
