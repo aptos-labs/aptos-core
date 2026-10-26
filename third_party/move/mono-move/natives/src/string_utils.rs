@@ -15,6 +15,9 @@ use move_core_types::account_address::AccountAddress;
 const EARGS_MISMATCH: u64 = 1;
 /// The format string is not well formed.
 const EINVALID_FORMAT: u64 = 2;
+// TODO(correctness): V1 aborts with `EUNABLE_TO_FORMAT_DELAYED_FIELD` (3) on
+// aggregators and snapshots, while here they format as plain structs. Read the
+// delayed value and format it instead.
 
 /// `0x1::string_utils::native_format<T>(s: &T, type_tag: bool, canonicalize:
 /// bool, single_line: bool, include_int_types: bool): String`
@@ -67,43 +70,35 @@ pub fn native_format_list<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
         ty: ctx.ty_arg(0)?,
     };
     let mut out = String::new();
-    // `1` after an opening `{`, `-1` after a closing `}`, `0` otherwise. The
-    // next character decides whether the brace was a substitution, an escape,
-    // or a malformed string.
-    let mut in_braces = 0i8;
+    // The brace just read, if any. The next character decides whether it was a
+    // substitution, an escape, or a malformed string.
+    let mut pending = None;
     for c in fmt.chars() {
-        if in_braces == 1 {
-            in_braces = 0;
-            if c == '}' {
-                match cursor.pop(ctx, &mut out)? {
-                    Ok(next) => cursor = next,
-                    Err(status) => return Ok(status),
-                }
-                continue;
-            } else if c != '{' {
+        match (pending.take(), c) {
+            (None, '{') => pending = Some(Brace::Open),
+            (None, '}') => pending = Some(Brace::Close),
+            (None, c) => out.push(c),
+            (Some(Brace::Open), '}') => match cursor.pop(ctx, &mut out)? {
+                Ok(next) => cursor = next,
+                Err(status) => return Ok(status),
+            },
+            (Some(Brace::Open), '{') => out.push('{'),
+            (Some(Brace::Open), _) => {
                 return Ok(abort(
                     EINVALID_FORMAT,
                     Some("Invalid format string: unmatched '{{' bracket"),
                 ));
-            }
-        } else if in_braces == -1 {
-            in_braces = 0;
-            if c != '}' {
+            },
+            (Some(Brace::Close), '}') => out.push('}'),
+            (Some(Brace::Close), _) => {
                 return Ok(abort(
                     EINVALID_FORMAT,
                     Some("Invalid format string: unmatched '}}' bracket"),
                 ));
-            }
-        } else if c == '{' {
-            in_braces = 1;
-            continue;
-        } else if c == '}' {
-            in_braces = -1;
-            continue;
+            },
         }
-        out.push(c);
     }
-    if in_braces != 0 {
+    if pending.is_some() {
         return Ok(abort(
             EINVALID_FORMAT,
             Some("Invalid format string: unclosed brackets"),
@@ -118,6 +113,13 @@ pub fn native_format_list<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // `vector<u8>`.
     unsafe { ctx.set_return(0, bytes)? };
     Ok(NativeStatus::Success)
+}
+
+/// A brace in the format string whose meaning depends on the next character.
+#[derive(Clone, Copy)]
+enum Brace {
+    Open,
+    Close,
 }
 
 /// Position in the cons list `Cons<T, N> { car: T, cdr: N }` being formatted.

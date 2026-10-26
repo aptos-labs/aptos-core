@@ -53,6 +53,10 @@ module 0x1::main {
 
     struct Unit has copy, drop {}
 
+    struct Opt has copy, drop {
+        o: option::Option<Foo>,
+    }
+
     enum Shape has copy, drop {
         Circle { r: u64 },
         Point,
@@ -83,6 +87,21 @@ module 0x1::main {
 
     public fun int_typed(): String {
         string_utils::native_format(&7u8, false, false, true, true)
+    }
+
+    public fun int_typed_u256(): String {
+        let x: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+        string_utils::native_format(&x, false, false, true, true)
+    }
+
+    public fun int_typed_neg_i64(): String {
+        let x: i64 = -5;
+        string_utils::native_format(&x, false, false, true, true)
+    }
+
+    public fun int_typed_neg_i256(): String {
+        let x: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
+        string_utils::native_format(&x, false, false, true, true)
     }
 
     public fun int_max_u64(): String {
@@ -189,6 +208,11 @@ module 0x1::main {
         debug_string(&vector[foo(), foo()])
     }
 
+    // `Some(..)` adds no indentation of its own.
+    public fun debug_option_struct(): String {
+        debug_string(&Opt { o: option::some(foo()) })
+    }
+
     // --- option ---
 
     public fun option_none(): String {
@@ -286,6 +310,15 @@ module 0x1::main {
 // RUN: execute 0x1::main::int_typed
 // CHECK: results: "7u8"
 
+// RUN: execute 0x1::main::int_typed_u256
+// CHECK: results: "115792089237316195423570985008687907853269984665640564039457584007913129639935u256"
+
+// RUN: execute 0x1::main::int_typed_neg_i64
+// CHECK: results: "-5i64"
+
+// RUN: execute 0x1::main::int_typed_neg_i256
+// CHECK: results: "-57896044618658097711785492504343953926634992332820282019728792003956564819968i256"
+
 // RUN: execute 0x1::main::int_max_u64
 // CHECK: results: "18446744073709551615"
 
@@ -354,6 +387,9 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::debug_vec_of_structs
 // CHECK: results: "[\n  0x1::main::Foo {\n    x: 1,\n    y: true\n  },\n  0x1::main::Foo {\n    x: 1,\n    y: true\n  }\n]"
+
+// RUN: execute 0x1::main::debug_option_struct
+// CHECK: results: "0x1::main::Opt {\n  o: Some(0x1::main::Foo {\n    x: 1,\n    y: true\n  })\n}"
 
 // RUN: execute 0x1::main::option_none
 // CHECK: results: "None"

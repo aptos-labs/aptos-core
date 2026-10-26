@@ -6,12 +6,15 @@
 //! [`FormatOptions`] chooses the syntax; see its module docs for the presets
 //! and for the rendering that deliberately differs from the V1 formatter.
 //
-// TODO(correctness): the integer reads assume a little-endian host, as the
-// comparison and BCS walks do.
+// TODO(metering, cleanup): the walk recurses on every nested value with no
+// bound on depth. Replace it with a common iterative value traversal that the
+// comparison and BCS walks can share.
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    memory::{read_enum_tag, read_ptr, read_vec_len},
+    memory::{
+        read_account_address, read_bool, read_enum_tag, read_int, read_ptr, read_u8, read_vec_len,
+    },
     types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
@@ -65,8 +68,6 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
     depth: usize,
     out: &mut String,
 ) -> VMResult<()> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
     let layout = layouts.layout(id).ok_or({
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
     })?;
@@ -75,7 +76,7 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
         LayoutKind::Bool => {
             // SAFETY: a bool occupies one readable byte at `base`.
             out.push_str(
-                if unsafe { *base } != 0 {
+                if unsafe { read_bool(base, 0usize) } {
                     "true"
                 } else {
                     "false"
@@ -84,15 +85,16 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
             Ok(())
         },
         LayoutKind::UnsignedInt => {
-            // SAFETY: `base` is readable for the layout's size.
+            // SAFETY: `base` holds an integer of the layout's size, aligned for
+            // its width.
             let suffix = unsafe {
                 match layout.size {
-                    1 => write_int(out, *base, "u8")?,
-                    2 => write_int(out, u16::from_le_bytes(read_array(base)), "u16")?,
-                    4 => write_int(out, u32::from_le_bytes(read_array(base)), "u32")?,
-                    8 => write_int(out, u64::from_le_bytes(read_array(base)), "u64")?,
-                    16 => write_int(out, u128::from_le_bytes(read_array(base)), "u128")?,
-                    32 => write_int(out, U256::from_le_bytes(read_array(base)), "u256")?,
+                    1 => write_int(out, read_u8(base, 0usize), "u8")?,
+                    2 => write_int(out, read_int::<u16>(base, 0usize), "u16")?,
+                    4 => write_int(out, read_int::<u32>(base, 0usize), "u32")?,
+                    8 => write_int(out, read_int::<u64>(base, 0usize), "u64")?,
+                    16 => write_int(out, read_int::<u128>(base, 0usize), "u128")?,
+                    32 => write_int(out, read_int::<U256>(base, 0usize), "u256")?,
                     _ => return Err(bad_int_width("unsigned")),
                 }
             };
@@ -102,15 +104,16 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
             Ok(())
         },
         LayoutKind::SignedInt => {
-            // SAFETY: `base` is readable for the layout's size.
+            // SAFETY: `base` holds an integer of the layout's size, aligned for
+            // its width.
             let suffix = unsafe {
                 match layout.size {
-                    1 => write_int(out, *(base as *const i8), "i8")?,
-                    2 => write_int(out, i16::from_le_bytes(read_array(base)), "i16")?,
-                    4 => write_int(out, i32::from_le_bytes(read_array(base)), "i32")?,
-                    8 => write_int(out, i64::from_le_bytes(read_array(base)), "i64")?,
-                    16 => write_int(out, i128::from_le_bytes(read_array(base)), "i128")?,
-                    32 => write_int(out, I256::from_le_bytes(read_array(base)), "i256")?,
+                    1 => write_int(out, read_int::<i8>(base, 0usize), "i8")?,
+                    2 => write_int(out, read_int::<i16>(base, 0usize), "i16")?,
+                    4 => write_int(out, read_int::<i32>(base, 0usize), "i32")?,
+                    8 => write_int(out, read_int::<i64>(base, 0usize), "i64")?,
+                    16 => write_int(out, read_int::<i128>(base, 0usize), "i128")?,
+                    32 => write_int(out, read_int::<I256>(base, 0usize), "i256")?,
                     _ => return Err(bad_int_width("signed")),
                 }
             };
@@ -322,10 +325,8 @@ where
 
 /// Renders `0x1::option::Option` as `None` or `Some(v)`. `body` points at the
 /// variant body, whose `fields` are empty for `None` and hold the payload for
-/// `Some`.
-///
-/// The payload nests one level deeper, like any other field. V1 keeps it at the
-/// caller's level, so a multi-line `Some(S { .. })` indents differently there.
+/// `Some`. The payload stays at the caller's depth, as in V1, so `Some(..)`
+/// adds no indentation.
 ///
 /// # Safety
 ///
@@ -350,7 +351,7 @@ unsafe fn display_option<L: LayoutProvider + ?Sized>(
             body.add(payload.offset as usize),
             payload.id,
             options,
-            depth + 1,
+            depth,
             out,
         )?
     };
@@ -501,19 +502,7 @@ unsafe fn read_address(base: *const u8, layout: &ValueLayout) -> VMResult<Accoun
         )));
     }
     // SAFETY: caller guarantees `AccountAddress::LENGTH` readable bytes.
-    Ok(AccountAddress::new(unsafe { read_array(base) }))
-}
-
-/// Reads `N` bytes from the pointer into an array.
-///
-/// # Safety
-///
-/// Pointer must point to at least `N` readable, initialized bytes.
-#[inline(always)]
-unsafe fn read_array<const N: usize>(p: *const u8) -> [u8; N] {
-    // SAFETY: `[u8; N]` has alignment 1, so this unaligned read is valid given
-    // the caller's guarantee of `N` readable bytes at `p`.
-    unsafe { (p as *const [u8; N]).read_unaligned() }
+    Ok(unsafe { read_account_address(base, 0usize) })
 }
 
 #[cfg(test)]
@@ -615,7 +604,9 @@ mod tests {
         let ty = intern_type_tag(&tag("option", "Option", vec![elem_tag.clone()]), guard).unwrap();
         let variant_ids = guard.publish_variant_layouts(ty, vec![
             struct_layout(None, 0, 1, vec![]),
-            struct_layout(None, elem_size, elem_size.max(1), vec![field(0, elem_id, "e")]),
+            struct_layout(None, elem_size, elem_size.max(1), vec![field(
+                0, elem_id, "e",
+            )]),
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
@@ -627,7 +618,9 @@ mod tests {
 
     fn publish_string(guard: &ExecutionGuard<'_>, vec_u8_id: LayoutId) -> InternedType {
         let ty = intern_type_tag(&tag("string", "String", vec![]), guard).unwrap();
-        guard.publish_layout(struct_layout(Some(ty), 8, 8, vec![field(0, vec_u8_id, "bytes")]));
+        guard.publish_layout(struct_layout(Some(ty), 8, 8, vec![field(
+            0, vec_u8_id, "bytes",
+        )]));
         ty
     }
 
@@ -667,6 +660,8 @@ mod tests {
         bool_ty: InternedType,
         address_ty: InternedType,
         u256_ty: InternedType,
+        i64_ty: InternedType,
+        i256_ty: InternedType,
         vec_u8: InternedType,
         vec_u64: InternedType,
         string: InternedType,
@@ -712,6 +707,8 @@ mod tests {
             bool_ty: intern_type_tag(&TypeTag::Bool, guard).unwrap(),
             address_ty: intern_type_tag(&TypeTag::Address, guard).unwrap(),
             u256_ty: intern_type_tag(&TypeTag::U256, guard).unwrap(),
+            i64_ty: intern_type_tag(&TypeTag::I64, guard).unwrap(),
+            i256_ty: intern_type_tag(&TypeTag::I256, guard).unwrap(),
             vec_u8,
             vec_u64,
             string,
@@ -780,6 +777,15 @@ mod tests {
             ..COMPACT
         };
         assert_eq!(render(&guard, f.u8_ty, &7u8, &options), "7u8");
+        assert_eq!(
+            render(&guard, f.u256_ty, &U256::MAX, &options),
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935u256"
+        );
+        assert_eq!(render(&guard, f.i64_ty, &-5i64, &options), "-5i64");
+        assert_eq!(
+            render(&guard, f.i256_ty, &I256::MIN, &options),
+            "-57896044618658097711785492504343953926634992332820282019728792003956564819968i256"
+        );
         assert_eq!(render(&guard, f.bool_ty, &true, &options), "true");
     }
 

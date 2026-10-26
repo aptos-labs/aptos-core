@@ -234,6 +234,9 @@ pub trait NativeContext {
 
     /// Renders the value of type `ty` at `base` as text.
     ///
+    /// Never allocates on the VM heap, so callers may hold pointers into it
+    /// across the call.
+    ///
     /// # Safety
     ///
     /// `base` must point to a fully initialized value of type `ty` that stays
