@@ -5509,6 +5509,21 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 // Not a function from this module
                 continue;
             }
+            let is_test_only = entry.attributes.iter().any(|attribute| {
+                let name = self.parent.env.symbol_pool().string(attribute.name());
+                well_known::is_test_only_attribute_name(name.as_str())
+            });
+            let is_test_poison = self
+                .parent
+                .env
+                .symbol_pool()
+                .string(fun_name.symbol)
+                .as_str()
+                == well_known::UNIT_TEST_POISON;
+            if is_test_only || is_test_poison {
+                // Test-only functions and the compiler's test poison function are not verified.
+                continue;
+            }
             let is_public = matches!(entry.visibility, Visibility::Public);
             let type_arg_count = entry.type_params.len();
             let is_excluded = exclusion_patterns.iter().any(|p| {
