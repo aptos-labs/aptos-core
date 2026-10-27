@@ -6,9 +6,11 @@ use aptos_crypto::HashValue;
 use aptos_types::{
     ledger_info::LedgerInfo,
     state_store::{
-        errors::StateViewError, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView,
+        errors::StateViewError,
+        state_key::StateKey,
+        state_slot::{StateSlot, StateSlotKind},
+        state_storage_usage::StateStorageUsage,
+        StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
 };
@@ -24,7 +26,7 @@ pub struct DbStateView {
 }
 
 impl DbStateView {
-    fn get(&self, key: &StateKey) -> StateViewResult<Option<(Version, StateValue)>> {
+    fn get(&self, key: &StateKey) -> StateViewResult<StateSlot> {
         if let Some(version) = self.version {
             if let Some(root_hash) = self.maybe_verify_against_state_root_hash {
                 // TODO(aldenhu): sample-verify proof inside DB
@@ -37,11 +39,9 @@ impl DbStateView {
                     proof.verify(root_hash, *key.crypto_hash_ref(), value.as_ref())?;
                 }
             }
-            Ok(self
-                .db
-                .get_state_value_with_version_by_version(key, version)?)
+            Ok(self.db.get_cold_state_slot_by_version(key, version)?)
         } else {
-            Ok(None)
+            Ok(StateSlot::new(key.clone(), StateSlotKind::ColdVacant))
         }
     }
 }
@@ -60,10 +60,7 @@ impl TStateView for DbStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
-        Ok(StateSlot::from_db_get(
-            state_key.clone(),
-            self.get(state_key)?,
-        ))
+        self.get(state_key)
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

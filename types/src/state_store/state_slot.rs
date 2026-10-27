@@ -171,7 +171,6 @@ impl StateSlot {
         self.maybe_update_cold_state(min_version).is_some()
     }
 
-    // TODO(HotState): db returns cold slot directly
     pub fn from_db_get(state_key: StateKey, tuple_opt: Option<(Version, StateValue)>) -> Self {
         let kind = match tuple_opt {
             None => ColdVacant,

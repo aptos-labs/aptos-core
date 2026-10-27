@@ -19,6 +19,7 @@ use aptos_types::{
     state_store::{
         hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
+        state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -575,6 +576,18 @@ pub trait DbReader: Send + Sync {
             /* root_depth = */ 0,
         )
         .map(|(value, proof_ext)| (value, proof_ext.into()))
+    }
+
+    /// Returns the slot of the given key in the cold state as of the given version.
+    fn get_cold_state_slot_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<StateSlot> {
+        Ok(StateSlot::from_db_get(
+            state_key.clone(),
+            self.get_state_value_with_version_by_version(state_key, version)?,
+        ))
     }
 
     fn ensure_synced_version(&self) -> Result<Version> {

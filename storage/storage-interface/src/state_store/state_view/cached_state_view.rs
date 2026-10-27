@@ -243,11 +243,8 @@ impl CachedStateView {
             slot
         } else if let Some(base_version) = self.base_version() {
             COUNTER.inc_with(&["sv_cold"]);
-            StateSlot::from_db_get(
-                state_key.clone(),
-                self.cold
-                    .get_state_value_with_version_by_version(state_key, base_version)?,
-            )
+            self.cold
+                .get_cold_state_slot_by_version(state_key, base_version)?
         } else {
             StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant)
         };
