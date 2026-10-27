@@ -303,11 +303,11 @@ where
     /// checked against the sorted GC layouts.
     fn run(&mut self) {
         let code = self.func.code.ops();
-        // [F1].
+        // [F1]
         if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
-        // [F2].
+        // [F2]
         if code.last().is_some_and(|last| !last.is_terminator()) {
             self.err(
                 Some(code.len() - 1),
@@ -319,7 +319,7 @@ where
         self.check_param_and_return_slots();
         self.check_gc_layouts();
 
-        // [F7].
+        // [F7]
         let origins = self.func.code.origins();
         if !origins.is_empty() && origins.len() != code.len() {
             fail!(
@@ -331,7 +331,8 @@ where
             );
         }
 
-        // [O1-O6] through the operand schema, then the op-specific checks.
+        // [O1-O6]
+        // Operand accesses through the schema, then the op-specific checks.
         for (pc, instr) in code.iter().enumerate() {
             let safe_point = self
                 .func
@@ -350,11 +351,11 @@ where
 
     fn check_frame_geometry(&mut self) {
         let func = self.func;
-        // [F3].
+        // [F3]
         if func.frame_size() > func.extended_frame_size {
             fail!(self, None, "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})", func.extended_frame_size, func.param_and_local_sizes_sum, FRAME_METADATA_SIZE, func.frame_size());
         }
-        // [F4].
+        // [F4]
         if func.param_region_size > func.param_and_local_sizes_sum {
             fail!(
                 self,
@@ -364,7 +365,7 @@ where
                 func.param_and_local_sizes_sum
             );
         }
-        // [F5].
+        // [F5]
         if !func.param_and_local_sizes_sum.is_multiple_of(MAX_ALIGN) {
             fail!(
                 self,
@@ -374,7 +375,7 @@ where
                 MAX_ALIGN
             );
         }
-        // [F6].
+        // [F6]
         if !func.frame_size().is_multiple_of(MAX_ALIGN) {
             fail!(
                 self,
@@ -388,7 +389,7 @@ where
 
     fn check_param_and_return_slots(&mut self) {
         let func = self.func;
-        // [P1].
+        // [P1]
         if func.param_slots.len() != func.param_tys.len() {
             fail!(
                 self,
@@ -406,7 +407,7 @@ where
         );
 
         let num_return_tys = view_type_list(func.return_tys).len();
-        // [R1].
+        // [R1]
         if func.return_slots.len() != num_return_tys {
             fail!(
                 self,
@@ -423,8 +424,9 @@ where
         );
     }
 
-    /// [P2-P4, R2-R4]. A parameter or return slot list: every slot
-    /// well-formed and within `[0, region_end)`, slots ascending and disjoint.
+    /// A parameter or return slot list: every slot well-formed and within
+    /// `[0, region_end)`, slots ascending and disjoint.
+    // [P2-P4, R2-R4]
     fn check_slot_list(
         &mut self,
         kind: &str,
@@ -459,7 +461,8 @@ where
         }
     }
 
-    /// [P2, R2, L4, L9]. Slot well-formedness.
+    /// Slot well-formedness.
+    // [P2, R2, L4, L9]
     fn check_sized_slot(&mut self, pc: Option<usize>, what: fmt::Arguments<'_>, slot: &SizedSlot) {
         if slot.size == 0 {
             fail!(self, pc, "{what}: size must be > 0");
@@ -483,19 +486,18 @@ where
         }
     }
 
-    /// [G1-G7].
-    ///
     /// Complexity: O(N * log(N)) in the number of layout slots: each safe-point
     /// slot is one binary search into `base`.
+    // [G1-G7]
     fn check_gc_layouts(&mut self) {
         let code = self.func.code.ops();
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_points = self.func.safe_point_layouts.entries();
 
-        // [G1, G2].
+        // [G1, G2]
         self.check_pointer_offsets(None, base_offsets);
 
-        // [G3].
+        // [G3]
         if !self.func.zero_frame {
             if let Some(off) = base_offsets
                 .iter()
@@ -504,7 +506,7 @@ where
                 fail!(self, None, "frame_layout names pointer slot {} beyond param_region_size ({}) but zero_frame is false", off.0, self.func.param_region_size);
             }
         }
-        // [G4].
+        // [G4]
         if let Some(w) = safe_points
             .windows(2)
             .find(|w| w[0].code_offset.0 >= w[1].code_offset.0)
@@ -520,18 +522,19 @@ where
 
         for entry in safe_points {
             let co = entry.code_offset.0 as usize;
-            // [G5].
+            // [G5]
             match code.get(co) {
                 None => fail!(self, None, "safe_point_layouts: code_offset {co} out of bounds (code length {})", code.len()),
                 Some(op) if !op.is_allocating() => fail!(self, co, "safe_point_layouts: code_offset {co} is not at an allocating op; top-frame-only contract — see `SafePointEntry`"),
                 Some(_) => {},
             }
             let sp_offsets = &entry.layout.heap_ptr_offsets;
-            // [G6].
+            // [G6]
             self.check_pointer_offsets(Some(co), sp_offsets);
-            // [G7]. `base` is strictly increasing (G2), so each safe-point
-            // offset is one binary search. If `base` is unsorted that is
-            // already reported, and a duplicate missed here is moot.
+            // [G7]
+            // `base` is strictly increasing (G2), so each safe-point offset is
+            // one binary search. If `base` is unsorted that is already
+            // reported, and a duplicate missed here is moot.
             for sp in sp_offsets {
                 if base_offsets.binary_search_by_key(&sp.0, |b| b.0).is_ok() {
                     fail!(
@@ -545,9 +548,9 @@ where
         }
     }
 
-    /// [G1, G2] (and G6 for a safe point). Pointer offsets the GC reads with
-    /// aligned `read_ptr`: each an in-frame, aligned pointer slot; the list
-    /// strictly increasing.
+    /// Pointer offsets the GC reads with aligned `read_ptr`: each an in-frame,
+    /// aligned pointer slot; the list strictly increasing.
+    // [G1, G2, G6]
     fn check_pointer_offsets(&mut self, pc: Option<usize>, offsets: &[FrameOffset]) {
         for &off in offsets {
             self.check_frame_operand(pc, None, off, OperandKind::Ptr);
@@ -626,37 +629,37 @@ where
             | EnumBorrowVariantFieldByTag { .. }
             | EnumCheckVariant { .. } => {},
 
-            // [I1].
+            // [I1]
             DivU64Imm { imm, .. } | ModU64Imm { imm, .. } if imm == 0 => {
                 self.err(pc, "division by zero (imm)");
             },
             DivU64Imm { .. } | ModU64Imm { .. } => {},
-            // [I2].
+            // [I2]
             ShlU64Imm { imm, .. } | ShrU64Imm { imm, .. } if imm >= 64 => {
                 fail!(self, pc, "shift amount {imm} exceeds 63 (imm)");
             },
             ShlU64Imm { .. } | ShrU64Imm { .. } => {},
 
-            // [I3].
+            // [I3]
             IntBitAnd(ref op) | IntBitOr(ref op) | IntBitXor(ref op) if op.rhs.is_signed() => {
                 self.err(pc, "bitwise on signed type");
             },
             IntBitAnd(_) | IntBitOr(_) | IntBitXor(_) => {},
-            // [I4].
+            // [I4]
             IntShl(op) | IntShr(op) if op.ty.is_signed() => {
                 self.err(pc, "shift on signed type");
             },
             IntShl(_) | IntShr(_) => {},
-            // [I5].
+            // [I5]
             IntNegate(op) if !op.ty.is_signed() => {
                 self.err(pc, "negate on unsigned type");
             },
             IntNegate(_) => {},
 
-            // [Z1].
+            // [Z1]
             Move { size, .. } => self.check_nonzero_size(pc, size),
 
-            // [B1].
+            // [B1]
             SlotBorrow { local, .. } if local.0 as usize >= self.func.param_and_local_sizes_sum => {
                 fail!(
                     self,
@@ -668,7 +671,7 @@ where
             },
             SlotBorrow { .. } => {},
 
-            // [J1] (and O3 for the value comparisons).
+            // [J1]
             Jump { target, .. }
             | JumpNotZeroU64 { target, .. }
             | JumpNotZeroByte { target, .. }
@@ -681,6 +684,7 @@ where
             | JumpGreaterEqualU64 { target, .. }
             | JumpNotEqualU64 { target, .. } => self.check_jump(pc, target),
             JumpIntCmp(ref op) => self.check_jump(pc, op.target),
+            // [J1, O3]
             JumpValueCmp(ref op) => {
                 self.check_value_type(pc, op.ty);
                 self.check_jump(pc, op.target);
@@ -689,20 +693,21 @@ where
                 self.check_value_type(pc, op.ty);
                 self.check_jump(pc, op.target);
             },
+            // [O3]
             ValueCmp(ref op) => self.check_value_type(pc, op.ty),
             ValueRefCmp(ref op) => self.check_value_type(pc, op.ty),
 
-            // [C4].
+            // [C4]
             CallDirect { ref ptr } => {
                 // SAFETY: the function pointer lives in the global context,
                 // which the caller's guard keeps alive during the check.
                 let callee = unsafe { ptr.as_ref_unchecked() };
                 self.check_direct_callee(pc, callee);
             },
-            // [C1, C2, C3].
+            // [C1, C2, C3]
             CallNative { ref abi, .. } => self.check_native_abi(pc, abi),
 
-            // [Z1, Z2].
+            // [Z1, Z2]
             HeapMoveFrom8 { offset, .. }
             | HeapMoveTo8 { offset, .. }
             | HeapMoveToImm8 { offset, .. } => {
@@ -729,8 +734,9 @@ where
                     self.check_offset_size(pc, offset, size);
                 }
             },
-            // [Z3]. The schema reports the saturated slot; this reports the
-            // overflow itself.
+            // [Z3]
+            // The schema reports the saturated slot; this reports the overflow
+            // itself.
             DeepCopyHeapPtrs { base, ref offsets } => {
                 for &off in offsets
                     .iter()
@@ -745,7 +751,7 @@ where
                 }
             },
 
-            // [Z1, K3].
+            // [Z1, K3]
             VecPushBack {
                 elem_size,
                 descriptor_id,
@@ -763,13 +769,13 @@ where
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_vector_descriptor(pc, "VecPack", op.descriptor_id, op.elem_size);
             },
-            // [Z1, D1].
+            // [Z1, D1]
             VecUnpack(ref op) => {
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_disjoint_destinations(pc, "VecUnpack", &op.dsts, op.elem_size);
             },
 
-            // [K1].
+            // [K1]
             HeapNew { descriptor_id, .. } => {
                 if let Some(inner) = self.descriptor_or_report(pc, "HeapNew", descriptor_id) {
                     if !matches!(
@@ -784,7 +790,7 @@ where
                     }
                 }
             },
-            // [K2].
+            // [K2]
             EnumNew {
                 descriptor_id,
                 variant,
@@ -806,9 +812,9 @@ where
                 ),
                 None => {},
             },
-            // [L1-L8].
+            // [L1-L8]
             PackClosure(ref op) => self.check_pack_closure(pc, op),
-            // [L9].
+            // [L9]
             CallClosure(ref op) => {
                 for (i, slot) in op.provided_args.iter().enumerate() {
                     self.check_sized_slot(
@@ -834,7 +840,7 @@ where
             "reserved descriptor[{}] must be Closure",
             CLOSURE_DESCRIPTOR_ID
         );
-        // [L1, L2, L3].
+        // [L1, L2, L3]
         match (op.captured_data_descriptor_id, op.captured.is_empty()) {
             (None, true) => {},
             (Some(id), false) => match self.descriptor_or_report(pc, "PackClosure", id) {
@@ -867,13 +873,13 @@ where
             ),
         }
         let mut all_aligned = true;
-        // [L4].
+        // [L4]
         for (i, slot) in op.captured.iter().enumerate() {
             self.check_sized_slot(Some(pc), format_args!("PackClosure: captured[{i}]"), slot);
             all_aligned &= is_valid_align(slot.align as usize);
         }
         let captured_count = op.mask.count_ones() as usize;
-        // [L5].
+        // [L5]
         if op.captured.len() != captured_count {
             fail!(self, pc, "PackClosure: captured list length {} does not match mask captured count {captured_count}", op.captured.len());
         }
@@ -883,7 +889,7 @@ where
                 // which the caller's guard keeps alive during the check.
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
                 let param_count = callee.param_slots.len();
-                // [L6].
+                // [L6]
                 if param_count > u64::BITS as usize {
                     fail!(self, pc, "PackClosure: callee has {param_count} params, exceeds 64-bit mask capacity");
                 } else if op
@@ -902,7 +908,7 @@ where
                     .take(u64::BITS as usize)
                     .enumerate()
                     .filter(|(i, _)| (op.mask >> i) & 1 != 0);
-                // [L7].
+                // [L7]
                 for (k, ((i, param_slot), slot)) in captured_params.zip(&op.captured).enumerate() {
                     if slot.size != param_slot.size {
                         fail!(
@@ -922,8 +928,9 @@ where
             // against the resolved callee.
             ClosureFuncRef::Unresolved(_) => {},
         }
-        // [L8]. Skipped when a captured alignment is invalid (already
-        // reported), since the layout is then undefined.
+        // [L8]
+        // Skipped when a captured alignment is invalid (already reported),
+        // since the layout is then undefined.
         if all_aligned {
             let expected =
                 captured_values_size(op.captured.iter().map(|slot| (slot.size, slot.align)));
@@ -950,10 +957,11 @@ where
         });
     }
 
-    /// [O1-O6]. Checks one frame operand per the [`OperandKind`] schema.
-    /// `safe_point` is the safe-point layout at the operand's pc, if any.
+    /// Checks one frame operand per the [`OperandKind`] schema. `safe_point`
+    /// is the safe-point layout at the operand's pc, if any.
     ///
     /// Complexity: O(log(N)) in the number of GC pointer slots (O6).
+    // [O1-O6]
     fn check_frame_operand(
         &mut self,
         pc: Option<usize>,
@@ -961,7 +969,7 @@ where
         offset: FrameOffset,
         kind: OperandKind,
     ) {
-        // [O2, O4, O5].
+        // [O2, O4, O5]
         let (width, align) = match kind.width_and_align(self.provider, self.constants) {
             Ok(wa) => wa,
             Err(UnknownOperandLayout::NoLayout(_)) => {
@@ -985,17 +993,18 @@ where
             },
         };
         self.check_access(pc, offset, width, align);
-        // [O6].
+        // [O6]
         if kind.is_scalar() {
             self.check_not_pointer_slot(pc, safe_point, offset, width);
         }
     }
 
-    /// [O6]. `[offset, offset + width)` does not intersect any pointer slot
-    /// in `frame_layout` or in `safe_point`, the layout at the operand's pc.
+    /// `[offset, offset + width)` does not intersect any pointer slot in
+    /// `frame_layout` or in `safe_point`, the layout at the operand's pc.
     ///
     /// Complexity: O(log(N)) in the number of pointer slots: both lists are
     /// strictly increasing (G2, G6), so each is one binary search.
+    // [O6]
     fn check_not_pointer_slot(
         &mut self,
         pc: Option<usize>,
@@ -1029,8 +1038,8 @@ where
         }
     }
 
-    /// [O1] (and G1 for GC layout slots). The access `(offset, size, align)`
-    /// is valid.
+    /// The access `(offset, size, align)` is valid.
+    // [O1]
     fn check_access(&mut self, pc: Option<usize>, offset: FrameOffset, size: u32, align: u32) {
         let offset = offset.0 as usize;
         let Some(end) = offset.checked_add(size as usize) else {
@@ -1062,17 +1071,16 @@ where
         }
     }
 
-    /// [O3].
+    // [O3]
     fn check_value_type(&mut self, pc: usize, ty: InternedType) {
         if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
             self.err(pc, "value comparison on a reference type");
         }
     }
 
-    /// [D1].
-    ///
     /// Complexity: O(N * log(N)) in the number of destinations: they are
     /// sorted to find overlaps.
+    // [D1]
     fn check_disjoint_destinations(
         &mut self,
         pc: usize,
@@ -1099,14 +1107,13 @@ where
     // Calls
     // -----------------------------------------------------------------------
 
-    /// [C1, C2, C3].
-    ///
     /// Complexity: O(N * log(N)) in the ABI's pointer offsets and argument
     /// slots: each offset binary-searches the sorted argument slots.
+    // [C1, C2, C3]
     fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
         let base = self.func.frame_size();
         let total = abi.total_frame_size();
-        // [C1].
+        // [C1]
         match base.checked_add(total as usize) {
             None => self.err(pc, "native slot region overflows usize"),
             Some(end) if end > self.func.extended_frame_size => fail!(
@@ -1117,7 +1124,7 @@ where
             ),
             Some(_) => {},
         }
-        // [C2].
+        // [C2]
         for &off in abi.heap_ptr_offsets() {
             let off_end = off.0 as u64 + PTR_SLOT.0 as u64;
             if off_end > total as u64 {
@@ -1153,7 +1160,7 @@ where
                 );
             }
         }
-        // [C3].
+        // [C3]
         for (i, id) in abi.required_descriptors().iter().enumerate() {
             if self.provider.descriptor(*id).is_none() {
                 fail!(self, pc, "native required descriptor {i} ({id}) is unknown");
@@ -1161,7 +1168,7 @@ where
         }
     }
 
-    /// [C4].
+    // [C4]
     fn check_direct_callee(&mut self, pc: usize, callee: &Function) {
         let region = self
             .func
@@ -1204,7 +1211,7 @@ where
         inner
     }
 
-    /// [K3].
+    // [K3]
     fn check_vector_descriptor(
         &mut self,
         pc: usize,
@@ -1230,7 +1237,7 @@ where
         }
     }
 
-    /// [J1].
+    // [J1]
     // TODO(metering): validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.ops().len();
@@ -1244,14 +1251,14 @@ where
         }
     }
 
-    /// [Z1].
+    // [Z1]
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(pc, "size must be > 0");
         }
     }
 
-    /// [Z2].
+    // [Z2]
     fn check_offset_size(&mut self, pc: usize, offset: u32, size: u32) {
         if offset.checked_add(size).is_none() {
             fail!(self, pc, "offset {offset} + size {size} overflows u32");
