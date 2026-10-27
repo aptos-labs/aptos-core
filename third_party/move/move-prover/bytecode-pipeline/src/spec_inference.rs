@@ -131,7 +131,7 @@ use move_stackless_bytecode::{
     dataflow_analysis::{BlockState, DataflowAnalysis, StateMap, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
     graph::{DomRelation, Graph},
     stackless_bytecode::{
         AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind, Label,
@@ -819,6 +819,76 @@ struct BranchInfo {
 // =================================================================================================
 // Spec Inference Processor
 
+/// Functions that neither read nor write global memory, directly or in a
+/// callee, and invoke no function value whose effect the summary does not
+/// bound. A read alone disqualifies: a call's behavioral predicates name the
+/// state it reads, and without a label of its own a later write would move
+/// that state. A function taking a function value is excluded outright, since
+/// what it may touch is its argument's. Usage analysis reads code, so for a
+/// native its spec stands in: no declared `modifies` and no condition reading
+/// memory. Every function a qualifying function calls must qualify in turn.
+pub struct MemoryFreeFunctions(BTreeSet<QualifiedId<FunId>>);
+
+fn compute_memory_free_functions(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
+    let locally_free = |fun: QualifiedId<FunId>| -> bool {
+        let fun_env = env.get_function(fun);
+        // A resource type parameter can be read by a spec through a bare-type
+        // footprint (`spec_exists_at<T>`) that neither `used_memory` nor usage
+        // analysis records at the declaration, so any function with one
+        // touches memory as far as this set can tell.
+        if fun_env
+            .get_parameter_types()
+            .iter()
+            .any(|ty| ty.skip_reference().is_function())
+            || !fun_env.get_modify_targets().is_empty()
+            || fun_env.get_type_parameters().iter().any(|tp| {
+                tp.1.abilities
+                    .has_ability(move_core_types::ability::Ability::Key)
+            })
+        {
+            return false;
+        }
+        if fun_env.is_native() {
+            return fun_env.get_spec().conditions.iter().all(|cond| {
+                cond.exp.used_memory(env).is_empty()
+                    && cond
+                        .additional_exps
+                        .iter()
+                        .all(|exp| exp.used_memory(env).is_empty())
+            });
+        }
+        let Some(data) = targets.get_data(&fun, &FunctionVariant::Baseline) else {
+            return false;
+        };
+        let Some(usage) = data
+            .annotations
+            .get::<move_stackless_bytecode::usage_analysis::UsageState>()
+        else {
+            return false;
+        };
+        usage.accessed.all.is_empty()
+            && usage.invoke_frame.all.is_empty()
+            && !usage.invoke_frame_wildcard
+            && !usage.unbounded_invoke
+    };
+    let mut free = BTreeSet::new();
+    for (fun, variant) in targets.get_funs_and_variants() {
+        if variant != FunctionVariant::Baseline || !locally_free(fun) {
+            continue;
+        }
+        let callees = env
+            .get_function(fun)
+            .get_transitive_closure_of_called_functions();
+        if callees
+            .iter()
+            .all(|callee| *callee == fun || locally_free(*callee))
+        {
+            free.insert(fun);
+        }
+    }
+    env.set_extension(MemoryFreeFunctions(free));
+}
+
 /// A processor that infers specifications for functions with empty spec blocks.
 pub struct SpecInferenceProcessor {
     /// Whether to store the WPAnnotation in the function data for dump output.
@@ -837,6 +907,7 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
     }
 
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        compute_memory_free_functions(env, targets);
         let mut inferred = ContractInferenceTargets::default();
         for (fun, variant) in targets.get_funs_and_variants() {
             let fun_env = env.get_function(fun);
@@ -1467,6 +1538,10 @@ impl LambdaSpecInferenceProcessor {
 impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
     fn name(&self) -> String {
         "lambda_spec_inference".to_string()
+    }
+
+    fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        compute_memory_free_functions(env, targets);
     }
 
     fn process(
@@ -4552,12 +4627,18 @@ impl StateBoundaryAnalysis<'_, '_> {
                     // vector::length (or similar) before a behavioral call would
                     // create a spurious label boundary even though the
                     // underlying memory state is unchanged.
-                    let is_vector = self
-                        .analyzer
-                        .global_env()
-                        .get_module(*module_id)
-                        .is_std_vector();
+                    let env = self.analyzer.global_env();
+                    let is_vector = env.get_module(*module_id).is_std_vector();
+                    // Likewise a callee that writes no global memory leaves the
+                    // state as it was. A label there would name an unchanged
+                    // memory, and at a join one branch's such label meets the
+                    // other branch's earlier one, which the merge cannot tell
+                    // apart from a real write.
+                    let writes_no_memory = env
+                        .get_extension::<MemoryFreeFunctions>()
+                        .is_some_and(|free| free.0.contains(&module_id.qualified(*fun_id)));
                     !(is_vector
+                        || writes_no_memory
                         || dests.len() == 1
                             && self
                                 .analyzer

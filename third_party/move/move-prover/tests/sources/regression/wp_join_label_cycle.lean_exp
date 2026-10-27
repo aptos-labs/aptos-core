@@ -1,0 +1,74 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/wp_join_label_cycle.move:18:5: error: verification failed with a residual obligation:
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+st_ids_vec : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.vector.carrier
+st_n : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+f :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            VerexIR.Proofs.Denote.NRow.nil
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+                  VerexIR.Proofs.Denote.NRow.nil)
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.vector
+                  VerexIR.Proofs.Denote.NRow.nil))
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                VerexIR.Proofs.Denote.NRow.nil))).ref
+        VerexIR.Proofs.Denote.NRow.nil)
+      [false] (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.bool VerexIR.Proofs.Denote.NRow.nil)).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed :
+  VerexIR.Proofs.KeepsMemoryAt executable✝
+    (VerexIR.Proofs.Denote.NRow.cons
+      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
+          (VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+                VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.vector
+                VerexIR.Proofs.Denote.NRow.nil))
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil))).ref
+      VerexIR.Proofs.Denote.NRow.nil)
+    f.val
+permitted : ↑st_ids_vec.values.size ≤ 1
+st_final_0 : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.vector.carrier
+st_final_1 : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+bounds✝ : st_ids_vec.values.size < 18446744073709551616
+bounds : st_final_0.values.size < 18446744073709551616
+st_n_lower : 0 ≤ st_n.val
+st_n_upper : st_n.val ≤ 18446744073709551615
+st_final_1_lower : 0 ≤ st_final_1.val
+st_final_1_upper : st_final_1.val ≤ 18446744073709551615
+⊢ VerexIR.Proofs.wp
+    (VerexIR.Proofs.Denote.closureMeaning executable✝ f.val
+      (VerexIR.Proofs.Denote.NRow.cons
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            VerexIR.Proofs.Denote.NRow.nil
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
+                  VerexIR.Proofs.Denote.NRow.nil)
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.vector
+                  VerexIR.Proofs.Denote.NRow.nil))
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                VerexIR.Proofs.Denote.NRow.nil))).ref
+        VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.Proofs.Denote.ResultShape.one VerexIR.Proofs.Denote.NTy.bool)
+      ((((st_ids_vec, PUnit.unit), st_n, PUnit.unit), (st_final_0, PUnit.unit), st_final_1, PUnit.unit), ()))
+    (fun result final => ↑st_final_0.values.size ≤ 1) (fun failure => True) initialState✝
+tests/sources/regression/wp_join_label_cycle.move:18:5: error: verex verification failed: the automatic verification of `apply` failed; provide a proof in `tests/sources/regression/wp_join_label_cycle.proof.lean`:
+  verify apply by
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
