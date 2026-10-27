@@ -22,10 +22,35 @@ class NightlySummaryTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[3]
         legacy = (root / ".github/actions/rust-unit-tests/action.yaml").read_text()
         nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
-        workspace = re.search(r"command: (cargo nextest run .*?)\n", nightly).group(1)
+        # The workspace suite is sharded into static package groups. Every package
+        # the legacy single-workspace run excluded must remain excluded by the
+        # catch-all (remaining) shard, and no shard may re-include a legacy exclusion.
+        legacy_excludes = set(re.findall(r"--exclude (\S+)", legacy))
+        shards = re.findall(r"command: (cargo nextest run .*?)\n", nightly)
+        self.assertTrue(shards, "nightly must define at least one nextest shard")
+        remaining = [s for s in shards if "--workspace" in s]
+        self.assertEqual(len(remaining), 1, "expected exactly one catch-all workspace shard")
+        remaining_excludes = set(re.findall(r"--exclude (\S+)", remaining[0]))
+        # The catch-all shard must carry every legacy exclusion.
+        self.assertTrue(
+            legacy_excludes <= remaining_excludes,
+            f"remaining shard drops legacy exclusions: {legacy_excludes - remaining_excludes}",
+        )
+        # Shard-assigned packages must be disjoint from, and excluded by, the catch-all.
+        assigned = {
+            pkg
+            for shard in shards
+            if shard != remaining[0]
+            for pkg in re.findall(r"-p (\S+)", shard)
+        }
         self.assertEqual(
-            set(re.findall(r"--exclude (\S+)", workspace)),
-            set(re.findall(r"--exclude (\S+)", legacy)),
+            assigned & legacy_excludes,
+            set(),
+            "a shard re-includes a legacy-excluded package",
+        )
+        self.assertTrue(
+            assigned <= remaining_excludes,
+            f"shard-assigned packages not excluded from remaining: {assigned - remaining_excludes}",
         )
         # Cargo test suites must already run in legacy CI, too.
         def cargo_test_args(text):
