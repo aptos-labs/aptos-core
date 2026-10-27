@@ -13,8 +13,8 @@ use mono_move_core::{
     DescriptorProvider, FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex,
     FunctionPtr, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, LayoutId, LayoutProvider,
     MicroOp, ObjectDescriptor, ObjectDescriptorTable, PackClosureOp, SafePointEntry, ShiftOperand,
-    SizedSlot, SortedSafePointEntries, Spec, ValueCmpOp, ValueLayout, VecUnpackOp,
-    IMPLEMENTED_CHECKS, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    SizedSlot, SortedSafePointEntries, ValueCmpOp, ValueLayout, VecUnpackOp,
+    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// A descriptor table paired with an empty layout provider, to satisfy the
@@ -1584,25 +1584,65 @@ fn call_closure_provided_args_are_checked() {
 // Specification / implementation consistency
 // ---------------------------------------------------------------------------
 
-/// Every check in [`Spec::CHECKS`] is evaluated by some tagged statement, and
-/// every tagged check is specified.
+/// A check id: an uppercase letter followed by digits (`F1`, `O6`).
+fn is_check_id(s: &str) -> bool {
+    let mut chars = s.chars();
+    chars.next().is_some_and(|c| c.is_ascii_uppercase())
+        && !s[1..].is_empty()
+        && chars.all(|c| c.is_ascii_digit())
+}
+
+/// Expands `F1, P2-P4` into `{F1, P2, P3, P4}`, or `None` if `list` is not a
+/// comma-separated list of ids and id ranges.
+fn expand_ids(list: &str) -> Option<Vec<String>> {
+    let mut ids = Vec::new();
+    for item in list.split(',').map(str::trim) {
+        match item.split_once('-') {
+            Some((lo, hi)) if is_check_id(lo) && is_check_id(hi) && lo[..1] == hi[..1] => {
+                let (a, b): (u32, u32) = (lo[1..].parse().ok()?, hi[1..].parse().ok()?);
+                ids.extend((a..=b).map(|n| format!("{}{n}", &lo[..1])));
+            },
+            None if is_check_id(item) => ids.push(item.to_string()),
+            _ => return None,
+        }
+    }
+    Some(ids)
+}
+
+/// Every check in the spec tables is cited at least once where it is
+/// evaluated, and every cited id is specified. A spec row is a module doc
+/// line `//! | F1 | ...`; a citation is a `//` or `///` comment opening with a
+/// bracketed id list such as `[F1]` or `[P1-P4, R1-R4]`.
 #[test]
 fn every_specified_check_is_implemented_and_vice_versa() {
     use std::collections::BTreeSet;
-    let specified: BTreeSet<String> = Spec::CHECKS.iter().map(|c| c.id.to_string()).collect();
-    let declared: BTreeSet<String> = IMPLEMENTED_CHECKS
-        .iter()
-        .flat_map(|m| m.checks.iter().map(|id| id.to_string()))
-        .collect();
-    assert!(!specified.is_empty() && !declared.is_empty());
-    let unimplemented: Vec<_> = specified.difference(&declared).collect();
-    let unspecified: Vec<_> = declared.difference(&specified).collect();
+    let source = include_str!("../src/well_formedness.rs");
+    let mut specified = BTreeSet::new();
+    let mut cited = BTreeSet::new();
+    for line in source.lines().map(str::trim_start) {
+        if let Some(row) = line.strip_prefix("//! | ") {
+            let id = row.split(' ').next().unwrap_or("");
+            if is_check_id(id) {
+                specified.insert(id.to_string());
+            }
+        } else if let Some(comment) = line.strip_prefix("//").filter(|c| !c.starts_with('!')) {
+            let body = comment.trim_start_matches('/').trim_start();
+            if let Some(list) = body.strip_prefix('[').and_then(|b| b.split(']').next()) {
+                if let Some(ids) = expand_ids(list) {
+                    cited.extend(ids);
+                }
+            }
+        }
+    }
+    assert!(!specified.is_empty() && !cited.is_empty());
+    let unimplemented: Vec<_> = specified.difference(&cited).collect();
+    let unspecified: Vec<_> = cited.difference(&specified).collect();
     assert!(
         unimplemented.is_empty(),
-        "specified but not declared by any method: {unimplemented:?}"
+        "specified but never cited: {unimplemented:?}"
     );
     assert!(
         unspecified.is_empty(),
-        "declared but not in the spec: {unspecified:?}"
+        "cited but not in the spec: {unspecified:?}"
     );
 }

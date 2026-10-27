@@ -68,6 +68,4 @@ pub use value_layout::{
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
 pub use vm_error::{CallFrame, ErrorLocation, VMInternalError, VMResult};
-pub use well_formedness::{
-    assert_well_formed, check_well_formedness, Spec, WellFormednessError, IMPLEMENTED_CHECKS,
-};
+pub use well_formedness::{assert_well_formed, check_well_formedness, WellFormednessError};
