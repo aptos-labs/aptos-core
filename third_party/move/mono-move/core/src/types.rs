@@ -135,6 +135,12 @@ pub fn view_type(ptr: InternedType) -> &'static Type {
     unsafe { ptr.as_ref_unchecked() }
 }
 
+/// Whether `ty` can name a resource in global storage, i.e. it is a struct or
+/// an enum type.
+pub fn is_resource_type(ty: InternedType) -> bool {
+    matches!(view_type(ty), Type::Nominal { .. })
+}
+
 /// Returns a reference to the arena-interned list of [`InternedType`]s
 /// behind `ptr`.
 pub fn view_type_list(ptr: InternedTypeList) -> &'static [InternedType] {

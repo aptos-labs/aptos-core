@@ -119,6 +119,7 @@ fn resource_types_for_native(
     let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
     let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
     let event = interner.module_id_of(&AccountAddress::ONE, ident_str!("event"));
+    let storage_slot = interner.module_id_of(&AccountAddress::ONE, ident_str!("storage_slot"));
 
     if module_id == object && func_name == interner.identifier_of(ident_str!("exists_at")) {
         return callee_ty_args.first().copied().into_iter().collect();
@@ -150,6 +151,13 @@ fn resource_types_for_native(
             None
         };
         return value_ty.into_iter().collect();
+    }
+
+    if module_id == storage_slot
+        && (func_name == interner.identifier_of(ident_str!("borrow_storage_slot_resource"))
+            || func_name == interner.identifier_of(ident_str!("borrow_storage_slot_resource_mut")))
+    {
+        return callee_ty_args.get(1).copied().into_iter().collect();
     }
 
     Vec::new()
