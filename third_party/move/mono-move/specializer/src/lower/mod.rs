@@ -30,8 +30,11 @@ enum LoweringError {
     #[error("Transfer({transfer}) read without a prior def in this block")]
     TransferReadWithoutDef { transfer: u16 },
 
-    #[error("scratch slot required when emitting 2+ parallel copies")]
-    ScratchSlotRequiredForParallelCopy,
+    #[error("parallel copy stuck: found no copy cycle to break")]
+    ParallelCopyNoProgress,
+
+    #[error("parallel copy scratch offset overflows u32")]
+    ParallelCopyScratchOverflow,
 
     // ---- GC layout derivation ----
     #[error("nominal type has no layout populated")]
@@ -192,7 +195,8 @@ impl IntoExecutionError for LoweringError {
             ExpectedReferenceType
             | ClosureSignatureNotFunction
             | TransferReadWithoutDef { .. }
-            | ScratchSlotRequiredForParallelCopy
+            | ParallelCopyNoProgress
+            | ParallelCopyScratchOverflow
             | LayoutNotPopulated
             | TypeParamReachedGcLayout
             | LayoutIdUnresolved
