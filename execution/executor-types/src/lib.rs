@@ -263,11 +263,6 @@ pub trait TransactionReplayer: Send {
     /// Commits the next chunk that has gone through ledger update. Called once per chunk counted by
     /// `enqueue_chunks()`.
     fn commit(&self) -> Result<Version>;
-
-    /// Executes and commits the partial block held back, leaving the ledger in the middle of a
-    /// block. All enqueued chunks must have been committed. Returns the last version committed, or
-    /// `None` if nothing is held back.
-    fn commit_partial_block(&self) -> Result<Option<Version>>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
