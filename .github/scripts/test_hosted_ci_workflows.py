@@ -183,6 +183,80 @@ class WorkflowTests(unittest.TestCase):
         )
         self.assertIn('test "$SHARDS_RESULT" = success', gate["run"])
 
+    def test_phase_a_followup_workflows_route_hosted_with_aws_fallback(self):
+        HOSTED = "64cpu-aptos-image-ubuntu22-x64"
+        AWS = "runs-on,cpu=64"
+        # (workflow, job, expect prebuilt-setup on hosted)
+        routed = {
+            "nightly-full-suite.yaml": ["cargo-tests", "batch-encryption"],
+            "coverage.yaml": ["rust-unit-coverage", "rust-smoke-coverage"],
+            "lint-test-gated.yaml": [
+                "rust-cryptohasher-domain-separation-check",
+                "rust-doc-tests",
+                "rust-batch-encryption-tests",
+                "rust-all-unit-tests",
+                "rust-build-cached-packages",
+                "rust-consensus-only-unit-test",
+                "rust-consensus-only-smoke-test",
+            ],
+            "run-gas-calibration.yaml": ["run-gas-calibration"],
+        }
+        for workflow, jobs in routed.items():
+            doc = yaml.load(
+                (ROOT / ".github/workflows" / workflow).read_text(),
+                Loader=yaml.BaseLoader,
+            )
+            self.assertIn("rust-ci-provider", doc["jobs"], workflow)
+            for name in jobs:
+                job = doc["jobs"][name]
+                # Single needs key, and it must include the provider (else runs-on
+                # cannot reference it). Guard against the duplicate-needs regression.
+                needs = job["needs"]
+                needs = [needs] if isinstance(needs, str) else needs
+                self.assertIn(
+                    "rust-ci-provider", needs, f"{workflow}:{name} missing provider in needs"
+                )
+                runs_on = job["runs-on"]
+                self.assertIn(HOSTED, runs_on, f"{workflow}:{name}")
+                self.assertIn(AWS, runs_on, f"{workflow}:{name}")
+                self.assertIn(
+                    "needs.rust-ci-provider.outputs.provider == 'hosted'",
+                    runs_on,
+                    f"{workflow}:{name}",
+                )
+
+    def test_nightly_workspace_shards_cover_full_suite(self):
+        doc = yaml.load(
+            (ROOT / ".github/workflows/nightly-full-suite.yaml").read_text(),
+            Loader=yaml.BaseLoader,
+        )
+        groups = doc["jobs"]["cargo-tests"]["strategy"]["matrix"]["include"]
+        commands = {g["suite"]: g["command"] for g in groups}
+        # The old single workspace command's exclusions must be preserved across shards.
+        import shlex
+
+        assigned = []
+        remaining_excludes = []
+        for suite, command in commands.items():
+            args = shlex.split(command)
+            if suite == "workspace-remaining":
+                self.assertIn("--workspace", args)
+                remaining_excludes = [
+                    args[i + 1] for i, a in enumerate(args) if a == "--exclude"
+                ]
+            elif suite.startswith("workspace-"):
+                assigned.extend(args[i + 1] for i, a in enumerate(args) if a == "-p")
+        self.assertEqual(len(assigned), len(set(assigned)))
+        # Every sharded package is excluded from the remaining shard, and the heavy
+        # packages excluded by the original workspace command stay excluded there.
+        for package in assigned + [
+            "smoke-test",
+            "aptos-testcases",
+            "aptos-keyless-circuit",
+            "aptos-batch-encryption",
+        ]:
+            self.assertIn(package, remaining_excludes)
+
 
 if __name__ == "__main__":
     unittest.main()
