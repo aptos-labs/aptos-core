@@ -2,6 +2,16 @@
 module 0x42::exists_only_memory {
     struct Probed has key { dummy: u8 }
 
+    // A bare type parameter in a memory access must be tracked as generic memory,
+    // not passed to the struct-only memory path.
+    public fun generic_exists<T: key>(a: address): bool {
+        exists<T>(a)
+    }
+
+    spec generic_exists {
+        ensures result == exists<T>(a);
+    }
+
     // The only reference to `Probed` anywhere.
     #[persistent]
     fun probe_impl(_a: address): bool {
