@@ -1,12 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Heap-object header access. The owned VM memory buffer ([`MemoryRegion`])
-//! lives in [`mono_move_alloc`] and the raw value read/write helpers in
-//! [`mono_move_core::memory`]; both are re-exported here.
+//! Heap-object header access. The raw value read/write helpers and the owned
+//! VM memory buffer ([`MemoryRegion`]) are re-exported from
+//! [`mono_move_core::memory`].
 
 use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use mono_move_alloc::MemoryRegion;
 pub use mono_move_core::memory::*;
 use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET};
 

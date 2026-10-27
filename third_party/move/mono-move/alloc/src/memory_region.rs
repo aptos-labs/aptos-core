@@ -4,7 +4,10 @@
 //! An owned, [`MAX_ALIGN`]-aligned VM memory buffer.
 
 use crate::MAX_ALIGN;
-use std::alloc::{self, Layout};
+use std::{
+    alloc::{self, Layout},
+    mem::MaybeUninit,
+};
 
 pub struct MemoryRegion {
     ptr: *mut u8,
@@ -110,6 +113,8 @@ impl MemoryRegion {
         Self { ptr, layout }
     }
 
+    /// Returns the region's base pointer. Writes must not overlap a live
+    /// [`Self::as_uninit_slice`] borrow.
     #[inline(always)]
     pub fn as_ptr(&self) -> *mut u8 {
         self.ptr
@@ -131,6 +136,16 @@ impl MemoryRegion {
     #[inline(always)]
     pub fn contains_range(&self, ptr: *const u8, len: usize) -> bool {
         ptr.addr().wrapping_sub(self.ptr.addr()).saturating_add(len) <= self.len()
+    }
+
+    /// Borrows the region as bytes that may be uninitialized or contain pointers.
+    /// Writes through [`Self::as_ptr`] are forbidden while this borrow is live.
+    #[inline(always)]
+    pub fn as_uninit_slice(&self) -> &[MaybeUninit<u8>] {
+        // SAFETY: the allocation is non-null and valid for `self.len()` bytes.
+        // `MaybeUninit<u8>` permits uninitialized bytes; callers must not write
+        // through raw pointers while the slice is borrowed.
+        unsafe { std::slice::from_raw_parts(self.ptr.cast(), self.len()) }
     }
 }
 

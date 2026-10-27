@@ -8,9 +8,10 @@ use super::{
     value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector},
 };
 use crate::{
-    interner::InternedModuleId, types::InternedType, DescriptorId, FormatOptions, VMResult,
+    interner::InternedModuleId, memory::MemoryRegion, types::InternedType, DescriptorId,
+    FormatOptions, VMResult,
 };
-use core::{cell::RefMut, cmp::Ordering};
+use core::{cell::RefMut, cmp::Ordering, mem::MaybeUninit};
 use move_core_types::account_address::AccountAddress;
 
 /// Trait that native functions are written generic over.
@@ -74,14 +75,15 @@ pub trait NativeContext {
         T: VMValue<'a>;
 
     /// Writes `bytes` as the in-frame representation of the `i`-th return value.
-    /// `bytes.len()` must equal the slot's size. Writing any return value poisons
-    /// the context against further argument reads.
+    /// `bytes.len()` must equal the slot's size. Writing any return value prevents
+    /// further argument reads. The representation may contain heap pointers and
+    /// uninitialized padding.
     ///
     /// # Safety
     ///
     /// `bytes` must be a valid in-frame representation of the slot's Move-level
     /// type. Any heap pointers it embeds must reference live objects.
-    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> VMResult<()>;
+    unsafe fn set_return_raw(&self, i: usize, bytes: &[MaybeUninit<u8>]) -> VMResult<()>;
 
     /// Number of type arguments.
     fn num_ty_args(&self) -> usize;
@@ -93,12 +95,14 @@ pub trait NativeContext {
     /// published layout (e.g. an unresolved generic or an unloaded module).
     fn value_size(&self, ty: InternedType) -> VMResult<u32>;
 
-    /// Returns a copy of the `i`-th argument's raw in-frame bytes -- a low-level
-    /// API for natives that need to operate on generic opaque values.
-    fn arg_raw(&self, i: usize) -> VMResult<Vec<u8>>;
+    /// Returns a frame-aligned copy of the `i`-th argument's bytes, padding and
+    /// pointer provenance included. Its heap pointers are not GC roots: they are
+    /// valid only until the next heap allocation unless relocated through
+    /// [`NativeExtension::relocate_roots`].
+    fn arg_raw(&self, i: usize) -> VMResult<MemoryRegion>;
 
-    /// Returns the heap-pointer offsets within the `i`-th argument,
-    /// relative to the value's start.
+    /// Offsets of the `i`-th argument's heap pointers, relative to its start.
+    /// Each is a whole, aligned pointer slot of its [`Self::arg_raw`] copy.
     fn arg_ptr_offsets(&self, i: usize) -> VMResult<Vec<u32>>;
 
     /// Returns the module of the caller of the function that invoked this native,
@@ -171,7 +175,7 @@ pub trait NativeContext {
         &self,
         vector: &Vector<'_, Opaque>,
         elem_size: u32,
-        data: &[u8],
+        data: &[MaybeUninit<u8>],
     ) -> VMResult<()>;
 
     /// Moves the elements of `from` at `[removal_position, removal_position + length)`
@@ -213,11 +217,18 @@ pub trait NativeContext {
 
     /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
     /// representation, or `None` when `bytes` is not a valid encoding of `ty`.
+    /// Padding may be uninitialized. Read typed fields with the matching accessors
+    /// and copy the full representation through [`MemoryRegion::as_uninit_slice`];
+    /// do not read it as `&[u8]`.
     ///
     /// The returned bytes may embed pointers to freshly allocated, unrooted heap
     /// objects, so they must be written into a frame slot before any further
     /// heap allocation.
-    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>>;
+    fn bcs_deserialize_value(
+        &self,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> VMResult<Option<MemoryRegion>>;
 
     /// The constant BCS-serialized size of any value of type `ty`.
     /// Returns `None` if the size is data-dependent (e.g. vectors) or `ty`

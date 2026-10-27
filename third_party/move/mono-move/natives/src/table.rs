@@ -16,6 +16,7 @@ use mono_move_core::{
     },
     VMResult,
 };
+use std::mem::MaybeUninit;
 
 /// Table entry already exists (`error::invalid_argument(100)`).
 const ALREADY_EXISTS: u64 = (100 << 8) + 7;
@@ -119,8 +120,9 @@ pub fn native_remove_box<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
             let size = ctx.return_size(0)?;
             // SAFETY: the entry was boxed from a `Box<V>` value, so its payload
             // begins with that value's in-frame bytes, and `size` is the return
-            // slot's size.
-            let bytes = unsafe { std::slice::from_raw_parts(value.ptr(), size) };
+            // slot's size. `MaybeUninit<u8>` permits uninitialized padding.
+            let bytes =
+                unsafe { std::slice::from_raw_parts(value.ptr().cast::<MaybeUninit<u8>>(), size) };
             // SAFETY: return 0 is `Box<V>`, which `bytes` is the representation of.
             unsafe { ctx.set_return_raw(0, bytes)? };
             Ok(NativeStatus::Success)
