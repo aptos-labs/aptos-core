@@ -16,3 +16,6 @@ shared-dsa = { workspace = true }
 smallbitvec = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

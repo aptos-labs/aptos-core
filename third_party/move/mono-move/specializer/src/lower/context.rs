@@ -358,17 +358,18 @@ pub struct LoweringContext<'a> {
     /// Substituted return types, corresponding to `return_slots`.
     pub return_types: InternedTypeList,
     pub num_transfer_positions: u16,
+    /// Base offset for scratch used by `parallel_copy::emit_parallel_copy` to
+    /// break `Instr::Ret` copy cycles. It follows all callee argument/return slots,
+    /// at or above `frame_data_size + FRAME_METADATA_SIZE`, so it cannot overlap
+    /// return sources or destinations. Lowering reserves the maximum bytes used
+    /// by any return, including padding, or zero if unused.
+    ///
+    /// Invariant: no callee is active during a return, and scratch values never
+    /// live across an allocating micro-op, so they need no GC tracking.
+    pub scratch: FrameOffset,
     /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
     /// live at a time, and they have the same GC invariant.
-    /// Frame offset of the cycle-breaking scratch slot used by
-    /// `parallel_copy::emit_parallel_copy` for `Instr::Ret`.
-    /// Reserved at the end of the home region (sized to fit the widest
-    /// return value). `None` when no scratch is needed.
-    ///
-    /// Invariant: scratch's live range never spans an allocating
-    /// micro-op, so does not need GC tracking.
-    pub scratch: Option<FrameOffset>,
     /// Frame offset of the 8-byte slot used for lowering of [`Instr::MoveTo`]
     /// and [`Instr::MoveFrom`] ([`None`] if no such instructions are present
     /// in the function). This slot holds the intermediate heap pointer (the
@@ -593,32 +594,7 @@ pub fn try_build_context<'a>(
         frame_data_size = ret_end;
     }
 
-    // 4. Reserve a scratch slot at the tail of the home region for
-    //    `Ret` cycle-breaking — `return_slots` overlap home, so swaps
-    //    like `(b, a)` form copy cycles that `emit_parallel_copy`
-    //    routes through this slot. Sized to the widest return slot
-    //    (Ret copies are type-matched).
-    //
-    //    Skipped when fewer than 2 return values: a cycle requires at
-    //    least two copies, so single-return (and no-return) functions
-    //    can never need scratch.
-    //
-    //    TODO(perf): tighten further by walking the IR's `Ret` instructions
-    //    and detecting whether any copy graph actually contains a
-    //    cycle. That would let multi-return functions whose Ret
-    //    copies are all identity or otherwise acyclic skip the slot
-    //    too, at the cost of ~O(N²) per Ret graph cycle check.
-    //    We may also want to consider stricter bounding on number of
-    //    return values in the bytecode verifier.
-    let max_value_width: u32 = return_slots.iter().map(|s| s.size).max().unwrap_or(0);
-    let scratch = (return_slots.len() >= 2 && max_value_width > 0).then(|| {
-        reserve_slot(
-            &mut frame_data_size,
-            align_up_u32(max_value_width, FRAME_ALIGN),
-        )
-    });
-
-    // 5. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
+    // 4. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
     //    lowering, when the body uses either. It holds the intermediate heap
     //    pointer between the alloc/move and the box/unbox copy. Must not be
     //    GC-tracked.
@@ -627,7 +603,7 @@ pub fn try_build_context<'a>(
         .any(|instr| matches!(instr, Instr::MoveTo { .. } | Instr::MoveFrom { .. }));
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
-    // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
+    // 5. Single IR pass over the function's enum ops: (1) verify each one's enum
     //    layout was derivable during discovery, and (2) detect whether
     //    pack/unpack needs the enum-pointer scratch slot.
     let mut needs_enum_ptr_scratch = false;
@@ -656,7 +632,7 @@ pub fn try_build_context<'a>(
 
     // TODO(perf): we need to revisit the complexity and performance of this function
     // after support for generic monomorphization is in place.
-    // 7. Lay out every callee-frame region in a single IR-order pass: regular
+    // 6. Lay out every callee-frame region in a single IR-order pass: regular
     //    calls (`Call`) and closures (`PackClosure`/`CallClosure`) are disjoint
     //    instruction kinds writing disjoint outputs, so one walk serves both.
     let callee_base = frame_data_size + FRAME_METADATA_SIZE as u32;
@@ -795,6 +771,20 @@ pub fn try_build_context<'a>(
         descriptors.closure_captured.len(),
         "PackClosure count diverged from discovered captured-data layouts"
     );
+
+    // 7. Place `Ret` scratch after the callee argument/return region, beyond
+    //    both Transfer sources and frame data that remains live across calls.
+    let scratch = call_sites
+        .iter()
+        .flat_map(|cs| cs.arg_slots.iter().chain(cs.ret_slots.iter()))
+        // Closure calls reserve only a caller-frame return region (the runtime
+        // stages args into the callee frame); include it so reads stay in bounds.
+        .chain(closure_call_sites.iter().flatten())
+        .map(|ts| ts.slot.offset.0 + ts.slot.size)
+        .max()
+        // Leaf function: no callee slots needed beyond metadata.
+        .unwrap_or(callee_base);
+    let scratch = FrameOffset(scratch);
 
     Ok(BuildContextOutcome::Built(LoweringContext {
         module: &module_ir.module,
@@ -1038,6 +1028,7 @@ pub fn try_lower_function(
         origins,
         entry_gas,
         mut safe_points,
+        scratch_size,
     } = lower_function(func_ir, &ctx)?;
     // TODO(perf): drop this sort if we can guarantee the input is already
     // sorted. `pc_map` is monotone and `emit` pushes in code-offset
@@ -1050,17 +1041,7 @@ pub fn try_lower_function(
     let param_slots = ctx.home_slots[..func_ir.num_params as usize].to_vec();
     let param_tys = view_type_list(ctx.home_types)[..func_ir.num_params as usize].to_vec();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
-    let extended_frame_size = ctx
-        .call_sites
-        .iter()
-        .flat_map(|cs| cs.arg_slots.iter().chain(cs.ret_slots.iter()))
-        // Closure calls reserve only a caller-frame return region (the runtime
-        // stages args into the callee frame); include it so reads stay in bounds.
-        .chain(ctx.closure_call_sites.iter().flatten())
-        .map(|ts| (ts.slot.offset.0 + ts.slot.size) as usize)
-        .max()
-        // Leaf function: no callee slots needed beyond metadata.
-        .unwrap_or(param_and_local_sizes_sum + FRAME_METADATA_SIZE);
+    let extended_frame_size = ctx.scratch + scratch_size;
 
     // Derive `frame_layout` and `zero_frame` from the substituted home-slot
     // types — `gc_layout` rejects raw `TypeParam`s.
@@ -1372,6 +1353,14 @@ fn subst_field_decls(
 /// alignment).
 /// Returns `None` if any field type lacks a concrete size or the running
 /// offset/total overflows `u32`.
+///
+/// Invariant: fields are laid out in declaration order, by the same rule as
+/// call arguments and returns. `Pack`/`Unpack` lowering relies on this to emit
+/// copies in forward or reverse order.
+///
+/// Note: If we ever end up reordering fields in the future, we may need to
+/// lower `Pack`/`Unpack` with `parallel_copy::emit_parallel_copy`; otherwise
+/// valid code fails with `NotOverlapSafe`.
 fn layout_inline_fields(
     layouts: &dyn LayoutProvider,
     decls: &[FieldDecl],
