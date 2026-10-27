@@ -1,0 +1,115 @@
+=== stackless ===
+// module 0x42::m
+
+fun make(r0, r1): S {
+  slots: params(2), locals(0), temps(3)
+    r0: u16
+    r1: i8
+    r2: u16
+    r3: bool
+    r4: 0x42::m::S
+  code:
+  L0:
+    0: r2 := ld_u16 40358 @0
+    1: r3 := ld_false @1
+    2: r4 := pack 0x42::m::S, [r2, r3] @2
+    3: ret [r4] @3
+}
+
+fun observe(r0): u8 * i8 * u16 * u16 * bool {
+  slots: params(1), locals(0), temps(5)
+    r0: 0x42::m::S
+    r1: u8
+    r2: i8
+    r3: u16
+    r4: u16
+    r5: bool
+  code:
+  L0:
+    0: r1 := ld_u8 2 @0
+    1: r2 := ld_i8 0 @1
+    2: r3 := ld_u16 0 @2
+    3: r4 := read_loc_field S::x, r0 @3
+    4: r5 := read_loc_field S::y, r0 @6
+    5: ret [r1, r2, r3, r4, r5] @9
+}
+
+fun runner(): u8 * i8 * u16 * u16 * bool {
+  slots: params(0), locals(0), temps(8)
+    r0: u16
+    r1: i8
+    r2: |u16, i8|(0x42::m::S) has copy + drop + store
+    r3: 0x42::m::S
+    r4: |0x42::m::S|(u8, i8, u16, u16, bool) has copy + drop + store
+    r5: u8
+    r6: u16
+    r7: bool
+  code:
+  L0:
+    0: r0 := ld_u16 10 @0
+    1: r1 := ld_i8 12 @1
+    2: r2 := pack_closure make, 0, [] @2
+    3: [r3] := call_closure [|u16, i8|(0x42::m::S)], [r0, r1, r2] @3
+    4: r4 := pack_closure observe, 0, [] @4
+    5: [r5, r1, r0, r6, r7] := call_closure [|0x42::m::S|(u8, i8, u16, u16, bool)], [r3, r4] @5
+    6: ret [r5, r1, r0, r6, r7] @6
+}
+=== micro-ops ===
+// module 0x42::m
+
+fun make() {
+  frame_data_size: 16
+  entry_gas: 48
+  code:
+    0: StoreImm2 [4] <- #40358 @0
+    1: StoreImm1 [6] <- #0 @1
+    2: Move(1) [10] <- [6] @2
+    3: Move(2) [8] <- [4] @2
+    4: Move(4) [0] <- [8] @3
+    5: Return @3
+}
+
+fun observe() {
+  frame_data_size: 16
+  entry_gas: 83
+  code:
+    0: StoreImm1 [4] <- #2 @0
+    1: StoreImm1 [5] <- #0 @1
+    2: StoreImm2 [6] <- #0 @2
+    3: Move(2) [8] <- [0] @3
+    4: Move(1) [10] <- [2] @6
+    5: Move(1) [0] <- [4] @9
+    6: Move(1) [1] <- [5] @9
+    7: Move(2) [2] <- [6] @9
+    8: Move(2) [4] <- [8] @9
+    9: Move(1) [6] <- [10] @9
+    10: Return @9
+}
+
+fun runner() {
+  frame_data_size: 40
+  entry_gas: 230
+  code:
+    0: StoreImm2 [0] <- #10 @0
+    1: StoreImm1 [2] <- #12 @1
+    2: PackClosure [8] <- func_ref=Unresolved(make), mask=0, captured_desc=<none>, captured=[] @2
+    3: CallClosure closure=[8], provided_args=[[0](2), [2](1)] @3
+    4: Move(4) [16] <- [64] @3
+    5: PackClosure [24] <- func_ref=Unresolved(observe), mask=0, captured_desc=<none>, captured=[] @4
+    6: CallClosure closure=[24], provided_args=[[16](4)] @5
+    7: Move(1) [32] <- [64] @5
+    8: Move(1) [2] <- [65] @5
+    9: Move(2) [0] <- [66] @5
+    10: Move(2) [34] <- [68] @5
+    11: Move(1) [36] <- [70] @5
+    12: Move(2) [4] <- [34] @6
+    13: Move(1) [6] <- [36] @6
+    14: Move(2) [72] <- [0] @6
+    15: Move(1) [0] <- [32] @6
+    16: Move(1) [1] <- [2] @6
+    17: Move(2) [2] <- [72] @6
+    18: Return @6
+  safe_point_layouts:
+    2: []
+    5: []
+}

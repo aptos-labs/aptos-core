@@ -99,6 +99,10 @@ name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_sc
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_matching_payload::case_3"
 
 [[test]]
+name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_mismatching_payload::case_3"
+note = "MonoMove does not execute multisig payloads."
+
+[[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash::case_1"
 
 [[test]]
@@ -106,6 +110,18 @@ name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_sc
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash::case_3"
+
+[[test]]
+name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash_and_failing_execution::case_1"
+note = "MonoMove does not execute multisig payloads."
+
+[[test]]
+name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash_and_failing_execution::case_2"
+note = "MonoMove does not execute multisig payloads."
+
+[[test]]
+name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_hash_and_failing_execution::case_3"
+note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_script_transaction_with_payload_succeeds::case_1"
@@ -139,6 +155,10 @@ name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_tr
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_hash"
+
+[[test]]
+name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_hash_and_failing_execution"
+note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "aptos-api::aptos_api$tests::multisig_transactions_test::test_multisig_transaction_with_payload_succeeds"
@@ -504,8 +524,8 @@ name = "e2e-move-tests::e2e_move_tests$tests::constructor_args::constructor_args
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::cryptoalgebra::crypto_algebra_type_tag_limit_exceeded_handled"
-note = "TODO"
+name = "e2e-move-tests::e2e_move_tests$tests::constructor_args::constructor_args_good"
+note = "MonoMove rejects struct entry function arguments with INVALID_MAIN_FUNCTION_SIGNATURE."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::false_false_expects"
@@ -558,6 +578,10 @@ note = "TODO"
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_existing_account_with_fee_payer_aborts"
 note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_caches::test_function_caches_for_recursive_functions_do_not_leak_memory"
+note = "Exceeds the CI time limit under MonoMove."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::excess_function_type_abilities_are_rejected"
@@ -779,10 +803,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::legacy_bytecode_publishing::legacy
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::macros::test_macros"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::add_vec_to_table"
 note = "TODO"
 
@@ -905,10 +925,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::io_limit_
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_generic_container_with_private_type_arg_rejected"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_negative_phantom_option_package"
 note = "TODO"
 
@@ -931,6 +947,10 @@ note = "TODO"
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pair_type_params_package"
 note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_phantom_validation_package"
+note = "MonoMove rejects struct entry function arguments with INVALID_MAIN_FUNCTION_SIGNATURE."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::public_structs_enums_upgrade::test_public_struct_args_feature_disabled_then_enabled"
@@ -1013,10 +1033,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::vm::encrypted_transaction_charges_
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::vm::encrypted_transaction_rejected_below_min_gas_price"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::vm::failed_encrypted_transaction_increments_sequence_number"
 note = "TODO"
 
@@ -1088,15 +1104,6 @@ name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::test_t
 
 [[test]]
 name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify_multi_agent_duplicate_secondary_signer"
-
-[[test]]
-name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify_multi_agent_invalid_secondary_signature"
-
-[[test]]
-name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify_multi_agent_invalid_sender_signature"
-
-[[test]]
-name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify_signature"
 
 [[test]]
 name = "smoke-test::smoke_test$aptos_cli::validator::test_register_and_update_validator"

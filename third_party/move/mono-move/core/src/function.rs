@@ -161,11 +161,11 @@ impl SortedSafePointEntries {
 ///   [0 .. param_region_size)                                  parameters (written by caller as arguments)
 ///   [param_region_size .. param_and_local_sizes_sum)          locals
 ///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots, then return scratch
 /// ```
 ///
-/// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
-/// functions (no callee region).
+/// For leaf functions without return scratch, `extended_frame_size` equals
+/// `param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub module_id: InternedModuleId,
@@ -188,11 +188,12 @@ pub struct Function {
     /// Size of the parameters + locals region. Frame metadata is stored
     /// immediately after this region at offset `param_and_local_sizes_sum`.
     pub param_and_local_sizes_sum: usize,
-    /// Total frame footprint including metadata and callee slots.
+    /// Bytes from `fp` this function's code may access: frame data, metadata,
+    /// callee slots, and return scratch.
     /// Must be >= `frame_size()` (i.e., `param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
-    /// For leaf functions this equals `frame_size()`; for calling functions
-    /// it additionally includes callee argument / return value slots
-    /// (sized to fit the largest callee's arguments or return values).
+    /// Callee slots accommodate the largest callee argument or return region;
+    /// return scratch follows them. Leaf functions without return scratch use
+    /// exactly `frame_size()` bytes.
     pub extended_frame_size: usize,
     /// Whether the runtime must zero-initialize the region beyond
     /// parameters (`param_region_size..extended_frame_size`) when a new

@@ -52,7 +52,7 @@ fun trigger(): u64 {
 // module 0x66::test
 
 fun three_rets() {
-  frame_data_size: 32
+  frame_data_size: 24
   entry_gas: 164
   code:
     0: StoreImm8 [0] <- #1 @0

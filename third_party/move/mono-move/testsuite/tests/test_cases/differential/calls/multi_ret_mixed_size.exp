@@ -48,7 +48,7 @@ fun trigger(): u64 {
 // module 0x66::test
 
 fun multi_ret() {
-  frame_data_size: 40
+  frame_data_size: 24
   entry_gas: 156
   code:
     0: StoreImm8 [16] <- #7 @1

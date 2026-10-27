@@ -7,7 +7,7 @@
 //! [`NativeContext`] trait, never on these types directly.
 
 use crate::{
-    error::RuntimeError,
+    error::{RuntimeError, RuntimeInvariantViolation},
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
         alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
@@ -31,9 +31,10 @@ use mono_move_core::{
     },
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
-    DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
-    MicroOp, ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorId, DescriptorProvider, ExecutionErrorKind, FormatOptions, Function, GasMeter,
+    LayoutKind, LayoutProvider, MicroOp, ObjectDescriptorInner, ResourceProvider, VMResult,
+    ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_core_types::account_address::AccountAddress;
@@ -146,6 +147,56 @@ impl<'a> ProductionNativeContext<'a> {
                 (read_ptr(metadata, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()?;
             Some((caller, read_u64(metadata, META_SAVED_PC_OFFSET)))
         }
+    }
+
+    /// Borrows the read-write set entry at `storage_key`, rooting a reference
+    /// to it for the rest of the call. Returns `None` if the entry does not
+    /// exist.
+    fn borrow_entry(
+        &self,
+        storage_key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+        mutable: bool,
+    ) -> VMResult<Option<Ref<'_, Opaque>>> {
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = if mutable {
+            match rws.try_borrow_global_mut(self.resource_provider, storage_key, group) {
+                Ok(EntryPtr::Writable(ptr)) => ptr,
+                Ok(EntryPtr::NonWritable(ptr)) => {
+                    // Copy-on-write: an external or stale value must be copied
+                    // into the local heap before it can be mutated.
+                    let heap = unsafe { &mut **self.heap.get() };
+                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
+                    let copied = unsafe {
+                        deep_copy_or_gc(
+                            heap,
+                            self.guard,
+                            rws,
+                            &self.pool,
+                            self.extensions,
+                            self.frame_ptr,
+                            TopFrame::Native(self.abi),
+                            ptr,
+                        )
+                    }?;
+                    rws.commit_borrow_global_mut(storage_key, copied);
+                    copied
+                },
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            match rws.borrow_global(self.resource_provider, storage_key, group) {
+                Ok(ptr) => ptr,
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        };
+        // SAFETY: `ptr` is the live entry value; the reference points at its
+        // start, so the offset is 0. The pool roots it for the rest of the call.
+        let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
+        Ok(Some(Ref::from_handle(handle)))
     }
 }
 
@@ -827,6 +878,18 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(rws.exists(self.resource_provider, &key, group)?)
     }
 
+    fn resource_borrow(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+        mutable: bool,
+    ) -> VMResult<Option<Ref<'_, Opaque>>> {
+        // Resolved before the `rws` reborrow; the resolver reads the module
+        // read-set, disjoint from the read-write set.
+        let group = (self.resource_group_of)(ty)?;
+        self.borrow_entry(&InMemoryStorageKey::resource(address, ty), group, mutable)
+    }
+
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>> {
         let slot =
             self.abi.args().get(i).copied().ok_or_else(|| {
@@ -850,6 +913,28 @@ impl NativeContext for ProductionNativeContext<'_> {
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering> {
         // SAFETY: forwarded from this method's contract.
         unsafe { crate::value_cmp::compare(self.guard, a, b, ty) }
+    }
+
+    unsafe fn format_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+        options: &FormatOptions,
+    ) -> VMResult<String> {
+        let mut out = String::new();
+        // SAFETY: forwarded from this method's contract.
+        unsafe { crate::value_display::display(self.guard, base, ty, options, &mut out)? };
+        Ok(out)
+    }
+
+    fn field_offset(&self, ty: InternedType, i: usize) -> VMResult<Option<u32>> {
+        let layout = self.guard.layout_by_ty(ty).ok_or({
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+        })?;
+        let LayoutKind::Struct { fields } = &layout.kind else {
+            return Ok(None);
+        };
+        Ok(fields.get(i).map(|field| field.offset))
     }
 
     unsafe fn new_enum<'a, V: VMValue<'a>>(
@@ -883,65 +968,30 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn table_contains(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value_ty: InternedType,
     ) -> VMResult<bool> {
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
+        let storage_key = InMemoryStorageKey::table_item(handle, key.into(), value_ty);
         // Table items never belong to a resource group.
         Ok(rws.exists(self.resource_provider, &storage_key, None)?)
     }
 
     fn table_borrow(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         mutable: bool,
         value_ty: InternedType,
     ) -> VMResult<Option<Ref<'_, Opaque>>> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
-        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let rws = unsafe { &mut **self.rws.get() };
         // Table items never belong to a resource group.
-        let ptr = if mutable {
-            match rws.try_borrow_global_mut(self.resource_provider, &storage_key, None) {
-                Ok(EntryPtr::Writable(ptr)) => ptr,
-                Ok(EntryPtr::NonWritable(ptr)) => {
-                    // Copy-on-write: an external or stale value must be copied
-                    // into the local heap before it can be mutated.
-                    let heap = unsafe { &mut **self.heap.get() };
-                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
-                    let copied = unsafe {
-                        deep_copy_or_gc(
-                            heap,
-                            self.guard,
-                            rws,
-                            &self.pool,
-                            self.extensions,
-                            self.frame_ptr,
-                            TopFrame::Native(self.abi),
-                            ptr,
-                        )
-                    }?;
-                    rws.commit_borrow_global_mut(&storage_key, copied);
-                    copied
-                },
-                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
-                Err(e) => return Err(e.into()),
-            }
-        } else {
-            match rws.borrow_global(self.resource_provider, &storage_key, None) {
-                Ok(ptr) => ptr,
-                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
-                Err(e) => return Err(e.into()),
-            }
-        };
-        // SAFETY: `ptr` is the live entry value; the reference points at its
-        // start, so the offset is 0. The pool roots it for the rest of the call.
-        let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
-        Ok(Some(Ref::from_handle(handle)))
+        self.borrow_entry(
+            &InMemoryStorageKey::table_item(handle, key.into(), value_ty),
+            None,
+            mutable,
+        )
     }
 
     // TODO(cleanup): See if there's a way to separate out argument-reading from boxing.
@@ -989,12 +1039,12 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn table_add(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value: Boxed<'_, Opaque>,
         value_ty: InternedType,
     ) -> VMResult<bool> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
+        let storage_key = InMemoryStorageKey::table_item(handle, key.into(), value_ty);
         let obj = NonNull::new(value.ptr())
             .ok_or_else(|| native_invariant_violation("table_add: null boxed value".into()))?;
         // SAFETY: `rws` is reborrowed exclusively here.
@@ -1009,11 +1059,11 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn table_remove(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value_ty: InternedType,
     ) -> VMResult<Option<Boxed<'_, Opaque>>> {
-        let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
+        let storage_key = InMemoryStorageKey::table_item(handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
         // Table items never belong to a resource group.

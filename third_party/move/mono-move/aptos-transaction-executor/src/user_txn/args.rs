@@ -152,8 +152,8 @@ fn is_allowed_arg_layout_uncached<'a>(
                 None => {
                     // An argument may carry any variant, so every variant's
                     // fields are checked.
-                    for &variant in variants.iter() {
-                        let body = guard.layout(variant).ok_or_else(|| {
+                    for variant in variants.iter() {
+                        let body = guard.layout(variant.id).ok_or_else(|| {
                             invariant_violation("a variant body's layout is published")
                         })?;
                         let LayoutKind::Struct { fields } = &body.kind else {
