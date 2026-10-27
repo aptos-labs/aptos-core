@@ -42,7 +42,8 @@
 //! | `base`                | `F.frame_layout.heap_ptr_offsets`: pointer slots the GC scans at every pc              |
 //! | `sps`                 | `F.safe_point_layouts.entries()`: `(code_offset, heap_ptr_offsets)` pairs              |
 //! | `desc(id)`            | the descriptor for `id`, or none                                                       |
-//! | `layout(ty)`          | `(size, align)` of `ty`, or none                                                       |
+//! | `shape(ty)`           | `(size, align)` of `ty`, intrinsic or from a published layout, or none                 |
+//! | `layout(ty)`          | the published `ValueLayout` for `ty`, or none                                          |
 //! | `const_ty(idx)`       | the type of constant `idx` in `F`'s module, or none                                    |
 //!
 //! A **slot** is `(o, w, a)`: offset `o` from the frame pointer, width `w`,
@@ -55,6 +56,12 @@
 //!
 //! A slot list is **ascending and disjoint** iff `end(s_i) <= o_{i+1}` for every
 //! consecutive pair.
+//!
+//! The **canonical signature layout** starts at cursor zero. For each type,
+//! resolve `shape(ty)`, align the cursor to that alignment, place a slot with
+//! that offset/size/alignment, and advance by its size. Sizes must be positive,
+//! alignments valid, and offsets and ends must fit in `u32`. There is no final
+//! padding. The same checked calculation packs capture sizes/alignments.
 //!
 //! # Checks
 //!
@@ -72,57 +79,67 @@
 //!
 //! ## Parameter and return slots
 //!
-//! | Id | Property                               | Condition                             | Rationale                                                                 |
-//! |----|----------------------------------------|---------------------------------------|---------------------------------------------------------------------------|
-//! | P1 | one slot per parameter                 | `len(params) = len(param_tys)`        |                                                                           |
-//! | P2 | parameter slots are well-formed        | every slot in `params` is well-formed |                                                                           |
-//! | P3 | parameters lie in the parameter region | every slot in `params` has `end <= P` | callers write each parameter at its slot, then the callee zeroes `[P, E)` |
-//! | P4 | parameters do not overlap              | `params` is ascending and disjoint    |                                                                           |
-//! | R1 | one slot per return value              | `len(rets) = len(ret_tys)`            |                                                                           |
-//! | R2 | return slots are well-formed           | every slot in `rets` is well-formed   |                                                                           |
-//! | R3 | return values lie in the data region   | every slot in `rets` has `end <= S`   |                                                                           |
-//! | R4 | return values do not overlap           | `rets` is ascending and disjoint      |                                                                           |
+//! | Id | Property                                | Condition                                                                        | Rationale                                                                      |
+//! |----|-----------------------------------------|----------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+//! | P1 | one slot per parameter                  | `len(params) = len(param_tys)`                                                   |                                                                                |
+//! | P2 | parameter slots are well-formed         | every slot in `params` is well-formed                                            |                                                                                |
+//! | P3 | parameters lie in the parameter region  | every slot in `params` has `end <= P`                                            | callers write each parameter at its slot, then the callee zeroes `[P, E)`      |
+//! | P4 | parameter slots match the signature ABI | every slot has the offset, size, and alignment of the canonical signature layout | implies ascending, disjoint slots; callers calculate this layout independently |
+//! | P5 | parameter region has exact extent       | `P` equals the canonical parameter layout size, or zero for no parameters        | no final alignment rounding                                                    |
+//! | R1 | one slot per return value               | `len(rets) = len(ret_tys)`                                                       |                                                                                |
+//! | R2 | return slots are well-formed            | every slot in `rets` is well-formed                                              |                                                                                |
+//! | R3 | return values lie in the data region    | every slot in `rets` has `end <= S`                                              |                                                                                |
+//! | R4 | return slots match the signature ABI    | every slot has the offset, size, and alignment of the canonical signature layout | parameters and returns reuse storage and are checked separately                |
 //!
 //! ## GC layouts
 //!
-//! | Id | Property                                  | Condition                                                       | Rationale                                                                                        |
-//! |----|-------------------------------------------|-----------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-//! | G1 | base pointer slots are real slots         | every `o` in `base` is a valid access `(o, ptr.w, ptr.a)`       |                                                                                                  |
-//! | G2 | base layout is sorted                     | `base` is strictly increasing                                   |                                                                                                  |
-//! | G3 | unwritten pointer slots start null        | if some `o` in `base` has `o >= P`, then `F.zero_frame`         | the GC scans `base` before the function writes anything; the caller does not fill slots past `P` |
-//! | G4 | safe points are sorted                    | the `code_offset`s of `sps` are strictly increasing             |                                                                                                  |
-//! | G5 | safe points sit at allocating ops         | every `code_offset < N` and `code[code_offset].is_allocating()` |                                                                                                  |
-//! | G6 | safe-point pointer slots are real slots   | every entry's `heap_ptr_offsets` satisfies G1 and G2            |                                                                                                  |
-//! | G7 | safe points do not repeat the base layout | no offset is in both an entry's `heap_ptr_offsets` and `base`   |                                                                                                  |
+//! | Id | Property                                      | Condition                                                                                                     | Rationale                                                         |
+//! |----|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
+//! | G1 | base pointer slots are real slots             | every `o` in `base` is a valid access `(o, ptr.w, ptr.a)`                                                     |                                                                   |
+//! | G2 | base layout is sorted                         | `base` is strictly increasing                                                                                 |                                                                   |
+//! | G3 | base roots have entry initialization coverage | for each `b` in `base`: if `b < P`, `[b, b + ptr.w)` fits within one parameter slot; otherwise `F.zero_frame` | argument copies do not initialize padding between parameter slots |
+//! | G4 | safe points are sorted                        | the `code_offset`s of `sps` are strictly increasing                                                           |                                                                   |
+//! | G5 | safe points sit at allocating ops             | every `code_offset < N` and `code[code_offset].is_allocating()`                                               |                                                                   |
+//! | G6 | safe-point pointer slots are real slots       | every entry's `heap_ptr_offsets` satisfies G1 and G2                                                          |                                                                   |
+//! | G7 | safe points do not repeat the base layout     | no offset is in both an entry's `heap_ptr_offsets` and `base`                                                 |                                                                   |
 //!
 //! ## Operand accesses
 //!
-//! For every `pc` and every `(o, kind)` reported by `code[pc].for_each_frame_operand` (see `instruction::operands`):
+//! For every `pc` and every `(o, kind, access)` reported by `code[pc].for_each_frame_operand` (see `instruction::operands`):
 //!
-//! | Id | Property                                                        | Condition                                                                                                                                                                  | Rationale                                                                                      |
-//! |----|-----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-//! | O1 | every operand access is in frame, off the metadata, and aligned | the access `(o, w, a)` is valid, with `(w, a)` = `OperandKind::width_and_align`: fixed per kind, `layout(ty)` for `Value(ty)`, `layout(const_ty(idx))` for `Constant(idx)` |                                                                                                |
-//! | O2 | compared values have a layout                                   | for `Value(ty)`, `layout(ty)` exists                                                                                                                                       |                                                                                                |
-//! | O3 | comparison is on values, not references                         | the `ty` of `ValueCmp`, `ValueRefCmp`, `JumpValueCmp`, and `JumpValueRefCmp` is not a reference type                                                                       |                                                                                                |
-//! | O4 | constants exist                                                 | for `Constant(idx)`, `const_ty(idx)` exists                                                                                                                                |                                                                                                |
-//! | O5 | constants have a layout                                         | for `Constant(idx)`, `layout(const_ty(idx))` exists                                                                                                                        |                                                                                                |
-//! | O6 | scalars do not alias GC pointer slots                           | for `kind` in {`Bool`, `Byte`, `U64`, `Int`, `Address`}, `[o, o + w)` does not intersect `[b, b + ptr.w)` for any `b` in `base` or in the safe-point layout at `pc`        | a pointer slot read or written as an integer is type confusion; the GC would trace the integer |
+//! | Id | Property                                                        | Condition                                                                                                                           | Rationale                                                            |
+//! |----|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+//! | O1 | every operand access is in frame, off the metadata, and aligned | the access `(o, w, a)` is valid; width/alignment come from the fixed kind or the published layout for `Value(ty)` / `Constant(idx)` |                                                                      |
+//! | O2 | compared values have a published layout                         | the `ty` of all four value comparison ops has `layout(ty)`                                                                          | reference comparisons also interpret their pointee using this layout |
+//! | O3 | comparison is on values, not references                         | the `ty` of `ValueCmp`, `ValueRefCmp`, `JumpValueCmp`, and `JumpValueRefCmp` is not a reference type                                |                                                                      |
+//! | O4 | constants exist                                                 | for `Constant(idx)`, `const_ty(idx)` exists                                                                                         |                                                                      |
+//! | O5 | constants have a layout                                         | for `Constant(idx)`, `layout(const_ty(idx))` exists                                                                                 |                                                                      |
+//! | O6 | known non-pointer bytes do not alias GC roots                   | every known non-pointer operand range is disjoint from every root range in `base` and the safe-point layout at `pc`                 | applies to both reads and writes; see ranges below                   |
+//!
+//! Known non-pointer ranges, relative to the operand start:
+//!
+//! - `Bool`, `Byte`, `U64`, `Int`, `Address`: the entire operand;
+//! - `FatPtr`, or a typed operand with `LayoutKind::Ref`: `[8, 16)`;
+//! - `Value`/`Constant` with `NO_POINTERS_NO_PADDING`: the entire operand.
+//!
+//! Raw `Bytes` and other aggregate layouts add no non-pointer ranges.
 //!
 //! ## Instruction-local invariants
 //!
-//! | Id | Property                               | Condition                                                                    | Rationale                                                                               |
-//! |----|----------------------------------------|------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
-//! | I1 | no unchecked division by zero          | `DivU64Imm`, `ModU64Imm`: `imm != 0`                                         | lowering emits the checked op when the immediate may be zero, so this is a lowering bug |
-//! | I2 | no unchecked over-shift                | `ShlU64Imm`, `ShrU64Imm`: `imm < 64`                                         | lowering emits the checked op when the amount may be out of range                       |
-//! | I3 | bitwise ops are unsigned               | `IntBitAnd`, `IntBitOr`, `IntBitXor`: `rhs` is unsigned                      | the interpreter rejects it at runtime as an invariant violation                         |
-//! | I4 | shifts are unsigned                    | `IntShl`, `IntShr`: `ty` is unsigned                                         | the interpreter rejects it at runtime as an invariant violation                         |
-//! | I5 | negation is signed                     | `IntNegate`: `ty` is signed                                                  | the interpreter rejects it at runtime as an invariant violation                         |
-//! | Z1 | copies move at least one byte          | `size > 0`, or `elem_size > 0`, for the ops listed below                     |                                                                                         |
-//! | Z2 | heap and reference windows do not wrap | `offset + size` (or `offset + ptr.w`) fits in `u32` for the ops listed below | any variant tag may be selected at runtime                                              |
-//! | Z3 | deep-copy slot offsets do not wrap     | `DeepCopyHeapPtrs`: `base + off` fits in `u32` for every `off`               |                                                                                         |
-//! | J1 | jumps stay in the function             | every jump `target < N`                                                      |                                                                                         |
-//! | D1 | multiple destinations do not overlap   | an op writing more than one frame destination writes disjoint ranges         |                                                                                         |
-//! | B1 | borrowed locals are in the data region | `SlotBorrow`: `local < S`                                                    | the op carries no width, so only the base can be checked                                |
+//! | Id | Property                                  | Condition                                                                                        | Rationale                                                                               |
+//! |----|-------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+//! | I1 | no unchecked division by zero             | `DivU64Imm`, `ModU64Imm`: `imm != 0`                                                             | lowering emits the checked op when the immediate may be zero, so this is a lowering bug |
+//! | I2 | no unchecked over-shift                   | `ShlU64Imm`, `ShrU64Imm`: `imm < 64`                                                             | lowering emits the checked op when the amount may be out of range                       |
+//! | I3 | bitwise ops are unsigned                  | `IntBitAnd`, `IntBitOr`, `IntBitXor`: `rhs` is unsigned                                          | the interpreter rejects it at runtime as an invariant violation                         |
+//! | I4 | shifts are unsigned                       | `IntShl`, `IntShr`: `ty` is unsigned                                                             | the interpreter rejects it at runtime as an invariant violation                         |
+//! | I5 | negation is signed                        | `IntNegate`: `ty` is signed                                                                      | the interpreter rejects it at runtime as an invariant violation                         |
+//! | Z1 | copies move at least one byte             | `size > 0`, or `elem_size > 0`, for the ops listed below                                         |                                                                                         |
+//! | Z2 | heap and reference windows do not wrap    | `offset + size` (or `offset + ptr.w`) fits in `u32` for the ops listed below                     | any variant tag may be selected at runtime                                              |
+//! | Z3 | deep-copy slot offsets do not wrap        | `DeepCopyHeapPtrs`: `base + off` fits in `u32` for every `off`                                   |                                                                                         |
+//! | Z4 | enum fields skip the tag                  | every `Some(offset)` in enum field read/write/borrow tables has `offset >= ENUM_DATA_OFFSET` (8) | offsets include the tag                                                                 |
+//! | J1 | jumps stay in the function                | every jump `target < N`                                                                          |                                                                                         |
+//! | D1 | logical frame destinations do not overlap | all nonempty operand ranges with access `Write` or `ReadWrite` are pairwise disjoint             | a read/write operand contributes one destination; source/destination overlap is allowed |
+//! | B1 | borrowed locals are in the data region    | `SlotBorrow`: `local < S`                                                                        | the op carries no width, so only the base can be checked                                |
 //!
 //! - Z1 `size`: `Move`, `ReadRef`, `WriteRef`, `ReadRefOffset`, `WriteRefOffset`,
 //!   `HeapReadOffset`, `HeapWriteOffset`, `HeapMoveFrom`, `HeapMoveTo`,
@@ -133,8 +150,9 @@
 //!   `HeapWriteOffset`, `ReadRefOffset`, `WriteRefOffset`, and every `Some(offset)`
 //!   in the tables of `EnumReadVariantFieldByTag` and `EnumWriteVariantFieldByTag`.
 //!   Z2 `offset + ptr.w`: `HeapMoveFrom8`, `HeapMoveTo8`, `HeapMoveToImm8`.
-//! - D1: today only `VecUnpack`, with destinations `[d, d + elem_size)` for each
-//!   `d` in `dsts`.
+//! - D1 uses the operand schema for every op, including `VecUnpack.dsts` and
+//!   the read/write pointer slots of `DeepCopyHeapPtrs`. Heap destinations
+//!   reached through runtime pointers and internal GC stores are not included.
 //!
 //! ## Descriptors
 //!
@@ -155,21 +173,25 @@
 //! | C3 | native descriptors exist                     | every `id` in `abi.required_descriptors` has `desc(id)`                                                                                   |                                                              |
 //! | C4 | callee fits the callee region                | `callee.P <= E - (S + M)` and every slot in `callee.rets` has `end <= E - (S + M)`                                                        | arguments and results pass through `Callee`                  |
 //!
+//! C4 relies on the callee having passed its own signature checks before
+//! publication. The final return slot bounds all returns, so C4 is O(1).
+//!
 //! ## Closures
 //!
 //! For `PackClosure` with `mask`, `cdd` (`captured_data_descriptor_id`), `values_size`, `captured`, and for `CallClosure` with `provided_args`:
 //!
-//! | Id | Property                                       | Condition                                                                                                                                             | Rationale                                                                          |
-//! |----|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-//! | L1 | captured data exists iff something is captured | `cdd` is `Some` iff `captured` is non-empty                                                                                                           |                                                                                    |
-//! | L2 | captured-data descriptor is the right kind     | if `cdd = Some(id)`, `desc(id)` exists and is `Trivial` or `CapturedData`                                                                             |                                                                                    |
-//! | L3 | captured-data pointers lie inside the values   | if `desc(id)` is `CapturedData { pointer_offsets }`, every `off` has `off + ptr.w <= values_size`                                                     | these descriptors are shared across closures of different sizes                    |
-//! | L4 | captured slots are well-formed                 | every slot in `captured` is well-formed                                                                                                               | its alignment drives `align_up`, undefined for 0 or non-powers of two              |
-//! | L5 | captured count matches the mask                | `len(captured) = popcount(mask)`                                                                                                                      |                                                                                    |
-//! | L6 | mask fits the callee                           | if `func_ref = Resolved(callee)`: `len(callee.params) <= u64::BITS` and `mask >> len(callee.params) = 0`                                              |                                                                                    |
-//! | L7 | captured values match the callee's parameters  | if `func_ref = Resolved(callee)`: for the `k`-th set bit `i` of `mask`, `captured[k].w = callee.params[i].w` and `captured[k].a = callee.params[i].a` | a captured value is written with its own `(w, a)` and read back at the parameter's |
-//! | L8 | values size matches the captured layout        | if every slot in `captured` has a valid `a`, `values_size = captured_values_size(captured)`                                                           | a smaller size would let the runtime's writes run out of bounds                    |
-//! | L9 | provided arguments are well-formed             | every slot in `provided_args` is well-formed                                                                                                          |                                                                                    |
+//! | Id  | Property                                       | Condition                                                                                                                                             | Rationale                                                                          |
+//! |-----|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+//! | L1  | captured data exists iff something is captured | `cdd` is `Some` iff `captured` is non-empty                                                                                                           |                                                                                    |
+//! | L2  | captured-data descriptor is the right kind     | if `cdd = Some(id)`, `desc(id)` exists and is `Trivial` or `CapturedData`                                                                             |                                                                                    |
+//! | L3  | captured-data pointers lie inside the values   | if `desc(id)` is `CapturedData { pointer_offsets }`, every `off` has `off + ptr.w <= values_size`                                                     | these descriptors are shared across closures of different sizes                    |
+//! | L4  | captured slots are well-formed                 | every slot in `captured` is well-formed                                                                                                               | its alignment drives `align_up`, undefined for 0 or non-powers of two              |
+//! | L5  | captured count matches the mask                | `len(captured) = popcount(mask)`                                                                                                                      |                                                                                    |
+//! | L6  | mask fits the callee                           | if `func_ref = Resolved(callee)`: `len(callee.params) <= u64::BITS` and `mask >> len(callee.params) = 0`                                              |                                                                                    |
+//! | L7  | captured values match the callee's parameters  | if `func_ref = Resolved(callee)`: for the `k`-th set bit `i` of `mask`, `captured[k].w = callee.params[i].w` and `captured[k].a = callee.params[i].a` | a captured value is written with its own `(w, a)` and read back at the parameter's |
+//! | L8  | values size matches the captured layout        | the aligned packed size of `captured` fits in `u32` and equals `values_size`, with no final padding                                                   | checked arithmetic; source frame offsets do not affect the packed layout           |
+//! | L9  | provided arguments are well-formed             | every slot in `provided_args` is well-formed                                                                                                          |                                                                                    |
+//! | L10 | provided arguments lie in caller data          | every slot in `provided_args` has `end <= S`                                                                                                          | interleaved callee writes must not clobber later sources                           |
 //!
 //! With `func_ref = Unresolved(_)`, L6 and L7 are checked at call time against
 //! the resolved callee.
@@ -194,14 +216,15 @@
 
 use crate::{
     align::{is_valid_align, MAX_ALIGN},
-    captured_values_size,
     native::NativeABI,
     types::{view_type, view_type_list, InternedType, Type, PTR_SLOT},
     ClosureFuncRef, CodeOffset, ConstantPoolProvider, DescriptorId, DescriptorProvider,
     FrameOffset, Function, LayoutProvider, MicroOp, ObjectDescriptorInner, OperandKind,
-    PackClosureOp, SizedSlot, UnknownOperandLayout, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    PackClosureOp, SizedSlot, UnknownOperandLayout, CLOSURE_DESCRIPTOR_ID, ENUM_DATA_OFFSET,
+    FRAME_METADATA_SIZE,
 };
-use std::fmt;
+use smallvec::SmallVec;
+use std::{fmt, ops::Range};
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -339,9 +362,15 @@ where
                 .func
                 .safe_point_layout_at(pc)
                 .map(|layout| layout.heap_ptr_offsets.as_slice());
-            instr.for_each_frame_operand(&mut |off, kind| {
-                self.check_frame_operand(Some(pc), safe_point, off, kind)
+            let mut destinations = SmallVec::<[Range<u64>; 1]>::new();
+            instr.for_each_frame_operand(&mut |off, kind, access| {
+                if let Some(width) = self.check_frame_operand(Some(pc), safe_point, off, kind) {
+                    if access.writes() && width != 0 {
+                        destinations.push(off.0 as u64..off.0 as u64 + width as u64);
+                    }
+                }
             });
+            self.check_disjoint_destinations(pc, &mut destinations);
             self.check_instruction(pc, instr);
         }
     }
@@ -390,51 +419,54 @@ where
 
     fn check_param_and_return_slots(&mut self) {
         let func = self.func;
-        // [P1]
-        if func.param_slots.len() != func.param_tys.len() {
-            fail!(
-                self,
-                None,
-                "number of param slots ({}) must equal number of param types ({})",
-                func.param_slots.len(),
-                func.param_tys.len()
-            );
-        }
-        self.check_slot_list(
+        let param_end = self.check_signature_slots(
             "param",
             &func.param_slots,
+            &func.param_tys,
             "param_region_size",
             func.param_region_size,
         );
-
-        let num_return_tys = view_type_list(func.return_tys).len();
-        // [R1]
-        if func.return_slots.len() != num_return_tys {
-            fail!(
-                self,
-                None,
-                "number of return slots ({}) must equal number of return types ({num_return_tys})",
-                func.return_slots.len()
-            );
+        // [P5]
+        if let Some(end) = param_end {
+            if end as usize != func.param_region_size {
+                fail!(
+                    self,
+                    None,
+                    "param_region_size ({}) must equal parameter signature layout size ({end})",
+                    func.param_region_size
+                );
+            }
         }
-        self.check_slot_list(
+        self.check_signature_slots(
             "return",
             &func.return_slots,
+            view_type_list(func.return_tys),
             "param_and_local_sizes_sum",
             func.param_and_local_sizes_sum,
         );
     }
 
-    /// A parameter or return slot list: every slot well-formed and within
-    /// `[0, region_end)`, slots ascending and disjoint.
-    // [P2-P4, R2-R4]
-    fn check_slot_list(
+    /// Slots match the signature's naturally aligned, contiguous layout at
+    /// base zero. Parameters and returns are checked independently because
+    /// they reuse storage. Returns the expected end, without trailing padding.
+    // [P1-P4, R1-R4]
+    fn check_signature_slots(
         &mut self,
         kind: &str,
         slots: &[SizedSlot],
+        tys: &[InternedType],
         region_name: &str,
         region_end: usize,
-    ) {
+    ) -> Option<u32> {
+        if slots.len() != tys.len() {
+            fail!(
+                self,
+                None,
+                "number of {kind} slots ({}) must equal number of {kind} types ({})",
+                slots.len(),
+                tys.len()
+            );
+        }
         for (i, slot) in slots.iter().enumerate() {
             self.check_sized_slot(None, format_args!("{kind} slot {i}"), slot);
             let end = slot.end();
@@ -447,19 +479,59 @@ where
                 );
             }
         }
-        for (i, w) in slots.windows(2).enumerate() {
-            if (w[1].offset.0 as usize) < w[0].end() {
+        let mut cursor = Some(0);
+        for (i, &ty) in tys.iter().enumerate() {
+            let Some((size, align)) = self.provider.size_and_align(ty) else {
                 fail!(
                     self,
                     None,
-                    "{kind} slots {i} and {} are not ascending and disjoint ([{}, {}) then {})",
-                    i + 1,
-                    w[0].offset.0,
-                    w[0].end(),
-                    w[1].offset.0
+                    "{kind} type {i} has no known size and alignment"
+                );
+                cursor = None;
+                continue;
+            };
+            if let Some(slot) = slots.get(i) {
+                if (slot.size, slot.align) != (size, align) {
+                    fail!(
+                        self,
+                        None,
+                        "{kind} slot {i}: size/alignment ({}, {}) != type layout ({size}, {align})",
+                        slot.size,
+                        slot.align
+                    );
+                }
+            }
+            let Some(start) = cursor else { continue };
+            match checked_packed_slot(start, size, align) {
+                Some((offset, end)) => {
+                    if let Some(slot) = slots.get(i) {
+                        if slot.offset.0 != offset {
+                            fail!(
+                                self,
+                                None,
+                                "{kind} slot {i}: offset {} != signature layout offset {offset}",
+                                slot.offset.0
+                            );
+                        }
+                    }
+                    cursor = Some(end);
+                },
+                None => {
+                    fail!(self, None, "{kind} signature layout at type {i} has invalid size/alignment or exceeds u32");
+                    cursor = None;
+                },
+            }
+        }
+        if let Some(end) = cursor {
+            if end as usize > region_end {
+                fail!(
+                    self,
+                    None,
+                    "{kind} signature layout size {end} exceeds {region_name} ({region_end})"
                 );
             }
         }
+        cursor
     }
 
     /// Slot well-formedness.
@@ -499,11 +571,19 @@ where
         self.check_pointer_offsets(None, base_offsets);
 
         // [G3]
-        if !self.func.zero_frame {
-            if let Some(off) = base_offsets
-                .iter()
-                .find(|off| off.0 as usize >= self.func.param_region_size)
-            {
+        for off in base_offsets {
+            if (off.0 as usize) < self.func.param_region_size {
+                if !range_inside_slot(off.0, PTR_SLOT.0, &self.func.param_slots, |slot| {
+                    (slot.offset.0, slot.size)
+                }) {
+                    fail!(
+                        self,
+                        None,
+                        "frame_layout pointer slot {} is not inside one parameter slot",
+                        off.0
+                    );
+                }
+            } else if !self.func.zero_frame {
                 fail!(self, None, "frame_layout names pointer slot {} beyond param_region_size ({}) but zero_frame is false", off.0, self.func.param_region_size);
             }
         }
@@ -574,8 +654,8 @@ where
 
     /// Op-specific checks beyond the operand schema.
     ///
-    /// Complexity: O(N * log(N)) in the op's operands: `VecUnpack` destinations
-    /// are sorted.
+    /// Complexity: O(N) in the op's immediate lists, except native argument
+    /// containment, which uses binary search.
     fn check_instruction(&mut self, pc: usize, instr: &MicroOp) {
         use MicroOp::*;
         match *instr {
@@ -628,7 +708,6 @@ where
             | MoveTo { .. }
             | ForceGC
             | EnumTestTag { .. }
-            | EnumBorrowVariantFieldByTag { .. }
             | EnumCheckVariant { .. } => {},
 
             // [I1]
@@ -733,7 +812,13 @@ where
             } => {
                 self.check_nonzero_size(pc, size);
                 for &offset in offsets.iter().flatten() {
+                    self.check_enum_field_offset(pc, offset);
                     self.check_offset_size(pc, offset, size);
+                }
+            },
+            EnumBorrowVariantFieldByTag { ref offsets, .. } => {
+                for &offset in offsets.iter().flatten() {
+                    self.check_enum_field_offset(pc, offset);
                 }
             },
             // [Z3]
@@ -772,11 +857,7 @@ where
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_vector_descriptor(pc, "VecPack", op.descriptor_id, op.elem_size);
             },
-            // [Z1, D1]
-            VecUnpack(ref op) => {
-                self.check_nonzero_size(pc, op.elem_size);
-                self.check_disjoint_destinations(pc, "VecUnpack", &op.dsts, op.elem_size);
-            },
+            VecUnpack(ref op) => self.check_nonzero_size(pc, op.elem_size),
 
             // [K1]
             HeapNew { descriptor_id, .. } => {
@@ -817,7 +898,7 @@ where
             },
             // [L1-L8]
             PackClosure(ref op) => self.check_pack_closure(pc, op),
-            // [L9]
+            // [L9, L10]
             CallClosure(ref op) => {
                 for (i, slot) in op.provided_args.iter().enumerate() {
                     self.check_sized_slot(
@@ -825,6 +906,15 @@ where
                         format_args!("CallClosure: provided_args[{i}]"),
                         slot,
                     );
+                    if slot.end() > self.func.param_and_local_sizes_sum {
+                        fail!(
+                            self,
+                            pc,
+                            "CallClosure: provided_args[{i}] ends at {}, beyond data region ({})",
+                            slot.end(),
+                            self.func.param_and_local_sizes_sum
+                        );
+                    }
                 }
             },
         }
@@ -875,11 +965,11 @@ where
                 "PackClosure: captured non-empty but captured_data_descriptor_id is None",
             ),
         }
-        let mut all_aligned = true;
+        let mut all_valid = true;
         // [L4]
         for (i, slot) in op.captured.iter().enumerate() {
             self.check_sized_slot(Some(pc), format_args!("PackClosure: captured[{i}]"), slot);
-            all_aligned &= is_valid_align(slot.align as usize);
+            all_valid &= slot.size > 0 && is_valid_align(slot.align as usize);
         }
         let captured_count = op.mask.count_ones() as usize;
         // [L5]
@@ -933,11 +1023,15 @@ where
         }
         // [L8]
         //
-        // Skipped when a captured alignment is invalid (already reported),
+        // Skipped when a captured size/alignment is invalid (already reported),
         // since the layout is then undefined.
-        if all_aligned {
-            let expected =
-                captured_values_size(op.captured.iter().map(|slot| (slot.size, slot.align)));
+        if all_valid {
+            let expected = op.captured.iter().try_fold(0, |cursor, slot| {
+                checked_packed_slot(cursor, slot.size, slot.align).map(|(_, end)| end)
+            });
+            let Some(expected) = expected else {
+                return self.err(pc, "PackClosure: captured layout size exceeds u32");
+            };
             if op.values_size != expected {
                 fail!(
                     self,
@@ -961,8 +1055,8 @@ where
         });
     }
 
-    /// Checks one frame operand per the [`OperandKind`] schema. `safe_point`
-    /// is the safe-point layout at the operand's pc, if any.
+    /// Checks one frame operand per the [`OperandKind`] schema and returns
+    /// its width when known. `safe_point` is the layout at its pc, if any.
     ///
     /// Complexity: O(log(N)) in the number of GC pointer slots (O6).
     // [O1-O6]
@@ -972,38 +1066,46 @@ where
         safe_point: Option<&[FrameOffset]>,
         offset: FrameOffset,
         kind: OperandKind,
-    ) {
+    ) -> Option<u32> {
         // [O2, O4, O5]
         let (width, align) = match kind.width_and_align(self.provider, self.constants) {
             Ok(wa) => wa,
             Err(UnknownOperandLayout::NoLayout(_)) => {
-                return self.err(pc, "value comparison operand type has no known layout");
+                self.err(pc, "value comparison operand type has no published layout");
+                return None;
             },
             Err(UnknownOperandLayout::NoConstant(idx)) => {
-                return fail!(
+                fail!(
                     self,
                     pc,
                     "StoreImmVec: constant pool index {} out of range",
                     idx.0
                 );
+                return None;
             },
             Err(UnknownOperandLayout::ConstantHasNoLayout(idx)) => {
-                return fail!(
+                fail!(
                     self,
                     pc,
-                    "StoreImmVec: constant {} has no known layout",
+                    "StoreImmVec: constant {} has no published layout",
                     idx.0
                 );
+                return None;
             },
         };
         self.check_access(pc, offset, width, align);
         // [O6]
-        if kind.is_scalar() {
-            self.check_not_pointer_slot(pc, safe_point, offset, width);
+        if let Some(range) = kind.non_pointer_range(self.provider, self.constants) {
+            self.check_not_pointer_slot(
+                pc,
+                safe_point,
+                offset.0 as u64 + range.start as u64..offset.0 as u64 + range.end as u64,
+            );
         }
+        Some(width)
     }
 
-    /// `[offset, offset + width)` does not intersect any pointer slot in
+    /// `range` does not intersect any pointer slot in
     /// `frame_layout` or in `safe_point`, the layout at the operand's pc.
     ///
     /// Complexity: O(log(N)) in the number of pointer slots: both lists are
@@ -1013,11 +1115,12 @@ where
         &mut self,
         pc: Option<usize>,
         safe_point: Option<&[FrameOffset]>,
-        offset: FrameOffset,
-        width: u32,
+        range: Range<u64>,
     ) {
-        let start = offset.0 as u64;
-        let end = start + width as u64;
+        let Range { start, end } = range;
+        if start == end {
+            return;
+        }
         let ptr_width = PTR_SLOT.0 as u64;
         let overlapping = |slots: &[FrameOffset]| -> Option<u32> {
             // First pointer slot ending after `start`; it overlaps iff it
@@ -1075,8 +1178,11 @@ where
         }
     }
 
-    // [O3]
+    // [O2, O3]
     fn check_value_type(&mut self, pc: usize, ty: InternedType) {
+        if self.provider.layout_by_ty(ty).is_none() {
+            self.err(pc, "value comparison type has no published layout");
+        }
         if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
             self.err(pc, "value comparison on a reference type");
         }
@@ -1085,24 +1191,17 @@ where
     /// Complexity: O(N * log(N)) in the number of destinations: they are
     /// sorted to find overlaps.
     // [D1]
-    fn check_disjoint_destinations(
-        &mut self,
-        pc: usize,
-        op: &str,
-        dsts: &[FrameOffset],
-        width: u32,
-    ) {
-        let mut sorted: Vec<u64> = dsts.iter().map(|d| d.0 as u64).collect();
-        sorted.sort_unstable();
-        if let Some(w) = sorted.windows(2).find(|w| w[0] + width as u64 > w[1]) {
+    fn check_disjoint_destinations(&mut self, pc: usize, dsts: &mut [Range<u64>]) {
+        dsts.sort_unstable_by_key(|range| range.start);
+        if let Some(w) = dsts.windows(2).find(|w| w[0].end > w[1].start) {
             fail!(
                 self,
                 pc,
-                "{op}: destinations [{}, {}) and [{}, {}) overlap",
-                w[0],
-                w[0] + width as u64,
-                w[1],
-                w[1] + width as u64
+                "destinations [{}, {}) and [{}, {}) overlap",
+                w[0].start,
+                w[0].end,
+                w[1].start,
+                w[1].end
             );
         }
     }
@@ -1151,10 +1250,9 @@ where
             // `args` is sorted by offset and non-overlapping (`NativeABI::new`),
             // so the only candidate is the last slot starting at or before
             // `off`.
-            let args = abi.args();
-            let inside_arg = args[..args.partition_point(|slot| slot.offset <= off.0)]
-                .last()
-                .is_some_and(|slot| off_end <= slot.end() as u64);
+            let inside_arg = range_inside_slot(off.0, PTR_SLOT.0, abi.args(), |slot| {
+                (slot.offset, slot.size)
+            });
             if !inside_arg {
                 fail!(
                     self,
@@ -1186,7 +1284,9 @@ where
                 callee.param_region_size
             );
         }
-        for (i, slot) in callee.return_slots.iter().enumerate() {
+        // Callees are checked before publication, so return slots are sorted
+        // and disjoint. Their final end bounds the whole list in O(1).
+        if let Some((i, slot)) = callee.return_slots.iter().enumerate().next_back() {
             let end = slot.end();
             if end > region {
                 fail!(self, pc, "CallDirect: callee return slot {i} [{}, {end}) exceeds the callee region ({region})", slot.offset.0);
@@ -1268,4 +1368,42 @@ where
             fail!(self, pc, "offset {offset} + size {size} overflows u32");
         }
     }
+
+    // [Z4]
+    fn check_enum_field_offset(&mut self, pc: usize, offset: u32) {
+        if offset < ENUM_DATA_OFFSET as u32 {
+            fail!(
+                self,
+                pc,
+                "enum field offset {offset} is below ENUM_DATA_OFFSET ({ENUM_DATA_OFFSET})"
+            );
+        }
+    }
+}
+
+/// Place a positive-sized value at its natural alignment, without final
+/// padding. Used for signature slots and captured payloads; all arithmetic
+/// stays checked in the u32 representation consumed by the micro-ops.
+fn checked_packed_slot(cursor: u32, size: u32, align: u32) -> Option<(u32, u32)> {
+    if size == 0 || !is_valid_align(align as usize) {
+        return None;
+    }
+    let offset = cursor.checked_add(align - 1)? & !(align - 1);
+    Some((offset, offset.checked_add(size)?))
+}
+
+/// Whether a range fits within one slot of a sorted, disjoint slot list.
+/// Native ABIs guarantee that ordering at construction; malformed function
+/// parameter lists are independently rejected by the signature checks.
+fn range_inside_slot<T>(
+    start: u32,
+    width: u32,
+    slots: &[T],
+    bounds: impl Fn(&T) -> (u32, u32),
+) -> bool {
+    let i = slots.partition_point(|slot| bounds(slot).0 <= start);
+    slots[..i].last().is_some_and(|slot| {
+        let (offset, size) = bounds(slot);
+        start as u64 + width as u64 <= offset as u64 + size as u64
+    })
 }
