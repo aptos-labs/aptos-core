@@ -26,38 +26,14 @@ permissions:
 
 
 jobs:
-  # Selects hosted (Azure) vs AWS. Defaults to hosted; set repo variable
-  # RUST_CI_PROVIDER=aws to fall back (no dispatch input: this workflow has none).
-  rust-ci-provider:
-    runs-on: 2cpu-gh-ubuntu24-x64
-    outputs:
-      provider: ${{ steps.select.outputs.provider }}
-    steps:
-      - id: select
-        env:
-          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
-        run: |
-          provider="${CONFIGURED_PROVIDER:-hosted}"
-          case "$provider" in
-            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
-            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
-          esac
-
   run-gas-calibration:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
-    needs: rust-ci-provider
-    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu22-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      # Hosted image provides the toolchain; verify it instead of reinstalling.
-      - uses: ./.github/actions/rust-prebuilt-setup
-        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
-        with:
-          cache-key: hosted-gas-calibration
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        if: ${{ needs.rust-ci-provider.outputs.provider != 'hosted' }}
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: install Valgrind

@@ -199,7 +199,6 @@ class WorkflowTests(unittest.TestCase):
                 "rust-consensus-only-unit-test",
                 "rust-consensus-only-smoke-test",
             ],
-            "run-gas-calibration.yaml": ["run-gas-calibration"],
         }
         for workflow, jobs in routed.items():
             doc = yaml.load(
