@@ -100,4 +100,8 @@ impl TStateView for DataStateView {
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unreachable!()
     }
+
+    fn next_version(&self) -> Version {
+        self.debugger_view.next_version()
+    }
 }
