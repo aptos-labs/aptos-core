@@ -66,6 +66,8 @@ pub enum NamedSlot {
     Home(HomeIndex),
     /// Call-interface slots, used for both passing arguments to a callee
     /// (before the call) and receiving return values (after the call).
+    /// Arguments of `Call` and results of `Call` or `CallClosure` may use
+    /// these slots; closure operands must use `Home` slots.
     /// `Transfer` overlaps with the callee's parameter/return area, so
     /// values produced directly into a `Transfer` slot avoid a copy at the
     /// call site. Displayed as `x0, x1, ...`.

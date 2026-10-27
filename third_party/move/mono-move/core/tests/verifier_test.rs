@@ -7,10 +7,10 @@ use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     interner::{InternedModuleId, ModuleId},
     types::{InternedType, EMPTY_TYPE_LIST},
-    verify_function, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
-    ObjectDescriptor, ObjectDescriptorTable, SortedSafePointEntries, ValueLayout,
-    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    verify_function, CallClosureOp, Code, CodeOffset as CO, DescriptorId, DescriptorProvider,
+    FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId,
+    LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SizedSlot,
+    SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// A descriptor table paired with an empty layout provider, to satisfy the
@@ -664,4 +664,45 @@ fn heap_new_rejects_vector_descriptor() {
     assert!(errors
         .iter()
         .any(|e| e.message.contains("not a Struct or Enum")));
+}
+
+/// `CallClosure` operands must lie in the data region `[0, 16)`: metadata is
+/// `[16, 40)` and the callee region `[40, 56)`.
+#[test]
+fn call_closure_operands_confined_to_data_region() {
+    let errors_for = |closure_src: u32, arg_offset: u32| {
+        let func = Function {
+            code: Code::from_vec(vec![
+                MicroOp::CallClosure(Box::new(CallClosureOp {
+                    closure_src: FO(closure_src),
+                    provided_args: vec![SizedSlot {
+                        offset: FO(arg_offset),
+                        size: 8,
+                        align: 8,
+                    }],
+                })),
+                MicroOp::Return,
+            ]),
+            param_and_local_sizes_sum: 16,
+            extended_frame_size: 56,
+            ..minimal_func()
+        };
+        verify_function(&func, &trivial_descriptors())
+    };
+
+    // Both operands together fill the data region exactly.
+    let errors = errors_for(0, 8);
+    assert!(errors.is_empty(), "{errors:?}");
+
+    // Reject arguments that cross into metadata or lie in metadata or the
+    // callee region, and a closure pointer in the callee region.
+    for (closure_src, arg_offset) in [(0, 12), (0, 16), (0, 40), (40, 8)] {
+        let errors = errors_for(closure_src, arg_offset);
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.message.contains("outside the data region")),
+            "closure_src {closure_src}, arg {arg_offset}: {errors:?}"
+        );
+    }
 }

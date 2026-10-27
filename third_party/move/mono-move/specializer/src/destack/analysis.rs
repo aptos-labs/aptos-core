@@ -44,6 +44,9 @@
 //!    monotonicity together make reverse-order emit provably safe by
 //!    structural reasoning, with no appeal to bytecode stack semantics or
 //!    runtime cycle detection.
+//! d. These invariants cover `Call` and `CallClosure`. A closure call's
+//!    args (including the closure itself) never use Transfer slots; its rets
+//!    follow the same rules as a direct call's.
 //!
 //! [`assert_transfer_invariants`] checks all seven invariants at the end of
 //! `analyze` in debug builds.
@@ -78,11 +81,9 @@
 //! coalescing, if ever added, would need to revisit this.)
 
 use crate::stackless_exec_ir::{
-    instr_utils::{clobbers_transfer, for_each_def, for_each_use, mut_local_borrow_target},
+    instr_utils::{for_each_def, for_each_use, mut_local_borrow_target, transfer_rets_and_args},
     HomeIndex, Instr, SsaSlot, TransferPosition,
 };
-#[cfg(debug_assertions)]
-use crate::validate::transfer::check_call_structural_invariants;
 use shared_dsa::{UnorderedMap, UnorderedSet};
 use smallbitvec::SmallBitVec;
 #[cfg(debug_assertions)]
@@ -115,9 +116,8 @@ pub(crate) struct BlockAnalysis {
     /// "Transfer slot invariants" for the different properties this map
     /// satisfies.
     pub transfer_precolor: UnorderedMap<SsaSlot, TransferPosition>,
-    /// Largest `max(args.len(), rets.len())` across all calls in the
-    /// block — i.e., the number of distinct `Transfer(j)` positions any
-    /// call uses.
+    /// Transfer position capacity for this block: the largest
+    /// `max(args.len(), rets.len())` across calls, excluding closure arguments.
     pub max_transfer_positions: u16,
 }
 
@@ -136,8 +136,8 @@ impl BlockAnalysis {
     /// `transfer_precolor`) are pairwise disjoint — `coalesce_to_local`
     /// skips ValueIds already in `stloc_targets`, and `transfer_precolor` skips
     /// ValueIds already in either earlier map. (`coalesce_to_local` ∩ call
-    /// rets is empty by SSA: a ValueId defined by a `Call` is never the
-    /// `dst` of `Copy`/`Move { dst: value_id, src: Home }`.)
+    /// rets is empty by SSA: a ValueId defined by a `Call` or `CallClosure`
+    /// is never the `dst` of `Copy`/`Move { dst: value_id, src: Home }`.)
     pub(crate) fn analyze(
         instrs: &[Instr<SsaSlot>],
         is_bitwise_copy_value: impl Fn(u16) -> bool,
@@ -186,14 +186,13 @@ impl BlockAnalysis {
             }
         }
 
-        // Call positions — any instruction that clobbers transfer slots.
-        // Already sorted since we iterate in order.
-        let call_positions: Vec<usize> = instrs
+        // Call boundaries and Transfer operands in instruction order,
+        // keeping `call_positions` sorted.
+        let (call_positions, call_operands): (Vec<usize>, Vec<(&[SsaSlot], &[SsaSlot])>) = instrs
             .iter()
             .enumerate()
-            .filter(|(_, ins)| clobbers_transfer(ins))
-            .map(|(i, _)| i)
-            .collect();
+            .filter_map(|(i, instr)| Some((i, transfer_rets_and_args(instr)?)))
+            .unzip();
 
         // StLoc look-ahead: map `ValueId` → Home slot when the `ValueId` is produced
         // and later stored to that Home slot, with the Home slot not accessed
@@ -342,11 +341,7 @@ impl BlockAnalysis {
         // cap. `SmallBitVec` keeps storage inline for typical small calls and
         // only spills to the heap for genuinely wide signatures.
         let mut args_claim: Vec<SmallBitVec> = Vec::with_capacity(call_positions.len());
-        for &call_pos in &call_positions {
-            let Some((rets, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
-                args_claim.push(SmallBitVec::new());
-                continue;
-            };
+        for (&call_pos, &(rets, args)) in call_positions.iter().zip(&call_operands) {
             let call_width = std::cmp::max(args.len(), rets.len()) as u16;
             max_transfer_positions = max_transfer_positions.max(call_width);
             let mut bits = SmallBitVec::from_elem(args.len(), false);
@@ -366,14 +361,16 @@ impl BlockAnalysis {
         // walk, but the args walk must still skip them (else it would
         // re-insert an args-side precolor and undo the cascade).
         let mut handled_rets: UnorderedSet<SsaSlot> = UnorderedSet::new();
-        for (call_idx, &call_pos) in call_positions.iter().enumerate() {
-            let Some((rets, _)) = direct_call_rets_and_args(&instrs[call_pos]) else {
-                continue;
-            };
-            let next_call_opt = call_positions.get(call_idx + 1).copied();
-            let next_call = next_call_opt.unwrap_or(instrs.len());
-            let next_args = next_call_opt
-                .and_then(|pos| direct_call_rets_and_args(&instrs[pos]).map(|(_, args)| args));
+        for (call_idx, (&call_pos, &(rets, _))) in
+            call_positions.iter().zip(&call_operands).enumerate()
+        {
+            let next_call = call_positions
+                .get(call_idx + 1)
+                .copied()
+                .unwrap_or(instrs.len());
+            let next_args: &[SsaSlot] = call_operands
+                .get(call_idx + 1)
+                .map_or(&[], |&(_, args)| args);
             let next_args_claim = args_claim.get(call_idx + 1);
 
             let mut found_home = false;
@@ -403,8 +400,8 @@ impl BlockAnalysis {
                 // `args_walk_eligible(next_args[j], next_call_pos)`
                 // result from the prep walk; no need to recompute
                 // the predicate here.
-                let target: Option<TransferPosition> = if let Some(args) = next_args
-                    && let Some(j) = args.iter().position(|a| *a == value_id)
+                let target: Option<TransferPosition> = if let Some(j) =
+                    next_args.iter().position(|a| *a == value_id)
                     && bit(next_args_claim, j)
                 {
                     Some(TransferPosition(j as u16))
@@ -431,11 +428,7 @@ impl BlockAnalysis {
         }
 
         // Args walk — args fill-in.
-        for (call_idx, &call_pos) in call_positions.iter().enumerate() {
-            let Some((_, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
-                continue;
-            };
-            let claim = &args_claim[call_idx];
+        for (&(_, args), claim) in call_operands.iter().zip(&args_claim) {
             for (j, &value_id) in args.iter().enumerate() {
                 if !claim
                     .get(j)
@@ -454,6 +447,7 @@ impl BlockAnalysis {
         assert_transfer_invariants(
             instrs,
             &call_positions,
+            &call_operands,
             &transfer_precolor,
             &def_pos,
             &live_end,
@@ -491,11 +485,11 @@ fn bit(bv: Option<&SmallBitVec>, j: usize) -> bool {
 fn next_arg_lifetime_overlaps(
     value_id: SsaSlot,
     k: u16,
-    next_args: Option<&[SsaSlot]>,
+    next_args: &[SsaSlot],
     def_pos: &UnorderedMap<SsaSlot, usize>,
     live_end: &UnorderedMap<SsaSlot, usize>,
 ) -> bool {
-    let Some(other) = next_args.and_then(|a| a.get(k as usize).copied()) else {
+    let Some(&other) = next_args.get(k as usize) else {
         return false;
     };
     let a_def = *def_pos
@@ -513,24 +507,26 @@ fn next_arg_lifetime_overlaps(
     !(a_lu <= b_def || b_lu <= a_def)
 }
 
-/// Verifies the seven Transfer invariants from the file header on the
-/// just-built `transfer_precolor` map. Per-call invariants (arg
-/// positionality, return monotonicity, pass-through contiguity, return
-/// Transfer prefix, and the per-ValueId lifetime checks for block-local
-/// lifetime, single use, not live across calls) are checked in a
-/// single forward pass over `call_positions`. A final cross-call pass
-/// checks slot-sharing — the no-overlapping-lifetimes property is
-/// implied by arg positionality + return monotonicity + single use +
-/// not live across calls but checked directly to localize any upstream
-/// regression that violates it.
+/// Checks the seven Transfer invariants above on `transfer_precolor` and
+/// rejects Transfer-bound closure operands. Per-call checks cover structure
+/// and lifetimes; a final pass checks that values sharing a slot have disjoint
+/// lifetimes. The latter follows from argument positionality, return monotonicity,
+/// single use, and lifetimes that do not span calls; checking it directly helps
+/// locate violations.
 #[cfg(debug_assertions)]
 fn assert_transfer_invariants(
     instrs: &[Instr<SsaSlot>],
     call_positions: &[usize],
+    call_operands: &[(&[SsaSlot], &[SsaSlot])],
     transfer_precolor: &UnorderedMap<SsaSlot, TransferPosition>,
     def_pos: &UnorderedMap<SsaSlot, usize>,
     live_end: &UnorderedMap<SsaSlot, usize>,
 ) {
+    use crate::{
+        stackless_exec_ir::instr_utils::for_each_value_use,
+        validate::transfer::check_call_structural_invariants,
+    };
+
     let is_transfer = |value_id: &SsaSlot| transfer_precolor.contains_key(value_id);
     let lifetime_of = |value_id: &SsaSlot| -> (usize, usize) {
         let dp = *def_pos
@@ -542,10 +538,9 @@ fn assert_transfer_invariants(
         (dp, lu)
     };
 
-    for (call_idx, &call_pos) in call_positions.iter().enumerate() {
-        let Some((rets, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
-            continue;
-        };
+    for (call_idx, (&call_pos, &(rets, args))) in
+        call_positions.iter().zip(call_operands).enumerate()
+    {
         let prev_call = (call_idx > 0).then(|| call_positions[call_idx - 1]);
         let next_call = call_positions
             .get(call_idx + 1)
@@ -564,6 +559,17 @@ fn assert_transfer_invariants(
                 .map(|position| position.0)
         })
         .unwrap_or_else(|e| panic!("[transfer structural invariant] {e}"));
+
+        // Only direct-call arguments may use Transfer slots;
+        // closure operands must use Home slots.
+        for_each_value_use(&instrs[call_pos], |slot| {
+            assert!(
+                !is_transfer(&slot) || args.contains(&slot),
+                "[in-place args] call at {} reads Transfer-bound ValueId {:?} outside its in-place args",
+                call_pos,
+                slot,
+            );
+        });
 
         // Pass-through contiguity: among args of `call_pos` defined at the
         // immediately-preceding call and bound to Transfer, the positions form
@@ -667,10 +673,7 @@ fn assert_transfer_invariants(
     // deterministic.
     let mut by_position: BTreeMap<TransferPosition, Vec<SsaSlot>> = BTreeMap::new();
     let mut seen_value_ids: UnorderedSet<SsaSlot> = UnorderedSet::new();
-    for &call_pos in call_positions {
-        let Some((rets, args)) = direct_call_rets_and_args(&instrs[call_pos]) else {
-            continue;
-        };
+    for &(rets, args) in call_operands {
         for value_id in rets.iter().chain(args.iter()) {
             if !seen_value_ids.insert(*value_id) {
                 continue;
@@ -703,20 +706,6 @@ fn assert_transfer_invariants(
                 );
             }
         }
-    }
-}
-
-/// Returns `(rets, args)` for `Call`. `CallClosure` is
-/// intentionally excluded: Transfer precoloring leaves closure calls alone
-/// (they still count as call boundaries via `clobbers_transfer`, just not
-/// destructured for slot inspection). For the boundary-wide counterpart
-/// covering both variants, see `instr_utils::call_boundary_rets_and_args`.
-#[inline]
-fn direct_call_rets_and_args(instr: &Instr<SsaSlot>) -> Option<(&[SsaSlot], &[SsaSlot])> {
-    if let Instr::Call { data } = instr {
-        Some((&data.rets, &data.args))
-    } else {
-        None
     }
 }
 

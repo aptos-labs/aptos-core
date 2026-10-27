@@ -733,21 +733,12 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             MicroOp::SlotBorrow { dst, local } => {
-                // Forms a fat pointer to `local` without dereferencing it, so only
-                // the base offset is checked: `local` must lie in the data region
-                // [0, param_and_local_sizes_sum), not metadata or the callee region.
-                // The op carries no size, so the borrowed value's full extent
-                // (`local + size`) is not bounds-checked here: a base in-region
-                // whose value extends past the region end is not rejected.
-                if local.0 as usize >= self.func.param_and_local_sizes_sum {
-                    self.err(
-                        Some(pc),
-                        format!(
-                            "SlotBorrow local {} is outside the data region [0, {})",
-                            local.0, self.func.param_and_local_sizes_sum
-                        ),
-                    );
-                }
+                // SlotBorrow forms a fat pointer without dereferencing `local`.
+                // Check its base as a one-byte data-region access, excluding
+                // metadata and the callee region. The op carries no size, so a
+                // borrowed value extending past the data region is not rejected
+                // if its base is in bounds.
+                self.check_data_region_access(pc, "SlotBorrow local", local, 1);
                 self.check_frame_access(Some(pc), dst, 16);
             },
 
@@ -1047,12 +1038,13 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
     }
 
     fn verify_call_closure(&mut self, pc: usize, op: &CallClosureOp) {
-        // Closure source: 8-byte heap pointer slot.
-        self.check_frame_access_8(pc, op.closure_src);
-        // Provided arg sources: each (offset, size) in-bounds.
+        // Operands must stay in the caller's data region: parameter writes
+        // must not overwrite arguments still to be read, and the closure
+        // pointer must remain in its GC root slot for re-reading after resolution.
+        self.check_data_region_access(pc, "CallClosure closure", op.closure_src, 8);
         for slot in &op.provided_args {
             self.check_nonzero_size(pc, slot.size);
-            self.check_frame_access(Some(pc), slot.offset, slot.size);
+            self.check_data_region_access(pc, "CallClosure provided arg", slot.offset, slot.size);
         }
     }
 
@@ -1119,6 +1111,24 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 );
                 0
             },
+        }
+    }
+
+    /// Checks that `[offset, offset + size)` fits in the data region
+    /// `[0, param_and_local_sizes_sum)`, excluding metadata and the callee region.
+    fn check_data_region_access(&mut self, pc: usize, what: &str, offset: FrameOffset, size: u32) {
+        let start = offset.0 as usize;
+        let data_end = self.func.param_and_local_sizes_sum;
+        if start
+            .checked_add(size as usize)
+            .is_none_or(|end| end > data_end)
+        {
+            self.err(
+                Some(pc),
+                format!(
+                    "{what} at offset {start} (size {size}) is outside the data region [0, {data_end})"
+                ),
+            );
         }
     }
 

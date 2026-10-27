@@ -41,8 +41,8 @@ fun caller(): u64 {
     0: r1 := ld_u64 7 @0
     1: r0 := pack_closure g, 10, [r1] @1
     2: [r1, r2, r3] := call three_rets, [] @3
-    3: [r2] := call_closure [|u64, u64|(u64) has drop], [r1, r2, r0] @6
-    4: ret [r2] @7
+    3: [x0] := call_closure [|u64, u64|(u64) has drop], [r1, r2, r0] @6
+    4: ret [x0] @7
 }
 === micro-ops ===
 // module 0x66::capture_middle_interleave
@@ -71,7 +71,7 @@ fun g() {
 
 fun caller() {
   frame_data_size: 32
-  entry_gas: 293
+  entry_gas: 267
   code:
     0: StoreImm8 [8] <- #7 @0
     1: PackClosure [0] <- func_ref=Unresolved(g), mask=10, captured_desc=0, captured=[[8](8)] @1
@@ -80,9 +80,8 @@ fun caller() {
     4: Move8 [16] <- [64] @3
     5: Move8 [24] <- [72] @3
     6: CallClosure closure=[0], provided_args=[[8](8), [16](8)] @6
-    7: Move8 [16] <- [56] @6
-    8: Move8 [0] <- [16] @7
-    9: Return @7
+    7: Move8 [0] <- [56] @7
+    8: Return @7
   safe_point_layouts:
     1: []
 }

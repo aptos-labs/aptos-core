@@ -2215,7 +2215,7 @@ impl<'a> LoweringState<'a> {
 
     /// Advance the Transfer state machine after `instr` has been lowered.
     fn commit_transfer_bindings_after(&mut self, instr: &Instr<NamedSlot>) {
-        // Calls manage their own Transfer state in `lower_call`.
+        // Calls manage their own Transfer state in `bind_call_returns`.
         if !clobbers_transfer(instr) {
             // Release Transfer bindings consumed by this instr's value uses.
             // Place uses leave the slot live, so their binding

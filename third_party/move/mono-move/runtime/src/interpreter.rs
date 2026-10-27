@@ -3325,11 +3325,9 @@ impl InterpreterContext<'_> {
             // alignment — the same layout `exec_pack_closure` wrote and the
             // descriptor records (see `next_captured_value_offset`).
             //
-            // Interleaving is safe: captured writes land at/above `new_fp`,
-            // while provided-arg sources are always below it — the destacker
-            // never leaves a closure call's provided args in the callee
-            // region. The ranges are disjoint, so a captured write cannot
-            // clobber a provided source read on a later iteration.
+            // Closure operands use Home slots in the caller's data region, below
+            // `new_fp`. Callee parameter writes start at `new_fp`, so they cannot
+            // overwrite provided arguments before they are read.
             let mut cursor = 0usize;
             let mut provided_idx = 0usize;
             for (i, pslot) in callee.param_slots.iter().enumerate() {
