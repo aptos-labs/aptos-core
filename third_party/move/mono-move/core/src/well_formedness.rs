@@ -332,6 +332,7 @@ where
         }
 
         // [O1-O6]
+        //
         // Operand accesses through the schema, then the op-specific checks.
         for (pc, instr) in code.iter().enumerate() {
             let safe_point = self
@@ -532,6 +533,7 @@ where
             // [G6]
             self.check_pointer_offsets(Some(co), sp_offsets);
             // [G7]
+            //
             // `base` is strictly increasing (G2), so each safe-point offset is
             // one binary search. If `base` is unsorted that is already
             // reported, and a duplicate missed here is moot.
@@ -735,6 +737,7 @@ where
                 }
             },
             // [Z3]
+            //
             // The schema reports the saturated slot; this reports the overflow
             // itself.
             DeepCopyHeapPtrs { base, ref offsets } => {
@@ -929,6 +932,7 @@ where
             ClosureFuncRef::Unresolved(_) => {},
         }
         // [L8]
+        //
         // Skipped when a captured alignment is invalid (already reported),
         // since the layout is then undefined.
         if all_aligned {
@@ -1237,8 +1241,8 @@ where
         }
     }
 
-    // [J1]
     // TODO(metering): validate branch gas fields are populated.
+    // [J1]
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.ops().len();
         if (target.0 as usize) >= code_len {
