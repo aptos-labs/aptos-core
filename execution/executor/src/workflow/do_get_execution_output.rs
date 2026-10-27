@@ -585,6 +585,10 @@ impl TStateView for WriteSetStateView<'_> {
     fn get_usage(&self) -> aptos_types::state_store::StateViewResult<StateStorageUsage> {
         unreachable!("Not supposed to be called on WriteSetStateView.")
     }
+
+    fn next_version(&self) -> Version {
+        unreachable!("Not supposed to be called on WriteSetStateView.")
+    }
 }
 
 #[cfg(test)]

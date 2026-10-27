@@ -78,8 +78,8 @@ impl StateCheckpointOutput {
 pub struct Inner {
     pub state_summary: LedgerStateSummary,
     pub state_checkpoint_hashes: Vec<Option<HashValue>>,
-    // TODO(HotState): this is currently None in testnet and mainnet, since we don't run hot state
-    // root hashes in consensus or state-sync yet.
+    /// Per-transaction hot state root, laid out like `state_checkpoint_hashes`.
+    /// `None` (the whole option) unless the hot-state-root-in-txn-info feature is on.
     pub hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
     /// Native-position summary after this chunk (latest + last_checkpoint),
     /// computed at execution time, persisted at commit without recompute.

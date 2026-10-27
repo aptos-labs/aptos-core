@@ -15,7 +15,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
     },
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{BlockExecutableTransaction as Transaction, Version},
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
@@ -67,6 +67,10 @@ where
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+        unreachable!("Not used in tests");
+    }
+
+    fn next_version(&self) -> Version {
         unreachable!("Not used in tests");
     }
 }
@@ -123,6 +127,10 @@ where
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+        unreachable!("Not used in tests");
+    }
+
+    fn next_version(&self) -> Version {
         unreachable!("Not used in tests");
     }
 }

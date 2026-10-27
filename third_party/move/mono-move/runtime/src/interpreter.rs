@@ -17,10 +17,10 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
+        read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr, read_int,
         read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
-        write_bool, write_enum_tag, write_fat_ptr, write_ptr, write_u32, write_u64, write_u8,
-        MemoryRegion,
+        write_bool, write_enum_tag, write_fat_ptr, write_int, write_ptr, write_u32, write_u64,
+        write_u8, MemoryRegion,
     },
     native_context::{ProductionNativeContext, ProductionNativeRegistry},
     types::{
@@ -1191,41 +1191,6 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
 // ---------------------------------------------------------------------------
 // Unspecialized integer op dispatchers
 // ---------------------------------------------------------------------------
-
-/// Read a `T`-sized value from `base + byte_offset`. Aligned access for
-/// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
-///
-/// TODO(correctness): this reads with native endianness, but `StoreImm*` writes immediates
-/// as little-endian bytes. Consistent on LE hosts (all current targets); force
-/// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
-///
-/// # Safety
-/// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
-/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
-#[inline(always)]
-unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
-    let ptr = unsafe { base.add(byte_offset.into()) as *const T };
-    unsafe {
-        if std::mem::align_of::<T>() <= MAX_ALIGN {
-            ptr.read()
-        } else {
-            ptr.read_unaligned()
-        }
-    }
-}
-
-/// Mirror of [`read_int`] for writes.
-#[inline(always)]
-unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: T) {
-    let ptr = unsafe { base.add(byte_offset.into()) as *mut T };
-    unsafe {
-        if std::mem::align_of::<T>() <= MAX_ALIGN {
-            ptr.write(val)
-        } else {
-            ptr.write_unaligned(val)
-        }
-    }
-}
 
 /// [`U256`]'s `Shl`/`Shr` trait impls require `Self` as the rhs.
 #[inline(always)]

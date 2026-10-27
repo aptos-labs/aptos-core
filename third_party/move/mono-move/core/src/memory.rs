@@ -141,6 +141,45 @@ pub unsafe fn write_u32(base: *mut u8, byte_offset: impl Into<usize>, val: u32) 
     unsafe { (base.add(byte_offset.into()) as *mut u32).write(val) }
 }
 
+/// Read a `T`-sized value from `base + byte_offset`. Aligned access for
+/// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
+///
+/// TODO(correctness): this reads with native endianness, but `StoreImm*` writes immediates
+/// as little-endian bytes. Consistent on LE hosts (all current targets); force
+/// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
+/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
+#[inline(always)]
+pub unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
+    let ptr = unsafe { base.add(byte_offset.into()) as *const T };
+    unsafe {
+        if std::mem::align_of::<T>() <= MAX_ALIGN {
+            ptr.read()
+        } else {
+            ptr.read_unaligned()
+        }
+    }
+}
+
+/// Mirror of [`read_int`] for writes.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid for a write of `size_of::<T>()`
+/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
+#[inline(always)]
+pub unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: T) {
+    let ptr = unsafe { base.add(byte_offset.into()) as *mut T };
+    unsafe {
+        if std::mem::align_of::<T>() <= MAX_ALIGN {
+            ptr.write(val)
+        } else {
+            ptr.write_unaligned(val)
+        }
+    }
+}
+
 /// Read a 32-byte [`AccountAddress`] starting at `byte_offset`. Reads aligned
 /// when its alignment is within [`MAX_ALIGN`], otherwise unaligned.
 ///

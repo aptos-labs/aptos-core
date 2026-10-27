@@ -7,10 +7,14 @@ use crate::{monomorphic_natives, polymorphic_natives, NativeEntry};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
+    types::is_resource_type,
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
 use std::collections::HashMap;
+
+/// The `exists_at` type argument is not a struct or enum.
+const NOT_A_RESOURCE_TYPE: u64 = 11;
 
 /// Per-transaction memo cache for derived object addresses. Pure compute
 /// optimization — the derivation is deterministic, so caching only saves work.
@@ -77,7 +81,19 @@ pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
 pub fn native_exists_at<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `address`.
     let address: AccountAddress = unsafe { ctx.arg(0)? };
-    let exists = ctx.resource_exists(address, ctx.ty_arg(0)?)?;
+
+    // Defensive, and matching V1: a non-struct `T` would reach global storage
+    // and trip an invariant violation instead of aborting. The framework's
+    // `key` bound rules it out in source, but the native cannot rely on that.
+    let ty = ctx.ty_arg(0)?;
+    if !is_resource_type(ty) {
+        return Ok(NativeStatus::Abort {
+            code: NOT_A_RESOURCE_TYPE,
+            message: Some("Object type argument must be a resource (struct) type".to_string()),
+        });
+    }
+
+    let exists = ctx.resource_exists(address, ty)?;
     // SAFETY: return 0 is `bool`.
     unsafe { ctx.set_return(0, exists)? };
     Ok(NativeStatus::Success)
