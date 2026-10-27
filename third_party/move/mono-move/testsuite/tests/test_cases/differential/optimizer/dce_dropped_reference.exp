@@ -1,0 +1,44 @@
+=== stackless ===
+// module 0x42::dce_dropped_reference
+
+fun contains(r0, r1): bool {
+  slots: params(2), locals(0), temps(2)
+    r0: &0x42::dce_dropped_reference::Maybe
+    r1: &u64
+    r2: bool
+    r3: &u64
+  code:
+  L2:
+    0: r2 := test_variant 0x42::dce_dropped_reference::Maybe@1, r0 @1
+    1: br_false L0, r2 @2
+  L1:
+    2: r2 := ld_false @7
+    3: ret [r2] @8
+  L0:
+    4: r3 := imm_borrow_variant_field Maybe::Some::inner, r0 @10
+    5: r2 := eq r3, r1 @12
+    6: ret [r2] @13
+}
+
+fun check(r0): bool {
+  slots: params(1), locals(2), temps(1), transfer(2)
+    r0: bool
+    r1: 0x42::dce_dropped_reference::Maybe
+    r2: u64
+    r3: u64
+  code:
+  L3:
+    0: br_false L0, r0 @1
+  L1:
+    1: r3 := ld_u64 7 @2
+    2: r1 := pack_variant 0x42::dce_dropped_reference::Maybe@0, [r3] @3
+  L2:
+    3: x0 := imm_borrow_loc r1 @5
+    4: r2 := ld_u64 7 @6
+    5: x1 := imm_borrow_loc r2 @8
+    6: [x0] := call contains, [x0, x1] @9
+    7: ret [x0] @10
+  L0:
+    8: r1 := pack_variant 0x42::dce_dropped_reference::Maybe@1, [] @11
+    9: branch L2 @13
+}

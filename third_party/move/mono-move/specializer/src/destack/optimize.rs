@@ -6,10 +6,10 @@
 
 use crate::stackless_exec_ir::{
     instr_utils::{
-        for_each_def, for_each_slot, for_each_use, mut_local_borrow_target, remap_all_slots_with,
-        remap_source_slots_with,
+        classify_exit, for_each_def, for_each_slot, for_each_use, mut_local_borrow_target,
+        remap_all_slots_with, remap_source_slots_with, BlockExit,
     },
-    FunctionIR, HomeIndex, Instr, ModuleIR, NamedSlot,
+    BasicBlock, FunctionIR, HomeIndex, Instr, ModuleIR, NamedSlot,
 };
 use mono_move_core::PreparedModule;
 use shared_dsa::{UnorderedMap, UnorderedSet};
@@ -171,43 +171,40 @@ fn eliminate_identity_moves(func: &mut FunctionIR, module: &PreparedModule) {
 /// Pass: Backward dead-code elimination within each basic block.
 ///
 /// Pre: after copy propagation and identity move elimination.
-/// Post: dead Copy/Move to unused slots removed.
+/// Post: dead Copy/Move instructions removed, except those with a Transfer source.
 ///
-/// Slots that appear in more than one basic block are excluded from
-/// removal — their liveness cannot be determined by block-local analysis.
+/// A definition is dead if its value has no remaining reads in the block
+/// and cannot be read after the block. A retained overwrite in the block
+/// or a slot marked dead by `live_at_some_block_end` rules out reads after
+/// block exit.
+///
+/// Each Transfer binding must be read exactly once. A Copy/Move from a
+/// Transfer slot must therefore remain even when its destination is dead.
 ///
 /// Deleting a *dead* Copy is sound for every type, including a heap-typed
 /// identity Copy kept by `eliminate_identity_moves`: a Copy's only effect
 /// is its dst slot, and dead means no instruction reads it.
 fn dead_instruction_elimination(func: &mut FunctionIR) {
-    // Pre-scan: identify Home slots that appear in more than one block.
-    // (Transfer slots are intra-block and never cross block boundaries.)
-    let mut slot_block: UnorderedMap<NamedSlot, usize> = UnorderedMap::new();
-    let mut cross_block_slots: UnorderedSet<NamedSlot> = UnorderedSet::new();
-    for (block_id, block) in func.blocks.iter().enumerate() {
-        for instr in &block.instrs {
-            for_each_slot(instr, |r| match slot_block.get(&r) {
-                Some(&prev) if prev != block_id => {
-                    cross_block_slots.insert(r);
-                },
-                None => {
-                    slot_block.insert(r, block_id);
-                },
-                _ => {},
-            });
-        }
-    }
+    let slots = DenseSlots::of(func);
+    let live_at_some_end = live_at_some_block_end(func, slots);
+    // For each slot, the last block whose backward scan encountered a retained definition.
+    let mut rewritten_below = vec![None; slots.len()];
 
-    for block in &mut func.blocks {
+    for (block_id, block) in func.blocks.iter_mut().enumerate() {
+        // TODO(perf): if profiling identifies DCE as a bottleneck, replace these
+        // per-block hash sets with reusable arrays for slots and instruction indices.
         let mut live: UnorderedSet<NamedSlot> = UnorderedSet::new();
         let mut dead_indices: UnorderedSet<usize> = UnorderedSet::new();
 
         for (i, instr) in block.instrs.iter().enumerate().rev() {
             let is_removable = match instr {
-                Instr::Copy { dst, .. } | Instr::Move { dst, .. }
-                    if !cross_block_slots.contains(dst) =>
+                Instr::Copy { dst, src } | Instr::Move { dst, src }
+                    if !matches!(src, NamedSlot::Transfer(_)) =>
                 {
-                    !live.contains(dst)
+                    let may_be_read_after_block = slots.index(*dst).is_none_or(|index| {
+                        live_at_some_end[index] && rewritten_below[index] != Some(block_id)
+                    });
+                    !may_be_read_after_block && !live.contains(dst)
                 },
                 _ => false,
             };
@@ -217,6 +214,9 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
             } else {
                 for_each_def(instr, |d| {
                     live.remove(&d);
+                    if let Some(index) = slots.index(d) {
+                        rewritten_below[index] = Some(block_id);
+                    }
                 });
                 for_each_use(instr, |s| {
                     live.insert(s);
@@ -228,6 +228,100 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
             block
                 .instrs
                 .retain_indexed(|index, _| !dead_indices.contains(&index));
+        }
+    }
+}
+
+/// Marks slots whose value at a block end may be read, indexed by `DenseSlots`.
+///
+/// A slot is marked if a block with a predecessor reads it before defining
+/// it. This includes loop-carried values but excludes incoming parameter
+/// reads in an entry block with no predecessors. Without such a read, the
+/// slot is dead at every block end. Temporary and Transfer bindings are
+/// defined and read within one block, so they never qualify.
+fn live_at_some_block_end(func: &FunctionIR, slots: DenseSlots) -> Vec<bool> {
+    let has_predecessor = blocks_with_predecessor(&func.blocks);
+    let mut last_def_block = vec![None; slots.len()];
+    let mut live_at_some_end = vec![false; slots.len()];
+    for (block_id, block) in func.blocks.iter().enumerate() {
+        if !has_predecessor[block_id] {
+            continue;
+        }
+        for instr in &block.instrs {
+            // An instruction reads its uses before writing its defs.
+            for_each_use(instr, |slot| {
+                if let Some(index) = slots.index(slot)
+                    && last_def_block[index] != Some(block_id)
+                {
+                    live_at_some_end[index] = true;
+                }
+            });
+            for_each_def(instr, |slot| {
+                if let Some(index) = slots.index(slot) {
+                    last_def_block[index] = Some(block_id);
+                }
+            });
+        }
+    }
+    live_at_some_end
+}
+
+/// Marks blocks with an incoming branch or fallthrough edge, including self-loops.
+fn blocks_with_predecessor(blocks: &[BasicBlock<NamedSlot>]) -> Vec<bool> {
+    let num_labels = blocks
+        .iter()
+        .map(|block| block.label.0 as usize + 1)
+        .max()
+        .unwrap_or(0);
+    let mut targeted = vec![false; num_labels];
+    let mut has_predecessor = vec![false; blocks.len()];
+    for (block_id, block) in blocks.iter().enumerate() {
+        let (target, falls_through) = match classify_exit(block) {
+            BlockExit::Jump { target } => (Some(target), false),
+            BlockExit::CondJump { taken, .. } => (Some(taken), true),
+            BlockExit::FallThrough => (None, true),
+            BlockExit::Exit(_) => (None, false),
+        };
+        if let Some(target) = target
+            && let Some(flag) = targeted.get_mut(target.0 as usize)
+        {
+            *flag = true;
+        }
+        if falls_through && let Some(flag) = has_predecessor.get_mut(block_id + 1) {
+            *flag = true;
+        }
+    }
+    for (block, flag) in blocks.iter().zip(has_predecessor.iter_mut()) {
+        *flag |= targeted[block.label.0 as usize];
+    }
+    has_predecessor
+}
+
+/// Dense table layout with Home slots followed by Transfer positions.
+#[derive(Clone, Copy)]
+struct DenseSlots {
+    num_home_slots: u16,
+    num_transfer_positions: u16,
+}
+
+impl DenseSlots {
+    fn of(func: &FunctionIR) -> Self {
+        Self {
+            num_home_slots: func.num_home_slots,
+            num_transfer_positions: func.num_transfer_positions,
+        }
+    }
+
+    fn len(self) -> usize {
+        self.num_home_slots as usize + self.num_transfer_positions as usize
+    }
+
+    /// Index of `slot`; `None` if `slot` is outside the declared ranges.
+    fn index(self, slot: NamedSlot) -> Option<usize> {
+        match slot {
+            NamedSlot::Home(idx) => (idx.0 < self.num_home_slots).then_some(idx.0 as usize),
+            NamedSlot::Transfer(position) => (position.0 < self.num_transfer_positions)
+                .then_some(self.num_home_slots as usize + position.0 as usize),
         }
     }
 }

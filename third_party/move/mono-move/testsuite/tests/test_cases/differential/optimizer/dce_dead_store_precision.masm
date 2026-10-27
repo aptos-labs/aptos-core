@@ -1,0 +1,69 @@
+// RUN: publish --print(stackless)
+module 0x66::dce_dead_store_precision
+
+public fun reassign_param(a: u64, b: u64): u64
+    copy_loc a
+    ld_u64 1
+    add
+    move_loc b
+    st_loc a
+    ret
+
+public fun reassign_param_in_entry_loop(a: u64, n: u64): u64
+l0: copy_loc n
+    copy_loc a
+    add
+    st_loc n
+    copy_loc n
+    st_loc a
+    copy_loc n
+    ld_u64 100
+    le
+    br_true l0
+    move_loc n
+    ret
+
+public fun overwrite_in_loop(a: u64, b: u64): u64
+    local c: u64
+    local n: u64
+    copy_loc a
+    st_loc c
+    ld_u64 0
+    st_loc n
+l0: copy_loc n
+    copy_loc c
+    add
+    st_loc n
+    copy_loc b
+    st_loc c
+    copy_loc a
+    st_loc c
+    copy_loc n
+    ld_u64 100
+    le
+    br_true l0
+    move_loc n
+    ret
+
+public fun read_after_fallthrough(x: u64, c: bool): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    move_loc c
+    br_false l0
+    move_loc y
+    ret
+l0: ld_u64 0
+    ret
+
+// RUN: execute 0x66::dce_dead_store_precision::reassign_param --args 3, 9
+// CHECK: results: 4
+
+// RUN: execute 0x66::dce_dead_store_precision::reassign_param_in_entry_loop --args 1, 1
+// CHECK: results: 128
+
+// RUN: execute 0x66::dce_dead_store_precision::overwrite_in_loop --args 1, 7
+// CHECK: results: 101
+
+// RUN: execute 0x66::dce_dead_store_precision::read_after_fallthrough --args 5, true
+// CHECK: results: 5
