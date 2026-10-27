@@ -38,9 +38,10 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo, FrameOffset as FO,
-    Function, FunctionDefinitionIndex, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, ShiftOperand, SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    align::align_up_u32, native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo,
+    FrameOffset as FO, Function, FunctionDefinitionIndex, IntBinaryOp, IntCastOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, MicroOp, ShiftOperand, SizedSlot, SortedSafePointEntries,
+    FRAME_METADATA_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use num::BigInt;
@@ -203,31 +204,45 @@ fn operand_ty(width: usize) -> mono_move_core::types::InternedType {
     }
 }
 
-/// Builds the single-op function, with one parameter per non-empty operand.
+/// Builds a function testing one op. Parameters follow the calling convention,
+/// then byte copies place them in the fixed operand slots used by this harness.
 fn make_func(op: MicroOp, lhs_width: usize, rhs_width: usize) -> Function {
     let mut param_slots = vec![];
     let mut param_tys = vec![];
+    let mut cursor = 0;
+    let mut code = vec![];
     for (offset, width) in [(SLOT_LHS, lhs_width), (SLOT_RHS, rhs_width)] {
         if width > 0 {
+            let align = width.min(8) as u32;
+            cursor = align_up_u32(cursor, align);
             param_slots.push(SizedSlot {
-                offset: FO(offset),
+                offset: FO(cursor),
                 size: width as u32,
-                align: width.min(8) as u32,
+                align,
             });
             param_tys.push(operand_ty(width));
+            code.push(MicroOp::Move {
+                dst: FO(offset),
+                src: FO(cursor),
+                size: width as u32,
+            });
+            cursor += width as u32;
         }
     }
+    // Move rhs first: a 32-byte lhs destination overlaps rhs's incoming slot.
+    code.reverse();
+    code.extend([op, MicroOp::Return]);
     Function {
         name: GlobalArenaPtr::from_static("op"),
         module_id: crate::program_module_id!("test"),
         def_idx: FunctionDefinitionIndex(0),
-        code: Code::from_vec(vec![op, MicroOp::Return]),
+        code: Code::from_vec(code),
         entry_gas: 0,
         param_slots,
         param_tys,
         return_slots: vec![],
         return_tys: EMPTY_TYPE_LIST,
-        param_region_size: FRAME_SIZE as usize,
+        param_region_size: cursor as usize,
         param_and_local_sizes_sum: FRAME_SIZE as usize,
         extended_frame_size: FRAME_SIZE as usize + FRAME_METADATA_SIZE,
         zero_frame: false,

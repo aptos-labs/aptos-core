@@ -970,7 +970,7 @@ pub(crate) enum TopFrame<'a> {
 /// # Safety assumptions
 ///
 /// Correctness relies on the following invariants maintained by the
-/// interpreter and the micro-op verifier:
+/// interpreter and the well-formedness checker:
 ///
 /// - **Frame metadata integrity**: each frame's saved `fp`, `func_ptr`,
 ///   and `pc` are written by [`MicroOp::Return`], [`MicroOp::CallDirect`],

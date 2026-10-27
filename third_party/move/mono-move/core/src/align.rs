@@ -59,6 +59,14 @@ pub const fn checked_align_max(size: usize) -> Option<usize> {
 // u32 variant (specializer layout)
 // ---------------------------------------------------------------------------
 
+/// Whether `align` is an alignment a slot may declare: a power of two no
+/// larger than [`MAX_ALIGN`]. Also the precondition of every rounding helper
+/// in this module.
+#[inline(always)]
+pub const fn is_valid_align(align: usize) -> bool {
+    align != 0 && align.is_power_of_two() && align <= MAX_ALIGN
+}
+
 /// `u32` variant of [`align_up`].
 ///
 /// **Pre-condition:** `align` is non-zero and is a power of two.

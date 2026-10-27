@@ -7,7 +7,7 @@
 //! any slot or field offset not guaranteed to meet the accessed type's
 //! alignment must use an unaligned access instead.
 
-use crate::align::MAX_ALIGN;
+use crate::{align::MAX_ALIGN, types::PTR_SLOT};
 use move_core_types::account_address::AccountAddress;
 
 /// # Safety
@@ -82,9 +82,9 @@ pub unsafe fn write_ptr(base: *mut u8, byte_offset: impl Into<usize>, ptr: *cons
     unsafe { (base.add(byte_offset.into()) as *mut *const u8).write(ptr) }
 }
 
-/// Byte offset of the scalar `offset` half within a 16-byte fat pointer; the
-/// `base` half occupies the first 8 bytes.
-const FAT_PTR_OFFSET_HALF: usize = 8;
+/// Byte offset of the scalar `offset` half within a fat pointer; the `base`
+/// half occupies the first pointer-sized bytes.
+const FAT_PTR_OFFSET_HALF: usize = PTR_SLOT.0 as usize;
 
 /// Read a 16-byte fat pointer `(base, offset)` whose base half starts at
 /// `byte_offset`.

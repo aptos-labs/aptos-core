@@ -46,8 +46,8 @@ use crate::{
     interner::{InternedIdentifier, InternedModuleId},
     Interner,
 };
-use mono_move_alloc::GlobalArenaPtr;
-use move_core_types::ability::AbilitySet;
+use mono_move_alloc::{GlobalArenaPtr, MAX_ALIGN};
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use std::{cmp::PartialEq, fmt};
 
 // ================================================================================================
@@ -345,29 +345,52 @@ pub enum Type {
     },
 }
 
+/// Width and alignment of a slot holding a `width`-byte scalar: natural
+/// alignment capped at [`MAX_ALIGN`]. This is the layout convention every
+/// primitive follows (see `docs/memory_alignment.md`).
+pub const fn int_slot_size_and_align(width: Size) -> (Size, Alignment) {
+    let align = if width as usize <= MAX_ALIGN {
+        width
+    } else {
+        MAX_ALIGN as Alignment
+    };
+    (width, align)
+}
+
+/// Width and alignment of a heap-pointer slot: vectors, function values, and
+/// owned struct and enum pointers.
+pub const PTR_SLOT: (Size, Alignment) = int_slot_size_and_align(size_of::<*const u8>() as Size);
+
+/// Width and alignment of a reference slot: a fat pointer
+/// `(base: *mut u8, byte_offset: u64)`.
+pub const REF_SLOT: (Size, Alignment) = (2 * PTR_SLOT.0, PTR_SLOT.1);
+
+/// Width and alignment of an inline `address` or `signer` slot.
+pub const ADDRESS_SLOT: (Size, Alignment) = int_slot_size_and_align(AccountAddress::LENGTH as Size);
+
 /// In-memory slot width and alignment for the shapes whose size is intrinsic:
-/// primitives, references (16-byte fat pointers), and vectors and function
-/// values (8-byte heap-pointer slots). Returns [`None`] for nominal types and
-/// for type parameters.
+/// primitives, references, and vectors and function values (heap-pointer
+/// slots). Returns [`None`] for nominal types and for type parameters.
 pub fn intrinsic_slot_size_and_align(ty: &Type) -> Option<(Size, Alignment)> {
     Some(match ty {
         // Primitives.
-        Type::Bool | Type::U8 | Type::I8 => (1, 1),
-        Type::U16 | Type::I16 => (2, 2),
-        Type::U32 | Type::I32 => (4, 4),
-        Type::U64 | Type::I64 => (8, 8),
-        Type::U128 | Type::I128 => (16, 8),
-        Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 8),
+        Type::Bool | Type::U8 | Type::I8 => int_slot_size_and_align(1),
+        Type::U16 | Type::I16 => int_slot_size_and_align(2),
+        Type::U32 | Type::I32 => int_slot_size_and_align(4),
+        Type::U64 | Type::I64 => int_slot_size_and_align(8),
+        Type::U128 | Type::I128 => int_slot_size_and_align(16),
+        Type::U256 | Type::I256 => int_slot_size_and_align(32),
+        Type::Address | Type::Signer => ADDRESS_SLOT,
 
         // Vectors: pointer to the heap which stores vector metadata such as
         // length, capacity.
-        Type::Vector { .. } => (8, 8),
+        Type::Vector { .. } => PTR_SLOT,
 
-        // References are 16-byte fat pointers, 8-byte aligned.
-        Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
+        // References are fat pointers.
+        Type::ImmutRef { .. } | Type::MutRef { .. } => REF_SLOT,
 
         // Function values - TODO(completeness): for now use heap pointer values.
-        Type::Function { .. } => (8, 8),
+        Type::Function { .. } => PTR_SLOT,
 
         // Nominal size is the sum of its fields (resolved through the layout
         // table); type parameters need substitution first.
