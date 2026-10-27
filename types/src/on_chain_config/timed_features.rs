@@ -356,21 +356,20 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterPackClosureCapturedValues, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 29, 14, 0, 0)
+                .with_ymd_and_hms(2026, 10, 27, 18, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterPackClosureCapturedValues, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 11, 4, 14, 0, 0)
+                .with_ymd_and_hms(2026, 10, 30, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
-            // TODO: set actual dates instead of the following dummy ones.
             (UniformVariantFieldHandles, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 12, 31, 10, 0, 0)
+                .with_ymd_and_hms(2026, 10, 27, 18, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (UniformVariantFieldHandles, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 12, 31, 10, 0, 0)
+                .with_ymd_and_hms(2026, 10, 30, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -380,11 +379,11 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterClosureCapturedLayouts, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 29, 14, 0, 0)
+                .with_ymd_and_hms(2026, 10, 27, 18, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterClosureCapturedLayouts, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 11, 4, 14, 0, 0)
+                .with_ymd_and_hms(2026, 10, 30, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -600,5 +599,39 @@ mod test {
             mainnet_nov_15_2024.is_enabled(EntryCompatibility),
             "EntryCompatibility should be enabled on Nov 15, 2024 on mainnet"
         );
+    }
+
+    #[test]
+    fn test_v1_49_hotfix_activation_times() {
+        use TimedFeatureFlag::*;
+
+        let flags = [
+            MeterPackClosureCapturedValues,
+            UniformVariantFieldHandles,
+            MeterClosureCapturedLayouts,
+        ];
+        for (chain_id, activation_time) in [
+            (ChainId::testnet(), (2026, 10, 27, 18)),
+            (ChainId::mainnet(), (2026, 10, 30, 12)),
+        ] {
+            let activation_micros = Los_Angeles
+                .with_ymd_and_hms(
+                    activation_time.0,
+                    activation_time.1,
+                    activation_time.2,
+                    activation_time.3,
+                    0,
+                    0,
+                )
+                .unwrap()
+                .timestamp_micros() as u64;
+            let before = TimedFeaturesBuilder::new(chain_id, activation_micros - 1);
+            let at = TimedFeaturesBuilder::new(chain_id, activation_micros);
+
+            for flag in flags {
+                assert!(!before.is_enabled(flag), "{flag:?} activated early");
+                assert!(at.is_enabled(flag), "{flag:?} did not activate on time");
+            }
+        }
     }
 }
