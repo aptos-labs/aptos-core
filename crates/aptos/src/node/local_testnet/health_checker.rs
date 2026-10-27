@@ -7,8 +7,10 @@ use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{transaction_stream::get_chain_id, TransactionStreamConfig},
     postgres::processor_metadata_schema::processor_metadata::processor_status,
 };
+use aptos_retrier::ExponentWithLimitDelay;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
+use futures::FutureExt;
 use reqwest::Url;
 use serde::Serialize;
 use std::time::Duration;
@@ -57,11 +59,8 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
-                let backoff = backoff::ExponentialBackoff {
-                    max_elapsed_time: Some(Duration::from_secs(5)),
-                    ..Default::default()
-                };
-                backoff::future::retry(backoff, || async {
+                let strategy = ExponentWithLimitDelay::new(500, 60_000, 5_000);
+                aptos_retrier::retry_async(strategy, || {
                     let transaction_stream_config = TransactionStreamConfig {
                         indexer_grpc_data_service_address: url.clone(),
                         auth_token: Some("notused".to_string()),
@@ -76,10 +75,13 @@ impl HealthChecker {
                         transaction_filter: None,
                         backup_endpoints: Default::default(),
                     };
-                    get_chain_id(transaction_stream_config)
-                        .await
-                        .context("Failed to get chain id")?;
-                    Ok(())
+                    async move {
+                        get_chain_id(transaction_stream_config)
+                            .await
+                            .context("Failed to get chain id")?;
+                        anyhow::Ok(())
+                    }
+                    .boxed()
                 })
                 .await
                 .context("Failed to get a response from gRPC")?;

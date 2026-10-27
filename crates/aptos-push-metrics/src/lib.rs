@@ -19,6 +19,7 @@ use std::{
     thread::JoinHandle,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 use url::Url;
 
 const DEFAULT_PUSH_FREQUENCY_SECS: u64 = 15;
@@ -35,6 +36,7 @@ pub struct MetricsPusher {
 
 impl MetricsPusher {
     fn push(
+        agent: &ureq::Agent,
         push_metrics_endpoint: &str,
         api_token: Option<&str>,
         push_metrics_extra_labels: &[String],
@@ -44,20 +46,19 @@ impl MetricsPusher {
         if let Err(e) = TextEncoder::new().encode(&aptos_metrics_core::gather(), &mut buffer) {
             error!("Failed to encode push metrics: {}.", e.to_string());
         } else {
-            let mut request = ureq::post(push_metrics_endpoint);
+            let mut request = agent.post(push_metrics_endpoint);
             if let Some(token) = api_token {
-                request.set("apikey", token);
+                request = request.header("apikey", token);
             }
-            push_metrics_extra_labels.iter().for_each(|label| {
-                request.query("extra_label", label);
-            });
-            let response = request.timeout_connect(10_000).send_bytes(&buffer);
-            if !response.ok() {
-                warn!(
+            for label in push_metrics_extra_labels {
+                request = request.query("extra_label", label);
+            }
+            match request.send(&buffer) {
+                Ok(_) => {},
+                Err(e) => warn!(
                     "Failed to push metrics to {},  resp: {}",
-                    push_metrics_endpoint,
-                    response.status_text()
-                )
+                    push_metrics_endpoint, e
+                ),
             }
         }
     }
@@ -69,12 +70,24 @@ impl MetricsPusher {
         push_metrics_api_token: Option<String>,
         push_metrics_extra_labels: Vec<String>,
     ) {
+        let agent = ureq::Agent::config_builder()
+            .tls_config(
+                TlsConfig::builder()
+                    .provider(TlsProvider::NativeTls)
+                    .root_certs(RootCerts::PlatformVerifier)
+                    .build(),
+            )
+            .proxy(None)
+            .timeout_connect(Some(Duration::from_secs(10)))
+            .build()
+            .new_agent();
         while quit_receiver
             .recv_timeout(Duration::from_secs(push_metrics_frequency_secs))
             .is_err()
         {
             // Timeout, no quit signal received.
             Self::push(
+                &agent,
                 &push_metrics_endpoint,
                 push_metrics_api_token.as_deref(),
                 &push_metrics_extra_labels,
@@ -82,6 +95,7 @@ impl MetricsPusher {
         }
         // final push
         Self::push(
+            &agent,
             &push_metrics_endpoint,
             push_metrics_api_token.as_deref(),
             &push_metrics_extra_labels,

@@ -30,7 +30,6 @@ use aptos_types::{
     },
     validator_txn::ValidatorTransaction,
 };
-use derivative::Derivative;
 use futures::future::{join5, BoxFuture, Shared};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -352,7 +351,6 @@ impl OrderedBlockWindow {
 /// or in executed state. In the ordered state, the block is waiting to be executed. In the executed state,
 /// the block has been executed and the output is available.
 /// This struct is not Cloneable, use Arc to share it.
-#[derive(Derivative)]
 pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,

@@ -25,7 +25,6 @@ use aptos_types::{
     transaction::{Transaction, TransactionPayload, Version},
 };
 use aptos_vm::VMBlockExecutor;
-use derivative::Derivative;
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -39,8 +38,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Debug)]
 pub struct PipelineConfig {
     pub generate_then_execute: bool,
     pub split_stages: bool,
@@ -48,12 +46,9 @@ pub struct PipelineConfig {
     pub allow_aborts: bool,
     pub allow_discards: bool,
     pub allow_retries: bool,
-    #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
-    #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
     pub partitioner_config: PartitionerV2Config,
-    #[derivative(Default(value = "8"))]
     pub num_sig_verify_threads: usize,
 
     pub print_transactions: bool,
@@ -63,13 +58,35 @@ pub struct PipelineConfig {
     /// for anything feature-gated at the executor (TransactionInfoV1, the
     /// position root). Off by default so existing runs don't shift.
     pub onchain_config_from_features: bool,
-    #[derivative(Default(value = "BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG"))]
     pub onchain_config: BlockExecutorConfigFromOnchain,
     /// After each block commits, check the published in-memory position
     /// index against a replay of the committed write sets. Needs
     /// `--enable-trading-native`.
     pub verify_positions_each_block: bool,
     pub position_verifier: Option<Arc<PositionIndexVerifier>>,
+}
+
+impl Default for PipelineConfig {
+    fn default() -> Self {
+        Self {
+            generate_then_execute: false,
+            split_stages: false,
+            skip_commit: false,
+            allow_aborts: false,
+            allow_discards: false,
+            allow_retries: false,
+            num_executor_shards: 0,
+            num_generator_workers: 4,
+            partitioner_config: PartitionerV2Config::default(),
+            num_sig_verify_threads: 8,
+            print_transactions: false,
+            wait_for_indexer_grpc: false,
+            onchain_config_from_features: false,
+            onchain_config: BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+            verify_positions_each_block: false,
+            position_verifier: None,
+        }
+    }
 }
 
 pub struct Pipeline<V> {
