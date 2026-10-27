@@ -43,11 +43,11 @@
 //! ## Generic structs
 
 use crate::{
-    interner::{InternedIdentifier, InternedModuleId},
+    interner::{view_module_id, InternedIdentifier, InternedModuleId},
     Interner,
 };
 use mono_move_alloc::GlobalArenaPtr;
-use move_core_types::ability::AbilitySet;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use std::{cmp::PartialEq, fmt};
 
 // ================================================================================================
@@ -135,6 +135,12 @@ pub fn view_type(ptr: InternedType) -> &'static Type {
     unsafe { ptr.as_ref_unchecked() }
 }
 
+/// Whether `ty` can name a resource in global storage, i.e. it is a struct or
+/// an enum type.
+pub fn is_resource_type(ty: InternedType) -> bool {
+    matches!(view_type(ty), Type::Nominal { .. })
+}
+
 /// Returns a reference to the arena-interned list of [`InternedType`]s
 /// behind `ptr`.
 pub fn view_type_list(ptr: InternedTypeList) -> &'static [InternedType] {
@@ -171,6 +177,25 @@ pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
         return None;
     };
     Some(*inner)
+}
+
+/// Whether `ty` is the struct or enum `address::module::name`, whatever its
+/// type arguments.
+///
+/// Inherits safety contract of [`view_type`].
+pub fn is_nominal(ty: InternedType, address: &AccountAddress, module: &str, name: &str) -> bool {
+    let Type::Nominal {
+        module_id,
+        name: ty_name,
+        ..
+    } = view_type(ty)
+    else {
+        return false;
+    };
+    let module_id = view_module_id(*module_id);
+    module_id.address() == address
+        && view_name(module_id.name()) == module
+        && view_name(*ty_name) == name
 }
 
 /// Whether a value of type `actual` may be used where `expected` is required.

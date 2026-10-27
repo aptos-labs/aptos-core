@@ -42,12 +42,12 @@ pub fn native_new_table_handle<C: NativeContext>(ctx: &C) -> VMResult<NativeStat
 /// Shared helper that
 /// - Reads the table handle (arg 0, a `&[mut] Table`)
 /// - Reads the key (arg 1) and serializes it
-fn handle_and_key<C: NativeContext>(ctx: &C) -> VMResult<(Ref<'_, TableHandle>, Vec<u8>)> {
+fn handle_and_key<C: NativeContext>(ctx: &C) -> VMResult<(TableHandle, Vec<u8>)> {
     // SAFETY: arg 0 is `&[mut] Table<K, V>`, which has the same representation
     // as `&TableHandle` — its single `handle` field.
     let handle: Ref<TableHandle> = unsafe { ctx.arg(0)? };
     let key = ctx.bcs_serialize_arg(1, ctx.ty_arg(0)?)?;
-    Ok((handle, key))
+    Ok((handle.get(), key))
 }
 
 /// `0x1::table::add_box<K, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>)`
@@ -60,7 +60,7 @@ pub fn native_add_box<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
         .ok_or_else(|| native_invariant_violation("add_box: missing value descriptor".into()))?;
     // Arg 2 is the `Box<V>` value; box it onto the heap before storing it.
     let value = ctx.box_arg(2, descriptor)?;
-    if ctx.table_add(handle.get(), &key, value, ctx.ty_arg(2)?)? {
+    if ctx.table_add(handle, &key, value, ctx.ty_arg(2)?)? {
         Ok(NativeStatus::Success)
     } else {
         Ok(NativeStatus::Abort {
@@ -74,7 +74,7 @@ pub fn native_add_box<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
 /// the entry is missing.
 fn borrow_box<C: NativeContext>(ctx: &C, mutable: bool) -> VMResult<NativeStatus> {
     let (handle, key) = handle_and_key(ctx)?;
-    match ctx.table_borrow(handle.get(), &key, mutable, ctx.ty_arg(2)?)? {
+    match ctx.table_borrow(handle, &key, mutable, ctx.ty_arg(2)?)? {
         // SAFETY: return 0 is the `&[mut] Box<V>` reference.
         Some(r) => unsafe { ctx.set_return(0, r) }.map(|()| NativeStatus::Success),
         None => Ok(NativeStatus::Abort {
@@ -103,7 +103,7 @@ pub fn native_borrow_box_mut<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus
 // TODO(metering): charge gas.
 pub fn native_contains_box<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let (handle, key) = handle_and_key(ctx)?;
-    let exists = ctx.table_contains(handle.get(), &key, ctx.ty_arg(2)?)?;
+    let exists = ctx.table_contains(handle, &key, ctx.ty_arg(2)?)?;
     // SAFETY: return 0 is `bool`.
     unsafe { ctx.set_return(0, exists)? };
     Ok(NativeStatus::Success)
@@ -114,7 +114,7 @@ pub fn native_contains_box<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> 
 // TODO(metering): charge gas.
 pub fn native_remove_box<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let (handle, key) = handle_and_key(ctx)?;
-    match ctx.table_remove(handle.get(), &key, ctx.ty_arg(2)?)? {
+    match ctx.table_remove(handle, &key, ctx.ty_arg(2)?)? {
         Some(value) => {
             let size = ctx.return_size(0)?;
             // SAFETY: the entry was boxed from a `Box<V>` value, so its payload

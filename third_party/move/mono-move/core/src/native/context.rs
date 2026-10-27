@@ -7,7 +7,9 @@ use super::{
     extension::NativeExtension,
     value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector},
 };
-use crate::{interner::InternedModuleId, types::InternedType, DescriptorId, VMResult};
+use crate::{
+    interner::InternedModuleId, types::InternedType, DescriptorId, FormatOptions, VMResult,
+};
 use core::{cell::RefMut, cmp::Ordering};
 use move_core_types::account_address::AccountAddress;
 
@@ -230,6 +232,26 @@ pub trait NativeContext {
     /// live for the duration of the call.
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering>;
 
+    /// Renders the value of type `ty` at `base` as text.
+    ///
+    /// Never allocates on the VM heap, so callers may hold pointers into it
+    /// across the call.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` that stays
+    /// live for the duration of the call.
+    unsafe fn format_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+        options: &FormatOptions,
+    ) -> VMResult<String>;
+
+    /// Byte offset of field `i` of the struct `ty`, or `None` when `ty` is not
+    /// a struct with that many fields.
+    fn field_offset(&self, ty: InternedType, i: usize) -> VMResult<Option<u32>>;
+
     /// Builds an enum value with variant `tag` and payload `value`, tagged with
     /// `descriptor` for GC tracing, and returns an owned handle. Pass `()` for a
     /// fieldless variant.
@@ -247,10 +269,25 @@ pub trait NativeContext {
     ) -> VMResult<Boxed<'a, Opaque>>;
 
     /// Whether a resource of type `ty` exists at `address` in global storage.
+    ///
+    /// `ty` must satisfy [`is_resource_type`](crate::types::is_resource_type):
+    /// resolving the resource group of anything else is an invariant violation.
     //
     // TODO(cleanup): see if the specializer can lower the caller (object::exists_at) to
     // the `Exists` micro-op directly, dropping this native path.
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool>;
+
+    /// Borrows the resource of type `ty` at `address`, returning a reference to
+    /// it. Returns `None` if the resource does not exist.
+    ///
+    /// `ty` must satisfy [`is_resource_type`](crate::types::is_resource_type):
+    /// resolving the resource group of anything else is an invariant violation.
+    fn resource_borrow(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+        mutable: bool,
+    ) -> VMResult<Option<Ref<'_, Opaque>>>;
 
     /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>>;
@@ -273,7 +310,7 @@ pub trait NativeContext {
     /// Whether a table entry exists at `(handle, key)`.
     fn table_contains(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value_ty: InternedType,
     ) -> VMResult<bool>;
@@ -282,7 +319,7 @@ pub trait NativeContext {
     /// Returns `None` if the entry does not exist.
     fn table_borrow(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         mutable: bool,
         value_ty: InternedType,
@@ -292,7 +329,7 @@ pub trait NativeContext {
     /// `key`. Returns false if an entry already exists at `key`.
     fn table_add(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value: Boxed<'_, Opaque>,
         value_ty: InternedType,
@@ -302,7 +339,7 @@ pub trait NativeContext {
     /// boxed object. Returns `None` if the entry does not exist.
     fn table_remove(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value_ty: InternedType,
     ) -> VMResult<Option<Boxed<'_, Opaque>>>;

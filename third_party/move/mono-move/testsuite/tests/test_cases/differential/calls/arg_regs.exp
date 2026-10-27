@@ -236,12 +236,12 @@ fun add_two() {
 }
 
 fun swap() {
-  frame_data_size: 24
+  frame_data_size: 16
   entry_gas: 106
   code:
-    0: Move8 [16] <- [8] @2
+    0: Move8 [40] <- [8] @2
     1: Move8 [8] <- [0] @2
-    2: Move8 [0] <- [16] @2
+    2: Move8 [0] <- [40] @2
     3: Return @2
 }
 

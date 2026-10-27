@@ -38,7 +38,7 @@ pub(crate) struct ChunkToUpdateLedger {
     pub chunk_verifier: Option<StateSyncChunkVerifier>,
 }
 
-/// It's a two stage pipeline, fed with whole blocks unless a partial block is committed on demand:
+/// It's a two stage pipeline, fed with whole blocks:
 ///           (front)     (front)
 ///          /           /
 ///    ... | to_commit | to_update_ledger | partial_block | ---> (txn version increases)
@@ -72,7 +72,7 @@ pub struct ChunkCommitQueue {
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
     /// Transactions after the last block end, held back until the next chunk completes the
-    /// block, or they are committed on demand.
+    /// block.
     partial_block: Option<TransactionChunk>,
 }
 
