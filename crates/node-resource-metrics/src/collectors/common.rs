@@ -8,9 +8,23 @@ use prometheus::{
     histogram_opts,
     proto::MetricFamily,
 };
+use std::collections::HashSet;
+use std::hash::Hash;
 use std::time::Instant;
 
 pub const NAMESPACE: &str = "node";
+
+/// Keep the first item for each key in an iterator.
+pub(crate) fn first_by_key<T, K>(
+    items: impl IntoIterator<Item = T>,
+    mut key: impl FnMut(&T) -> K,
+) -> impl Iterator<Item = T>
+where
+    K: Eq + Hash,
+{
+    let mut seen = HashSet::new();
+    items.into_iter().filter(move |item| seen.insert(key(item)))
+}
 
 pub static LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
@@ -59,5 +73,21 @@ impl Drop for MeasureLatency {
         LATENCY
             .with_label_values(&[&self.name])
             .observe(elapsed as f64);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::first_by_key;
+
+    #[test]
+    fn first_by_key_keeps_one_item_per_key() {
+        let actual: Vec<_> = first_by_key(
+            [("/", "8:0"), ("/mnt/a", "8:0"), ("/mnt/b", "8:16")],
+            |(_, device)| *device,
+        )
+        .collect();
+
+        assert_eq!(actual, vec![("/", "8:0"), ("/mnt/b", "8:16")]);
     }
 }

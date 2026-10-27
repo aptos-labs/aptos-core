@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::NAMESPACE;
+use super::common::{first_by_key, NAMESPACE};
 use crate::collectors::common::MeasureLatency;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
@@ -82,35 +82,35 @@ impl Collector for DiskMetricsCollector {
         system.refresh_disks_list();
         system.refresh_disks();
 
-        system
-            .disks()
-            .iter()
-            .flat_map(|disk| {
-                let total_space = ConstMetric::new_counter(
-                    self.total_space.clone(),
-                    disk.total_space() as f64,
-                    Some(&[
-                        disk.name().to_string_lossy().into_owned(),
-                        format!("{:?}", disk.type_()),
-                        String::from_utf8_lossy(disk.file_system()).to_string(),
-                    ]),
-                )
-                .unwrap();
-                let available_space = ConstMetric::new_counter(
-                    self.available_space.clone(),
-                    disk.available_space() as f64,
-                    Some(&[
-                        disk.name().to_string_lossy().into_owned(),
-                        format!("{:?}", disk.type_()),
-                        String::from_utf8_lossy(disk.file_system()).to_string(),
-                    ]),
-                )
-                .unwrap();
+        first_by_key(
+            system.disks().iter().map(|disk| {
+                let labels = vec![
+                    disk.name().to_string_lossy().into_owned(),
+                    format!("{:?}", disk.type_()),
+                    String::from_utf8_lossy(disk.file_system()).to_string(),
+                ];
+                (disk, labels)
+            }),
+            |(_, labels)| labels.clone(),
+        )
+        .flat_map(|(disk, labels)| {
+            let total_space = ConstMetric::new_counter(
+                self.total_space.clone(),
+                disk.total_space() as f64,
+                Some(&labels),
+            )
+            .unwrap();
+            let available_space = ConstMetric::new_counter(
+                self.available_space.clone(),
+                disk.available_space() as f64,
+                Some(&labels),
+            )
+            .unwrap();
 
-                vec![total_space, available_space]
-            })
-            .flat_map(|metric| metric.collect())
-            .collect()
+            vec![total_space, available_space]
+        })
+        .flat_map(|metric| metric.collect())
+        .collect()
     }
 }
 
