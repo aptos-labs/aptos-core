@@ -6,7 +6,7 @@ use aptos_types::{
     access_path::Path,
     state_store::{
         state_key::{
-            inner::{StateKeyInner, TradingNativeKey},
+            inner::{CollateralScope, StateKeyInner, TradingNativeKey},
             StateKey,
         },
         table::TableHandle,
@@ -103,6 +103,20 @@ impl std::fmt::Display for HumanReadable<&StateKey> {
                     market,
                     account,
                 } => write!(f, "bulk_order::{}::{}::{}", exchange, market, account),
+                TradingNativeKey::Collateral {
+                    exchange,
+                    account,
+                    scope,
+                } => match scope {
+                    CollateralScope::Cross => {
+                        write!(f, "collateral::{}::{}::cross", exchange, account)
+                    },
+                    CollateralScope::Isolated { market } => write!(
+                        f,
+                        "collateral::{}::{}::isolated::{}",
+                        exchange, account, market
+                    ),
+                },
             },
         }
     }
@@ -186,6 +200,25 @@ impl FromStr for HumanReadable<StateKey> {
                     exchange, market, account,
                 )))
             },
+            ["collateral", exchange, account, "cross"] => {
+                let exchange = AccountAddress::from_str(exchange)?;
+                let account = AccountAddress::from_str(account)?;
+                Ok(HumanReadable(StateKey::collateral(
+                    exchange,
+                    account,
+                    CollateralScope::Cross,
+                )))
+            },
+            ["collateral", exchange, account, "isolated", market] => {
+                let exchange = AccountAddress::from_str(exchange)?;
+                let account = AccountAddress::from_str(account)?;
+                let market = AccountAddress::from_str(market)?;
+                Ok(HumanReadable(StateKey::collateral(
+                    exchange,
+                    account,
+                    CollateralScope::Isolated { market },
+                )))
+            },
             _ => bail!("Unknown StateKey format: {}", s),
         }
     }
@@ -210,6 +243,8 @@ fn test_state_key_roundtrip() -> Result<()> {
         "position::0x5::0x1234::0x2",
         "order::0x5::0x2::340282366920938463463374607431768211455",
         "bulk_order::0x5::0x2::0x1234",
+        "collateral::0x5::0x1234::cross",
+        "collateral::0x5::0x1234::isolated::0x2",
     ];
 
     for key in keys {

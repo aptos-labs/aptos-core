@@ -2308,6 +2308,7 @@ impl TransactionInfo {
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
         position_state_checkpoint_hash: Option<HashValue>,
+        collateral_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self::V1(TransactionInfoV1::new(
             transaction_hash,
@@ -2319,6 +2320,7 @@ impl TransactionInfo {
             status,
             auxiliary_info_hash,
             position_state_checkpoint_hash,
+            collateral_state_checkpoint_hash,
         ))
     }
 
@@ -2399,6 +2401,13 @@ impl TransactionInfo {
         match self {
             Self::V0(_) => None,
             Self::V1(v) => v.position_state_checkpoint_hash,
+        }
+    }
+
+    pub fn collateral_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.collateral_state_checkpoint_hash,
         }
     }
 
@@ -2491,7 +2500,8 @@ pub struct TransactionInfoV1 {
     /// Repurposed reserved field; `None` matches the prior BCS encoding.
     position_state_checkpoint_hash: Option<HashValue>,
     placeholder1: Option<HashValue>,
-    placeholder2: Option<HashValue>,
+    /// Repurposed reserved field; `None` matches the prior BCS encoding.
+    collateral_state_checkpoint_hash: Option<HashValue>,
     placeholder3: Option<HashValue>,
     placeholder4: Option<HashValue>,
     placeholder5: Option<HashValue>,
@@ -2510,6 +2520,7 @@ impl TransactionInfoV1 {
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
         position_state_checkpoint_hash: Option<HashValue>,
+        collateral_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -2522,7 +2533,7 @@ impl TransactionInfoV1 {
             auxiliary_info_hash,
             position_state_checkpoint_hash,
             placeholder1: None,
-            placeholder2: None,
+            collateral_state_checkpoint_hash,
             placeholder3: None,
             placeholder4: None,
             placeholder5: None,
