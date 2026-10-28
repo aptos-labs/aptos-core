@@ -40,7 +40,7 @@ pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     };
     // SAFETY: `value` is the in-frame representation of type `ty`, which is the
     // return type `T`; it is written before any further heap allocation.
-    unsafe { ctx.set_return_raw(0, &value)? };
+    unsafe { ctx.set_return_raw(0, value.as_uninit_slice())? };
     Ok(NativeStatus::Success)
 }
 

@@ -15,7 +15,7 @@ use crate::{
     },
     memory::{
         read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_enum_tag,
-        write_ptr, write_u64,
+        write_ptr, write_u64, MemoryRegion,
     },
     types::{
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
@@ -42,6 +42,7 @@ use shared_dsa::UnorderedMap;
 use std::{
     cell::{Cell, RefMut, UnsafeCell},
     cmp::Ordering,
+    mem::MaybeUninit,
     ptr::NonNull,
 };
 
@@ -200,6 +201,15 @@ impl<'a> ProductionNativeContext<'a> {
     }
 }
 
+/// Allocates an uninitialized value buffer, rejecting zero sizes because
+/// [`MemoryRegion`] requires a nonempty allocation.
+fn value_region(size: usize) -> VMResult<MemoryRegion> {
+    if size == 0 {
+        return Err(native_invariant_violation("zero-sized value".into()));
+    }
+    Ok(MemoryRegion::new_uninit(size))
+}
+
 impl NativeContext for ProductionNativeContext<'_> {
     fn num_args(&self) -> usize {
         self.abi.args().len()
@@ -276,7 +286,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(())
     }
 
-    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> VMResult<()> {
+    unsafe fn set_return_raw(&self, i: usize, bytes: &[MaybeUninit<u8>]) -> VMResult<()> {
         let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
             native_invariant_violation(format!(
                 "return index {} out of bounds (num_returns={})",
@@ -302,7 +312,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Re-audit this if new value APIs are added.
         unsafe {
             std::ptr::copy_nonoverlapping(
-                bytes.as_ptr(),
+                bytes.as_ptr().cast::<u8>(),
                 self.frame_ptr.add(slot.offset as usize),
                 bytes.len(),
             );
@@ -334,7 +344,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             })
     }
 
-    fn arg_raw(&self, i: usize) -> VMResult<Vec<u8>> {
+    fn arg_raw(&self, i: usize) -> VMResult<MemoryRegion> {
         if self.returns_started.get() {
             return Err(native_invariant_violation(format!(
                 "arg_raw({i}) called after a return value was written",
@@ -347,12 +357,19 @@ impl NativeContext for ProductionNativeContext<'_> {
                 self.abi.args().len(),
             ))
         })?;
-        // SAFETY: the ABI keeps `[offset, offset + size)` within the frame, and
-        // the caller wrote the argument's bytes there before the native ran.
-        let bytes = unsafe {
-            std::slice::from_raw_parts(self.frame_ptr.add(slot.offset as usize), slot.size as usize)
+        let region = value_region(slot.size as usize)?;
+        // SAFETY: the ABI bounds the source range to the frame. The destination
+        // is a fresh allocation of the same size, so the ranges do not overlap.
+        // `copy_nonoverlapping` preserves pointer provenance and uninitialized
+        // padding.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.frame_ptr.add(slot.offset as usize),
+                region.as_ptr(),
+                region.len(),
+            )
         };
-        Ok(bytes.to_vec())
+        Ok(region)
     }
 
     fn arg_ptr_offsets(&self, i: usize) -> VMResult<Vec<u32>> {
@@ -365,14 +382,26 @@ impl NativeContext for ProductionNativeContext<'_> {
         })?;
         // The ABI's heap-pointer offsets are frame-relative and span all args;
         // keep the ones inside this arg's slot and rebase them to the arg start.
-        Ok(self
-            .abi
+        self.abi
             .heap_ptr_offsets()
             .iter()
-            .map(|o| o.0)
-            .filter(|&o| slot.offset <= o && o < slot.offset + slot.size)
-            .map(|o| o - slot.offset)
-            .collect())
+            .map(|frame_off| frame_off.0)
+            .filter(|&frame_off| slot.offset <= frame_off && frame_off < slot.offset + slot.size)
+            .map(|frame_off| {
+                let off = frame_off - slot.offset;
+                let fits = off
+                    .checked_add(size_of::<*mut u8>() as u32)
+                    .is_some_and(|end| end <= slot.size);
+                if fits && off.is_multiple_of(align_of::<*mut u8>() as u32) {
+                    Ok(off)
+                } else {
+                    Err(native_invariant_violation(format!(
+                        "arg {i}: heap-pointer offset {off} is not a pointer slot of the {}-byte arg",
+                        slot.size,
+                    )))
+                }
+            })
+            .collect()
     }
 
     fn caller_module(&self) -> Option<InternedModuleId> {
@@ -580,7 +609,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         &self,
         vector: &Vector<'_, Opaque>,
         elem_size: u32,
-        data: &[u8],
+        data: &[MaybeUninit<u8>],
     ) -> VMResult<()> {
         if self.returns_started.get() {
             return Err(native_invariant_violation(
@@ -645,16 +674,15 @@ impl NativeContext for ProductionNativeContext<'_> {
         let rws = unsafe { &mut **self.rws.get() };
         // A heap-aliasing `data` would be invalidated by the GC the deep copies
         // below may trigger.
-        if is_heap_ptr(heap, data.as_ptr()) {
+        let src = data.as_ptr().cast::<u8>();
+        if is_heap_ptr(heap, src) {
             return Err(native_invariant_violation(
                 "vector_write_elements_raw_test_only: data must not alias the VM heap".into(),
             ));
         }
         // SAFETY: bounded by `capacity` above, and `data` does not alias the
         // heap.
-        unsafe {
-            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len())
-        };
+        unsafe { std::ptr::copy_nonoverlapping(src, ptr.add(VEC_DATA_OFFSET), data.len()) };
 
         // The elements now share whatever objects `data` pointed at. Replace
         // each shared pointer with a deep copy, as `MicroOp::DeepCopyHeapPtrs`
@@ -820,25 +848,24 @@ impl NativeContext for ProductionNativeContext<'_> {
         unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) }
     }
 
-    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>> {
+    fn bcs_deserialize_value(
+        &self,
+        ty: InternedType,
+        bytes: &[u8],
+    ) -> VMResult<Option<MemoryRegion>> {
         let layout = self.guard.layout_by_ty(ty).ok_or_else(|| {
             native_invariant_violation("bcs deserialize: no layout for type".into())
         })?;
-        // `MemoryRegion` meets the alignment `deserialize` requires. Zeroed
-        // rather than left as is, because the copy below reads the padding the
-        // deserializer skips. `max(1)` because a region cannot be empty.
-        let size = layout.size as usize;
-        let region = self.guard.take_region(size.max(1));
+        // `MemoryRegion` meets the alignment `deserialize` requires.
+        let region = value_region(layout.size as usize)?;
         let dst = region.as_ptr();
-        // SAFETY: the region is `size` writable bytes.
-        unsafe { std::ptr::write_bytes(dst, 0, size) };
         // SAFETY: heap and rws are distinct fields (see the type-level aliasing
         // rule), so reborrowing both through `&self` at once is sound.
         let heap = unsafe { &mut **self.heap.get() };
         let rws = unsafe { &mut **self.rws.get() };
         // `bytes` is off-heap (the native copied it), so it survives the GC the
         // retry may run.
-        // SAFETY: `dst` is `size` writable, correctly aligned bytes.
+        // SAFETY: `dst` is `layout.size` writable, correctly aligned bytes.
         let result = unsafe {
             deserialize_or_gc(
                 heap,
@@ -853,18 +880,13 @@ impl NativeContext for ProductionNativeContext<'_> {
                 TopFrame::Native(self.abi),
             )
         };
-        let out = match result {
-            // SAFETY: `deserialize_or_gc` initialized `size` bytes at `dst`.
-            Ok(()) => Ok(Some(
-                unsafe { std::slice::from_raw_parts(dst, size) }.to_vec(),
-            )),
+        match result {
+            Ok(()) => Ok(Some(region)),
             // Malformed input: the bytes are not a valid encoding of `ty`. Heap
             // exhaustion and missing layouts carry other kinds and still propagate.
             Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
             Err(e) => Err(e),
-        };
-        self.guard.return_region(region);
-        out
+        }
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {

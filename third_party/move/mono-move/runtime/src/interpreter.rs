@@ -17,8 +17,8 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr, read_int,
-        read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
+        copy_8, read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
+        read_int, read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
         write_bool, write_enum_tag, write_fat_ptr, write_int, write_ptr, write_u32, write_u64,
         write_u8, MemoryRegion,
     },
@@ -739,7 +739,7 @@ impl<'guard> InterpreterContext<'guard> {
         // bytes.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
-            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_ptr(base, META_SAVED_FP_OFFSET, null());
             write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
@@ -990,7 +990,7 @@ impl<'guard> InterpreterContext<'guard> {
         // the root frame.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
-            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_ptr(base, META_SAVED_FP_OFFSET, null());
             write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
@@ -2197,11 +2197,9 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Move8 { dst, src } => {
-                        // The slots need not be 8-aligned (see `Move8`'s doc),
-                        // so the accesses must be unaligned — same codegen as
-                        // aligned loads on x86-64/aarch64.
-                        let v = (fp.add(src.into()) as *const u64).read_unaligned();
-                        (fp.add(dst.into()) as *mut u64).write_unaligned(v);
+                        // Preserve pointer provenance and uninitialized padding
+                        // without requiring 8-byte alignment.
+                        copy_8(fp.add(src.into()), fp.add(dst.into()));
                     },
 
                     MicroOp::Move { dst, src, size } => {
@@ -2473,12 +2471,9 @@ impl InterpreterContext<'_> {
                         offset,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        // Neither `heap_ptr + offset` nor the frame slot need
-                        // be 8-aligned (see the op's doc), so the accesses
-                        // must be unaligned — same codegen as aligned loads
-                        // on x86-64/aarch64.
-                        let val = (obj_ptr.add(offset as usize) as *const u64).read_unaligned();
-                        (fp.add(dst.into()) as *mut u64).write_unaligned(val);
+                        // The value may contain pointers or uninitialized
+                        // padding and need not be 8-aligned.
+                        copy_8(obj_ptr.add(offset as usize), fp.add(dst.into()));
                     },
 
                     MicroOp::HeapMoveFrom {
@@ -2501,9 +2496,9 @@ impl InterpreterContext<'_> {
                         src,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        // Unaligned accesses: see `HeapMoveFrom8` above.
-                        let val = (fp.add(src.into()) as *const u64).read_unaligned();
-                        (obj_ptr.add(offset as usize) as *mut u64).write_unaligned(val);
+                        // The value may contain pointers or uninitialized
+                        // padding and need not be 8-aligned.
+                        copy_8(fp.add(src.into()), obj_ptr.add(offset as usize));
                     },
 
                     MicroOp::HeapMoveToImm8 {
@@ -2512,7 +2507,8 @@ impl InterpreterContext<'_> {
                         imm,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        // Unaligned access: see `HeapMoveFrom8` above.
+                        // The destination may be unaligned. `imm` contains
+                        // initialized integer bytes, so a typed store is valid.
                         (obj_ptr.add(offset as usize) as *mut u64).write_unaligned(imm);
                     },
 

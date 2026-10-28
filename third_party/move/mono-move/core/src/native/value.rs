@@ -512,6 +512,20 @@ mod tests {
         buf
     }
 
+    /// Builds a `vector<vector<u8>>` object with layout `[len: u64][inner_ptr...]`.
+    /// The inner buffers must outlive all uses of the returned object.
+    fn nested_byte_vec_object_for_test(inners: &[Vec<u64>]) -> Vec<u64> {
+        let mut outer = vec![0u64; 1 + inners.len()];
+        outer[0] = inners.len() as u64;
+        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
+        for (slot, inner) in inners.iter().enumerate() {
+            // SAFETY: `outer` has an aligned pointer slot for each inner vector.
+            // `write_ptr` preserves each inner buffer's pointer provenance.
+            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + slot * 8, inner.as_ptr().cast()) };
+        }
+        outer
+    }
+
     /// `Vector::<Vector<u8>>::get_element` reads each inner byte vector back by
     /// value, including an empty inner vector.
     #[test]
@@ -525,16 +539,8 @@ mod tests {
             byte_vec_object_for_test(b"world!!"),
         ];
 
-        // Outer object: `[len: u64][inner_ptr0][inner_ptr1][inner_ptr2]`.
-        let mut outer = vec![0u64; 1 + inners.len()];
-        outer[0] = inners.len() as u64;
+        let mut outer = nested_byte_vec_object_for_test(&inners);
         let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
-        for (i, inner) in inners.iter().enumerate() {
-            // SAFETY: slot `i` is within `outer`. The pointers are stored with
-            // `write_ptr` rather than as `u64`, which would discard provenance
-            // and leave `get` reading through an address it cannot dereference.
-            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + i * 8, inner.as_ptr().cast()) };
-        }
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
         // buffers outlive the reads.
@@ -561,15 +567,11 @@ mod tests {
             byte_vec_object_for_test(b"a"),
             byte_vec_object_for_test(b"b"),
         ];
-        let mut outer = vec![0u64; 1 + inners.len()];
-        outer[0] = inners.len() as u64;
-        for (i, inner) in inners.iter().enumerate() {
-            outer[1 + i] = inner.as_ptr() as u64;
-        }
+        let mut outer = nested_byte_vec_object_for_test(&inners);
+        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object.
-        let vec: Vector<Vector<u8>> =
-            Vector::from_handle(unsafe { pool.root_object(outer.as_ptr() as *mut u8) });
+        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_ptr) });
 
         assert_eq!(vec.len(), 2);
         assert!(vec.get_element(0).is_ok());
