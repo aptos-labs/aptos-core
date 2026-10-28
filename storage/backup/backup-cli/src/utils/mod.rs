@@ -160,7 +160,8 @@ pub struct GlobalRestoreOpt {
     #[clap(
         long,
         help = "Content newer than this version will not be recovered to DB, \
-        defaulting to the largest version possible, meaning recover everything in the backups."
+        defaulting to the largest version possible, meaning recover everything in the backups. \
+        Transactions are recovered up to the last block end at or before this version."
     )]
     pub target_version: Option<Version>,
 

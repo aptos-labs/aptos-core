@@ -297,9 +297,32 @@ impl TransactionRestoreBatchController {
         format!("transaction {}", self.global_opt.run_mode.name())
     }
 
-    async fn run_impl(self) -> Result<()> {
+    async fn run_impl(mut self) -> Result<()> {
         if self.manifest_handles.is_empty() {
             return Ok(());
+        }
+
+        // Replay can't end in the middle of a block, so restore as if the target were the last block
+        // end at or before it.
+        if !self.global_opt.run_mode.is_verify() {
+            let Some(block_end) = self.last_block_end_at_or_before_target().await? else {
+                warn!(
+                    target_version = self.global_opt.target_version,
+                    "No block end at or before the target version, nothing to restore."
+                );
+                return Ok(());
+            };
+            // The DB can be past it already, e.g. on a rerun after a completed restore.
+            if let Some(first_version) = self.first_version.filter(|v| block_end < *v) {
+                info!(
+                    block_end = block_end,
+                    first_version = first_version,
+                    "DB is already past the last block end at or before the target version, \
+                    nothing to restore."
+                );
+                return Ok(());
+            }
+            self.global_opt.target_version = block_end;
         }
 
         let mut loaded_chunk_stream = self.loaded_chunk_stream();
@@ -336,6 +359,50 @@ impl TransactionRestoreBatchController {
                 .await?;
         }
         Ok(())
+    }
+
+    /// Returns the last txn with a state checkpoint hash at or before the target version, searching
+    /// back from the chunk with the target, or from the last chunk if the backups end before it.
+    async fn last_block_end_at_or_before_target(&self) -> Result<Option<Version>> {
+        let target_version = self.global_opt.target_version;
+        let mut chunks = Vec::new();
+        for hdl in &self.manifest_handles {
+            let manifest: TransactionBackup =
+                self.storage.load_json_file(hdl).await.err_notes(hdl)?;
+            manifest.verify()?;
+            chunks.extend(
+                manifest
+                    .chunks
+                    .into_iter()
+                    .filter(|c| c.first_version <= target_version),
+            );
+        }
+        let Some(last_version) = chunks.last().map(|c| min(c.last_version, target_version)) else {
+            return Ok(None);
+        };
+
+        for chunk in chunks.into_iter().rev() {
+            let first_version = chunk.first_version;
+            let chunk =
+                LoadedChunk::load(chunk, &self.storage, self.epoch_history.as_ref()).await?;
+            let block_end = (first_version..)
+                .zip(&chunk.txn_infos)
+                .take_while(|(version, _)| *version <= target_version)
+                .filter(|(_, txn_info)| txn_info.has_state_checkpoint_hash())
+                .last()
+                .map(|(version, _)| version);
+            if let Some(block_end) = block_end {
+                if block_end < last_version {
+                    warn!(
+                        target_version = target_version,
+                        block_end = block_end,
+                        "Restore target is in the middle of a block, ending at the block end before it."
+                    );
+                }
+                return Ok(Some(block_end));
+            }
+        }
+        Ok(None)
     }
 
     fn loaded_chunk_stream(&self) -> Peekable<impl Stream<Item = Result<LoadedChunk>> + use<>> {
@@ -700,7 +767,7 @@ impl TransactionRestoreBatchController {
             })
             .try_buffered_x(3, 1);
 
-        let mut total_replayed = db_commit_stream
+        let total_replayed = db_commit_stream
             .and_then(|()| {
                 let chunk_replayer = chunk_replayer.clone();
                 async move {
@@ -727,14 +794,6 @@ impl TransactionRestoreBatchController {
             .try_fold(0, |_prev_total, total| future::ok(total))
             .await?;
 
-        // The restore target can fall inside a block.
-        let replayer = Arc::clone(&chunk_replayer);
-        if let Some(version) =
-            tokio::task::spawn_blocking(move || replayer.commit_partial_block()).await??
-        {
-            total_replayed = version + 1 - first_version;
-            TRANSACTION_REPLAY_VERSION.set(version as i64);
-        }
         // assert all chunks are fully processed and in DB.
         assert!(chunk_replayer.is_empty());
 
@@ -845,8 +904,7 @@ impl<T> BlockBatcher<T> {
             .then(|| std::mem::take(&mut self.batch))
     }
 
-    /// Returns what's left at the end of the input, which is a partial block only if the restore
-    /// target is in the middle of one.
+    /// Returns what's left at the end of the input.
     fn finish(&mut self) -> Option<Vec<T>> {
         (!self.batch.is_empty()).then(|| std::mem::take(&mut self.batch))
     }
@@ -856,8 +914,12 @@ impl<T> BlockBatcher<T> {
 mod tests {
     use super::{BlockBatcher, TransactionRestoreBatchController, BATCH_SIZE};
     use crate::{
-        storage::local_fs::LocalFs,
-        utils::{GlobalRestoreOptions, RestoreRunMode},
+        backup_types::transaction::backup::{TransactionBackupController, TransactionBackupOpt},
+        storage::{local_fs::LocalFs, BackupStorage},
+        utils::{
+            backup_service_client::BackupServiceClient, test_utils::start_local_backup_service,
+            GlobalBackupOpt, GlobalRestoreOptions, RestoreRunMode,
+        },
     };
     use aptos_db::{get_restore_handler::GetRestoreHandler, AptosDB};
     use aptos_executor_test_helpers::integration_test_impl::{
@@ -866,73 +928,97 @@ mod tests {
     use aptos_executor_types::VerifyExecutionMode;
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
+    use aptos_types::transaction::Version;
     use futures::stream;
     use itertools::{izip, Itertools};
-    use std::{collections::HashSet, sync::Arc};
+    use std::{collections::HashSet, sync::Arc, time::Duration};
 
-    #[tokio::test]
-    async fn test_replay_commits_partial_block() {
+    #[test]
+    fn test_restore_ends_at_block_end() {
         let source_path = TempPath::new();
         let source = test_execution_with_storage_impl_inner(false, source_path.path());
-        // The block after genesis ends at version 11.
-        let target_version = 10;
-        let (outputs, persisted_aux_info) = source
-            .get_transaction_outputs(0, target_version + 1, source.expect_synced_version())
+        let source_version = source.expect_synced_version();
+        let block_ends: Vec<_> = source
+            .get_transaction_info_iterator(0, source_version + 1)
             .unwrap()
-            .into_parts();
-        assert!(!outputs
-            .proof
-            .transaction_infos
-            .last()
-            .unwrap()
-            .has_state_checkpoint_hash());
-        let transactions = izip!(
-            outputs.transactions_and_outputs,
-            persisted_aux_info,
-            outputs.proof.transaction_infos,
-        )
-        .map(|((transaction, output), aux_info, info)| {
-            Ok((
-                transaction,
-                aux_info,
-                info,
-                output.write_set().clone(),
-                output.events().to_vec(),
-            ))
-        });
+            .positions(|info| info.unwrap().has_state_checkpoint_hash())
+            .map(|idx| idx as Version)
+            .collect();
+        // A target in the middle of the second block after genesis.
+        let last_block_end = block_ends[1];
+        let target_version = block_ends[2] - 1;
+        assert!(target_version > last_block_end);
 
-        let target_path = TempPath::new();
-        let target = Arc::new(AptosDB::new_for_test(target_path.path()));
-        let restore_handler = target.get_restore_handler();
+        let (rt, port) = start_local_backup_service(Arc::clone(&source));
+        let client = Arc::new(BackupServiceClient::new(format!(
+            "http://localhost:{}",
+            port
+        )));
         let backup_path = TempPath::new();
-        let controller = TransactionRestoreBatchController::new(
-            GlobalRestoreOptions {
-                target_version,
-                trusted_waypoints: Arc::new(Default::default()),
-                run_mode: Arc::new(RestoreRunMode::Restore {
-                    restore_handler: restore_handler.clone(),
-                }),
-                concurrent_downloads: 1,
-                replay_concurrency_level: 1,
-            },
-            Arc::new(LocalFs::new(backup_path.path().to_path_buf())),
-            vec![],
-            None,
-            Some((0, false)),
-            None,
-            VerifyExecutionMode::NoVerify,
-            None,
-        );
-        controller
-            .replay_transactions(&restore_handler, stream::iter(transactions))
-            .await
+        backup_path.create_as_dir().unwrap();
+        let store: Arc<dyn BackupStorage> =
+            Arc::new(LocalFs::new(backup_path.path().to_path_buf()));
+        let manifest = rt
+            .block_on(
+                TransactionBackupController::new(
+                    TransactionBackupOpt {
+                        start_version: 0,
+                        num_transactions: source_version as usize + 1,
+                    },
+                    // A txn per chunk, so the block end is searched for across chunks.
+                    GlobalBackupOpt {
+                        max_chunk_size: 1,
+                        concurrent_data_requests: 2,
+                    },
+                    client,
+                    Arc::clone(&store),
+                )
+                .run(),
+            )
             .unwrap();
 
-        assert_eq!(target.expect_synced_version(), target_version);
-        assert_eq!(
-            target.get_accumulator_root_hash(target_version).unwrap(),
-            source.get_accumulator_root_hash(target_version).unwrap(),
-        );
+        // No replay, full replay and KV only replay.
+        for replay in [None, Some(false), Some(true)] {
+            let target_path = TempPath::new();
+            let target = Arc::new(AptosDB::new_for_test(target_path.path()));
+            let restore = |first_version| {
+                rt.block_on(
+                    TransactionRestoreBatchController::new(
+                        GlobalRestoreOptions {
+                            target_version,
+                            trusted_waypoints: Arc::new(Default::default()),
+                            run_mode: Arc::new(RestoreRunMode::Restore {
+                                restore_handler: target.get_restore_handler(),
+                            }),
+                            concurrent_downloads: 1,
+                            replay_concurrency_level: 1,
+                        },
+                        Arc::clone(&store),
+                        vec![manifest.clone()],
+                        first_version,
+                        replay.map(|kv_only| (first_version.unwrap_or(0), kv_only)),
+                        None,
+                        VerifyExecutionMode::verify_all(),
+                        None,
+                    )
+                    .run(),
+                )
+            };
+
+            restore(None).unwrap();
+            assert_eq!(target.expect_synced_version(), last_block_end);
+            assert_eq!(
+                target.get_accumulator_root_hash(last_block_end).unwrap(),
+                source.get_accumulator_root_hash(last_block_end).unwrap(),
+            );
+
+            // A rerun finds the DB at the block end already. With a txn per chunk, no chunk is left
+            // to restore past it.
+            restore(Some(last_block_end + 1)).unwrap();
+            assert_eq!(target.expect_synced_version(), last_block_end);
+        }
+
+        rt.shutdown_timeout(Duration::from_secs(1));
     }
 
     #[tokio::test]
