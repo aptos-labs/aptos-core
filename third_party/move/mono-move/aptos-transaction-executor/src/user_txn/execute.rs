@@ -19,7 +19,7 @@ use crate::{
     outcome::TxnOutcome,
     providers::read_config,
 };
-use aptos_gas_schedule::HighLimitPricing;
+use aptos_gas_schedule::HighLimitPricingIfAvailable;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::ApprovedExecutionHashes,
@@ -51,12 +51,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let mut txn_data = TxnMetadata::new(txn, aux_info);
 
         // A staking-backed limits request bills gas above the base execution
-        // and IO limits at `k` times the price. Scaling the budget down by
-        // `k` here, before it sizes the gas meter, keeps `gas_used * price -
-        // refund` equal to the fee the epilogue actually charges: see
-        // `HighLimitPricing::epilogue_max_gas_units`. This needs the gas
-        // schedule, so it must happen before the session (and its gas meter)
-        // is created.
+        // and IO limits at a higher price. Scaling the budget down here,
+        // before it sizes the gas meter, keeps `gas_used * price - refund`
+        // equal to the fee the epilogue actually charges: see
+        // `HighLimitPricingIfAvailable::epilogue_max_gas_units`. This needs
+        // the gas schedule, so it must happen before the session (and its
+        // gas meter) is created.
         let gas_params = match self.env.gas_params().as_ref() {
             Ok(gas_params) => gas_params,
             Err(e) => {
@@ -68,12 +68,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 };
             },
         };
-        let high_limit_pricing = txn_data.txn_limits_request.as_ref().and_then(|_| {
-            HighLimitPricing::new(self.env.gas_feature_version(), &gas_params.vm.txn)
-        });
-        if let Some(pricing) = &high_limit_pricing {
-            txn_data.max_gas_amount /= pricing.excess_gas_price_multiplier();
-        }
+        let high_limit_pricing = if txn_data.txn_limits_request.is_some() {
+            HighLimitPricingIfAvailable::new(self.env.gas_feature_version(), &gas_params.vm.txn)
+        } else {
+            HighLimitPricingIfAvailable::default()
+        };
+        txn_data.max_gas_amount = high_limit_pricing.scale_max_gas_amount(txn_data.max_gas_amount);
 
         // ========================== Session setup ===========================
         // One session hosts the whole transaction: pre-execution checks,
@@ -106,7 +106,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // transaction against, so a discard that skipped it would drop the
         // transaction's dependencies. Finishing also parks the worker's stack
         // and heap for reuse.
-        let result = self.run_session(&mut interp, txn, &txn_data, high_limit_pricing.as_ref());
+        let result = self.run_session(&mut interp, txn, &txn_data, high_limit_pricing);
         match (result, interp.finish()) {
             (_, Err(e)) => TxnOutcome::Panic(e),
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
@@ -131,7 +131,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         interp: &mut InterpreterContext<'guard>,
         txn: &SignedTransaction,
         txn_data: &TxnMetadata,
-        high_limit_pricing: Option<&HighLimitPricing>,
+        high_limit_pricing: HighLimitPricingIfAvailable,
     ) -> Result<(ExecutionStatus, FeeStatement), DiscardReason> {
         let guard = self.guard;
         let max_gas = txn_data.max_gas_amount;
@@ -242,18 +242,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // ============================ Epilogue ==============================
         // Transaction cleanup -- charge gas, bump sequence number etc.
         //
-        // A staking-backed limits request bills gas above the base execution
-        // and IO limits at `k` times the price. Report that billed amount as
-        // the fee statement's total (not the raw metered `gas_used`) so it
-        // matches the fee the epilogue actually charges; `max_gas` is already
-        // scaled down by `k`, so `gas_used` in the `max_gas_units` slot
-        // reuses the same formula the epilogue uses to inflate its own
-        // budget. MonoMove doesn't track IO gas separately, so `io_gas_used`
-        // is always `0`.
-        let billed_gas_used = match high_limit_pricing {
-            Some(pricing) => pricing.epilogue_max_gas_units(gas_used, gas_used, gas_used, 0),
-            None => gas_used,
-        };
+        // MonoMove doesn't track IO gas separately, so `io_gas_used` is
+        // always `0`.
+        let billed_gas_used = high_limit_pricing.billed_gas_used(gas_used, gas_used, 0);
         let fee_statement = placeholder_fee_statement(gas_used, billed_gas_used);
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(

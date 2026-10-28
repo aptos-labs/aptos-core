@@ -11,7 +11,7 @@ use crate::{
     calls::call_system_function_unmetered,
     errors::{call_result, MoveExecutionFailure},
 };
-use aptos_gas_schedule::HighLimitPricing;
+use aptos_gas_schedule::HighLimitPricingIfAvailable;
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
@@ -61,12 +61,9 @@ pub(crate) fn run_prologue<'a>(
     symbols: &FrameworkSymbols,
     signers: &ValidationSigners,
     txn_data: &TxnMetadata,
-    high_limit_pricing: Option<&HighLimitPricing>,
+    high_limit_pricing: HighLimitPricingIfAvailable,
 ) -> Result<(), MoveExecutionFailure> {
-    let txn_gas_price = match high_limit_pricing {
-        Some(pricing) => pricing.reserve_price(txn_data.gas_unit_price),
-        None => txn_data.gas_unit_price,
-    };
+    let txn_gas_price = high_limit_pricing.reserve_price(txn_data.gas_unit_price);
     let args = PrologueArgs::V1 {
         needs_fee_payer_auth_check: txn_data.fee_payer.is_some(),
         txn_sender_public_key: txn_data.sender_auth_key.clone(),
@@ -99,23 +96,14 @@ pub(crate) fn run_epilogue<'a>(
     txn_data: &TxnMetadata,
     fee_statement: FeeStatement,
     gas_units_remaining: u64,
-    high_limit_pricing: Option<&HighLimitPricing>,
+    high_limit_pricing: HighLimitPricingIfAvailable,
 ) -> Result<(), MoveExecutionFailure> {
-    let txn_max_gas_units = match high_limit_pricing {
-        Some(pricing) => {
-            // `fee_statement.gas_used()` is already the billed amount (see
-            // `execute.rs`); recompute the raw metered gas used from
-            // `gas_units_remaining` instead, so excess isn't counted twice.
-            let gas_used = txn_data.max_gas_amount.saturating_sub(gas_units_remaining);
-            pricing.epilogue_max_gas_units(
-                txn_data.max_gas_amount,
-                gas_used,
-                fee_statement.execution_gas_used(),
-                fee_statement.io_gas_used(),
-            )
-        },
-        None => txn_data.max_gas_amount,
-    };
+    let txn_max_gas_units = high_limit_pricing.epilogue_max_gas_units(
+        txn_data.max_gas_amount,
+        gas_units_remaining,
+        fee_statement.execution_gas_used(),
+        fee_statement.io_gas_used(),
+    );
     let args = EpilogueArgs::V1 {
         fee_statement,
         txn_gas_price: txn_data.gas_unit_price,

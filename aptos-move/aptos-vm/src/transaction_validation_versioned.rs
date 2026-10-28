@@ -63,10 +63,9 @@ impl PrologueBuilder {
                 .iter()
                 .map(|proof| proof.optional_auth_key())
                 .collect(),
-            txn_gas_price: match &txn_data.high_limit_pricing {
-                Some(pricing) => pricing.reserve_price(txn_data.gas_unit_price().into()),
-                None => txn_data.gas_unit_price().into(),
-            },
+            txn_gas_price: txn_data
+                .high_limit_pricing
+                .reserve_price(txn_data.gas_unit_price().into()),
             txn_max_gas_units: txn_data.max_gas_amount().into(),
             txn_expiration_time: txn_data.expiration_timestamp_secs(),
             chain_id: txn_data.chain_id().id(),
@@ -148,22 +147,12 @@ impl EpilogueBuilder {
         is_simulation: bool,
     ) -> Self {
         let max_gas_amount: u64 = txn_data.max_gas_amount().into();
-        let txn_max_gas_units = match &txn_data.high_limit_pricing {
-            Some(pricing) => {
-                // `fee_statement.gas_used()` is already the billed amount
-                // (see `AptosVM::fee_statement_from_gas_meter`); recompute
-                // the raw metered gas used from `gas_remaining` instead, so
-                // excess isn't counted twice.
-                let gas_used = max_gas_amount.saturating_sub(gas_remaining.into());
-                pricing.epilogue_max_gas_units(
-                    max_gas_amount,
-                    gas_used,
-                    fee_statement.execution_gas_used(),
-                    fee_statement.io_gas_used(),
-                )
-            },
-            None => max_gas_amount,
-        };
+        let txn_max_gas_units = txn_data.high_limit_pricing.epilogue_max_gas_units(
+            max_gas_amount,
+            gas_remaining.into(),
+            fee_statement.execution_gas_used(),
+            fee_statement.io_gas_used(),
+        );
         Self {
             fee_statement,
             txn_gas_price: txn_data.gas_unit_price().into(),

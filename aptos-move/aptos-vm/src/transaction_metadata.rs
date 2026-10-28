@@ -3,7 +3,7 @@
 
 use crate::AptosVM;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
-use aptos_gas_schedule::HighLimitPricing;
+use aptos_gas_schedule::HighLimitPricingIfAvailable;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -47,7 +47,7 @@ pub struct TransactionMetadata {
     pub txn_limits: Option<TxnLimitsRequest>,
     /// Set for a staking-backed limits request, which pays more for gas used
     /// above the base limits.
-    pub high_limit_pricing: Option<HighLimitPricing>,
+    pub high_limit_pricing: HighLimitPricingIfAvailable,
 }
 
 impl TransactionMetadata {
@@ -125,23 +125,20 @@ impl TransactionMetadata {
                         Some(format!("VM Startup Failed. {}", err)),
                     )
                 })?;
-                HighLimitPricing::new(vm.gas_feature_version(), &gas_params.vm.txn)
+                HighLimitPricingIfAvailable::new(vm.gas_feature_version(), &gas_params.vm.txn)
             },
-            Some(TxnLimitsRequest::ApprovedGovernanceScript) | None => None,
+            Some(TxnLimitsRequest::ApprovedGovernanceScript) | None => {
+                HighLimitPricingIfAvailable::default()
+            },
         };
 
         // A staking-backed limits request bills gas above the base execution
-        // and IO limits at `k` times the price. Scaling the budget down by
-        // `k` here, before it sizes the gas meter, keeps `gas_used * price -
-        // refund` equal to the fee the epilogue actually charges: see
-        // `HighLimitPricing::epilogue_max_gas_units`.
-        let max_gas_amount: Gas = txn.max_gas_amount().into();
-        let max_gas_amount = match &high_limit_pricing {
-            Some(pricing) => {
-                Gas::new(u64::from(max_gas_amount) / pricing.excess_gas_price_multiplier())
-            },
-            None => max_gas_amount,
-        };
+        // and IO limits at a higher price. Scaling the budget down here,
+        // before it sizes the gas meter, keeps `gas_used * price - refund`
+        // equal to the fee the epilogue actually charges: see
+        // `HighLimitPricingIfAvailable::epilogue_max_gas_units`.
+        let max_gas_amount =
+            Gas::new(high_limit_pricing.scale_max_gas_amount(txn.max_gas_amount()));
 
         Ok(Self {
             sender: txn.sender(),
