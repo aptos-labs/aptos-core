@@ -136,7 +136,7 @@ fun add_u64(r0, r1): u64 {
 }
 
 fun adder(r0): u64 {
-  slots: params(1), locals(1), temps(1)
+  slots: params(1), locals(1), temps(1), transfer(1)
     r0: u64
     r1: |u64|(u64) has drop
     r2: u64
@@ -144,25 +144,24 @@ fun adder(r0): u64 {
   L0:
     0: r1 := pack_closure __lambda__1__adder, 1, [r0] @1
     1: r2 := ld_u64 8 @3
-    2: [r2] := call_closure [|u64|(u64) has drop], [r2, r1] @5
-    3: ret [r2] @6
+    2: [x0] := call_closure [|u64|(u64) has drop], [r2, r1] @5
+    3: ret [x0] @6
 }
 
 fun all_captured(r0, r1): u64 {
-  slots: params(2), locals(0), temps(2)
+  slots: params(2), locals(0), temps(1), transfer(1)
     r0: u64
     r1: u64
     r2: ||(u64) has copy + drop
-    r3: u64
   code:
   L0:
     0: r2 := pack_closure add_u64, 11, [r0, r1] @2
-    1: [r3] := call_closure [||(u64) has drop], [r2] @3
-    2: ret [r3] @4
+    1: [x0] := call_closure [||(u64) has drop], [r2] @3
+    2: ret [x0] @4
 }
 
 fun capture_ends(r0, r1): u64 {
-  slots: params(2), locals(1), temps(1)
+  slots: params(2), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
     r2: |u64|(u64) has drop
@@ -171,12 +170,12 @@ fun capture_ends(r0, r1): u64 {
   L0:
     0: r2 := pack_closure add3, 101, [r0, r1] @2
     1: r3 := ld_u64 100 @4
-    2: [r3] := call_closure [|u64|(u64) has drop], [r3, r2] @6
-    3: ret [r3] @7
+    2: [x0] := call_closure [|u64|(u64) has drop], [r3, r2] @6
+    3: ret [x0] @7
 }
 
 fun capture_second(r0): u64 {
-  slots: params(1), locals(1), temps(1)
+  slots: params(1), locals(1), temps(1), transfer(1)
     r0: u64
     r1: |u64|(u64) has drop
     r2: u64
@@ -184,12 +183,12 @@ fun capture_second(r0): u64 {
   L0:
     0: r1 := pack_closure add_u64, 10, [r0] @1
     1: r2 := ld_u64 7 @3
-    2: [r2] := call_closure [|u64|(u64) has drop], [r2, r1] @5
-    3: ret [r2] @6
+    2: [x0] := call_closure [|u64|(u64) has drop], [r2, r1] @5
+    3: ret [x0] @6
 }
 
 fun capture_two(r0, r1): u64 {
-  slots: params(2), locals(1), temps(1)
+  slots: params(2), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
     r2: |u64|(u64) has drop
@@ -198,8 +197,8 @@ fun capture_two(r0, r1): u64 {
   L0:
     0: r2 := pack_closure add3, 11, [r0, r1] @2
     1: r3 := ld_u64 1 @4
-    2: [r3] := call_closure [|u64|(u64) has drop], [r3, r2] @6
-    3: ret [r3] @7
+    2: [x0] := call_closure [|u64|(u64) has drop], [r3, r2] @6
+    3: ret [x0] @7
 }
 
 fun make_adder(r0): |u64|u64 {
@@ -213,16 +212,15 @@ fun make_adder(r0): |u64|u64 {
 }
 
 fun use_adder(r0, r1): u64 {
-  slots: params(2), locals(1), temps(1), transfer(1)
+  slots: params(2), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
     r2: |u64|(u64) has drop
-    r3: u64
   code:
   L0:
     0: [r2] := call make_adder, [r0] @1
-    1: [r3] := call_closure [|u64|(u64) has drop], [r1, r2] @5
-    2: ret [r3] @6
+    1: [x0] := call_closure [|u64|(u64) has drop], [r1, r2] @5
+    2: ret [x0] @6
 }
 
 fun __lambda__1__adder(r0, r1): u64 {
@@ -270,69 +268,64 @@ fun add_u64() {
 
 fun adder() {
   frame_data_size: 24
-  entry_gas: 179
+  entry_gas: 153
   code:
     0: PackClosure [8] <- func_ref=Unresolved(__lambda__1__adder), mask=1, captured_desc=0, captured=[[0](8)] @1
     1: StoreImm8 [16] <- #8 @3
     2: CallClosure closure=[8], provided_args=[[16](8)] @5
-    3: Move8 [16] <- [48] @5
-    4: Move8 [0] <- [16] @6
-    5: Return @6
+    3: Move8 [0] <- [48] @6
+    4: Return @6
   safe_point_layouts:
     0: []
 }
 
 fun all_captured() {
-  frame_data_size: 32
-  entry_gas: 177
+  frame_data_size: 24
+  entry_gas: 151
   code:
     0: PackClosure [16] <- func_ref=Unresolved(add_u64), mask=11, captured_desc=0, captured=[[0](8), [8](8)] @2
     1: CallClosure closure=[16], provided_args=[] @3
-    2: Move8 [24] <- [56] @3
-    3: Move8 [0] <- [24] @4
-    4: Return @4
+    2: Move8 [0] <- [48] @4
+    3: Return @4
   safe_point_layouts:
     0: []
 }
 
 fun capture_ends() {
   frame_data_size: 32
-  entry_gas: 205
+  entry_gas: 179
   code:
     0: PackClosure [16] <- func_ref=Unresolved(add3), mask=101, captured_desc=0, captured=[[0](8), [8](8)] @2
     1: StoreImm8 [24] <- #100 @4
     2: CallClosure closure=[16], provided_args=[[24](8)] @6
-    3: Move8 [24] <- [56] @6
-    4: Move8 [0] <- [24] @7
-    5: Return @7
+    3: Move8 [0] <- [56] @7
+    4: Return @7
   safe_point_layouts:
     0: []
 }
 
 fun capture_second() {
   frame_data_size: 24
-  entry_gas: 179
+  entry_gas: 153
   code:
     0: PackClosure [8] <- func_ref=Unresolved(add_u64), mask=10, captured_desc=0, captured=[[0](8)] @1
     1: StoreImm8 [16] <- #7 @3
     2: CallClosure closure=[8], provided_args=[[16](8)] @5
-    3: Move8 [16] <- [48] @5
-    4: Move8 [0] <- [16] @6
-    5: Return @6
+    3: Move8 [0] <- [48] @6
+    4: Return @6
   safe_point_layouts:
     0: []
 }
 
 fun capture_two() {
   frame_data_size: 32
-  entry_gas: 205
+  entry_gas: 179
   code:
     0: PackClosure [16] <- func_ref=Unresolved(add3), mask=11, captured_desc=0, captured=[[0](8), [8](8)] @2
     1: StoreImm8 [24] <- #1 @4
     2: CallClosure closure=[16], provided_args=[[24](8)] @6
-    3: Move8 [24] <- [56] @6
-    4: Move8 [0] <- [24] @7
-    5: Return @7
+    3: Move8 [0] <- [56] @7
+    4: Return @7
   safe_point_layouts:
     0: []
 }
@@ -349,16 +342,15 @@ fun make_adder() {
 }
 
 fun use_adder() {
-  frame_data_size: 32
-  entry_gas: 204
+  frame_data_size: 24
+  entry_gas: 178
   code:
-    0: Move8 [56] <- [0] @1
+    0: Move8 [48] <- [0] @1
     1: CallIndirect 0x99::capturing::make_adder @1
-    2: Move8 [16] <- [56] @1
+    2: Move8 [16] <- [48] @1
     3: CallClosure closure=[16], provided_args=[[8](8)] @5
-    4: Move8 [24] <- [56] @5
-    5: Move8 [0] <- [24] @6
-    6: Return @6
+    4: Move8 [0] <- [48] @6
+    5: Return @6
 }
 
 fun __lambda__1__adder() {

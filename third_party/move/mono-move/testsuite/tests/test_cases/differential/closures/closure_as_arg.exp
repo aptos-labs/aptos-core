@@ -38,14 +38,13 @@ fun add_u64(r0, r1): u64 {
 }
 
 fun apply(r0, r1): u64 {
-  slots: params(2), locals(0), temps(1)
+  slots: params(2), locals(0), temps(0), transfer(1)
     r0: |u64|(u64)
     r1: u64
-    r2: u64
   code:
   L0:
-    0: [r2] := call_closure [|u64|(u64)], [r1, r0] @2
-    1: ret [r2] @3
+    0: [x0] := call_closure [|u64|(u64)], [r1, r0] @2
+    1: ret [x0] @3
 }
 
 fun run(r0, r1): u64 {
@@ -71,13 +70,12 @@ fun add_u64() {
 }
 
 fun apply() {
-  frame_data_size: 24
-  entry_gas: 142
+  frame_data_size: 16
+  entry_gas: 116
   code:
     0: CallClosure closure=[0], provided_args=[[8](8)] @2
-    1: Move8 [16] <- [48] @2
-    2: Move8 [0] <- [16] @3
-    3: Return @3
+    1: Move8 [0] <- [40] @3
+    2: Return @3
 }
 
 fun run() {

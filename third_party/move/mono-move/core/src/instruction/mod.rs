@@ -266,9 +266,9 @@ pub struct PackClosureOp {
 pub struct CallClosureOp {
     /// Frame slot holding the closure heap pointer.
     pub closure_src: FrameOffset,
-    /// Sources (in caller's frame) of the provided (non-captured) arguments,
-    /// in the order that `mask.is_captured(i)` is false — i.e. ascending `i`
-    /// through the function's parameter list.
+    /// Non-captured argument sources, all within the caller's data region.
+    /// Ordered by ascending parameter index `i` where `mask.is_captured(i)`
+    /// is false.
     pub provided_args: Vec<SizedSlot>,
 }
 

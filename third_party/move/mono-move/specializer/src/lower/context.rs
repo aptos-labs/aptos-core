@@ -1176,14 +1176,9 @@ fn try_discover_types_for_lowering_in_function_impl(
         discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
     }
     for instr in func_ir.instrs() {
-        // Calls: walk param + return signature lists.
-        //
-        // TODO(completeness): closure-call signatures are not walked, and
-        // `discover_type_metadata` stops at `Type::Function`. Verify that:
-        // closure args/results are always materialized in home-slot temps (or
-        // reached via the return/direct-call walks), so their nominals are
-        // still discovered. Otherwise, we need to feed `CallClosure` signature
-        // types here and recurse into `Type::Function`.
+        // Discover direct-call parameter and return types. Closure arguments
+        // are covered by `home_slot_types`; closure results also need a signature
+        // walk because they may stay in Transfer slots.
         let (params, returns, handle_idx, callee_ty_args) = match instr {
             Instr::Call { data } => {
                 let (params, returns) = instantiate_callee_signature(
@@ -1198,6 +1193,14 @@ fn try_discover_types_for_lowering_in_function_impl(
                     Some(data.function_handle),
                     data.ty_args,
                 )
+            },
+            Instr::CallClosure { data } => {
+                let Type::Function { results, .. } = view_type(data.closure_ty) else {
+                    return Err(VMInternalError::new(
+                        LoweringError::ClosureSignatureNotFunction,
+                    ));
+                };
+                (None, Some(*results), None, EMPTY_TYPE_LIST)
             },
             _ => (None, None, None, EMPTY_TYPE_LIST),
         };
