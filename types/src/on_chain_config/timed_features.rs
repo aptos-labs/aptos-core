@@ -88,6 +88,8 @@ enum TimedFeaturesImpl {
 pub enum TimedFeatureOverride {
     Replay,
     Testing,
+    /// Used for comparison testing of Move VM V1 and MonoMove.
+    VmComparison,
 }
 
 impl TimedFeatureOverride {
@@ -102,6 +104,14 @@ impl TimedFeatureOverride {
             (Replay, _ModuleComplexityCheck) => Some(true),
             // Add overrides for testing here.
             (Testing, EntryCompatibility) => Some(true),
+
+            // For both, disables gas metering that was enabled by timed feature
+            // flags. For comparison, those charges are enabled by the
+            // appropriate gas feature version and can be programmatically set
+            // to 0.
+            (VmComparison, MeterBcsByValueSize) => Some(false),
+            (VmComparison, MeterValueNodesOnDeserialize) => Some(false),
+
             // Exhaustive over flags so adding a new flag forces a decision.
             (
                 _,
@@ -412,9 +422,13 @@ mod test {
 
     #[test]
     fn timed_features_override_is_serializable() {
-        let replay = assert_ok!(bcs::to_bytes(&TimedFeatureOverride::Replay));
-        let testing = assert_ok!(bcs::to_bytes(&TimedFeatureOverride::Testing));
-        assert_ne!(replay, testing);
+        fn assert_index(value: TimedFeatureOverride, index: u8) {
+            assert_eq!(assert_ok!(bcs::to_bytes(&value)), [index]);
+        }
+
+        assert_index(TimedFeatureOverride::Replay, 0);
+        assert_index(TimedFeatureOverride::Testing, 1);
+        assert_index(TimedFeatureOverride::VmComparison, 2);
     }
 
     #[test]
