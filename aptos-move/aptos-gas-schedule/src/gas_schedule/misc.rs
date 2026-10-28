@@ -7,7 +7,9 @@
 use crate::{
     gas_schedule::VMGasParameters,
     traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
-    ver::gas_feature_versions::{RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_50},
+    ver::gas_feature_versions::{
+        RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_50, TESTNET_RESET_OCT_2026,
+    },
 };
 use aptos_gas_algebra::{
     AbstractValueSize, AbstractValueSizePerArg, AbstractValueSizePerByte,
@@ -49,10 +51,10 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
         [closure: AbstractValueSize, { RELEASE_V1_33.. => "closure" }, 40],
-        [closure_v2: AbstractValueSize, { RELEASE_V1_50.. => "closure_v2" }, 200],
+        [closure_v2: AbstractValueSize, { TESTNET_RESET_OCT_2026.. => "closure_v2" }, 200],
         [
             closure_per_ty_tag_unit: AbstractValueSizePerTypeTagPseudoGasUnit,
-            { RELEASE_V1_50.. => "closure_per_ty_tag_unit" },
+            { TESTNET_RESET_OCT_2026.. => "closure_per_ty_tag_unit" },
             1
         ],
         [
@@ -87,13 +89,14 @@ crate::gas_schedule::macros::define_gas_parameters!(
     ]
 );
 
-// `MeterClosureTypeArguments` can turn metering on before 1.50 puts
-// `closure_per_ty_tag_unit` on chain. Same value, so the switch does not
-// change pricing.
-const CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50: AbstractValueSizePerTypeTagPseudoGasUnit =
+// `MeterClosureTypeArguments` can turn metering on before the testnet-reset
+// version (54) puts `closure_per_ty_tag_unit` on chain. Same value, so the
+// switch does not change pricing.
+const CLOSURE_PER_TY_TAG_UNIT_BEFORE_TESTNET_RESET: AbstractValueSizePerTypeTagPseudoGasUnit =
     AbstractValueSizePerTypeTagPseudoGasUnit::new(1);
 
-// Same for `MeterClosureCapturedLayouts` and `closure_per_captured_layout_byte`.
+// Same for `MeterClosureCapturedLayouts` and `closure_per_captured_layout_byte`,
+// which 1.50 (55) puts on chain.
 const CLOSURE_PER_CAPTURED_LAYOUT_BYTE_BEFORE_V1_50: AbstractValueSizePerByte =
     AbstractValueSizePerByte::new(1);
 
@@ -102,6 +105,10 @@ const CLOSURE_PER_CAPTURED_LAYOUT_BYTE_BEFORE_V1_50: AbstractValueSizePerByte =
 ///
 /// Invariant: every `visit_closure` must get the size from here. The memory tracker charges quota
 /// with one visitor and releases it with another, so two visitors that disagree would leak quota.
+///
+/// The node and type-argument terms switch to on-chain parameters at the testnet-reset version
+/// (54), the captured-layout term at 1.50 (55): testnet ran at 54 without the layout parameter,
+/// and replaying that history must not read it.
 fn closure_abstract_size(
     params: &AbstractValueSizeGasParameters,
     feature_version: u64,
@@ -110,15 +117,17 @@ fn closure_abstract_size(
 ) -> AbstractValueSize {
     let units = NumTypeTagPseudoGasUnits::new(ty_args_pseudo_gas_cost);
     let layout_bytes = NumBytes::new(captured_layouts_size);
-    if feature_version >= RELEASE_V1_50 {
-        params.closure_v2
-            + params.closure_per_ty_tag_unit * units
-            + params.closure_per_captured_layout_byte * layout_bytes
+    let node_and_ty_args = if feature_version >= TESTNET_RESET_OCT_2026 {
+        params.closure_v2 + params.closure_per_ty_tag_unit * units
     } else {
-        params.closure
-            + CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50 * units
-            + CLOSURE_PER_CAPTURED_LAYOUT_BYTE_BEFORE_V1_50 * layout_bytes
-    }
+        params.closure + CLOSURE_PER_TY_TAG_UNIT_BEFORE_TESTNET_RESET * units
+    };
+    let layouts = if feature_version >= RELEASE_V1_50 {
+        params.closure_per_captured_layout_byte * layout_bytes
+    } else {
+        CLOSURE_PER_CAPTURED_LAYOUT_BYTE_BEFORE_V1_50 * layout_bytes
+    };
+    node_and_ty_args + layouts
 }
 
 struct DerefVisitor<V> {
@@ -1130,17 +1139,45 @@ mod tests {
             AbstractValueSize::new(31_040)
         );
 
+        for ver in [TESTNET_RESET_OCT_2026, RELEASE_V1_50] {
+            assert_eq!(
+                closure_abstract_size(&params, ver, 0, 0),
+                AbstractValueSize::new(200)
+            );
+            assert_eq!(
+                closure_abstract_size(&params, ver, 1000, 0),
+                AbstractValueSize::new(1200)
+            );
+            assert_eq!(
+                closure_abstract_size(&params, ver, 1000, 30_000),
+                AbstractValueSize::new(31_200)
+            );
+        }
+    }
+
+    /// Which term reads an on-chain parameter at which version. The initial values equal the
+    /// pre-release constants, so this uses parameters that differ from them.
+    #[test]
+    fn test_closure_abstract_size_parameter_sources() {
+        let mut params = AbstractValueSizeGasParameters::initial();
+        params.closure_per_ty_tag_unit = AbstractValueSizePerTypeTagPseudoGasUnit::new(3);
+        params.closure_per_captured_layout_byte = AbstractValueSizePerByte::new(5);
+
+        // Before 54: `closure` and both pre-release constants.
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_50, 0, 0),
-            AbstractValueSize::new(200)
+            closure_abstract_size(&params, RELEASE_V1_49, 10, 100),
+            AbstractValueSize::new(40 + 10 + 100)
         );
+        // 54 (testnet reset): `closure_v2` and `closure_per_ty_tag_unit` from the schedule, the
+        // layout term still from the constant, as the 1.49.x binaries testnet ran computed it.
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_50, 1000, 0),
-            AbstractValueSize::new(1200)
+            closure_abstract_size(&params, TESTNET_RESET_OCT_2026, 10, 100),
+            AbstractValueSize::new(200 + 30 + 100)
         );
+        // 55 (1.50): everything from the schedule.
         assert_eq!(
-            closure_abstract_size(&params, RELEASE_V1_50, 1000, 30_000),
-            AbstractValueSize::new(31_200)
+            closure_abstract_size(&params, RELEASE_V1_50, 10, 100),
+            AbstractValueSize::new(200 + 30 + 500)
         );
     }
 }
