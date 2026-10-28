@@ -21,6 +21,9 @@ pub(crate) struct TxnMetadata {
     /// Maximum gas a transaction can use. Scaled down for high-limit
     /// transactions to enable charging excess units at higher gas price.
     pub max_gas_amount: u64,
+    /// Maximum gas amount specified on the transaction. Unlike
+    /// `max_gas_amount`, never scaled for high-limit transactions.
+    pub signed_max_gas_amount: u64,
     /// A request for higher execution and IO limits. The prologue checks the
     /// staking that backs it.
     pub txn_limits_request: Option<UserTxnLimitsRequest>,
@@ -92,6 +95,7 @@ impl TxnMetadata {
                 .collect(),
             gas_unit_price: txn.gas_unit_price(),
             max_gas_amount: high_limit_pricing.scale_max_gas_amount(txn.max_gas_amount()),
+            signed_max_gas_amount: txn.max_gas_amount(),
             txn_limits_request,
             high_limit_pricing,
             transaction_size: txn.txn_bytes_len() as u64,
@@ -130,7 +134,7 @@ impl TxnMetadata {
             self.sender,
             self.secondary_signers.clone(),
             self.fee_payer.unwrap_or(self.sender),
-            self.max_gas_amount,
+            self.signed_max_gas_amount,
             self.gas_unit_price,
             self.chain_id,
             None,

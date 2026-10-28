@@ -30,6 +30,9 @@ pub struct TransactionMetadata {
     /// `Some([])` if the authenticator for the fee payer is a [NoAccountAuthenticator].
     pub fee_payer_authentication_proof: Option<AuthenticationProof>,
     pub max_gas_amount: Gas,
+    /// Maximum gas amount specified on the transaction. Unlike
+    /// `max_gas_amount`, never scaled for high-limit transactions.
+    pub signed_max_gas_amount: Gas,
     pub gas_unit_price: FeePerGasUnit,
     pub transaction_size: NumBytes,
     pub expiration_timestamp_secs: u64,
@@ -155,6 +158,7 @@ impl TransactionMetadata {
                 .fee_payer_signer()
                 .map(|signer| signer.authentication_proof()),
             max_gas_amount,
+            signed_max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (transaction_size as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
@@ -364,7 +368,7 @@ impl TransactionMetadata {
             self.sender,
             self.secondary_signers.clone(),
             self.fee_payer.unwrap_or(self.sender),
-            self.max_gas_amount.into(),
+            self.signed_max_gas_amount.into(),
             self.gas_unit_price.into(),
             self.chain_id.id(),
             self.entry_function_payload()
