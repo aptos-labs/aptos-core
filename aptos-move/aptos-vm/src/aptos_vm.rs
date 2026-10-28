@@ -617,10 +617,11 @@ impl AptosVM {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
         let execution_gas_units = u64::from(gas_meter.execution_gas_used());
         let io_gas_units = u64::from(gas_meter.io_gas_used());
-        let billed_gas_used =
-            txn_data
-                .high_limit_pricing
-                .billed_gas_used(gas_used, execution_gas_units, io_gas_units);
+        let billed_gas_used = txn_data.high_limit_pricing.billed_gas_used(
+            gas_used,
+            execution_gas_units,
+            io_gas_units,
+        );
         FeeStatement::builder()
             .total_charge_gas_units(billed_gas_used)
             .execution_gas_units(execution_gas_units)

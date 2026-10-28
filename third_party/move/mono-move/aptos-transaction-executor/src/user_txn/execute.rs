@@ -232,7 +232,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // Transaction cleanup -- charge gas, bump sequence number etc.
         //
         // TODO(completeness): pass IO charges for MonoMove.
-        let billed_gas_used = txn_data.high_limit_pricing.billed_gas_used(gas_used, gas_used, 0);
+        let billed_gas_used = txn_data
+            .high_limit_pricing
+            .billed_gas_used(gas_used, gas_used, 0);
         let fee_statement = placeholder_fee_statement(gas_used, billed_gas_used);
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(
