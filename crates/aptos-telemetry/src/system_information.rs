@@ -6,7 +6,7 @@ use aptos_infallible::Mutex;
 use aptos_telemetry_service::types::telemetry::TelemetryEvent;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
-use sysinfo::{CpuExt, DiskExt, System, SystemExt};
+use sysinfo::{Disks, System};
 
 /// System information event name
 const APTOS_NODE_SYSTEM_INFORMATION: &str = "APTOS_NODE_SYSTEM_INFORMATION";
@@ -32,8 +32,13 @@ const SYSTEM_KERNEL_VERSION: &str = "system_kernel_version";
 const SYSTEM_NAME: &str = "system_name";
 const SYSTEM_OS_VERSION: &str = "system_os_version";
 
+/// The global CPU name that older sysinfo versions reported on Linux, kept for continuity
+const GLOBAL_CPU_NAME: &str = "cpu";
+
 /// Global system singleton (to avoid recreations)
 pub static GLOBAL_SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new_all()));
+pub static GLOBAL_DISKS: Lazy<Mutex<Disks>> =
+    Lazy::new(|| Mutex::new(Disks::new_with_refreshed_list()));
 
 /// Collects and sends the build information via telemetry
 pub(crate) async fn create_system_info_telemetry_event() -> TelemetryEvent {
@@ -57,14 +62,18 @@ pub fn get_system_information() -> BTreeMap<String, String> {
 /// Collects the system info and appends it to the given map
 pub(crate) fn collect_system_info(system_information: &mut BTreeMap<String, String>) {
     // Note: this might be expensive, so it shouldn't be done often
-    GLOBAL_SYSTEM.lock().refresh_system();
-    GLOBAL_SYSTEM.lock().refresh_disks();
+    {
+        let mut system = GLOBAL_SYSTEM.lock();
+        system.refresh_memory();
+        system.refresh_cpu_all();
+    }
+    GLOBAL_DISKS.lock().refresh(true);
 
     // Collect relevant and available system information
     collect_cpu_info(system_information, &GLOBAL_SYSTEM);
-    collect_disk_info(system_information, &GLOBAL_SYSTEM);
+    collect_disk_info(system_information, &GLOBAL_DISKS);
     collect_memory_info(system_information, &GLOBAL_SYSTEM);
-    collect_sys_info(system_information, &GLOBAL_SYSTEM);
+    collect_sys_info(system_information);
 }
 
 /// Collects the cpu info and appends it to the given map
@@ -79,27 +88,32 @@ fn collect_cpu_info(
     utils::insert_optional_value(
         system_information,
         CPU_CORE_COUNT,
-        system_lock
-            .physical_core_count()
-            .map(|count| count.to_string()),
+        System::physical_core_count().map(|count| count.to_string()),
     );
 
-    // Collect the overall CPU info
-    let global_cpu = system_lock.global_cpu_info();
-    system_information.insert(CPU_BRAND.into(), global_cpu.brand().into());
-    system_information.insert(CPU_FREQUENCY.into(), global_cpu.frequency().to_string());
-    system_information.insert(CPU_NAME.into(), global_cpu.name().into());
-    system_information.insert(CPU_VENDOR_ID.into(), global_cpu.vendor_id().into());
+    // Collect the overall CPU info. Brand and vendor are the same across CPUs.
+    let (brand, vendor_id) = cpus
+        .first()
+        .map(|cpu| (cpu.brand(), cpu.vendor_id()))
+        .unwrap_or_default();
+    let frequency = cpus.iter().map(|cpu| cpu.frequency()).max().unwrap_or(0);
+    system_information.insert(CPU_BRAND.into(), brand.into());
+    system_information.insert(CPU_FREQUENCY.into(), frequency.to_string());
+    system_information.insert(CPU_NAME.into(), GLOBAL_CPU_NAME.into());
+    system_information.insert(CPU_VENDOR_ID.into(), vendor_id.into());
 }
 
 /// Collects the disk info and appends it to the given map
 fn collect_disk_info(
     system_information: &mut BTreeMap<String, String>,
-    system: &Lazy<Mutex<System>>,
+    disks: &Lazy<Mutex<Disks>>,
 ) {
-    // Collect the number of disks
-    let system_lock = system.lock();
-    let disks = system_lock.disks();
+    // Collect the number of disks. Older sysinfo versions skipped disks without a known size.
+    let disks_lock = disks.lock();
+    let disks: Vec<_> = disks_lock
+        .iter()
+        .filter(|disk| disk.total_space() != 0)
+        .collect();
     utils::insert_optional_value(
         system_information,
         DISK_COUNT,
@@ -131,7 +145,7 @@ fn collect_disk_info(
     system_information.insert(DISK_FILE_SYSTEM.into(), format!("{:?}", disk.file_system()));
     system_information.insert(DISK_NAME.into(), format!("{:?}", disk.name()));
     system_information.insert(DISK_TOTAL_SPACE.into(), disk.total_space().to_string());
-    system_information.insert(DISK_TYPE.into(), format!("{:?}", disk.type_()));
+    system_information.insert(DISK_TYPE.into(), format!("{:?}", disk.kind()));
 }
 
 /// Collects the memory info and appends it to the given map
@@ -150,24 +164,17 @@ fn collect_memory_info(
 }
 
 /// Collects the sys info and appends it to the given map
-fn collect_sys_info(
-    system_information: &mut BTreeMap<String, String>,
-    system: &Lazy<Mutex<System>>,
-) {
-    utils::insert_optional_value(
-        system_information,
-        SYSTEM_HOST_NAME,
-        system.lock().host_name(),
-    );
+fn collect_sys_info(system_information: &mut BTreeMap<String, String>) {
+    utils::insert_optional_value(system_information, SYSTEM_HOST_NAME, System::host_name());
     utils::insert_optional_value(
         system_information,
         SYSTEM_KERNEL_VERSION,
-        system.lock().kernel_version(),
+        System::kernel_version(),
     );
-    utils::insert_optional_value(system_information, SYSTEM_NAME, system.lock().name());
+    utils::insert_optional_value(system_information, SYSTEM_NAME, System::name());
     utils::insert_optional_value(
         system_information,
         SYSTEM_OS_VERSION,
-        system.lock().long_os_version(),
+        System::long_os_version(),
     );
 }
