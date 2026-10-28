@@ -248,12 +248,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         // Call the shared implementation.
         self.with_inner("enqueue_by_execution", |inner| {
-            inner.enqueue_chunk(
-                chunk,
-                Some(chunk_verifier),
-                "execute",
-                /* commit_partial_block = */ false,
-            )
+            inner.enqueue_chunk(chunk, Some(chunk_verifier), "execute")
         })
     }
 
@@ -304,12 +299,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         // Call the shared implementation.
         self.with_inner("enqueue_by_outputs", |inner| {
-            inner.enqueue_chunk(
-                chunk,
-                Some(chunk_verifier),
-                "apply",
-                /* commit_partial_block = */ false,
-            )
+            inner.enqueue_chunk(chunk, Some(chunk_verifier), "apply")
         })
     }
 
@@ -418,7 +408,6 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         chunk: TransactionChunk,
         chunk_verifier: Option<StateSyncChunkVerifier>,
         mode_for_log: &'static str,
-        commit_partial_block: bool,
     ) -> Result<()> {
         let parent_state = self.commit_queue.lock().latest_state().clone();
 
@@ -451,8 +440,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .zip(position_floor.as_ref())
             .map(|(overlay, floor)| PositionParent { overlay, floor });
 
-        // Hold back partial blocks until the next chunk completes them or they are committed on
-        // demand. The one in the queue is only replaced once enqueued, so it survives failures.
+        // Hold back partial blocks until the next chunk completes them. The one in the queue is only
+        // replaced once enqueued, so it survives failures.
         let mut chunk = match self.commit_queue.lock().partial_block().cloned() {
             Some(mut partial_block) => {
                 partial_block.append(chunk);
@@ -460,11 +449,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             },
             None => chunk,
         };
-        let partial_block = if commit_partial_block {
-            None
-        } else {
-            chunk.split_off_partial_block()
-        };
+        let partial_block = chunk.split_off_partial_block();
         let num_txns_held_back = partial_block.as_ref().map_or(0, TransactionChunk::len);
         // If no block is completed, nothing is executed for the proof to be verified against.
         let chunk_verifier = chunk_verifier.filter(|_| !chunk.is_empty());
@@ -644,15 +629,6 @@ impl<V: VMBlockExecutor> TransactionReplayer for ChunkExecutor<V> {
 
         self.with_inner("replayer_commit", |inner| inner.commit())
     }
-
-    fn commit_partial_block(&self) -> Result<Option<Version>> {
-        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit_partial_block"]);
-
-        self.maybe_initialize("replayer_commit_partial_block")?;
-        self.with_inner("replayer_commit_partial_block", |inner| {
-            inner.commit_partial_block()
-        })
-    }
 }
 
 impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
@@ -722,38 +698,6 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         );
 
         Ok(output.expect_last_version())
-    }
-
-    fn commit_partial_block(&self) -> Result<Option<Version>> {
-        let next_version = {
-            let commit_queue = self.commit_queue.lock();
-            ensure!(
-                commit_queue.is_empty(),
-                "Drain the chunk pipeline before committing the partial block"
-            );
-            let Some(partial_block) = commit_queue.partial_block() else {
-                return Ok(None);
-            };
-            partial_block.next_version()
-        };
-
-        // Nothing but the partial block held back is enqueued.
-        let chunk = TransactionChunk {
-            transactions: Vec::new(),
-            // Keeps the outputs of the partial block when appended.
-            transaction_outputs: Some(Vec::new()),
-            persisted_aux_info: Vec::new(),
-            transaction_infos: Vec::new(),
-            first_version: next_version,
-        };
-        self.enqueue_chunk(
-            chunk,
-            None,
-            "partial_block",
-            /* commit_partial_block = */ true,
-        )?;
-        self.update_ledger()?;
-        self.commit().map(Some)
     }
 
     /// Remove `end_version - begin_version` transactions from the mutable input arguments and replay.
@@ -957,9 +901,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             transaction_infos: txn_infos,
             first_version: begin_version,
         };
-        self.enqueue_chunk(
-            chunk, None, "replay", /* commit_partial_block = */ false,
-        )?;
+        self.enqueue_chunk(chunk, None, "replay")?;
 
         Ok(())
     }
