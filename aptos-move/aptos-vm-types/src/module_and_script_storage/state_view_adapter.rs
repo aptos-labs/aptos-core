@@ -105,18 +105,25 @@ where
     ) -> &dyn ScriptCache<Key = [u8; 32], Deserialized = CompiledScript, Verified = Script> {
         &self.storage
     }
+}
 
+// Separate from the impl above because ambassador cannot parse `use<..>`.
+impl<S, E> AptosCodeStorageAdapter<'_, S, E>
+where
+    S: StateView,
+    E: WithRuntimeEnvironment,
+{
     /// Drains cached verified modules from the code storage, transforming them into format used by
     /// global caches.
     pub fn into_verified_module_code_iter(
         self,
     ) -> Result<
         impl Iterator<
-            Item = (
-                ModuleId,
-                Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
-            ),
-        >,
+                Item = (
+                    ModuleId,
+                    Arc<ModuleCode<CompiledModule, Module, AptosModuleExtension>>,
+                ),
+            > + use<S, E>,
         PanicError,
     > {
         let (state_view, verified_modules_iter) = self
