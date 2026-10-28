@@ -96,10 +96,6 @@ pub enum PreExecutionCheckFailure {
     EncryptedGasPriceBelowMinimum { price: u64, min: u64 },
     #[error("gas unit price {price} is below the raised-limits minimum {min}")]
     HighLimitGasPriceBelowMinimum { price: u64, min: u64 },
-    #[error(
-        "raised-limits max fee overflows at gas unit price {price} and max gas amount {max_gas}"
-    )]
-    HighLimitMaxFeeOverflow { price: u64, max_gas: u64 },
     #[error("limits multiplier {percent}% must be above {min}% and at most {max}%")]
     InvalidLimitsMultiplier { percent: u64, min: u64, max: u64 },
     #[error("an approved governance script may not request raised limits")]

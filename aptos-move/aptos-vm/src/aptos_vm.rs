@@ -624,9 +624,12 @@ impl AptosVM {
         // by `k`, so `gas_used` in the `max_gas_units` slot reuses the same
         // formula the epilogue uses to inflate its own budget.
         let billed_gas_used = match &txn_data.high_limit_pricing {
-            Some(pricing) => {
-                pricing.epilogue_max_gas_units(gas_used, gas_used, execution_gas_units, io_gas_units)
-            },
+            Some(pricing) => pricing.epilogue_max_gas_units(
+                gas_used,
+                gas_used,
+                execution_gas_units,
+                io_gas_units,
+            ),
             None => gas_used,
         };
         FeeStatement::builder()
@@ -2385,9 +2388,9 @@ impl AptosVM {
         let initial_balance = if self.features().is_account_abstraction_enabled()
             || self.features().is_derivable_account_abstraction_enabled()
         {
-            vm_params.txn.max_aa_gas.min(txn.max_gas_amount().into())
+            vm_params.txn.max_aa_gas.min(txn_metadata.max_gas_amount())
         } else {
-            txn.max_gas_amount().into()
+            txn_metadata.max_gas_amount()
         };
 
         let mut gas_meter = make_gas_meter(

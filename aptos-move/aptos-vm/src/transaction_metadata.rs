@@ -138,7 +138,7 @@ impl TransactionMetadata {
         let max_gas_amount: Gas = txn.max_gas_amount().into();
         let max_gas_amount = match &high_limit_pricing {
             Some(pricing) => {
-                Gas::new(u64::from(max_gas_amount) / pricing.excess_price_multiplier())
+                Gas::new(u64::from(max_gas_amount) / pricing.excess_gas_price_multiplier())
             },
             None => max_gas_amount,
         };

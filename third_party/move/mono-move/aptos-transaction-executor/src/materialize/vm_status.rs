@@ -137,7 +137,6 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
         F::HighLimitGasPriceBelowMinimum { .. } => {
             StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
         },
-        F::HighLimitMaxFeeOverflow { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
         F::InvalidLimitsMultiplier { .. } => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
         F::LimitsRequestOnGovernanceScript => {
             StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT

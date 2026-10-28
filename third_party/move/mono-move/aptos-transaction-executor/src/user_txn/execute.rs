@@ -72,7 +72,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             HighLimitPricing::new(self.env.gas_feature_version(), &gas_params.vm.txn)
         });
         if let Some(pricing) = &high_limit_pricing {
-            txn_data.max_gas_amount /= pricing.excess_price_multiplier();
+            txn_data.max_gas_amount /= pricing.excess_gas_price_multiplier();
         }
 
         // ========================== Session setup ===========================
@@ -203,11 +203,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(interp, self.symbols, &signers, txn_data, high_limit_pricing)
-        .map_err(|failure| DiscardReason::Failure {
-            stage: ExecutionStage::Prologue,
-            failure,
-        })?;
+        run_prologue(interp, self.symbols, &signers, txn_data, high_limit_pricing).map_err(
+            |failure| DiscardReason::Failure {
+                stage: ExecutionStage::Prologue,
+                failure,
+            },
+        )?;
         // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
         checkpoint(interp)?;
 

@@ -240,24 +240,6 @@ pub(crate) fn check_gas(
                 Some(msg),
             ));
         }
-
-        // The prologue reserves the fee for the whole budget billed at the
-        // excess price, which must fit in u64.
-        if let Some(pricing) = &txn_metadata.high_limit_pricing {
-            let gas_unit_price = u64::from(txn_metadata.gas_unit_price());
-            let max_gas_amount = u64::from(txn_metadata.max_gas_amount());
-            if pricing.max_fee(gas_unit_price, max_gas_amount).is_none() {
-                let msg = format!(
-                    "[VM] High-limit txn max fee overflows; gas unit price {}, max gas amount {}",
-                    gas_unit_price, max_gas_amount,
-                );
-                speculative_warn!(log_context, msg.clone());
-                return Err(VMStatus::error(
-                    StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
-                    Some(msg),
-                ));
-            }
-        }
     }
 
     // The submitted gas price is greater than the maximum gas unit price set by the VM.

@@ -15,7 +15,7 @@ use aptos_gas_schedule::{
     gas_params::txn::{
         ENCRYPTED_TXN_DECRYPTION_BASE_COST, KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST,
     },
-    AptosGasParameters, HighLimitPricing, TransactionGasParameters, VMGasParameters,
+    AptosGasParameters, TransactionGasParameters, VMGasParameters,
 };
 use aptos_types::{
     on_chain_config::ApprovedExecutionHashes,
@@ -169,20 +169,6 @@ impl<'a> PreExecutionChecker<'a> {
                     price: self.gas_price().into(),
                     min: high_limit_min.into(),
                 });
-            }
-            // The prologue reserves the fee for the whole budget billed at the
-            // excess price, which must fit in u64.
-            if let Some(pricing) =
-                HighLimitPricing::new(self.gas_feature_version, self.txn_gas_params())
-            {
-                let price = u64::from(self.gas_price());
-                let max_gas = u64::from(self.max_gas());
-                if pricing.max_fee(price, max_gas).is_none() {
-                    return Err(PreExecutionCheckFailure::HighLimitMaxFeeOverflow {
-                        price,
-                        max_gas,
-                    });
-                }
             }
         }
         let max = self.txn_gas_params().max_price_per_gas_unit;

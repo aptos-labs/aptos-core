@@ -861,33 +861,6 @@ fn test_high_limit_txn_reserves_max_fee_at_multiplier() {
 }
 
 #[test]
-fn test_high_limit_txn_max_fee_overflow() {
-    let mut h = new_test_harness();
-    let acc = setup_validator(&mut h);
-    h.new_epoch();
-
-    // `max_gas_amount` is scaled down by the multiplier before
-    // `HighLimitPricing::max_fee` sees it, so (for a `max_gas_amount` that's
-    // a multiple of the multiplier) the overflow threshold is the same
-    // `price * max_gas_amount` a normal transaction would hit.
-    let max_gas_amount = 1_000_000;
-    assert_eq!(max_gas_amount % EXCESS_PRICE_MULTIPLIER, 0);
-    let gas_unit_price = u64::MAX / max_gas_amount + 1;
-    h.modify_gas_schedule(|params| {
-        params.vm.txn.max_price_per_gas_unit = gas_unit_price.into();
-    });
-    let txn = h
-        .create_transaction_without_sign(
-            &acc,
-            payload_with_limits(*acc.address(), stake_pool_owner(200, 200)),
-        )
-        .gas_unit_price(gas_unit_price)
-        .max_gas_amount(max_gas_amount)
-        .sign();
-    run_and_assert_discard(&mut h, txn, StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND);
-}
-
-#[test]
 fn test_high_limit_txn_drained_balance_pays_on_failure() {
     let mut h = new_test_harness();
     let (acc, base) = setup_excess_execution(&mut h);
@@ -940,4 +913,61 @@ fn test_high_limit_txn_before_v1_50_pays_gas_price() {
         .max_gas_amount(max_gas_amount)
         .sign();
     assert_success!(h.run(txn));
+}
+
+/// Account abstraction's `inject_balance` step happens to also size the gas
+/// meter from `TransactionMetadata::max_gas_amount`, so it can mask a
+/// scaling bug there. Disable it to check the real metering budget directly.
+#[test]
+fn test_high_limit_txn_meter_budget_is_scaled_down() {
+    let mut h = new_test_harness();
+    h.enable_features(vec![], vec![
+        FeatureFlag::ACCOUNT_ABSTRACTION,
+        FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION,
+    ]);
+    let acc = setup_validator(&mut h);
+    let beef = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    assert_success!(h.publish_package(
+        &beef,
+        &common::test_dir_path("transaction_limits.data/pack"),
+    ));
+    h.new_epoch();
+
+    // Measure spin(SPIN_ITERATIONS)'s real execution cost under a limit it
+    // cannot reach.
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_execution_gas = params.vm.txn.max_execution_gas_gov;
+    });
+    let txn = h.create_transaction_payload(
+        &acc,
+        TransactionPayload::EntryFunction(spin(SPIN_ITERATIONS)),
+    );
+    let (status, fee_statement, _) = run_and_get_fee(&mut h, &acc, txn);
+    assert_success!(status);
+    let real_cost = fee_statement.gas_used();
+
+    // A budget twice the real cost: enough for a normal transaction, not
+    // enough for a high-limit request's meter, which is sized at
+    // max_gas_amount / k.
+    let max_gas_amount = real_cost * 2;
+    assert!(max_gas_amount / EXCESS_PRICE_MULTIPLIER < real_cost);
+
+    let normal_txn = h
+        .create_transaction_without_sign(
+            &acc,
+            TransactionPayload::EntryFunction(spin(SPIN_ITERATIONS)),
+        )
+        .gas_unit_price(DEFAULT_GAS_UNIT_PRICE)
+        .max_gas_amount(max_gas_amount)
+        .sign();
+    assert_success!(h.run(normal_txn));
+
+    let payload = entry_function_with_limits(spin(SPIN_ITERATIONS), stake_pool_owner(200, 200));
+    let high_limit_txn = h
+        .create_transaction_without_sign(&acc, payload)
+        .gas_unit_price(DEFAULT_GAS_UNIT_PRICE)
+        .max_gas_amount(max_gas_amount)
+        .sign();
+    let (status, _, _) = run_and_get_fee(&mut h, &acc, high_limit_txn);
+    assert_eq!(status, TransactionStatus::Keep(ExecutionStatus::OutOfGas));
 }

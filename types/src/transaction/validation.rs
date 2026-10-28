@@ -44,9 +44,6 @@ pub enum EpilogueArgs {
     V1 {
         fee_statement: FeeStatement,
         txn_gas_price: u64,
-        /// The maximum gas units the fee is billed against. For a staking-backed
-        /// limits request, gas used above the base limits counts more than once,
-        /// so this can exceed the transaction's max gas amount.
         txn_max_gas_units: u64,
         gas_units_remaining: u64,
         is_simulation: bool,

@@ -347,48 +347,49 @@ impl ToUnitWithParams<TransactionGasParameters, InternalGasUnit> for GasUnit {
 }
 
 /// Pricing for transactions with a staking-backed limits request. Gas used
-/// above the base execution and IO limits costs `k` times the gas price.
+/// above the base execution and IO limits costs a higher gas price.
 #[derive(Clone, Copy, Debug)]
 pub struct HighLimitPricing {
-    excess_price_multiplier: u64,
-    base_execution_gas: Gas,
-    base_io_gas: Gas,
+    /// Multiplier for gas price to charge for any gas used above base
+    /// execution and IO limits.
+    excess_gas_price_multiplier: u64,
+    base_max_execution_gas: Gas,
+    base_max_io_gas: Gas,
 }
 
 impl HighLimitPricing {
-    /// Returns `None` before gas feature version 1.50, which bills all gas at
-    /// the gas price.
+    /// Returns [`None`] if high limit pricing is not enabled.
     pub fn new(gas_feature_version: u64, params: &TransactionGasParameters) -> Option<Self> {
         if gas_feature_version < RELEASE_V1_50 {
             return None;
         }
         Some(Self {
-            // Below 1x the reserve would not cover the gas used.
-            excess_price_multiplier: u64::from(params.high_limit_txn_excess_price_multiplier)
+            // Price multiplier must be at least 1x.
+            excess_gas_price_multiplier: u64::from(params.high_limit_txn_excess_price_multiplier)
                 .max(1),
-            base_execution_gas: params
+            base_max_execution_gas: params
                 .max_execution_gas
                 .to_unit_round_up_with_params(params),
-            base_io_gas: params.max_io_gas.to_unit_round_up_with_params(params),
+            base_max_io_gas: params.max_io_gas.to_unit_round_up_with_params(params),
         })
     }
 
     /// The multiple of the gas price that gas used above the base execution
     /// and IO limits costs.
-    pub fn excess_price_multiplier(&self) -> u64 {
-        self.excess_price_multiplier
+    pub fn excess_gas_price_multiplier(&self) -> u64 {
+        self.excess_gas_price_multiplier
     }
 
     /// The most the transaction can be charged, or `None` if it overflows.
     pub fn max_fee(&self, gas_unit_price: u64, max_gas_units: u64) -> Option<u64> {
         gas_unit_price
-            .checked_mul(self.excess_price_multiplier)?
+            .checked_mul(self.excess_gas_price_multiplier)?
             .checked_mul(max_gas_units)
     }
 
     /// The gas price the prologue reserves the maximum fee at.
     pub fn reserve_price(&self, gas_unit_price: u64) -> u64 {
-        gas_unit_price.saturating_mul(self.excess_price_multiplier)
+        gas_unit_price.saturating_mul(self.excess_gas_price_multiplier)
     }
 
     /// The maximum gas units the epilogue bills against. Each excess unit is
@@ -404,10 +405,10 @@ impl HighLimitPricing {
         // Execution and IO are rounded up separately, so their sum can exceed
         // the gas used.
         let excess = execution_gas_used
-            .saturating_sub(self.base_execution_gas.into())
-            .saturating_add(io_gas_used.saturating_sub(self.base_io_gas.into()))
+            .saturating_sub(self.base_max_execution_gas.into())
+            .saturating_add(io_gas_used.saturating_sub(self.base_max_io_gas.into()))
             .min(gas_used);
-        max_gas_units.saturating_add((self.excess_price_multiplier - 1).saturating_mul(excess))
+        max_gas_units.saturating_add((self.excess_gas_price_multiplier - 1).saturating_mul(excess))
     }
 }
 
@@ -437,8 +438,8 @@ mod tests {
         params.max_execution_gas = InternalGas::new(1_000 * GAS_SCALING_FACTOR + 1);
         params.max_io_gas = InternalGas::new(2_000 * GAS_SCALING_FACTOR - 1);
         let pricing = HighLimitPricing::new(RELEASE_V1_50, &params).unwrap();
-        assert_eq!(pricing.base_execution_gas, Gas::new(1_001));
-        assert_eq!(pricing.base_io_gas, Gas::new(2_000));
+        assert_eq!(pricing.base_max_execution_gas, Gas::new(1_001));
+        assert_eq!(pricing.base_max_io_gas, Gas::new(2_000));
     }
 
     #[test]
