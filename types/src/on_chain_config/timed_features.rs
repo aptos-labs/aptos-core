@@ -356,20 +356,20 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterPackClosureCapturedValues, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 27, 18, 0, 0)
+                .with_ymd_and_hms(2026, 10, 28, 18, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterPackClosureCapturedValues, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 30, 12, 0, 0)
+                .with_ymd_and_hms(2026, 10, 31, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
             (UniformVariantFieldHandles, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 27, 18, 0, 0)
+                .with_ymd_and_hms(2026, 10, 28, 18, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (UniformVariantFieldHandles, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 30, 12, 0, 0)
+                .with_ymd_and_hms(2026, 10, 31, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -379,11 +379,11 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterClosureCapturedLayouts, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 27, 18, 0, 0)
+                .with_ymd_and_hms(2026, 10, 28, 18, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterClosureCapturedLayouts, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 10, 30, 12, 0, 0)
+                .with_ymd_and_hms(2026, 10, 31, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -611,8 +611,8 @@ mod test {
             MeterClosureCapturedLayouts,
         ];
         for (chain_id, activation_time) in [
-            (ChainId::testnet(), (2026, 10, 27, 18)),
-            (ChainId::mainnet(), (2026, 10, 30, 12)),
+            (ChainId::testnet(), (2026, 10, 28, 18)),
+            (ChainId::mainnet(), (2026, 10, 31, 12)),
         ] {
             let activation_micros = Los_Angeles
                 .with_ymd_and_hms(
