@@ -17,7 +17,7 @@ pub use instr::InstructionGasParameters;
 pub use misc::{AbstractValueSizeGasParameters, MiscGasParameters};
 pub use move_stdlib::MoveStdlibGasParameters;
 pub use table::TableGasParameters;
-pub use transaction::TransactionGasParameters;
+pub use transaction::{HighLimitPricingIfAvailable, TransactionGasParameters};
 
 pub mod gas_params {
     use super::*;

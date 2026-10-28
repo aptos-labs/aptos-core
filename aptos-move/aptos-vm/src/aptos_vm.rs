@@ -615,10 +615,17 @@ impl AptosVM {
         storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
+        let execution_gas_units = u64::from(gas_meter.execution_gas_used());
+        let io_gas_units = u64::from(gas_meter.io_gas_used());
+        let billed_gas_used = txn_data.high_limit_pricing.billed_gas_used(
+            gas_used,
+            execution_gas_units,
+            io_gas_units,
+        );
         FeeStatement::builder()
-            .total_charge_gas_units(gas_used)
-            .execution_gas_units(u64::from(gas_meter.execution_gas_used()))
-            .io_gas_units(u64::from(gas_meter.io_gas_used()))
+            .total_charge_gas_units(billed_gas_used)
+            .execution_gas_units(execution_gas_units)
+            .io_gas_units(io_gas_units)
             .storage_fee_octas(u64::from(gas_meter.storage_fee_used()))
             .storage_fee_refund_octas(storage_fee_refund)
             .build()
@@ -2371,9 +2378,9 @@ impl AptosVM {
         let initial_balance = if self.features().is_account_abstraction_enabled()
             || self.features().is_derivable_account_abstraction_enabled()
         {
-            vm_params.txn.max_aa_gas.min(txn.max_gas_amount().into())
+            vm_params.txn.max_aa_gas.min(txn_metadata.max_gas_amount())
         } else {
-            txn.max_gas_amount().into()
+            txn_metadata.max_gas_amount()
         };
 
         let mut gas_meter = make_gas_meter(

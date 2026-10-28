@@ -47,7 +47,23 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         aux_info: &AuxiliaryInfo,
     ) -> TxnOutcome {
         let guard = self.guard;
-        let txn_data = TxnMetadata::new(txn, aux_info);
+        let gas_params = match self.env.gas_params().as_ref() {
+            Ok(gas_params) => gas_params,
+            Err(e) => {
+                return TxnOutcome::Discarded {
+                    reason: DiscardReason::InvariantViolation(format!(
+                        "the gas schedule is unavailable: {e}"
+                    )),
+                    effects: None,
+                };
+            },
+        };
+        let txn_data = TxnMetadata::new(
+            txn,
+            aux_info,
+            self.env.gas_feature_version(),
+            &gas_params.vm.txn,
+        );
 
         // ========================== Session setup ===========================
         // One session hosts the whole transaction: pre-execution checks,
@@ -214,7 +230,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ============================ Epilogue ==============================
         // Transaction cleanup -- charge gas, bump sequence number etc.
-        let fee_statement = placeholder_fee_statement(gas_used);
+        //
+        // TODO(completeness): pass IO charges for MonoMove.
+        let billed_gas_used = txn_data
+            .high_limit_pricing
+            .billed_gas_used(gas_used, gas_used, 0);
+        let fee_statement = placeholder_fee_statement(gas_used, billed_gas_used);
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(
                 interp,
@@ -330,14 +351,12 @@ fn transaction_extensions(txn_data: &TxnMetadata, usage: StateStorageUsage) -> N
     )
 }
 
-/// The fee statement for a transaction that consumed `gas_used` units.
-//
 // TODO(metering): IO gas, storage fees, and refunds are all zero until they
-// are charged; `gas_used` is in uncalibrated MonoMove units.
-fn placeholder_fee_statement(gas_used: u64) -> FeeStatement {
+// are charged; `execution_gas_used` is in uncalibrated MonoMove units.
+fn placeholder_fee_statement(execution_gas_used: u64, billed_gas_used: u64) -> FeeStatement {
     FeeStatement::builder()
-        .total_charge_gas_units(gas_used)
-        .execution_gas_units(gas_used)
+        .total_charge_gas_units(billed_gas_used)
+        .execution_gas_units(execution_gas_used)
         .io_gas_units(0)
         .storage_fee_octas(0)
         .storage_fee_refund_octas(0)

@@ -61,6 +61,9 @@ pub(crate) fn run_prologue<'a>(
     signers: &ValidationSigners,
     txn_data: &TxnMetadata,
 ) -> Result<(), MoveExecutionFailure> {
+    let txn_gas_price = txn_data
+        .high_limit_pricing
+        .reserve_price(txn_data.gas_unit_price);
     let args = PrologueArgs::V1 {
         needs_fee_payer_auth_check: txn_data.fee_payer.is_some(),
         txn_sender_public_key: txn_data.sender_auth_key.clone(),
@@ -68,7 +71,7 @@ pub(crate) fn run_prologue<'a>(
         replay_protector: txn_data.replay_protector,
         secondary_signer_addresses: txn_data.secondary_signers.clone(),
         secondary_signer_public_key_hashes: txn_data.secondary_auth_keys.clone(),
-        txn_gas_price: txn_data.gas_unit_price,
+        txn_gas_price,
         txn_max_gas_units: txn_data.max_gas_amount,
         txn_expiration_time: txn_data.expiration_timestamp_secs,
         chain_id: txn_data.chain_id,
@@ -94,10 +97,16 @@ pub(crate) fn run_epilogue<'a>(
     fee_statement: FeeStatement,
     gas_units_remaining: u64,
 ) -> Result<(), MoveExecutionFailure> {
+    let txn_max_gas_units = txn_data.high_limit_pricing.epilogue_max_gas_units(
+        txn_data.max_gas_amount,
+        gas_units_remaining,
+        fee_statement.execution_gas_used(),
+        fee_statement.io_gas_used(),
+    );
     let args = EpilogueArgs::V1 {
         fee_statement,
         txn_gas_price: txn_data.gas_unit_price,
-        txn_max_gas_units: txn_data.max_gas_amount,
+        txn_max_gas_units,
         gas_units_remaining,
         is_simulation: false,
         is_orderless_txn: txn_data.is_orderless(),

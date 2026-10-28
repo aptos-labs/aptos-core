@@ -3,6 +3,7 @@
 
 use crate::AptosVM;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
+use aptos_gas_schedule::HighLimitPricingIfAvailable;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -44,6 +45,9 @@ pub struct TransactionMetadata {
     pub transaction_index_kind: TransactionIndexKind,
     /// Transaction limits request (requested by user or set by the system).
     pub txn_limits: Option<TxnLimitsRequest>,
+    /// Set for a staking-backed limits request, which pays more for gas used
+    /// above the base limits.
+    pub high_limit_pricing: HighLimitPricingIfAvailable,
 }
 
 impl TransactionMetadata {
@@ -112,6 +116,28 @@ impl TransactionMetadata {
             None
         };
 
+        let high_limit_pricing = match &txn_limits {
+            Some(TxnLimitsRequest::Staking(_)) => {
+                let env = vm.environment();
+                let gas_params = env.gas_params().as_ref().map_err(|err| {
+                    VMStatus::error(
+                        StatusCode::VM_STARTUP_FAILURE,
+                        Some(format!("VM Startup Failed. {}", err)),
+                    )
+                })?;
+                HighLimitPricingIfAvailable::new(vm.gas_feature_version(), &gas_params.vm.txn)
+            },
+            Some(TxnLimitsRequest::ApprovedGovernanceScript) | None => {
+                HighLimitPricingIfAvailable::default()
+            },
+        };
+
+        // For high-limit transaction, maximum gas amount is scaled down so
+        // that a higher gas price can be charged for units that exceed
+        // baseline limits on execution and IO.
+        let max_gas_amount =
+            Gas::new(high_limit_pricing.scale_max_gas_amount(txn.max_gas_amount()));
+
         Ok(Self {
             sender: txn.sender(),
             authentication_proof: txn.authenticator().sender().authentication_proof(),
@@ -128,7 +154,7 @@ impl TransactionMetadata {
                 .authenticator()
                 .fee_payer_signer()
                 .map(|signer| signer.authentication_proof()),
-            max_gas_amount: txn.max_gas_amount().into(),
+            max_gas_amount,
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (transaction_size as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
@@ -202,6 +228,7 @@ impl TransactionMetadata {
             },
             transaction_index_kind: auxiliary_info.transaction_index_kind(),
             txn_limits,
+            high_limit_pricing,
         })
     }
 

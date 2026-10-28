@@ -8,6 +8,10 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V55:
+///   - New `txn.high_limit_txn_excess_price_multiplier` parameter: transactions with a
+///     staking-backed limits request pay this multiple of the gas price for gas used above the
+///     base execution and IO limits
 /// - V54:
 ///   - New `txn.min_module_bytecode_version` parameter gating module publishing on a minimum
 ///     bytecode version
@@ -92,7 +96,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_50;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_51;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -137,4 +141,5 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_48: u64 = 52;
     pub const RELEASE_V1_49: u64 = 53;
     pub const RELEASE_V1_50: u64 = 54;
+    pub const RELEASE_V1_51: u64 = 55;
 }
