@@ -314,7 +314,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.93"
+rust-version = "1.95"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -836,7 +836,7 @@ strum = "0.27.1"
 strum_macros = "0.27.1"
 sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
-sysinfo = "0.28.4"
+sysinfo = { version = "0.39.6", features = ["multithread"] }
 tar = "0.4.40"
 tempfile = "3.27.0"
 tera = "1.16.0"
