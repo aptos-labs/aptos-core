@@ -230,11 +230,12 @@ impl DbWriter for AptosDB {
                 );
             }
 
-            // An empty hot state snapshot streams no values, so nothing has written the root that
-            // later hot state commits build on, or the hot KV commit progress that a restart
-            // requires.
-            if output_with_proof.proof.transaction_infos[0].hot_state_checkpoint_hash()
-                == Some(*SPARSE_MERKLE_PLACEHOLDER_HASH)
+            // An empty hot state snapshot streams no values, and a target without a hot root has no
+            // snapshot to sync, so nothing has written the root that later hot state commits build
+            // on, or the hot KV commit progress that a restart requires.
+            if output_with_proof.proof.transaction_infos[0]
+                .hot_state_checkpoint_hash()
+                .is_none_or(|root| root == *SPARSE_MERKLE_PLACEHOLDER_HASH)
             {
                 StateStore::write_empty_hot_state(
                     &self.state_store.hot_state_merkle_db,

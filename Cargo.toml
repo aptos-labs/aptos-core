@@ -47,6 +47,7 @@ members = [
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
     "aptos-move/framework/natives",
+    "aptos-move/framework/order-natives",
     "aptos-move/framework/position-natives",
     "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
@@ -225,6 +226,7 @@ members = [
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
     "third_party/move/mono-move/testsuite",
+    "third_party/move/mono-move/vm-comparison",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -526,7 +528,7 @@ aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-index
 ] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1" }
 arbitrary = { version = "1.4.1", features = ["derive"] }
-arc-swap = "1.6.0"
+arc-swap = "1.9.3"
 ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
 ark-bn254 = { version = "0.5.0", features = ["curve"] }
 ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
@@ -546,13 +548,13 @@ async-recursion = "1.0.5"
 async-trait = "0.1.53"
 axum = "0.7.5"
 backoff = { version = "0.4.0", features = ["tokio"] }
-backtrace = "0.3.58"
+backtrace = "0.3.76"
 base64 = "0.13.0"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
 bigdecimal = { version = "0.4.0", features = ["serde"] }
-bitflags = "2.11.0"
-bitvec = "1.0.1"
+bitflags = "2.13.2"
+bitvec = "1.1.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blake3 = { version = "1.5.4", features = ["mmap", "rayon"] }
@@ -561,7 +563,7 @@ blst = "0.3.15"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
-bon = "3.9.3"
+bon = "3.10.3"
 boxcar = "0.2.13"
 build_html = "2.5.0"
 bulletproofs = { version = "4.0.0" }
@@ -575,14 +577,14 @@ chrono = { version = "0.4.19", features = ["clock", "serde"] }
 chrono-tz = "0.10.1"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = [
+clap = { version = "4.6.7", features = [
     "derive",
     "env",
     "unstable-styles",
     "wrap_help",
 ] }
-clap-verbosity-flag = "2.1.1"
-clap_complete = "4.4.1"
+clap-verbosity-flag = "3.0.4"
+clap_complete = "4.6.11"
 cloud-storage = { version = "0.11.1", features = [
     "global-client",
     "rustls-tls",
@@ -595,9 +597,9 @@ console-subscriber = "0.3.0"
 core_affinity = "0.8.1"
 coset = "0.3"
 criterion = "0.8.2"
-crossbeam = "0.8.1"
-crossbeam-channel = "0.5.4"
-crossbeam-utils = "0.8"
+crossbeam = "0.8.5"
+crossbeam-channel = "0.5.17"
+crossbeam-utils = "0.8.23"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
@@ -627,7 +629,7 @@ dudect-bencher = "0.6"
 dunce = "1.0.4"
 ed25519-dalek = { version = "1.0.1", features = ["rand_core", "std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
-either = "1.6.1"
+either = "1.19.0"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 equivalent = "1.0"
@@ -725,12 +727,12 @@ num-derive = "0.4.2"
 num-integer = "0.1.42"
 num-traits = "0.2.19"
 num_cpus = "1.13.1"
-once_cell = "1.10.0"
+once_cell = "1.21.4"
 open = "5.3.1"
 opentelemetry = { version = "0.27.0", features = ["trace"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
-ordered-float = "3.9.1"
+ordered-float = "4.6.0"
 ouroboros = "0.18.5"
 owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
@@ -780,7 +782,7 @@ redis = { version = "0.22.3", features = [
 ] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 ref-cast = "1.0.6"
-regex = "1.9.3"
+regex = "1.13.1"
 reqwest = { version = "0.11.11", features = [
     "blocking",
     "cookies",
@@ -792,7 +794,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
-rlimit = "0.10.2"
+rlimit = "0.11.0"
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
@@ -840,20 +842,20 @@ tempfile = "3.3.0"
 tera = "1.16.0"
 termcolor = "1.1.2"
 test-case = "3.1.0"
-textwrap = "0.15.0"
+textwrap = "0.16.0"
 thiserror = "2.0.21"
 thousands = "0.2.0"
-thread_local = "1.1.7"
+thread_local = "1.1.10"
 threadpool = "1.8.1"
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
-tokio-stream = { version = "0.1.14", features = ["fs"] }
+tokio-stream = { version = "0.1.19", features = ["fs"] }
 tokio-test = "0.4.1"
-tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
+tokio-util = { version = "0.7.20", features = ["compat", "codec"] }
 toml = "0.7.4"
 tonic = { version = "0.12.3", features = [
     "tls-roots",
@@ -887,19 +889,20 @@ usdt = "0.6.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"
 version-compare = "0.1.1"
+vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
-which = "4.2.5"
-whoami = "1.5.0"
+whoami = "2.1.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-order-natives = { path = "aptos-move/framework/order-natives" }
 aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }

@@ -16,6 +16,22 @@ use move_core_types::vm_status::{StatusCode, VMStatus};
 /// other limits once position writes are gas-metered, instead of a const.
 pub const MAX_POSITION_WRITE_OPS_PER_TRANSACTION: usize = 1000;
 
+/// Cap on distinct orders a single transaction may write, a hard bound like
+/// [`MAX_POSITION_WRITE_OPS_PER_TRANSACTION`].
+///
+/// TODO[native_order](metering): derive from gas parameters once order writes
+/// are gas-metered.
+pub const MAX_ORDER_WRITE_OPS_PER_TRANSACTION: usize = 1000;
+
+/// Cap on the total bytes (key + value) of a transaction's order writes.
+/// Order values vary in size, so the count cap alone does not bound them.
+/// Separate from the regular write set's byte limits, which order writes do
+/// not count against.
+///
+/// TODO[native_order](metering): derive from gas parameters once order writes
+/// are gas-metered.
+pub const MAX_ORDER_WRITE_BYTES_PER_TRANSACTION: u64 = 1 << 20;
+
 #[derive(Clone, Debug)]
 pub struct ChangeSetConfigs {
     gas_feature_version: u64,
@@ -130,6 +146,18 @@ impl ChangeSetConfigs {
 
         if change_set.num_position_write_ops() > MAX_POSITION_WRITE_OPS_PER_TRANSACTION {
             return storage_write_limit_reached(Some("Too many position write ops."));
+        }
+
+        if change_set.num_order_write_ops() > MAX_ORDER_WRITE_OPS_PER_TRANSACTION {
+            return storage_write_limit_reached(Some("Too many order write ops."));
+        }
+
+        let order_write_bytes: u64 = change_set
+            .order_write_set_size_iter()
+            .filter_map(|(key, op_size)| Some(op_size.write_len()? + key.size() as u64))
+            .sum();
+        if order_write_bytes > MAX_ORDER_WRITE_BYTES_PER_TRANSACTION {
+            return storage_write_limit_reached(Some("Too many order write bytes."));
         }
 
         let mut write_set_size = 0;

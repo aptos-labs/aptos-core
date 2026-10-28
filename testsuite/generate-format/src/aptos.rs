@@ -123,6 +123,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<TradingNativeKey>(&samples)?;
+    tracer.trace_type::<write_set::Extension>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
     tracer.trace_type::<transaction::MultisigTransactionPayload>(&samples)?;
 

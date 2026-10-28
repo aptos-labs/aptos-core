@@ -2,15 +2,14 @@
 // module 0x42::generic_closure_pack
 
 fun call_identity(r0): u64 {
-  slots: params(1), locals(1), temps(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: |u64|(u64) has drop
-    r2: u64
   code:
   L0:
     0: r1 := pack_closure identity<u64>, 0, [] @0
-    1: [r2] := call_closure [|u64|(u64) has drop], [r0, r1] @4
-    2: ret [r2] @5
+    1: [x0] := call_closure [|u64|(u64) has drop], [r0, r1] @4
+    2: ret [x0] @5
 }
 
 fun call_pick(r0): u64 {
@@ -27,13 +26,13 @@ fun call_pick(r0): u64 {
     1: [r2] := call make_pick<u64>, [r0] @4
     2: r3 := add r0, #1 @8
     3: r4 := ld_true @9
-    4: [r3] := call_closure [|u64, bool|(u64) has drop], [r3, r4, r1] @11
-    5: r3 := mul r3, #1000 @13
+    4: [x0] := call_closure [|u64, bool|(u64) has drop], [r3, r4, r1] @11
+    5: r3 := mul x0, #1000 @13
     6: r5 := add r0, #1 @16
     7: r4 := ld_false @17
-    8: [r5] := call_closure [|u64, bool|(u64) has drop], [r5, r4, r2] @19
-    9: r5 := add r3, r5 @20
-    10: ret [r5] @21
+    8: [x0] := call_closure [|u64, bool|(u64) has drop], [r5, r4, r2] @19
+    9: r3 := add r3, x0 @20
+    10: ret [r3] @21
 }
 
 fun identity(r0): _0 {
@@ -71,21 +70,20 @@ fun pick(r0, r1, r2): _0 {
 // module 0x42::generic_closure_pack
 
 fun call_identity() {
-  frame_data_size: 24
-  entry_gas: 151
+  frame_data_size: 16
+  entry_gas: 125
   code:
     0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[] @0
     1: CallClosure closure=[8], provided_args=[[0](8)] @4
-    2: Move8 [16] <- [48] @4
-    3: Move8 [0] <- [16] @5
-    4: Return @5
+    2: Move8 [0] <- [40] @5
+    3: Return @5
   safe_point_layouts:
     0: []
 }
 
 fun call_pick() {
   frame_data_size: 48
-  entry_gas: 388
+  entry_gas: 336
   code:
     0: Move8 [72] <- [0] @1
     1: CallIndirect 0x42::generic_closure_pack::make_pick<u64> @1
@@ -96,15 +94,13 @@ fun call_pick() {
     6: AddU64Imm [24] <- [0] + #1 @8
     7: StoreImm1 [32] <- #1 @9
     8: CallClosure closure=[8], provided_args=[[24](8), [32](1)] @11
-    9: Move8 [24] <- [72] @11
-    10: MulU64Imm [24] <- [24] * #1000 @13
-    11: AddU64Imm [40] <- [0] + #1 @16
-    12: StoreImm1 [32] <- #0 @17
-    13: CallClosure closure=[16], provided_args=[[40](8), [32](1)] @19
-    14: Move8 [40] <- [72] @19
-    15: AddU64 [40] <- [24] + [40] @20
-    16: Move8 [0] <- [40] @21
-    17: Return @21
+    9: MulU64Imm [24] <- [72] * #1000 @13
+    10: AddU64Imm [40] <- [0] + #1 @16
+    11: StoreImm1 [32] <- #0 @17
+    12: CallClosure closure=[16], provided_args=[[40](8), [32](1)] @19
+    13: AddU64 [24] <- [24] + [72] @20
+    14: Move8 [0] <- [24] @21
+    15: Return @21
 }
 
 fun identity(): skipped (generic function not instantiated)

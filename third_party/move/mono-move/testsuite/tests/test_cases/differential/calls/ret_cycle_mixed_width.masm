@@ -1,0 +1,36 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x42::m
+
+struct S has copy+drop
+  x: u16
+  y: bool
+
+public fun make(_p: u16, _q: i8): S
+    ld_u16 40358
+    ld_false
+    pack S
+    ret
+
+public fun observe(v: S): (u8, i8, u16, u16, bool)
+    ld_u8 2
+    ld_i8 0
+    ld_u16 0
+    move_loc v
+    unpack S
+    ret
+
+fun tick()
+    ret
+
+public fun runner(): (u8, i8, u16, u16, bool)
+    ld_u16 10
+    ld_i8 12
+    pack_closure make, 0
+    call_closure <|u16, i8|S>
+    pack_closure observe, 0
+    call_closure <|S|(u8, i8, u16, u16, bool)>
+    call tick
+    ret
+
+// RUN: execute 0x42::m::runner
+// CHECK: results: 2, 0, 0, 40358, false

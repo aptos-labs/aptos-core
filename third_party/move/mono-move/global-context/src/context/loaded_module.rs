@@ -12,7 +12,7 @@ use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
     types::{view_type, InternedType, InternedTypeList, Type},
-    FieldTypes, Function, FunctionDefinitionIndex, FunctionPtr, Interner, PreparedModule,
+    Function, FunctionDefinitionIndex, FunctionPtr, Interner, NominalFields, PreparedModule,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -267,9 +267,9 @@ impl LoadedModule {
             .map(|def| {
                 let name =
                     module.interned_identifier_at(module.struct_handle_at(def.struct_handle).name);
-                let num_variants = match module.interned_field_types(name) {
-                    Some(FieldTypes::Enum(variants)) => variants.len(),
-                    Some(FieldTypes::Struct(_)) | None => 1,
+                let num_variants = match module.interned_fields(name) {
+                    Some(NominalFields::Enum(variants)) => variants.len(),
+                    Some(NominalFields::Struct(_)) | None => 1,
                 };
                 vec![false; num_variants]
             })

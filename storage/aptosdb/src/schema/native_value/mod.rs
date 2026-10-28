@@ -33,13 +33,13 @@ use std::{io::Write, mem::size_of};
 pub type Key = (HashValue, Version);
 
 define_schema!(
-    PositionValueSchema,
+    NativeValueSchema,
     Key,
     Option<StateValue>,
     POSITION_VALUE_CF_NAME
 );
 
-impl KeyCodec<PositionValueSchema> for Key {
+impl KeyCodec<NativeValueSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
         let mut out = Vec::with_capacity(HashValue::LENGTH + size_of::<Version>());
         out.write_all(self.0.as_ref())?;
@@ -56,7 +56,7 @@ impl KeyCodec<PositionValueSchema> for Key {
     }
 }
 
-impl ValueCodec<PositionValueSchema> for Option<StateValue> {
+impl ValueCodec<NativeValueSchema> for Option<StateValue> {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }

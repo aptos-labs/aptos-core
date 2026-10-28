@@ -509,6 +509,47 @@ impl Debug for WriteOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativePositionOp(BaseStateOp);
 
+/// Native-order write produced by a transaction. Carried inside
+/// [`Extension::NativeOrder`]; the same shape as [`NativePositionOp`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeOrderOp(BaseStateOp);
+
+impl NativeOrderOp {
+    pub fn from_write_op(op: WriteOp) -> Self {
+        Self(op.into_base_op())
+    }
+
+    pub fn as_base_op(&self) -> &BaseStateOp {
+        &self.0
+    }
+
+    /// Borrow as a `WriteOp`. Always succeeds because the only
+    /// constructor takes a `WriteOp`.
+    pub fn as_write_op(&self) -> &WriteOp {
+        self.0
+            .as_write_op_opt()
+            .expect("NativeOrderOp must wrap a WriteOp variant")
+    }
+}
+
+impl Serialize for NativeOrderOp {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_write_op().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for NativeOrderOp {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        WriteOp::deserialize(deserializer).map(NativeOrderOp::from_write_op)
+    }
+}
+
 impl NativePositionOp {
     pub fn from_write_op(op: WriteOp) -> Self {
         Self(op.into_base_op())
@@ -550,6 +591,7 @@ impl<'de> Deserialize<'de> for NativePositionOp {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Extension {
     NativePosition(BTreeMap<StateKey, NativePositionOp>),
+    NativeOrder(BTreeMap<StateKey, NativeOrderOp>),
 }
 
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -625,6 +667,24 @@ impl WriteSet {
                     );
                     result = Some(m);
                 },
+                Extension::NativeOrder(_) => {},
+            }
+        }
+        result
+    }
+
+    fn native_orders(&self) -> Option<&BTreeMap<StateKey, NativeOrderOp>> {
+        let mut result = None;
+        for ext in self.extensions_ref() {
+            match ext {
+                Extension::NativeOrder(m) => {
+                    assert!(
+                        result.is_none(),
+                        "at most one Extension::NativeOrder expected"
+                    );
+                    result = Some(m);
+                },
+                Extension::NativePosition(_) => {},
             }
         }
         result
@@ -768,6 +828,33 @@ impl WriteSet {
 
     pub fn has_native_positions(&self) -> bool {
         self.native_positions().is_some_and(|m| !m.is_empty())
+    }
+
+    /// Iterate the native-order bucket. Used by the order storage commit
+    /// applier; main-state consumers never see these entries.
+    pub fn native_order_iter(&self) -> impl Iterator<Item = (&StateKey, &NativeOrderOp)> {
+        self.native_orders().into_iter().flat_map(|m| m.iter())
+    }
+
+    pub fn native_order_keys(&self) -> impl Iterator<Item = &StateKey> {
+        self.native_orders().into_iter().flat_map(|m| m.keys())
+    }
+
+    pub fn has_native_orders(&self) -> bool {
+        self.native_orders().is_some_and(|m| !m.is_empty())
+    }
+
+    /// Install the native-order bucket. Expected to be called once per
+    /// WriteSet, like [`Self::add_native_positions`].
+    pub fn add_native_orders(&mut self, native_orders: BTreeMap<StateKey, NativeOrderOp>) {
+        let extensions = self.extensions_mut();
+        assert!(
+            !extensions
+                .iter()
+                .any(|e| matches!(e, Extension::NativeOrder(_))),
+            "native_orders should only be initialized once."
+        );
+        extensions.push(Extension::NativeOrder(native_orders));
     }
 
     /// Install the native-position bucket. Mirrors [`add_hotness`]:
@@ -915,5 +1002,74 @@ impl FromIterator<(StateKey, WriteOp)> for WriteSetMut {
             ws.insert((write.0, write.1));
         }
         ws
+    }
+}
+
+#[cfg(test)]
+mod native_extension_tests {
+    use super::*;
+    use crate::state_store::state_key::StateKey;
+    use move_core_types::account_address::AccountAddress;
+
+    fn addr(byte: u8) -> AccountAddress {
+        let mut bytes = [0u8; AccountAddress::LENGTH];
+        bytes[AccountAddress::LENGTH - 1] = byte;
+        AccountAddress::new(bytes)
+    }
+
+    fn order_op(tag: u8) -> NativeOrderOp {
+        NativeOrderOp::from_write_op(WriteOp::legacy_modification(vec![tag].into()))
+    }
+
+    fn position_op(tag: u8) -> NativePositionOp {
+        NativePositionOp::from_write_op(WriteOp::legacy_modification(vec![tag].into()))
+    }
+
+    #[test]
+    fn order_bucket_is_separate_from_position_bucket() {
+        let mut ws = WriteSetMut::default().freeze().unwrap().into_v1();
+        ws.add_native_positions(BTreeMap::from([(
+            StateKey::position(addr(1), addr(2), addr(3)),
+            position_op(1),
+        )]));
+        ws.add_native_orders(BTreeMap::from([(
+            StateKey::order(addr(1), addr(3), 7),
+            order_op(2),
+        )]));
+
+        assert_eq!(ws.native_position_iter().count(), 1);
+        assert_eq!(ws.native_order_iter().count(), 1);
+        assert!(ws.has_native_orders());
+        assert_eq!(
+            ws.native_order_keys().next(),
+            Some(&StateKey::order(addr(1), addr(3), 7))
+        );
+    }
+
+    /// A `WriteSetV1` serializes its extensions, so both native buckets
+    /// survive a BCS round trip.
+    #[test]
+    fn native_buckets_survive_v1_serialization() {
+        let mut ws = WriteSetMut::default().freeze().unwrap().into_v1();
+        ws.add_native_positions(BTreeMap::from([(
+            StateKey::position(addr(1), addr(2), addr(3)),
+            position_op(1),
+        )]));
+        ws.add_native_orders(BTreeMap::from([(
+            StateKey::bulk_order(addr(1), addr(3), addr(9)),
+            order_op(5),
+        )]));
+        let decoded: WriteSet = bcs::from_bytes(&bcs::to_bytes(&ws).unwrap()).unwrap();
+        assert_eq!(decoded, ws);
+        assert_eq!(decoded.native_position_iter().count(), 1);
+        assert_eq!(decoded.native_order_iter().count(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "native_orders should only be initialized once.")]
+    fn order_bucket_installs_once() {
+        let mut ws = WriteSetMut::default().freeze().unwrap().into_v1();
+        ws.add_native_orders(BTreeMap::new());
+        ws.add_native_orders(BTreeMap::new());
     }
 }

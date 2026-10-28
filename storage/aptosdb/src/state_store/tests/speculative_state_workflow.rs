@@ -53,9 +53,13 @@ use std::{
 const NUM_KEYS: usize = NUM_STATE_SHARDS * 6;
 const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = NUM_KEYS / NUM_STATE_SHARDS / 2;
 
-// TODO(HotState): these are not used much at the moment.
-const MAX_PROMOTIONS_PER_BLOCK: usize = NUM_KEYS;
-const REFRESH_INTERVAL_VERSIONS: Version = 50;
+// Small enough that a block leaves many keys read but not written, so they are eligible for
+// promotion.
+const MAX_WRITE_SET_SIZE: usize = NUM_KEYS / 8;
+// Small enough that blocks regularly hit the cap.
+const MAX_PROMOTIONS_PER_BLOCK: usize = 16;
+// Short enough that promotions mix refreshes with skips of recently hot keys.
+const REFRESH_INTERVAL_VERSIONS: Version = 20;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
@@ -980,16 +984,17 @@ proptest! {
                 (
                     vec(
                         (
-                            arb_user_block(keys.clone(), NUM_KEYS, NUM_KEYS, NUM_KEYS),
+                            arb_user_block(keys.clone(), NUM_KEYS, MAX_WRITE_SET_SIZE, NUM_KEYS),
                             prop_oneof![
                                 1 => Just(None),
-                                9 => arb_user_txn(keys.clone(), NUM_KEYS, NUM_KEYS).prop_map(Some),
+                                9 => arb_user_txn(keys.clone(), NUM_KEYS, MAX_WRITE_SET_SIZE)
+                                    .prop_map(Some),
                             ],
                         ),
                         1..100
                     ),
-                    arb_user_block(keys.clone(), NUM_KEYS, NUM_KEYS, NUM_KEYS),
-                    arb_user_txn(keys, NUM_KEYS, NUM_KEYS),
+                    arb_user_block(keys.clone(), NUM_KEYS, MAX_WRITE_SET_SIZE, NUM_KEYS),
+                    arb_user_txn(keys, NUM_KEYS, MAX_WRITE_SET_SIZE),
                 )
             })
     ) {

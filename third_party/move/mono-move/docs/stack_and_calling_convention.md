@@ -28,7 +28,7 @@ When the caller invokes a function:
 
 When the callee returns:
 
-1. The callee stores all return values at the beginning of its frame, contiguously, potentially overwriting some of its own parameters or locals.
+1. The callee stores all return values at the beginning of its frame, contiguously, potentially overwriting some of its own parameters or locals. If these moves form a cycle (e.g., `(b, a)` returned from `(a, b)`), the callee first saves some values to a scratch region. The scratch sits above the callee's own arg/return region, at the top of its frame. That space is free during a return, and it does not make the stack deeper: when this function calls another, the callee's frame reuses those bytes.
 2. The interpreter reads the saved metadata at `fp - 24` to restore the caller's `pc`, `fp` and `func_ptr`.
 
 ## Local Access

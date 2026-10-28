@@ -7,7 +7,7 @@
 //! `for_each_slot`, `collect_defs_and_uses`), in-place slot rewriters
 //! (`remap_all_slots_with`, `remap_source_slots_with`), the consuming
 //! slot-form converter (`try_map_slots`), and miscellaneous instruction
-//! helpers (`call_boundary_rets_and_args`, `is_commutative`). Everything is
+//! helpers (`transfer_rets_and_args`, `is_commutative`). Everything is
 //! generic over the slot form `SlotForm` of `Instr<SlotForm>`.
 //!
 //! # Architecture
@@ -134,15 +134,20 @@ pub(crate) fn remap_source_slots_with<SlotForm: Copy>(
 // Other instruction utilities
 // =============================================================================
 
-/// `(rets, args)` of a call-boundary instruction (`Call`, `CallClosure`),
-/// `None` for everything else.
+/// Returns `(rets, args)` for Transfer-slot analysis, or `None` for non-call
+/// instructions.
+///
+/// Both call variants return into the callee region, but only `Call` reads
+/// arguments there. For `CallClosure`, the runtime interleaves arguments from
+/// the caller's data region with captured values. Closure arguments cannot
+/// use Transfer slots, so their slice is empty.
 #[inline]
-pub(crate) fn call_boundary_rets_and_args<SlotForm>(
+pub(crate) fn transfer_rets_and_args<SlotForm>(
     instr: &Instr<SlotForm>,
 ) -> Option<(&[SlotForm], &[SlotForm])> {
     match instr {
         Instr::Call { data } => Some((&data.rets, &data.args)),
-        Instr::CallClosure { data } => Some((&data.rets, &data.args)),
+        Instr::CallClosure { data } => Some((&data.rets, &[])),
 
         // Every other instruction: not a call boundary.
         Instr::LdConst { .. }
@@ -211,7 +216,7 @@ pub(crate) fn call_boundary_rets_and_args<SlotForm>(
 /// slots.
 #[inline]
 pub(crate) fn clobbers_transfer<SlotForm>(instr: &Instr<SlotForm>) -> bool {
-    call_boundary_rets_and_args(instr).is_some()
+    transfer_rets_and_args(instr).is_some()
 }
 
 /// The local whose storage `instr` mutably borrows, if any. A later write

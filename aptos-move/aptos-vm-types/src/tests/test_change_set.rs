@@ -11,7 +11,10 @@ use crate::{
     module_write_set::ModuleWriteSet,
     output::VMOutput,
     resolver::ResourceGroupSize,
-    storage::change_set_configs::{ChangeSetConfigs, MAX_POSITION_WRITE_OPS_PER_TRANSACTION},
+    storage::change_set_configs::{
+        ChangeSetConfigs, MAX_ORDER_WRITE_BYTES_PER_TRANSACTION,
+        MAX_ORDER_WRITE_OPS_PER_TRANSACTION, MAX_POSITION_WRITE_OPS_PER_TRANSACTION,
+    },
     tests::utils::{
         as_bytes, as_state_key, mock_create_with_layout, mock_delete_with_layout,
         mock_modify_with_layout, mock_tag_1, raw_metadata, ExpandedVMChangeSetBuilder,
@@ -22,7 +25,7 @@ use aptos_aggregator::{
     delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
 };
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     delayed_fields::SnapshotToStringFormula,
     fee_statement::FeeStatement,
@@ -1081,4 +1084,162 @@ mod tests {
             true,
         ));
     }
+}
+
+fn order_key(order_id: u128) -> StateKey {
+    StateKey::order(
+        AccountAddress::from_hex_literal("0x5").unwrap(),
+        AccountAddress::from_hex_literal("0x2").unwrap(),
+        order_id,
+    )
+}
+
+fn change_set_with_n_orders(n: usize, payload: impl Into<Bytes>) -> VMChangeSet {
+    let payload = payload.into();
+    let mut change_set = VMChangeSet::empty();
+    let writes = (0..n)
+        .map(|i| {
+            (
+                order_key(i as u128),
+                WriteOp::legacy_creation(payload.clone()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    change_set.set_order_bucket(writes).unwrap();
+    change_set
+}
+
+#[test]
+fn test_order_write_ops_limit() {
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+
+    let at_limit = change_set_with_n_orders(MAX_ORDER_WRITE_OPS_PER_TRANSACTION, &b"payload"[..]);
+    assert_eq!(
+        at_limit.num_order_write_ops(),
+        MAX_ORDER_WRITE_OPS_PER_TRANSACTION
+    );
+    assert_ok!(configs.check_change_set(&at_limit));
+
+    let over_limit =
+        change_set_with_n_orders(MAX_ORDER_WRITE_OPS_PER_TRANSACTION + 1, &b"payload"[..]);
+    assert_err!(configs.check_change_set(&over_limit));
+}
+
+#[test]
+fn test_order_write_bytes_limit() {
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let key_size = order_key(0).size() as u64;
+    let payload_len = (MAX_ORDER_WRITE_BYTES_PER_TRANSACTION / 2 - key_size) as usize;
+
+    let at_limit = change_set_with_n_orders(2, vec![0u8; payload_len]);
+    assert_ok!(configs.check_change_set(&at_limit));
+
+    let over_limit = change_set_with_n_orders(2, vec![0u8; payload_len + 1]);
+    assert_err!(configs.check_change_set(&over_limit));
+}
+
+#[test]
+fn test_order_writes_do_not_share_regular_byte_limits() {
+    let mut gas_params = AptosGasParameters::initial();
+    gas_params.vm.txn.max_bytes_per_write_op = 1.into();
+    gas_params.vm.txn.max_bytes_all_write_ops_per_transaction = 1.into();
+    let configs = ChangeSetConfigs::new(LATEST_GAS_FEATURE_VERSION, &gas_params);
+    assert_ok!(configs.check_change_set(&change_set_with_n_orders(10, vec![0u8; 1000])));
+}
+
+#[test]
+fn test_orders_survive_write_set_serialization() {
+    let mut change_set = change_set_with_n_orders(2, &b"payload"[..]);
+    change_set
+        .set_position_bucket(BTreeMap::from([(
+            position_key("0x5", "0x1", "0x2"),
+            WriteOp::legacy_creation(Bytes::from_static(b"position")),
+        )]))
+        .unwrap();
+    let output = VMOutput::new(
+        change_set,
+        ModuleWriteSet::empty(),
+        FeeStatement::zero(),
+        TransactionStatus::Keep(ExecutionStatus::Success),
+    );
+    let txn_output = assert_ok!(output.into_transaction_output());
+    assert_eq!(txn_output.write_set().native_order_iter().count(), 2);
+    assert_eq!(txn_output.write_set().native_position_iter().count(), 1);
+
+    let bytes = bcs::to_bytes(txn_output.write_set()).unwrap();
+    let decoded: WriteSet = bcs::from_bytes(&bytes).unwrap();
+    assert_eq!(decoded.native_order_iter().count(), 2);
+    assert_eq!(decoded.native_position_iter().count(), 1);
+}
+
+#[test]
+fn test_orders_only_upgrade_write_set() {
+    let output = VMOutput::new(
+        change_set_with_n_orders(1, &b"payload"[..]),
+        ModuleWriteSet::empty(),
+        FeeStatement::zero(),
+        TransactionStatus::Keep(ExecutionStatus::Success),
+    );
+    let txn_output = assert_ok!(output.into_transaction_output());
+    assert!(matches!(txn_output.write_set(), WriteSet::V1(_)));
+    assert!(!txn_output.write_set().has_native_positions());
+    assert!(txn_output.write_set().has_native_orders());
+}
+
+#[test]
+fn test_order_bucket_accepts_order_and_bulk_order_keys() {
+    let mut change_set = VMChangeSet::empty();
+    let bulk_key = StateKey::bulk_order(
+        AccountAddress::from_hex_literal("0x5").unwrap(),
+        AccountAddress::from_hex_literal("0x2").unwrap(),
+        AccountAddress::from_hex_literal("0x9").unwrap(),
+    );
+    assert_ok!(change_set.set_order_bucket(BTreeMap::from([
+        (order_key(1), WriteOp::legacy_deletion()),
+        (bulk_key, WriteOp::legacy_deletion()),
+    ])));
+    assert_eq!(change_set.num_order_write_ops(), 2);
+}
+
+#[test]
+fn test_order_bucket_rejects_non_order_keys() {
+    let mut change_set = VMChangeSet::empty();
+    let bad = BTreeMap::from([(
+        position_key("0x5", "0x1", "0x2"),
+        WriteOp::legacy_deletion(),
+    )]);
+    assert_err!(change_set.set_order_bucket(bad));
+    let bad = BTreeMap::from([(StateKey::raw(b"not-an-order"), WriteOp::legacy_deletion())]);
+    assert_err!(change_set.set_order_bucket(bad));
+}
+
+#[test]
+fn test_set_order_bucket_rejects_double_set() {
+    let mut change_set = change_set_with_n_orders(1, &b"payload"[..]);
+    let more = BTreeMap::from([(order_key(9), WriteOp::legacy_deletion())]);
+    assert_err!(change_set.set_order_bucket(more));
+}
+
+#[test]
+fn test_combine_into_storage_change_set_rejects_unmaterialized_orders() {
+    let change_set = change_set_with_n_orders(1, &b"payload"[..]);
+    assert_err!(change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+
+    let mut change_set = change_set_with_n_orders(1, &b"payload"[..]);
+    assert_eq!(change_set.take_order_write_set().len(), 1);
+    assert_ok!(change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+}
+
+#[test]
+fn test_squash_order_bucket_last_wins() {
+    let key = order_key(1);
+    let creation = WriteOp::legacy_creation(Bytes::from_static(b"order"));
+    let mut cs1 = VMChangeSet::empty();
+    cs1.set_order_bucket(BTreeMap::from([(key.clone(), creation.clone())]))
+        .unwrap();
+    let mut cs2 = VMChangeSet::empty();
+    cs2.set_order_bucket(BTreeMap::from([(key.clone(), WriteOp::legacy_deletion())]))
+        .unwrap();
+    assert_ok!(cs1.squash_additional_change_set(cs2, false));
+    assert_some_eq!(cs1.order_write_set().get(&key), &WriteOp::legacy_deletion());
 }

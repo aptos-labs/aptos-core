@@ -8,7 +8,7 @@
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
     native_store::kv_db::PositionDb,
-    schema::stale_position_value_index::{StalePositionValueIndex, StalePositionValueIndexSchema},
+    schema::native_stale_value_index::{NativeStaleValueIndex, NativeStaleValueIndexSchema},
     utils::truncation_helper::{get_native_commit_progress, truncate_native_kv_db_shards},
 };
 use aptos_crypto::hash::CryptoHash;
@@ -143,10 +143,10 @@ fn apply_emits_no_prev_version_sentinel_for_first_write() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
-    let mut entries: Vec<StalePositionValueIndex> = Vec::new();
+    let mut entries: Vec<NativeStaleValueIndex> = Vec::new();
     for row in iter {
         let (idx, _) = row.unwrap();
         if idx.state_key_hash == hash {
@@ -173,10 +173,10 @@ fn apply_emits_prior_version_on_overwrite() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
-    let mut entries: Vec<StalePositionValueIndex> = Vec::new();
+    let mut entries: Vec<NativeStaleValueIndex> = Vec::new();
     for row in iter {
         let (idx, _) = row.unwrap();
         if idx.state_key_hash == hash {
@@ -280,7 +280,7 @@ fn truncate_advances_overall_position_commit_progress() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
     let stale_since_versions: Vec<Version> = iter
@@ -318,10 +318,10 @@ fn in_chunk_writes_chain_stale_index_versions() {
     let shard = crate::sharded_kv_db::ShardedKvDb::shard_of_hash(hash);
     let mut iter = db
         .shard(shard)
-        .iter::<StalePositionValueIndexSchema>()
+        .iter::<NativeStaleValueIndexSchema>()
         .unwrap();
     iter.seek_to_first();
-    let mut entries: Vec<StalePositionValueIndex> = iter
+    let mut entries: Vec<NativeStaleValueIndex> = iter
         .filter_map(|r| r.ok())
         .map(|(idx, _)| idx)
         .filter(|i| i.state_key_hash == hash)

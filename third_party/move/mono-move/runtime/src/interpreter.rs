@@ -17,10 +17,10 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
-        read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
-        write_bool, write_enum_tag, write_fat_ptr, write_ptr, write_u32, write_u64, write_u8,
-        MemoryRegion,
+        copy_8, read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
+        read_int, read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
+        write_bool, write_enum_tag, write_fat_ptr, write_int, write_ptr, write_u32, write_u64,
+        write_u8, MemoryRegion,
     },
     native_context::{ProductionNativeContext, ProductionNativeRegistry},
     types::{
@@ -739,7 +739,7 @@ impl<'guard> InterpreterContext<'guard> {
         // bytes.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
-            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_ptr(base, META_SAVED_FP_OFFSET, null());
             write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
@@ -990,7 +990,7 @@ impl<'guard> InterpreterContext<'guard> {
         // the root frame.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
-            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_ptr(base, META_SAVED_FP_OFFSET, null());
             write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
@@ -1054,7 +1054,10 @@ impl<'guard> InterpreterContext<'guard> {
         &'a mut self,
         func: &'guard Function,
     ) -> VMResult<CallBuilder<'a, 'guard>> {
-        if FRAME_METADATA_SIZE + func.extended_frame_size > self.stack.len() {
+        if !self
+            .stack
+            .contains_range(root_frame_base(&self.stack), func.extended_frame_size)
+        {
             return Err(VMInternalError::new(RuntimeError::StackOverflow));
         }
         // Reset the trace before argument placement can overwrite frame
@@ -1191,41 +1194,6 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
 // ---------------------------------------------------------------------------
 // Unspecialized integer op dispatchers
 // ---------------------------------------------------------------------------
-
-/// Read a `T`-sized value from `base + byte_offset`. Aligned access for
-/// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
-///
-/// TODO(correctness): this reads with native endianness, but `StoreImm*` writes immediates
-/// as little-endian bytes. Consistent on LE hosts (all current targets); force
-/// LE here (`from_le`/`to_le`, no-op on LE) to be portable.
-///
-/// # Safety
-/// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
-/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
-#[inline(always)]
-unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
-    let ptr = unsafe { base.add(byte_offset.into()) as *const T };
-    unsafe {
-        if std::mem::align_of::<T>() <= MAX_ALIGN {
-            ptr.read()
-        } else {
-            ptr.read_unaligned()
-        }
-    }
-}
-
-/// Mirror of [`read_int`] for writes.
-#[inline(always)]
-unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: T) {
-    let ptr = unsafe { base.add(byte_offset.into()) as *mut T };
-    unsafe {
-        if std::mem::align_of::<T>() <= MAX_ALIGN {
-            ptr.write(val)
-        } else {
-            ptr.write_unaligned(val)
-        }
-    }
-}
 
 /// [`U256`]'s `Shl`/`Shr` trait impls require `Self` as the rhs.
 #[inline(always)]
@@ -2229,11 +2197,9 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Move8 { dst, src } => {
-                        // The slots need not be 8-aligned (see `Move8`'s doc),
-                        // so the accesses must be unaligned — same codegen as
-                        // aligned loads on x86-64/aarch64.
-                        let v = (fp.add(src.into()) as *const u64).read_unaligned();
-                        (fp.add(dst.into()) as *mut u64).write_unaligned(v);
+                        // Preserve pointer provenance and uninitialized padding
+                        // without requiring 8-byte alignment.
+                        copy_8(fp.add(src.into()), fp.add(dst.into()));
                     },
 
                     MicroOp::Move { dst, src, size } => {
@@ -2505,12 +2471,9 @@ impl InterpreterContext<'_> {
                         offset,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        // Neither `heap_ptr + offset` nor the frame slot need
-                        // be 8-aligned (see the op's doc), so the accesses
-                        // must be unaligned — same codegen as aligned loads
-                        // on x86-64/aarch64.
-                        let val = (obj_ptr.add(offset as usize) as *const u64).read_unaligned();
-                        (fp.add(dst.into()) as *mut u64).write_unaligned(val);
+                        // The value may contain pointers or uninitialized
+                        // padding and need not be 8-aligned.
+                        copy_8(obj_ptr.add(offset as usize), fp.add(dst.into()));
                     },
 
                     MicroOp::HeapMoveFrom {
@@ -2533,9 +2496,9 @@ impl InterpreterContext<'_> {
                         src,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        // Unaligned accesses: see `HeapMoveFrom8` above.
-                        let val = (fp.add(src.into()) as *const u64).read_unaligned();
-                        (obj_ptr.add(offset as usize) as *mut u64).write_unaligned(val);
+                        // The value may contain pointers or uninitialized
+                        // padding and need not be 8-aligned.
+                        copy_8(fp.add(src.into()), obj_ptr.add(offset as usize));
                     },
 
                     MicroOp::HeapMoveToImm8 {
@@ -2544,7 +2507,8 @@ impl InterpreterContext<'_> {
                         imm,
                     } => {
                         let obj_ptr = read_ptr(fp, heap_ptr);
-                        // Unaligned access: see `HeapMoveFrom8` above.
+                        // The destination may be unaligned. `imm` contains
+                        // initialized integer bytes, so a typed store is valid.
                         (obj_ptr.add(offset as usize) as *mut u64).write_unaligned(imm);
                     },
 
@@ -3361,11 +3325,9 @@ impl InterpreterContext<'_> {
             // alignment — the same layout `exec_pack_closure` wrote and the
             // descriptor records (see `next_captured_value_offset`).
             //
-            // Interleaving is safe: captured writes land at/above `new_fp`,
-            // while provided-arg sources are always below it — the destacker
-            // never leaves a closure call's provided args in the callee
-            // region. The ranges are disjoint, so a captured write cannot
-            // clobber a provided source read on a later iteration.
+            // Closure operands use Home slots in the caller's data region, below
+            // `new_fp`. Callee parameter writes start at `new_fp`, so they cannot
+            // overwrite provided arguments before they are read.
             let mut cursor = 0usize;
             let mut provided_idx = 0usize;
             for (i, pslot) in callee.param_slots.iter().enumerate() {
@@ -3435,14 +3397,16 @@ impl InterpreterContext<'_> {
         fp: *mut u8,
         callee_extended_frame_size: usize,
     ) -> VMResult<*mut u8> {
-        unsafe {
-            let new_fp = fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE);
-            let stack_end = self.stack.as_ptr().add(self.stack.len());
-            if new_fp.add(callee_extended_frame_size) > stack_end {
-                return Err(VMInternalError::new(RuntimeError::StackOverflow));
-            }
-            Ok(new_fp)
+        // Check the full span before computing the callee frame pointer to
+        // avoid forming an out-of-bounds pointer for oversized frames.
+        let caller_frame_size = caller.frame_size();
+        let span = caller_frame_size.saturating_add(callee_extended_frame_size);
+        if !self.stack.contains_range(fp, span) {
+            return Err(VMInternalError::new(RuntimeError::StackOverflow));
         }
+        // SAFETY: `fp` points into the stack, and the bounds check covers
+        // the caller frame and the callee's full extended frame.
+        Ok(unsafe { fp.add(caller_frame_size) })
     }
 
     /// Implementation of call opcodes. Validates the stack first, then
@@ -3473,10 +3437,9 @@ impl InterpreterContext<'_> {
     /// # Safety
     ///
     /// In addition to the contract on [`Self::call`], `new_fp` must equal
-    /// `regs.fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
-    /// `new_fp + callee.extended_frame_size` must be within the stack
-    /// (i.e., the caller has already passed the check that
-    /// [`Self::check_stack_for_call`] performs).
+    /// `regs.fp + caller.frame_size()`. The callee's full extended frame
+    /// starting at `new_fp` must fit within the stack, as verified by
+    /// [`Self::check_stack_for_call`].
     #[inline(always)]
     unsafe fn call_unchecked(
         &mut self,
