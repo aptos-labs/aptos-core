@@ -9,7 +9,7 @@ use prometheus::{
     Opts,
 };
 use std::vec;
-use sysinfo::{RefreshKind, System, SystemExt};
+use sysinfo::System;
 
 const LOAD_AVG_METRICS_COUNT: usize = 3;
 const LOAD_AVG_SUBSYSTEM: &str = "loadavg";
@@ -19,8 +19,6 @@ const LOAD5: &str = "load5";
 const LOAD15: &str = "load15";
 
 pub(crate) struct LoadAvgCollector {
-    system: System,
-
     load_one: Desc,
     load_five: Desc,
     load_fifteen: Desc,
@@ -29,8 +27,6 @@ pub(crate) struct LoadAvgCollector {
 /// A Collector for exposing host load averages
 impl LoadAvgCollector {
     fn new() -> Self {
-        let system = System::new_with_specifics(RefreshKind::new());
-
         let load_one = Opts::new(LOAD1, "1m load average.")
             .namespace(NAMESPACE)
             .subsystem(LOAD_AVG_SUBSYSTEM)
@@ -48,7 +44,6 @@ impl LoadAvgCollector {
             .unwrap();
 
         Self {
-            system,
             load_one,
             load_five,
             load_fifteen,
@@ -70,7 +65,7 @@ impl Collector for LoadAvgCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("load_avg".into());
 
-        let load_avg = self.system.load_average();
+        let load_avg = System::load_average();
 
         let load_one = ConstMetric::new_gauge(self.load_one.clone(), load_avg.one, None).unwrap();
 
