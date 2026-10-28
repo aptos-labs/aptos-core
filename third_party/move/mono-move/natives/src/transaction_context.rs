@@ -416,7 +416,7 @@ fn return_optional_payload<C: NativeContext, T: Serialize>(
     })?;
     // SAFETY: `value` is the in-frame representation of `ty`, the native's
     // declared return type; it is written before any further heap allocation.
-    unsafe { ctx.set_return_raw(0, &value)? };
+    unsafe { ctx.set_return_raw(0, value.as_uninit_slice())? };
     Ok(NativeStatus::Success)
 }
 
