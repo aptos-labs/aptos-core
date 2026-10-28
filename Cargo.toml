@@ -519,7 +519,7 @@ fuzzer = { path = "testsuite/fuzzer" }
 aes-gcm = "0.10.3"
 again = "0.1.2"
 ahash = { version = "0.8.11", features = ["serde"] }
-ambassador = "0.4.1"
+ambassador = "0.5.1"
 annotate-snippets = "0.11.5"
 anstyle = "1.0.1"
 anyhow = "1.0.98"
