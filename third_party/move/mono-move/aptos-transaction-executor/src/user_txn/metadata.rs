@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_gas_schedule::{HighLimitPricingIfAvailable, TransactionGasParameters};
 use aptos_types::transaction::{
     authenticator::AnySignature,
     user_transaction_context::{TransactionIndexKind, UserTransactionContext},
@@ -21,6 +22,9 @@ pub(crate) struct TxnMetadata {
     /// A request for higher execution and IO limits. The prologue checks the
     /// staking that backs it.
     pub txn_limits_request: Option<UserTxnLimitsRequest>,
+    /// Set for a staking-backed limits request, which pays more for gas used
+    /// above the base limits. `max_gas_amount` is already scaled down by it.
+    pub high_limit_pricing: HighLimitPricingIfAvailable,
     /// Size of the full signed transaction.
     pub transaction_size: u64,
     /// Whether any signer authenticates with a keyless signature (a gas
@@ -48,7 +52,12 @@ pub(crate) struct TxnMetadata {
 }
 
 impl TxnMetadata {
-    pub fn new(txn: &SignedTransaction, aux_info: &AuxiliaryInfo) -> Self {
+    pub fn new(
+        txn: &SignedTransaction,
+        aux_info: &AuxiliaryInfo,
+        gas_feature_version: u64,
+        txn_gas_params: &TransactionGasParameters,
+    ) -> Self {
         let transaction_index_kind = aux_info.transaction_index_kind();
         let script_hash = txn.payload().script_hash();
         let session_id = SessionId::txn(
@@ -59,6 +68,12 @@ impl TxnMetadata {
         );
         let authenticator = txn.authenticator_ref();
         let extra_config = txn.payload().extra_config();
+        let txn_limits_request = extra_config.txn_limits_request().cloned();
+        let high_limit_pricing = if txn_limits_request.is_some() {
+            HighLimitPricingIfAvailable::new(gas_feature_version, txn_gas_params)
+        } else {
+            HighLimitPricingIfAvailable::default()
+        };
         Self {
             sender: txn.sender(),
             fee_payer: authenticator.fee_payer_address(),
@@ -76,8 +91,9 @@ impl TxnMetadata {
                 .map(|account_auth| account_auth.authentication_proof().optional_auth_key())
                 .collect(),
             gas_unit_price: txn.gas_unit_price(),
-            max_gas_amount: txn.max_gas_amount(),
-            txn_limits_request: extra_config.txn_limits_request().cloned(),
+            max_gas_amount: high_limit_pricing.scale_max_gas_amount(txn.max_gas_amount()),
+            txn_limits_request,
+            high_limit_pricing,
             transaction_size: txn.txn_bytes_len() as u64,
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|auths| !auths.is_empty())

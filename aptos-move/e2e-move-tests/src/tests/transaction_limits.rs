@@ -663,10 +663,7 @@ fn spin_then_transfer(to: AccountAddress, amount: u64, n: u64) -> EntryFunction 
 }
 
 /// Runs the transaction. Returns its status, fee statement, and how much the
-/// payer's balance dropped. `FeeStatement.gas_used()` is the amount the
-/// transaction is actually billed against (for a high-limit request, that
-/// already includes the excess surcharge), so it must never exceed the
-/// transaction's own signed `max_gas_amount`.
+/// payer's balance dropped.
 fn run_and_get_fee(
     h: &mut MoveHarness,
     payer: &Account,
@@ -690,9 +687,6 @@ fn run_and_get_fee(
 }
 
 /// The fee actually charged, and the excess gas units over the base limits.
-/// For a high-limit request, `fee_statement.gas_used()` already includes the
-/// excess surcharge, so `price * gas_used - refund` is the real fee with no
-/// further adjustment.
 fn fee_and_excess(fee_statement: &FeeStatement, base: &BaseLimits) -> (u64, u64) {
     let excess = (fee_statement
         .execution_gas_used()
@@ -738,9 +732,7 @@ fn setup_excess_execution(h: &mut MoveHarness) -> (Account, BaseLimits) {
 }
 
 /// Transfers away most of the account's balance. Returns a max gas amount
-/// whose fee at the gas price is affordable, but not at the multiplier. Only
-/// meaningful when `HighLimitPricing` is off (pre `RELEASE_V1_50`), where the
-/// prologue reserve is `price * max_gas_amount` with no multiplier at all.
+/// whose fee is affordable at the gas price, but not at the multiplier.
 fn max_gas_between_reserves(h: &mut MoveHarness, acc: &Account) -> u64 {
     let other = h.new_account_with_balance_and_sequence_number(0, 0);
     let keep = 5_0000_0000;
@@ -756,10 +748,8 @@ fn max_gas_between_reserves(h: &mut MoveHarness, acc: &Account) -> u64 {
     max_gas_amount
 }
 
-/// Transfers away most of the account's balance. Returns a max gas amount,
-/// a multiple of the multiplier, whose scaled-down reserve (`price * k *
-/// (max_gas_amount / k)`, which is exactly `price * max_gas_amount` for a
-/// multiple of `k`) the remaining balance cannot cover.
+/// Transfers away most of the account's balance. Returns a max gas amount
+/// whose scaled-down reserve the remaining balance cannot cover.
 fn max_gas_above_scaled_reserve(h: &mut MoveHarness, acc: &Account) -> u64 {
     let other = h.new_account_with_balance_and_sequence_number(0, 0);
     let keep = 5_0000_0000;
@@ -915,9 +905,8 @@ fn test_high_limit_txn_before_v1_50_pays_gas_price() {
     assert_success!(h.run(txn));
 }
 
-/// Account abstraction's `inject_balance` step happens to also size the gas
-/// meter from `TransactionMetadata::max_gas_amount`, so it can mask a
-/// scaling bug there. Disable it to check the real metering budget directly.
+/// Disables account abstraction, which can mask a gas-meter scaling bug, to
+/// check the real metering budget directly.
 #[test]
 fn test_high_limit_txn_meter_budget_is_scaled_down() {
     let mut h = new_test_harness();
@@ -946,9 +935,8 @@ fn test_high_limit_txn_meter_budget_is_scaled_down() {
     assert_success!(status);
     let real_cost = fee_statement.gas_used();
 
-    // A budget twice the real cost: enough for a normal transaction, not
-    // enough for a high-limit request's meter, which is sized at
-    // max_gas_amount / k.
+    // Enough for a normal transaction, not for a high-limit request's
+    // scaled-down meter.
     let max_gas_amount = real_cost * 2;
     assert!(max_gas_amount / EXCESS_PRICE_MULTIPLIER < real_cost);
 
