@@ -663,23 +663,36 @@ fn spin_then_transfer(to: AccountAddress, amount: u64, n: u64) -> EntryFunction 
 }
 
 /// Runs the transaction. Returns its status, fee statement, and how much the
-/// payer's balance dropped.
+/// payer's balance dropped. `FeeStatement.gas_used()` is the amount the
+/// transaction is actually billed against (for a high-limit request, that
+/// already includes the excess surcharge), so it must never exceed the
+/// transaction's own signed `max_gas_amount`.
 fn run_and_get_fee(
     h: &mut MoveHarness,
     payer: &Account,
     txn: SignedTransaction,
 ) -> (TransactionStatus, FeeStatement, u64) {
+    let max_gas_amount = txn.max_gas_amount();
     let before = h.read_aptos_balance(payer.address());
     let output: TransactionOutput = h.run_raw(txn);
     let fee_statement = output
         .try_extract_fee_statement()
         .expect("fee statement should decode")
         .expect("kept transaction should emit a fee statement");
+    assert!(
+        fee_statement.gas_used() <= max_gas_amount,
+        "gas_used {} exceeds the signed max_gas_amount {}",
+        fee_statement.gas_used(),
+        max_gas_amount,
+    );
     let paid = before - h.read_aptos_balance(payer.address());
     (output.status().clone(), fee_statement, paid)
 }
 
-/// The fee at the gas price, and the excess gas units over the base limits.
+/// The fee actually charged, and the excess gas units over the base limits.
+/// For a high-limit request, `fee_statement.gas_used()` already includes the
+/// excess surcharge, so `price * gas_used - refund` is the real fee with no
+/// further adjustment.
 fn fee_and_excess(fee_statement: &FeeStatement, base: &BaseLimits) -> (u64, u64) {
     let excess = (fee_statement
         .execution_gas_used()
@@ -689,14 +702,6 @@ fn fee_and_excess(fee_statement: &FeeStatement, base: &BaseLimits) -> (u64, u64)
     let fee =
         DEFAULT_GAS_UNIT_PRICE * fee_statement.gas_used() - fee_statement.storage_fee_refund();
     (fee, excess)
-}
-
-/// The fee for a high-limit transaction: excess gas units cost the multiplier
-/// times the gas price.
-fn high_limit_fee(fee_statement: &FeeStatement, base: &BaseLimits) -> (u64, u64) {
-    let (fee, excess) = fee_and_excess(fee_statement, base);
-    let surcharge = (EXCESS_PRICE_MULTIPLIER - 1) * DEFAULT_GAS_UNIT_PRICE * excess;
-    (fee + surcharge, excess)
 }
 
 /// Sets up a validator and publishes `0xbeef::limits`. Then sets the base
@@ -733,7 +738,9 @@ fn setup_excess_execution(h: &mut MoveHarness) -> (Account, BaseLimits) {
 }
 
 /// Transfers away most of the account's balance. Returns a max gas amount
-/// whose fee at the gas price is affordable, but not at the multiplier.
+/// whose fee at the gas price is affordable, but not at the multiplier. Only
+/// meaningful when `HighLimitPricing` is off (pre `RELEASE_V1_50`), where the
+/// prologue reserve is `price * max_gas_amount` with no multiplier at all.
 fn max_gas_between_reserves(h: &mut MoveHarness, acc: &Account) -> u64 {
     let other = h.new_account_with_balance_and_sequence_number(0, 0);
     let keep = 5_0000_0000;
@@ -746,6 +753,26 @@ fn max_gas_between_reserves(h: &mut MoveHarness, acc: &Account) -> u64 {
     let max_gas_amount = balance / (5 * DEFAULT_GAS_UNIT_PRICE);
     assert!(DEFAULT_GAS_UNIT_PRICE * max_gas_amount <= balance);
     assert!(EXCESS_PRICE_MULTIPLIER * DEFAULT_GAS_UNIT_PRICE * max_gas_amount > balance);
+    max_gas_amount
+}
+
+/// Transfers away most of the account's balance. Returns a max gas amount,
+/// a multiple of the multiplier, whose scaled-down reserve (`price * k *
+/// (max_gas_amount / k)`, which is exactly `price * max_gas_amount` for a
+/// multiple of `k`) the remaining balance cannot cover.
+fn max_gas_above_scaled_reserve(h: &mut MoveHarness, acc: &Account) -> u64 {
+    let other = h.new_account_with_balance_and_sequence_number(0, 0);
+    let keep = 5_0000_0000;
+    let amount = h.read_aptos_balance(acc.address()) - keep;
+    assert_success!(
+        h.run_transaction_payload(acc, aptos_account_transfer(*other.address(), amount))
+    );
+
+    let balance = h.read_aptos_balance(acc.address());
+    let max_gas_amount = (balance / (DEFAULT_GAS_UNIT_PRICE * EXCESS_PRICE_MULTIPLIER) + 1)
+        * EXCESS_PRICE_MULTIPLIER;
+    assert_eq!(max_gas_amount % EXCESS_PRICE_MULTIPLIER, 0);
+    assert!(DEFAULT_GAS_UNIT_PRICE * max_gas_amount > balance);
     max_gas_amount
 }
 
@@ -774,7 +801,7 @@ fn test_high_limit_txn_excess_pays_multiplier() {
     let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
     assert_success!(status);
 
-    let (fee, excess) = high_limit_fee(&fee_statement, &base);
+    let (fee, excess) = fee_and_excess(&fee_statement, &base);
     assert!(excess > 0);
     assert_eq!(paid, fee);
 }
@@ -790,7 +817,7 @@ fn test_high_limit_txn_excess_pays_multiplier_on_failure() {
     let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, txn);
     assert_vm_status!(status, StatusCode::EXECUTION_LIMIT_REACHED);
 
-    let (fee, excess) = high_limit_fee(&fee_statement, &base);
+    let (fee, excess) = fee_and_excess(&fee_statement, &base);
     assert!(excess > 0);
     assert_eq!(paid, fee);
 }
@@ -818,7 +845,7 @@ fn test_high_limit_txn_reserves_max_fee_at_multiplier() {
     let acc = setup_validator(&mut h);
     h.new_epoch();
 
-    let max_gas_amount = max_gas_between_reserves(&mut h, &acc);
+    let max_gas_amount = max_gas_above_scaled_reserve(&mut h, &acc);
     let txn = h
         .create_transaction_without_sign(
             &acc,
@@ -839,10 +866,13 @@ fn test_high_limit_txn_max_fee_overflow() {
     let acc = setup_validator(&mut h);
     h.new_epoch();
 
-    // The max fee fits in u64 at the gas price, but not at the multiplier.
+    // `max_gas_amount` is scaled down by the multiplier before
+    // `HighLimitPricing::max_fee` sees it, so (for a `max_gas_amount` that's
+    // a multiple of the multiplier) the overflow threshold is the same
+    // `price * max_gas_amount` a normal transaction would hit.
     let max_gas_amount = 1_000_000;
-    let gas_unit_price = u64::MAX / (EXCESS_PRICE_MULTIPLIER * max_gas_amount) + 1;
-    assert!(gas_unit_price.checked_mul(max_gas_amount).is_some());
+    assert_eq!(max_gas_amount % EXCESS_PRICE_MULTIPLIER, 0);
+    let gas_unit_price = u64::MAX / max_gas_amount + 1;
     h.modify_gas_schedule(|params| {
         params.vm.txn.max_price_per_gas_unit = gas_unit_price.into();
     });
@@ -879,7 +909,7 @@ fn test_high_limit_txn_drained_balance_pays_on_failure() {
         status => panic!("Expected the epilogue to abort, got {:?}", status),
     }
 
-    let (fee, excess) = high_limit_fee(&fee_statement, &base);
+    let (fee, excess) = fee_and_excess(&fee_statement, &base);
     assert!(excess > 0);
     assert_eq!(paid, fee);
     assert_eq!(h.read_aptos_balance(recipient.address()), 0);

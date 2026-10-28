@@ -102,12 +102,18 @@ pub(crate) fn run_epilogue<'a>(
     high_limit_pricing: Option<&HighLimitPricing>,
 ) -> Result<(), MoveExecutionFailure> {
     let txn_max_gas_units = match high_limit_pricing {
-        Some(pricing) => pricing.epilogue_max_gas_units(
-            txn_data.max_gas_amount,
-            fee_statement.gas_used(),
-            fee_statement.execution_gas_used(),
-            fee_statement.io_gas_used(),
-        ),
+        Some(pricing) => {
+            // `fee_statement.gas_used()` is already the billed amount (see
+            // `execute.rs`); recompute the raw metered gas used from
+            // `gas_units_remaining` instead, so excess isn't counted twice.
+            let gas_used = txn_data.max_gas_amount.saturating_sub(gas_units_remaining);
+            pricing.epilogue_max_gas_units(
+                txn_data.max_gas_amount,
+                gas_used,
+                fee_statement.execution_gas_used(),
+                fee_statement.io_gas_used(),
+            )
+        },
         None => txn_data.max_gas_amount,
     };
     let args = EpilogueArgs::V1 {

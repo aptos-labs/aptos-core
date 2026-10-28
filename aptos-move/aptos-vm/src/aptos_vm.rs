@@ -615,10 +615,24 @@ impl AptosVM {
         storage_fee_refund: u64,
     ) -> FeeStatement {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
+        let execution_gas_units = u64::from(gas_meter.execution_gas_used());
+        let io_gas_units = u64::from(gas_meter.io_gas_used());
+        // A staking-backed limits request bills gas above the base execution
+        // and IO limits at `k` times the price. Report that billed amount
+        // here (not the raw metered `gas_used`) so it matches the fee the
+        // epilogue actually charges; `max_gas_amount` is already scaled down
+        // by `k`, so `gas_used` in the `max_gas_units` slot reuses the same
+        // formula the epilogue uses to inflate its own budget.
+        let billed_gas_used = match &txn_data.high_limit_pricing {
+            Some(pricing) => {
+                pricing.epilogue_max_gas_units(gas_used, gas_used, execution_gas_units, io_gas_units)
+            },
+            None => gas_used,
+        };
         FeeStatement::builder()
-            .total_charge_gas_units(gas_used)
-            .execution_gas_units(u64::from(gas_meter.execution_gas_used()))
-            .io_gas_units(u64::from(gas_meter.io_gas_used()))
+            .total_charge_gas_units(billed_gas_used)
+            .execution_gas_units(execution_gas_units)
+            .io_gas_units(io_gas_units)
             .storage_fee_octas(u64::from(gas_meter.storage_fee_used()))
             .storage_fee_refund_octas(storage_fee_refund)
             .build()

@@ -373,6 +373,12 @@ impl HighLimitPricing {
         })
     }
 
+    /// The multiple of the gas price that gas used above the base execution
+    /// and IO limits costs.
+    pub fn excess_price_multiplier(&self) -> u64 {
+        self.excess_price_multiplier
+    }
+
     /// The most the transaction can be charged, or `None` if it overflows.
     pub fn max_fee(&self, gas_unit_price: u64, max_gas_units: u64) -> Option<u64> {
         gas_unit_price

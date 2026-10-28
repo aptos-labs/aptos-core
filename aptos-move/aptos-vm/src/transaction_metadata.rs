@@ -130,6 +130,19 @@ impl TransactionMetadata {
             Some(TxnLimitsRequest::ApprovedGovernanceScript) | None => None,
         };
 
+        // A staking-backed limits request bills gas above the base execution
+        // and IO limits at `k` times the price. Scaling the budget down by
+        // `k` here, before it sizes the gas meter, keeps `gas_used * price -
+        // refund` equal to the fee the epilogue actually charges: see
+        // `HighLimitPricing::epilogue_max_gas_units`.
+        let max_gas_amount: Gas = txn.max_gas_amount().into();
+        let max_gas_amount = match &high_limit_pricing {
+            Some(pricing) => {
+                Gas::new(u64::from(max_gas_amount) / pricing.excess_price_multiplier())
+            },
+            None => max_gas_amount,
+        };
+
         Ok(Self {
             sender: txn.sender(),
             authentication_proof: txn.authenticator().sender().authentication_proof(),
@@ -146,7 +159,7 @@ impl TransactionMetadata {
                 .authenticator()
                 .fee_payer_signer()
                 .map(|signer| signer.authentication_proof()),
-            max_gas_amount: txn.max_gas_amount().into(),
+            max_gas_amount,
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (transaction_size as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),

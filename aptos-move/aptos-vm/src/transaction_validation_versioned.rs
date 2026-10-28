@@ -147,14 +147,21 @@ impl EpilogueBuilder {
         gas_remaining: Gas,
         is_simulation: bool,
     ) -> Self {
-        let max_gas_amount = txn_data.max_gas_amount().into();
+        let max_gas_amount: u64 = txn_data.max_gas_amount().into();
         let txn_max_gas_units = match &txn_data.high_limit_pricing {
-            Some(pricing) => pricing.epilogue_max_gas_units(
-                max_gas_amount,
-                fee_statement.gas_used(),
-                fee_statement.execution_gas_used(),
-                fee_statement.io_gas_used(),
-            ),
+            Some(pricing) => {
+                // `fee_statement.gas_used()` is already the billed amount
+                // (see `AptosVM::fee_statement_from_gas_meter`); recompute
+                // the raw metered gas used from `gas_remaining` instead, so
+                // excess isn't counted twice.
+                let gas_used = max_gas_amount.saturating_sub(gas_remaining.into());
+                pricing.epilogue_max_gas_units(
+                    max_gas_amount,
+                    gas_used,
+                    fee_statement.execution_gas_used(),
+                    fee_statement.io_gas_used(),
+                )
+            },
             None => max_gas_amount,
         };
         Self {
