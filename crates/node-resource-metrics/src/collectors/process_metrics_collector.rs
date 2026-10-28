@@ -10,7 +10,7 @@ use prometheus::{
     Opts,
 };
 use std::sync::Arc;
-use sysinfo::{ProcessExt, System, SystemExt};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
 const PROCESS_METRICS_COUNT: usize = 3;
 const PROCESS_SUBSYSTEM: &str = "process";
@@ -117,7 +117,14 @@ impl Collector for ProcessMetricsCollector {
         let mut system = self.system.lock();
 
         let pid = if let Ok(pid) = sysinfo::get_current_pid() {
-            system.refresh_process(pid);
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[pid]),
+                true,
+                ProcessRefreshKind::nothing()
+                    .with_memory()
+                    .with_cpu()
+                    .with_disk_usage(),
+            );
             pid
         } else {
             return Vec::new();

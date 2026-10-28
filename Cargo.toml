@@ -835,7 +835,7 @@ strum = "0.27.1"
 strum_macros = "0.27.1"
 sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
-sysinfo = "0.28.4"
+sysinfo = "0.39.6"
 tar = "0.4.40"
 tempfile = "3.27.0"
 tera = "1.16.0"
