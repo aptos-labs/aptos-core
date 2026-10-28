@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::NAMESPACE;
+use super::common::{first_by_key, NAMESPACE};
 use crate::collectors::common::MeasureLatency;
 use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
@@ -11,7 +11,7 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 const LINUX_SYSTEM_CPU_USAGE: &str = "linux_system_cpu_usage";
 const LINUX_CPU_METRICS_COUNT: usize = 11;
@@ -371,33 +371,31 @@ impl Collector for LinuxDiskMetricsCollector {
                 },
             };
 
-        let mut seen_devices = HashSet::new();
-        for mount in mounts {
-            if let Some(disk_stat) = disk_stats.get(&mount.majmin) {
-                let labels = std::slice::from_ref(&disk_stat.name);
-                disk_stats_counter!(mfs, num_reads, disk_stat.reads, labels);
-                disk_stats_counter!(mfs, num_merged_reads, disk_stat.merged, labels);
-                disk_stats_counter!(mfs, num_sectors_read, disk_stat.sectors_read, labels);
-                disk_stats_counter!(mfs, time_reading_ms, disk_stat.time_reading, labels);
-                disk_stats_counter!(mfs, num_writes, disk_stat.writes, labels);
-                disk_stats_counter!(mfs, num_merged_writes, disk_stat.writes_merged, labels);
-                disk_stats_counter!(mfs, num_sectors_written, disk_stat.sectors_written, labels);
-                disk_stats_counter!(mfs, time_writing_ms, disk_stat.time_writing, labels);
-                disk_stats_guage!(mfs, io_in_progress, disk_stat.in_progress, labels);
-                disk_stats_counter!(mfs, total_io_time_ms, disk_stat.time_in_progress, labels);
+        let mount_disk_stats = mounts
+            .into_iter()
+            .filter_map(|mount| disk_stats.get(&mount.majmin));
+        for disk_stat in first_by_key(mount_disk_stats, |disk_stat| disk_stat.name.clone()) {
+            let labels = std::slice::from_ref(&disk_stat.name);
+            disk_stats_counter!(mfs, num_reads, disk_stat.reads, labels);
+            disk_stats_counter!(mfs, num_merged_reads, disk_stat.merged, labels);
+            disk_stats_counter!(mfs, num_sectors_read, disk_stat.sectors_read, labels);
+            disk_stats_counter!(mfs, time_reading_ms, disk_stat.time_reading, labels);
+            disk_stats_counter!(mfs, num_writes, disk_stat.writes, labels);
+            disk_stats_counter!(mfs, num_merged_writes, disk_stat.writes_merged, labels);
+            disk_stats_counter!(mfs, num_sectors_written, disk_stat.sectors_written, labels);
+            disk_stats_counter!(mfs, time_writing_ms, disk_stat.time_writing, labels);
+            disk_stats_guage!(mfs, io_in_progress, disk_stat.in_progress, labels);
+            disk_stats_counter!(mfs, total_io_time_ms, disk_stat.time_in_progress, labels);
 
-                // Emit disk_info only once per device to avoid duplicates from bind mounts
-                if seen_devices.insert(disk_stat.name.clone()) {
-                    if let Some((model, raid_level)) = self.disk_info_cache.get(&disk_stat.name) {
-                        let info_labels: Vec<String> =
-                            vec![disk_stat.name.clone(), model.clone(), raid_level.clone()];
-                        mfs.extend(
-                            ConstMetric::new_gauge(self.disk_info.clone(), 1.0, Some(&info_labels))
-                                .unwrap()
-                                .collect(),
-                        );
-                    }
-                }
+            // Emit disk_info only once per device, along with its other metric families.
+            if let Some((model, raid_level)) = self.disk_info_cache.get(&disk_stat.name) {
+                let info_labels: Vec<String> =
+                    vec![disk_stat.name.clone(), model.clone(), raid_level.clone()];
+                mfs.extend(
+                    ConstMetric::new_gauge(self.disk_info.clone(), 1.0, Some(&info_labels))
+                        .unwrap()
+                        .collect(),
+                );
             }
         }
 
