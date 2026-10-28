@@ -236,6 +236,11 @@ pub enum FeatureFlag {
     /// Rejects publishing new modules that would run eager `init_module`. Modules must
     /// use a newer compiler with lazy initialization support instead. Off by default.
     DISABLE_EAGER_MODULE_INITIALIZATION = 130,
+    /// When enabled, the bytecode verifier checks the signature shape of every function
+    /// handle with a borrow field struct API attribute, rejecting mismatches with
+    /// `INVALID_STRUCT_API_CODE`. Gated because it changes the recorded status of
+    /// transactions that fail either way.
+    INVARIANT_VIOLATION_FIXES = 131,
 }
 
 /// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default
@@ -368,6 +373,7 @@ impl FeatureFlag {
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
             Self::CHECK_FUNCTION_TYPE_ABILITIES,
+            Self::INVARIANT_VIOLATION_FIXES,
         ];
         if mono_move_env_enabled() {
             features.push(Self::ENABLE_MONO_MOVE);

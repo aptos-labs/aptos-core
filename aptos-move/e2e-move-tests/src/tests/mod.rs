@@ -88,6 +88,7 @@ mod state_metadata;
 mod storage_refund;
 mod string_args;
 mod string_utils;
+mod struct_api_handle_shape;
 mod struct_def_count;
 mod swap_function_values;
 mod token_event_store;

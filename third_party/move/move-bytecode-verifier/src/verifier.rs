@@ -68,6 +68,9 @@ pub struct VerifierConfig {
     /// Rejects function types whose abilities are not a subset of
     /// `AbilitySet::PUBLIC_FUNCTIONS` when enabled.
     pub check_function_type_abilities: bool,
+    /// Checks the signature shape of every function handle with a borrow field struct API
+    /// attribute, including imported ones, before reference safety trusts the attribute.
+    pub invariant_violation_fixes: bool,
 }
 
 /// Scope of verification.
@@ -272,6 +275,7 @@ impl VerifierConfig {
         sig_checker_v2_fix_script_ty_param_count: true,
         sig_checker_v2_fix_function_signatures: true,
         check_function_type_abilities: true,
+        invariant_violation_fixes: true,
 
         enable_enum_types: true,
         enable_resource_access_control: false,
@@ -321,6 +325,7 @@ impl VerifierConfig {
             sig_checker_v2_fix_script_ty_param_count: true,
             sig_checker_v2_fix_function_signatures: true,
             check_function_type_abilities: true,
+            invariant_violation_fixes: true,
 
             enable_enum_types: true,
             enable_resource_access_control: false,
