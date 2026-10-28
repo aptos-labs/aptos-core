@@ -131,11 +131,14 @@ fn execute_v2_sequence<S: StateView + Sync>(
 
     let state = DeltaStateStore::new_with_base(base);
     let global_ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = global_ctx
-        .try_execution_context(0)
-        .expect("execution context is available");
     let mut outputs = Vec::with_capacity(txns.len());
     for txn in txns {
+        // One guard per transaction, as the block executor does: it records
+        // the modules a transaction charged for. The caches under test live on
+        // the context and survive it.
+        let guard = global_ctx
+            .try_execution_context(0)
+            .expect("execution context is available");
         let output = execute_v2_in(&guard, &state, |executor| {
             executor.execute_transaction(
                 &Transaction::UserTransaction(txn.clone()),
@@ -1129,10 +1132,11 @@ fn object_argument_accepted_like_v1() {
     assert_succeeds_like_v1(&fx, &alice, txn);
 }
 
-/// The layout cache outlives a transaction but the read set does not, so a
-/// second transaction checking the same `Object<T>` must still record `T`'s
-/// defining module. `T` comes from the transaction's type arguments and is
-/// phantom, so nothing but the check itself loads that module.
+/// The layout cache outlives a transaction, but the modules a transaction
+/// charged for do not carry over, so a second transaction checking the same
+/// `Object<T>` must still charge for `T`'s defining module. `T` comes from the
+/// transaction's type arguments and is phantom, so nothing but the check itself
+/// loads that module.
 #[test]
 fn repeated_object_argument_rejected_the_same_way() {
     use move_core_types::language_storage::{StructTag, TypeTag};

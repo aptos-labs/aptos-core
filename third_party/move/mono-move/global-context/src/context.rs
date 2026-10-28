@@ -61,9 +61,11 @@ use mono_move_core::{
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
     any::{Any, TypeId},
+    cell::Cell,
     collections::HashMap,
     hash::{Hash, Hasher},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 // Submodules: to split implementation into smaller pieces.
@@ -75,8 +77,11 @@ mod loaded_module;
 pub use loaded_module::{FunctionIrLookup, FunctionSlot, LoadedModule};
 mod module_cache;
 use module_cache::ModuleCache;
+pub use mono_move_core::interner::{ModuleIdx, SCRIPT_MODULE_IDX};
 mod script_cache;
-use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
+use mono_move_core::interner::{
+    script_module_id, InternedFunctionRef, InternedIdentifier, InternedModuleId,
+};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use script_cache::ScriptCache;
 pub use script_cache::ScriptHash;
@@ -307,6 +312,14 @@ pub struct ExecutionGuard<'ctx> {
     /// Arena dedicated for this execution guard with exclusive access.
     /// During execution, data can be allocated here without contention.
     global_arena: GlobalArenaShard<'ctx>,
+    /// The script loaded by the execution holding this guard, if any. Scripts
+    /// are keyed by the hash of their bytes rather than by an ID, so unlike a
+    /// module this one has nowhere in the context to live.
+    ///
+    /// Borrowed, not owned: the script cache frees it. A `&'ctx LoadedModule`
+    /// would make `ExecutionGuard<'ctx>` invariant, because [`Cell`] is
+    /// invariant in its parameter.
+    script: Cell<Option<NonNull<LoadedModule>>>,
 }
 
 /// A scoped reference to data obtained from [`ExecutionGuard`] and is guaranteed
@@ -358,6 +371,7 @@ impl GlobalContext {
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
         };
+        reserve_script_module_idx(&mut this.ctx, &this.global_arena);
         install_framework_symbols(&mut this.ctx, &this.global_arena);
         this
     }
@@ -401,6 +415,7 @@ impl GlobalContext {
         Some(ExecutionGuard {
             ctx: &self.ctx,
             global_arena: self.global_arena.try_lock_arena(worker_id)?,
+            script: Cell::new(None),
         })
     }
 }
@@ -456,7 +471,9 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         }
 
         // The interner started over, so the framework symbols are interned
-        // again. A client's preinstalled values are its own to redo.
+        // again and the script index is minted again. A client's preinstalled
+        // values are its own to redo.
+        reserve_script_module_idx(self.ctx, self.global_arena);
         install_framework_symbols(self.ctx, self.global_arena);
     }
 }
@@ -500,15 +517,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// TODO(correctness): include deserializer and verifier configs in module
     /// and script cache keys, or clear both caches when on-chain configs
     /// change. Reusing cached code would bypass the updated rules.
-    pub fn insert_module(&self, module: Box<LoadedModule>) -> &LoadedModule {
-        let ptr = self.ctx.module_cache.insert(module);
+    pub fn insert_module(&self, module: Box<LoadedModule>) -> Result<&LoadedModule> {
+        let ptr = self.ctx.module_cache.insert(module)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive). If the loaded module was
         // already in the cache, it is also alive (maintenance has not reset
         // caches).
-        unsafe { ptr.as_ref_unchecked() }
+        Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
     /// Inserts a script loaded as a module into the cache, keyed by the hash
@@ -538,6 +555,67 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive).
         Some(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Returns the index of the module with the specified ID, minting one if
+    /// this is the first time the ID is seen. The index exists whether or not
+    /// the module is loaded.
+    pub fn module_idx(&self, id: InternedModuleId) -> Result<ModuleIdx> {
+        self.ctx.module_cache.get_or_create_idx(id)
+    }
+
+    /// Looks up a loaded module by its index, or [`None`] if the index has no
+    /// row or the row is not filled yet.
+    ///
+    /// [`SCRIPT_MODULE_IDX`] resolves to this execution's script, so a script
+    /// reaches every index-keyed caller without any of them special-casing it.
+    pub fn module_at<'guard>(&'guard self, idx: ModuleIdx) -> Option<&'guard LoadedModule> {
+        if idx == SCRIPT_MODULE_IDX {
+            return self.script();
+        }
+        self.ctx.module_cache.entry(idx)?.get(self)
+    }
+
+    /// Looks up the ID an index was minted for, or [`None`] if the index has
+    /// no row.
+    pub fn module_id_at(&self, idx: ModuleIdx) -> Option<InternedModuleId> {
+        self.ctx.module_cache.id_at(idx)
+    }
+
+    /// Records `idx` as charged by the execution holding this guard, returning
+    /// whether it was not already charged. The record is dropped the next time
+    /// this guard's arena is acquired.
+    pub fn mark_charged(&self, idx: ModuleIdx) -> bool {
+        self.global_arena.mark_charged_module(idx.as_u32())
+    }
+
+    /// Whether the execution holding this guard has already charged `idx`.
+    pub fn is_charged(&self, idx: ModuleIdx) -> bool {
+        self.global_arena.is_charged_module(idx.as_u32())
+    }
+
+    /// The modules the execution holding this guard charged. Recording happens
+    /// at the point of charging, so this is also the set of modules the
+    /// execution read.
+    pub fn charged_modules(&self) -> Vec<ModuleIdx> {
+        self.global_arena
+            .charged_modules()
+            .into_iter()
+            .filter_map(|raw| self.ctx.module_cache.checked_idx(raw))
+            .collect()
+    }
+
+    /// Records the script this execution runs, replacing any earlier one.
+    pub fn set_script<'guard>(&'guard self, script: &'guard LoadedModule) {
+        self.script.set(Some(NonNull::from(script)));
+    }
+
+    /// The script this execution runs, if one has been loaded.
+    pub fn script<'guard>(&'guard self) -> Option<&'guard LoadedModule> {
+        // SAFETY: the pointer came from a reference the script cache handed
+        // out under this guard, so it cannot be freed while the guard is
+        // alive.
+        self.script.get().map(|ptr| unsafe { ptr.as_ref() })
     }
 
     /// Wraps module ID pointer in a guard-scoped [`ArenaRef`], matching the
@@ -899,6 +977,10 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         self.intern_address_name_internal(*address, name)
     }
 
+    fn module_idx_of(&self, module_id: InternedModuleId) -> Option<ModuleIdx> {
+        self.ctx.module_cache.get_or_create_idx(module_id).ok()
+    }
+
     fn function_ref_of(
         &self,
         module_id: InternedModuleId,
@@ -1054,9 +1136,34 @@ fn install_framework_symbols(ctx: &mut Context, global_arena: &GlobalArenaPool) 
         global_arena: global_arena
             .try_lock_arena(0)
             .expect("no execution is in progress on a fresh or reset context"),
+        script: Cell::new(None),
     });
     ctx.preinstalled
         .insert(TypeId::of::<FrameworkSymbols>(), Box::new(symbols));
+}
+
+/// Mints the module index every loaded script takes. Called on a fresh or
+/// just-reset context, so the index is always [`SCRIPT_MODULE_IDX`].
+///
+/// Scripts are cached by the hash of their bytes, not by this index, so the
+/// row stays empty. It exists so that a script can be recorded and charged
+/// through the same index-keyed path as a module.
+fn reserve_script_module_idx(ctx: &mut Context, global_arena: &GlobalArenaPool) {
+    let guard = ExecutionGuard {
+        ctx,
+        global_arena: global_arena
+            .try_lock_arena(0)
+            .expect("no execution is in progress on a fresh or reset context"),
+        script: Cell::new(None),
+    };
+    let id = script_module_id(&guard);
+    let idx = guard
+        .module_idx(id)
+        .expect("the first index in an empty table is in range");
+    assert_eq!(
+        idx, SCRIPT_MODULE_IDX,
+        "the script module must take the first index in the table"
+    );
 }
 
 impl<'ctx> MaintenanceGuard<'ctx> {
@@ -1094,6 +1201,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         function_refs.clear();
         descriptors.reset();
         layouts.reset();
+        module_cache.reset();
         // Dropped, not rebuilt: `reset_arena_pool` reinstalls the framework
         // symbols, and whoever resets preinstalls its own values again.
         preinstalled.clear();
@@ -1102,7 +1210,6 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         // execution guards alive. Hence, there are no pointers to modules
         // alive, and it is safe to free the allocation behind the box.
         unsafe {
-            module_cache.clear();
             script_cache.clear();
         }
     }

@@ -59,6 +59,41 @@ pub fn view_module_id(ptr: InternedModuleId) -> &'static ModuleId {
     unsafe { ptr.as_ref_unchecked() }
 }
 
+/// Index of a module in the module table.
+///
+/// Minted when a module ID is first seen, which can be before the module is
+/// loaded. Lowered call sites carry it, so an index has to stay valid for as
+/// long as any lowered code does.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ModuleIdx(u32);
+
+/// The index every loaded script takes. Reserved on a fresh or just-reset
+/// context, before any module can claim it.
+pub const SCRIPT_MODULE_IDX: ModuleIdx = ModuleIdx(0);
+
+impl ModuleIdx {
+    /// Builds an index from a table row, or [`None`] if the table has outgrown
+    /// `u32`. Only the module cache assigns rows, so only it mints indices.
+    //
+    // TODO(security, metering): the index space is consumed by any module a
+    // mandatory-set walk or a lowered call site references, loaded or not, and
+    // is reclaimed only by a full reset. Bound it, and decide what a block does
+    // when the bound is hit.
+    pub fn from_table_row(row: usize) -> Option<Self> {
+        u32::try_from(row).ok().map(Self)
+    }
+
+    /// Returns the underlying index.
+    pub fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Returns the underlying index as `usize`.
+    pub fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+}
+
 /// Symbolic identity of a function: the same `(module, name, type arguments)`
 /// triple the loader keys function code on, bundled so a single thin arena
 /// pointer can name a function for lazy resolution (e.g. a closure's target).
@@ -159,6 +194,10 @@ pub trait Interner {
     /// Returns the interned IR corresponding to (address, module name) pair
     /// that identifies a module.
     fn module_id_of(&self, address: &AccountAddress, name: &IdentStr) -> InternedModuleId;
+
+    /// Returns the table index of a module, minting one if the ID has not been
+    /// seen before. [`None`] once the index space is exhausted.
+    fn module_idx_of(&self, module_id: InternedModuleId) -> Option<ModuleIdx>;
 
     /// Returns an interned string identifier.
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier;

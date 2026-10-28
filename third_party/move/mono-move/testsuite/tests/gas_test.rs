@@ -5,7 +5,7 @@
 
 use mono_move_core::{types::EMPTY_TYPE_LIST, GasExhaustedError, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{CompletedCall, InterpreterContext, ProductionNativeRegistry};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
@@ -91,10 +91,8 @@ fn test_out_of_gas_during_load() {
         .into_global_arena_ptr();
 
     // 1 gas unit — far below the byte-length cost of any real module.
-    let mut read_set = ModuleReadSet::new();
     let mut gas_meter = GasMeter::new(1);
-    let Err(err) = loader.load_function(&mut read_set, &mut gas_meter, id, f_name, EMPTY_TYPE_LIST)
-    else {
+    let Err(err) = loader.load_function(&mut gas_meter, id, f_name, EMPTY_TYPE_LIST) else {
         panic!("loading failed");
     };
     assert!(

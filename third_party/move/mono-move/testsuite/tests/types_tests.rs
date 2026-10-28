@@ -5,7 +5,7 @@
 
 use mono_move_core::{native::NoNatives, GasMeter, Interner, LayoutKind, LayoutProvider};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -45,12 +45,11 @@ module 0x1::a {
         &NoNatives,
     );
 
-    let mut read_set = ModuleReadSet::new();
     let mut gas_meter = GasMeter::with_max_budget();
 
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("a"));
     let ir = loader
-        .load_module(&mut read_set, &mut gas_meter, id)
+        .load_module(&mut gas_meter, id)
         .unwrap()
         .ir();
 

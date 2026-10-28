@@ -3,8 +3,9 @@
 
 //! Loader for the MonoMove module cache.
 //!
-//! Provides policy-driven entry points that load modules from storage into
-//! long-living cache and per-transaction read-set. Supported policies:
+//! Provides policy-driven entry points that load modules from storage into a
+//! long-living cache, charging each module at most once per transaction.
+//! Supported policies:
 //!
 //! - [`LoadingPolicy::Lazy`]: loads just the requested module. Functions are
 //!   lowered depending on the lowering policy:
@@ -23,9 +24,7 @@
 
 mod error;
 mod loader;
-mod read_set;
 
 pub use error::{LoaderError, LoaderInvariantViolation};
 pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
 pub use mono_move_core::ModuleProvider;
-pub use read_set::{ModuleRead, ModuleReadSet, ModuleState};

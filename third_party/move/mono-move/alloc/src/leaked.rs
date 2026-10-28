@@ -30,6 +30,16 @@ impl<T> LeakedBoxPtr<T> {
         self.0
     }
 
+    /// Rebuilds the pointer from its raw form.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must have been produced by [`LeakedBoxPtr::from_box`] and must
+    /// not have been freed.
+    pub unsafe fn from_raw_unchecked(ptr: NonNull<T>) -> Self {
+        Self(ptr)
+    }
+
     /// Frees allocated data.
     ///
     /// # Safety

@@ -15,7 +15,7 @@ use mono_move_core::{
     Function, GasMeter, VMInternalError, VMResult,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::{
     make_all_bls12381_test_natives, make_all_bulletproofs_test_natives,
     make_all_crypto_algebra_test_natives, make_all_ed25519_test_natives,
@@ -259,10 +259,9 @@ pub fn with_loaded_module<R>(
         LoadingPolicy::Lazy(LoweringPolicy::Eager),
         &NoNatives,
     );
-    let mut read_set = ModuleReadSet::new();
     let mut gas_meter = GasMeter::with_max_budget();
     let id = guard.intern_address_name(&AccountAddress::ONE, module_name);
-    let module_ir = loader.load_module(&mut read_set, &mut gas_meter, id)?.ir();
+    let module_ir = loader.load_module(&mut gas_meter, id)?.ir();
     Ok(body(&guard, module_ir))
 }
 

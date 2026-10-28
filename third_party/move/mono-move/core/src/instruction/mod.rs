@@ -115,7 +115,7 @@
 
 use crate::{
     align::{align_up, MAX_ALIGN},
-    interner::{view_function_ref, InternedFunctionRef, InternedIdentifier, InternedModuleId},
+    interner::{view_function_ref, InternedFunctionRef, ModuleIdx},
     native::{FrameSlot, NativeABI, NativeIdx},
     types::{
         display_type, display_type_list, view_name, InternedType, InternedTypeList, VariantTag,
@@ -611,9 +611,16 @@ pub enum MicroOp {
     /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
     /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
     CallIndirect {
-        module_id: InternedModuleId,
-        func_name: InternedIdentifier,
-        ty_args: InternedTypeList,
+        /// Addresses the callee's module table row directly, so resolving the
+        /// call costs no hash lookup. Valid only against the table generation
+        /// that minted it, which is the generation this code was lowered
+        /// under: a reset frees every loaded module and the lowered code with
+        /// it, so no instruction survives to name a stale row.
+        module_idx: ModuleIdx,
+        /// Name and type arguments of the callee, behind a thin pointer so
+        /// this variant does not set the size of [`MicroOp`]. Its module ID is
+        /// the one `module_idx` addresses.
+        func_ref: InternedFunctionRef,
     },
 
     /// Call a function via direct pointer. Same calling convention as
@@ -1473,22 +1480,19 @@ impl fmt::Display for MicroOp {
             MicroOp::BoolOr { dst, lhs, rhs } => {
                 write!(f, "BoolOr [{}] <- [{}] | [{}]", dst.0, lhs.0, rhs.0)
             },
-            MicroOp::CallIndirect {
-                module_id,
-                func_name,
-                ty_args,
-            } => {
+            MicroOp::CallIndirect { func_ref, .. } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
                 // TODO(completeness): Have a safe display impl that takes guard.
-                let module_id = unsafe { module_id.as_ref_unchecked() };
+                let func_ref = view_function_ref(*func_ref);
+                let module_id = unsafe { func_ref.module_id.as_ref_unchecked() };
                 let addr = module_id.address().short_str_lossless();
                 let module_name = unsafe { module_id.name().as_ref_unchecked() };
-                let func_name = unsafe { func_name.as_ref_unchecked() };
+                let func_name = unsafe { func_ref.func_name.as_ref_unchecked() };
                 write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)?;
-                if !ty_args.is_empty() {
+                if !func_ref.ty_args.is_empty() {
                     write!(f, "<")?;
-                    display_type_list(f, *ty_args)?;
+                    display_type_list(f, func_ref.ty_args)?;
                     write!(f, ">")?;
                 }
                 Ok(())
@@ -2514,9 +2518,9 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // TODO(perf):
-        //   Size is dominated by indirect call: refactor to keep variant size
-        //   small and keep call metadata in a side table.
+        // TODO(perf): every instruction pays for the widest variant, which is
+        // the fused compare-and-branch. Push its metadata behind a thin
+        // interned pointer the way the calls do.
         assert_eq!(std::mem::size_of::<MicroOp>(), 48);
     }
 }

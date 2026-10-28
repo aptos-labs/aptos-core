@@ -5,6 +5,7 @@ use crate::MemoryRegion;
 use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
 use parking_lot::{Mutex, MutexGuard};
+use shared_dsa::SparseSet;
 use std::{
     cell::RefCell,
     hash::{Hash, Hasher},
@@ -133,6 +134,10 @@ fn bucket_index(size: usize) -> Option<usize> {
 struct ArenaSlot {
     bump: Bump,
     regions: RefCell<[Vec<MemoryRegion>; NUM_BUCKETS]>,
+    /// Modules charged by the execution currently holding this arena. Lives
+    /// here rather than on the caller so its growth is reused across
+    /// executions instead of being paid for again on every acquire.
+    charged_modules: RefCell<SparseSet>,
 }
 
 impl ArenaSlot {
@@ -140,6 +145,7 @@ impl ArenaSlot {
         Self {
             bump: Bump::with_capacity(arena_capacity),
             regions: RefCell::new(std::array::from_fn(|_| vec![])),
+            charged_modules: RefCell::new(SparseSet::new()),
         }
     }
 }
@@ -182,9 +188,7 @@ impl GlobalArenaPool {
     /// Panics if the index is out of bounds.
     pub fn try_lock_arena(&self, idx: usize) -> Option<GlobalArenaShard<'_>> {
         assert!(idx < self.num_arenas());
-        Some(GlobalArenaShard {
-            guard: self.arenas[idx].try_lock()?,
-        })
+        Some(GlobalArenaShard::new(self.arenas[idx].try_lock()?))
     }
 
     /// Locks the arena at a specific index and returns its guard. Blocks if
@@ -195,9 +199,7 @@ impl GlobalArenaPool {
     /// Panics if the index is out of bounds.
     pub fn lock_arena(&self, idx: usize) -> GlobalArenaShard<'_> {
         assert!(idx < self.num_arenas());
-        GlobalArenaShard {
-            guard: self.arenas[idx].lock(),
-        }
+        GlobalArenaShard::new(self.arenas[idx].lock())
     }
 
     /// Returns the number of arenas in the pool.
@@ -240,6 +242,13 @@ pub struct GlobalArenaShard<'pool> {
 }
 
 impl<'pool> GlobalArenaShard<'pool> {
+    /// Wraps a freshly locked slot, discarding what the previous holder left
+    /// in the per-execution scratch.
+    fn new(guard: MutexGuard<'pool, ArenaSlot>) -> Self {
+        guard.charged_modules.borrow_mut().clear();
+        Self { guard }
+    }
+
     /// Allocates a value in the arena, returning a raw pointer to it.
     ///
     /// ## Panics
@@ -303,5 +312,21 @@ impl<'pool> GlobalArenaShard<'pool> {
         if let Some(bucket) = bucket_index(region.len()) {
             self.guard.regions.borrow_mut()[bucket].push(region);
         }
+    }
+
+    /// Records `idx` as charged by this execution, returning whether it was not
+    /// already recorded.
+    pub fn mark_charged_module(&self, idx: u32) -> bool {
+        self.guard.charged_modules.borrow_mut().insert(idx)
+    }
+
+    /// Whether `idx` has already been charged by this execution.
+    pub fn is_charged_module(&self, idx: u32) -> bool {
+        self.guard.charged_modules.borrow().contains(idx)
+    }
+
+    /// The modules charged by this execution.
+    pub fn charged_modules(&self) -> Vec<u32> {
+        self.guard.charged_modules.borrow().iter().collect()
     }
 }

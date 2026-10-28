@@ -7,11 +7,13 @@
 //! closure (excluding M itself). Lowering itself stays per-call in
 //! `load_function`.
 
-use mono_move_core::{native::NoNatives, GasMeter};
-use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST, GasMeter};
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_testsuite::InMemoryModuleProvider;
-use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
+};
 
 // Modeled on the EL example in `loader/DESIGN.md` §3.
 //
@@ -37,6 +39,14 @@ module 0x1::d {
 }
 "#;
 
+/// Whether `0x1::<name>` has been charged for under `guard`.
+fn is_charged(guard: &ExecutionGuard<'_>, name: &IdentStr) -> bool {
+    let id = guard
+        .intern_address_name(&AccountAddress::ONE, name)
+        .into_global_arena_ptr();
+    guard.is_charged(guard.module_idx(id).unwrap())
+}
+
 #[test]
 fn load_eager_preloads_struct_closure() {
     let modules =
@@ -57,33 +67,20 @@ fn load_eager_preloads_struct_closure() {
         AccountAddress::ONE,
         ident_str!("a").to_owned(),
     ));
-    let id_b = guard.intern_module_id(&ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("b").to_owned(),
-    ));
-    let id_c = guard.intern_module_id(&ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("c").to_owned(),
-    ));
-    let id_d = guard.intern_module_id(&ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("d").to_owned(),
-    ));
 
-    let mut read_set = ModuleReadSet::new();
     let mut gas = GasMeter::with_max_budget();
     let before = gas.balance();
-    let exec = loader.load_module(&mut read_set, &mut gas, id_a).unwrap();
+    let exec = loader.load_module(&mut gas, id_a).unwrap();
     let charged = before - gas.balance();
 
-    // a + b + c are in the read-set; d (unreached) is not.
-    assert_eq!(read_set.len(), 3, "expected {{a, b, c}} in read-set");
-    assert!(read_set.get(id_a).is_some(), "a must be in read-set");
-    assert!(read_set.get(id_b).is_some(), "b must be in read-set");
-    assert!(read_set.get(id_c).is_some(), "c must be in read-set");
+    // a + b + c are charged for; d (unreached) is not.
+    assert_eq!(guard.charged_modules().len(), 3, "expected {{a, b, c}}");
+    assert!(is_charged(&guard, ident_str!("a")), "a must be charged for");
+    assert!(is_charged(&guard, ident_str!("b")), "b must be charged for");
+    assert!(is_charged(&guard, ident_str!("c")), "c must be charged for");
     assert!(
-        read_set.get(id_d).is_none(),
-        "d must NOT be in read-set (unreached by a's functions)"
+        !is_charged(&guard, ident_str!("d")),
+        "d must NOT be charged for (unreached by a's functions)"
     );
 
     // a's stored MS holds {a, b, c}: a filled MS always includes self
@@ -95,19 +92,21 @@ fn load_eager_preloads_struct_closure() {
     );
 
     // Gas charged equals cost(a) + cost(b) + cost(c).
-    let cost_a = exec.cost();
-    let cost_b = read_set.get(id_b).unwrap().cost_for_test();
-    let cost_c = read_set.get(id_c).unwrap().cost_for_test();
+    let cost_of = |name: &IdentStr| {
+        let id = guard
+            .intern_address_name(&AccountAddress::ONE, name)
+            .into_global_arena_ptr();
+        loader.loaded_module(id).unwrap().cost()
+    };
     assert_eq!(
         charged,
-        cost_a + cost_b + cost_c,
+        exec.cost() + cost_of(ident_str!("b")) + cost_of(ident_str!("c")),
         "EL must charge bodies of a, b, c exactly once"
     );
 }
 
 // Module whose only function uses primitives. The lowering walker visits
-// no struct fields, so without seeding self the MS would be empty and
-// mark_ready_for_lowering would bail.
+// no struct fields, so without seeding self the MS would be empty.
 const PRIMITIVE_ONLY_SOURCE: &str = r#"
 module 0x1::p {
     public fun f(x: u64): u64 { x + 1 }
@@ -135,11 +134,10 @@ fn load_eager_primitive_only_module_includes_self() {
         ident_str!("p").to_owned(),
     ));
 
-    let mut read_set = ModuleReadSet::new();
     let mut gas = GasMeter::with_max_budget();
-    let exec = loader.load_module(&mut read_set, &mut gas, id_p).unwrap();
+    let exec = loader.load_module(&mut gas, id_p).unwrap();
 
-    assert_eq!(read_set.len(), 1);
+    assert_eq!(guard.charged_modules().len(), 1);
     assert_eq!(
         exec.mandatory_dependencies().len(),
         1,
@@ -155,6 +153,51 @@ fn load_eager_cache_hit_reproduces_state() {
     module_provider.add_modules(&modules);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
+
+    // Each load runs under its own execution guard: the guard is what records
+    // charged modules, so sharing one would make the second load a free hit.
+    let load_once = || {
+        let guard = ctx.try_execution_context(0).unwrap();
+        let loader = Loader::new_with_policy(
+            &guard,
+            &module_provider,
+            LoadingPolicy::Lazy(LoweringPolicy::Eager),
+            &NoNatives,
+        );
+        let id_a = guard.intern_module_id(&ModuleId::new(
+            AccountAddress::ONE,
+            ident_str!("a").to_owned(),
+        ));
+
+        let mut gas = GasMeter::with_max_budget();
+        let before = gas.balance();
+        loader.load_module(&mut gas, id_a).unwrap();
+        (before - gas.balance(), guard.charged_modules().len())
+    };
+
+    // Prime the cache, then hit it. The hit must recreate the same shape:
+    // same total charged, same number of modules charged for.
+    let (cost_first, charged_first) = load_once();
+    let (cost_second, charged_second) = load_once();
+
+    assert_eq!(cost_first, cost_second);
+    assert_eq!(charged_first, charged_second);
+    assert_eq!(charged_second, 3);
+}
+
+// EL has no per-transaction "already lowered" bit: every call into a module
+// the transaction has charged for re-resolves MS(M) and charges for its
+// members. MS is memoized on the module and the members are already charged,
+// so the repeat must come out free. Anything else would make gas depend on how
+// many times a transaction happens to call into the same module.
+#[test]
+fn load_function_on_charged_module_charges_nothing() {
+    let modules =
+        mono_move_testsuite::compile_move_source(TEST_SOURCE).expect("compilation failed");
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
+
+    let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
     let loader = Loader::new_with_policy(
         &guard,
@@ -163,27 +206,27 @@ fn load_eager_cache_hit_reproduces_state() {
         &NoNatives,
     );
 
-    let id_a = guard.intern_module_id(&ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("a").to_owned(),
-    ));
+    let id_a = guard
+        .intern_address_name(&AccountAddress::ONE, ident_str!("a"))
+        .into_global_arena_ptr();
+    let name_mk = guard
+        .intern_identifier(ident_str!("mk"))
+        .into_global_arena_ptr();
 
-    // Prime the cache.
-    let mut rs1 = ModuleReadSet::new();
-    let mut g1 = GasMeter::with_max_budget();
-    let before1 = g1.balance();
-    loader.load_module(&mut rs1, &mut g1, id_a).unwrap();
-    let cost_first = before1 - g1.balance();
+    let mut gas = GasMeter::with_max_budget();
+    let before_first = gas.balance();
+    loader
+        .load_function(&mut gas, id_a, name_mk, EMPTY_TYPE_LIST)
+        .expect("a::mk must lower");
+    assert!(before_first > gas.balance(), "the first call charges");
 
-    // Cache hit on a fresh read-set must recreate the same shape:
-    // same total charged, same number of read-set entries.
-    let mut rs2 = ModuleReadSet::new();
-    let mut g2 = GasMeter::with_max_budget();
-    let before2 = g2.balance();
-    loader.load_module(&mut rs2, &mut g2, id_a).unwrap();
-    let cost_second = before2 - g2.balance();
-
-    assert_eq!(cost_first, cost_second);
-    assert_eq!(rs1.len(), rs2.len());
-    assert_eq!(rs2.len(), 3);
+    let before_second = gas.balance();
+    loader
+        .load_function(&mut gas, id_a, name_mk, EMPTY_TYPE_LIST)
+        .expect("a::mk must resolve again");
+    assert_eq!(
+        before_second,
+        gas.balance(),
+        "a second call into an already-charged module must charge nothing"
+    );
 }
