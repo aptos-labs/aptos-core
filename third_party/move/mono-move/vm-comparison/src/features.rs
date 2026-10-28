@@ -14,6 +14,7 @@ const FORCED_ON: &[FeatureFlag] = &[
     FeatureFlag::ENABLE_FUNCTION_REFLECTION,
     FeatureFlag::FUNCTION_VALUE_DISPATCH,
     FeatureFlag::VM_BINARY_FORMAT_V10,
+    FeatureFlag::ENABLE_FUNCTION_VALUES,
 ];
 
 /// Enables [`FORCED_ON`] in the dump's on-chain config.

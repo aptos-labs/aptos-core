@@ -5,9 +5,7 @@ use crate::{
     traits::{AptosGasMeter, GasAlgebra},
     CacheValueSizes,
 };
-use aptos_gas_algebra::{
-    AbstractValueSize, Fee, FeePerGasUnit, NumTypeNodes,
-};
+use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::{
     gas_feature_versions::*,
     gas_params::{instr::*, txn::*},

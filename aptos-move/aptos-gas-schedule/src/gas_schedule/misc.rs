@@ -1075,7 +1075,10 @@ impl FromOnChainGasSchedule for MiscGasParameters {
 impl ToOnChainGasSchedule for MiscGasParameters {
     fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
         let mut entries = self.abs_val.to_on_chain_gas_schedule(feature_version);
-        entries.extend(self.value_traversal.to_on_chain_gas_schedule(feature_version));
+        entries.extend(
+            self.value_traversal
+                .to_on_chain_gas_schedule(feature_version),
+        );
         entries
     }
 }

@@ -4,10 +4,10 @@
 //! Rewrites parallelizable coin supply into its sequential form.
 
 use anyhow::Result;
-use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
+use aptos_transaction_simulation::SimulationStateStore;
 use aptos_types::{
     account_config::{CoinInfoResource, IntegerResource},
-    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
+    state_store::{state_key::StateKey, state_value::StateValue},
     AptosCoinType, CoinType,
 };
 
@@ -20,7 +20,7 @@ fn coin_info_key() -> Result<StateKey> {
 
 /// Moves `AptosCoin`'s supply off the aggregator and into the plain `Integer`
 /// counter, folding in the aggregator's current value.
-pub fn sequentialize_coin_supply(state: &InMemoryStateStore) -> Result<()> {
+pub fn sequentialize_coin_supply(state: &impl SimulationStateStore) -> Result<()> {
     let key = coin_info_key()?;
     let Some(value) = state.get_state_value(&key)? else {
         return Ok(());
@@ -53,6 +53,8 @@ pub fn sequentialize_coin_supply(state: &InMemoryStateStore) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_transaction_simulation::InMemoryStateStore;
+    use aptos_types::state_store::TStateView;
 
     fn state_with_coin_info(supply: u128, with_value: bool) -> InMemoryStateStore {
         let coin_info = AptosCoinInfo::random(u128::MAX);
@@ -60,7 +62,10 @@ mod tests {
 
         let bytes = bcs::to_bytes(&coin_info).unwrap();
         state
-            .set_state_value(coin_info_key().unwrap(), StateValue::new_legacy(bytes.into()))
+            .set_state_value(
+                coin_info_key().unwrap(),
+                StateValue::new_legacy(bytes.into()),
+            )
             .unwrap();
         if with_value {
             let bytes = bcs::to_bytes(&supply).unwrap();

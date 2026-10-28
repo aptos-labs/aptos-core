@@ -95,7 +95,9 @@ mod tests {
         // `string` is a dependency of the overridden set, but not overridden.
         let key = StateKey::module_id(&framework_module("string"));
         let captured = StateValue::new_legacy(vec![1, 2, 3].into());
-        state.set_state_value(key.clone(), captured.clone()).unwrap();
+        state
+            .set_state_value(key.clone(), captured.clone())
+            .unwrap();
 
         override_framework(&state).unwrap();
 
