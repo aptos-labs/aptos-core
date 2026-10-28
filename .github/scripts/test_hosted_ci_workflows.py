@@ -223,6 +223,23 @@ class WorkflowTests(unittest.TestCase):
                     runs_on,
                     f"{workflow}:{name}",
                 )
+                # Every hosted-routed job must run rust-prebuilt-setup on hosted so the
+                # image toolchain (cargo et al.) is verified and on PATH. Regression guard:
+                # rust-cryptohasher initially missed this and failed on hosted with
+                # 'cargo not found'.
+                prebuilt = [
+                    s
+                    for s in job["steps"]
+                    if s.get("uses") == "./.github/actions/rust-prebuilt-setup"
+                ]
+                self.assertTrue(
+                    prebuilt, f"{workflow}:{name} has no rust-prebuilt-setup step"
+                )
+                self.assertIn(
+                    "provider == 'hosted'",
+                    prebuilt[0]["if"],
+                    f"{workflow}:{name} prebuilt-setup not gated to hosted",
+                )
 
     def test_nightly_workspace_shards_cover_full_suite(self):
         doc = yaml.load(

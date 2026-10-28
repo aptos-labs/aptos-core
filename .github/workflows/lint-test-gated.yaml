@@ -73,6 +73,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v4
+      # cargo is only on PATH via the image toolchain on hosted; verify and export it.
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-gated-cryptohasher
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   # Run the docs tests. This is a PR required job.
