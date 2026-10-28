@@ -380,23 +380,24 @@ impl HighLimitPricing {
         gas_unit_price.saturating_mul(self.excess_gas_price_multiplier)
     }
 
-    /// The maximum gas units the epilogue bills against. Each excess unit is
-    /// counted `k` times, so billing at the gas price charges it at `k` times
-    /// the price. Bounded by `k * max_gas_units`.
-    fn epilogue_max_gas_units(
+    /// `base` scaled up by `(k - 1) * excess`, where `excess` is how much of
+    /// `execution_usage` and `io_usage` together are above the base
+    /// execution and IO limits, capped by `total_usage` (execution and IO
+    /// are rounded up separately, so their sum can exceed the total). Used
+    /// both to inflate the epilogue's max gas units (`base` = the gas
+    /// budget) and to compute the billed gas used (`base` = `total_usage`).
+    fn gas_units_scaled(
         &self,
-        max_gas_units: u64,
-        gas_used: u64,
-        execution_gas_used: u64,
-        io_gas_used: u64,
+        base: u64,
+        total_usage: u64,
+        execution_usage: u64,
+        io_usage: u64,
     ) -> u64 {
-        // Execution and IO are rounded up separately, so their sum can exceed
-        // the gas used.
-        let excess = execution_gas_used
+        let excess = execution_usage
             .saturating_sub(self.base_max_execution_gas.into())
-            .saturating_add(io_gas_used.saturating_sub(self.base_max_io_gas.into()))
-            .min(gas_used);
-        max_gas_units.saturating_add((self.excess_gas_price_multiplier - 1).saturating_mul(excess))
+            .saturating_add(io_usage.saturating_sub(self.base_max_io_gas.into()))
+            .min(total_usage);
+        base.saturating_add((self.excess_gas_price_multiplier - 1).saturating_mul(excess))
     }
 }
 
@@ -441,12 +442,7 @@ impl HighLimitPricingIfAvailable {
         match self.0 {
             Some(pricing) => {
                 let gas_used = max_gas_amount.saturating_sub(gas_remaining);
-                pricing.epilogue_max_gas_units(
-                    max_gas_amount,
-                    gas_used,
-                    execution_gas_used,
-                    io_gas_used,
-                )
+                pricing.gas_units_scaled(max_gas_amount, gas_used, execution_gas_used, io_gas_used)
             },
             None => max_gas_amount,
         }
@@ -458,7 +454,7 @@ impl HighLimitPricingIfAvailable {
     pub fn billed_gas_used(&self, gas_used: u64, execution_gas_used: u64, io_gas_used: u64) -> u64 {
         match self.0 {
             Some(pricing) => {
-                pricing.epilogue_max_gas_units(gas_used, gas_used, execution_gas_used, io_gas_used)
+                pricing.gas_units_scaled(gas_used, gas_used, execution_gas_used, io_gas_used)
             },
             None => gas_used,
         }
@@ -499,7 +495,7 @@ mod tests {
     fn high_limit_pricing_within_base_limits() {
         let pricing = high_limit_pricing(10);
         assert_eq!(
-            pricing.epilogue_max_gas_units(10_000, 3_000, 1_000, 2_000),
+            pricing.gas_units_scaled(10_000, 3_000, 1_000, 2_000),
             10_000
         );
     }
@@ -509,7 +505,7 @@ mod tests {
         let pricing = high_limit_pricing(10);
         // 500 execution units above the base, each counted 10 times.
         assert_eq!(
-            pricing.epilogue_max_gas_units(10_000, 3_500, 1_500, 2_000),
+            pricing.gas_units_scaled(10_000, 3_500, 1_500, 2_000),
             10_000 + 9 * 500
         );
     }
@@ -518,7 +514,7 @@ mod tests {
     fn high_limit_pricing_io_excess() {
         let pricing = high_limit_pricing(10);
         assert_eq!(
-            pricing.epilogue_max_gas_units(10_000, 3_300, 1_000, 2_300),
+            pricing.gas_units_scaled(10_000, 3_300, 1_000, 2_300),
             10_000 + 9 * 300
         );
     }
@@ -528,7 +524,7 @@ mod tests {
         let pricing = high_limit_pricing(10);
         // Rounding up execution and IO separately overshoots the gas used.
         assert_eq!(
-            pricing.epilogue_max_gas_units(10_000, 400, 1_300, 2_300),
+            pricing.gas_units_scaled(10_000, 400, 1_300, 2_300),
             10_000 + 9 * 400
         );
     }
@@ -539,7 +535,7 @@ mod tests {
         let (price, max_gas_units) = (100, 10_000);
         for (gas_used, exec, io) in [(0, 0, 0), (3_000, 1_000, 2_000), (10_000, 9_000, 9_000)] {
             let remaining = max_gas_units - gas_used;
-            let billed = pricing.epilogue_max_gas_units(max_gas_units, gas_used, exec, io);
+            let billed = pricing.gas_units_scaled(max_gas_units, gas_used, exec, io);
             let fee = price * (billed - remaining);
             assert!(fee <= pricing.reserve_price(price) * max_gas_units);
         }
@@ -551,7 +547,7 @@ mod tests {
             let pricing = high_limit_pricing(multiplier);
             assert_eq!(pricing.reserve_price(100), 100);
             assert_eq!(
-                pricing.epilogue_max_gas_units(10_000, 3_500, 1_500, 2_000),
+                pricing.gas_units_scaled(10_000, 3_500, 1_500, 2_000),
                 10_000
             );
         }
