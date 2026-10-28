@@ -591,7 +591,7 @@ cloud-storage = { version = "0.11.1", features = [
 ], default-features = false }
 codespan = "0.11.1"
 codespan-reporting = "0.11.1"
-colored = "2.0.0"
+colored = "3.1.1"
 concurrent-queue = "2.2.0"
 console-subscriber = "0.3.0"
 core_affinity = "0.8.1"
@@ -668,10 +668,10 @@ handlebars = "4.2.2"
 hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
-hex-literal = "0.3.4"
+hex-literal = "1.1.0"
 hkdf = "0.10.0"
 hmac = "0.12.0"
-hostname = "0.3.1"
+hostname = "0.4.2"
 http = "0.2.9"
 http-body-util = "0.1.1"
 httpmock = "0.6.8"
@@ -681,7 +681,7 @@ image = "0.24.5"
 imbl = "7.0.2"
 indexmap = "2.7.0"
 indicatif = "0.17.7"
-indoc = "1.0.6"
+indoc = "2.0.8"
 inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
@@ -734,7 +734,7 @@ opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
 ordered-float = "4.6.0"
 ouroboros = "0.18.5"
-owo-colors = "3.5.0"
+owo-colors = "4.4.0"
 p256 = { version = "0.13.2" }
 pairing = "0.23"
 parking_lot = "0.12.0"
@@ -752,7 +752,7 @@ poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
-pretty = "0.10.0"
+pretty = "0.12.5"
 pretty_assertions = "1.2.1"
 prettydiff = "0.6.2"
 primitive-types = { version = "0.12.2" }
@@ -799,7 +799,7 @@ rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
-rstest = "0.15.0"
+rstest = { version = "0.28.0", default-features = false }
 rustc-hash = "2"
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
@@ -838,7 +838,7 @@ sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
-tempfile = "3.3.0"
+tempfile = "3.27.0"
 tera = "1.16.0"
 termcolor = "1.1.2"
 test-case = "3.1.0"
@@ -866,7 +866,7 @@ tonic = { version = "0.12.3", features = [
     "zstd",
 ] }
 tonic-reflection = "0.12.3"
-topological-sort = "0.2.2"
+topological-sort = "0.3.1"
 tracing = "0.1.37"
 tracing-log = "0.2.0"
 tracing-opentelemetry = "0.28.0"
@@ -888,7 +888,7 @@ url = { version = "2.4.0", features = ["serde"] }
 usdt = "0.6.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"
-version-compare = "0.1.1"
+version-compare = "0.2.1"
 vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
