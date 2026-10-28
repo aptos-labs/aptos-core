@@ -47,8 +47,6 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         aux_info: &AuxiliaryInfo,
     ) -> TxnOutcome {
         let guard = self.guard;
-        // `TxnMetadata` needs the gas schedule to scale `max_gas_amount` for
-        // a high-limit request before it sizes the gas meter.
         let gas_params = match self.env.gas_params().as_ref() {
             Ok(gas_params) => gas_params,
             Err(e) => {
@@ -233,8 +231,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // ============================ Epilogue ==============================
         // Transaction cleanup -- charge gas, bump sequence number etc.
         //
-        // MonoMove doesn't track IO gas separately, so `io_gas_used` is
-        // always `0`.
+        // TODO(completeness): pass IO charges for MonoMove.
         let billed_gas_used = txn_data.high_limit_pricing.billed_gas_used(gas_used, gas_used, 0);
         let fee_statement = placeholder_fee_statement(gas_used, billed_gas_used);
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
@@ -352,16 +349,12 @@ fn transaction_extensions(txn_data: &TxnMetadata, usage: StateStorageUsage) -> N
     )
 }
 
-/// The fee statement for a transaction that consumed `gas_used` units, billed
-/// against `billed_gas_used` (equal to `gas_used` outside a high-limit
-/// request).
-//
 // TODO(metering): IO gas, storage fees, and refunds are all zero until they
-// are charged; `gas_used` is in uncalibrated MonoMove units.
-fn placeholder_fee_statement(gas_used: u64, billed_gas_used: u64) -> FeeStatement {
+// are charged; `execution_gas_used` is in uncalibrated MonoMove units.
+fn placeholder_fee_statement(execution_gas_used: u64, billed_gas_used: u64) -> FeeStatement {
     FeeStatement::builder()
         .total_charge_gas_units(billed_gas_used)
-        .execution_gas_units(gas_used)
+        .execution_gas_units(execution_gas_used)
         .io_gas_units(0)
         .storage_fee_octas(0)
         .storage_fee_refund_octas(0)

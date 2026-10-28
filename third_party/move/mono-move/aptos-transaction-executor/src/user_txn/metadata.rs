@@ -18,12 +18,12 @@ pub(crate) struct TxnMetadata {
     pub fee_payer_auth_key: Option<Vec<u8>>,
     pub secondary_auth_keys: Vec<Option<Vec<u8>>>,
     pub gas_unit_price: u64,
+    /// Maximum gas a transaction can use. Scaled down for high-limit
+    /// transactions to enable charging excess units at higher gas price.
     pub max_gas_amount: u64,
     /// A request for higher execution and IO limits. The prologue checks the
     /// staking that backs it.
     pub txn_limits_request: Option<UserTxnLimitsRequest>,
-    /// Set for a staking-backed limits request, which pays more for gas used
-    /// above the base limits. `max_gas_amount` is already scaled down by it.
     pub high_limit_pricing: HighLimitPricingIfAvailable,
     /// Size of the full signed transaction.
     pub transaction_size: u64,

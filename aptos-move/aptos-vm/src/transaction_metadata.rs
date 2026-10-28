@@ -132,11 +132,9 @@ impl TransactionMetadata {
             },
         };
 
-        // A staking-backed limits request bills gas above the base execution
-        // and IO limits at a higher price. Scaling the budget down here,
-        // before it sizes the gas meter, keeps `gas_used * price - refund`
-        // equal to the fee the epilogue actually charges: see
-        // `HighLimitPricingIfAvailable::epilogue_max_gas_units`.
+        // For high-limit transaction, maximum gas amount is scaled down so
+        // that a higher gas price can be charged for units that exceed
+        // baseline limits on execution and IO.
         let max_gas_amount =
             Gas::new(high_limit_pricing.scale_max_gas_amount(txn.max_gas_amount()));
 

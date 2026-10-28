@@ -8,7 +8,7 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
-        RELEASE_V1_41, RELEASE_V1_45, RELEASE_V1_50,
+        RELEASE_V1_41, RELEASE_V1_45, RELEASE_V1_50, RELEASE_V1_51,
     },
 };
 use aptos_gas_algebra::{
@@ -70,7 +70,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         // the gas price for gas used above the base execution and IO limits.
         [
             high_limit_txn_excess_price_multiplier: GasMultiplier,
-            { RELEASE_V1_50.. => "high_limit_txn_excess_price_multiplier" },
+            { RELEASE_V1_51.. => "high_limit_txn_excess_price_multiplier" },
             10
         ],
         // The maximum gas unit price that a transaction can be submitted with.
@@ -361,7 +361,7 @@ struct HighLimitPricing {
 impl HighLimitPricing {
     /// Returns [`None`] if high limit pricing is not enabled.
     fn new(gas_feature_version: u64, params: &TransactionGasParameters) -> Option<Self> {
-        if gas_feature_version < RELEASE_V1_50 {
+        if gas_feature_version < RELEASE_V1_51 {
             return None;
         }
         Some(Self {
@@ -380,12 +380,17 @@ impl HighLimitPricing {
         gas_unit_price.saturating_mul(self.excess_gas_price_multiplier)
     }
 
-    /// `base` scaled up by `(k - 1) * excess`, where `excess` is how much of
-    /// `execution_usage` and `io_usage` together are above the base
-    /// execution and IO limits, capped by `total_usage` (execution and IO
-    /// are rounded up separately, so their sum can exceed the total). Used
-    /// both to inflate the epilogue's max gas units (`base` = the gas
-    /// budget) and to compute the billed gas used (`base` = `total_usage`).
+    /// Given a base `B`, a usage `U`, and execution/IO usage:
+    ///
+    /// ```text
+    /// excess = min(U, (execution_used - base_execution)+ + (io_used - base_io)+)
+    /// result = B + (k - 1) * excess
+    /// ```
+    ///
+    /// `excess` is how much of the real execution and IO usage is above the
+    /// base limits (clamped by `U`, since execution and IO are rounded up
+    /// separately and their sum can overshoot). Each excess unit gets
+    /// counted `k` times by adding `(k - 1) * excess` on top of `B`.
     fn gas_units_scaled(
         &self,
         base: u64,
@@ -402,8 +407,7 @@ impl HighLimitPricing {
 }
 
 /// A transaction's high-limit pricing: present only for a staking-backed
-/// limits request at a gas feature version that supports it. Every method is
-/// a no-op passthrough when absent, so callers never need to branch on it.
+/// limits request at a gas feature version that supports it.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct HighLimitPricingIfAvailable(Option<HighLimitPricing>);
 
@@ -420,12 +424,11 @@ impl HighLimitPricingIfAvailable {
         }
     }
 
-    /// The gas meter's budget: `max_gas_amount` scaled down by the excess
-    /// price multiplier `k`, so billing gas used above the base limits at
-    /// `k` times the price never charges more than `max_gas_amount`.
+    /// Scales gas amount down by a factor of excess price multiplier. This
+    /// amount is used as a gas meter budget.
     pub fn scale_max_gas_amount(&self, max_gas_amount: u64) -> u64 {
         match self.0 {
-            Some(pricing) => max_gas_amount / pricing.excess_gas_price_multiplier,
+            Some(pricing) => max_gas_amount / pricing.excess_gas_price_multiplier.max(1),
             None => max_gas_amount,
         }
     }
@@ -434,23 +437,27 @@ impl HighLimitPricingIfAvailable {
     /// much of the (already-scaled) budget remains unspent.
     pub fn epilogue_max_gas_units(
         &self,
-        max_gas_amount: u64,
+        scaled_max_gas_amount: u64,
         gas_remaining: u64,
         execution_gas_used: u64,
         io_gas_used: u64,
     ) -> u64 {
         match self.0 {
             Some(pricing) => {
-                let gas_used = max_gas_amount.saturating_sub(gas_remaining);
-                pricing.gas_units_scaled(max_gas_amount, gas_used, execution_gas_used, io_gas_used)
+                let gas_used = scaled_max_gas_amount.saturating_sub(gas_remaining);
+                pricing.gas_units_scaled(
+                    scaled_max_gas_amount,
+                    gas_used,
+                    execution_gas_used,
+                    io_gas_used,
+                )
             },
-            None => max_gas_amount,
+            None => scaled_max_gas_amount,
         }
     }
 
-    /// The amount to report as `FeeStatement.gas_used()`: the true metered
-    /// `gas_used`, billed at a higher price for any of it above the base
-    /// execution and IO limits.
+    /// The amount of gas used reported in the fee statement. Excess units
+    /// are scaled based on the excess price multiplier.
     pub fn billed_gas_used(&self, gas_used: u64, execution_gas_used: u64, io_gas_used: u64) -> u64 {
         match self.0 {
             Some(pricing) => {
@@ -464,7 +471,7 @@ impl HighLimitPricingIfAvailable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ver::gas_feature_versions::RELEASE_V1_49, InitialGasSchedule};
+    use crate::{ver::gas_feature_versions::RELEASE_V1_50, InitialGasSchedule};
 
     // Base limits of 1,000 execution and 2,000 IO gas units.
     fn high_limit_pricing(multiplier: u64) -> HighLimitPricing {
@@ -472,13 +479,13 @@ mod tests {
         params.max_execution_gas = Gas::new(1_000).to_unit_with_params(&params);
         params.max_io_gas = Gas::new(2_000).to_unit_with_params(&params);
         params.high_limit_txn_excess_price_multiplier = multiplier.into();
-        HighLimitPricing::new(RELEASE_V1_50, &params).unwrap()
+        HighLimitPricing::new(RELEASE_V1_51, &params).unwrap()
     }
 
     #[test]
-    fn high_limit_pricing_disabled_before_v1_50() {
+    fn high_limit_pricing_disabled_before_v1_51() {
         let params = TransactionGasParameters::initial();
-        assert!(HighLimitPricing::new(RELEASE_V1_49, &params).is_none());
+        assert!(HighLimitPricing::new(RELEASE_V1_50, &params).is_none());
     }
 
     #[test]
@@ -486,7 +493,7 @@ mod tests {
         let mut params = TransactionGasParameters::initial();
         params.max_execution_gas = InternalGas::new(1_000 * GAS_SCALING_FACTOR + 1);
         params.max_io_gas = InternalGas::new(2_000 * GAS_SCALING_FACTOR - 1);
-        let pricing = HighLimitPricing::new(RELEASE_V1_50, &params).unwrap();
+        let pricing = HighLimitPricing::new(RELEASE_V1_51, &params).unwrap();
         assert_eq!(pricing.base_max_execution_gas, Gas::new(1_001));
         assert_eq!(pricing.base_max_io_gas, Gas::new(2_000));
     }
@@ -571,7 +578,7 @@ mod tests {
         params.max_execution_gas = Gas::new(1_000).to_unit_with_params(&params);
         params.max_io_gas = Gas::new(2_000).to_unit_with_params(&params);
         params.high_limit_txn_excess_price_multiplier = 10.into();
-        let present = HighLimitPricingIfAvailable::new(RELEASE_V1_50, &params);
+        let present = HighLimitPricingIfAvailable::new(RELEASE_V1_51, &params);
 
         assert_eq!(present.reserve_price(100), 1_000);
         assert_eq!(present.scale_max_gas_amount(10_000), 1_000);
@@ -594,9 +601,9 @@ mod tests {
     }
 
     #[test]
-    fn if_available_before_v1_50_is_absent() {
+    fn if_available_before_v1_51_is_absent() {
         let params = TransactionGasParameters::initial();
-        let pricing = HighLimitPricingIfAvailable::new(RELEASE_V1_49, &params);
+        let pricing = HighLimitPricingIfAvailable::new(RELEASE_V1_50, &params);
         assert_eq!(pricing.scale_max_gas_amount(10_000), 10_000);
     }
 

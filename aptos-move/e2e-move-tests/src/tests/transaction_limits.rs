@@ -15,7 +15,7 @@ use aptos_cached_packages::aptos_stdlib::{
 };
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::Gas;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_49;
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_50;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
@@ -879,10 +879,10 @@ fn test_high_limit_txn_drained_balance_pays_on_failure() {
 }
 
 #[test]
-fn test_high_limit_txn_before_v1_50_pays_gas_price() {
+fn test_high_limit_txn_before_v1_51_pays_gas_price() {
     let mut h = new_test_harness();
     let (acc, base) = setup_excess_execution(&mut h);
-    h.modify_gas_schedule_raw(|gas_schedule| gas_schedule.feature_version = RELEASE_V1_49);
+    h.modify_gas_schedule_raw(|gas_schedule| gas_schedule.feature_version = RELEASE_V1_50);
 
     let payload = entry_function_with_limits(spin(SPIN_ITERATIONS), stake_pool_owner(200, 200));
     let txn = h.create_transaction_payload(&acc, payload);
