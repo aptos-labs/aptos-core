@@ -87,6 +87,14 @@ pub struct VMChangeSet {
     /// count limit in `ChangeSetConfigs` (and counted in
     /// `VMOutput::materialized_size`), which should give way to real metering.
     position_write_set: BTreeMap<StateKey, WriteOp>,
+
+    /// Native-order writes, materialized into the `WriteSet`'s
+    /// `native_orders` sibling bucket like positions.
+    ///
+    /// TODO[native_order](metering): not charged IO gas or storage fees yet.
+    /// Bounded by its own write-op count and byte limits in
+    /// `ChangeSetConfigs`.
+    order_write_set: BTreeMap<StateKey, WriteOp>,
 }
 
 impl VMChangeSet {
@@ -96,6 +104,7 @@ impl VMChangeSet {
             events: vec![],
             delayed_field_change_set: BTreeMap::new(),
             position_write_set: BTreeMap::new(),
+            order_write_set: BTreeMap::new(),
         }
     }
 
@@ -109,6 +118,7 @@ impl VMChangeSet {
             events,
             delayed_field_change_set,
             position_write_set: BTreeMap::new(),
+            order_write_set: BTreeMap::new(),
         }
     }
 
@@ -150,6 +160,46 @@ impl VMChangeSet {
             }
         }
         self.position_write_set = position_writes;
+        Ok(())
+    }
+
+    pub fn order_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        &self.order_write_set
+    }
+
+    /// Take the Order bucket, leaving it empty.
+    pub fn take_order_write_set(&mut self) -> BTreeMap<StateKey, WriteOp> {
+        std::mem::take(&mut self.order_write_set)
+    }
+
+    /// Set the Order bucket; validates every key is an order or bulk order.
+    /// Errors rather than overwriting a bucket that already holds writes.
+    pub fn set_order_bucket(
+        &mut self,
+        order_writes: BTreeMap<StateKey, WriteOp>,
+    ) -> PartialVMResult<()> {
+        if !self.order_write_set.is_empty() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("order_write_set bucket is already populated".to_string()),
+            );
+        }
+        for key in order_writes.keys() {
+            if !matches!(
+                key.inner(),
+                StateKeyInner::TradingNative(
+                    TradingNativeKey::Order { .. } | TradingNativeKey::BulkOrder { .. }
+                )
+            ) {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "order_write_set bucket received a non-order StateKey".to_string(),
+                        ),
+                );
+            }
+        }
+        self.order_write_set = order_writes;
         Ok(())
     }
 
@@ -254,6 +304,7 @@ impl VMChangeSet {
             delayed_field_change_set,
             events,
             position_write_set,
+            order_write_set,
         } = self;
 
         if !delayed_field_change_set.is_empty() {
@@ -268,6 +319,11 @@ impl VMChangeSet {
         if !position_write_set.is_empty() {
             return Err(code_invariant_error(
                 "Cannot convert from VMChangeSet with non-materialized position writes to ChangeSet.",
+            ));
+        }
+        if !order_write_set.is_empty() {
+            return Err(code_invariant_error(
+                "Cannot convert from VMChangeSet with non-materialized order writes to ChangeSet.",
             ));
         }
 
@@ -682,6 +738,7 @@ impl VMChangeSet {
             delayed_field_change_set: additional_delayed_field_change_set,
             events: additional_events,
             position_write_set: additional_position_write_set,
+            order_write_set: additional_order_write_set,
         } = additional_change_set;
 
         Self::squash_additional_resource_writes(
@@ -698,6 +755,9 @@ impl VMChangeSet {
         // correct. Cross-TX squashing is handled by MVHashMap.
         for (key, op) in additional_position_write_set {
             self.position_write_set.insert(key, op);
+        }
+        for (key, op) in additional_order_write_set {
+            self.order_write_set.insert(key, op);
         }
         self.events.extend(additional_events);
         Ok(())
@@ -780,6 +840,12 @@ pub trait ChangeSetInterface {
     /// being bounded and counted towards the transaction output size.
     fn position_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)>;
 
+    /// Distinct orders written. Not included in `num_write_ops`.
+    fn num_order_write_ops(&self) -> usize;
+
+    /// Sizes of the order writes, outside the gas-metered write set.
+    fn order_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)>;
+
     fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)>;
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent>;
@@ -807,6 +873,16 @@ impl ChangeSetInterface for VMChangeSet {
 
     fn position_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
         self.position_write_set
+            .iter()
+            .map(|(k, op)| (k, op.write_op_size()))
+    }
+
+    fn num_order_write_ops(&self) -> usize {
+        self.order_write_set.len()
+    }
+
+    fn order_write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.order_write_set
             .iter()
             .map(|(k, op)| (k, op.write_op_size()))
     }
