@@ -1054,7 +1054,10 @@ impl<'guard> InterpreterContext<'guard> {
         &'a mut self,
         func: &'guard Function,
     ) -> VMResult<CallBuilder<'a, 'guard>> {
-        if FRAME_METADATA_SIZE + func.extended_frame_size > self.stack.len() {
+        if !self
+            .stack
+            .contains_range(root_frame_base(&self.stack), func.extended_frame_size)
+        {
             return Err(VMInternalError::new(RuntimeError::StackOverflow));
         }
         // Reset the trace before argument placement can overwrite frame
@@ -3400,14 +3403,16 @@ impl InterpreterContext<'_> {
         fp: *mut u8,
         callee_extended_frame_size: usize,
     ) -> VMResult<*mut u8> {
-        unsafe {
-            let new_fp = fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE);
-            let stack_end = self.stack.as_ptr().add(self.stack.len());
-            if new_fp.add(callee_extended_frame_size) > stack_end {
-                return Err(VMInternalError::new(RuntimeError::StackOverflow));
-            }
-            Ok(new_fp)
+        // Check the full span before computing the callee frame pointer to
+        // avoid forming an out-of-bounds pointer for oversized frames.
+        let caller_frame_size = caller.frame_size();
+        let span = caller_frame_size.saturating_add(callee_extended_frame_size);
+        if !self.stack.contains_range(fp, span) {
+            return Err(VMInternalError::new(RuntimeError::StackOverflow));
         }
+        // SAFETY: `fp` points into the stack, and the bounds check covers
+        // the caller frame and the callee's full extended frame.
+        Ok(unsafe { fp.add(caller_frame_size) })
     }
 
     /// Implementation of call opcodes. Validates the stack first, then
@@ -3438,10 +3443,9 @@ impl InterpreterContext<'_> {
     /// # Safety
     ///
     /// In addition to the contract on [`Self::call`], `new_fp` must equal
-    /// `regs.fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
-    /// `new_fp + callee.extended_frame_size` must be within the stack
-    /// (i.e., the caller has already passed the check that
-    /// [`Self::check_stack_for_call`] performs).
+    /// `regs.fp + caller.frame_size()`. The callee's full extended frame
+    /// starting at `new_fp` must fit within the stack, as verified by
+    /// [`Self::check_stack_for_call`].
     #[inline(always)]
     unsafe fn call_unchecked(
         &mut self,

@@ -1046,18 +1046,23 @@ mod native_extension_tests {
         );
     }
 
-    /// The extension enum round-trips through BCS. The `WriteSetV1` field
-    /// that holds extensions is `serde(skip)`ped, so the bucket is not part
-    /// of the serialized write set itself; that is the existing behaviour
-    /// for positions too.
+    /// A `WriteSetV1` serializes its extensions, so both native buckets
+    /// survive a BCS round trip.
     #[test]
-    fn order_extension_round_trips() {
-        let ext = Extension::NativeOrder(BTreeMap::from([(
+    fn native_buckets_survive_v1_serialization() {
+        let mut ws = WriteSetMut::default().freeze().unwrap().into_v1();
+        ws.add_native_positions(BTreeMap::from([(
+            StateKey::position(addr(1), addr(2), addr(3)),
+            position_op(1),
+        )]));
+        ws.add_native_orders(BTreeMap::from([(
             StateKey::bulk_order(addr(1), addr(3), addr(9)),
             order_op(5),
         )]));
-        let bytes = bcs::to_bytes(&ext).unwrap();
-        assert_eq!(bcs::from_bytes::<Extension>(&bytes).unwrap(), ext);
+        let decoded: WriteSet = bcs::from_bytes(&bcs::to_bytes(&ws).unwrap()).unwrap();
+        assert_eq!(decoded, ws);
+        assert_eq!(decoded.native_position_iter().count(), 1);
+        assert_eq!(decoded.native_order_iter().count(), 1);
     }
 
     #[test]

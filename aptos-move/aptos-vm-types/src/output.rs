@@ -13,7 +13,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::{NativePositionOp, WriteOp},
+    write_set::{NativeOrderOp, NativePositionOp, WriteOp},
 };
 use derivative::Derivative;
 use move_core_types::{
@@ -163,6 +163,7 @@ impl VMOutput {
             .change_set
             .write_set_size_iter()
             .chain(self.change_set.position_write_set_size_iter())
+            .chain(self.change_set.order_write_set_size_iter())
             .chain(self.module_write_set.write_set_size_iter())
         {
             size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
@@ -226,17 +227,27 @@ impl VMOutput {
             .into_iter()
             .map(|(k, op)| (k, NativePositionOp::from_write_op(op)))
             .collect();
+        let native_orders: BTreeMap<StateKey, NativeOrderOp> = change_set
+            .take_order_write_set()
+            .into_iter()
+            .map(|(k, op)| (k, NativeOrderOp::from_write_op(op)))
+            .collect();
 
         let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
         write_set.add_hotness(hotness);
-        if !native_positions.is_empty() {
-            // `freeze()` produces V0, whose extension bucket is `#[serde(skip)]`.
-            // Upgrade so the positions survive serialization (write-set replay,
-            // output sync, remote execution) rather than being silently dropped.
+        // `freeze()` produces V0, whose extension bucket is `#[serde(skip)]`.
+        // Upgrade so the native writes survive serialization (write-set replay,
+        // output sync, remote execution) rather than being silently dropped.
+        if !native_positions.is_empty() || !native_orders.is_empty() {
             write_set = write_set.into_v1();
+        }
+        if !native_positions.is_empty() {
             write_set.add_native_positions(native_positions);
+        }
+        if !native_orders.is_empty() {
+            write_set.add_native_orders(native_orders);
         }
         Ok(TransactionOutput::new(
             write_set,

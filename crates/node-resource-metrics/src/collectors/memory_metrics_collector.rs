@@ -10,7 +10,7 @@ use prometheus::{
     Opts,
 };
 use std::sync::Arc;
-use sysinfo::{RefreshKind, System, SystemExt};
+use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 
 const MEM_METRICS_COUNT: usize = 6;
 
@@ -38,7 +38,7 @@ pub(crate) struct MemoryMetricsCollector {
 impl MemoryMetricsCollector {
     fn new() -> Self {
         let system = Arc::new(Mutex::new(System::new_with_specifics(
-            RefreshKind::new().with_memory(),
+            RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()),
         )));
 
         let mem_total = Opts::new(SYSTEM_MEM_TOTAL, "Memory total.")
