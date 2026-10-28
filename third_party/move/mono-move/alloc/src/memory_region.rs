@@ -124,6 +124,14 @@ impl MemoryRegion {
     pub fn is_empty(&self) -> bool {
         self.layout.size() == 0
     }
+
+    /// Checks whether `len` bytes at `ptr` fit within the region's address bounds,
+    /// allowing an empty range at its end. Uses integer arithmetic to reject
+    /// out-of-bounds or overflowing ranges without forming out-of-bounds pointers.
+    #[inline(always)]
+    pub fn contains_range(&self, ptr: *const u8, len: usize) -> bool {
+        ptr.addr().wrapping_sub(self.ptr.addr()).saturating_add(len) <= self.len()
+    }
 }
 
 impl Drop for MemoryRegion {
