@@ -58,7 +58,6 @@ use chunk_result_verifier::StateSyncChunkVerifier;
 use fail::fail_point;
 use itertools::{multizip, Itertools};
 use std::{
-    iter::once,
     marker::PhantomData,
     sync::atomic::{AtomicBool, Ordering},
     time::Instant,
@@ -92,6 +91,22 @@ fn chunk_onchain_config(state_view: &CachedStateView) -> Result<BlockExecutorCon
             base
         },
     })
+}
+
+/// The number of txns up to the last block end.
+fn num_txns_in_blocks(txn_infos: &[TransactionInfo]) -> usize {
+    txn_infos
+        .iter()
+        .rposition(TransactionInfo::has_state_checkpoint_hash)
+        .map_or(0, |idx| idx + 1)
+}
+
+/// The number of txns up to the first block end, if there is one.
+fn num_txns_to_block_end(txn_infos: &[TransactionInfo]) -> Option<usize> {
+    txn_infos
+        .iter()
+        .position(TransactionInfo::has_state_checkpoint_hash)
+        .map(|idx| idx + 1)
 }
 
 enum ChunkExecutorState<V> {
@@ -714,52 +729,23 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         end_version: Version,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<usize> {
-        // we try to apply the txns in sub-batches split by known txns to skip and the end of the batch
-        let txns_to_skip = verify_execution_mode.txns_to_skip();
-        let mut batch_ends = txns_to_skip
-            .range(begin_version..end_version)
-            .chain(once(&end_version));
-
         let mut chunks_enqueued = 0;
 
         let mut batch_begin = begin_version;
-        let mut batch_end = *batch_ends.next().unwrap();
         while batch_begin < end_version {
-            if batch_begin == batch_end {
-                // batch_end is a known broken version that won't pass execution verification
-                self.remove_and_apply(
+            let batch_end = if verify_execution_mode.should_verify() {
+                self.verify_next_batch(
                     transactions,
                     persisted_aux_info,
                     transaction_infos,
                     write_sets,
                     event_vecs,
                     batch_begin,
-                    batch_begin + 1,
-                )?;
-                chunks_enqueued += 1;
-                info!(
-                    version_skipped = batch_begin,
-                    "Skipped known broken transaction, applied transaction output directly."
-                );
-                batch_begin += 1;
-                batch_end = *batch_ends.next().unwrap();
-                continue;
-            }
-
-            // Try to run the transactions with the VM
-            let next_begin = if verify_execution_mode.should_verify() {
-                self.verify_execution(
-                    transactions,
-                    persisted_aux_info,
-                    transaction_infos,
-                    write_sets,
-                    event_vecs,
-                    batch_begin,
-                    batch_end,
+                    end_version,
                     verify_execution_mode,
                 )?
             } else {
-                batch_end
+                end_version
             };
             self.remove_and_apply(
                 transactions,
@@ -768,13 +754,74 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 write_sets,
                 event_vecs,
                 batch_begin,
-                next_begin,
+                batch_end,
             )?;
             chunks_enqueued += 1;
-            batch_begin = next_begin;
+            batch_begin = batch_end;
         }
 
         Ok(chunks_enqueued)
+    }
+
+    /// Verifies the whole blocks at the front of the inputs, unless they start with a block with
+    /// a txn to skip, and returns the end of the txns to apply next.
+    fn verify_next_batch(
+        &self,
+        transactions: &[Transaction],
+        persisted_aux_info: &[PersistedAuxiliaryInfo],
+        transaction_infos: &[TransactionInfo],
+        write_sets: &[WriteSet],
+        event_vecs: &[Vec<ContractEvent>],
+        begin_version: Version,
+        end_version: Version,
+        verify_execution_mode: &VerifyExecutionMode,
+    ) -> Result<Version> {
+        // Re-execution has to start at a block start, which can be in the partial block held back.
+        let block_begin = self
+            .commit_queue
+            .lock()
+            .partial_block()
+            .map_or(begin_version, |partial_block| partial_block.first_version);
+        let txns_to_skip = verify_execution_mode.txns_to_skip();
+        let next_txn_to_skip = txns_to_skip.range(block_begin..end_version).next();
+        // The inputs are drained as they are applied, so they start at `begin_version`.
+        let txn_infos = &transaction_infos[..(end_version - begin_version) as usize];
+        let num_txns_before_skip = next_txn_to_skip.map_or(txn_infos.len(), |version| {
+            version.saturating_sub(begin_version) as usize
+        });
+        let num_txns_to_verify = num_txns_in_blocks(&txn_infos[..num_txns_before_skip]);
+        if num_txns_to_verify > 0 {
+            self.verify_execution(
+                transactions,
+                persisted_aux_info,
+                transaction_infos,
+                write_sets,
+                event_vecs,
+                begin_version,
+                begin_version + num_txns_to_verify as Version,
+                verify_execution_mode,
+            )
+        } else if let Some(txn_to_skip) = next_txn_to_skip {
+            // Blocks with known broken transactions aren't executed. This one can continue in the
+            // next input, so it's logged once complete.
+            match num_txns_to_block_end(&txn_infos[num_txns_before_skip..]) {
+                Some(n) => {
+                    let next_block_begin = begin_version + (num_txns_before_skip + n) as Version;
+                    info!(
+                        version_skipped = txn_to_skip,
+                        first_version = block_begin,
+                        last_version = next_block_begin - 1,
+                        "Skipped the block with a known broken transaction, \
+                        applied transaction outputs directly."
+                    );
+                    Ok(next_block_begin)
+                },
+                None => Ok(end_version),
+            }
+        } else {
+            // A partial block at the end is verified once the next input completes it.
+            Ok(end_version)
+        }
     }
 
     fn verify_execution(
@@ -788,36 +835,37 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         end_version: Version,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<Version> {
-        // Execute on top of the partial block held back, which is applied rather than executed,
-        // in case it has transactions known to be broken.
-        let (latest_state, partial_block) = {
+        // Re-execution has to start at a block start, so the partial block held back is re-executed
+        // along with the rest of the block.
+        let (parent_state, partial_block) = {
             let commit_queue = self.commit_queue.lock();
             (
                 commit_queue.latest_state().clone(),
                 commit_queue.partial_block().cloned(),
             )
         };
-        let parent_state = match partial_block {
-            Some(partial_block) => {
-                let state_view = self.state_view(latest_state.latest())?;
-                partial_block
-                    .into_output::<V>(&latest_state, None, state_view)?
-                    .result_state
-                    .clone()
-            },
-            None => latest_state,
-        };
+        let partial_block = partial_block.as_ref();
+        let first_version = partial_block.map_or(begin_version, |p| p.first_version);
+        let partial_outputs = partial_block.map_or(&[][..], |p| {
+            p.transaction_outputs
+                .as_deref()
+                .expect("Replayed transactions come with outputs.")
+        });
+        let num_txns = (end_version - begin_version) as usize;
+
         let state_view = self.state_view(parent_state.latest())?;
-        let txns = transactions
-            .iter()
-            .take((end_version - begin_version) as usize)
+        let txns = partial_block
+            .into_iter()
+            .flat_map(|p| &p.transactions)
+            .chain(&transactions[..num_txns])
             .cloned()
             .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
-        let auxiliary_info = persisted_aux_info
-            .iter()
-            .take((end_version - begin_version) as usize)
+        let auxiliary_info = partial_block
+            .into_iter()
+            .flat_map(|p| &p.persisted_aux_info)
+            .chain(&persisted_aux_info[..num_txns])
             .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
             .collect::<Vec<_>>();
         let onchain_config = chunk_onchain_config(&state_view)?;
@@ -830,15 +878,24 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             None,
             state_view,
             onchain_config,
-            TransactionSliceMetadata::chunk(begin_version, end_version),
+            TransactionSliceMetadata::chunk(first_version, end_version),
         )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
-            begin_version..end_version,
+            first_version..end_version,
             &execution_output.to_commit.transaction_outputs,
-            transaction_infos.iter(),
-            write_sets.iter(),
-            event_vecs.iter(),
+            partial_block
+                .into_iter()
+                .flat_map(|p| &p.transaction_infos)
+                .chain(transaction_infos),
+            partial_outputs
+                .iter()
+                .map(TransactionOutput::write_set)
+                .chain(write_sets),
+            partial_outputs
+                .iter()
+                .map(TransactionOutput::events)
+                .chain(event_vecs.iter().map(Vec::as_slice)),
         )) {
             if let Err(err) = txn_out.ensure_match_transaction_info(
                 version,
@@ -847,9 +904,17 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 Some(events),
             ) {
                 return if verify_execution_mode.is_lazy_quit() {
-                    error!("(Not quitting right away.) {}", err);
+                    // The rest of the block goes unverified.
+                    let idx = version.saturating_sub(begin_version) as usize;
+                    let num_txns_left = num_txns_to_block_end(&transaction_infos[idx..num_txns])
+                        .expect("Verified transactions end at a block end.");
+                    let next_block_begin = begin_version + (idx + num_txns_left) as Version;
+                    error!(
+                        unverified_until = next_block_begin - 1,
+                        "(Not quitting right away, the rest of the block goes unverified.) {}", err
+                    );
                     verify_execution_mode.mark_seen_error();
-                    Ok(version + 1)
+                    Ok(next_block_begin)
                 } else {
                     Err(err)
                 };
@@ -858,8 +923,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         Ok(end_version)
     }
 
-    /// Consume `end_version - begin_version` txns from the mutable input arguments
-    /// It's guaranteed that there's no known broken versions or epoch endings in the range.
+    /// Consume `end_version - begin_version` txns from the mutable input arguments and apply their
+    /// outputs, so known broken versions can be in the range. It doesn't cross epoch boundaries.
     fn remove_and_apply(
         &self,
         transactions: &mut Vec<Transaction>,
