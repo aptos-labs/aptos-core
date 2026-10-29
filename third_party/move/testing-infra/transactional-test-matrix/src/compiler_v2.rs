@@ -307,18 +307,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality.move",
-        "function values in resources, function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
-        "function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality_widened.move",
-        "function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/misc_1.move",
         "function value serialization",
     ),
@@ -337,10 +325,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::semantic(
         "tests/no-v1-comparison/closures/reentrancy_nested.move",
         "no reentrancy checks",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/registry.move",
-        "function values in resources",
     ),
     MonoMoveDivergence::semantic(
         "tests/no-v1-comparison/inlining_optimization/locked_caller_inlined_helper.move",

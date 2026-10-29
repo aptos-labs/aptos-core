@@ -9,6 +9,13 @@ use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     memory::{read_enum_tag, read_ptr, read_vec_len},
     types::VEC_DATA_OFFSET,
+    value_conv::{
+        bcs::{
+            capture_blob, capture_layouts_of, capture_slots, closure_parts, emit_closure_captures,
+            materialized_capture_layouts, ClosureParts,
+        },
+        layout_wire::{compare_captures, compare_func_refs},
+    },
 };
 use mono_move_core::{
     types::InternedType, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
@@ -182,10 +189,9 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
                 )
             }
         },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values are not yet supported",
-        ))),
+        // SAFETY: a function slot holds a closure pointer, and the caller
+        // guarantees its heap objects are live.
+        LayoutKind::Function => unsafe { closures_equal(layouts, a, b) },
         LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::Unreachable(
                 "Equality runs on pointee types only".to_string(),
@@ -401,16 +407,197 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                 )
             }
         },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values are not yet supported",
-        ))),
+        // SAFETY: a function slot holds a closure pointer, and the caller
+        // guarantees its heap objects are live.
+        LayoutKind::Function => unsafe { closures_compare(layouts, a, b) },
         LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::Unreachable(
                 "Comparison runs on pointee types only".to_string(),
             ),
         ))),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Function values
+// ---------------------------------------------------------------------------
+//
+// A closure's captures live in one of two forms: flat values laid out by
+// `PackClosure`, or the wire bytes a closure read from storage was built from.
+// Comparing a flat pair against a wire pair means putting them in one form, and
+// the flat side is the one that converts: emitting its wire bytes needs only
+// the layout table, while decoding the wire side would need the target loaded
+// and lowered, giving comparison a failure class V1 does not have.
+//
+// TODO(security, metering): a mixed pair re-emits the flat side on every
+// comparison. Check that the `Eq` gas formula scales with capture size, and
+// reuse a per-worker scratch buffer.
+
+/// Structural equality of two function values.
+///
+/// # Safety
+///
+/// `a` and `b` must point to fully initialized function values whose reachable
+/// heap objects stay live throughout the call.
+unsafe fn closures_equal<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    a: *const u8,
+    b: *const u8,
+) -> VMResult<bool> {
+    // SAFETY: forwarded from this function's contract.
+    let (a, b) = unsafe { (closure_parts(a)?, closure_parts(b)?) };
+    if a.mask != b.mask || !same_target(&a, &b)? {
+        return Ok(false);
+    }
+    let count = a.captured_count();
+    if count == 0 {
+        return Ok(true);
+    }
+
+    // SAFETY: a closure capturing anything has a live captured-data object.
+    let ids = unsafe {
+        (
+            materialized_capture_layouts(a.captured_data)?,
+            materialized_capture_layouts(b.captured_data)?,
+        )
+    };
+    if let (Some(id_a), Some(id_b)) = ids {
+        if id_a == id_b {
+            // One layout list for both, so the captures compare in place.
+            let capture_layouts = capture_layouts_of(layouts, id_a, count)?;
+            for slot in capture_slots(layouts, capture_layouts) {
+                let (id, _, offset) = slot?;
+                // SAFETY: both captures lie within their values region and are
+                // described by the layout they were published under.
+                let eq = unsafe {
+                    equals_impl(
+                        layouts,
+                        a.captured_data.add(offset),
+                        b.captured_data.add(offset),
+                        id,
+                    )?
+                };
+                if !eq {
+                    return Ok(false);
+                }
+            }
+            return Ok(true);
+        }
+    }
+
+    // SAFETY: forwarded.
+    let (bytes_a, bytes_b) = unsafe { (capture_bytes(layouts, &a)?, capture_bytes(layouts, &b)?) };
+    // BCS is canonical, and each tail carries the layouts it was written under,
+    // so identical bytes are identical values. A closure read from storage and
+    // never called still holds the bytes it came from, which makes filtering an
+    // unchanged resource write a memcmp.
+    if bytes_a.as_ref() == bytes_b.as_ref() {
+        return Ok(true);
+    }
+    Ok(compare_captures(bytes_a.as_ref(), bytes_b.as_ref(), count as u64)?.is_eq())
+}
+
+/// Ordering of two function values, by target, then mask, then captures.
+///
+/// # Safety
+///
+/// `a` and `b` must point to fully initialized function values whose reachable
+/// heap objects stay live throughout the call.
+unsafe fn closures_compare<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    a: *const u8,
+    b: *const u8,
+) -> VMResult<Ordering> {
+    // SAFETY: forwarded from this function's contract.
+    let (a, b) = unsafe { (closure_parts(a)?, closure_parts(b)?) };
+    let ord = compare_func_refs(a.func_ref, b.func_ref)?.then_with(|| a.mask.cmp(&b.mask));
+    if ord.is_ne() {
+        return Ok(ord);
+    }
+    let count = a.captured_count();
+    if count == 0 {
+        return Ok(Ordering::Equal);
+    }
+
+    // SAFETY: a closure capturing anything has a live captured-data object.
+    let ids = unsafe {
+        (
+            materialized_capture_layouts(a.captured_data)?,
+            materialized_capture_layouts(b.captured_data)?,
+        )
+    };
+    if let (Some(id_a), Some(id_b)) = ids {
+        if id_a == id_b {
+            // One layout list for both, so the captures compare in place.
+            let capture_layouts = capture_layouts_of(layouts, id_a, count)?;
+            for slot in capture_slots(layouts, capture_layouts) {
+                let (id, _, offset) = slot?;
+                // SAFETY: both captures lie within their values region and are
+                // described by the layout they were published under.
+                let ord = unsafe {
+                    compare_impl(
+                        layouts,
+                        a.captured_data.add(offset),
+                        b.captured_data.add(offset),
+                        id,
+                    )?
+                };
+                if ord.is_ne() {
+                    return Ok(ord);
+                }
+            }
+            return Ok(Ordering::Equal);
+        }
+    }
+
+    // SAFETY: forwarded.
+    let (bytes_a, bytes_b) = unsafe { (capture_bytes(layouts, &a)?, capture_bytes(layouts, &b)?) };
+    Ok(compare_captures(
+        bytes_a.as_ref(),
+        bytes_b.as_ref(),
+        count as u64,
+    )?)
+}
+
+/// Whether two closures call the same function with the same type arguments.
+/// Interning is canonical, so matching targets share one `FunctionRef`.
+fn same_target(a: &ClosureParts, b: &ClosureParts) -> VMResult<bool> {
+    Ok(std::ptr::eq(a.func_ref, b.func_ref) || compare_func_refs(a.func_ref, b.func_ref)?.is_eq())
+}
+
+/// A closure's captures as wire bytes: the stored blob when it has one, else
+/// freshly emitted from the flat values.
+enum CaptureBytes<'a> {
+    Stored(&'a [u8]),
+    Emitted(Vec<u8>),
+}
+
+impl AsRef<[u8]> for CaptureBytes<'_> {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            CaptureBytes::Stored(bytes) => bytes,
+            CaptureBytes::Emitted(bytes) => bytes,
+        }
+    }
+}
+
+/// # Safety
+///
+/// `parts.captured_data` must be non-null and point to a live captured-data
+/// object that stays live for the lifetime of the result.
+unsafe fn capture_bytes<'a, T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    parts: &ClosureParts<'a>,
+) -> VMResult<CaptureBytes<'a>> {
+    // SAFETY: forwarded from this function's contract.
+    if unsafe { materialized_capture_layouts(parts.captured_data)? }.is_none() {
+        return Ok(CaptureBytes::Stored(unsafe {
+            capture_blob(parts.captured_data)
+        }));
+    }
+    let mut out = vec![];
+    unsafe { emit_closure_captures(layouts, parts, &mut out)? };
+    Ok(CaptureBytes::Emitted(out))
 }
 
 /// Reads `N` bytes from the pointer into an array.
