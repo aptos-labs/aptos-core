@@ -12,7 +12,8 @@ use crate::{
     output::VMOutput,
     resolver::ResourceGroupSize,
     storage::change_set_configs::{
-        ChangeSetConfigs, MAX_ORDER_WRITE_BYTES_PER_TRANSACTION,
+        ChangeSetConfigs, MAX_COLLATERAL_WRITE_BYTES_PER_TRANSACTION,
+        MAX_COLLATERAL_WRITE_OPS_PER_TRANSACTION, MAX_ORDER_WRITE_BYTES_PER_TRANSACTION,
         MAX_ORDER_WRITE_OPS_PER_TRANSACTION, MAX_POSITION_WRITE_OPS_PER_TRANSACTION,
     },
     tests::utils::{
@@ -29,7 +30,10 @@ use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEAT
 use aptos_types::{
     delayed_fields::SnapshotToStringFormula,
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    state_store::{
+        state_key::{inner::CollateralScope, StateKey},
+        state_value::StateValueMetadata,
+    },
     transaction::{ChangeSet as StorageChangeSet, ExecutionStatus, TransactionStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -1242,4 +1246,219 @@ fn test_squash_order_bucket_last_wins() {
         .unwrap();
     assert_ok!(cs1.squash_additional_change_set(cs2, false));
     assert_some_eq!(cs1.order_write_set().get(&key), &WriteOp::legacy_deletion());
+}
+
+fn collateral_key(account: u64) -> StateKey {
+    StateKey::collateral(
+        AccountAddress::from_hex_literal("0x5").unwrap(),
+        AccountAddress::from_hex_literal(&format!("0x{:x}", account)).unwrap(),
+        CollateralScope::Cross,
+    )
+}
+
+fn change_set_with_n_collateral(n: usize, payload: impl Into<Bytes>) -> VMChangeSet {
+    let payload = payload.into();
+    let mut change_set = VMChangeSet::empty();
+    let writes = (0..n)
+        .map(|i| {
+            (
+                collateral_key(i as u64),
+                WriteOp::legacy_creation(payload.clone()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    change_set.set_collateral_bucket(writes).unwrap();
+    change_set
+}
+
+fn output_of(change_set: VMChangeSet) -> VMOutput {
+    VMOutput::new(
+        change_set,
+        ModuleWriteSet::empty(),
+        FeeStatement::zero(),
+        TransactionStatus::Keep(ExecutionStatus::Success),
+    )
+}
+
+#[test]
+fn test_collateral_write_ops_limit() {
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+
+    let at_limit =
+        change_set_with_n_collateral(MAX_COLLATERAL_WRITE_OPS_PER_TRANSACTION, &b"payload"[..]);
+    assert_eq!(
+        at_limit.num_collateral_write_ops(),
+        MAX_COLLATERAL_WRITE_OPS_PER_TRANSACTION
+    );
+    assert_ok!(configs.check_change_set(&at_limit));
+
+    let over_limit = change_set_with_n_collateral(
+        MAX_COLLATERAL_WRITE_OPS_PER_TRANSACTION + 1,
+        &b"payload"[..],
+    );
+    assert_err!(configs.check_change_set(&over_limit));
+}
+
+#[test]
+fn test_collateral_write_bytes_limit() {
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let key_size = collateral_key(0).size() as u64;
+    let payload_len = (MAX_COLLATERAL_WRITE_BYTES_PER_TRANSACTION / 2 - key_size) as usize;
+
+    let at_limit = change_set_with_n_collateral(2, vec![0u8; payload_len]);
+    assert_ok!(configs.check_change_set(&at_limit));
+
+    let over_limit = change_set_with_n_collateral(2, vec![0u8; payload_len + 1]);
+    assert_err!(configs.check_change_set(&over_limit));
+}
+
+#[test]
+fn test_collateral_writes_do_not_share_regular_byte_limits() {
+    let mut gas_params = AptosGasParameters::initial();
+    gas_params.vm.txn.max_bytes_per_write_op = 1.into();
+    gas_params.vm.txn.max_bytes_all_write_ops_per_transaction = 1.into();
+    let configs = ChangeSetConfigs::new(LATEST_GAS_FEATURE_VERSION, &gas_params);
+    assert_ok!(configs.check_change_set(&change_set_with_n_collateral(10, vec![0u8; 1000])));
+}
+
+#[test]
+fn test_all_native_buckets_survive_write_set_serialization() {
+    let mut change_set = change_set_with_n_collateral(2, &b"payload"[..]);
+    change_set
+        .set_position_bucket(BTreeMap::from([(
+            position_key("0x5", "0x1", "0x2"),
+            WriteOp::legacy_creation(Bytes::from_static(b"position")),
+        )]))
+        .unwrap();
+    change_set
+        .set_order_bucket(BTreeMap::from([(
+            order_key(1),
+            WriteOp::legacy_creation(Bytes::from_static(b"order")),
+        )]))
+        .unwrap();
+    let txn_output = assert_ok!(output_of(change_set).into_transaction_output());
+    assert_eq!(txn_output.write_set().native_collateral_iter().count(), 2);
+
+    let bytes = bcs::to_bytes(txn_output.write_set()).unwrap();
+    let decoded: WriteSet = bcs::from_bytes(&bytes).unwrap();
+    assert_eq!(&decoded, txn_output.write_set());
+    assert_eq!(decoded.native_position_iter().count(), 1);
+    assert_eq!(decoded.native_order_iter().count(), 1);
+    assert_eq!(decoded.native_collateral_iter().count(), 2);
+}
+
+#[test]
+fn test_collateral_only_upgrade_write_set() {
+    let txn_output = assert_ok!(
+        output_of(change_set_with_n_collateral(1, &b"payload"[..])).into_transaction_output()
+    );
+    assert!(matches!(txn_output.write_set(), WriteSet::V1(_)));
+    assert!(!txn_output.write_set().has_native_positions());
+    assert!(!txn_output.write_set().has_native_orders());
+    assert!(txn_output.write_set().has_native_collateral());
+}
+
+#[test]
+fn test_collateral_bucket_accepts_both_scopes() {
+    let mut change_set = VMChangeSet::empty();
+    let isolated = StateKey::collateral(
+        AccountAddress::from_hex_literal("0x5").unwrap(),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+        CollateralScope::Isolated {
+            market: AccountAddress::from_hex_literal("0x2").unwrap(),
+        },
+    );
+    assert_ok!(change_set.set_collateral_bucket(BTreeMap::from([
+        (collateral_key(1), WriteOp::legacy_deletion()),
+        (isolated, WriteOp::legacy_deletion()),
+    ])));
+    assert_eq!(change_set.num_collateral_write_ops(), 2);
+}
+
+#[test]
+fn test_collateral_bucket_rejects_non_collateral_keys() {
+    let mut change_set = VMChangeSet::empty();
+    let bad = BTreeMap::from([(
+        position_key("0x5", "0x1", "0x2"),
+        WriteOp::legacy_deletion(),
+    )]);
+    assert_err!(change_set.set_collateral_bucket(bad));
+    let bad = BTreeMap::from([(order_key(1), WriteOp::legacy_deletion())]);
+    assert_err!(change_set.set_collateral_bucket(bad));
+}
+
+#[test]
+fn test_set_collateral_bucket_rejects_double_set() {
+    let mut change_set = change_set_with_n_collateral(1, &b"payload"[..]);
+    let more = BTreeMap::from([(collateral_key(9), WriteOp::legacy_deletion())]);
+    assert_err!(change_set.set_collateral_bucket(more));
+}
+
+#[test]
+fn test_combine_into_storage_change_set_rejects_unmaterialized_collateral() {
+    let change_set = change_set_with_n_collateral(1, &b"payload"[..]);
+    assert_err!(change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+
+    let mut change_set = change_set_with_n_collateral(1, &b"payload"[..]);
+    assert_eq!(change_set.take_collateral_write_set().len(), 1);
+    assert_ok!(change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+}
+
+#[test]
+fn test_squash_collateral_bucket_last_wins() {
+    let key = collateral_key(1);
+    let creation = WriteOp::legacy_creation(Bytes::from_static(b"collateral"));
+    let mut cs1 = VMChangeSet::empty();
+    cs1.set_collateral_bucket(BTreeMap::from([(key.clone(), creation.clone())]))
+        .unwrap();
+    let mut cs2 = VMChangeSet::empty();
+    cs2.set_collateral_bucket(BTreeMap::from([(key.clone(), WriteOp::legacy_deletion())]))
+        .unwrap();
+    assert_ok!(cs1.squash_additional_change_set(cs2, false));
+    assert_some_eq!(
+        cs1.collateral_write_set().get(&key),
+        &WriteOp::legacy_deletion()
+    );
+}
+
+#[test]
+fn test_materialized_collateral_writes_reach_the_write_set() {
+    let change_set = change_set_with_n_collateral(1, &b"with-id"[..]);
+    let patched = WriteOp::legacy_creation(Bytes::from_static(b"with-value"));
+    let txn_output = assert_ok!(output_of(change_set)
+        .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![(
+            collateral_key(0),
+            patched.clone()
+        )]));
+    let (key, op) = txn_output
+        .write_set()
+        .native_collateral_iter()
+        .next()
+        .unwrap();
+    assert_eq!(key, &collateral_key(0));
+    assert_eq!(op.as_write_op(), &patched);
+}
+
+#[test]
+fn test_replace_materialized_collateral_writes_rejects_unknown_key() {
+    let mut change_set = change_set_with_n_collateral(1, &b"payload"[..]);
+    assert_err!(change_set.replace_materialized_collateral_writes(vec![(
+        collateral_key(9),
+        WriteOp::legacy_creation(Bytes::from_static(b"x"))
+    )]));
+}
+
+#[test]
+fn test_replace_materialized_collateral_writes_rejects_deletion() {
+    let mut change_set = VMChangeSet::empty();
+    change_set
+        .set_collateral_bucket(BTreeMap::from([(
+            collateral_key(1),
+            WriteOp::legacy_deletion(),
+        )]))
+        .unwrap();
+    assert_err!(change_set.replace_materialized_collateral_writes(vec![(
+        collateral_key(1),
+        WriteOp::legacy_creation(Bytes::from_static(b"x"))
+    )]));
 }

@@ -8,9 +8,35 @@
 //! aggregator snapshot is materialized: a snapshot serializes as its `u64`,
 //! so `primary_offset` is that `u64`, the balance offset by 2^63.
 
+use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 const SIGN_OFFSET: u64 = 1 << 63;
+
+/// Runtime layout of the Move `Collateral` value. `primary` is an
+/// `AggregatorSnapshot<u64>`, whose single field is the delayed field, as the
+/// VM lays it out. Used to swap the snapshot's identifier for its committed
+/// value when the write is materialized.
+static COLLATERAL_LAYOUT: Lazy<MoveTypeLayout> = Lazy::new(|| {
+    let snapshot = MoveTypeLayout::new_struct(MoveStructLayout::new(vec![MoveTypeLayout::Native(
+        IdentifierMappingKind::Snapshot,
+        Box::new(MoveTypeLayout::U64),
+    )]));
+    let secondary = MoveTypeLayout::new_struct(MoveStructLayout::new(vec![
+        MoveTypeLayout::Address,
+        MoveTypeLayout::U64,
+    ]));
+    MoveTypeLayout::new_struct(MoveStructLayout::new_variants(vec![vec![
+        snapshot,
+        MoveTypeLayout::Vector(Box::new(secondary)),
+        MoveTypeLayout::U64,
+    ]]))
+});
+
+pub fn collateral_layout() -> &'static MoveTypeLayout {
+    &COLLATERAL_LAYOUT
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NativeCollateral {
@@ -108,6 +134,59 @@ mod tests {
         let mut bytes = sample().serialize().unwrap();
         bytes.push(0xFF);
         assert!(NativeCollateral::deserialize(&bytes).is_err());
+    }
+
+    fn without_delayed_fields(layout: &MoveTypeLayout) -> MoveTypeLayout {
+        match layout {
+            MoveTypeLayout::Native(_, inner) => without_delayed_fields(inner),
+            MoveTypeLayout::Vector(inner) => {
+                MoveTypeLayout::Vector(Box::new(without_delayed_fields(inner)))
+            },
+            MoveTypeLayout::Struct(s) => MoveTypeLayout::new_struct(match s.as_ref() {
+                MoveStructLayout::Runtime(fields) => {
+                    MoveStructLayout::new(fields.iter().map(without_delayed_fields).collect())
+                },
+                MoveStructLayout::RuntimeVariants(variants) => MoveStructLayout::new_variants(
+                    variants
+                        .iter()
+                        .map(|fields| fields.iter().map(without_delayed_fields).collect())
+                        .collect(),
+                ),
+                other => panic!("unexpected struct layout {:?}", other),
+            }),
+            other => other.clone(),
+        }
+    }
+
+    #[test]
+    fn layout_matches_value_encoding() {
+        let bytes = sample().serialize().unwrap();
+        let layout = without_delayed_fields(collateral_layout());
+        let value = MoveValue::simple_deserialize(&bytes, &layout).unwrap();
+        assert_eq!(value.simple_serialize().unwrap(), bytes);
+    }
+
+    #[test]
+    fn layout_marks_primary_as_snapshot() {
+        let MoveTypeLayout::Struct(s) = collateral_layout() else {
+            panic!("collateral layout is not a struct");
+        };
+        let MoveStructLayout::RuntimeVariants(variants) = s.as_ref() else {
+            panic!("collateral layout is not an enum");
+        };
+        assert_eq!(variants.len(), 1);
+        let MoveTypeLayout::Struct(primary) = &variants[0][0] else {
+            panic!("primary is not a struct");
+        };
+        assert!(matches!(
+            primary.as_ref(),
+            MoveStructLayout::Runtime(fields)
+                if matches!(
+                    fields.as_slice(),
+                    [MoveTypeLayout::Native(IdentifierMappingKind::Snapshot, inner)]
+                        if matches!(inner.as_ref(), MoveTypeLayout::U64)
+                )
+        ));
     }
 
     #[test]
