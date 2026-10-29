@@ -120,6 +120,7 @@ use crate::{
     types::{
         display_type, display_type_list, view_name, InternedType, InternedTypeList, VariantTag,
     },
+    value_layout::CaptureLayoutsId,
     FunctionPtr,
 };
 use move_binary_format::file_format::ConstantPoolIndex;
@@ -255,6 +256,10 @@ pub struct PackClosureOp {
     /// Byte width of the captured values region: the natural-aligned layout of
     /// `captured`. `0` for a non-capturing closure.
     pub values_size: u32,
+    /// Layouts of the captured values, in capture order. Serializing the
+    /// closure walks them, so it never has to resolve the target.
+    /// [`CaptureLayoutsId::NONE`] for a non-capturing closure.
+    pub capture_layouts_id: CaptureLayoutsId,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -2157,10 +2162,13 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 
 // ---------------------------------------------------------------------------
-// ClosureCapturedData object layout (Materialized)
+// ClosureCapturedData object layout
 // ---------------------------------------------------------------------------
 //
-//   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [captured values @ 8, packed in param order]
+//   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4]
+//                [blob_size: u32 @ 8] [capture_layouts_id: u32 @ 12]
+//                [captured values @ 16, packed in param order]
+//                [blob @ 16 + values_size]
 //
 // Offsets below are relative to the data start (the object pointer). The
 // 8-byte header lives at `obj_ptr - 8`.
@@ -2169,6 +2177,10 @@ pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 // positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
 // Total count is implied by `mask.captured_count()`. Individual sizes are
 // read from the target function's `param_slots` at call time.
+//
+// The blob is the verbatim `(layout, value)*` tail of a deserialized
+// closure's wire encoding. Re-serializing it reproduces the layouts the
+// value was stored under, which may predate the current module version.
 
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
 pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
@@ -2177,8 +2189,20 @@ pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
 /// captured-data object's prefix.
 pub const CAPTURED_DATA_VALUES_SIZE_OFFSET: usize = 4;
 
-/// Byte offset where captured values begin (after tag + padding).
-pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
+/// Byte offset of the trailing wire blob's byte width (`u32`). Zero when the
+/// object holds no blob.
+pub const CAPTURED_DATA_BLOB_SIZE_OFFSET: usize = 8;
+
+/// Byte offset of the `CaptureLayoutsId` (`u32`) naming the layouts of the
+/// captured values. `CaptureLayoutsId::NONE` when there are no values.
+pub const CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET: usize = 12;
+
+/// Byte offset where captured values begin (after the header).
+pub const CAPTURED_DATA_VALUES_OFFSET: usize = 16;
+
+// Captured values are laid out at their natural alignment from here, so the
+// region must start `MAX_ALIGN`-aligned for the widest capture to land right.
+const _: () = assert!(CAPTURED_DATA_VALUES_OFFSET.is_multiple_of(MAX_ALIGN));
 
 /// `ClosureCapturedData::Materialized` tag value.
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
