@@ -13,7 +13,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::{NativeOrderOp, NativePositionOp, WriteOp},
+    write_set::{NativeCollateralOp, NativeOrderOp, NativePositionOp, WriteOp},
 };
 use derivative::Derivative;
 use move_core_types::{
@@ -87,6 +87,10 @@ impl VMOutput {
         &self,
     ) -> &BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.change_set.delayed_field_change_set()
+    }
+
+    pub fn collateral_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        self.change_set.collateral_write_set()
     }
 
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
@@ -164,6 +168,7 @@ impl VMOutput {
             .write_set_size_iter()
             .chain(self.change_set.position_write_set_size_iter())
             .chain(self.change_set.order_write_set_size_iter())
+            .chain(self.change_set.collateral_write_set_size_iter())
             .chain(self.module_write_set.write_set_size_iter())
         {
             size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
@@ -232,6 +237,11 @@ impl VMOutput {
             .into_iter()
             .map(|(k, op)| (k, NativeOrderOp::from_write_op(op)))
             .collect();
+        let native_collateral: BTreeMap<StateKey, NativeCollateralOp> = change_set
+            .take_collateral_write_set()
+            .into_iter()
+            .map(|(k, op)| (k, NativeCollateralOp::from_write_op(op)))
+            .collect();
 
         let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
@@ -240,7 +250,10 @@ impl VMOutput {
         // `freeze()` produces V0, whose extension bucket is `#[serde(skip)]`.
         // Upgrade so the native writes survive serialization (write-set replay,
         // output sync, remote execution) rather than being silently dropped.
-        if !native_positions.is_empty() || !native_orders.is_empty() {
+        if !native_positions.is_empty()
+            || !native_orders.is_empty()
+            || !native_collateral.is_empty()
+        {
             write_set = write_set.into_v1();
         }
         if !native_positions.is_empty() {
@@ -248,6 +261,9 @@ impl VMOutput {
         }
         if !native_orders.is_empty() {
             write_set.add_native_orders(native_orders);
+        }
+        if !native_collateral.is_empty() {
+            write_set.add_native_collateral(native_collateral);
         }
         Ok(TransactionOutput::new(
             write_set,
@@ -265,10 +281,14 @@ impl VMOutput {
         mut self,
         patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
+        patched_collateral_writes: Vec<(StateKey, WriteOp)>,
     ) -> Result<TransactionOutput, PanicError> {
         // materialize delayed fields into resource writes
         self.change_set
             .extend_resource_write_set(patched_resource_write_set.into_iter())?;
+        // materialize snapshot identifiers in collateral writes
+        self.change_set
+            .replace_materialized_collateral_writes(patched_collateral_writes)?;
         let _ = self.change_set.drain_delayed_field_change_set();
 
         // materialize delayed fields into events
