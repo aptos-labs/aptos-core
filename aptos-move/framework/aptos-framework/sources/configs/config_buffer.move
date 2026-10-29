@@ -26,6 +26,7 @@ module aptos_framework::config_buffer {
     friend aptos_framework::epoch_timeout_config;
     friend aptos_framework::execution_config;
     friend aptos_framework::gas_schedule;
+    friend aptos_framework::hot_state_config;
     friend aptos_framework::jwks;
     friend aptos_framework::jwk_consensus_config;
     friend aptos_framework::keyless_account;
