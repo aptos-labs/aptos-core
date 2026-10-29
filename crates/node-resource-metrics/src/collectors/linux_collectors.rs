@@ -5,7 +5,7 @@ use super::common::NAMESPACE;
 use crate::collectors::common::MeasureLatency;
 use aptos_logger::warn;
 use aptos_metrics_core::const_metric::ConstMetric;
-use procfs::{DiskStat, KernelStats};
+use procfs::{CurrentSI, DiskStat, KernelStats};
 use prometheus::{
     core::{Collector, Desc, Describer},
     proto::MetricFamily,
@@ -94,7 +94,7 @@ impl Collector for LinuxCpuMetricsCollector {
 
         let mut mfs = Vec::with_capacity(LINUX_CPU_METRICS_COUNT);
 
-        let kernel_stats = match KernelStats::new() {
+        let kernel_stats = match KernelStats::current() {
             Ok(stats) => stats,
             Err(err) => {
                 warn!("unable to collect cpu metrics for linux: {}", err);
