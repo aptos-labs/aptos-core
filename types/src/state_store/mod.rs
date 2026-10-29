@@ -21,6 +21,7 @@ use std::ops::Deref;
 
 pub mod errors;
 pub mod hot_state;
+pub mod native_collateral;
 pub mod native_order;
 pub mod native_position;
 pub mod state_key;

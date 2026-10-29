@@ -4,7 +4,10 @@
 use crate::{
     account_config::{AccountResource, ObjectGroupResource},
     state_store::state_key::{
-        inner::{StateKeyDecodeErr, StateKeyInner, TradingNativeKey, TradingNativeKeyTag},
+        inner::{
+            CollateralScope, StateKeyDecodeErr, StateKeyInner, TradingNativeKey,
+            TradingNativeKeyTag,
+        },
         StateKey,
     },
 };
@@ -104,6 +107,71 @@ fn test_trading_native_sub_tags_pinned() {
     assert_eq!(TradingNativeKeyTag::Position as u8, 0);
     assert_eq!(TradingNativeKeyTag::Order as u8, 1);
     assert_eq!(TradingNativeKeyTag::BulkOrder as u8, 2);
+    assert_eq!(TradingNativeKeyTag::Collateral as u8, 3);
+}
+
+#[test]
+fn test_collateral_cross_key_encoding() {
+    let key = StateKey::collateral(addr(5), addr(2), CollateralScope::Cross);
+
+    let mut expected = vec![2u8, TradingNativeKeyTag::Collateral as u8];
+    expected.extend_from_slice(addr(5).as_ref());
+    expected.extend_from_slice(addr(2).as_ref());
+    expected.push(0);
+    assert_eq!(key.encoded().as_ref(), expected.as_slice());
+    assert_eq!(key.size(), 1 + AccountAddress::LENGTH * 2 + 1);
+    assert_eq!(StateKey::decode(key.encoded()).unwrap(), key);
+}
+
+#[test]
+fn test_collateral_isolated_key_encoding() {
+    let key = StateKey::collateral(addr(5), addr(2), CollateralScope::Isolated {
+        market: addr(0x34),
+    });
+
+    let mut expected = vec![2u8, TradingNativeKeyTag::Collateral as u8];
+    expected.extend_from_slice(addr(5).as_ref());
+    expected.extend_from_slice(addr(2).as_ref());
+    expected.push(1);
+    expected.extend_from_slice(addr(0x34).as_ref());
+    assert_eq!(key.encoded().as_ref(), expected.as_slice());
+    assert_eq!(key.size(), 1 + AccountAddress::LENGTH * 3 + 1);
+    assert_eq!(StateKey::decode(key.encoded()).unwrap(), key);
+}
+
+#[test]
+fn test_collateral_scopes_are_distinct() {
+    let cross = StateKey::collateral(addr(5), addr(2), CollateralScope::Cross);
+    let isolated = StateKey::collateral(addr(5), addr(2), CollateralScope::Isolated {
+        market: addr(0),
+    });
+    assert_ne!(cross, isolated);
+    assert_ne!(cross.crypto_hash_ref(), isolated.crypto_hash_ref());
+}
+
+#[test]
+fn test_collateral_decode_rejects_bad_scope() {
+    let cross = StateKey::collateral(addr(5), addr(2), CollateralScope::Cross);
+    let mut bad_tag = cross.encoded().to_vec();
+    *bad_tag.last_mut().unwrap() = 7;
+    assert!(matches!(
+        StateKey::decode(&bad_tag),
+        Err(StateKeyDecodeErr::NotEnoughBytes { .. })
+    ));
+    let mut cross_with_market = cross.encoded().to_vec();
+    cross_with_market.extend_from_slice(addr(0x34).as_ref());
+    assert!(matches!(
+        StateKey::decode(&cross_with_market),
+        Err(StateKeyDecodeErr::NotEnoughBytes { .. })
+    ));
+    let isolated = StateKey::collateral(addr(5), addr(2), CollateralScope::Isolated {
+        market: addr(0x34),
+    });
+    let truncated = &isolated.encoded()[..isolated.encoded().len() - 1];
+    assert!(matches!(
+        StateKey::decode(truncated),
+        Err(StateKeyDecodeErr::NotEnoughBytes { .. })
+    ));
 }
 
 #[test]
@@ -192,6 +260,13 @@ fn test_trading_native_debug() {
     assert_eq!(
         format!("{:?}", StateKey::bulk_order(addr(5), addr(2), addr(3))),
         "StateKey::TradingNative::BulkOrder { exchange: 0x5, market: 0x2, account: 0x3 }",
+    );
+    assert_eq!(
+        format!(
+            "{:?}",
+            StateKey::collateral(addr(5), addr(2), CollateralScope::Cross)
+        ),
+        "StateKey::TradingNative::Collateral { exchange: 0x5, account: 0x2, scope: Cross }",
     );
 }
 
