@@ -192,7 +192,9 @@ jobs:
         if: ${{ needs.gated_file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
         with:
           cache-key: hosted-gated-batch-encryption
-      # The hosted image has no Node/pnpm; the TS tests need it (AWS installs via dev_setup -J).
+      # Image drift insurance: the image recipe installs Node (dev_setup -J), but the
+      # manifest does not cover it; setup-node keeps this required check independent
+      # of image rebuilds. AWS installs via dev_setup -J.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # pin@v4
         if: ${{ needs.gated_file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
       - name: Run dev_setup.sh
