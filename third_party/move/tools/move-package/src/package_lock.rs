@@ -32,7 +32,7 @@ pub(crate) enum PackageLock {
     Inactive,
     Active {
         thread_lock: MutexGuard<'static, ()>,
-        process_lock: NamedLockGuard<'static>,
+        process_lock: NamedLockGuard,
     },
 }
 
