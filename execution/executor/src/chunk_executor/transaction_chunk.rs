@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    chunk_executor::chunk_onchain_config,
+    chunk_executor::{chunk_onchain_config, num_txns_in_blocks},
     metrics::{CHUNK_DISCARDED_OUTPUTS, CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
     workflow::do_get_execution_output::DoGetExecutionOutput,
 };
@@ -85,12 +85,8 @@ impl TransactionChunk {
     /// Splits off the transactions after the last block end, i.e. the last `TransactionInfo`
     /// with a state checkpoint hash. They can't be executed until the rest of the block comes.
     pub fn split_off_partial_block(&mut self) -> Option<Self> {
-        let num_txns_in_blocks = self
-            .transaction_infos
-            .iter()
-            .rposition(TransactionInfo::has_state_checkpoint_hash)
-            .map_or(0, |idx| idx + 1);
-        (num_txns_in_blocks < self.len()).then(|| self.split_off(num_txns_in_blocks))
+        let at = num_txns_in_blocks(&self.transaction_infos);
+        (at < self.len()).then(|| self.split_off(at))
     }
 
     fn split_off(&mut self, at: usize) -> Self {
