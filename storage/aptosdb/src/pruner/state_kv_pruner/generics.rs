@@ -123,3 +123,28 @@ impl StateValuePrunerSchema for OrderValue {
         DbMetadataKey::OrderValuePrunerProgress
     }
 }
+
+/// Native-collateral value pruner.
+// Used once the collateral store is attached to AptosDB.
+#[allow(dead_code)]
+pub(crate) enum CollateralValue {}
+impl StateValuePrunerSchema for CollateralValue {
+    type StaleIndexSchema = NativeStaleValueIndexSchema;
+    type ValueSchema = NativeValueSchema;
+
+    fn name() -> &'static str {
+        "collateral_value_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "collateral_value"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralValueShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralValuePrunerProgress
+    }
+}

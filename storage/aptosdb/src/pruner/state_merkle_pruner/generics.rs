@@ -204,3 +204,51 @@ impl MerklePrunerSchema for OrderEpochSnapshot {
         DbMetadataKey::OrderEpochSnapshotPrunerProgress
     }
 }
+
+/// Native-collateral regular merkle pruner.
+// Used once the collateral store is attached to AptosDB.
+#[allow(dead_code)]
+pub(crate) enum CollateralStateMerkle {}
+impl MerklePrunerSchema for CollateralStateMerkle {
+    type StaleIndexSchema = StaleNodeIndexSchema;
+
+    fn name() -> &'static str {
+        "collateral_state_merkle_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "collateral_state_merkle"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralStateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralStateMerklePrunerProgress
+    }
+}
+
+/// Native-collateral epoch-snapshot merkle pruner.
+// Used once the collateral store is attached to AptosDB.
+#[allow(dead_code)]
+pub(crate) enum CollateralEpochSnapshot {}
+impl MerklePrunerSchema for CollateralEpochSnapshot {
+    type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
+
+    fn name() -> &'static str {
+        "collateral_epoch_snapshot_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "collateral_epoch_snapshot"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralEpochSnapshotShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralEpochSnapshotPrunerProgress
+    }
+}

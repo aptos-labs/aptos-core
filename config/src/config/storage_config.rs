@@ -545,6 +545,8 @@ pub struct StorageDirPaths {
     position_merkle_db_paths: ShardedDbPaths,
     order_db_paths: ShardedDbPaths,
     order_merkle_db_paths: ShardedDbPaths,
+    collateral_db_paths: ShardedDbPaths,
+    collateral_merkle_db_paths: ShardedDbPaths,
 }
 
 impl StorageDirPaths {
@@ -656,6 +658,30 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn collateral_db_metadata_root_path(&self) -> &PathBuf {
+        self.collateral_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.collateral_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_merkle_db_metadata_root_path(&self) -> &PathBuf {
+        self.collateral_merkle_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn collateral_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
+        self.collateral_merkle_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         Self {
             default_path: path.as_ref().to_path_buf(),
@@ -668,6 +694,8 @@ impl StorageDirPaths {
             position_merkle_db_paths: Default::default(),
             order_db_paths: Default::default(),
             order_merkle_db_paths: Default::default(),
+            collateral_db_paths: Default::default(),
+            collateral_merkle_db_paths: Default::default(),
         }
     }
 
@@ -690,6 +718,8 @@ impl StorageDirPaths {
             position_merkle_db_paths: Default::default(),
             order_db_paths: Default::default(),
             order_merkle_db_paths: Default::default(),
+            collateral_db_paths: Default::default(),
+            collateral_merkle_db_paths: Default::default(),
         }
     }
 }

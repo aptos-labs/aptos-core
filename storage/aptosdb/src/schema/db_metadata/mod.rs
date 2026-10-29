@@ -91,6 +91,15 @@ pub enum DbMetadataKey {
     OrderEpochSnapshotPrunerProgress,
     OrderEpochSnapshotShardPrunerProgress(ShardId),
     OrderSnapshotKvRestoreProgress(Version),
+    CollateralCommitProgress,
+    CollateralShardCommitProgress(ShardId),
+    CollateralValuePrunerProgress,
+    CollateralValueShardPrunerProgress(ShardId),
+    CollateralStateMerklePrunerProgress,
+    CollateralStateMerkleShardPrunerProgress(ShardId),
+    CollateralEpochSnapshotPrunerProgress,
+    CollateralEpochSnapshotShardPrunerProgress(ShardId),
+    CollateralSnapshotKvRestoreProgress(Version),
 }
 
 define_schema!(

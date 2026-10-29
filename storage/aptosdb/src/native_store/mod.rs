@@ -21,12 +21,13 @@ pub(crate) mod state_sync;
 
 use crate::{
     common::{
-        ORDER_DB_FOLDER_NAME, ORDER_MERKLE_DB_FOLDER_NAME, POSITION_DB_FOLDER_NAME,
-        POSITION_MERKLE_DB_FOLDER_NAME,
+        COLLATERAL_DB_FOLDER_NAME, COLLATERAL_MERKLE_DB_FOLDER_NAME, ORDER_DB_FOLDER_NAME,
+        ORDER_MERKLE_DB_FOLDER_NAME, POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME,
     },
     pruner::{
-        MerklePrunerSchema, OrderEpochSnapshot, OrderStateMerkle, OrderValue,
-        PositionEpochSnapshot, PositionStateMerkle, PositionValue, StateValuePrunerSchema,
+        CollateralEpochSnapshot, CollateralStateMerkle, CollateralValue, MerklePrunerSchema,
+        OrderEpochSnapshot, OrderStateMerkle, OrderValue, PositionEpochSnapshot,
+        PositionStateMerkle, PositionValue, StateValuePrunerSchema,
     },
     schema::{
         db_metadata::DbMetadataKey, native_stale_value_index::NativeStaleValueIndexSchema,
@@ -75,6 +76,11 @@ pub(crate) enum PositionStore {}
 // Constructed by the order write path (PR 6); until then only tests use it.
 #[allow(dead_code)]
 pub(crate) enum OrderStore {}
+
+/// Native collateral, keyed by `(exchange, account, scope)`.
+// Attached to AptosDB in a later change; until then only tests use it.
+#[allow(dead_code)]
+pub(crate) enum CollateralStore {}
 
 impl NativeStoreSpec for PositionStore {
     type EpochSnapshotPruner = PositionEpochSnapshot;
@@ -164,6 +170,50 @@ impl NativeStoreSpec for OrderStore {
     }
 }
 
+impl NativeStoreSpec for CollateralStore {
+    type EpochSnapshotPruner = CollateralEpochSnapshot;
+    type StateMerklePruner = CollateralStateMerkle;
+    type ValuePruner = CollateralValue;
+
+    const BATCH_THREAD_NAME: &'static str = "collateral_merkle_batch_committer";
+    const KV_DB_FOLDER_NAME: &'static str = COLLATERAL_DB_FOLDER_NAME;
+    const KV_METADATA_DB_NAME: &'static str = "collateral_db_metadata";
+    const KV_SHARD_DB_NAME_PREFIX: &'static str = "collateral_db_shard";
+    const MERKLE_DB_FOLDER_NAME: &'static str = COLLATERAL_MERKLE_DB_FOLDER_NAME;
+    const MERKLE_METADATA_DB_NAME: &'static str = "collateral_merkle_db_metadata";
+    const MERKLE_SHARD_DB_NAME_PREFIX: &'static str = "collateral_merkle_db_shard";
+    const NAME: &'static str = "collateral";
+    const SNAPSHOT_THREAD_NAME: &'static str = "collateral_snapshot_committer";
+
+    fn kv_db_metadata_root_path(db_paths: &StorageDirPaths) -> &PathBuf {
+        db_paths.collateral_db_metadata_root_path()
+    }
+
+    fn kv_db_shard_root_path(db_paths: &StorageDirPaths, shard_id: usize) -> &PathBuf {
+        db_paths.collateral_db_shard_root_path(shard_id)
+    }
+
+    fn merkle_db_metadata_root_path(db_paths: &StorageDirPaths) -> &PathBuf {
+        db_paths.collateral_merkle_db_metadata_root_path()
+    }
+
+    fn merkle_db_shard_root_path(db_paths: &StorageDirPaths, shard_id: usize) -> &PathBuf {
+        db_paths.collateral_merkle_db_shard_root_path(shard_id)
+    }
+
+    fn commit_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralCommitProgress
+    }
+
+    fn shard_commit_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralShardCommitProgress(shard_id)
+    }
+
+    fn snapshot_kv_restore_progress_key(version: Version) -> DbMetadataKey {
+        DbMetadataKey::CollateralSnapshotKvRestoreProgress(version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,5 +287,66 @@ mod tests {
         let _orders: NativeMerkleDb<OrderStore> =
             NativeMerkleDb::new(&db_paths, RocksdbConfig::default(), None, None, false, 0).unwrap();
         assert!(tmpdir.path().join(ORDER_MERKLE_DB_FOLDER_NAME).is_dir());
+    }
+
+    #[test]
+    fn collateral_store_names_and_keys_are_distinct() {
+        for (name, kv, merkle, metadata, shard_prefix, progress) in [
+            (
+                PositionStore::NAME,
+                PositionStore::KV_DB_FOLDER_NAME,
+                PositionStore::MERKLE_DB_FOLDER_NAME,
+                PositionStore::KV_METADATA_DB_NAME,
+                PositionStore::MERKLE_SHARD_DB_NAME_PREFIX,
+                PositionStore::commit_progress_key(),
+            ),
+            (
+                OrderStore::NAME,
+                OrderStore::KV_DB_FOLDER_NAME,
+                OrderStore::MERKLE_DB_FOLDER_NAME,
+                OrderStore::KV_METADATA_DB_NAME,
+                OrderStore::MERKLE_SHARD_DB_NAME_PREFIX,
+                OrderStore::commit_progress_key(),
+            ),
+        ] {
+            assert_ne!(CollateralStore::NAME, name);
+            assert_ne!(CollateralStore::KV_DB_FOLDER_NAME, kv);
+            assert_ne!(CollateralStore::MERKLE_DB_FOLDER_NAME, merkle);
+            assert_ne!(CollateralStore::KV_METADATA_DB_NAME, metadata);
+            assert_ne!(CollateralStore::MERKLE_SHARD_DB_NAME_PREFIX, shard_prefix);
+            assert_ne!(CollateralStore::commit_progress_key(), progress);
+        }
+        assert_eq!(
+            CollateralStore::commit_progress_key(),
+            DbMetadataKey::CollateralCommitProgress
+        );
+        assert_eq!(
+            CollateralStore::shard_commit_progress_key(3),
+            DbMetadataKey::CollateralShardCommitProgress(3)
+        );
+    }
+
+    #[test]
+    fn collateral_dbs_open_in_their_own_folders() {
+        let tmpdir = TempPath::new();
+        tmpdir.create_as_dir().unwrap();
+        let db_paths = StorageDirPaths::from_path(tmpdir.path());
+
+        let kv: NativeKvDb<CollateralStore> =
+            NativeKvDb::new(&db_paths, RocksdbConfig::default(), None, None, false).unwrap();
+        let merkle: NativeMerkleDb<CollateralStore> =
+            NativeMerkleDb::new(&db_paths, RocksdbConfig::default(), None, None, false, 0).unwrap();
+        drop((kv, merkle));
+
+        assert!(tmpdir.path().join(COLLATERAL_DB_FOLDER_NAME).is_dir());
+        assert!(tmpdir
+            .path()
+            .join(COLLATERAL_DB_FOLDER_NAME)
+            .join("metadata")
+            .is_dir());
+        assert!(tmpdir
+            .path()
+            .join(COLLATERAL_MERKLE_DB_FOLDER_NAME)
+            .is_dir());
     }
 }
