@@ -551,7 +551,7 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.76"
 base64 = "0.13.0"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
-better_any = "0.1.1"
+better_any = { version = "0.2.1", features = ["derive"] }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 bitflags = "2.13.2"
 bitvec = "1.1.1"
@@ -570,13 +570,13 @@ bulletproofs = { version = "4.0.0" }
 bumpalo = { version = "3.14" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
-bytesize = { version = "1.3.0" }
+bytesize = { version = "2.7.0" }
 camino = { version = "1.1.6" }
 cfg-if = "1.0.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 chrono-tz = "0.10.1"
 ciborium = "0.2"
-claims = "0.7"
+claims = "0.8"
 clap = { version = "4.6.7", features = [
     "derive",
     "env",
@@ -633,7 +633,7 @@ either = "1.19.0"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 equivalent = "1.0"
-erased-serde = "0.3.13"
+erased-serde = "0.4.11"
 ethers = { version = "2" }
 ethnum = "1.5.2"
 fail = "0.5.0"
@@ -645,7 +645,7 @@ firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "
 firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
-flexi_logger = "0.27.4"
+flexi_logger = "0.31.10"
 float-cmp = "0.9.0"
 fs2 = "0.4.3"
 futures = "0.3.29"
@@ -664,7 +664,7 @@ goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.17.5"
-handlebars = "4.2.2"
+handlebars = "6.4.4"
 hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
@@ -754,13 +754,13 @@ poem-openapi-derive = "5.1.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.12.5"
 pretty_assertions = "1.2.1"
-prettydiff = "0.6.2"
+prettydiff = "0.9.0"
 primitive-types = { version = "0.12.2" }
 proc-macro2 = "1.0.38"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
 processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.1", default-features = false }
-procfs = "0.14.1"
+procfs = "0.18.0"
 project-root = "0.2.2"
 prometheus = { version = "0.14.0", default-features = false }
 prometheus-http-query = "0.5.2"
@@ -768,7 +768,7 @@ proptest = "1.4.0"
 proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
 prost-types = "0.13.3"
-quick-junit = "0.5.0"
+quick-junit = "0.8.0"
 quick_cache = "0.5.1"
 quote = "1.0.18"
 rand = "0.7.3"

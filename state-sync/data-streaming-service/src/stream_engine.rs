@@ -457,8 +457,8 @@ impl DataStreamEngine for StateStreamEngine {
     }
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
-        // TODO(HotState): peers don't advertise hot state separately, so this
-        // assumes they retain hot snapshots as long as the main ones.
+        // Hot snapshots share the main ones' pruning windows, so `states` covers
+        // them too.
         Ok(AdvertisedData::contains_range(
             self.request.version,
             self.request.version,

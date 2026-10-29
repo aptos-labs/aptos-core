@@ -23,8 +23,7 @@ pub(crate) trait MerklePrunerSchema: 'static + Send + Sync {
     fn pruner_progress_key() -> DbMetadataKey;
 }
 
-/// Main-state regular merkle pruner (cold and hot share this identity,
-/// distinguished by their DB).
+/// Main-state cold regular merkle pruner.
 pub(crate) enum StateMerkle {}
 impl MerklePrunerSchema for StateMerkle {
     type StaleIndexSchema = StaleNodeIndexSchema;
@@ -46,7 +45,7 @@ impl MerklePrunerSchema for StateMerkle {
     }
 }
 
-/// Main-state epoch-snapshot merkle pruner.
+/// Main-state cold epoch-snapshot merkle pruner.
 pub(crate) enum EpochSnapshot {}
 impl MerklePrunerSchema for EpochSnapshot {
     type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
@@ -57,6 +56,52 @@ impl MerklePrunerSchema for EpochSnapshot {
 
     fn worker_name() -> &'static str {
         "state_merkle"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::EpochEndingStateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::EpochEndingStateMerklePrunerProgress
+    }
+}
+
+/// Main-state hot regular merkle pruner. Reuses the cold progress keys, as
+/// they live in the hot DB.
+pub(crate) enum HotStateMerkle {}
+impl MerklePrunerSchema for HotStateMerkle {
+    type StaleIndexSchema = StaleNodeIndexSchema;
+
+    fn name() -> &'static str {
+        "hot_state_merkle_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "hot_jmt"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::StateMerkleShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::StateMerklePrunerProgress
+    }
+}
+
+/// Main-state hot epoch-snapshot merkle pruner. Reuses the cold progress keys,
+/// as they live in the hot DB.
+pub(crate) enum HotEpochSnapshot {}
+impl MerklePrunerSchema for HotEpochSnapshot {
+    type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;
+
+    fn name() -> &'static str {
+        "hot_epoch_snapshot_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "hot_ep"
     }
 
     fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
