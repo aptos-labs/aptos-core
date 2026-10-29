@@ -29,8 +29,8 @@ use crate::{
     memory::{read_enum_tag, read_ptr, read_u32, read_u64, read_vec_len, write_ptr, write_u32},
     types::VEC_DATA_OFFSET,
     value_conv::layout_wire::{
-        emit_closure_header, emit_move_type_layout, read_closure_header, walk_capture_pair,
-        ClosureHeader,
+        emit_closure_header, emit_move_type_layout, read_closure_header, skip_layout,
+        walk_capture_pair, ClosureHeader,
     },
 };
 use mono_move_core::{
@@ -38,14 +38,15 @@ use mono_move_core::{
     interner::{view_function_ref, view_module_id, FunctionRef, InternedFunctionRef},
     next_captured_value_offset,
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    CaptureLayoutsId, ClosureFuncRef, Function, Interner, LayoutKind, LayoutProvider,
-    VMInternalError, VMResult, ValueLayout, CAPTURED_DATA_BLOB_SIZE_OFFSET,
+    CaptureLayoutsId, ClosureFuncRef, DescriptorId, Function, Interner, LayoutId, LayoutKind,
+    LayoutProvider, VMInternalError, VMResult, ValueLayout, CAPTURED_DATA_BLOB_SIZE_OFFSET,
     CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
-    CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET,
-    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
-    OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 
@@ -310,7 +311,7 @@ unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
     };
     match tag {
         CAPTURED_DATA_TAG_MATERIALIZED => {},
-        CAPTURED_DATA_TAG_RAW => {
+        CAPTURED_DATA_TAG_RAW | CAPTURED_DATA_TAG_MATERIALIZED_RAW => {
             // SAFETY: the blob follows the values region, and the two widths
             // were written when the object was allocated.
             unsafe {
@@ -861,6 +862,122 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
     Ok(closure)
 }
 
+/// Decodes a `Raw` captured-data object's blob into a fresh `MaterializedRaw`
+/// object and returns its heap pointer. The values land in the values region at
+/// the natural alignment of `capture_layouts`, and the blob follows them, so a
+/// later serialization still reproduces the stored bytes.
+///
+/// Each capture's stored layout must match the one the callee publishes today.
+/// A mismatch means the closure was written against a different version of the
+/// target's signature; the call is refused rather than decoded under layouts
+/// that disagree with the bytes.
+///
+/// # Allocating semantics
+///
+/// Allocates without running GC, exactly like [`deserialize`]: on heap
+/// exhaustion the half-built object is unreachable, so the caller can collect
+/// and run the whole decode again.
+///
+/// # Safety
+///
+/// `raw` must point to a live `Raw` captured-data object, and `descriptor_id`
+/// must describe the values region `capture_layouts` lays out.
+pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    heap: &mut Heap,
+    raw: *const u8,
+    capture_layouts: &[LayoutId],
+    values_size: u32,
+    descriptor_id: DescriptorId,
+) -> AllocationResult<*mut u8> {
+    // Copying the blob out first keeps the decode independent of the heap: the
+    // allocations below may hand out the bytes `raw` occupies back to the
+    // collector before the last capture is read.
+    // SAFETY: a `Raw` object holds its blob after an empty values region, and
+    // the width was written when it was allocated.
+    let blob = unsafe {
+        let raw_values_size = read_u32(raw, CAPTURED_DATA_VALUES_SIZE_OFFSET) as usize;
+        let blob_size = read_u32(raw, CAPTURED_DATA_BLOB_SIZE_OFFSET) as usize;
+        std::slice::from_raw_parts(
+            raw.add(CAPTURED_DATA_VALUES_OFFSET + raw_values_size),
+            blob_size,
+        )
+        .to_vec()
+    };
+
+    let total_size = OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + values_size as usize;
+    let obj = heap_alloc(
+        heap,
+        total_size
+            .checked_add(blob.len())
+            .ok_or(RuntimeError::AllocationTooLarge {
+                requested: total_size,
+            })?,
+        descriptor_id,
+    )?;
+    // SAFETY: the allocation covers the header, the values region and the blob
+    // after it.
+    unsafe {
+        *obj.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED_RAW;
+        write_u32(obj, CAPTURED_DATA_VALUES_SIZE_OFFSET, values_size);
+        write_u32(obj, CAPTURED_DATA_BLOB_SIZE_OFFSET, blob.len() as u32);
+        write_u32(
+            obj,
+            CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET,
+            CaptureLayoutsId::NONE.as_u32(),
+        );
+        std::ptr::copy_nonoverlapping(
+            blob.as_ptr(),
+            obj.add(CAPTURED_DATA_VALUES_OFFSET + values_size as usize),
+            blob.len(),
+        );
+    }
+
+    let mut cursor = 0usize;
+    let mut value_cursor = 0usize;
+    let mut stored_layout = vec![];
+    for &id in capture_layouts {
+        let layout = layouts.layout(id).ok_or(RuntimeError::InvariantViolation(
+            RuntimeInvariantViolation::ValueLayoutNotFound,
+        ))?;
+        let layout_start = cursor;
+        skip_layout(&blob, &mut cursor)?;
+        stored_layout.clear();
+        emit_move_type_layout(layouts, id, &mut stored_layout).map_err(|e| {
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(e.to_string()))
+        })?;
+        if stored_layout != blob[layout_start..cursor] {
+            return Err(RuntimeError::Unsupported(
+                "calling a function value captured under a different layout",
+            )
+            .into());
+        }
+        let (offset, next) =
+            next_captured_value_offset(value_cursor, layout.size as usize, layout.align as usize);
+        // SAFETY: the capture's layout places it inside the values region, and
+        // the object was allocated to hold that region whole.
+        unsafe {
+            deserialize_impl(
+                layouts,
+                heap,
+                layout,
+                &blob,
+                &mut cursor,
+                obj.add(CAPTURED_DATA_VALUES_OFFSET + offset),
+                None,
+            )?
+        };
+        value_cursor = next;
+    }
+    if cursor != blob.len() {
+        return Err(RuntimeError::BCSRemainingInput {
+            remaining: blob.len().saturating_sub(cursor),
+        }
+        .into());
+    }
+    Ok(obj)
+}
+
 /// Interns a decoded closure header's `(module, name, type arguments)` into the
 /// loader's function-code key. Structural: no module is loaded and no layout is
 /// published. The interner's own `TODO(metering)` covers the permanent arena
@@ -1008,9 +1125,10 @@ mod tests {
             ADDRESS_LAYOUT_ID, BOOL_LAYOUT_ID, FUNCTION_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID,
             U64_LAYOUT_ID, U8_LAYOUT_ID,
         },
-        DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
-        VariantValueLayout, CAPTURED_DATA_BLOB_SIZE_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
-        CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+        DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ObjectDescriptorTable,
+        ValueLayoutTable, VariantValueLayout, CAPTURED_DATA_BLOB_SIZE_OFFSET,
+        CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID,
+        OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
     };
     use mono_move_global_context::{ExecutionGuard, GlobalContext};
     use move_core_types::{
@@ -1022,6 +1140,7 @@ mod tests {
     use serde::Serialize;
     use std::{
         mem::{offset_of, size_of},
+        ptr::NonNull,
         sync::Arc,
     };
 
@@ -2275,7 +2394,10 @@ mod tests {
     ///
     /// `closure` must be a live closure object whose captures are described by
     /// `layouts`.
-    unsafe fn serialize_closure_value(layouts: &ValueLayoutTable, closure: *mut u8) -> Vec<u8> {
+    unsafe fn serialize_closure_value<T: LayoutProvider + ?Sized>(
+        layouts: &T,
+        closure: *mut u8,
+    ) -> Vec<u8> {
         let slot = closure as u64;
         let mut out = vec![];
         // SAFETY: a `u64` holding the closure pointer is exactly a function
@@ -2687,6 +2809,158 @@ mod tests {
                 "a {n}-byte prefix decoded"
             );
         }
+    }
+
+    /// Decodes `bytes` as a function value onto `heap` and returns the closure
+    /// together with its `Raw` captured-data object.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must encode a closure with at least one capture.
+    unsafe fn decode_raw_closure<T: LayoutProvider + ?Sized>(
+        layouts: &T,
+        heap: &mut Heap,
+        bytes: &[u8],
+    ) -> (*mut u8, *mut u8) {
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        // SAFETY: a `u64` holding the closure pointer is exactly a function
+        // value's in-memory image.
+        unsafe {
+            deserialize_impl(
+                layouts,
+                heap,
+                &ValueLayout::function(),
+                bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                None,
+            )
+            .unwrap()
+        };
+        assert_eq!(cursor, bytes.len());
+        let closure = slot as *mut u8;
+        // SAFETY: the decode wrote a live closure with captures.
+        let raw = unsafe { read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET) };
+        assert_eq!(unsafe { *raw.add(CAPTURED_DATA_TAG_OFFSET) }, {
+            CAPTURED_DATA_TAG_RAW
+        });
+        (closure, raw)
+    }
+
+    #[test]
+    fn materialize_raw_captures_decodes_and_keeps_blob() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let mut table = ValueLayoutTable::new();
+        let vec_id = table.push(vector_layout(U64_TY, U8_LAYOUT_ID));
+        let layouts = InternedLayouts {
+            table: &table,
+            guard: &guard,
+        };
+
+        let elems = vec![1u8, 2, 3];
+        let bytes = closure_wire(0b11, &[], &[
+            (MoveTypeLayout::U64, bcs::to_bytes(&7u64).unwrap()),
+            (
+                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+                bcs::to_bytes(&elems).unwrap(),
+            ),
+        ]);
+
+        let mut heap = Heap::new(4096);
+        let out = unsafe {
+            let (closure, raw) = decode_raw_closure(&layouts, &mut heap, &bytes);
+            let materialized = materialize_raw_captures(
+                &layouts,
+                &mut heap,
+                raw,
+                &[U64_LAYOUT_ID, vec_id],
+                16,
+                TRIVIAL_DESCRIPTOR_ID,
+            )
+            .unwrap();
+            assert_eq!(*materialized.add(CAPTURED_DATA_TAG_OFFSET), {
+                CAPTURED_DATA_TAG_MATERIALIZED_RAW
+            });
+            // The captures land in the values region at their natural offsets.
+            assert_eq!(read_u64(materialized, CAPTURED_DATA_VALUES_OFFSET), 7);
+            let vec_ptr = read_ptr(materialized, CAPTURED_DATA_VALUES_OFFSET + 8);
+            assert_eq!(read_vec_len(vec_ptr) as usize, elems.len());
+
+            write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, materialized);
+            serialize_closure_value(&layouts, closure)
+        };
+        assert_eq!(out, bytes);
+    }
+
+    #[test]
+    fn materialize_raw_captures_rejects_layout_skew() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let table = ValueLayoutTable::new();
+        let layouts = InternedLayouts {
+            table: &table,
+            guard: &guard,
+        };
+
+        // Stored as a `bool`, decoded as if the target's parameter were a
+        // `u64`: the bytes say one thing and the callee's signature another.
+        let bytes = closure_wire(0b1, &[], &[(MoveTypeLayout::Bool, vec![1u8])]);
+        let mut heap = Heap::new(4096);
+        let err = unsafe {
+            let (_, raw) = decode_raw_closure(&layouts, &mut heap, &bytes);
+            materialize_raw_captures(
+                &layouts,
+                &mut heap,
+                raw,
+                &[U64_LAYOUT_ID],
+                8,
+                TRIVIAL_DESCRIPTOR_ID,
+            )
+            .unwrap_err()
+        };
+        assert!(matches!(
+            err,
+            AllocationError::RuntimeError(RuntimeError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn deep_copy_keeps_a_materialized_raw_blob() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let table = ValueLayoutTable::new();
+        let layouts = InternedLayouts {
+            table: &table,
+            guard: &guard,
+        };
+        let descriptors = ObjectDescriptorTable::new();
+
+        let bytes = closure_wire(0b1, &[], &[(
+            MoveTypeLayout::U64,
+            bcs::to_bytes(&7u64).unwrap(),
+        )]);
+        let mut heap = Heap::new(4096);
+        let out = unsafe {
+            let (closure, raw) = decode_raw_closure(&layouts, &mut heap, &bytes);
+            let materialized = materialize_raw_captures(
+                &layouts,
+                &mut heap,
+                raw,
+                &[U64_LAYOUT_ID],
+                8,
+                TRIVIAL_DESCRIPTOR_ID,
+            )
+            .unwrap();
+            write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, materialized);
+
+            let copy = heap
+                .try_deep_copy(&descriptors, NonNull::new(closure).unwrap())
+                .unwrap();
+            serialize_closure_value(&layouts, copy.as_ptr())
+        };
+        assert_eq!(out, bytes);
     }
 }
 

@@ -82,6 +82,7 @@ fun churn() {
   safe_point_layouts:
     0: []
     5: []
+    6: []
     7: [64]
 }
 

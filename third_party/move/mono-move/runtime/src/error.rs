@@ -439,8 +439,27 @@ pub enum RuntimeInvariantViolation {
     #[error("CallClosure: mask {mask:#b} references parameters beyond callee's {num_params}")]
     ClosureMaskExceedsParams { mask: u64, num_params: usize },
 
-    #[error("CallClosure: packed captured values_size {packed} != resolved callee's captured layout {expected}")]
-    ClosureCapturedLayoutMismatch { expected: u32, packed: u32 },
+    #[error(
+        "CallClosure: capture {capture_idx} was packed as ({packed_size}, {packed_align}) but \
+         resolved callee's param {param_idx} is ({param_size}, {param_align})"
+    )]
+    ClosureCapturedLayoutMismatch {
+        capture_idx: usize,
+        packed_size: u32,
+        packed_align: u32,
+        param_idx: usize,
+        param_size: u32,
+        param_align: u32,
+    },
+
+    #[error("CallClosure: {packed} capture layouts for a mask capturing {captured}")]
+    ClosureCapturedCountMismatch { packed: usize, captured: usize },
+
+    #[error("CallClosure: no published capture layouts for id {id}")]
+    ClosureCaptureLayoutsMissing { id: u32 },
+
+    #[error("CallClosure: no published layout for capture {capture_idx}")]
+    ClosureCaptureLayoutMissing { capture_idx: usize },
 
     #[error("CallClosure: null function pointer in closure")]
     NullFuncRefInClosure,
