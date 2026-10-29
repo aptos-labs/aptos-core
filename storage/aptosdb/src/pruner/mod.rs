@@ -18,8 +18,8 @@ pub(crate) use state_kv_pruner::{
 };
 pub(crate) use state_merkle_pruner::{
     generics::{
-        EpochSnapshot, MerklePrunerSchema, OrderEpochSnapshot, OrderStateMerkle,
-        PositionEpochSnapshot, PositionStateMerkle, StateMerkle,
+        EpochSnapshot, HotEpochSnapshot, HotStateMerkle, MerklePrunerSchema, OrderEpochSnapshot,
+        OrderStateMerkle, PositionEpochSnapshot, PositionStateMerkle, StateMerkle,
     },
     leaked_stale_node_cleaner,
     state_merkle_pruner_manager::StateMerklePrunerManager,
