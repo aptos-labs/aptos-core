@@ -7,6 +7,7 @@
 
 use crate::{
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
+    native_state_store::decode_position_writes,
     native_store::kv_db::PositionDb,
     schema::native_stale_value_index::{NativeStaleValueIndex, NativeStaleValueIndexSchema},
     utils::truncation_helper::{get_native_commit_progress, truncate_native_kv_db_shards},
@@ -83,28 +84,21 @@ fn delete() -> WriteOp {
 }
 
 /// Commit one position write at `version` using the committer's
-/// per-chunk-batched path. Returns the decoded `PositionWrite`s the
-/// committer emitted for this chunk.
-fn commit_one(
-    db: &Arc<PositionDb>,
-    version: Version,
-    key: StateKey,
-    op: WriteOp,
-) -> crate::native_state_store::PositionWrites {
+/// per-chunk-batched path.
+fn commit_one(db: &Arc<PositionDb>, version: Version, key: StateKey, op: WriteOp) {
     let committer = NativeStateCommitter::new(Arc::clone(db));
     let mut sharded_kv_batches = new_sharded_kv_batches();
     let mut in_chunk_prior = InChunkPriorVersions::new();
-    let writes = committer
+    committer
         .apply(
             version,
-            std::iter::once((key, op)),
+            std::iter::once((&key, &op)),
             &mut sharded_kv_batches,
             &mut in_chunk_prior,
         )
         .expect("apply");
     db.commit(version, None, sharded_kv_batches)
         .expect("position_db commit");
-    writes
 }
 
 #[test]
@@ -201,47 +195,27 @@ fn apply_emits_prior_version_on_overwrite() {
     assert_eq!(v5.version, 0);
 }
 
-#[test]
-fn apply_emits_typed_position_for_upsert_none_for_delete() {
-    let (_tmp, db) = open_position_db();
-    let key = position_key(1);
-
-    let upserts = commit_one(&db, 0, key.clone(), upsert(7));
-    assert_eq!(upserts.len(), 1);
-    let pos = upserts[0]
-        .1
-        .as_ref()
-        .expect("upsert carries the decoded value");
-    assert_eq!(pos.size(), 7, "decoded NativePosition's tag survives apply");
-
-    let deletes = commit_one(&db, 1, key.clone(), delete());
-    assert_eq!(deletes.len(), 1);
-    assert!(deletes[0].1.is_none(), "delete carries no value");
-}
-
 /// One `PositionWrite` per input, in arrival order, correctly decoded.
 #[test]
-fn apply_emits_one_position_write_per_input() {
-    let (_tmp, db) = open_position_db();
-    let committer = NativeStateCommitter::new(Arc::clone(&db));
-    let mut sharded_kv_batches = new_sharded_kv_batches();
-    let mut in_chunk_prior = InChunkPriorVersions::new();
-
+fn decode_emits_one_position_write_per_input() {
     let exch = exchange(1);
     let acct_a = account(2);
     let acct_b = account(3);
     let market_x = market(7);
     let market_y = market(8);
 
-    let inputs = vec![
+    let inputs = [
         (StateKey::position(exch, acct_a, market_x), upsert(100)),
         (StateKey::position(exch, acct_b, market_y), upsert(200)),
         (StateKey::position(exch, acct_a, market_y), delete()),
     ];
 
-    let writes = committer
-        .apply(0, inputs, &mut sharded_kv_batches, &mut in_chunk_prior)
-        .expect("apply");
+    let writes = decode_position_writes(
+        inputs
+            .iter()
+            .map(|(key, op)| (key, op.as_state_value_opt())),
+    )
+    .expect("decode");
 
     assert_eq!(writes.len(), 3, "one PositionWrite per input");
 
@@ -306,7 +280,7 @@ fn in_chunk_writes_chain_stale_index_versions() {
         committer
             .apply(
                 i as Version,
-                std::iter::once((key.clone(), upsert(*tag))),
+                std::iter::once((&key, &upsert(*tag))),
                 &mut sharded_kv_batches,
                 &mut in_chunk_prior,
             )
@@ -805,6 +779,7 @@ mod verify {
             .unwrap()
             .expect("synced version");
         let snapshot = bundle
+            .store
             .merkle_db
             .latest_snapshot_version_at_or_before(tip)
             .unwrap()
@@ -819,7 +794,7 @@ mod verify {
             .unwrap();
         match txn_info.position_state_checkpoint_hash() {
             Some(committed_root) => {
-                let jmt_root = bundle.merkle_db.get_root_hash(snapshot).unwrap();
+                let jmt_root = bundle.store.merkle_db.get_root_hash(snapshot).unwrap();
                 assert_eq!(
                     committed_root, jmt_root,
                     "position root in TransactionInfo@{snapshot} disagrees with the JMT"
@@ -909,13 +884,15 @@ mod verify {
         // Durable: JMT leaves at the snapshot, each agreeing with its KV row.
         let mut on_disk: BTreeMap<PositionKey, Vec<u8>> = BTreeMap::new();
         let leaves = bundle
+            .store
             .merkle_db
-            .iter_active_leaves_with_values(Arc::clone(&bundle.kv_db), snapshot, 0)
+            .iter_active_leaves_with_values(Arc::clone(&bundle.store.kv_db), snapshot, 0)
             .unwrap();
         for row in leaves {
             let (key, value) = row.unwrap();
             let pk = position_key_of(&key).unwrap();
             let kv = bundle
+                .store
                 .kv_db
                 .expect_value_by_version(&key, snapshot)
                 .unwrap();
@@ -1039,7 +1016,7 @@ mod reopen {
             BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
             TransactionToCommit, Version,
         },
-        write_set::{NativePositionOp, WriteOp, WriteSet},
+        write_set::{NativeOrderOp, NativePositionOp, WriteOp, WriteSet},
     };
     use std::collections::BTreeMap;
 
@@ -1063,6 +1040,15 @@ mod reopen {
     /// A one-transaction block whose write set sets each `(key, tag)`;
     /// its transaction info commits `position_root` when given.
     fn block(writes: &[(StateKey, u64)], position_root: Option<HashValue>) -> TransactionToCommit {
+        block_with_orders(writes, &[], position_root)
+    }
+
+    /// As [`block`], also writing each `(order key, value)`; `None` deletes.
+    fn block_with_orders(
+        writes: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&'static [u8]>)],
+        position_root: Option<HashValue>,
+    ) -> TransactionToCommit {
         let txn_info = TransactionInfo::builder_v1()
             .transaction_hash(HashValue::random())
             .state_change_hash(HashValue::random())
@@ -1081,6 +1067,20 @@ mod reopen {
             .collect();
         let mut write_set = WriteSet::default().into_v1();
         write_set.add_native_positions(positions);
+        if !orders.is_empty() {
+            write_set.add_native_orders(
+                orders
+                    .iter()
+                    .map(|(key, value)| {
+                        let op = match value {
+                            Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                            None => WriteOp::legacy_deletion(),
+                        };
+                        (key.clone(), NativeOrderOp::from_write_op(op))
+                    })
+                    .collect(),
+            );
+        }
         TransactionToCommit::new(
             Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
             txn_info,
@@ -1288,7 +1288,7 @@ mod reopen {
         {
             let db = open(&dir, true);
             let bundle = db.position().unwrap();
-            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.merkle_db, 0)
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.store.merkle_db, 0)
                 .unwrap();
         }
         let db = Arc::new(
@@ -1332,7 +1332,7 @@ mod reopen {
         {
             let db = open(&dir, true);
             crate::utils::truncation_helper::truncate_native_merkle_db(
-                &db.position().unwrap().merkle_db,
+                &db.position().unwrap().store.merkle_db,
                 0,
             )
             .unwrap();
@@ -1363,16 +1363,296 @@ mod reopen {
     /// materialize whole, rather than allocating without bound.
     #[test]
     fn replay_refuses_an_unbounded_gap() {
-        use crate::native_store::buffered_state::MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT;
+        use crate::native_store::{
+            buffered_state::MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT, bundle::NativeStoreBundle,
+            PositionStore,
+        };
 
         let dir = TempPath::new();
         let db = open(&dir, true);
-        let err = db
-            .position_write_sets_after_snapshot(0, MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT + 1)
-            .expect_err("gap above the limit");
+        let err = NativeStoreBundle::<PositionStore>::write_sets_after_snapshot(
+            &db.ledger_db,
+            0,
+            MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT + 1,
+        )
+        .expect_err("gap above the limit");
         assert!(
             err.to_string().contains("Too many versions to replay"),
             "{err}"
+        );
+    }
+
+    fn order_key(order_id: u128) -> StateKey {
+        StateKey::order(exchange(1), super::market(7), order_id)
+    }
+
+    fn commit_orders(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        orders: &[(StateKey, Option<&'static [u8]>)],
+    ) {
+        db.save_transactions_for_test(
+            &[block_with_orders(positions, orders, None)],
+            version,
+            None,
+            true,
+        )
+        .expect("commit");
+    }
+
+    /// The order store's live rows at its latest JMT snapshot, which must be
+    /// at the ledger tip.
+    fn order_rows(db: &AptosDB) -> BTreeMap<StateKey, Vec<u8>> {
+        let order = db.order.as_ref().expect("order store attached");
+        let tip = db.get_synced_version().unwrap().expect("synced version");
+        let snapshot = order
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap();
+        assert_eq!(snapshot, Some(tip), "order snapshot at the tip");
+        order
+            .snapshot_rows(tip)
+            .unwrap()
+            .map(|row| {
+                let (key, value) = row.unwrap();
+                (key, value.bytes().to_vec())
+            })
+            .collect()
+    }
+
+    fn position_row_keys(db: &AptosDB) -> Vec<StateKey> {
+        let bundle = db.position().expect("position store attached");
+        let tip = db.get_synced_version().unwrap().expect("synced version");
+        let snapshot = bundle
+            .store
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap()
+            .expect("position snapshot");
+        bundle
+            .store
+            .snapshot_rows(snapshot)
+            .unwrap()
+            .map(|row| row.unwrap().0)
+            .collect()
+    }
+
+    /// Order writes land in the order store, latest-wins with deletes, and
+    /// a reopen sees them from the JMT; positions in the same blocks stay
+    /// in the position store.
+    #[test]
+    fn orders_commit_to_their_own_store_and_survive_reopen() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[(position_key(1), 10)], &[
+                (order_key(1), Some(b"a")),
+                (order_key(2), Some(b"b")),
+            ]);
+            commit_orders(&db, 1, &[], &[
+                (order_key(1), None),
+                (order_key(3), Some(b"c")),
+            ]);
+            commit_orders(&db, 2, &[(position_key(2), 20)], &[(
+                order_key(2),
+                Some(b"B"),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([(order_key(2), b"B".to_vec()), (order_key(3), b"c".to_vec()),])
+        );
+        let positions = position_row_keys(&db);
+        assert_eq!(positions.len(), 2, "{positions:?}");
+        assert!(positions.contains(&position_key(1)) && positions.contains(&position_key(2)));
+        assert_eq!(size_of(&db, 1), Some(10));
+        assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// Flag on through v0, off for v1..=v2, on again: the reopen replays the
+    /// gap into the order store.
+    #[test]
+    fn reenabling_replays_the_gap_into_the_order_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(b"a"))]);
+        }
+        {
+            let db = open(&dir, false);
+            assert!(db.order.is_none());
+            commit_orders(&db, 1, &[], &[(order_key(1), Some(b"b"))]);
+            commit_orders(&db, 2, &[], &[(order_key(2), Some(b"c"))]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([(order_key(1), b"b".to_vec()), (order_key(2), b"c".to_vec()),])
+        );
+    }
+
+    /// Positions-only blocks leave the order store empty.
+    #[test]
+    fn position_writes_never_reach_the_order_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+        }
+        let db = open(&dir, true);
+        assert!(order_rows(&db).is_empty(), "no order was ever written");
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// A crash between the order commit and the ledger's progress write
+    /// leaves order rows above the chain; the reopen truncates them.
+    #[test]
+    fn reopening_truncates_order_rows_ahead_of_the_ledger() {
+        use crate::{
+            native_state_committer::{
+                new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter,
+            },
+            utils::truncation_helper::get_native_commit_progress,
+        };
+        use aptos_crypto::hash::CryptoHash;
+        use std::sync::Arc;
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(b"a"))]);
+            commit_orders(&db, 1, &[], &[(order_key(2), Some(b"b"))]);
+
+            let order = db.order.as_ref().unwrap();
+            let committer = NativeStateCommitter::new(Arc::clone(&order.kv_db));
+            let mut batches = new_sharded_kv_batches();
+            let mut in_chunk_prior = InChunkPriorVersions::new();
+            let ahead = WriteOp::legacy_modification(b"x".to_vec().into());
+            committer
+                .apply(
+                    2,
+                    std::iter::once((&order_key(1), &ahead)),
+                    &mut batches,
+                    &mut in_chunk_prior,
+                )
+                .unwrap();
+            order.kv_db.commit(2, None, batches).unwrap();
+            assert_eq!(get_native_commit_progress(&order.kv_db).unwrap(), Some(2));
+        }
+        let db = open(&dir, true);
+        let order = db.order.as_ref().unwrap();
+        assert_eq!(get_native_commit_progress(&order.kv_db).unwrap(), Some(1));
+        let (version, value) = order
+            .kv_db
+            .get_value(order_key(1).hash(), 2)
+            .unwrap()
+            .expect("v0 row survives");
+        assert_eq!(version, 0, "the row ahead of the ledger is gone");
+        assert_eq!(value.bytes().as_ref(), b"a");
+        assert_eq!(
+            order_rows(&db),
+            BTreeMap::from([(order_key(1), b"a".to_vec()), (order_key(2), b"b".to_vec()),])
+        );
+    }
+
+    /// Commits wake the order value pruner, so superseded order rows are
+    /// pruned while the node stays up, not only after a restart.
+    #[test]
+    fn commits_drive_the_order_value_pruner() {
+        use crate::pruner::PrunerManager;
+        use aptos_config::config::{LedgerPrunerConfig, PrunerConfig};
+        use aptos_crypto::hash::CryptoHash;
+
+        let dir = TempPath::new();
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            PrunerConfig {
+                ledger_pruner_config: LedgerPrunerConfig {
+                    enable: true,
+                    prune_window: 0,
+                    batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+                ..NO_OP_STORAGE_PRUNER_CONFIG
+            },
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("open");
+        commit_orders(&db, 0, &[], &[(order_key(1), Some(b"a"))]);
+        commit_orders(&db, 1, &[], &[(order_key(1), Some(b"b"))]);
+        commit_orders(&db, 2, &[], &[(order_key(2), Some(b"c"))]);
+
+        let order = db.order.as_ref().unwrap();
+        let value_pruner = &order.pruner.as_ref().unwrap().value_pruner;
+        value_pruner.wait_for_pruner().unwrap();
+        assert_eq!(value_pruner.get_min_readable_version(), 2);
+        assert!(
+            order
+                .kv_db
+                .get_value(order_key(1).hash(), 0)
+                .unwrap()
+                .is_none(),
+            "the superseded v0 row is pruned"
+        );
+        let (version, _) = order
+            .kv_db
+            .get_value(order_key(1).hash(), 2)
+            .unwrap()
+            .expect("live row kept");
+        assert_eq!(version, 1);
+    }
+
+    /// Storage enabled on a running chain, as `test_enable_native_positions_on_running_chain`
+    /// does: blocks without order writes must keep committing.
+    #[test]
+    fn enabling_on_a_running_chain_then_committing_without_orders() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit(&db, 0, &[]);
+            commit(&db, 1, &[]);
+        }
+        {
+            let db = open(&dir, true);
+            commit(&db, 2, &[(position_key(1), 10)]);
+            commit(&db, 3, &[]);
+        }
+        let db = open(&dir, true);
+        commit(&db, 4, &[]);
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// The order tree follows the chain through blocks with no order writes,
+    /// so it persists snapshots and a reopen replays only past the latest.
+    /// Otherwise a reopen replays from version 0, which a restored or pruned
+    /// ledger cannot serve.
+    #[test]
+    fn order_snapshots_track_the_chain_without_order_writes() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[]);
+            commit(&db, 2, &[]);
+        }
+        let db = open(&dir, true);
+        let order = db.order.as_ref().expect("order store attached");
+        assert_eq!(
+            order
+                .merkle_db
+                .latest_snapshot_version_at_or_before(Version::MAX)
+                .unwrap(),
+            Some(2),
         );
     }
 }

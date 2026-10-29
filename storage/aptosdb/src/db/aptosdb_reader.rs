@@ -70,7 +70,7 @@ impl DbReader for AptosDB {
             // fabricate an empty base.
             self.position
                 .as_ref()
-                .and_then(|bundle| bundle.persisted.as_ref())
+                .and_then(|bundle| bundle.store.persisted.as_ref())
                 .map(|persisted| persisted.get())
                 .ok_or_else(|| self.position_storage_unavailable())
         })
@@ -82,7 +82,7 @@ impl DbReader for AptosDB {
             // writes not yet merklized).
             self.position
                 .as_ref()
-                .and_then(|bundle| bundle.state_store.as_ref())
+                .and_then(|bundle| bundle.store.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone())
                 .ok_or_else(|| self.position_storage_unavailable())
         })
@@ -113,7 +113,7 @@ impl DbReader for AptosDB {
             // committer), so live nodes are normally retained. Guard anyway —
             // like `error_if_state_merkle_pruned` for main state — so a pruned
             // version returns a typed error instead of panicking in the JMT.
-            if let Some(pruner) = bundle.position_pruner.as_ref() {
+            if let Some(pruner) = bundle.store.pruner.as_ref() {
                 let min_readable = pruner.state_merkle_pruner.get_min_readable_version();
                 ensure!(
                     version >= min_readable,
@@ -122,6 +122,7 @@ impl DbReader for AptosDB {
                 );
             }
             let (_value, proof) = bundle
+                .store
                 .merkle_db
                 .get_with_proof_ext(key_hash, version, root_depth)?;
             Ok(proof)
@@ -700,7 +701,7 @@ impl DbReader for AptosDB {
             let position_state_summary = self
                 .position
                 .as_ref()
-                .and_then(|bundle| bundle.state_store.as_ref())
+                .and_then(|bundle| bundle.store.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone());
             let positions = self
                 .position

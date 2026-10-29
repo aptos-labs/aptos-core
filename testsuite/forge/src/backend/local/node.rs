@@ -9,8 +9,8 @@ use aptos_config::{
 };
 use aptos_db::common::{
     HOT_STATE_KV_DB_FOLDER_NAME, HOT_STATE_MERKLE_DB_FOLDER_NAME, LEDGER_DB_FOLDER_NAME,
-    POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME, STATE_KV_DB_FOLDER_NAME,
-    STATE_MERKLE_DB_FOLDER_NAME,
+    ORDER_DB_FOLDER_NAME, ORDER_MERKLE_DB_FOLDER_NAME, POSITION_DB_FOLDER_NAME,
+    POSITION_MERKLE_DB_FOLDER_NAME, STATE_KV_DB_FOLDER_NAME, STATE_MERKLE_DB_FOLDER_NAME,
 };
 use aptos_logger::{debug, error, info};
 use aptos_sdk::{
@@ -422,6 +422,8 @@ impl Node for LocalNode {
             HOT_STATE_KV_DB_FOLDER_NAME,
             POSITION_DB_FOLDER_NAME,
             POSITION_MERKLE_DB_FOLDER_NAME,
+            ORDER_DB_FOLDER_NAME,
+            ORDER_MERKLE_DB_FOLDER_NAME,
             STATE_SYNC_DB_NAME,
         ]
         .map(|name| storage_dir.join(name));

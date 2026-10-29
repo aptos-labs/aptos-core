@@ -73,7 +73,12 @@ fn commit_at(db: &Arc<PositionDb>, version: Version, writes: Vec<(StateKey, Writ
     let mut batches = new_sharded_kv_batches();
     let mut in_chunk_prior = InChunkPriorVersions::new();
     committer
-        .apply(version, writes, &mut batches, &mut in_chunk_prior)
+        .apply(
+            version,
+            writes.iter().map(|(key, op)| (key, op)),
+            &mut batches,
+            &mut in_chunk_prior,
+        )
         .expect("apply");
     db.commit(version, None, batches).expect("commit");
 }

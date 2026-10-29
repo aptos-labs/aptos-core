@@ -201,9 +201,10 @@ pub struct RocksdbConfigs {
     pub index_db_config: RocksdbConfig,
     #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
-    /// Attach native-position storage on open: the position KV and JMT DBs
-    /// and the resident index. The on-chain `TRADING_NATIVE` and
-    /// `NATIVE_POSITION` features gate the writes themselves.
+    /// Attach trading-native storage on open: the position and order KV and
+    /// JMT DBs, and the resident position index. The on-chain
+    /// `TRADING_NATIVE`, `NATIVE_POSITION` and `NATIVE_ORDERBOOK` features
+    /// gate the writes themselves.
     #[serde(default)]
     pub enable_trading_native: bool,
     pub high_priority_background_threads: i32,
