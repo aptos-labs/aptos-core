@@ -4,7 +4,7 @@
 use crate::{
     access_path::AccessPath,
     state_store::{
-        state_key::inner::{StateKeyInner, StateKeyInnerHasher, TradingNativeKey},
+        state_key::inner::{CollateralScope, StateKeyInner, StateKeyInnerHasher, TradingNativeKey},
         table::TableHandle,
     },
 };
@@ -87,6 +87,13 @@ impl Drop for Entry {
                 } => REGISTRY
                     .bulk_order((*exchange, *market), account)
                     .maybe_remove(&(*exchange, *market), account),
+                TradingNativeKey::Collateral {
+                    exchange,
+                    account,
+                    scope,
+                } => REGISTRY
+                    .collateral((*exchange, *account), scope)
+                    .maybe_remove(&(*exchange, *account), scope),
             },
         }
     }
@@ -226,6 +233,7 @@ const NUM_RAW_SHARDS: usize = 4;
 const NUM_POSITION_SHARDS: usize = 8;
 const NUM_ORDER_SHARDS: usize = 8;
 const NUM_BULK_ORDER_SHARDS: usize = 8;
+const NUM_COLLATERAL_SHARDS: usize = 8;
 
 #[derive(Default)]
 pub struct StateKeyRegistry {
@@ -245,6 +253,10 @@ pub struct StateKeyRegistry {
     bulk_order_shards: [CachePadded<
         TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress>,
     >; NUM_BULK_ORDER_SHARDS],
+    /// (exchange, account) -> scope -> Entry.
+    collateral_shards: [CachePadded<
+        TwoKeyRegistry<(AccountAddress, AccountAddress), CollateralScope>,
+    >; NUM_COLLATERAL_SHARDS],
 }
 
 impl StateKeyRegistry {
@@ -338,5 +350,24 @@ impl StateKeyRegistry {
         hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
         hasher.write_u8(account.as_ref()[AccountAddress::LENGTH - 1]);
         &self.bulk_order_shards[hasher.finish() as usize % self.bulk_order_shards.len()]
+    }
+
+    pub(crate) fn collateral(
+        &self,
+        key1: (AccountAddress, AccountAddress),
+        scope: &CollateralScope,
+    ) -> &TwoKeyRegistry<(AccountAddress, AccountAddress), CollateralScope> {
+        let (exchange, account) = key1;
+        let mut hasher = fxhash::FxHasher::default();
+        hasher.write_u8(exchange.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u8(account.as_ref()[AccountAddress::LENGTH - 1]);
+        match scope {
+            CollateralScope::Cross => hasher.write_u8(0),
+            CollateralScope::Isolated { market } => {
+                hasher.write_u8(1);
+                hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
+            },
+        }
+        &self.collateral_shards[hasher.finish() as usize % self.collateral_shards.len()]
     }
 }

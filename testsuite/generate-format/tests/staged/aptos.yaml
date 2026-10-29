@@ -315,6 +315,15 @@ ClaimedEntryFunction:
     - function:
         OPTION:
           TYPENAME: Identifier
+CollateralScope:
+  ENUM:
+    0:
+      Cross: UNIT
+    1:
+      Isolated:
+        STRUCT:
+          - market:
+              TYPENAME: AccountAddress
 ContractEvent:
   ENUM:
     0:
@@ -490,6 +499,14 @@ Extension:
               TYPENAME: WriteOp
     1:
       NativeOrder:
+        NEWTYPE:
+          MAP:
+            KEY:
+              TYPENAME: StateKey
+            VALUE:
+              TYPENAME: WriteOp
+    2:
+      NativeCollateral:
         NEWTYPE:
           MAP:
             KEY:
@@ -826,6 +843,15 @@ TradingNativeKey:
               TYPENAME: AccountAddress
           - account:
               TYPENAME: AccountAddress
+    3:
+      Collateral:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
+          - scope:
+              TYPENAME: CollateralScope
 Transaction:
   ENUM:
     0:

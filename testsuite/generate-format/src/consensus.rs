@@ -15,7 +15,10 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{
-        state_key::{inner::TradingNativeKey, StateKey},
+        state_key::{
+            inner::{CollateralScope, TradingNativeKey},
+            StateKey,
+        },
         state_value::PersistedStateValueMetadata,
     },
     transaction::{self, block_epilogue::BlockEpiloguePayload},
@@ -134,6 +137,7 @@ pub fn get_registry() -> Result<Registry> {
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<TradingNativeKey>(&samples)?;
+    tracer.trace_type::<CollateralScope>(&samples)?;
     tracer.trace_type::<write_set::Extension>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchInfoExt>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::round_timeout::RoundTimeoutReason>(&samples)?;

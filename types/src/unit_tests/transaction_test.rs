@@ -91,3 +91,31 @@ proptest! {
         assert_canonical_encode_decode(acct_txns_with_proof);
     }
 }
+
+#[test]
+fn collateral_state_checkpoint_hash_roundtrips_through_placeholder_slot() {
+    use crate::transaction::ExecutionStatus;
+    use aptos_crypto::HashValue;
+
+    let root = HashValue::random();
+    let info = TransactionInfo::builder_v1()
+        .transaction_hash(HashValue::zero())
+        .state_change_hash(HashValue::zero())
+        .event_root_hash(HashValue::zero())
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .maybe_position_state_checkpoint_hash(None)
+        .maybe_collateral_state_checkpoint_hash(Some(root))
+        .build();
+    assert_eq!(info.collateral_state_checkpoint_hash(), Some(root));
+    assert_eq!(info.position_state_checkpoint_hash(), None);
+
+    let none = TransactionInfo::builder_v1()
+        .transaction_hash(HashValue::zero())
+        .state_change_hash(HashValue::zero())
+        .event_root_hash(HashValue::zero())
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
+    assert_eq!(none.collateral_state_checkpoint_hash(), None);
+}
