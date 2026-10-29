@@ -7,8 +7,8 @@ use crate::{
     ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb},
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
     pruner::{
-        leaked_stale_node_cleaner, ColdStateKv, EpochSnapshot, HotStateKv, StateKvPrunerManager,
-        StateMerkle, StateMerklePrunerManager,
+        leaked_stale_node_cleaner, ColdStateKv, EpochSnapshot, HotEpochSnapshot, HotStateKv,
+        HotStateMerkle, StateKvPrunerManager, StateMerkle, StateMerklePrunerManager,
     },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -111,8 +111,8 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
 pub(crate) struct StatePruner {
-    pub hot_state_merkle_pruner: StateMerklePrunerManager<StateMerkle>,
-    pub hot_epoch_snapshot_pruner: StateMerklePrunerManager<EpochSnapshot>,
+    pub hot_state_merkle_pruner: StateMerklePrunerManager<HotStateMerkle>,
+    pub hot_epoch_snapshot_pruner: StateMerklePrunerManager<HotEpochSnapshot>,
     pub hot_state_kv_pruner: StateKvPrunerManager<HotStateKv>,
     pub state_merkle_pruner: StateMerklePrunerManager<StateMerkle>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<EpochSnapshot>,
@@ -131,11 +131,11 @@ impl StatePruner {
     ) -> Self {
         // Hot pruners must keep the main configs: peers advertise one `states`
         // range for both.
-        let hot_state_merkle_pruner = StateMerklePrunerManager::<StateMerkle>::new(
+        let hot_state_merkle_pruner = StateMerklePrunerManager::<HotStateMerkle>::new(
             Arc::clone(&hot_state_merkle_db),
             config.state_merkle_pruner_config,
         );
-        let hot_epoch_snapshot_pruner = StateMerklePrunerManager::<EpochSnapshot>::new(
+        let hot_epoch_snapshot_pruner = StateMerklePrunerManager::<HotEpochSnapshot>::new(
             hot_state_merkle_db,
             config.epoch_snapshot_pruner_config.into(),
         );
