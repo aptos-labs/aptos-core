@@ -129,6 +129,8 @@ impl StatePruner {
         state_kv_db: Arc<StateKvDb>,
         config: PrunerConfig,
     ) -> Self {
+        // Hot pruners must keep the main configs: peers advertise one `states`
+        // range for both.
         let hot_state_merkle_pruner = StateMerklePrunerManager::<StateMerkle>::new(
             Arc::clone(&hot_state_merkle_db),
             config.state_merkle_pruner_config,
