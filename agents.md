@@ -72,10 +72,12 @@ This file provides guidance for AI coding agents working autonomously in this re
 3. Modify: Make changes to Move code
 4. Test Move: cargo test -p <framework-package>
 5. Rebuild cached packages (REQUIRED — do not skip):
-   cargo build -p aptos-cached-packages
-6. Verify and commit the regenerated bundle:
+   scripts/cargo_build_aptos_cached_packages.sh
+   # `cargo build -p aptos-cached-packages` does NOT regenerate it.
+6. Verify and commit the regenerated files:
    git status aptos-move/framework/cached-packages/
    # Expect: M aptos-move/framework/cached-packages/src/head.mrb
+   # (plus generated *_sdk_builder.rs if entry functions changed)
 ```
 
 ### Workflow: API Changes
@@ -220,8 +222,7 @@ cargo build
 ### Framework Not Updating
 
 ```bash
-# Force rebuild cached packages
-cargo clean -p aptos-cached-packages
+# Rebuild cached packages
 ./scripts/cargo_build_aptos_cached_packages.sh
 ```
 
@@ -286,7 +287,7 @@ When modifying one component, verify these integration points:
 | Component | Affects | Verify With |
 |-----------|---------|-------------|
 | VM | Execution, Gas | `cargo test -p aptos-vm -p aptos-block-executor` |
-| Framework | VM, API | `cargo test -p aptos-framework && cargo build -p aptos-cached-packages` |
+| Framework | VM, API | `cargo test -p aptos-framework && scripts/cargo_build_aptos_cached_packages.sh` |
 | Storage | Everything | `cargo test -p aptos-db -p aptos-executor` |
 | API | Clients | `cargo test -p aptos-api` + check OpenAPI spec |
 | Types | Everything | `cargo test -p aptos-types` |
