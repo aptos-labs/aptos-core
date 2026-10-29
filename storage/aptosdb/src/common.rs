@@ -30,6 +30,8 @@ pub const POSITION_DB_FOLDER_NAME: &str = "position_db";
 pub const POSITION_MERKLE_DB_FOLDER_NAME: &str = "position_merkle_db";
 pub const ORDER_DB_FOLDER_NAME: &str = "order_db";
 pub const ORDER_MERKLE_DB_FOLDER_NAME: &str = "order_merkle_db";
+pub const COLLATERAL_DB_FOLDER_NAME: &str = "collateral_db";
+pub const COLLATERAL_MERKLE_DB_FOLDER_NAME: &str = "collateral_merkle_db";
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
