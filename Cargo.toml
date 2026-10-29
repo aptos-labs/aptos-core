@@ -623,7 +623,7 @@ diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 difference = "2.0.0"
 digest = "0.9.0"
 dir-diff = "0.3.2"
-dirs = "5.0.1"
+dirs = "7.0.0"
 dirs-next = "2.0.0"
 dudect-bencher = "0.6"
 dunce = "1.0.4"
@@ -631,7 +631,7 @@ ed25519-dalek = { version = "1.0.1", features = ["rand_core", "std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.19.0"
 enum_dispatch = "0.3.12"
-env_logger = "0.10.0"
+env_logger = "0.11.11"
 equivalent = "1.0"
 erased-serde = "0.4.11"
 ethers = { version = "2" }
@@ -646,7 +646,7 @@ firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
 flexi_logger = "0.31.10"
-float-cmp = "0.9.0"
+float-cmp = "0.10.0"
 fs2 = "0.4.3"
 futures = "0.3.29"
 futures-channel = "0.3.29"
@@ -666,7 +666,7 @@ group = "0.13"
 guppy = "0.17.5"
 handlebars = "6.4.4"
 hashbrown = { version = "0.14.3", features = ["equivalent"] }
-heck = "0.4.1"
+heck = "0.5.0"
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal = "1.1.0"
 hkdf = "0.10.0"
@@ -680,7 +680,7 @@ hyper-util = { version = "0.1.3", features = ["client-legacy"] }
 image = "0.24.5"
 imbl = "7.0.2"
 indexmap = "2.7.0"
-indicatif = "0.17.7"
+indicatif = "0.18.6"
 indoc = "2.0.8"
 inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
@@ -715,12 +715,12 @@ mirai-annotations = "1.12.0"
 mockall = "0.12.1"
 more-asserts = "0.3.0"
 nalgebra = "0.32"
-named-lock = "0.2.0"
+named-lock = "0.4.1"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
-nix = { version = "0.29", features = ["signal"] }
+nix = { version = "0.31", features = ["signal"] }
 notify = "8.2.0"
-ntest = "0.9.3"
+ntest = "0.10.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num-derive = "0.4.2"
@@ -732,7 +732,7 @@ open = "5.3.1"
 opentelemetry = { version = "0.27.0", features = ["trace"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
 opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
-ordered-float = "4.6.0"
+ordered-float = "5.5.0"
 ouroboros = "0.18.5"
 owo-colors = "4.4.0"
 p256 = { version = "0.13.2" }
