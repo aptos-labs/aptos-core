@@ -522,6 +522,49 @@ impl TestLedger {
             .get_transaction_outputs(*range.start(), num_txns, self.version())
             .unwrap()
     }
+
+    /// Replays `range`, with the `TransactionInfo`s of `versions_to_fail` replaced by the ones before
+    /// them, so that these transactions fail verification if executed.
+    fn replay(
+        &self,
+        executor: &ChunkExecutor<MockVM>,
+        range: &RangeInclusive<Version>,
+        versions_to_fail: &[Version],
+        verify_execution_mode: &VerifyExecutionMode,
+    ) -> anyhow::Result<usize> {
+        let (txn_list, persisted_aux_info) = self.transactions(range).into_parts();
+        let mut txn_infos = txn_list.proof.transaction_infos;
+        for version in versions_to_fail.iter().filter(|v| range.contains(*v)) {
+            let idx = (version - range.start()) as usize;
+            // Copying a block end, or over one, would change the blocks.
+            assert!(
+                !txn_infos[idx - 1].has_state_checkpoint_hash()
+                    && !txn_infos[idx].has_state_checkpoint_hash(),
+                "Txn {version} or the one before it ends a block."
+            );
+            txn_infos[idx] = txn_infos[idx - 1].clone();
+        }
+        let num_txns = range.end() - range.start() + 1;
+        let reader = &self.source.db.reader;
+        let write_sets = reader
+            .get_write_set_iterator(*range.start(), num_txns)
+            .unwrap()
+            .map(|write_set| write_set.unwrap())
+            .collect();
+        let event_vecs = reader
+            .get_events_iterator(*range.start(), num_txns)
+            .unwrap()
+            .map(|events| events.unwrap())
+            .collect();
+        executor.enqueue_chunks(
+            txn_list.transactions,
+            persisted_aux_info,
+            txn_infos,
+            write_sets,
+            event_vecs,
+            verify_execution_mode,
+        )
+    }
 }
 
 #[test]
@@ -591,8 +634,7 @@ fn test_replayer_executes_whole_blocks() {
         executor,
     } = TestExecutor::new();
 
-    // Both the batches and the transaction skipping verification split blocks, so verification
-    // has to happen on top of the partial block held back.
+    // The batches split a block, which also has a transaction skipping verification.
     let verify_execution_mode = VerifyExecutionMode::verify_except(vec![15]);
     let mut num_chunks = 0;
     for range in [1..=18, 19..=40] {
@@ -636,6 +678,76 @@ fn test_replayer_executes_whole_blocks() {
             .ledger_info()
             .transaction_accumulator_hash(),
     );
+}
+
+#[test]
+fn test_replayer_verifies_whole_blocks() {
+    let ledger = TestLedger::new(&[1..=10, 11..=25, 26..=40]);
+    // The first batch enqueues 1-10, and 11-18 to be held back. The second one enqueues 19-40 in
+    // one go, or 19-25 and 26-40 if block 11-25 isn't verified to its end.
+    let batches = [1..=18, 19..=40];
+
+    // Each batch is expected to enqueue a number of chunks, or to fail at a version.
+    for (verify_execution_mode, versions_to_fail, expected_results) in [
+        // Txns held back are verified once the block is complete.
+        (VerifyExecutionMode::verify_all(), vec![15], [
+            Ok(2),
+            Err(15),
+        ]),
+        // The block with a txn to skip goes unverified, including the part held back.
+        (VerifyExecutionMode::verify_except(vec![15]), vec![20], [
+            Ok(2),
+            Ok(2),
+        ]),
+        (VerifyExecutionMode::verify_except(vec![20]), vec![13], [
+            Ok(2),
+            Ok(2),
+        ]),
+        // Verification resumes at the next block.
+        (VerifyExecutionMode::verify_except(vec![15]), vec![30], [
+            Ok(2),
+            Err(30),
+        ]),
+    ] {
+        let TestExecutor {
+            _path,
+            db: _,
+            executor,
+        } = TestExecutor::new();
+        for (range, expected_result) in batches.iter().zip(expected_results) {
+            let result = ledger.replay(&executor, range, &versions_to_fail, &verify_execution_mode);
+            match expected_result {
+                Ok(num_chunks) => {
+                    assert_eq!(result.unwrap(), num_chunks);
+                },
+                Err(version) => {
+                    let error = result.unwrap_err();
+                    assert!(
+                        error.to_string().contains(&format!("version:{version},")),
+                        "{error:?}"
+                    );
+                },
+            }
+        }
+    }
+
+    // Lazy quit doesn't stop at a mismatch, which is still found only once the block is complete.
+    // Verification then resumes at the next block.
+    let verify_execution_mode = VerifyExecutionMode::verify_all().set_lazy_quit(true);
+    let TestExecutor {
+        _path,
+        db: _,
+        executor,
+    } = TestExecutor::new();
+    for (range, (expected_num_chunks, expected_seen_error)) in
+        batches.iter().zip([(2, false), (2, true)])
+    {
+        let num_chunks = ledger
+            .replay(&executor, range, &[15], &verify_execution_mode)
+            .unwrap();
+        assert_eq!(num_chunks, expected_num_chunks);
+        assert_eq!(verify_execution_mode.seen_error(), expected_seen_error);
+    }
 }
 
 #[test]
