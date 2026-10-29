@@ -6,25 +6,33 @@
 use crate::{
     assert_success,
     stake::{initialize_staking, join_validator_set, rotate_consensus_key, setup_staking},
+    tests::common,
     MoveHarness,
 };
 use aptos_cached_packages::aptos_stdlib::{
-    aptos_coin_transfer, delegation_pool_add_stake, delegation_pool_initialize_delegation_pool,
-    stake_set_delegated_voter,
+    aptos_account_transfer, aptos_coin_transfer, delegation_pool_add_stake,
+    delegation_pool_initialize_delegation_pool, stake_set_delegated_voter,
 };
 use aptos_crypto::HashValue;
+use aptos_gas_algebra::Gas;
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_50;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
+    fee_statement::FeeStatement,
     move_utils::MemberId,
     on_chain_config::{ApprovedExecutionHashes, FeatureFlag, OnChainConfig},
     transaction::{
-        RequestedMultipliers, Script, SignedTransaction, TransactionExecutable,
+        EntryFunction, RequestedMultipliers, Script, SignedTransaction, TransactionExecutable,
         TransactionExtraConfig, TransactionPayload, TransactionPayloadInner, TransactionStatus,
         UserTxnLimitsRequest,
     },
 };
-use move_core_types::{ident_str, language_storage::StructTag, vm_status::StatusCode};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, StructTag},
+    vm_status::StatusCode,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -86,11 +94,8 @@ fn delegation_pool_delegator(
     }
 }
 
-fn payload_with_limits(
-    sender_addr: AccountAddress,
-    request: UserTxnLimitsRequest,
-) -> TransactionPayload {
-    match aptos_coin_transfer(sender_addr, 0) {
+fn with_limits(payload: TransactionPayload, request: UserTxnLimitsRequest) -> TransactionPayload {
+    match payload {
         TransactionPayload::EntryFunction(entry_func) => {
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
                 executable: TransactionExecutable::EntryFunction(entry_func),
@@ -103,6 +108,13 @@ fn payload_with_limits(
         },
         _ => unreachable!(),
     }
+}
+
+fn payload_with_limits(
+    sender_addr: AccountAddress,
+    request: UserTxnLimitsRequest,
+) -> TransactionPayload {
+    with_limits(aptos_coin_transfer(sender_addr, 0), request)
 }
 
 fn sign_txn_with_limits_and_gas_unit_price(
@@ -597,4 +609,155 @@ fn test_approved_gov_script_with_txn_limits_request_rejected() {
         txn,
         StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT,
     );
+}
+
+const EXCESS_PRICE_MULTIPLIER: u64 = 10;
+
+// Iterations of `0xbeef::limits::spin`, enough to use execution gas above the
+// base limit set by `setup_excess_execution`.
+const SPIN_ITERATIONS: u64 = 50_000;
+
+fn spin_with_limits() -> TransactionPayload {
+    let spin = EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::from_hex_literal("0xbeef").unwrap(),
+            ident_str!("limits").to_owned(),
+        ),
+        ident_str!("spin").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&SPIN_ITERATIONS).unwrap()],
+    );
+    with_limits(
+        TransactionPayload::EntryFunction(spin),
+        stake_pool_owner(200, 200),
+    )
+}
+
+/// Runs a successful transaction with the given excess price multiplier, and
+/// checks the payer is charged what its fee statement says.
+fn run_with_excess_multiplier(
+    h: &mut MoveHarness,
+    acc: &Account,
+    payload: TransactionPayload,
+    multiplier: u64,
+) -> FeeStatement {
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.high_limit_txn_excess_price_multiplier = multiplier.into();
+    });
+    let txn = h.create_transaction_payload(acc, payload);
+    let gas_unit_price = txn.gas_unit_price();
+
+    let before = h.read_aptos_balance(acc.address());
+    let output = h.run_raw(txn);
+    assert_success!(output.status().clone());
+    let fee_statement = output.try_extract_fee_statement().unwrap().unwrap();
+
+    let paid = before - h.read_aptos_balance(acc.address());
+    assert_eq!(
+        paid,
+        gas_unit_price * fee_statement.gas_used() - fee_statement.storage_fee_refund()
+    );
+    fee_statement
+}
+
+/// Checks that gas used above the base costs the excess multiplier. Rounding
+/// internal gas up to gas units can lose up to `EXCESS_PRICE_MULTIPLIER` units.
+fn assert_excess_pays_multiplier(base: u64, raw: u64, billed: u64) {
+    assert!(raw > base);
+    let expected = raw + (EXCESS_PRICE_MULTIPLIER - 1) * (raw - base);
+    assert!(
+        billed <= expected && billed + EXCESS_PRICE_MULTIPLIER > expected,
+        "billed {billed}, expected {expected}"
+    );
+}
+
+/// Sets up a validator and publishes `0xbeef::limits`. Then sets the base
+/// execution limit to two thirds of what `spin_with_limits` uses. Returns the
+/// account, the base limit, and the fee statement of a run without excess
+/// pricing.
+fn setup_excess_execution(h: &mut MoveHarness) -> (Account, u64, FeeStatement) {
+    let acc = setup_validator(h);
+    let beef = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    assert_success!(h.publish_package(
+        &beef,
+        &common::test_dir_path("transaction_limits.data/pack"),
+    ));
+    h.new_epoch();
+
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_execution_gas = params.vm.txn.max_execution_gas_gov;
+    });
+    let raw = run_with_excess_multiplier(h, &acc, spin_with_limits(), 1);
+
+    let base = raw.execution_gas_used() * 2 / 3;
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_execution_gas = Gas::new(base) * params.vm.txn.gas_unit_scaling_factor;
+    });
+    (acc, base, raw)
+}
+
+#[test]
+fn test_high_limit_txn_execution_excess_pays_multiplier() {
+    let mut h = new_test_harness();
+    let (acc, base, raw) = setup_excess_execution(&mut h);
+
+    let billed =
+        run_with_excess_multiplier(&mut h, &acc, spin_with_limits(), EXCESS_PRICE_MULTIPLIER);
+    assert_excess_pays_multiplier(base, raw.execution_gas_used(), billed.execution_gas_used());
+    assert_eq!(billed.io_gas_used(), raw.io_gas_used());
+}
+
+#[test]
+fn test_high_limit_txn_io_excess_pays_multiplier() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    let payload = || payload_with_limits(*acc.address(), stake_pool_owner(200, 200));
+    let raw = run_with_excess_multiplier(&mut h, &acc, payload(), 1);
+
+    let base = raw.io_gas_used() * 2 / 3;
+    h.modify_gas_schedule(|params| {
+        params.vm.txn.max_io_gas = Gas::new(base) * params.vm.txn.gas_unit_scaling_factor;
+    });
+    let billed = run_with_excess_multiplier(&mut h, &acc, payload(), EXCESS_PRICE_MULTIPLIER);
+    assert_excess_pays_multiplier(base, raw.io_gas_used(), billed.io_gas_used());
+    assert_eq!(billed.execution_gas_used(), raw.execution_gas_used());
+}
+
+#[test]
+fn test_high_limit_txn_storage_fee_pays_gas_price() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    // A transfer to a fresh address pays the storage fee for a new account.
+    let txn =
+        h.create_transaction_payload(&acc, aptos_account_transfer(AccountAddress::random(), 1));
+    let output = h.run_raw(txn);
+    assert_success!(output.status().clone());
+    let fee_statement = output.try_extract_fee_statement().unwrap().unwrap();
+    assert!(fee_statement.storage_fee_used() > 0);
+
+    // The same transfer with a limits request fits in a similar budget.
+    let payload = with_limits(
+        aptos_account_transfer(AccountAddress::random(), 1),
+        stake_pool_owner(200, 200),
+    );
+    let txn = h
+        .create_transaction_without_sign(&acc, payload)
+        .max_gas_amount(2 * fee_statement.gas_used())
+        .sign();
+    assert_success!(h.run(txn));
+}
+
+#[test]
+fn test_high_limit_txn_before_v1_51_pays_gas_price() {
+    let mut h = new_test_harness();
+    let (acc, _, raw) = setup_excess_execution(&mut h);
+    h.modify_gas_schedule_raw(|gas_schedule| gas_schedule.feature_version = RELEASE_V1_50);
+
+    let fee_statement =
+        run_with_excess_multiplier(&mut h, &acc, spin_with_limits(), EXCESS_PRICE_MULTIPLIER);
+    assert_eq!(fee_statement.execution_gas_used(), raw.execution_gas_used());
 }
