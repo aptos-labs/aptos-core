@@ -1059,6 +1059,10 @@ impl LayoutProvider for LoweringContext<'_, '_, '_> {
     fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]> {
         self.loader.guard.capture_layouts(id)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.loader.guard.interner()
+    }
 }
 
 impl SpecializerContext for LoweringContext<'_, '_, '_> {

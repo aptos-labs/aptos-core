@@ -2204,9 +2204,13 @@ pub const CAPTURED_DATA_VALUES_OFFSET: usize = 16;
 // region must start `MAX_ALIGN`-aligned for the widest capture to land right.
 const _: () = assert!(CAPTURED_DATA_VALUES_OFFSET.is_multiple_of(MAX_ALIGN));
 
-/// `ClosureCapturedData::Materialized` tag value.
+/// `ClosureCapturedData::Materialized` tag value. The captured values are laid
+/// out flat in the values region and there is no blob.
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
-// Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
+
+/// `ClosureCapturedData::Raw` tag value. The object holds only the blob: the
+/// captures are still wire bytes and the values region is empty.
+pub const CAPTURED_DATA_TAG_RAW: u8 = 1;
 
 /// Places the next captured value of `(size, align)` after `cursor` bytes at its
 /// natural alignment, returning `(value_offset, next_cursor)`. The values region
