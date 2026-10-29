@@ -959,3 +959,77 @@ fn test_high_limit_txn_meter_budget_is_scaled_down() {
     let (status, _, _) = run_and_get_fee(&mut h, &acc, high_limit_txn);
     assert_eq!(status, TransactionStatus::Keep(ExecutionStatus::OutOfGas));
 }
+
+/// A transfer to a fresh address: creates the account and its primary store,
+/// so the cost is almost entirely storage fee, with execution and IO far below
+/// the base limits.
+fn create_account_txn(
+    h: &mut MoveHarness,
+    sender: &Account,
+    request: Option<UserTxnLimitsRequest>,
+    max_gas_amount: u64,
+) -> SignedTransaction {
+    let fresh = Account::new();
+    let entry = match aptos_account_transfer(*fresh.address(), 1) {
+        TransactionPayload::EntryFunction(entry) => entry,
+        _ => unreachable!(),
+    };
+    let payload = match request {
+        Some(request) => entry_function_with_limits(entry, request),
+        None => TransactionPayload::EntryFunction(entry),
+    };
+    h.create_transaction_without_sign(sender, payload)
+        .gas_unit_price(DEFAULT_GAS_UNIT_PRICE)
+        .max_gas_amount(max_gas_amount)
+        .sign()
+}
+
+/// Storage fees are never surcharged, but they are deducted from the scaled
+/// meter budget like everything else. So a high-limit transaction whose
+/// storage fee alone is a tenth of the declared `max_gas_amount` runs out of
+/// gas, while the same payload with the same `max_gas_amount` succeeds as a
+/// normal transaction. The prologue reserved ten times the fee; the sender
+/// pays for a tenth of the budget and gets nothing.
+#[test]
+fn test_high_limit_txn_out_of_gas_on_storage_at_a_tenth_of_the_budget() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+    let base = base_limits(&h);
+
+    // Measure the payload as a normal transaction with a generous budget.
+    let txn = create_account_txn(&mut h, &acc, None, 1_000_000);
+    let (status, fee_statement, _) = run_and_get_fee(&mut h, &acc, txn);
+    assert_success!(status);
+    let cost = fee_statement.gas_used();
+    let storage_units = fee_statement
+        .storage_fee_used()
+        .div_ceil(DEFAULT_GAS_UNIT_PRICE);
+    let (_, excess) = fee_and_excess(&fee_statement, &base);
+    assert_eq!(excess, 0, "the payload must stay within the base limits");
+
+    // A budget that covers the whole cost (and then some), but whose
+    // scaled-down meter budget is one unit short of the storage fee alone.
+    let max_gas_amount = EXCESS_PRICE_MULTIPLIER * storage_units - EXCESS_PRICE_MULTIPLIER;
+    assert!(max_gas_amount >= cost);
+    assert!(max_gas_amount / EXCESS_PRICE_MULTIPLIER < storage_units);
+
+    let normal_txn = create_account_txn(&mut h, &acc, None, max_gas_amount);
+    let (status, _, _) = run_and_get_fee(&mut h, &acc, normal_txn);
+    assert_success!(status);
+
+    let high_limit_txn = create_account_txn(
+        &mut h,
+        &acc,
+        Some(stake_pool_owner(200, 200)),
+        max_gas_amount,
+    );
+    let (status, fee_statement, paid) = run_and_get_fee(&mut h, &acc, high_limit_txn);
+    assert_eq!(status, TransactionStatus::Keep(ExecutionStatus::OutOfGas));
+
+    // No surcharge was ever in play, and the sender paid at most a tenth of
+    // what the prologue made them reserve.
+    let (_, excess) = fee_and_excess(&fee_statement, &base);
+    assert_eq!(excess, 0);
+    assert!(paid * EXCESS_PRICE_MULTIPLIER <= max_gas_amount * DEFAULT_GAS_UNIT_PRICE);
+}
