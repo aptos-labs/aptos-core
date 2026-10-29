@@ -250,10 +250,7 @@ fn group_member_added_then_sibling_modified_matches_v1() {
     assert_kept_success(&v2, "mono");
 
     // The group is owned by the resource account `init_signer` derived from 0x1
-    // with the seed. `set_resource` also mut-borrows `MainResource` without
-    // changing it; mono emits that unchanged copy as a write while legacy elides
-    // it, so a whole-output diff would flag noise unrelated to the group. Assert
-    // on the group blob directly instead.
+    // with the seed.
     use move_core_types::language_storage::StructTag;
     let owner =
         aptos_types::account_address::create_resource_address(AccountAddress::ONE, b"mono-group");
@@ -263,6 +260,7 @@ fn group_member_added_then_sibling_modified_matches_v1() {
     // The group write is not fee dependent, so legacy and mono must emit a
     // byte-identical blob for each transaction.
     for (i, (o1, o2)) in v1.iter().zip(&v2).enumerate() {
+        compare_outputs(o1, o2, *user.address(), i);
         let g1 = group_write(o1, &group_key);
         let g2 = group_write(o2, &group_key);
         assert_eq!(
