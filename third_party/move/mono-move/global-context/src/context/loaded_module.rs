@@ -4,10 +4,8 @@
 //! Loaded module — what the module cache stores. Stores the polymorphic IR
 //! with the lowered monomorphic functions and generic function instantiations.
 
-use crate::context::ExecutionGuard;
 use anyhow::Result;
 use aptos_types::vm::module_metadata::{get_metadata, get_randomness_annotation};
-use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
@@ -24,116 +22,17 @@ use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
 
-/// Stable cache slot for a loaded module. The slot's identifier is fixed at
-/// creation time (from the cache key), while the content may be empty until
-/// the module is installed.
-pub struct ModuleSlot {
-    id: InternedModuleId,
-    versions: VersionedLeakedBoxPtr<LoadedModule>,
-}
-
-impl ModuleSlot {
-    /// Creates an empty slot for the specified module ID.
-    pub fn new(id: InternedModuleId) -> Self {
-        Self {
-            id,
-            versions: VersionedLeakedBoxPtr::new(),
-        }
-    }
-
-    /// Returns the module ID this slot is keyed by.
-    pub fn id(&self) -> InternedModuleId {
-        self.id
-    }
-
-    /// Reads the current loaded module behind this slot. If slot is not set,
-    /// returns [`None`].
-    pub fn get<'guard>(&self, _guard: &'guard ExecutionGuard<'_>) -> Option<&'guard LoadedModule> {
-        // SAFETY: while a guard is held, maintenance cannot run, so the
-        // pointer is alive for and not null.
-        unsafe { self.versions.load().map(|p| p.as_ref_unchecked()) }
-    }
-
-    /// Returns the raw pointer to the module if set, and [`None`] otherwise.
-    pub fn get_ptr(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
-        self.versions.load()
-    }
-
-    /// Sets the slot content if empty. See [`VersionedLeakedBoxPtr::init`]
-    /// for race semantics.
-    pub fn init(&self, ptr: LeakedBoxPtr<LoadedModule>) -> Result<(), LeakedBoxPtr<LoadedModule>> {
-        self.versions.init(ptr)
-    }
-
-    /// Atomically empties the slot, returning the previous content if any.
-    pub fn clear(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
-        self.versions.clear()
-    }
-}
-
-/// Stable slot pointer for a loaded module in the cache. May be empty if the
-/// module has not yet been cached.
-pub type LoadedModuleSlot = LeakedBoxPtr<ModuleSlot>;
-
-/// What a loaded module says about its mandatory dependencies, keyed by the
-/// loading policy that built it.
-#[derive(Clone)]
-pub enum ModuleMandatoryDependencies {
-    /// Cell that may be filled with slots at a later time. Used by all lazy
-    /// (LL and EL) policies, and for module loads for lowering (shallow).
-    ///
-    /// # Invariants
-    ///   1. Under LL the cell is always empty.
-    ///   2. For shallow layout loads, the cell is created empty.
-    ///   3. Under EL the loader fills it for module M once MS(M) has been
-    ///      computed. Shallow side-loads stay with an unset cell until they require lowering.
-    ///   4. Filled entries always include self.
-    Lazy(OnceLock<Arc<[LoadedModuleSlot]>>),
-    /// Every member of the same package as the owning module. Includes the
-    /// owning module itself. Used by package loading (PL) policy.
-    Package(Arc<[LoadedModuleSlot]>),
-}
-
-impl ModuleMandatoryDependencies {
-    /// Slots of the modules this module loaded together with.
-    pub fn slots(&self) -> &[LoadedModuleSlot] {
-        match self {
-            Self::Lazy(cell) => cell.get().map(|s| s.as_ref()).unwrap_or(&[]),
-            Self::Package(slots) => slots,
-        }
-    }
-
-    /// Returns the cell for lazy mandatory dependencies.
-    pub fn as_lazy(&self) -> Option<&OnceLock<Arc<[LoadedModuleSlot]>>> {
-        match self {
-            Self::Lazy(cell) => Some(cell),
-            Self::Package(_) => None,
-        }
-    }
-
-    /// Returns empty mandatory dependencies for lazy module loads. This does
-    /// not include self.
-    pub fn lazy_unset() -> Self {
-        Self::Lazy(OnceLock::new())
-    }
-
-    /// Returns mandatory dependencies for the package. Always includes self.
-    pub fn package(package_slots: Vec<LoadedModuleSlot>) -> Self {
-        Self::Package(Arc::from(package_slots))
-    }
-}
-
-/// Lowered code for a single function instance, paired with the dependency
-/// slots the lowering required.
+/// Lowered code for a single function instance, paired with the modules the
+/// lowering required.
 pub struct FunctionSlot {
     pub function: FunctionPtr,
-    pub mandatory_dependencies: Arc<[LoadedModuleSlot]>,
+    pub mandatory_dependencies: Arc<[InternedModuleId]>,
 }
 
 impl FunctionSlot {
     /// Returns a new slot owning the monomorphic function with its mandatory
     /// dependencies.
-    pub fn new(function: Function, mandatory_dependencies: Arc<[LoadedModuleSlot]>) -> Self {
+    pub fn new(function: Function, mandatory_dependencies: Arc<[InternedModuleId]>) -> Self {
         Self {
             function: FunctionPtr::new(Box::new(function)),
             mandatory_dependencies,
@@ -158,9 +57,18 @@ pub struct LoadedModule {
     ir: ModuleIR,
     /// Deterministic load cost recorded at insertion time.
     cost: u64,
-    /// Mandatory-dependency descriptor produced by the loader's policy. These
-    /// are all modules that have to be loaded together with this module.
-    mandatory_dependencies: ModuleMandatoryDependencies,
+    /// Modules that must be loaded together with this one. Empty until the
+    /// loading policy computes the set; a package load fills it at
+    /// construction.
+    ///
+    /// # Invariants
+    ///   1. Under LL the cell is always empty.
+    ///   2. For shallow layout loads, the cell is created empty.
+    ///   3. Under EL the loader fills it for module M once MS(M) has been
+    ///      computed. Shallow side-loads stay with an unset cell until they
+    ///      require lowering.
+    ///   4. Filled entries always include self.
+    mandatory_dependencies: OnceLock<Arc<[InternedModuleId]>>,
     /// Lowered code for the module's non-generic functions, one slot per
     /// function name. Filled on first call.
     ///
@@ -202,9 +110,13 @@ impl LoadedModule {
     pub fn new(
         ir: ModuleIR,
         cost: u64,
-        mandatory_dependencies: ModuleMandatoryDependencies,
+        mandatory_dependencies: Option<Arc<[InternedModuleId]>>,
         interner: &impl Interner,
     ) -> Result<Box<Self>> {
+        let mandatory_dependencies = match mandatory_dependencies {
+            Some(deps) => OnceLock::from(deps),
+            None => OnceLock::new(),
+        };
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
         let mut randomness_annotated = UnorderedSet::new();
@@ -361,9 +273,26 @@ impl LoadedModule {
         &self.ir
     }
 
-    /// Returns the mandatory-dependency descriptor.
-    pub fn mandatory_dependencies(&self) -> &ModuleMandatoryDependencies {
-        &self.mandatory_dependencies
+    /// Returns the modules that must be loaded together with this one, or an
+    /// empty slice if the set has not been computed yet.
+    pub fn mandatory_dependencies(&self) -> &[InternedModuleId] {
+        self.mandatory_dependencies
+            .get()
+            .map(|deps| deps.as_ref())
+            .unwrap_or(&[])
+    }
+
+    /// Returns the mandatory dependencies only if the set has been computed,
+    /// distinguishing that from a set that is known to be empty.
+    pub fn mandatory_dependencies_if_known(&self) -> Option<&Arc<[InternedModuleId]>> {
+        self.mandatory_dependencies.get()
+    }
+
+    /// Installs the mandatory dependencies, returning the installed set. A
+    /// concurrent computation may win the race, in which case its set is
+    /// returned and `deps` is dropped.
+    pub fn set_mandatory_dependencies(&self, deps: Arc<[InternedModuleId]>) -> &[InternedModuleId] {
+        self.mandatory_dependencies.get_or_init(|| deps)
     }
 
     /// Returns interned module ID of this module.
@@ -408,7 +337,7 @@ impl LoadedModule {
         &self,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
+    ) -> Option<(FunctionPtr, Arc<[InternedModuleId]>)> {
         self.instantiated_functions
             .lock()
             .get(&(name, ty_args))
@@ -424,7 +353,7 @@ impl LoadedModule {
         name: InternedIdentifier,
         ty_args: InternedTypeList,
         function: Function,
-        function_ms: Arc<[LoadedModuleSlot]>,
+        function_ms: Arc<[InternedModuleId]>,
     ) -> FunctionPtr {
         match self.instantiated_functions.lock().entry((name, ty_args)) {
             Entry::Occupied(e) => e.get().function,
