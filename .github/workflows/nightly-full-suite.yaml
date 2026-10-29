@@ -24,8 +24,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Selects hosted (Azure) vs AWS. Defaults to hosted; set repo variable
-  # RUST_CI_PROVIDER=aws or dispatch with rust_ci_provider=aws to fall back.
   rust-ci-provider:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
@@ -52,7 +50,6 @@ jobs:
     timeout-minutes: 720
     strategy:
       fail-fast: false
-      max-parallel: 6
       matrix:
         include:
           # The workspace suite is sharded into the same four static package groups
@@ -76,7 +73,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      # Hosted image provides the toolchain; verify it instead of reinstalling.
       - uses: ./.github/actions/rust-prebuilt-setup
         if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
         with:

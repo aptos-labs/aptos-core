@@ -34,8 +34,6 @@ permissions:
 
 
 jobs:
-  # Selects hosted (Azure) vs AWS. Defaults to hosted; set repo variable
-  # RUST_CI_PROVIDER=aws or dispatch with rust_ci_provider=aws to fall back.
   rust-ci-provider:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
@@ -187,14 +185,12 @@ jobs:
       - uses: actions/checkout@v4
         if: needs.gated_file_change_determinator.outputs.only_docs_changed != 'true'
 
-      # Hosted image provides the Rust toolchain; verify it instead of reinstalling.
       - uses: ./.github/actions/rust-prebuilt-setup
         if: ${{ needs.gated_file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
         with:
           cache-key: hosted-gated-batch-encryption
-      # Image drift insurance: the image recipe installs Node (dev_setup -J), but the
-      # manifest does not cover it; setup-node keeps this required check independent
-      # of image rebuilds. AWS installs via dev_setup -J.
+      # dev_setup -J installs Node in the image, but the manifest does not cover it;
+      # this required check stays independent of image rebuilds.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # pin@v4
         if: ${{ needs.gated_file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
       - name: Run dev_setup.sh

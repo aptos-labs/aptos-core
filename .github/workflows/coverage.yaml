@@ -29,8 +29,6 @@ permissions:
 
 
 jobs:
-  # Selects hosted (Azure) vs AWS. Defaults to hosted; set repo variable
-  # RUST_CI_PROVIDER=aws or dispatch with rust_ci_provider=aws to fall back.
   rust-ci-provider:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
@@ -62,7 +60,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      # Hosted image provides the Rust toolchain; verify it instead of reinstalling.
       - uses: ./.github/actions/rust-prebuilt-setup
         if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
         with:
