@@ -2,8 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
-    positions::PositionOverlay, sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
-    state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
+    orders::OrderOverlay, positions::PositionOverlay, sharded_jmt_state::PositionStateWithSummary,
+    state::LedgerState, state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
 };
 use aptos_config::config::HotStateConfig;
 use aptos_types::{
@@ -21,6 +21,8 @@ pub struct LedgerSummary {
     pub position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
     /// Pre-committed position overlay; `None` when position is disabled.
     pub positions: Option<PositionOverlay>,
+    /// Pre-committed order overlay; `None` when trading-native storage is off.
+    pub orders: Option<OrderOverlay>,
 }
 
 impl LedgerSummary {
@@ -37,6 +39,7 @@ impl LedgerSummary {
             transaction_accumulator,
             position_state_summary: None,
             positions: None,
+            orders: None,
         }
     }
 

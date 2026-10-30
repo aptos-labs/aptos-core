@@ -16,9 +16,9 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     state_store::{
-        positions::PositionOverlay, sharded_jmt_state::PositionStateWithSummary,
-        state::LedgerState, state_summary::LedgerStateSummary,
-        state_with_summary::LedgerWithSummary,
+        orders::OrderOverlay, positions::PositionOverlay,
+        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
     DbReader, LedgerSummary,
 };
@@ -68,6 +68,10 @@ pub struct ChunkCommitQueue {
     /// target to fold into the position base — `latest_positions` runs
     /// ahead of it by whatever is still in the pipeline.
     committed_positions: Option<PositionOverlay>,
+    /// The order overlays, tracked as `latest_positions` and
+    /// `committed_positions` are. `None` when trading-native storage is off.
+    latest_orders: Option<OrderOverlay>,
+    committed_orders: Option<OrderOverlay>,
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
@@ -84,6 +88,7 @@ impl ChunkCommitQueue {
             transaction_accumulator,
             position_state_summary,
             positions,
+            orders,
         } = db.get_pre_committed_ledger_summary()?;
         // Read under separate locks from state. The overlay may lag state (a
         // replayed gap with no position writes doesn't extend it) but never
@@ -96,6 +101,14 @@ impl ChunkCommitQueue {
                 state.next_version(),
             );
         }
+        if let Some(orders) = orders.as_ref() {
+            ensure!(
+                orders.next_version() <= state.next_version(),
+                "Order overlay at next version {} is ahead of state at {}.",
+                orders.next_version(),
+                state.next_version(),
+            );
+        }
         CHUNK_PARTIAL_BLOCK_TXNS.set(0);
 
         Ok(Self {
@@ -104,6 +117,8 @@ impl ChunkCommitQueue {
             latest_position_state_summary: position_state_summary,
             latest_positions: positions.clone(),
             committed_positions: positions,
+            latest_orders: orders.clone(),
+            committed_orders: orders,
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
@@ -140,6 +155,7 @@ impl ChunkCommitQueue {
         // chunk a stale parent, so it would extend this chunk's parent
         // instead of this chunk and silently drop these writes.
         self.latest_positions = chunk_to_update_ledger.output.result_positions().cloned();
+        self.latest_orders = chunk_to_update_ledger.output.result_orders().cloned();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
         CHUNK_PARTIAL_BLOCK_TXNS
@@ -207,6 +223,10 @@ impl ChunkCommitQueue {
         self.latest_positions.clone()
     }
 
+    pub(crate) fn latest_orders(&self) -> Option<OrderOverlay> {
+        self.latest_orders.clone()
+    }
+
     pub(crate) fn next_chunk_to_commit(&mut self) -> Result<ExecutedChunk> {
         let chunk_opt = self
             .to_commit
@@ -221,6 +241,7 @@ impl ChunkCommitQueue {
     pub(crate) fn dequeue_committed(
         &mut self,
         committed_positions: Option<PositionOverlay>,
+        committed_orders: Option<OrderOverlay>,
     ) -> Result<()> {
         ensure!(!self.to_commit.is_empty(), "to_commit is empty.");
         ensure!(
@@ -231,12 +252,17 @@ impl ChunkCommitQueue {
         // `None` throughout when native position is off, `Some` throughout
         // when it is on, so this needs no guard.
         self.committed_positions = committed_positions;
+        self.committed_orders = committed_orders;
         Ok(())
     }
 
     /// The fold target: the last chunk whose write set is durable.
     pub(crate) fn committed_positions(&self) -> Option<PositionOverlay> {
         self.committed_positions.clone()
+    }
+
+    pub(crate) fn committed_orders(&self) -> Option<OrderOverlay> {
+        self.committed_orders.clone()
     }
 
     pub(crate) fn is_empty(&self) -> bool {

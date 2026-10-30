@@ -11,7 +11,8 @@ use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
-    positions::PositionParent, state::LedgerState, state_view::cached_state_view::CachedStateView,
+    orders::OrderParent, positions::PositionParent, state::LedgerState,
+    state_view::cached_state_view::CachedStateView,
 };
 use aptos_types::{
     block_executor::transaction_slice_metadata::TransactionSliceMetadata,
@@ -106,6 +107,7 @@ impl TransactionChunk {
         self,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         let Self {
@@ -123,6 +125,7 @@ impl TransactionChunk {
                 persisted_aux_info,
                 parent_state,
                 parent_positions,
+                parent_orders,
                 state_view,
             ),
             None => Self::execute::<V>(
@@ -130,6 +133,7 @@ impl TransactionChunk {
                 persisted_aux_info,
                 parent_state,
                 parent_positions,
+                parent_orders,
                 state_view,
             ),
         }
@@ -140,6 +144,7 @@ impl TransactionChunk {
         persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         assert_eq!(
@@ -174,6 +179,7 @@ impl TransactionChunk {
                 .collect(),
             parent_state,
             parent_positions,
+            parent_orders,
             state_view,
             onchain_config,
             TransactionSliceMetadata::unknown(),
@@ -186,6 +192,7 @@ impl TransactionChunk {
         persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
+        parent_orders: Option<OrderParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         let onchain_config = chunk_onchain_config(&state_view)?;
@@ -198,6 +205,7 @@ impl TransactionChunk {
                 .collect(),
             parent_state,
             parent_positions,
+            parent_orders,
             state_view,
             onchain_config,
         )

@@ -11,7 +11,10 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    state_store::{positions::PositionParent, state_view::cached_state_view::CachedStateView},
+    state_store::{
+        orders::OrderParent, positions::PositionParent,
+        state_view::cached_state_view::CachedStateView,
+    },
     DbReaderWriter, DbWriter, LedgerSummary,
 };
 use aptos_types::{
@@ -167,6 +170,12 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         .as_ref()
         .zip(position_floor.as_ref())
         .map(|(overlay, floor)| PositionParent { overlay, floor });
+    let order_floor = db.writer.advance_order_base(None)?;
+    let parent_orders = ledger_summary
+        .orders
+        .as_ref()
+        .zip(order_floor.as_ref())
+        .map(|(overlay, floor)| OrderParent { overlay, floor });
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         &V::new(),
         vec![genesis_txn.clone().into()].into(),
@@ -175,6 +184,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         vec![AuxiliaryInfo::new_empty()],
         &ledger_summary.state,
         parent_positions,
+        parent_orders,
         base_state_view,
         onchain_config,
         TransactionSliceMetadata::unknown(),
