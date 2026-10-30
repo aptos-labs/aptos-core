@@ -1530,6 +1530,53 @@ impl StateStore {
         .take(chunk_size))
     }
 
+    /// Returns the usage of the state at `version`, given `cold_usage` of the cold state at the
+    /// same version. A hot entry supersedes the cold value of the same key, which may be stale.
+    pub(crate) fn overlay_hot_state_usage(
+        self: &Arc<Self>,
+        version: Version,
+        cold_usage: StateStorageUsage,
+    ) -> Result<StateStorageUsage> {
+        const CHUNK_SIZE: usize = 10_000;
+
+        let num_hot_items = self.get_hot_state_item_count(version)?;
+        let (items_delta, bytes_delta) = (0..num_hot_items.div_ceil(CHUNK_SIZE))
+            .into_par_iter()
+            .map(|i| {
+                Self::hot_state_usage_delta(
+                    self.get_hot_state_value_chunk_iter(version, i * CHUNK_SIZE, CHUNK_SIZE)?,
+                    |key| self.get_state_value_by_version(key, version),
+                )
+            })
+            .try_reduce(|| (0, 0), |(i1, b1), (i2, b2)| Ok((i1 + i2, b1 + b2)))?;
+        Ok(StateStorageUsage::new(
+            (cold_usage.items() as i64 + items_delta) as usize,
+            (cold_usage.bytes() as i64 + bytes_delta) as usize,
+        ))
+    }
+
+    /// Returns the (items, bytes) change in usage from overlaying `hot_entries` on the cold state
+    /// read by `get_cold_value`.
+    fn hot_state_usage_delta(
+        hot_entries: impl Iterator<Item = Result<(StateKey, HotStateValue)>>,
+        get_cold_value: impl Fn(&StateKey) -> Result<Option<StateValue>>,
+    ) -> Result<(i64, i64)> {
+        let mut items_delta = 0;
+        let mut bytes_delta = 0;
+        for entry in hot_entries {
+            let (key, hot_value) = entry?;
+            if let Some(value) = get_cold_value(&key)? {
+                items_delta -= 1;
+                bytes_delta -= (key.size() + value.size()) as i64;
+            }
+            if let Some(value) = hot_value.value_opt() {
+                items_delta += 1;
+                bytes_delta += (key.size() + value.size()) as i64;
+            }
+        }
+        Ok((items_delta, bytes_delta))
+    }
+
     /// Assembles a [`HotStateValueChunkWithProof`] for the given hot state leaves, with a range
     /// proof against the hot state Merkle root at `version`.
     pub fn get_hot_state_value_chunk_proof(

@@ -19,6 +19,7 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
+        version_data::VersionDataSchema,
     },
     state_store::StateStore,
 };
@@ -38,7 +39,10 @@ use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_config::new_block_event_key,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
+    state_store::{
+        hot_state::HotStateValue, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+    },
     transaction::{
         Transaction, TransactionInfo, TransactionOutput, TransactionOutputListWithProofV2, Version,
     },
@@ -297,6 +301,22 @@ impl DbWriter for AptosDB {
                 ledger_infos,
                 Some(&mut ledger_db_batch.ledger_metadata_db_batches),
             )?;
+
+            // The state snapshot restore only counted cold state. Start from its progress rather
+            // than `VersionData`, which a previous attempt may have overlaid already.
+            let cold_usage = self
+                .state_kv_db
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotKvRestoreProgress(version))?
+                .map_or(StateStorageUsage::zero(), |v| {
+                    v.expect_state_snapshot_progress().usage
+                });
+            let usage = self
+                .state_store
+                .overlay_hot_state_usage(version, cold_usage)?;
+            ledger_db_batch
+                .ledger_metadata_db_batches
+                .put::<VersionDataSchema>(&version, &usage.into())?;
 
             ledger_db_batch
                 .ledger_metadata_db_batches
