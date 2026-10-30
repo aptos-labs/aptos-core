@@ -8,6 +8,8 @@ use aptos_aggregator::{bounded_math::SignedU128, types::DelayedFieldsSpeculative
 #[cfg(feature = "testing")]
 use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
+use aptos_collateral_natives::NativeCollateralContext;
+#[cfg(feature = "testing")]
 use aptos_framework_natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework_natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
@@ -223,6 +225,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
     exts.add(NativeObjectContext::default());
+    exts.add(NativeCollateralContext::new());
     exts.add(NativeOrderContext::new());
     exts.add(NativePositionContext::new());
 

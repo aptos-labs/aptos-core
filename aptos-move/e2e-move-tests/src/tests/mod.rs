@@ -61,6 +61,7 @@ mod missing_gas_parameter;
 mod module_event;
 mod mono_move;
 mod move_executor_coverage;
+mod native_collateral;
 mod new_integer_types;
 mod nft_dao;
 mod object_code_deployment;

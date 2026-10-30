@@ -58,5 +58,13 @@ pub fn aptos_natives_with_builder(
                     ("native_order_book".to_string(), func_name, func)
                 }),
         ))
+        .chain(make_table_from_iter(
+            EXPERIMENTAL_CODE_ADDRESS,
+            aptos_collateral_natives::all_natives(builder)
+                .into_iter()
+                .map(|(func_name, func)| {
+                    ("native_collateral".to_string(), func_name, func)
+                }),
+        ))
         .collect()
 }

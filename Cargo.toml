@@ -46,6 +46,7 @@ members = [
     "aptos-move/flow",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
+    "aptos-move/framework/collateral-natives",
     "aptos-move/framework/natives",
     "aptos-move/framework/order-natives",
     "aptos-move/framework/position-natives",
@@ -902,6 +903,7 @@ z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-collateral-natives = { path = "aptos-move/framework/collateral-natives" }
 aptos-order-natives = { path = "aptos-move/framework/order-natives" }
 aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
