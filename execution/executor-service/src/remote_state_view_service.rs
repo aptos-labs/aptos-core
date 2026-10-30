@@ -86,7 +86,20 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let req: RemoteKVRequest = bcs::from_bytes(&message.data).unwrap();
         drop(bcs_deser_timer);
 
-        let (shard_id, state_keys) = req.into();
+        let (shard_id, state_keys, epoch) = req.into();
+
+        // Take a single snapshot of the state view for the whole request. A straggler
+        // request can arrive after the block it belongs to has finished and the state view
+        // has been dropped; the shard discards responses from other epochs, so drop the
+        // request instead of panicking.
+        let Some(state_view) = state_view.read().unwrap().clone() else {
+            trace!(
+                "Dropping KV request for shard {} with {} keys, no state view set",
+                shard_id,
+                state_keys.len()
+            );
+            return;
+        };
         trace!(
             "remote state view service - received request for shard {} with {} keys",
             shard_id,
@@ -95,18 +108,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let resp = state_keys
             .into_iter()
             .map(|state_key| {
-                let state_value = state_view
-                    .read()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .get_state_value(&state_key)
-                    .unwrap();
+                let state_value = state_view.get_state_value(&state_key).unwrap();
                 (state_key, state_value)
             })
             .collect_vec();
         let len = resp.len();
-        let resp = RemoteKVResponse::new(resp);
+        let resp = RemoteKVResponse::new(resp, epoch);
         let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_resp_ser"])
             .start_timer();
@@ -119,5 +126,43 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         );
         let message = Message::new(resp);
         kv_tx[shard_id].send(message).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RemoteKVRequest;
+    use aptos_transaction_simulation::InMemoryStateStore;
+    use aptos_types::state_store::state_key::StateKey;
+
+    #[test]
+    fn test_handle_message_without_state_view_is_noop() {
+        // A straggler KV request can arrive after the block has finished and the state
+        // view has been dropped; the request must be dropped instead of panicking.
+        let request = RemoteKVRequest::new(0, 1, vec![StateKey::raw(b"key1")]);
+        let message = Message::new(bcs::to_bytes(&request).unwrap());
+        let state_view: Arc<RwLock<Option<Arc<InMemoryStateStore>>>> = Arc::new(RwLock::new(None));
+        let (tx, rx) = crossbeam_channel::unbounded::<Message>();
+        let kv_tx = Arc::new(vec![tx]);
+        RemoteStateViewService::<InMemoryStateStore>::handle_message(message, state_view, kv_tx);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_handle_message_response_echoes_request_epoch() {
+        let state_store = Arc::new(InMemoryStateStore::from_head_genesis());
+        let state_view: Arc<RwLock<Option<Arc<InMemoryStateStore>>>> =
+            Arc::new(RwLock::new(Some(state_store)));
+        let request = RemoteKVRequest::new(0, 7, vec![StateKey::raw(b"key1")]);
+        let message = Message::new(bcs::to_bytes(&request).unwrap());
+        let (tx, rx) = crossbeam_channel::unbounded::<Message>();
+        let kv_tx = Arc::new(vec![tx]);
+        RemoteStateViewService::<InMemoryStateStore>::handle_message(message, state_view, kv_tx);
+        let response: RemoteKVResponse = bcs::from_bytes(&rx.try_recv().unwrap().data).unwrap();
+        assert_eq!(response.epoch, 7);
+        assert_eq!(response.inner.len(), 1);
+        assert_eq!(response.inner[0].0, StateKey::raw(b"key1"));
+        assert!(response.inner[0].1.is_none());
     }
 }

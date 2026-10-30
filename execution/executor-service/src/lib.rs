@@ -68,25 +68,31 @@ impl ExecuteBlockCommand {
 pub struct RemoteKVRequest {
     pub(crate) shard_id: ShardId,
     pub(crate) keys: Vec<StateKey>,
+    pub(crate) epoch: u64,
 }
 
 impl RemoteKVRequest {
-    pub fn new(shard_id: ShardId, keys: Vec<StateKey>) -> Self {
-        Self { shard_id, keys }
+    pub fn new(shard_id: ShardId, epoch: u64, keys: Vec<StateKey>) -> Self {
+        Self {
+            shard_id,
+            keys,
+            epoch,
+        }
     }
 
-    pub fn into(self) -> (ShardId, Vec<StateKey>) {
-        (self.shard_id, self.keys)
+    pub fn into(self) -> (ShardId, Vec<StateKey>, u64) {
+        (self.shard_id, self.keys, self.epoch)
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteKVResponse {
     pub(crate) inner: Vec<(StateKey, Option<StateValue>)>,
+    pub(crate) epoch: u64,
 }
 
 impl RemoteKVResponse {
-    pub fn new(inner: Vec<(StateKey, Option<StateValue>)>) -> Self {
-        Self { inner }
+    pub fn new(inner: Vec<(StateKey, Option<StateValue>)>, epoch: u64) -> Self {
+        Self { inner, epoch }
     }
 }
