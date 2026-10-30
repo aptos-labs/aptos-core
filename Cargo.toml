@@ -520,7 +520,7 @@ aes-gcm = "0.10.3"
 again = "0.1.2"
 ahash = { version = "0.8.11", features = ["serde"] }
 ambassador = "0.5.1"
-annotate-snippets = "0.11.5"
+annotate-snippets = "0.12.17"
 anstyle = "1.0.1"
 anyhow = "1.0.98"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1", features = [
@@ -610,7 +610,7 @@ debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivation-path = "0.2.0"
 derivative = "2.2.0"
 derive_builder = "0.20.0"
-derive_more = { version = "1.0.0", features = ["add", "deref", "deref_mut"] }
+derive_more = { version = "2.1.1", features = ["add", "deref", "deref_mut"] }
 determinator = "0.12.0"
 diesel = { version = "~2.3", features = ["uuid"] }
 diesel-async = { version = "0.7.4", features = [
@@ -682,7 +682,7 @@ imbl = "7.0.2"
 indexmap = "2.7.0"
 indicatif = "0.18.6"
 indoc = "2.0.8"
-inferno = "0.11.14"
+inferno = "0.12.8"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
@@ -712,9 +712,9 @@ merlin = "3"
 mime = "0.3.16"
 mini-moka = { version = "0.10.3", features = ["sync"] }
 mirai-annotations = "1.12.0"
-mockall = "0.12.1"
+mockall = "0.15.0"
 more-asserts = "0.3.0"
-nalgebra = "0.32"
+nalgebra = "0.35.0"
 named-lock = "0.4.1"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
@@ -723,7 +723,7 @@ notify = "8.2.0"
 ntest = "0.10.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
-num-derive = "0.4.2"
+num-derive = "0.5.1"
 num-integer = "0.1.42"
 num-traits = "0.2.19"
 num_cpus = "1.13.1"
@@ -765,14 +765,14 @@ project-root = "0.2.2"
 prometheus = { version = "0.14.0", default-features = false }
 prometheus-http-query = "0.5.2"
 proptest = "1.4.0"
-proptest-derive = "0.5.1"
+proptest-derive = "0.9.0"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
 prost-types = "0.13.3"
 quick-junit = "0.8.0"
-quick_cache = "0.5.1"
+quick_cache = "0.7.0"
 quote = "1.0.18"
 rand = "0.7.3"
-random_word = "0.3.0"
+random_word = { version = "0.5.3", features = ["en"] }
 rapidhash = "1.4.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = [
@@ -825,15 +825,15 @@ sha3 = "0.9.1"
 shadow-rs = { version = "0.36.1", default-features = false, features = ["tzdb"] }
 shell-words = "1.0.0"
 signature = "2.1.0"
-siphasher = "0.3.10"
+siphasher = "1.0.4"
 slh-dsa = "=0.2.0-rc.4"
 smallbitvec = "2.5.1"
 smallvec = "1.8.0"
 specializer = { path = "third_party/move/mono-move/specializer" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
-strum = "0.27.1"
-strum_macros = "0.27.1"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = { version = "0.39.6", features = ["multithread"] }
