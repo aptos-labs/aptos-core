@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:35:5: error: the precondition of `op` at call 1 is not established
 tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:35:5: error: verex verification failed: the automatic verification of `wildcard_target` failed; provide a proof in `tests/sources/functional/closures/lambda_unknown_closure_declared_frame.proof.lean`:
-  verify wildcard_target by
+  verify wildcard_target by lean =>
     verex_obligations
     verex_on
     | requires_of_op_at_call_1 => verex_prepare; sorry

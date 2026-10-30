@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/InvocationStateLabels.lean:66:4: error: the specification clause `ensures ..S |~ ensures_of<function[Fn(Address, u64) -> u64](put)>(addr, 1, 1)` is not established
 VerexE2ETests/Check/Specifications/InvocationStateLabels.lean:63:7: error: verex verification failed: the automatic verification of `chained` failed; provide a proof in the module:
-  verify chained by
+  verify chained by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

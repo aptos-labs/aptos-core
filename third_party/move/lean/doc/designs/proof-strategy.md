@@ -13,7 +13,7 @@ outside this design.
 
 The map use cases illustrate the distinction: after writing a value at a
 present key, the key sequence and map size are unchanged, and the loop
-invariant applies to earlier positions. Direct map laws state that argument;
+invariant applies to earlier positions. Direct map lemmas state that argument;
 repeated normalization and general arithmetic or congruence search cost much
 more than checking it ([`performance.md`](performance.md)).
 
@@ -26,7 +26,7 @@ more than checking it ([`performance.md`](performance.md)).
    whole goal; it does not run speculative automatic solving first. Its
    script may request cheap deciders or `verex_solve` where useful.
 3. **Goals are writable.** Source-named parameters and hypotheses, generated
-   specification-law names, and typed `SpecMap K V` laws. A preparation
+   specification-lemma names, and typed `SpecMap K V` lemmas. A preparation
    tactic exposes the mathematics the proof needs without translating
    unrelated facts.
 4. **Program joins are preserved and work is shared before splitting.** A
@@ -47,7 +47,8 @@ more than checking it ([`performance.md`](performance.md)).
 - **Writable goals.** `verex_prepare` names parameters, old values, callee
   results and hypotheses from their source declarations; loop and callee
   clauses keep their provenance for `verex_on` routing; maps are named with
-  `verex_name_maps`; generated laws use the module's specification names.
+  `verex_name_maps`; the built-in map lemmas are named from the module's
+  specification functions.
   The failure message prints a companion proof template with one alternative
   per undecided clause ([`source-verification.md`](source-verification.md),
   "Proofs").

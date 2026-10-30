@@ -55,7 +55,7 @@ error: the specification clause `ensures ∃ (S : StateDomain),
       ((..S |~ increases(old(c), c))) && (S.. |~ increases(old(c), c))` is not established
 ---
 error: verex verification failed: the automatic verification of `once` failed; provide a proof in the module:
-  verify once by
+  verify once by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

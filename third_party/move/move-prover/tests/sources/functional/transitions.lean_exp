@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/transitions.move:47:9: error: the specification clause `ensures wrong_incr_R(a)` is not established
 tests/sources/functional/transitions.move:46:5: error: verex verification failed: the automatic verification of `do_incr_wrong` failed; provide a proof in `tests/sources/functional/transitions.proof.lean`:
-  verify do_incr_wrong by
+  verify do_incr_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

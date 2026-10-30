@@ -136,7 +136,7 @@ import VerexMove.Proofs
 verex proofs for "proofs.move"
 verex proofs where
 
-verify square_of_sum by
+verify square_of_sum by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case ensures_1 => …

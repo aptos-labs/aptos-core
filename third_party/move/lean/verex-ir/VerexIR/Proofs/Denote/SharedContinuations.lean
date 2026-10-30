@@ -28,7 +28,8 @@ private partial def normalExits (action : Lean.Expr) (flow : Bool) : MetaM Nat :
   if action.isLambda then return ← normalExits action.getLambdaBody flow
   if let .letE _ _ value body _ := action then
     return ← normalExits (body.instantiate1 value) flow
-  if action.isAppOf ``Spec.abort || action.isAppOf ``Spec.stuck then return 0
+  if action.isAppOf ``Spec.abort || action.isAppOf ``abortAt || action.isAppOf ``Spec.stuck then
+    return 0
   if action.isAppOfArity ``Spec.pure 4 then
     let value := (action.getArg! 3).consumeMData.headBeta
     return if flow && (value.isAppOf ``Flow.return_ || value.isAppOf ``Flow.break_ ||
@@ -48,6 +49,8 @@ private partial def normalExits (action : Lean.Expr) (flow : Bool) : MetaM Nat :
       exits := min 2 (exits + (← normalExits alternative flow))
       if exits == 2 then break
     return exits
+  if (action.isAppOf ``branchAt || action.isAppOf ``armAt) && action.getAppNumArgs ≥ 1 then
+    return ← normalExits action.appArg! flow
   if action.isAppOf ``loopAt then return 2
   return 1
 

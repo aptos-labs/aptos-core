@@ -31,12 +31,12 @@ verex module 0x1::example where
   public(friend) fun «other»() -> Unit := ()
   spec «other» where
     pragma verify = true
-  verify «other» by
+  verify «other» by lean =>
     first
       | omega
       | grind
 
-  verify selected by
+  verify selected by lean =>
     trivial
 verex module 0x1::later where
   fun ignored() -> Unit := ()

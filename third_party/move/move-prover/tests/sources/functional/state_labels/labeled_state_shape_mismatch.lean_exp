@@ -3,7 +3,7 @@ tests/sources/functional/state_labels/labeled_state_shape_mismatch.move:25:9: er
         ((..S |~ single_progressed(old(a), a)))
           && (S.. |~ pair_progressed(old(a), a, old(b), b))` is not established
 tests/sources/functional/state_labels/labeled_state_shape_mismatch.move:24:5: error: verex verification failed: the automatic verification of `step_both` failed; provide a proof in `tests/sources/functional/state_labels/labeled_state_shape_mismatch.proof.lean`:
-  verify step_both by
+  verify step_both by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

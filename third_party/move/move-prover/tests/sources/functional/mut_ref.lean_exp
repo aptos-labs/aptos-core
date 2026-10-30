@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/mut_ref.move:8:14: error: the data invariant `invariant value > 0` does not hold where a mutation ends
 tests/sources/functional/mut_ref.move:125:5: error: verex verification failed: the automatic verification of `call_return_ref_different_path_vec2_incorrect` failed; provide a proof in `tests/sources/functional/mut_ref.proof.lean`:
-  verify call_return_ref_different_path_vec2_incorrect by
+  verify call_return_ref_different_path_vec2_incorrect by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry

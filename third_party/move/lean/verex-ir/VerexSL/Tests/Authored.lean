@@ -78,6 +78,6 @@ verex module 0x42::authored where
     ensures result <= limit
 
 verify 0x42::authored::source
-verify 0x42::authored::count by
+verify 0x42::authored::count by lean =>
   verex_proof preparing
     verex_prepare values

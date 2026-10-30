@@ -2,7 +2,7 @@ Move prover returns: exiting with verification errors
 tests/sources/regression/fun_arg_frame_check.move:31:9: error: the precondition `requires exists<R>(a)` of `apply_pure` does not hold at call 1
 tests/sources/regression/fun_arg_frame_check.move:52:5: error: the precondition of `apply_pure` at call 1 is not established
 tests/sources/regression/fun_arg_frame_check.move:52:5: error: verex verification failed: the automatic verification of `named_fun` failed; provide a proof in `tests/sources/regression/fun_arg_frame_check.proof.lean`:
-  verify named_fun by
+  verify named_fun by lean =>
     verex_obligations
     verex_on
     | requires_1_of_apply_pure_at_call_1 => verex_prepare; sorry
@@ -12,7 +12,7 @@ tests/sources/regression/fun_arg_frame_check.move:52:5: error: verex verificatio
 tests/sources/regression/fun_arg_frame_check.move:31:9: error: the precondition `requires exists<R>(a)` of `apply_pure` does not hold at call 1
 tests/sources/regression/fun_arg_frame_check.move:57:5: error: the precondition of `apply_pure` at call 1 is not established
 tests/sources/regression/fun_arg_frame_check.move:57:5: error: verex verification failed: the automatic verification of `lambda_call` failed; provide a proof in `tests/sources/regression/fun_arg_frame_check.proof.lean`:
-  verify lambda_call by
+  verify lambda_call by lean =>
     verex_obligations
     verex_on
     | requires_1_of_apply_pure_at_call_1 => verex_prepare; sorry
@@ -22,7 +22,7 @@ tests/sources/regression/fun_arg_frame_check.move:57:5: error: verex verificatio
 tests/sources/regression/fun_arg_frame_check.move:31:9: error: the precondition `requires exists<R>(a)` of `apply_pure` does not hold at call 1
 tests/sources/regression/fun_arg_frame_check.move:62:5: error: the precondition of `apply_pure` at call 1 is not established
 tests/sources/regression/fun_arg_frame_check.move:62:5: error: verex verification failed: the automatic verification of `lambda_write` failed; provide a proof in `tests/sources/regression/fun_arg_frame_check.proof.lean`:
-  verify lambda_write by
+  verify lambda_write by lean =>
     verex_obligations
     verex_on
     | requires_1_of_apply_pure_at_call_1 => verex_prepare; sorry
@@ -32,7 +32,7 @@ tests/sources/regression/fun_arg_frame_check.move:62:5: error: verex verificatio
 tests/sources/regression/fun_arg_frame_check.move:31:9: error: the precondition `requires exists<R>(a)` of `apply_pure` does not hold at call 1
 tests/sources/regression/fun_arg_frame_check.move:67:5: error: the precondition of `apply_pure` at call 1 is not established
 tests/sources/regression/fun_arg_frame_check.move:67:5: error: verex verification failed: the automatic verification of `helper_with_spec` failed; provide a proof in `tests/sources/regression/fun_arg_frame_check.proof.lean`:
-  verify helper_with_spec by
+  verify helper_with_spec by lean =>
     verex_obligations
     verex_on
     | requires_1_of_apply_pure_at_call_1 => verex_prepare; sorry

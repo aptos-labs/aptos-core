@@ -9,7 +9,7 @@ import VerexIR.Proofs.Denote.Term
 Swapping and removing elements cannot exceed an already certified vector's
 length. Rewrite their denotations to one bounds check and a certified result,
 without re-checking representability or splitting redundant optional reads.
-The map laws preserve generic caller/callee transport of these results.
+The map lemmas preserve generic caller/callee transport of these results.
 -/
 
 namespace VerexIR.Proofs
@@ -38,16 +38,16 @@ def swapBounded {α : Type} (v : SpecVector α) (i j : Nat) : SpecVector α :=
   ⟨v.values.swapIfInBounds i j, by simpa only [Array.size_swapIfInBounds] using v.bounded⟩
 
 @[vir_denote ↓ high] theorem denote_swap_direct {ρ : ResultShape} {Γ : NRow} {τ : NTy}
-    {width : Nat} {signed : Bool}
+    {width : Nat} {signed : Bool} (site : Nat)
     (vector : Term unit ρ Γ (.vector τ)) (left right : Term unit ρ Γ (.int width signed))
     (executable : Validation.ExecutableUnit unit) (meanings : Meanings executable) (env : HEnv Γ) :
-    (Term.swap vector left right).denote meanings env =
+    (Term.swap site vector left right).denote meanings env =
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (left.denote meanings env) fun i env =>
           Flow.bind (right.denote meanings env) fun j env =>
             if i.val < 0 ∨ j.val < 0 ∨ values.values.size ≤ i.val.toNat ∨
                 values.values.size ≤ j.val.toNat then
-              Spec.abort (Failure.ofInts .abort #[i.val, j.val])
+              abortAt site (Failure.ofInts .abort #[i.val, j.val])
             else Spec.pure (.value (swapBounded values i.val.toNat j.val.toNat) env) := by
   rw [Term.denote]
   congr 1
@@ -81,16 +81,16 @@ def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
 -- Keep the result carrier explicit: inferred partially expanded HLists
 -- obstruct later normalization across generic caller/callee frames.
 @[vir_denote ↓ high] theorem denote_remove_direct {ρ : ResultShape} {Γ : NRow} {τ : NTy}
-    {width : Nat} {signed : Bool}
+    {width : Nat} {signed : Bool} (site : Nat)
     (vector : Term unit ρ Γ (.vector τ)) (position : Term unit ρ Γ (.int width signed))
     (executable : Validation.ExecutableUnit unit) (meanings : Meanings executable) (env : HEnv Γ) :
-    (Term.remove vector position).denote meanings env =
+    (Term.remove site vector position).denote meanings env =
       Flow.bind (β := NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
         (vector.denote meanings env) fun values env =>
         Flow.bind (β := NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
           (position.denote meanings env) fun i env =>
           if h : i.val < 0 ∨ values.values.size ≤ i.val.toNat then
-            (Spec.abort (Failure.ofInts .abort #[i.val]) :
+            (abortAt site (Failure.ofInts .abort #[i.val]) :
               Comp unit (Flow ρ Γ (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))))
           else Spec.pure (@Flow.value unit _ ρ Γ
             (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))

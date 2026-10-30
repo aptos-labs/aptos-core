@@ -1,13 +1,13 @@
 VerexE2ETests/SourceVerify/proofs_errors.move:11:9: error: the specification clause `ensures result >= a * a` is not established
 VerexE2ETests/SourceVerify/proofs_errors.move:8:5: error: verex verification failed: the automatic verification of `square_of_sum` failed; provide a proof in `VerexE2ETests/SourceVerify/proofs_errors.proof.lean`:
-  verify square_of_sum by
+  verify square_of_sum by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/proofs_errors.move:26:5: error: verex verification failed: `twice` sets `pragma verify = manual`; provide a proof in `VerexE2ETests/SourceVerify/proofs_errors.proof.lean`:
-  verify twice by
+  verify twice by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide

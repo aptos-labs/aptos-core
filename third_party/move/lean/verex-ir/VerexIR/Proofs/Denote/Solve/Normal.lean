@@ -14,7 +14,7 @@ module does not import them.
 
 namespace VerexIR.Proofs.Denote
 
-open FamilyTransport (inducedCarriers? spelledNTy spelledNRow spelledNRows substitutionRow?
+open FamilyTransport (respellOperation? inducedCarriers? spelledNTy spelledNRow spelledNRows substitutionRow?
   rowEntry? substituteNTy substituteNRow substituteNRows)
 
 open Lean Elab Tactic Meta
@@ -77,7 +77,8 @@ private def bindActionStep (e : Lean.Expr) : Simp.SimpM Simp.Step := do
   let expr := mkApp2 head result.expr next
   let proof? ← result.proof?.mapM fun proof => do mkCongrFun (← mkCongrArg head proof) next
   let completed := match result.expr.getAppFn with
-    | .const name _ => name == ``VerexIR.Proofs.Spec.pure || name == ``VerexIR.Proofs.Spec.abort
+    | .const name _ => name == ``VerexIR.Proofs.Spec.pure || name == ``VerexIR.Proofs.Spec.abort ||
+        name == ``VerexIR.Proofs.Denote.abortAt
     | _ => false
   if completed then return .continue (some { expr, proof? })
   return .done { expr, proof? }
@@ -277,35 +278,11 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
     | some t' => return .done t'
     | none =>
     -- Any other native operation at an induced family: at the outer family,
-    -- each type it takes substituted.
-    unless (`VerexIR.Proofs.Denote).isPrefixOf head do return .continue
-    let some family := args[0]? | return .continue
-    let some (outer, row) := induced family | return .continue
-    let env ← getEnv
-    let spelledType (e : Lean.Expr) : Bool := match e.consumeMData.getAppFn.constName? with
-      | some name => env.isConstructor name &&
-          [``VerexIR.Proofs.Denote.NTy, ``VerexIR.Proofs.Denote.NRow,
-            ``VerexIR.Proofs.Denote.NRows].contains name.getPrefix
-      | none => false
-    let mut rebuiltArgs := #[outer]
-    let mut typed := 1
-    for arg in args.extract 1 args.size do
-      if spelledType arg then
-        let kind := arg.consumeMData.getAppFn.constName!.getPrefix
-        let substituted := if kind == ``VerexIR.Proofs.Denote.NTy then substituteNTy row arg
-          else if kind == ``VerexIR.Proofs.Denote.NRow then substituteNRow row arg
-          else substituteNRows row arg
-        let some substituted := substituted | return .continue
-        rebuiltArgs := rebuiltArgs.push substituted
-        typed := rebuiltArgs.size
-      else rebuiltArgs := rebuiltArgs.push arg
-    -- Only where the operation converts at its family and types, as a
-    -- definition may not unfold at both families; the values it is applied
-    -- to are left out of the check, which would otherwise evaluate it.
-    let operation := mkAppN t.getAppFn (args.extract 0 typed)
-    let respelled := mkAppN t.getAppFn (rebuiltArgs.extract 0 typed)
-    if operation.hasLooseBVars || !(← isDefEq operation respelled) then return .continue
-    return .done (mkAppN t.getAppFn rebuiltArgs))
+    -- each type and index it takes substituted.
+    if t.hasLooseBVars then return .continue
+    match ← respellOperation? t with
+    | some t' => return .done t'
+    | none => return .continue)
 
 /-- The canonical spelling of an expression's families, where it converts. -/
 private def canonicalFamilyResult (e : Lean.Expr) : MetaM Simp.Result := do
@@ -915,6 +892,46 @@ dsimproc [vir_denote, vir_denote_norm] whichProjectConstructor
     return .visit (mkApp2 (mkConst ``Option.some [Level.zero]) row payload)
   return .visit (mkApp (mkConst ``Option.none [Level.zero]) row)
 
+/-- Close `goal`, an equation between two projections of one variant value
+`value`, case by case on the value: at a constructor both sides reduce. -/
+private partial def projectionsAgree (goal : MVarId) (value : FVarId) : MetaM Bool := do
+  try goal.refl; return true catch _ => pure ()
+  -- A variant carrier is a sum by its definition, which `cases` does not unfold.
+  let goal ← goal.withContext do
+    goal.replaceLocalDeclDefEq value (← whnfD (← value.getType))
+  let some subgoals ← (some <$> goal.cases value) <|> pure none | return false
+  for subgoal in subgoals do
+    if ← (do subgoal.mvarId.refl; pure true) <|> pure false then continue
+    -- The rest of the variants, where the value is not the first.
+    let some field := subgoal.fields.back? | return false
+    unless field.isFVar do return false
+    let sum ← subgoal.mvarId.withContext do
+      return (← whnfD (← inferType field)).isAppOfArity ``Sum 2
+    unless sum && (← projectionsAgree subgoal.mvarId field.fvarId!) do return false
+  return true
+
+open Lean Meta Simp in
+/-- A choice's projection at a frame type arguments induce, at the outer
+frame with the types substituted: equal, case by case on the value, though
+not convertible, since the projection matches on the choice and the value
+together, which keeps it an atom where the value is unknown. A step proof's
+leaf reads a callee's results so (`verex_step_obligation`); the automatic
+normal form keeps the callee's spelling. -/
+simproc_decl whichProjectFamily
+    (@VerexIR.Proofs.Denote.Which.project? _ ?skolems _ _ _ _ _) := fun e => do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 7 && !e.hasLooseBVars do
+    return .continue
+  let some (respelled, _) ← FamilyTransport.respelledOperation? e | return .continue
+  let valueType ← inferType e.appArg!
+  let statement ← withLocalDeclD `value valueType fun value => do
+    mkForallFVars #[value] (← mkEq (mkApp e.appFn! value) (mkApp respelled.appFn! value))
+  let proof ← mkFreshExprMVar statement
+  let (value, goal) ← proof.mvarId!.intro1
+  -- The carriers of the two frames agree by unfolding their definitions.
+  unless ← withTransparency .default (projectionsAgree goal value) do return .continue
+  return .visit { expr := respelled, proof? := some (mkApp (← instantiateMVars proof) e.appArg!) }
+
 /-- A choice's projection of a constructed enum value, mapped: the mapped
 payload, or nothing, typed as the map spells its result. A contract spells
 the map at the caller's family and the projection at the callee's, which
@@ -1015,10 +1032,15 @@ attribute [vir_denote_norm] VerexIR.Proofs.Denote.variantName_inl
   VerexIR.Proofs.Denote.variantName_inr VerexIR.Proofs.Denote.ghostValueOf_same
   VerexIR.Proofs.Denote.ghostInitOf_same Weave.supplying_cons Weave.supplying_nil NRow.length
 attribute [vir_denote_norm] VerexIR.Proofs.wp_choose VerexIR.Proofs.wp_assume
-  VerexIR.Proofs.wp_certifyState
+  VerexIR.Proofs.wp_certifyState VerexIR.Proofs.Denote.wp_prophecyOf
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.Weave.compose
 -- A value a function states, before the equation is taken apart.
 attribute [vir_denote_norm ↓] exists_apply_eq_apply
+
+/-- A conjunction stated true, as a lemma's Boolean equation gives it where
+its other side is decided: each conjunct true. -/
+@[vir_denote_norm] theorem true_eq_and (a b : Bool) : (true = (a && b)) = (a = true ∧ b = true) := by
+  cases a <;> cases b <;> decide
 
 attribute [vir_denote_norm] decide_false decide_true Bool.decide_eq_true Bool.decide_eq_false
 -- A branch on a condition neither arm reads, as `omega` splits it.
@@ -1485,7 +1507,14 @@ attribute [vir_denote_norm] VerexIR.Proofs.Denote.wrapInt_unsigned
   VerexIR.Proofs.Denote.BitOp.run_val
 attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.wp_abort VerexIR.Proofs.wp_given VerexIR.Proofs.Spec.pure_bind
-  VerexIR.Proofs.Spec.abort_bind
+  VerexIR.Proofs.Spec.abort_bind VerexIR.Proofs.Denote.wp_abortAt VerexIR.Proofs.Denote.wp_opAt
+  VerexIR.Proofs.Denote.wp_opAfterAt VerexIR.Proofs.Denote.AfterAt_true
+  VerexIR.Proofs.Denote.opAt_pure VerexIR.Proofs.Denote.opAt_abort
+  VerexIR.Proofs.Denote.wp_branchAt VerexIR.Proofs.Denote.branchIn_some
+  VerexIR.Proofs.Denote.branchIn_none VerexIR.Proofs.Denote.AbortsAt_true VerexIR.Proofs.Denote.Taken_true
+  VerexIR.Proofs.Denote.wp_armAt VerexIR.Proofs.Denote.armIn_some VerexIR.Proofs.Denote.armIn_none
+  VerexIR.Proofs.Denote.Matched_true
+  VerexIR.Proofs.Denote.abortAt_bind VerexIR.Proofs.Denote.Flow.bind_abortAt
   VerexIR.Proofs.Denote.ResultShape.bodyType Bool.not_eq_true decide_eq_true_eq Bool.and_eq_true
   Bool.or_eq_true and_assoc exists_and_left exists_and_right exists_eq_left exists_eq_left'
   exists_true_left
@@ -1561,7 +1590,7 @@ theorem getElem_replicated {α : Type u} (value : α) (n i : Nat) (h : i < n) :
   apply List.getElem_replicate
 
 /-- Literal vectors often contain equal values while their index comes from
-a callee. Recognize the constant list and use its lookup law, without case
+a callee. Recognize the constant list and use its lookup lemma, without case
 search over the index. Definitional equality also ignores range certificates
 on otherwise equal bounded values. -/
 simproc [vir_denote_norm] uniformListRead ((_ : List _)[_]'_) := fun e => do
@@ -1619,7 +1648,7 @@ attribute [vir_denote_norm] Int.reduceToNat Nat.reduceLeDiff Nat.reduceLT Int.re
 /-- Fold literal shifts before collecting arithmetic bounds. Leaving `1 << k`
 symbolic makes each use of that constant acquire separate quotient/remainder
 facts. As with literal powers, respect Lean's evaluation threshold. Symbolic
-operands keep their bit-vector representation and existing arithmetic laws. -/
+operands keep their bit-vector representation and existing arithmetic lemmas. -/
 private def shiftLiteralStep (operation : Int → Nat → Int) : Simp.DSimproc := fun e => do
   let args := e.getAppArgs
   let (some value, some distance) := (args[0]?.bind Lean.Expr.int?, args[1]?.bind Lean.Expr.nat?)

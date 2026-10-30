@@ -2,7 +2,7 @@ Move prover returns: exiting with verification errors
 tests/sources/regression/behavioral_predicate_cycle.move:57:9: error: the specification clause `ensures ensures_of<function[Fn(u64) -> u64](f)>(x, result)
         && result != result_of<function[Fn(u64) -> u64](f)>(x)` is not established
 tests/sources/regression/behavioral_predicate_cycle.move:53:5: error: verex verification failed: the automatic verification of `f` failed; provide a proof in the module:
-  verify f by
+  verify f by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -10,7 +10,7 @@ tests/sources/regression/behavioral_predicate_cycle.move:53:5: error: verex veri
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavioral_predicate_cycle.move:65:18: error: the specification clause `ensures result == 7` is not established
 tests/sources/regression/behavioral_predicate_cycle.move:65:5: error: verex verification failed: the automatic verification of `use_f` failed; provide a proof in the module:
-  verify use_f by
+  verify use_f by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -22,7 +22,7 @@ tests/sources/regression/behavioral_predicate_cycle.move:70:1: error: `requires_
 tests/sources/regression/behavioral_predicate_cycle.move:11:1: error: `requires_of` cannot read `f`: its precondition states a behavioral predicate
 tests/sources/regression/behavioral_predicate_cycle.move:26:18: error: the specification clause `ensures result == 7` is not established
 tests/sources/regression/behavioral_predicate_cycle.move:26:5: error: verex verification failed: the automatic verification of `use_f` failed; provide a proof in the module:
-  verify use_f by
+  verify use_f by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -32,7 +32,7 @@ tests/sources/regression/behavioral_predicate_cycle.move:92:1: error: a behavior
 tests/sources/regression/behavioral_predicate_cycle.move:92:1: error: a behavioral predicate reads the executable unit, which this contract does not take
 tests/sources/regression/behavioral_predicate_cycle.move:132:9: error: the precondition `requires !aborts_of<function[Fn(u64) -> u64](h)>(n) || n == 0` of `g` does not hold at call 1
 tests/sources/regression/behavioral_predicate_cycle.move:130:5: error: verex verification failed: the automatic verification of `g` failed; provide a proof in the module:
-  verify g by
+  verify g by lean =>
     verex_obligations
     verex_on
     | requires_1_of_g_at_call_1 => verex_prepare; sorry
@@ -42,7 +42,7 @@ tests/sources/regression/behavioral_predicate_cycle.move:116:1: error: `requires
 tests/sources/regression/behavioral_predicate_cycle.move:30:1: error: `requires_of` cannot read `f`: its precondition states a behavioral predicate
 tests/sources/regression/behavioral_predicate_cycle.move:47:18: error: the specification clause `ensures result == 7` is not established
 tests/sources/regression/behavioral_predicate_cycle.move:47:5: error: verex verification failed: the automatic verification of `use_f` failed; provide a proof in the module:
-  verify use_f by
+  verify use_f by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

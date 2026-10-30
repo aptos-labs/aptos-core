@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/behavioral_congruence.move:42:5: error: the continuation after call 1 of `same` is not established
 tests/sources/functional/closures/behavioral_congruence.move:42:5: error: verex verification failed: the automatic verification of `field_equal` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify field_equal by
+  verify field_equal by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_same => verex_prepare; sorry
@@ -10,7 +10,7 @@ tests/sources/functional/closures/behavioral_congruence.move:42:5: error: verex 
 tests/sources/functional/closures/behavioral_congruence.move:49:5: error: the continuation after call 1 of `rebuilt` is not established
 tests/sources/functional/closures/behavioral_congruence.move:50:9: error: the specification clause `aborts_if aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:49:5: error: verex verification failed: the automatic verification of `field_fieldwise` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify field_fieldwise by
+  verify field_fieldwise by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_rebuilt => verex_prepare; sorry
@@ -19,7 +19,7 @@ tests/sources/functional/closures/behavioral_congruence.move:49:5: error: verex 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_congruence.move:58:5: error: the continuation after call 1 of `same` is not established
 tests/sources/functional/closures/behavioral_congruence.move:58:5: error: verex verification failed: the automatic verification of `param_equal` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify param_equal by
+  verify param_equal by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_same => verex_prepare; sorry
@@ -118,7 +118,7 @@ verexEnsures :
             VerexIR.Proofs.Denote.NRow.nil)))
       VerexIR.Proofs.Denote.NRow.nil)
     { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none cb_f
-    ((named, (x_id_vec, PUnit.unit), ()), ()) verexResult verexFinal verexFinal
+    ((named, (x_id_vec, ()), ()), ()) verexResult verexFinal verexFinal
 ⊢ ¬(18446744073709551615 < x_n.val + 1 ∨
       x_n.val + 1 ≤ 18446744073709551615 ∧
         VerexIR.Proofs.AbortsOf (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
@@ -147,7 +147,7 @@ verexEnsures :
 tests/sources/functional/closures/behavioral_congruence.move:67:9: error: the specification clause `aborts_if x.n + 1 > MAX_U64` is not established
 tests/sources/functional/closures/behavioral_congruence.move:68:9: error: the specification clause `aborts_if x.n + 1 <= MAX_U64 && aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:66:5: error: verex verification failed: the automatic verification of `field_bumped` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify field_bumped by
+  verify field_bumped by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
@@ -157,7 +157,7 @@ tests/sources/functional/closures/behavioral_congruence.move:66:5: error: verex 
 tests/sources/functional/closures/behavioral_congruence.move:75:5: error: the continuation after call 1 of `0x1::option::none` is not established
 tests/sources/functional/closures/behavioral_congruence.move:76:9: error: the specification clause `aborts_if aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:75:5: error: verex verification failed: the automatic verification of `field_dropped_id` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify field_dropped_id by
+  verify field_dropped_id by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_none => verex_prepare; sorry
@@ -166,7 +166,7 @@ tests/sources/functional/closures/behavioral_congruence.move:75:5: error: verex 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_congruence.move:94:9: error: the specification clause `ensures _a == _b ==> (aborts_of<_cb.f>(_a) <==> aborts_of<_cb.f>(_b))` is not established
 tests/sources/functional/closures/behavioral_congruence.move:93:5: error: verex verification failed: the automatic verification of `ghost_divergent` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify ghost_divergent by
+  verify ghost_divergent by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

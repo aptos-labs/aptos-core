@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/frame_conditions.move:154:5: error: the continuation after call 1 of `apply` is not established
 tests/sources/functional/state_labels/frame_conditions.move:154:5: error: verex verification failed: the automatic verification of `test_aborts_of_wrong` failed; provide a proof in `tests/sources/functional/state_labels/frame_conditions.proof.lean`:
-  verify test_aborts_of_wrong by
+  verify test_aborts_of_wrong by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_apply => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/state_labels/frame_conditions.move:154:5: error: verex 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/state_labels/frame_conditions.move:171:9: error: the specification clause `ensures result == global<Counter>(addr).value + 1` is not established
 tests/sources/functional/state_labels/frame_conditions.move:169:5: error: verex verification failed: the automatic verification of `test_reads_frame_wrong_result` failed; provide a proof in `tests/sources/functional/state_labels/frame_conditions.proof.lean`:
-  verify test_reads_frame_wrong_result by
+  verify test_reads_frame_wrong_result by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

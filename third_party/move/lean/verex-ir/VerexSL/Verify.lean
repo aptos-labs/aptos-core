@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import VerexSL.Verify.Members
+import VerexSL.Verify.Steps
 
 /-!
 # Verification through the denotation
@@ -45,18 +45,22 @@ private partial def pathSegments (stx : Syntax) : Array String :=
   | .node _ _ arguments => arguments.flatMap pathSegments
   | _ => #[]
 
-/-- The optional authored script of a `verify` form. -/
-def scriptOfOptional (optional : Syntax) :
-    Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) :=
+/-- The optional authored script of a `verify` form: its block lowered, a
+proof in steps unless it is one `lean =>` step. -/
+def scriptOfOptional (optional : Syntax) : CommandElabM (Option AuthoredScript) :=
   match optional.getArgs with
-  | #[_, script] => some ⟨script⟩
-  | _ => none
+  | #[_, block] => do
+      let steps := !(match blockSteps block with
+        | #[step] => step.isOfKind ``verexLeanStep
+        | _ => false)
+      return some { tactic := ← lowerProofBlock block, steps }
+  | _ => pure none
 
 /-- Verify one function of a registered unit from outside its module. A
 qualified path names the module; a bare name must be declared by exactly one
 registered module. -/
 syntax (name := verexVerifyCommand)
-  ("verify!" <|> "verify") verexPath ("by" Lean.Parser.Tactic.tacticSeq)? : command
+  ("verify!" <|> "verify") verexPath ("by" verexProofBlock)? : command
 
 /-- Whether a `verify` item or command is marked `verify!`. -/
 def demandedVerify (stx : Syntax) : Bool :=
@@ -103,7 +107,7 @@ def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
       (VerexSL.registeredUnit? (← getEnv) (pathName canonical)).isSome then
     canonical.push segments.back!
   else segments
-  let script := (scriptOfOptional (stx[2]?.getD .missing)).map ({ tactic := · })
+  let script ← scriptOfOptional (stx[2]?.getD .missing)
   let function := segments.back!
   if skipVerify (← getOptions) && !demandedVerify stx then
     skippedInEditor pathSyntax function
@@ -131,7 +135,7 @@ at, and its authored proof, if any. -/
 private structure VerificationTarget where
   function : String
   reference : Syntax
-  script : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)
+  script : Option AuthoredScript
   /-- A `verify` item, not an automatic target: its skip in the editor is
   reported. -/
   item : Bool
@@ -142,7 +146,7 @@ private structure VerificationTarget where
   deriving Inhabited
 
 private def VerificationTarget.authored? (target : VerificationTarget) : Option AuthoredScript :=
-  target.script.map ({ tactic := ·, file := target.file })
+  target.script.map ({ · with file := target.file })
 
 /-- The specified functions a function's proof uses through their verified
 theorems: its callees with a specification, found through the unspecified
@@ -563,55 +567,24 @@ private structure ItemSource where
   stx : Syntax
   file : Option ParsedFile := none
 
-/-- The laws of a module's intrinsic maps under the names of the module's
-specification functions: for an owner binding `spec_get`, `spec_set`,
-`spec_remove`, `spec_len`, `spec_contains_key`, `spec_key_at` and
-`spec_rank`, the theorems `spec_get_set`, `spec_len_remove`,
-`spec_contains_key_key_at`, `spec_key_at_eq_iff`, …
-(`doc/designs/proof-strategy.md`, P2), each the law of typed maps it names
+/-- The lemmas of a module's intrinsic maps (`mapLemmas`) under names composed
+from the module's specification functions: for an owner binding `spec_get`,
+`spec_set`, `spec_remove`, `spec_len`, `spec_contains_key`, `spec_key_at`
+and `spec_rank`, the theorems `lemma_get_set`, `lemma_len_remove`,
+`lemma_contains_key_key_at`, `lemma_key_at_eq_iff`, …
+(`doc/designs/proof-strategy.md`, P2), each the lemma of typed maps it names
 (`VerexIR.SpecMap.valueAt_update`, …). -/
-private def ensureMapLaws (segments : Array String) (unit : ValidatedUnit) : CommandElabM Unit := do
+private def ensureMapLemmas (segments : Array String) (unit : ValidatedUnit) : CommandElabM Unit := do
   let some ns := unit.namespaces[0]? | return
-  let nameOf (reference : VerexIR.QualifiedRef) : Option String :=
-    (ns.tables.names[reference.name.index]?).map (·.name)
-  -- The word of an operation: its specification function without `spec_`.
-  let word (target : String) : String :=
-    if target.startsWith "spec_" then (target.drop 5).toString else target
-  let laws : Array (VerexIR.MapSpecRole × VerexIR.MapSpecRole × Option String × Name) := #[
-    (.get, .set, none, ``VerexIR.SpecMap.valueAt_update),
-    (.hasKey, .set, none, ``VerexIR.SpecMap.hasKey_update),
-    (.len, .set, none, ``VerexIR.SpecMap.size_update),
-    (.keyAt, .set, some "present", ``VerexIR.SpecMap.keyAt_update_present),
-    (.get, .del, none, ``VerexIR.SpecMap.valueAt_remove),
-    (.hasKey, .del, none, ``VerexIR.SpecMap.hasKey_remove),
-    (.len, .del, none, ``VerexIR.SpecMap.size_remove),
-    (.keyAt, .del, none, ``VerexIR.SpecMap.keyAt_remove_ordered),
-    (.len, .new_, none, ``VerexIR.SpecMap.size_empty),
-    (.hasKey, .new_, none, ``VerexIR.SpecMap.hasKey_empty),
-    (.hasKey, .keyAt, none, ``VerexIR.SpecMap.hasKey_keyAt),
-    (.rank, .keyAt, none, ``VerexIR.SpecMap.rank_keyAt),
-    (.keyAt, .rank, none, ``VerexIR.SpecMap.keyAt_rank)]
-  for intrinsic in ns.intrinsics do
-    unless intrinsic.model == "map" do continue
-    let bound (role : VerexIR.MapSpecRole) : Option String :=
-      (intrinsic.specBindings.find? (·.role == role.name)).bind fun binding => nameOf binding.target
-    let mut names : Array (String × Name) := #[]
-    for (reading, operation, qualifier, law) in laws do
-      let some reader := bound reading | continue
-      let some operand := bound operation | continue
-      let suffix := match qualifier with | some q => s!"_{q}" | none => ""
-      names := names.push (s!"{reader}_{word operand}{suffix}", law)
-    if let some keyAt := bound .keyAt then
-      names := names.push (s!"{keyAt}_eq_iff", ``VerexIR.SpecMap.keyAt_eq_keyAt_iff)
-    for (lawName, law) in names do
-      -- The module's artifacts are absolute names.
-      let name := Name.str (pathName segments) lawName
-      if (← getEnv).contains name then continue
-      let info ← getConstInfo law
-      let value := mkConst law (info.levelParams.map mkLevelParam)
-      let alias : TheoremVal :=
-        { name := name, levelParams := info.levelParams, type := info.type, value := value }
-      liftTermElabM <| addDecl (.thmDecl alias)
+  for (lemmaName, lemmaTheorem) in namespaceMapLemmaNames ns do
+    -- The module's artifacts are absolute names.
+    let name := Name.str (pathName segments) lemmaName
+    if (← getEnv).contains name then continue
+    let info ← getConstInfo lemmaTheorem
+    let value := mkConst lemmaTheorem (info.levelParams.map mkLevelParam)
+    let alias : TheoremVal :=
+      { name := name, levelParams := info.levelParams, type := info.type, value := value }
+    liftTermElabM <| addDecl (.thmDecl alias)
 
 /-- Verify a registered module from the items of `sources`, its command's
 then its proof file's: its theorems in its namespace, then, with that
@@ -662,19 +635,19 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
   -- The explicit `verify` items, and the specified functions with a body
   -- that no explicit item names and whose specification does not set
   -- `pragma verify = false`, in source order.
-  let targets : Array VerificationTarget := items.filterMap fun (item, file) =>
+  let targets : Array VerificationTarget ← items.filterMapM fun (item, file) => do
     if item.isOfKind ``verexVerifyItem then
-      item[1]?.map fun identifier =>
-        ⟨identifier.getId.toString (escape := false), identifier,
-          scriptOfOptional (item[2]?.getD .missing), true, demandedVerify item, file⟩
-    else do
+      let some identifier := item[1]? | return none
+      return some ⟨identifier.getId.toString (escape := false), identifier,
+        ← scriptOfOptional (item[2]?.getD .missing), true, demandedVerify item, file⟩
+    return (do
       let identifier ← item.getArgs.find? (·.isIdent)
       let function := identifier.getId.toString (escape := false)
       if explicit.contains function then none
       let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
       if declaration.body == .absent || statesNothing declaration.contract ||
           automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration then none
-      some ⟨function, identifier, none, false, false, file⟩
+      some ⟨function, identifier, none, false, false, file⟩ : Option VerificationTarget)
   -- A function without a specification is verified against its loop
   -- invariants, its in-body assertions, the preconditions of the functions
   -- it calls, the data invariants of the values it takes, returns,
@@ -712,6 +685,17 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
           module.file⟩
   let targets := targets ++ writers
   if targets.isEmpty then return
+  -- The expressions of the items' steps, lowered once for the module.
+  let stepped ← items.filterMapM fun (item, file) => do
+    unless item.isOfKind ``verexVerifyItem do return none
+    let some identifier := item[1]? | return none
+    let optional := item[2]?.getD .missing
+    let #[_, block] := optional.getArgs | return none
+    let fileName ← match file with
+      | some file => pure file.name
+      | none => getFileName
+    return some (item, identifier.getId.toString (escape := false), block, fileName)
+  lowerStepExpressions invariantRelatedModules unit module.stx module.file stepped
   stageLog s!"module {moduleNamespace}: verification start"
   verifyScheduled unit segments opens targets
   stageLog s!"module {moduleNamespace}: verification done"
@@ -751,7 +735,7 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
   -- A recursive specification function is a definition of the module.
   let segments := pathSegments pathSyntax
   let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments) | return
-  ensureMapLaws segments unit
+  ensureMapLemmas segments unit
   unless (recursiveSpecFunctions unit).isEmpty do
     liftTermElabM (ensureSpecFunctionDefinitions unit)
   let proofFile := unit.namespaces[0]? >>= proofFile?

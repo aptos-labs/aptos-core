@@ -5,7 +5,7 @@ tests/sources/regression/performance_200511.move:47:9: error: the specification 
         )
       )` is not established
 tests/sources/regression/performance_200511.move:45:5: error: verex verification failed: the automatic verification of `fresh_guid` failed; provide a proof in `tests/sources/regression/performance_200511.proof.lean`:
-  verify fresh_guid by
+  verify fresh_guid by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/regression/performance_200511.move:55:9: error: the specification 
         ), serialize(sender)
       )` is not established
 tests/sources/regression/performance_200511.move:53:5: error: verex verification failed: the automatic verification of `new_event_handle_impl` failed; provide a proof in `tests/sources/regression/performance_200511.proof.lean`:
-  verify new_event_handle_impl by
+  verify new_event_handle_impl by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/opaque.move:14:9: error: the specification clause `ensures result == 2` is not established
 tests/sources/functional/opaque.move:12:5: error: verex verification failed: the automatic verification of `opaque_incorrect` failed; provide a proof in `tests/sources/functional/opaque.proof.lean`:
-  verify opaque_incorrect by
+  verify opaque_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

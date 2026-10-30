@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/generic_aliasing_write_routes.move:21:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:19:5: error: verex verification failed: the automatic verification of `read_sees_write` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify read_sees_write by
+  verify read_sees_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:19:5: error: verex v
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_write_routes.move:33:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:30:5: error: verex verification failed: the automatic verification of `two_reads_one_write` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify two_reads_one_write by
+  verify two_reads_one_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:30:5: error: verex v
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_write_routes.move:50:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:47:5: error: verex verification failed: the automatic verification of `callee_writes` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify callee_writes by
+  verify callee_writes by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -26,7 +26,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:47:5: error: verex v
 tests/sources/regression/generic_aliasing_write_routes.move:66:5: error: the continuation after call 1 of `remove_r` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:68:9: error: the specification clause `ensures result` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:66:5: error: verex verification failed: the automatic verification of `native_modifies` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify native_modifies by
+  verify native_modifies by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_remove_r => verex_prepare; sorry
@@ -35,7 +35,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:66:5: error: verex v
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_write_routes.move:86:9: error: the specification clause `ensures result` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:84:5: error: verex verification failed: the automatic verification of `opaque_modifies` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify opaque_modifies by
+  verify opaque_modifies by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -43,7 +43,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:84:5: error: verex v
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_write_routes.move:99:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:96:5: error: verex verification failed: the automatic verification of `frame_writes` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify frame_writes by
+  verify frame_writes by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -51,7 +51,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:96:5: error: verex v
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_write_routes.move:116:9: error: the specification clause `ensures result` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:113:5: error: verex verification failed: the automatic verification of `closure_writes` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify closure_writes by
+  verify closure_writes by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -59,7 +59,7 @@ tests/sources/regression/generic_aliasing_write_routes.move:113:5: error: verex 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_write_routes.move:128:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:125:5: error: verex verification failed: the automatic verification of `frame_only` failed; provide a proof in `tests/sources/regression/generic_aliasing_write_routes.proof.lean`:
-  verify frame_only by
+  verify frame_only by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

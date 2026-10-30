@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/unify_attached_specs.move:24:13: error: the loop invariant `acc == «spec_fold$lambda$0»(v, init, i)` is not preserved by an iteration
 tests/sources/functional/closures/inline/unify_attached_specs.move:42:5: error: verex verification failed: the automatic verification of `sum_attached_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/unify_attached_specs.proof.lean`:
-  verify sum_attached_wrong by
+  verify sum_attached_wrong by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry

@@ -43,13 +43,18 @@ theorem newton_quotient {y r : Int} (square : 0 < y → r * r ≤ y)
     rw [Int.mul_assoc, Int.mul_comm 4294967296, Int.mul_assoc, Int.mul_assoc]; rfl]
   exact Int.mul_lt_mul_of_pos_right (by omega) (by decide)
 
-verify sqrt by
+verify sqrt by lean =>
   verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  case aborts_if_1_6 =>
-    have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
-    have := newton_quotient ‹_› ‹_› (by omega) (by omega) (by omega)
-    omega
-  case aborts_if_1_8 =>
-    have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
-    omega
+  verex_on
+  | aborts_if 1 when aborts at op 8 =>
+    first | verex_decide | (verex_prepare; all_goals try verex_decide)
+    all_goals
+      have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
+      have := newton_quotient ‹_› ‹_› (by omega) (by omega) (by omega)
+      omega
+  | aborts_if 1 when aborts at op 5 =>
+    first | verex_decide | (verex_prepare; all_goals try verex_decide)
+    all_goals
+      have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
+      omega
+  | _ => first | verex_decide | (verex_prepare; all_goals try verex_decide)

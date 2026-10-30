@@ -168,7 +168,7 @@ native ones; most act on the normalization of encoded terms.
    extends it; prepare an older fact again only when a new equation or
    fact changes it. Bound on `upsert`: preparation 126M → 25–30M, the
    script 171M → 75M. Needs a rule set that commutes with substitution
-   (operations with laws never unfolded); two attempts failed on the
+   (operations with lemmas never unfolded); two attempts failed on the
    encoded rule set.
 2. **Directed steps instead of `simp_all` fixpoints** in authored map
    preparation: definitions substituted once in order, one pass of the
@@ -206,7 +206,7 @@ native ones; most act on the normalization of encoded terms.
 ### Leaf engine
 
 - **One `grind` per native leaf**, seeded with the map, vector and
-  arithmetic laws, the cascade as fallback. On encoded leaves `grind`
+  arithmetic lemmas, the cascade as fallback. On encoded leaves `grind`
   closed 21 of 23 prepared leaves of `iter_walk_mut` at 10–130M, the cost
   being internalization (17M on a 100k-node leaf); a 7k-node native leaf
   should internalize in about 1M. No clause learning: a cap bounds cost,

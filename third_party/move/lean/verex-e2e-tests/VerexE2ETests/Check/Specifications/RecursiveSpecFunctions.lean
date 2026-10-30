@@ -55,7 +55,7 @@ verex module 0x42::recursive_spec where
         · have := ih (n - 1).toNat (by omega) (n - 1) rfl (by omega)
           split <;> omega
 
-  verify first_is by
+  verify first_is by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     intro first

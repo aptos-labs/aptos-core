@@ -10,7 +10,7 @@ open VerexIR.Proofs.Denote
 
 -- Compare stored closures by their captures and masks, then preserve the
 -- stored invariants through the calculator's removal and publication.
-verify process by
+verify process by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals simp_all [vir_denote_norm, NTy.encode_function,

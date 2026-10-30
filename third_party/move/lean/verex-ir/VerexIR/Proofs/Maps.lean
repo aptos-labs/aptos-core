@@ -12,7 +12,7 @@ of its `(key, value)` entries, under one of two disciplines. A sequence keeps
 insertion order: an update replaces the entry in place or appends one, and a
 removal moves the last entry into the removed position. An ordered map keeps
 its keys strictly ascending under the structural order. The operations are
-defined for every list, and the laws that need distinct or ascending keys
+defined for every list, and the lemmas that need distinct or ascending keys
 take them as hypotheses.
 -/
 
@@ -147,7 +147,7 @@ theorem get_of_perm {left right : Entries} (perm : left.Perm right) (distinct : 
           simp [get, h.1, ih h.2]
     rw [none left present, none right absent]
 
-/-! ## Laws of the sequence discipline -/
+/-! ## Lemmas of the sequence discipline -/
 
 theorem containsB_replaceFirst (entries : Entries) (key value probe : RuntimeValue) :
     containsB (replaceFirst key value entries) probe = containsB entries probe := by
@@ -368,7 +368,7 @@ def ordDel (key : RuntimeValue) : Entries → Entries
   | [] => []
   | entry :: rest => if entry.1 = key then rest else entry :: ordDel key rest
 
-/-! ## Laws of the ordered discipline -/
+/-! ## Lemmas of the ordered discipline -/
 
 section OrderedLaws
 variable (rank : ValueRanks)
@@ -772,7 +772,7 @@ theorem Layout.slotsOf_build (layout : Layout) (handle : RuntimeValue) (entries 
 
 /-! ## Map values
 
-The model a specification sees of a map value, and the laws a proof uses. -/
+The model a specification sees of a map value, and the lemmas a proof uses. -/
 
 /-- The number of entries. -/
 def size (map : RuntimeValue) : Int := (entriesOf map).length
@@ -795,7 +795,7 @@ theorem size_nonneg (map : RuntimeValue) : 0 ≤ size map := by
   simp [size]
 
 /-- A map value built as a vector literal holds as many entries as the
-vector, stated by bounds: its size stays the abstract size the laws read. -/
+vector, stated by bounds: its size stays the abstract size the lemmas read. -/
 theorem size_nominal_vector_bounds (owner : StructHandle) (variant : Option String)
     (elements : Array RuntimeValue) :
     0 ≤ size (.nominal owner variant #[.vector elements]) ∧
@@ -807,7 +807,7 @@ theorem size_nominal_vector_bounds (owner : StructHandle) (variant : Option Stri
 entries as the list: the size of an abstract map's encoding is its carrier's
 length, which the carrier bounds (`SpecEntries`): the size of a carrier's
 encoding reads as the carrier's length, an integer the bounds name. A
-fact a leaf asserts, not a normal form: the laws read `size` of the map. -/
+fact a leaf asserts, not a normal form: the lemmas read `size` of the map. -/
 theorem size_nominal_vector_map {α : Type} (owner : StructHandle)
     (variant : Option String) (encode : α → RuntimeValue) (entries : List α) :
     size (.nominal owner variant #[.vector (entries.map encode).toArray]) = entries.length := by
@@ -1113,7 +1113,7 @@ def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
       rw [length_ordSet rank valid]
       split <;> simp
 
-/-- Under the sequence discipline the size law needs no validity: an update
+/-- Under the sequence discipline the size lemma needs no validity: an update
 replaces the key's first entry or appends. A table's contents follow it. -/
 theorem size_update_sequence (layout : Layout) (map key value : RuntimeValue) :
     size (update layout .sequence map key value) =
@@ -1494,7 +1494,7 @@ def AbortsReplaceKey (layout : Layout) (discipline : Discipline) (map old new : 
     elementsOf (.vector elements) = elements.toList := rfl
 
 
-/-! ## Laws of the bulk operations -/
+/-! ## Lemmas of the bulk operations -/
 
 theorem containsB_eq_decide_mem (entries : Entries) (probe : RuntimeValue) :
     containsB entries probe = decide (probe ∈ entries.map Prod.fst) := by

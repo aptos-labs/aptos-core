@@ -19,7 +19,7 @@ verex module 0x4b::forged where
     pragma bv = b"0"
     ensures result == 2
 
-  verify one by
+  verify one by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     have unsat := Std.Tactic.BVDecide.Reflect.unsat_of_verifyBVExpr_eq_true _ _

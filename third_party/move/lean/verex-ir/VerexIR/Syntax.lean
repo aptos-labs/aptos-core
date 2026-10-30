@@ -993,12 +993,26 @@ inductive ExprKind where
   | spec (block : SpecBlock)
   deriving Repr, BEq, Inhabited
 
+/-- The source construct an expression stands for, where a frontend or an
+import pass introduced it for one of another kind. Provenance only: it does
+not alter the expression's semantics. -/
+inductive ExprOrigin where
+  /-- The test of an arm of a `match` lowered to conditionals: the match's
+  location, the arm's variant (`_` for another pattern), and, where the
+  conditional's other branch is the match's last arm taken untested, that
+  arm's variant. -/
+  | matchArm (site : LocId) (variant : String) (last : Option String)
+  /-- The throw of a lowered `match` none of whose arms matches. -/
+  | matchMismatch (site : LocId)
+  deriving Repr, BEq, Inhabited
+
 /-- Located, typed expression arena node. The checker validates `typeId` and
 all child IDs before a backend can receive the enclosing `ValidatedUnit`. -/
 structure Expr where
   loc : LocId
   typeId : TypeId
   kind : ExprKind
+  origin : Option ExprOrigin := none
   deriving Repr, BEq, Inhabited
 
 /-- Binding and matching pattern language shared by declarations, `let`,

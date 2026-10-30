@@ -572,7 +572,7 @@ whose one field is the Boolean placeholder `dummy_field` the compilers give
 an empty struct) are placeholder layouts of the table view: their entries
 are the owner's hidden contents field, their identity is their entries, and
 every role, the bulk roles included, is available to them
-([`intrinsic-maps.md`](../designs/intrinsic-maps.md), "Views", "Laws of the bulk
+([`intrinsic-maps.md`](../designs/intrinsic-maps.md), "Views", "Lemmas of the bulk
 roles"). `intrinsic_map_rank`, `intrinsic_map_rank_bulk` and
 `intrinsic_map_insertion_order` fail exactly the functions the Prover fails
 (`rank_wrong`, `build_wrong`, `same_entries_not_equal` and `canary`).

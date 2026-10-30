@@ -173,7 +173,7 @@ verex module 0x42::computed_call_range_results where
 -- Even a one-thousand-heartbeat automatic leaf cap does not constrain an
 -- authored proof, including its explicitly requested cheap deciders.
 set_option verex.leafHeartbeats 1 in
-verify 0x42::computed_call_range_results::repeated_choices by
+verify 0x42::computed_call_range_results::repeated_choices by lean =>
   verex_obligations
   verex_group range := assert_1, assert_2
   verex_on
@@ -188,7 +188,7 @@ verify 0x42::computed_call_range_results::repeated_choices by
 error: the specification clause `ensures result == 8` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_value` failed; provide a proof in the module:
-  verify wrong_value by
+  verify wrong_value by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -202,7 +202,7 @@ verify 0x42::computed_call_range_results::wrong_value
 error: the specification clause `aborts_if false` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_index` failed; provide a proof in the module:
-  verify wrong_index by
+  verify wrong_index by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/uninst_global_invariant.move:33:9: error: the module invariant `invariant {T} exists<S2<T> >(@0x42) ==> exists<S1>(@0x42)` does not hold after a write of memory it reads
 tests/sources/functional/uninst_global_invariant.move:11:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof in `tests/sources/functional/uninst_global_invariant.proof.lean`:
-  verify test2 by
+  verify test2 by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry

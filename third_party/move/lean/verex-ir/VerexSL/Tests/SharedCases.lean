@@ -147,7 +147,7 @@ verify 0x42::shared_entry_cases::bounded
 error: the specification clause `ensures result == 1` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry
@@ -187,7 +187,7 @@ verex module 0x42::shared_case_errors where
 error: the specification clause `ensures (if b then result + 1 else result + 2) == n + 1` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry

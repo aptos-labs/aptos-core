@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Enums/VariantFields.lean:28:4: error: the specification clause `aborts_if false` is not established
 VerexE2ETests/Check/Enums/VariantFields.lean:27:7: error: verex verification failed: the automatic verification of `select_z_incorrect` failed; provide a proof in the module:
-  verify select_z_incorrect by
+  verify select_z_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

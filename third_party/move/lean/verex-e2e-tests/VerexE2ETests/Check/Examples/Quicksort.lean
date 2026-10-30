@@ -396,7 +396,7 @@ verex module 0x42::quicksort where
     obtain ⟨v, x, lo, hi, ⟨⟩⟩ := bundle
     exact count_cnt v x _ lo hi rfl
 
-  verify partition by
+  verify partition by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals (try simp only [count_eq, VerexIR.Proofs.Denote.swapBounded] at *)
@@ -441,7 +441,7 @@ verex module 0x42::quicksort where
     forall (i : Int), forall (j : Int),
       lo <= i && i < j && j < hi ==> core.prim.compare(values[i], values[j]) <= 0
 
-  verify quick_sort_range by
+  verify quick_sort_range by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals (try simp only [count_eq] at *)

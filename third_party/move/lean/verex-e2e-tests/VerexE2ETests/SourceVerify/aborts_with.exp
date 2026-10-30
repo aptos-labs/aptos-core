@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/aborts_with.move:18:18: error: the specification clause `aborts_with 1, 3` is not established
 VerexE2ETests/SourceVerify/aborts_with.move:18:5: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/aborts_with.proof.lean`:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | aborts_with_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ VerexE2ETests/SourceVerify/aborts_with.move:18:5: error: verex verification fail
 VerexE2ETests/SourceVerify/aborts_with.move:36:9: error: the specification clause `aborts_if x == 0 with 7` is not established
 VerexE2ETests/SourceVerify/aborts_with.move:37:9: error: the specification clause `aborts_with 8` is not established
 VerexE2ETests/SourceVerify/aborts_with.move:34:5: error: verex verification failed: the automatic verification of `partial_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/aborts_with.proof.lean`:
-  verify partial_wrong by
+  verify partial_wrong by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ VerexE2ETests/SourceVerify/aborts_with.move:34:5: error: verex verification fail
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/aborts_with.move:47:9: error: the specification clause `aborts_if x == 0 with 7` is not established
 VerexE2ETests/SourceVerify/aborts_with.move:45:5: error: verex verification failed: the automatic verification of `partial_codes_only` failed; provide a proof in `VerexE2ETests/SourceVerify/aborts_with.proof.lean`:
-  verify partial_codes_only by
+  verify partial_codes_only by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

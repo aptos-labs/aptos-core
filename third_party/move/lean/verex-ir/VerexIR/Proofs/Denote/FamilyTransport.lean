@@ -26,7 +26,7 @@ private partial def identity (goal : MVarId) (fuel : Nat := 128) : MetaM Unit :=
       type.isConstOf ``Empty || type.isAppOf ``SpecEntries || type.isAppOf ``SpecVector) then
     for branch in ← goal.cases rhs.fvarId! do identity branch.mvarId (fuel - 1)
     return
-  -- Match the map law before weak-head reduction can enter Array.map's
+  -- Match the map lemma before weak-head reduction can enter Array.map's
   -- implementation. Only its element transport needs a proof.
   if type.isAppOf ``List || type.isAppOf ``Array then
     let theoremName := if type.isAppOf ``List then ``List.map_id'' else ``Array.map_id''
@@ -192,6 +192,85 @@ partial def substituteNRows (θ : Lean.Expr) (rows : Lean.Expr) : Option Lean.Ex
   else none
 end
 
+/-- The families of indices into native types: a variable of a row, the
+variables of a row, a variant of an enum, a field the variants share. -/
+def indexFamilies : List Name :=
+  -- `Vars`, `Which` and `Choices` are the denotation's, later than this module.
+  [``Var, `VerexIR.Proofs.Denote.Vars, `VerexIR.Proofs.Denote.Which,
+    `VerexIR.Proofs.Denote.Choices]
+
+/-- An index into native types (`indexFamilies`), a chain of constructors,
+with the types it is indexed by substituted by `row`; none for any other
+term, or where a type does not substitute. -/
+partial def respellIndex? (env : Environment) (row e : Lean.Expr) : Option Lean.Expr := do
+  let e := e.consumeMData
+  let .const name _ := e.getAppFn | none
+  guard (env.isConstructor name && indexFamilies.contains name.getPrefix)
+  let args ← e.getAppArgs.mapM fun arg => do
+    let arg := arg.consumeMData
+    let some head := arg.getAppFn.constName? | pure arg
+    unless env.isConstructor head do return arg
+    let kind := head.getPrefix
+    if kind == ``NTy then substituteNTy row arg
+    else if kind == ``NRow then substituteNRow row arg
+    else if kind == ``NRows then substituteNRows row arg
+    else if indexFamilies.contains kind then respellIndex? env row arg
+    else pure arg
+  return mkAppN e.getAppFn args
+
+/-- The induced family an operation is at, from its arguments: the carriers
+it takes first, or the frame it takes after its unit. Its position, the type
+arguments, and the outer family. -/
+def operationFamily? (args : Array Lean.Expr) : Option (Nat × Lean.Expr × Lean.Expr) :=
+  match args[0]?.bind (fun family => inducedCarriers? family.consumeMData) with
+  | some (θ, outer) => some (0, θ, outer)
+  | none => do
+      let frame := (← args[1]?).consumeMData
+      guard (frame.isAppOfArity ``Skolems.instantiate 3)
+      pure (1, frame.getArg! 1, frame.getArg! 2)
+
+/-- A native operation at an induced family whose type arguments are
+spelled, at the outer family with each type and index it takes substituted,
+and the number of its arguments up to the last type or index; none where a
+type does not substitute. At spelled types the two are definitionally equal
+where the operation reduces on its types and indices (`respellOperation?`
+checks it on those arguments, not on the values, which it would evaluate). -/
+def respelledOperation? (t : Lean.Expr) : MetaM (Option (Lean.Expr × Nat)) := do
+  let some head := t.getAppFn.constName? | return none
+  unless (`VerexIR.Proofs.Denote).isPrefixOf head do return none
+  let args := t.getAppArgs
+  let some (position, θ, outer) := operationFamily? args | return none
+  let some row := substitutionRow? θ | return none
+  let env ← getEnv
+  let spelledType (e : Lean.Expr) : Bool := match e.consumeMData.getAppFn.constName? with
+    | some name => env.isConstructor name && [``NTy, ``NRow, ``NRows].contains name.getPrefix
+    | none => false
+  let mut rebuiltArgs := (args.extract 0 position).push outer
+  let mut typed := position + 1
+  for arg in args.extract (position + 1) args.size do
+    if spelledType arg then
+      let kind := arg.consumeMData.getAppFn.constName!.getPrefix
+      let substituted := if kind == ``NTy then substituteNTy row arg
+        else if kind == ``NRow then substituteNRow row arg
+        else substituteNRows row arg
+      let some substituted := substituted | return none
+      rebuiltArgs := rebuiltArgs.push substituted
+      typed := rebuiltArgs.size
+    else if let some index := respellIndex? env row arg then
+      rebuiltArgs := rebuiltArgs.push index
+      typed := rebuiltArgs.size
+    else rebuiltArgs := rebuiltArgs.push arg
+  return some (mkAppN t.getAppFn rebuiltArgs, typed)
+
+/-- `respelledOperation?` where the two spellings convert. -/
+def respellOperation? (t : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let some (respelled, typed) ← respelledOperation? t | return none
+  let operation := mkAppN t.getAppFn (t.getAppArgs.extract 0 typed)
+  if operation.hasLooseBVars then return none
+  unless ← isDefEq operation (mkAppN respelled.getAppFn (respelled.getAppArgs.extract 0 typed)) do
+    return none
+  return some respelled
+
 /-- A term with the types and defaults it spells at an induced family
 spelled at the outer family, as the caller states them: carriers, rows,
 variants, result shapes, and defaults (`NTy.inhabitantOf`), in types and
@@ -267,6 +346,11 @@ def respellInducedFamily (e : Lean.Expr) : MetaM Lean.Expr :=
           pure (some (mkApp3 (mkConst ``NTy.inhabitantOf) outer substituted decided))
       | _, _ => pure none
     match respelled with
+    | some value => return .done value
+    | none =>
+    -- Any other native operation at the induced family, such as a field's
+    -- selection, at the outer family.
+    match ← respellOperation? e with
     | some value => return .done value
     | none => return .continue)
 

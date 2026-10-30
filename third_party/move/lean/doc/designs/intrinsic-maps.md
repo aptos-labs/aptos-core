@@ -62,7 +62,7 @@ one of two disciplines:
   moves the last entry into the removed position (swap-remove), as
   `SimpleMap` does. `SimpleMap`, `Table`, `TableWithLength`.
 
-The operations and their laws (membership, lookup, length, update,
+The operations and their lemmas (membership, lookup, length, update,
 removal, enumeration, and the bulk operations below) are defined and
 proved once in Lean (`VerexIR/Proofs/Maps/Model.lean`, `SpecMap K V`),
 independent of any Aptos type. The entries are as many as a Move vector
@@ -209,7 +209,7 @@ representation invariant (`Maps.Valid`). It is an implicit data invariant
 of the owner type, deep as the Prover's data-invariant instrumentation is:
 a value is valid wherever it appears, in fields, vector elements, and map
 values. A function assumes it of its inputs and establishes it of what it
-returns and modifies, and a loop keeps it. The laws carry it through every
+returns and modifies, and a loop keeps it. The lemmas carry it through every
 role that produces a map (`valid_update`, `valid_remove`,
 `valid_updateAll`, `valid_takeEntries`, `valid_dropEntries`, and
 `valid_replaceKey` where the replacement does not abort). Iterator
@@ -275,8 +275,8 @@ keeps `SimpleMap`'s order.
 ## Maps in proofs
 
 The solver keeps map values abstract: observations (`size`, `hasKey`,
-`valueAt`, `keyAt`, `rank`) are reduced by the laws over the operations,
-never by evaluating a model's list, which would lose the laws' patterns.
+`valueAt`, `keyAt`, `rank`) are reduced by the lemmas over the operations,
+never by evaluating a model's list, which would lose the lemmas' patterns.
 Where the Prover's SMT solver has map axioms, the solver adds their
 instances at the positions a leaf reads a map at, deciding the positions
 by omega: a key the map has sits at its rank, and a key at a position
@@ -288,8 +288,8 @@ positions of a map holds at each position the leaf reads.
 A leaf states a table's map as `SpecMap.ofEntries keys values x` over the
 owner's `SpecEntries` component ([`native-verification.md`](native-verification.md));
 `verex_prepare typed` names the maps a leaf reads (`verex_name_maps`), so
-that an authored proof argues with the `SpecMap` laws under the module's
+that an authored proof argues with the `SpecMap` lemmas under the module's
 own specification function names ([`source-verification.md`](source-verification.md),
 "Tactics"). A companion proof file needs no local helper theorems about
-maps; the general ghost-field selection law lives with contract
+maps; the general ghost-field selection lemma lives with contract
 translation.

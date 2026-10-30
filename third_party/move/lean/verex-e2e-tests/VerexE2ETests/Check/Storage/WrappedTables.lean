@@ -128,7 +128,7 @@ verex module 0x42::wrapped_tables where
 error: the specification clause `ensures size(t) == size(old(t))` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_size` failed; provide a proof in the module:
-  verify wrong_size by
+  verify wrong_size by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

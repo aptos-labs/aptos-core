@@ -4,7 +4,7 @@ tests/sources/functional/return_values.move:18:9: error: the specification claus
 tests/sources/functional/return_values.move:35:9: error: the specification clause `ensures result == 2` is not established
 tests/sources/functional/return_values.move:36:9: error: the specification clause `ensures spec.result[1] == 1` is not established
 tests/sources/functional/return_values.move:33:5: error: verex verification failed: the automatic verification of `one_two_wrapper_incorrect` failed; provide a proof in `tests/sources/functional/return_values.proof.lean`:
-  verify one_two_wrapper_incorrect by
+  verify one_two_wrapper_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/return_values.move:60:9: error: the specification claus
 tests/sources/functional/return_values.move:62:9: error: the specification clause `ensures result == false` is not established
 tests/sources/functional/return_values.move:63:9: error: the specification clause `ensures spec.result[1] == 0` is not established
 tests/sources/functional/return_values.move:59:5: error: verex verification failed: the automatic verification of `true_one_wrapper_incorrect` failed; provide a proof in `tests/sources/functional/return_values.proof.lean`:
-  verify true_one_wrapper_incorrect by
+  verify true_one_wrapper_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

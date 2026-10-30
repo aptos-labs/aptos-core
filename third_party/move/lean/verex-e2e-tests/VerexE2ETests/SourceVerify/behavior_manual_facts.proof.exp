@@ -31,17 +31,22 @@ a✝⁶ :
           1)
 a✝⁵ :
   ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
-      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-        Proofs.Denote.Weave.nil.supplied.mask #[] ())
-      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+      (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+        { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] () ⋯)
       (addr, ()) initialState✝
 a✝⁴ :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ()) initialState✝
           {
             type :=
@@ -65,28 +70,39 @@ a✝³ :
                 (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil } →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ()) initialState✝ resource =
         initialState✝ resource
 a✝² :
   Proofs.Denoted
     (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
-      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-        Proofs.Denote.Weave.nil.supplied.mask #[] ())
-      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+      (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+        { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] () ⋯)
       (addr, ()) () initialState✝
       (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-          Proofs.Denote.Weave.nil.supplied.mask #[] ())
-        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+        (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+          { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+          ⋯)
         (addr, ()) initialState✝))
 x✝¹ :
   (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-          Proofs.Denote.Weave.nil.supplied.mask #[] ())
-        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+        (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+          { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+          ⋯)
         (addr, ()) initialState✝
         {
           type :=
@@ -97,27 +113,38 @@ x✝¹ :
     true
 x✝ :
   ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
-      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-        Proofs.Denote.Weave.nil.supplied.mask #[] ())
-      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+      (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+        { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask #[] () ⋯)
       (addr, ())
       (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-          Proofs.Denote.Weave.nil.supplied.mask #[] ())
-        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+        (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+          { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+          ⋯)
         (addr, ()) initialState✝)
 a✝¹ :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ())
           (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-            (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-              Proofs.Denote.Weave.nil.supplied.mask #[] ())
-            (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+            (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+            (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+              { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[]
+              () ⋯)
             (addr, ()) initialState✝)
           {
             type :=
@@ -126,9 +153,12 @@ a✝¹ :
             arguments := Proofs.Denote.NRow.nil }
           key =
         Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ()) initialState✝
           {
             type :=
@@ -145,48 +175,71 @@ a✝ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil } →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ())
           (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-            (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-              Proofs.Denote.Weave.nil.supplied.mask #[] ())
-            (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+            (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+            (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+              { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[]
+              () ⋯)
             (addr, ()) initialState✝)
           resource =
         Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ()) initialState✝ resource
 x :
   Proofs.Denoted
     (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
-      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-        Proofs.Denote.Weave.nil.supplied.mask #[] ())
-      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+      (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+        { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask #[] () ⋯)
       (addr, ()) ()
       (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-          Proofs.Denote.Weave.nil.supplied.mask #[] ())
-        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+        (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+          { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+          ⋯)
         (addr, ()) initialState✝)
       (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-          Proofs.Denote.Weave.nil.supplied.mask #[] ())
-        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+        (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+          { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+          ⋯)
         (addr, ())
         (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-            Proofs.Denote.Weave.nil.supplied.mask #[] ())
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+          (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+            { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask #[] ()
+            ⋯)
           (addr, ()) initialState✝)))
 increment_ensures_1 :
   ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                Proofs.Denote.Weave.nil.supplied.mask #[] ())
-              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+              (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                #[] () ⋯)
               (addr, ()) initialState✝
               {
                 type :=
@@ -206,15 +259,21 @@ increment_ensures_1 :
       1
 flip_flag_ensures_1 :
   ¬(((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-                (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-                  Proofs.Denote.Weave.nil.supplied.mask #[] ())
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
-                Proofs.Denote.ResultShape.none (addr, ())
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+                (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                  { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask
+                  #[] () ⋯)
+                (addr, ())
                 (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-                  (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                    Proofs.Denote.Weave.nil.supplied.mask #[] ())
                   (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
-                  Proofs.Denote.ResultShape.none (addr, ()) initialState✝)
+                  { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+                  (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                    { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                    { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                    Proofs.Denote.Weave.nil.supplied.mask #[] () ⋯)
+                  (addr, ()) initialState✝)
                 {
                   type :=
                     Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
@@ -224,10 +283,13 @@ flip_flag_ensures_1 :
             (false, ())).fst =
         true ↔
       ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-                (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                  Proofs.Denote.Weave.nil.supplied.mask #[] ())
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
-                Proofs.Denote.ResultShape.none (addr, ()) initialState✝
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+                (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                  { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                  #[] () ⋯)
+                (addr, ()) initialState✝
                 {
                   type :=
                     Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
@@ -239,15 +301,21 @@ flip_flag_ensures_1 :
 left✝² :
   0 ≤
     ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-                Proofs.Denote.Weave.nil.supplied.mask #[] ())
-              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+              (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask
+                #[] () ⋯)
               (addr, ())
               (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-                (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                  Proofs.Denote.Weave.nil.supplied.mask #[] ())
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
-                Proofs.Denote.ResultShape.none (addr, ()) initialState✝)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+                (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                  { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                  #[] () ⋯)
+                (addr, ()) initialState✝)
               {
                 type :=
                   Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
@@ -257,15 +325,21 @@ left✝² :
           ({ val := 0, fits := ⋯ }, ())).fst.val
 right✝² :
   ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-                Proofs.Denote.Weave.nil.supplied.mask #[] ())
-              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+              (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask
+                #[] () ⋯)
               (addr, ())
               (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-                (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                  Proofs.Denote.Weave.nil.supplied.mask #[] ())
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
-                Proofs.Denote.ResultShape.none (addr, ()) initialState✝)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+                (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                  { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                  #[] () ⋯)
+                (addr, ()) initialState✝)
               {
                 type :=
                   Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
@@ -297,9 +371,12 @@ right✝¹ :
 left✝ :
   0 ≤
     ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                Proofs.Denote.Weave.nil.supplied.mask #[] ())
-              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+              (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                #[] () ⋯)
               (addr, ()) initialState✝
               {
                 type :=
@@ -310,9 +387,12 @@ left✝ :
           ({ val := 0, fits := ⋯ }, ())).fst.val
 right✝ :
   ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                Proofs.Denote.Weave.nil.supplied.mask #[] ())
-              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+              (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                #[] () ⋯)
               (addr, ()) initialState✝
               {
                 type :=
@@ -323,15 +403,21 @@ right✝ :
           ({ val := 0, fits := ⋯ }, ())).fst.val ≤
     18446744073709551615
 ⊢ ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
-                Proofs.Denote.Weave.nil.supplied.mask #[] ())
-              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil) Proofs.Denote.ResultShape.none
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+              (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                { namespaceId := { index := 0 }, functionId := { index := 1 } } Proofs.Denote.Weave.nil.supplied.mask
+                #[] () ⋯)
               (addr, ())
               (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
-                (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
-                  Proofs.Denote.Weave.nil.supplied.mask #[] ())
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
-                Proofs.Denote.ResultShape.none (addr, ()) initialState✝)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none
+                (Proofs.Denote.functionOf (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [] } Proofs.Denote.NRow.nil
+                  { namespaceId := { index := 0 }, functionId := { index := 0 } } Proofs.Denote.Weave.nil.supplied.mask
+                  #[] () ⋯)
+                (addr, ()) initialState✝)
               {
                 type :=
                   Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil

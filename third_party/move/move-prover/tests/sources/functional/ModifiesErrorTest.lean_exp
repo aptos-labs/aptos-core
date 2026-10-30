@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/ModifiesErrorTest.move:45:5: error: the continuation after call 2 of `0x0::A::read_at` is not established
 tests/sources/functional/ModifiesErrorTest.move:45:5: error: verex verification failed: the automatic verification of `mutate_at_test_incorrect` failed; provide a proof in the module:
-  verify mutate_at_test_incorrect by
+  verify mutate_at_test_incorrect by lean =>
     verex_obligations
     verex_on
     | after_call_2_of_read_at => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/ModifiesErrorTest.move:45:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ModifiesErrorTest.move:58:5: error: the continuation after call 2 of `0x0::A::read_at` is not established
 tests/sources/functional/ModifiesErrorTest.move:58:5: error: verex verification failed: the automatic verification of `move_to_test_incorrect` failed; provide a proof in the module:
-  verify move_to_test_incorrect by
+  verify move_to_test_incorrect by lean =>
     verex_obligations
     verex_on
     | after_call_2_of_read_at => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/ModifiesErrorTest.move:58:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ModifiesErrorTest.move:72:5: error: the continuation after call 2 of `0x0::A::read_at` is not established
 tests/sources/functional/ModifiesErrorTest.move:72:5: error: verex verification failed: the automatic verification of `move_from_test_incorrect` failed; provide a proof in the module:
-  verify move_from_test_incorrect by
+  verify move_from_test_incorrect by lean =>
     verex_obligations
     verex_on
     | after_call_2_of_read_at => verex_prepare; sorry
@@ -25,7 +25,7 @@ tests/sources/functional/ModifiesErrorTest.move:72:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ModifiesErrorTest.move:85:5: error: the continuation after call 2 of `0x0::A::read_at` is not established
 tests/sources/functional/ModifiesErrorTest.move:85:5: error: verex verification failed: the automatic verification of `mutate_S_test1_incorrect` failed; provide a proof in the module:
-  verify mutate_S_test1_incorrect by
+  verify mutate_S_test1_incorrect by lean =>
     verex_obligations
     verex_on
     | after_call_2_of_read_at => verex_prepare; sorry
@@ -33,7 +33,7 @@ tests/sources/functional/ModifiesErrorTest.move:85:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ModifiesErrorTest.move:95:13: error: the assertion `x0 == x1` does not hold
 tests/sources/functional/ModifiesErrorTest.move:98:5: error: verex verification failed: the automatic verification of `mutate_S_test2_incorrect` failed; provide a proof in the module:
-  verify mutate_S_test2_incorrect by
+  verify mutate_S_test2_incorrect by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

@@ -174,6 +174,17 @@ def memoryWrittenGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr))
     let some site ← (evalNat (action.getArg! 4)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
+/-- The site of the abort a goal's weakest precondition is over, if any
+(`wp_abortAt`). -/
+def abortAtGoal? (goal : MVarId) : MetaM (Option Nat) :=
+  goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
+    let action := target.getArg! 3
+    unless action.isAppOf ``VerexIR.Proofs.Denote.abortAt && action.getAppNumArgs ≥ 2 do
+      return none
+    (evalNat (action.getArg! (action.getAppNumArgs - 2))).run
+
 /-- The call a goal's weakest precondition is over, if any: its site, and
 the arguments of `wp_callAt`. -/
 def callAtGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
@@ -272,8 +283,11 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
     TacticM (Option (List MVarId × Bool)) := do
   let target ← goal.withContext (instantiateMVars (← goal.getType))
   if target.isForall then
-    -- A quantified variable keeps its name, for an authored proof.
-    let (_, next) ← goal.intro1P
+    -- A quantified variable keeps its name, for an authored proof; a
+    -- borrow's prophecy mark is consumed.
+    let (introduced, next) ← goal.intro1P
+    if (prophecyMark? target.bindingDomain!).isSome then
+      return some ([← consumeProphecy next introduced], false)
     return some ([next], false)
   if target.isAppOfArity ``And 2 then
     let subgoals ← goal.apply (mkConst ``And.intro)
@@ -2455,8 +2469,9 @@ def combineLeaves (tag : Name) (leaves : Array MVarId) : MetaM (Option MVarId) :
     statements := statements.push statement
     orders := orders.push extras
     let (provenance, clauses) := ((← (← targetState).leafOrigins.get)[leaf]?).getD (none, #[])
+    let decisions := ((← (← targetState).leafDecisions.get)[leaf]?).getD #[]
     paths := paths.push (Name.mkSimple s!"{tag}_{paths.size + 1}", provenance, clauses,
-      extras.map (·.isImplementationDetail))
+      extras.map (·.isImplementationDetail), decisions)
   let mut statement := statements.back!
   for part in statements.pop.reverse do statement := mkAnd part statement
   let combined ← mkFreshExprMVarAt lctx instances statement .syntheticOpaque tag

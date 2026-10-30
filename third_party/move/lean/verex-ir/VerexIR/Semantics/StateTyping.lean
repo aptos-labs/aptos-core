@@ -2800,7 +2800,7 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
       | tuple elementTypes =>
           simp only at static
           split at static
-          · rename_i expression position _ expression_eq
+          · rename_i expression position _ _ expression_eq
             split at static
             · cases static
             rename_i nonnegative

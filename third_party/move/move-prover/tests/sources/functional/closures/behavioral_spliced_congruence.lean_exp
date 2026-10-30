@@ -411,28 +411,9 @@ right✝ :
             ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
               (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
             initialState✝)
-    (fun failure =>
-      VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
-        (VerexIR.Proofs.Denote.NRow.cons
-          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            VerexIR.Proofs.Denote.NRow.nil
-            (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
-              (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil))
-                    VerexIR.Proofs.Denote.NRow.nil)
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                        VerexIR.Proofs.Denote.NRow.nil
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                          VerexIR.Proofs.Denote.NRow.nil)).vector
-                    VerexIR.Proofs.Denote.NRow.nil))
-                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                  VerexIR.Proofs.Denote.NRow.nil))))
+    (fun error =>
+      VerexIR.Proofs.Denote.AbortsAt 10439
+        (VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
           (VerexIR.Proofs.Denote.NRow.cons
             (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
               VerexIR.Proofs.Denote.NRow.nil
@@ -453,15 +434,36 @@ right✝ :
                       VerexIR.Proofs.Denote.NRow.nil))
                   (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                     VerexIR.Proofs.Denote.NRow.nil))))
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
-        { parameters := [false, false, false], results := [false] }
-        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
-        ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
-          (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
-        initialState✝)
+            (VerexIR.Proofs.Denote.NRow.cons
+              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                VerexIR.Proofs.Denote.NRow.nil
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+                  (VerexIR.Proofs.Denote.NRow.cons
+                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
+                      (VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
+                          VerexIR.Proofs.Denote.NRow.nil
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+                            VerexIR.Proofs.Denote.NRow.nil))
+                        VerexIR.Proofs.Denote.NRow.nil)
+                      (VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
+                            VerexIR.Proofs.Denote.NRow.nil
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
+                              VerexIR.Proofs.Denote.NRow.nil)).vector
+                        VerexIR.Proofs.Denote.NRow.nil))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                      VerexIR.Proofs.Denote.NRow.nil))))
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                VerexIR.Proofs.Denote.NRow.nil)))
+          { parameters := [false, false, false], results := [false] }
+          (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
+          ((taker_account, (taker_client_id_vec, ()), taker_price, ()),
+            (maker_account, (maker_client_id_vec, ()), maker_price, ()), size, ())
+          initialState✝))
     initialState✝
 tests/sources/functional/closures/behavioral_spliced_congruence.move:70:5: error: verex verification failed: the automatic verification of `run` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify run by
+  verify run by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
@@ -470,7 +472,7 @@ tests/sources/functional/closures/behavioral_spliced_congruence.move:70:5: error
 tests/sources/functional/closures/behavioral_spliced_congruence.move:79:5: error: the precondition of `settle` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:79:5: error: the precondition of `settle` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:79:5: error: verex verification failed: the automatic verification of `run_concrete` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify run_concrete by
+  verify run_concrete by lean =>
     verex_obligations
     verex_on
     | requires_of_settle => verex_prepare; sorry
@@ -485,7 +487,7 @@ tests/sources/functional/closures/behavioral_spliced_congruence.move:95:9: error
             + 1
         )` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:93:5: error: verex verification failed: the automatic verification of `run_concrete_wrong` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify run_concrete_wrong by
+  verify run_concrete_wrong by lean =>
     verex_obligations
     verex_on
     | requires_of_settle => verex_prepare; sorry
@@ -495,7 +497,7 @@ tests/sources/functional/closures/behavioral_spliced_congruence.move:93:5: error
 tests/sources/functional/closures/behavioral_spliced_congruence.move:57:5: error: the precondition of `settle` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:57:5: error: the precondition of `settle` is not established
 tests/sources/functional/closures/behavioral_spliced_congruence.move:57:5: error: verex verification failed: the automatic verification of `callbacks` failed; provide a proof in `tests/sources/functional/closures/behavioral_spliced_congruence.proof.lean`:
-  verify callbacks by
+  verify callbacks by lean =>
     verex_obligations
     verex_on
     | requires_of_settle => verex_prepare; sorry

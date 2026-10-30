@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/loop_memory_havoc.move:19:9: error: the specification clause `ensures global<R>(addr).x == old(global<R>(addr).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:17:5: error: verex verification failed: the automatic verification of `bump_loop_frame_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify bump_loop_frame_fails by
+  verify bump_loop_frame_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/loop_memory_havoc.move:17:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:29:9: error: the specification clause `ensures global<R>(addr).x == old(global<R>(addr).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:27:5: error: verex verification failed: the automatic verification of `bump_once_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify bump_once_fails by
+  verify bump_once_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -18,7 +18,7 @@ tests/sources/functional/loop_memory_havoc.move:27:5: error: verex verification 
 tests/sources/functional/loop_memory_havoc.move:74:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v
         == old(global<«Ghost$gcount»>(@0x0).v)` is not established
 tests/sources/functional/loop_memory_havoc.move:73:5: error: verex verification failed: the automatic verification of `ghost_inline_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify ghost_inline_update_fails by
+  verify ghost_inline_update_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -27,7 +27,7 @@ tests/sources/functional/loop_memory_havoc.move:73:5: error: verex verification 
 tests/sources/functional/loop_memory_havoc.move:96:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v
         == old(global<«Ghost$gcount»>(@0x0).v)` is not established
 tests/sources/functional/loop_memory_havoc.move:95:5: error: verex verification failed: the automatic verification of `ghost_callee_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify ghost_callee_update_fails by
+  verify ghost_callee_update_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -36,7 +36,7 @@ tests/sources/functional/loop_memory_havoc.move:95:5: error: verex verification 
 tests/sources/functional/loop_memory_havoc.move:125:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v
         == old(global<«Ghost$gcount»>(@0x0).v)` is not established
 tests/sources/functional/loop_memory_havoc.move:124:5: error: verex verification failed: the automatic verification of `ghost_update_after_preamble_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify ghost_update_after_preamble_fails by
+  verify ghost_update_after_preamble_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -44,7 +44,7 @@ tests/sources/functional/loop_memory_havoc.move:124:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:169:9: error: the specification clause `ensures result.gf == 0` is not established
 tests/sources/functional/loop_memory_havoc.move:168:5: error: verex verification failed: the automatic verification of `ghost_field_loop_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify ghost_field_loop_fails by
+  verify ghost_field_loop_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -52,7 +52,7 @@ tests/sources/functional/loop_memory_havoc.move:168:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:207:9: error: the specification clause `ensures global<«Ghost$gcount»>(@0x0).v == 7` is not established
 tests/sources/functional/loop_memory_havoc.move:205:5: error: verex verification failed: the automatic verification of `ghost_untouched_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify ghost_untouched_framed by
+  verify ghost_untouched_framed by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -61,7 +61,7 @@ tests/sources/functional/loop_memory_havoc.move:205:5: error: verex verification
 tests/sources/functional/loop_memory_havoc.move:219:5: error: a loop invariant at an iteration is not established
 tests/sources/functional/loop_memory_havoc.move:222:9: error: the specification clause `ensures global<R>(addr).x == old(global<R>(addr).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:219:5: error: verex verification failed: the automatic verification of `fv_modifies_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_modifies_update_fails by
+  verify fv_modifies_update_fails by lean =>
     verex_obligations
     verex_on
     | invariant_step => verex_prepare; sorry
@@ -71,7 +71,7 @@ tests/sources/functional/loop_memory_havoc.move:219:5: error: verex verification
 tests/sources/functional/loop_memory_havoc.move:261:5: error: a loop invariant at an iteration is not established
 tests/sources/functional/loop_memory_havoc.move:264:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:261:5: error: verex verification failed: the automatic verification of `fv_field_modifies_update_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_field_modifies_update_fails by
+  verify fv_field_modifies_update_fails by lean =>
     verex_obligations
     verex_on
     | invariant_step => verex_prepare; sorry
@@ -82,7 +82,7 @@ tests/sources/functional/loop_memory_havoc.move:277:5: error: a loop invariant a
 tests/sources/functional/loop_memory_havoc.move:280:9: error: the specification clause `ensures global<Config>(s.address).active
         == old(global<Config>(s.address).active)` is not established
 tests/sources/functional/loop_memory_havoc.move:277:5: error: verex verification failed: the automatic verification of `fv_field_untouched_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_field_untouched_framed by
+  verify fv_field_untouched_framed by lean =>
     verex_obligations
     verex_on
     | invariant_step => verex_prepare; sorry
@@ -91,7 +91,7 @@ tests/sources/functional/loop_memory_havoc.move:277:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:297:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:295:5: error: verex verification failed: the automatic verification of `fv_local_closure_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_local_closure_fails by
+  verify fv_local_closure_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -99,7 +99,7 @@ tests/sources/functional/loop_memory_havoc.move:295:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:318:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:316:5: error: verex verification failed: the automatic verification of `fv_returned_closure_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_returned_closure_fails by
+  verify fv_returned_closure_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -107,7 +107,7 @@ tests/sources/functional/loop_memory_havoc.move:316:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:359:9: error: the specification clause `ensures global<Counter>(a).x == old(global<Counter>(a).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:357:5: error: verex verification failed: the automatic verification of `fv_curry_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_curry_fails by
+  verify fv_curry_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -116,7 +116,7 @@ tests/sources/functional/loop_memory_havoc.move:357:5: error: verex verification
 tests/sources/functional/loop_memory_havoc.move:379:5: error: a loop invariant at an iteration is not established
 tests/sources/functional/loop_memory_havoc.move:383:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:379:5: error: verex verification failed: the automatic verification of `fv_wild_forward_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_wild_forward_fails by
+  verify fv_wild_forward_fails by lean =>
     verex_obligations
     verex_on
     | invariant_step => verex_prepare; sorry
@@ -126,7 +126,7 @@ tests/sources/functional/loop_memory_havoc.move:379:5: error: verex verification
 tests/sources/functional/loop_memory_havoc.move:404:5: error: a loop invariant at an iteration is not established
 tests/sources/functional/loop_memory_havoc.move:407:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:404:5: error: verex verification failed: the automatic verification of `fv_forward_depth2_fails` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify fv_forward_depth2_fails by
+  verify fv_forward_depth2_fails by lean =>
     verex_obligations
     verex_on
     | invariant_step => verex_prepare; sorry
@@ -136,7 +136,7 @@ tests/sources/functional/loop_memory_havoc.move:404:5: error: verex verification
 tests/sources/functional/loop_memory_havoc.move:428:9: error: the precondition `requires exists<R>(a)` of `rec_bump` does not hold at call 1
 tests/sources/functional/loop_memory_havoc.move:429:9: error: the specification clause `ensures global<R>(a).x == old(global<R>(a).x)` is not established
 tests/sources/functional/loop_memory_havoc.move:426:5: error: verex verification failed: the automatic verification of `rec_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify rec_bump by
+  verify rec_bump by lean =>
     verex_obligations
     verex_on
     | requires_1_of_rec_bump_at_call_1 => verex_prepare; sorry
@@ -145,7 +145,7 @@ tests/sources/functional/loop_memory_havoc.move:426:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:446:9: error: the specification clause `ensures global<G<T> >(a).v == old(global<G<T> >(a).v)` is not established
 tests/sources/functional/loop_memory_havoc.move:444:5: error: verex verification failed: the automatic verification of `gen_bump` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify gen_bump by
+  verify gen_bump by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -153,7 +153,7 @@ tests/sources/functional/loop_memory_havoc.move:444:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/loop_memory_havoc.move:483:9: error: the specification clause `ensures result == 7` is not established
 tests/sources/functional/loop_memory_havoc.move:480:5: error: verex verification failed: the automatic verification of `untouched_memory_framed` failed; provide a proof in `tests/sources/functional/loop_memory_havoc.proof.lean`:
-  verify untouched_memory_framed by
+  verify untouched_memory_framed by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

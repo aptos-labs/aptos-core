@@ -120,6 +120,50 @@ so the state is the theorem's being proved, kept in the environment of its
 elaboration branch (`Environment.asyncPrefix?`); a synchronous elaboration
 keeps the anonymous state in the main environment. -/
 
+/-- Where a path aborts: in a call, its number among the target's calls of
+the callee and among all calls; at the target's `number`-th `abort` or
+`assert!`, aborting operation, or invocation, in source order. -/
+inductive AbortSite where
+  | call (number : Nat) (callee : String) (overall : Nat)
+  | abort (number : Nat)
+  | op (number : Nat)
+  | invoke (number : Nat)
+  deriving BEq, Inhabited
+
+/-- A program point a proof places facts at (`doc/plan/proof-language.md`,
+"Points"): the function's entry, the entry of its `loop`-th loop or the start
+of an iteration of it, where a path continues after a site, or the end of a
+path. -/
+inductive ProgramPointKey where
+  | entry
+  | exit
+  | loopEntry (loop : Nat)
+  | loopStep (loop : Nat)
+  | after (site : AbortSite)
+  deriving BEq, Inhabited
+
+/-- The point as a proof spells it: `at entry`, `at loop 1 step`, `after
+call 2 of g`, `after op 1`. -/
+def ProgramPointKey.text : ProgramPointKey → String
+  | .entry => "at entry"
+  | .exit => "at exit"
+  | .loopEntry loop => s!"at loop {loop} entry"
+  | .loopStep loop => s!"at loop {loop} step"
+  | .after (.call number "" _) => s!"after call {number}"
+  | .after (.call number callee _) => s!"after call {number} of {callee}"
+  | .after (.abort number) => s!"after abort {number}"
+  | .after (.op number) => s!"after op {number}"
+  | .after (.invoke number) => s!"after invoke {number}"
+
+/-- Whether a point is one a pattern names, a call without its callee
+counted among all calls. -/
+def ProgramPointKey.selects (pattern point : ProgramPointKey) : Bool :=
+  match pattern, point with
+  | .after (.call number "" _), .after (.call _ _ overall) => number == overall
+  | .after (.call number callee _), .after (.call other otherCallee _) =>
+      number == other && callee == otherCallee
+  | _, _ => pattern == point
+
 /-- What a leaf owes, as a proof addresses it (`doc/plan/proof-language.md`,
 "Obligation addressing"): a clause by its kind and number among the clauses
 of that kind, a loop invariant at entry or at a step, a callee's
@@ -137,10 +181,16 @@ structure ObligationKey where
   /-- The number of the call among the target's calls of the callee, in
   source order. -/
   call : Option Nat := none
+  /-- The number of the loop an invariant is of, in source order, where the
+  function has several. -/
+  loop : Option Nat := none
+  /-- The point an `assert` of a proof's point step is at. -/
+  point : Option ProgramPointKey := none
   deriving BEq, Inhabited
 
 /-- The key as a proof and a message spell it: `ensures 1`, `invariant 2
-step`, `requires 1 of iter_next at call 2`, `after call 1 of add_shares`. -/
+step`, `invariant 3 of loop 2 entry`, `requires 1 of iter_next at call 2`,
+`after call 1 of add_shares`, `assert 1 of at entry`. -/
 def ObligationKey.text (key : ObligationKey) : String :=
   let index := (key.index.map (s!" {·}")).getD ""
   let call := (key.call.map (s!" at call {·}")).getD ""
@@ -149,7 +199,8 @@ def ObligationKey.text (key : ObligationKey) : String :=
   | "after", some callee => match key.call with
       | some number => s!"after call {number} of {callee}"
       | none => s!"after {callee}"
-  | kind, _ => s!"{kind}{index}" ++ (key.phase.map (s!" {·}")).getD ""
+  | kind, _ => s!"{kind}{index}" ++ (key.loop.map (s!" of loop {·}")).getD "" ++
+      (key.phase.map (s!" {·}")).getD "" ++ (key.point.map (s!" of {·.text}")).getD ""
 
 /-- The key as a goal's tag: its text with underscores (`ensures_1`,
 `requires_1_of_iter_next_at_call_2`). -/
@@ -161,7 +212,44 @@ part the pattern states the same. -/
 def ObligationKey.selects (pattern key : ObligationKey) : Bool :=
   pattern.kind == key.kind &&
     (pattern.index.all (some · == key.index)) && (pattern.phase.all (some · == key.phase)) &&
-    (pattern.callee.all (some · == key.callee)) && (pattern.call.all (some · == key.call))
+    (pattern.callee.all (some · == key.callee)) && (pattern.call.all (some · == key.call)) &&
+    (pattern.loop.all (some · == key.loop)) &&
+    -- An assert of the body is no point's.
+    (match pattern.point, key.point with
+      | none, none => true
+      | some point, some other => point.selects other
+      | _, _ => false)
+
+/-- A source decision on a leaf's path (`doc/plan/proof-language.md`,
+"Obligation addressing"): the `number`-th `if` taken, `match` taking a
+variant, loop exiting or continuing, or where the path aborts. -/
+inductive Decision where
+  | branch (number : Nat) (taken : Bool)
+  | variant (number : Nat) (name : String)
+  | loop (number : Nat) (exits : Bool)
+  | aborts (site : AbortSite)
+  deriving BEq, Inhabited
+
+/-- The decision as a selector spells it: `if 1 then`, `match 2 Some`,
+`loop 1 exits`, `aborts at call 1 of add_shares`. -/
+def Decision.text : Decision → String
+  | .branch number taken => s!"if {number} {if taken then "then" else "else"}"
+  | .variant number name => s!"match {number} {name}"
+  | .loop number exits => s!"loop {number} {if exits then "exits" else "continues"}"
+  | .aborts (.call number callee _) => s!"aborts at call {number} of {callee}"
+  | .aborts (.abort number) => s!"aborts at abort {number}"
+  | .aborts (.op number) => s!"aborts at op {number}"
+  | .aborts (.invoke number) => s!"aborts at invoke {number}"
+
+/-- Whether a path's decision is one a selector states: the same, a call
+without its callee counted among all calls. -/
+def Decision.selects (pattern decision : Decision) : Bool :=
+  match pattern, decision with
+  | .aborts (.call number "" _), .aborts (.call _ _ overall) => number == overall
+  | .aborts (.call number callee _), .aborts (.call other otherCallee _) =>
+      number == other && callee == otherCallee
+  | _, _ => pattern == decision
+
 
 /-- Where a goal the solver splits off comes from, when no clause marker
 locates it. -/
@@ -172,8 +260,11 @@ inductive Provenance where
   /-- What follows a call, at the callee's `call`-th call where the call is
   the target's own. -/
   | continuation (callee : String) (call : Option Nat)
-  | loopEntry
-  | loopIteration
+  /-- A loop's invariant at its entry, the loop's number where the target
+  has several loops. -/
+  | loopEntry (loop : Option Nat)
+  /-- A loop's invariant after an iteration. -/
+  | loopIteration (loop : Option Nat)
   | assertion
   | mutationEnd
   | construction
@@ -188,6 +279,8 @@ inductive Provenance where
   | storedWrite
   /-- That an `update`'s value lies in its ghost field type's domain. -/
   | ghostWrite
+  /-- The `index`-th `assert` of a proof's steps at a point. -/
+  | pointAssert (point : ProgramPointKey) (index : Nat)
   deriving BEq
 
 /-- A hypothesis's normal form up to the names of its free variables: the
@@ -219,6 +312,9 @@ structure TargetState where
   /-- The number of each precondition among its function's, by its source
   range: what a callee's precondition is keyed by. -/
   preconditionNumbers : IO.Ref (Array (ObligationRange × Nat))
+  /-- The key of each invariant clause, by its source range: `data
+  invariant` for a struct's, `module invariant` for a global one. -/
+  invariantKeys : IO.Ref (Array (ObligationRange × String))
   /-- The last target's undecided leaves with their actual diagnostic
   locations, including foreign files and fallback locations. -/
   failedLeaves : IO.Ref (Array (Message × String))
@@ -311,9 +407,30 @@ structure TargetState where
   /-- What each handed-over leaf owes, by its tag: what `verex_on` selects
   by. -/
   leafKeys : IO.Ref (Std.HashMap Name ObligationKey)
-  /-- The paths of a clause's goal: each leaf's tag, its origin, and which
-  of the binders it quantifies over were implementation details. -/
-  leafPaths : IO.Ref (Std.HashMap MVarId (Array (Name × Option Provenance × Array ObligationRange × Array Bool)))
+  /-- Each selector of the proof's `verex_on` alternatives, by its syntax:
+  its text, whether it took a path, and the decisions of the paths of the
+  obligations it names. A proof can run an alternative on several goals, one
+  per case of an enum parameter. -/
+  selectorUses : IO.Ref (Array (Syntax × String × Bool × Array String))
+  /-- The simp contexts of the proof steps' normal form, by their call, built
+  once per target. -/
+  stepSimpContexts : IO.Ref (Array (Nat × Simp.Context × Simp.SimprocsArray))
+  /-- The simp theorems of a hypothesis as a rule of the proof steps' normal
+  form, by the hypothesis, the direction it is read in and whether it
+  rewrites before its subterms: a function of the hypothesis. -/
+  stepRuleTheorems : IO.Ref (Std.HashMap (FVarId × Bool × Bool) (Array SimpTheorem))
+  /-- The rules of the proof steps' normal form at a goal, by the goal: a
+  function of its context, its kinds of rules in the steps' order. -/
+  stepBlockRules : IO.Ref (Std.HashMap MVarId (Array (Array FVarId)))
+  /-- The source decisions on each handed-over leaf's path, and on each
+  path of a clause's goal once taken apart: what a selector of `verex_on`
+  reads. -/
+  leafDecisions : IO.Ref (Std.HashMap MVarId (Array Decision))
+  /-- The paths of a clause's goal: each leaf's tag, its origin, which of
+  the binders it quantifies over were implementation details, and its
+  decisions. -/
+  leafPaths : IO.Ref (Std.HashMap MVarId
+    (Array (Name × Option Provenance × Array ObligationRange × Array Bool × Array Decision)))
   /-- The normal forms of callee contracts, by the contract and the pattern of
   arguments they were found for: the closed proof of each condition's normal
   form, and the constants the proofs use. A constant a backtracked attempt
@@ -334,12 +451,29 @@ structure TargetState where
   undone removes it with `mkAuxTheorem`'s cache, and the next proof of the
   statement takes it again. -/
   hiddenStatements : IO.Ref (Std.HashMap (List Name × Lean.Expr) Name)
+  /-- The names of a step proof's scope, which get scope entries where they
+  are bound (`ScopeEntry`), and those of its mutable references; none for
+  any other proof. -/
+  scopeNames : IO.Ref (Option (List String × List String))
+  /-- The source names of a step proof's locals by declaration index, where
+  a borrow's prophecy reads the name of the local it borrows. -/
+  scopeLocals : IO.Ref (Array String)
+  /-- The goals a point's `assert` owes, by goal, with the point and the
+  assert's number: obligations the walk queues (`.pointAssert`). -/
+  pointOwed : IO.Ref (Std.HashMap MVarId (ProgramPointKey × Nat))
+  /-- The obligations a proof's `on` steps take (`verex_step_routing`), and
+  whether an `on _` takes the rest: a path is prepared once for them
+  (`verex_step_prepare`) where one of its clauses is among them. -/
+  routedKeys : IO.Ref (Option (Array ObligationKey × Bool))
+  /-- Whether the path being prepared has a clause a proof's `on` step takes. -/
+  pathRouted : IO.Ref Bool
 
 /-- The state a target begins with. -/
 def TargetState.new : IO TargetState := do
   return {
     clauseRanges := ← IO.mkRef #[]
     preconditionNumbers := ← IO.mkRef #[]
+    invariantKeys := ← IO.mkRef #[]
     failedLeaves := ← IO.mkRef #[]
     runtimeMention := ← IO.mkRef .none
     nativeStatements := ← IO.mkRef {}
@@ -363,12 +497,22 @@ def TargetState.new : IO TargetState := do
     leafReports := ← IO.mkRef (#[], #[])
     leafOrigins := ← IO.mkRef {}
     leafKeys := ← IO.mkRef {}
+    leafDecisions := ← IO.mkRef {}
+    selectorUses := ← IO.mkRef #[]
+    stepSimpContexts := ← IO.mkRef #[]
+    stepRuleTheorems := ← IO.mkRef {}
+    stepBlockRules := ← IO.mkRef {}
     leafPaths := ← IO.mkRef {}
     contractNormalForms := ← IO.mkRef {}
     proofName := ← IO.mkRef .anonymous
     hiddenTheorems := ← IO.mkRef {}
     hiddenCount := ← IO.mkRef 0
     hiddenStatements := ← IO.mkRef {}
+    scopeNames := ← IO.mkRef none
+    scopeLocals := ← IO.mkRef #[]
+    pointOwed := ← IO.mkRef {}
+    routedKeys := ← IO.mkRef none
+    pathRouted := ← IO.mkRef true
   }
 
 /-- The state of the target being proved, in its elaboration branch's
@@ -392,6 +536,231 @@ def targetState : CoreM TargetState := do
   let fresh ← TargetState.new
   modifyEnv (targetStateExt.setState · (some (key, fresh)))
   return fresh
+
+/-! ## Scope entries
+
+A step proof reads a function's names (`functionScope`) at a leaf through
+scope entries: each local of a source name gets an entry where it is bound,
+an inert fact of the context naming its value, so that a substitution or a
+case split rewrites the value as it rewrites the leaf. A renaming of the
+local renames its entry. The entries exist only in step proofs, whose target
+state holds the scope's names (`TargetState.scopeNames`). -/
+
+/-- A name of a step proof's scope and its value at a leaf, at the binding
+`index` that orders the bindings of one name: the latest binding is the
+one in scope (`doc/plan/proof-language.md`, "Semantics and lowering"). -/
+structure ScopeEntry (name : String) (index : Nat) {α : Sort u} (value : α) : Prop where
+  intro ::
+
+/-- The value the `&mut` parameter `name` holds at the function's exit: its
+prophecy, an inert fact beside its scope entry, which a substitution
+rewrites as it rewrites the leaf; an `ensures` binds it as `name'`
+(`bindFinals`). -/
+structure FinalEntry (name : String) {α : Sort u} (value : α) : Prop where
+  intro ::
+
+/-- A scope entry's name, binding index and value. -/
+def scopeEntry? (type : Lean.Expr) : Option (String × Nat × Lean.Expr) := do
+  guard (type.isAppOfArity ``ScopeEntry 4)
+  let .lit (.strVal name) := type.getArg! 0 | none
+  -- A case split restates a raw index as a numeral.
+  let index ← (type.getArg! 1).rawNatLit? <|> (type.getArg! 1).nat?
+  some (name, index, type.getArg! 3)
+
+/-- The names of the step proof's scope, and those of its mutable references:
+none outside a step proof. -/
+def scopeTable? : CoreM (Option (List String × List String)) := do
+  (← targetState).scopeNames.get
+
+/-- The binding index after the context's scope entries. -/
+def nextScopeIndex : MetaM Nat := do
+  (← getLCtx).foldlM (init := 0) fun found decl => do
+    return match scopeEntry? (← instantiateMVars decl.type) with
+      | some (_, index, _) => max found (index + 1)
+      | none => found
+
+/-- Give a goal the scope entries of `entries`, names and values, at binding
+indices after the context's. -/
+def addScopeEntries (goal : MVarId) (entries : Array (String × Lean.Expr)) : MetaM MVarId := do
+  if entries.isEmpty then return goal
+  let mut next ← goal.withContext nextScopeIndex
+  let mut goal := goal
+  for (name, value) in entries do
+    let (entry, proof) ← goal.withContext do
+      return (← mkAppOptM ``ScopeEntry #[mkStrLit name, mkRawNatLit next, none, value],
+        ← mkAppOptM ``ScopeEntry.intro #[mkStrLit name, mkRawNatLit next, none, value])
+    let (fvarId, next') ← (← goal.assert (Name.mkSimple s!"{name}_scope") entry proof).intro1P
+    goal ← next'.withContext do
+      next'.setFVarKind fvarId .implDetail
+      pure next'
+    next := next + 1
+  return goal
+
+/-- The goal's target `∀ name : domain, body`, where `name` is one of the
+scope's, with the binder's scope entry as a premise under it, at binding
+`index`: the entry is introduced with the binder, and a substitution of the
+binder rewrites it. -/
+def scopedBinderGoal (goal : MVarId) (name : Name) (domain body : Lean.Expr) (info : BinderInfo)
+    (index : Nat) : MetaM MVarId := goal.withContext do
+  let plain := Lean.Expr.forallE name domain body info
+  let some (names, references) ← scopeTable? | goal.replaceTargetDefEq plain
+  unless names.contains name.toString do return ← goal.replaceTargetDefEq plain
+  -- A mutable reference's entry holds its current value, the first of its
+  -- pair.
+  let (level, read, value) ← if references.contains name.toString then
+      match ← whnfD domain with
+      | .app (.app (.const ``Prod [u, v]) current) final =>
+          pure (← getLevel current, current, mkApp3 (mkConst ``Prod.fst [u, v]) current final (.bvar 0))
+      | _ => throwError "internal: a mutable reference's carrier that is no pair"
+    else pure (← getLevel domain, domain, .bvar 0)
+  let arguments := #[mkStrLit name.toString, mkRawNatLit index, read, value]
+  let withEntry := Lean.Expr.forallE name domain
+    (.forallE (name.appendAfter "_scope") (mkAppN (mkConst ``ScopeEntry [level]) arguments)
+      (body.liftLooseBVars 0 1) .default) info
+  let next ← mkFreshExprSyntheticOpaqueMVar withEntry (← goal.getTag)
+  goal.assign (.lam name domain (mkApp2 next (.bvar 0)
+    (mkAppN (mkConst ``ScopeEntry.intro [level]) arguments)) info)
+  return next.mvarId!
+
+/-- Give the locals `fvarIds` of the scope's names their scope entries: their
+binding. -/
+def bindScopeEntries (goal : MVarId) (fvarIds : Array FVarId) : MetaM MVarId := do
+  if fvarIds.isEmpty then return goal
+  goal.withContext do
+    let some (names, references) ← scopeTable? | return goal
+    -- A value of the name, not a hypothesis that takes it; a reference's
+    -- current value.
+    let entries ← fvarIds.filterMapM fun fvarId => do
+      let decl ← fvarId.getDecl
+      let name := decl.userName.toString
+      if !names.contains name || (← isProp decl.type) then return none
+      let type ← instantiateMVars decl.type
+      if references.contains name && type.isAppOfArity ``NTy.carrier 2 &&
+          (type.getArg! 1).isAppOf ``NTy.ref then
+        return some (name, ← mkAppM ``Prod.fst #[mkFVar fvarId])
+      return some (name, mkFVar fvarId)
+    -- A reference's prophecy, its value at the exit.
+    let mut goal ← addScopeEntries goal entries
+    for fvarId in fvarIds do
+      let (name, type) ← goal.withContext do
+        let decl ← fvarId.getDecl
+        return (decl.userName.toString, ← instantiateMVars decl.type)
+      unless references.contains name && type.isAppOfArity ``NTy.carrier 2 &&
+          (type.getArg! 1).isAppOf ``NTy.ref do continue
+      let (entry, proof) ← goal.withContext do
+        let final ← mkAppM ``Prod.snd #[mkFVar fvarId]
+        return (← mkAppOptM ``FinalEntry #[mkStrLit name, none, final],
+          ← mkAppOptM ``FinalEntry.intro #[mkStrLit name, none, final])
+      let (entryId, next) ← (← goal.assert (Name.mkSimple s!"{name}_final_scope") entry proof).intro1P
+      goal ← next.withContext do
+        next.setFVarKind entryId .implDetail
+        pure next
+    return goal
+
+/-- `verex_scope_names [names] [references] [locals]`: the target is a step
+proof over these scope names (`TargetState.scopeNames`); `references` are its
+mutable references, `locals` the source names of its locals by declaration
+index (`TargetState.scopeLocals`). -/
+elab "verex_scope_names " "[" names:str,* "]" " [" references:str,* "]" " [" locals:str,* "]" :
+    tactic => do
+  (← targetState).scopeNames.set (some (names.getElems.toList.map (·.getString),
+    references.getElems.toList.map (·.getString)))
+  (← targetState).scopeLocals.set (locals.getElems.map (·.getString))
+
+/-- The declaration index of a variable (`Var.index`), read structurally. -/
+private partial def varIndex? (x : Lean.Expr) : Option Nat :=
+  if x.isAppOfArity ``VerexIR.Proofs.Denote.Var.here 2 then some 0
+  else if x.isAppOfArity ``VerexIR.Proofs.Denote.Var.there 4 then
+    (varIndex? x.appArg!.consumeMData).map (· + 1)
+  else none
+
+/-- A borrow's prophecy mark (`Prophecy x path value`): the declaration index
+of the borrowed local where the borrow takes it whole, a reference's
+referent included, and the value. -/
+def prophecyMark? (type : Lean.Expr) : Option (Option Nat × Lean.Expr) := do
+  guard (type.isAppOf ``VerexIR.Proofs.Denote.Prophecy)
+  let arguments := type.getAppArgs
+  guard (arguments.size ≥ 3)
+  let path := arguments[arguments.size - 2]!.consumeMData
+  let nil (path : Lean.Expr) := path.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.Proj.nil 1
+  let whole := nil path ||
+    (path.isAppOfArity ``VerexIR.Proofs.Denote.Proj.deref 3 && nil path.appArg!)
+  some (if whole then varIndex? arguments[arguments.size - 3]!.consumeMData else none,
+    arguments[arguments.size - 1]!)
+
+/-- Consume a borrow's prophecy mark the goal holds as `mark`: in a step
+proof, a borrow of a whole local `x` binds the prophecy as the value written
+back, `x'` (`ScopeEntry`); any other mark is dropped. -/
+def consumeProphecy (goal : MVarId) (mark : FVarId) : MetaM MVarId := do
+  let some (index?, value) ← goal.withContext do
+      return prophecyMark? (← instantiateMVars (← mark.getType))
+    | return goal
+  let goal ← goal.clear mark
+  let some (names, _) ← scopeTable? | return goal
+  let some index := index? | return goal
+  let some name := (← (← targetState).scopeLocals.get)[index]? | return goal
+  let written := name ++ "'"
+  unless names.contains written do return goal
+  addScopeEntries goal #[(written, value)]
+
+/-- At an obligation of the function's exit, each `&mut` parameter's value
+there, its prophecy (`FinalEntry`), bound as the value written back, `x'`. -/
+def bindFinals (goal : MVarId) : MetaM MVarId := goal.withContext do
+  let some (names, _) ← scopeTable? | return goal
+  let finals ← (← getLCtx).foldlM (init := #[]) fun found decl => do
+    let type ← instantiateMVars decl.type
+    unless type.isAppOfArity ``FinalEntry 3 do return found
+    let .lit (.strVal name) := type.getArg! 0 | return found
+    let written := name ++ "'"
+    return if names.contains written then found.push (written, type.getArg! 2) else found
+  addScopeEntries goal finals
+
+/-- `verex_scope_bind [x, …]`: the locals' scope entries, their binding. -/
+elab "verex_scope_bind " "[" locals:ident,* "]" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let fvarIds ← goal.withContext do locals.getElems.mapM fun x => getFVarId x
+  replaceMainGoal [← bindScopeEntries goal fvarIds]
+
+/-- Rename a local, and its scope entry with it. -/
+def renameScoped (goal : MVarId) (fvarId : FVarId) (name : Name) : MetaM MVarId := do
+  let goal ← goal.rename fvarId name
+  let entry? ← goal.withContext do
+    (← getLCtx).findDeclM? fun decl => do
+      let some (_, index, value) := scopeEntry? (← instantiateMVars decl.type) | return none
+      return if value.consumeMData == mkFVar fvarId then some (decl.fvarId, index) else none
+  let some (entry, index) := entry? | return goal
+  let (type, proof) ← goal.withContext do
+    let value := mkFVar fvarId
+    return (← mkAppOptM ``ScopeEntry #[mkStrLit name.toString, mkRawNatLit index, none, value],
+      ← mkAppOptM ``ScopeEntry.intro #[mkStrLit name.toString, mkRawNatLit index, none, value])
+  let (renamed, goal) ← (← (← goal.clear entry).assert (name.appendAfter "_scope") type proof).intro1P
+  goal.withContext do goal.setFVarKind renamed .implDetail
+  return goal
+
+/-- Rename the latest scope entry of `name` whose value is not `except`, a
+value whose local is gone: an earlier binding a later one displaces. -/
+def renameLatestEntry (goal : MVarId) (name : String) (except : Option FVarId) (newName : Name) :
+    MetaM MVarId := do
+  let latest? ← goal.withContext do
+    (← getLCtx).foldlM (init := none) fun (found : Option (FVarId × Nat × Lean.Expr)) decl => do
+      let some (entryName, index, value) := scopeEntry? (← instantiateMVars decl.type) | return found
+      if entryName != name || except.any (value.consumeMData == mkFVar ·) then return found
+      return match found with
+        | some (_, best, _) => if index > best then some (decl.fvarId, index, value) else found
+        | none => some (decl.fvarId, index, value)
+  let some (entry, index, value) := latest? | return goal
+  let (type, proof) ← goal.withContext do
+    return (← mkAppOptM ``ScopeEntry #[mkStrLit newName.toString, mkRawNatLit index, none, value],
+      ← mkAppOptM ``ScopeEntry.intro #[mkStrLit newName.toString, mkRawNatLit index, none, value])
+  let (renamed, goal) ← (← (← goal.clear entry).assert (newName.appendAfter "_scope") type proof).intro1P
+  goal.withContext do goal.setFVarKind renamed .implDetail
+  return goal
+
+/-- Whether a name is taken in the context: by a local, or by a scope entry. -/
+def nameTaken (name : Name) : MetaM Bool := do
+  if ((← getLCtx).findFromUserName? name).isSome then return true
+  (← getLCtx).anyM fun decl => do
+    return (scopeEntry? (← instantiateMVars decl.type)).any (·.1 == name.toString)
 
 /-- A proof as an auxiliary theorem of the theorem being proved, as
 `mkAuxTheorem` makes one, registered with the target: of a kind of its own,
@@ -531,8 +900,10 @@ def Provenance.describe : Provenance → String
   | .precondition callee (some call) => s!"the precondition of `{callee}` at call {call}"
   | .continuation callee none => s!"the continuation after `{callee}`"
   | .continuation callee (some call) => s!"the continuation after call {call} of `{callee}`"
-  | .loopEntry => "a loop invariant at entry"
-  | .loopIteration => "a loop invariant at an iteration"
+  | .loopEntry none => "a loop invariant at entry"
+  | .loopEntry (some loop) => s!"an invariant of loop {loop} at entry"
+  | .loopIteration none => "a loop invariant at an iteration"
+  | .loopIteration (some loop) => s!"an invariant of loop {loop} at an iteration"
   | .assertion => "an in-body assertion"
   | .mutationEnd => "a data invariant where a mutation ends"
   | .construction => "a data invariant where a value is constructed"
@@ -542,6 +913,7 @@ def Provenance.describe : Provenance → String
   | .unrollBound bound => s!"the bound `pragma unroll = {bound}` of a loop"
   | .storedWrite => "the data invariant of a value written to memory"
   | .ghostWrite => "the domain of a ghost field an update writes"
+  | .pointAssert point index => s!"the assertion {index} {point.text}"
 
 /-- The heartbeats one complete automatic leaf attempt may spend, in
 thousands, including call observations, cheap deciders and preparation.
@@ -1022,6 +1394,87 @@ def typedBound? (value type : Lean.Expr) : MetaM (Option Lean.Expr) := do
       return some (mkApp2 (mkConst lemma) (width.getArg! 0) value)
   return none
 
+/-- The bounds of the values a goal reads from typed maps whose keys or values
+fit an integer type (`m_keys`, `m_values`; `doc/plan/proof-language.md`,
+"Normal-form fixes"): a key at a position, a key the context states present,
+a key's successor or predecessor, a value at a key. Each
+as the pair of bounds a parameter's certificate gives, under which the
+normal form reads a cut value's round trip as the value (`val_ofInt_*`). -/
+def containerBounds (expressions : Array Lean.Expr) : MetaM (Array Lean.Expr) := do
+  -- The maps whose keys or values fit, with their facts.
+  let mut keyed : Array (Lean.Expr × Lean.Expr × Nat × Bool) := #[]
+  let mut valued : Array (Lean.Expr × Lean.Expr × Nat × Bool) := #[]
+  let mut present : Array (Lean.Expr × Lean.Expr) := #[]
+  -- A successor's or predecessor's statement, with its lemma.
+  let mut neighbours : Array (Lean.Expr × Lean.Expr × Name) := #[]
+  let fitting (property : Lean.Expr) : Option (Nat × Bool) := do
+    guard (property.isAppOfArity ``VerexIR.IntegerValueFits 2)
+    let width := property.getArg! 0
+    guard (width.isAppOfArity ``VerexIR.IntWidth.bits 1)
+    let bits ← (width.getArg! 0).nat?
+    guard (bits != 0)
+    pure (bits, (property.getArg! 1).isConstOf ``Bool.true)
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let type ← instantiateMVars decl.type
+    if type.isAppOfArity ``VerexIR.SpecMap.KeysSatisfy 4 then
+      if let some (bits, signed) := fitting (type.getArg! 2) then
+        keyed := keyed.push (type.getArg! 3, decl.toExpr, bits, signed)
+    else if type.isAppOfArity ``VerexIR.SpecMap.ValuesSatisfy 4 then
+      if let some (bits, signed) := fitting (type.getArg! 2) then
+        valued := valued.push (type.getArg! 3, decl.toExpr, bits, signed)
+    else if let some (_, lhs, rhs) := type.eq? then
+      if lhs.isAppOf ``VerexIR.SpecMap.hasKey && rhs.isConstOf ``Bool.true then
+        present := present.push (lhs.appFn!.appArg!, decl.toExpr)
+      else if rhs.isAppOfArity ``Option.some 2 then
+        if lhs.isAppOf ``VerexIR.SpecMap.nextKey? then
+          neighbours := neighbours.push (lhs.appFn!.appArg!, decl.toExpr,
+            ``VerexIR.SpecMap.nextKey_satisfies)
+        else if lhs.isAppOf ``VerexIR.SpecMap.prevKey? then
+          neighbours := neighbours.push (lhs.appFn!.appArg!, decl.toExpr,
+            ``VerexIR.SpecMap.prevKey_satisfies)
+  if keyed.isEmpty && valued.isEmpty then return #[]
+  -- A certificate's bounds.
+  let pair (fits : Lean.Expr) (signed : Bool) : MetaM Lean.Expr :=
+    mkAppM (if signed then ``VerexIR.Proofs.Denote.bounds_of_fits_signed
+      else ``VerexIR.Proofs.Denote.bounds_of_fits_unsigned) #[fits]
+  -- The default a read outside the map takes fits: an integer's is zero.
+  let fallback (bits : Nat) (signed : Bool) : MetaM Lean.Expr := do
+    mkAppM ``VerexIR.Proofs.Denote.zero_fits
+      #[mkNatLit bits, toExpr signed, ← mkDecideProof (← mkAppM ``Ne #[mkNatLit bits, mkNatLit 0])]
+  let attempt (fact : MetaM Lean.Expr) : MetaM (Option Lean.Expr) :=
+    try some <$> fact catch _ => pure none
+  let mut facts := #[]
+  for (map, keys, bits, signed) in keyed do
+    for read in sitesWhere (fun e => e.isAppOf ``VerexIR.SpecMap.keyAt && e.getAppNumArgs ≥ 2 &&
+        e.appFn!.appArg! == map && !e.hasLooseBVars) expressions do
+      let fact ← attempt do
+        let fits ← mkAppM ``VerexIR.SpecMap.keyAt_satisfies_all
+          #[keys, ← fallback bits signed, read.appArg!]
+        pair fits signed
+      if let some fact := fact then facts := facts.push fact
+    for (presentMap, stated) in present do
+      unless presentMap == map do continue
+      let fact ← attempt do
+        let fits ← mkAppM ``VerexIR.SpecMap.hasKey_satisfies #[keys, stated]
+        pair fits signed
+      if let some fact := fact then facts := facts.push fact
+    for (neighbourMap, found, lemma) in neighbours do
+      unless neighbourMap == map do continue
+      let fact ← attempt do
+        let fits ← mkAppM lemma #[keys, found]
+        pair fits signed
+      if let some fact := fact then facts := facts.push fact
+  for (map, values, bits, signed) in valued do
+    for read in sitesWhere (fun e => e.isAppOf ``VerexIR.SpecMap.valueAt && e.getAppNumArgs ≥ 2 &&
+        e.appFn!.appArg! == map && !e.hasLooseBVars) expressions do
+      let fact ← attempt do
+        let fits ← mkAppM ``VerexIR.SpecMap.valueAt_satisfies
+          #[values, ← fallback bits signed, read.appArg!]
+        pair fits signed
+      if let some fact := fact then facts := facts.push fact
+  return facts
+
 /-- Assert the facts a leaf needs beside its hypotheses: the bounds of every
 certified integer in context, and the bounds of every bit operation on
 them that the goal or a hypothesis mentions. A fact whose statement is in
@@ -1051,7 +1504,9 @@ def assertBounds (skip : Array Lean.Expr := #[]) (includeMagnitudes : Bool := tr
         (fun e => e.isAppOfArity ``VerexIR.Proofs.serializedBytes 4 && !e.hasLooseBVars) expressions do
       facts := facts.push (mkAppN (mkConst ``VerexIR.Proofs.serializedBytes_nonempty)
         serialized.getAppArgs)
-    if typedOnly then return facts
+    -- Authored preparation also bounds the values read from typed maps;
+    -- the automatic leaf reads its maps as entries.
+    if typedOnly then return facts ++ (← containerBounds expressions)
     let reads := divisionReads expressions
     let sites := operationSites expressions
     for site in sites do
@@ -1175,10 +1630,89 @@ def assertBounds (skip : Array Lean.Expr := #[]) (includeMagnitudes : Bool := tr
 /-- Assert the bounds a leaf needs beside its hypotheses (`assertBounds`). -/
 elab "verex_bounds" : tactic => discard assertBounds
 
-/-- The certificates carried by the locals' types, without deriving facts
-about every operation in the context. Manual proofs request those laws at
-the positions they actually use. -/
-elab "verex_type_bounds" : tactic => discard (assertBounds (typedOnly := true))
+/-- The value a fact bounds from both sides by closed terms (`0 ≤ v ∧ v ≤
+2 ^ 64 - 1`), or the value of one side (`0 ≤ v`; `v ≤ 2 ^ 64 - 1`). -/
+private def boundedSides (type : Lean.Expr) :
+    Array (Lean.Expr × Bool × (Lean.Expr → Lean.Expr)) := Id.run do
+  let side (part : Lean.Expr) : Option (Lean.Expr × Bool) :=
+    if part.isAppOfArity ``LE.le 4 && (part.getArg! 0).isConstOf ``Int then
+      let low := part.getArg! 2
+      let high := part.getArg! 3
+      if !low.hasFVar && !low.hasMVar then some (high, true)
+      else if !high.hasFVar && !high.hasMVar then some (low, false)
+      else none
+    else none
+  if type.isAppOfArity ``And 2 then
+    let mut found := #[]
+    if let some (value, lower) := side (type.getArg! 0) then
+      found := found.push (value, lower, fun proof => mkProj ``And 0 proof)
+    if let some (value, lower) := side (type.getArg! 1) then
+      found := found.push (value, lower, fun proof => mkProj ``And 1 proof)
+    return found
+  match side type with
+  | some (value, lower) => #[(value, lower, id)]
+  | none => #[]
+
+/-- Read the round trips of bounded values as the values: a value cut back to
+an integer carrier (`SpecInt.ofInt`) whose bounds facts of the context state,
+by the cut's lemma at those facts (`SpecInt.val_ofInt_*`). Only the goal and
+the facts that mention such a cut are rewritten. -/
+def cutBoundedRoundTrips : TacticM Unit := focusGoal do
+  if (← getGoals).isEmpty then return
+  let goal ← getMainGoal
+  let found ← goal.withContext do
+    let mut lows : Std.HashMap Lean.Expr (Array Lean.Expr) := {}
+    let mut highs : Std.HashMap Lean.Expr (Array Lean.Expr) := {}
+    let mut facts := #[]
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let type ← instantiateMVars decl.type
+      facts := facts.push (decl.fvarId, type)
+      for (value, lower, part) in boundedSides type do
+        if lower then lows := lows.alter value (some <| ·.getD #[] |>.push (part decl.toExpr))
+        else highs := highs.alter value (some <| ·.getD #[] |>.push (part decl.toExpr))
+    let bounded (e : Lean.Expr) : Bool :=
+      e.isAppOfArity ``VerexIR.SpecInt.ofInt 4 && !e.hasLooseBVars &&
+        lows.contains e.appArg! && highs.contains e.appArg!
+    let target ← instantiateMVars (← goal.getType)
+    let mut lemmas := #[]
+    for cut in sitesWhere bounded (facts.map (·.2) |>.push target) do
+      let type ← inferType cut
+      let width := type.getArg! 0
+      unless width.isAppOfArity ``VerexIR.IntWidth.bits 1 do continue
+      let some bits := width.appArg!.nat? | continue
+      if bits == 0 then continue
+      let lemma := if (type.getArg! 1).isConstOf ``Bool.true
+        then ``VerexIR.Proofs.Denote.SpecInt.val_ofInt_signed
+        else ``VerexIR.Proofs.Denote.SpecInt.val_ofInt_unsigned
+      let value := cut.appArg!
+      let lemma ← (lows.getD value #[]).findSomeM? fun low => (highs.getD value #[]).findSomeM? fun high =>
+        observing? (mkAppM lemma #[mkNatLit (bits - 1), cut.getArg! 2, low, high])
+      if let some lemma := lemma then lemmas := lemmas.push lemma
+    if lemmas.isEmpty then return none
+    let mentions (e : Lean.Expr) := (e.find? bounded).isSome
+    return some (lemmas, facts.filterMap fun (fvarId, type) =>
+      if mentions type then some fvarId else none, mentions target)
+  let some (lemmas, targets, target) := found | return
+  let mut equations : SimpTheorems := {}
+  for name in [``VerexIR.SpecInt.ofInt_eq_iff, ``VerexIR.SpecInt.eq_ofInt_iff] do
+    equations ← equations.addConst name
+  let mut rules : SimpTheoremsArray := #[equations]
+  for lemma in lemmas do rules ← rules.addTheorem (.other `cut) lemma
+  let ctx ← Simp.mkContext { failIfUnchanged := false } rules (← getSimpCongrTheorems)
+  let (result, _) ← simpGoal goal ctx #[] none (simplifyTarget := target) (fvarIdsToSimp := targets)
+  replaceMainGoal (result.map (·.2) |>.toList)
+
+/-- The certificates carried by the locals' types and the bounds of the values
+read from typed maps (`assertBounds`), without deriving facts about every
+operation in the context, and the round trips of the bounded values read as
+the values. Manual proofs request the operations' lemmas at the positions they
+actually use. -/
+def typeBounds : TacticM Unit := do
+  discard (assertBounds (typedOnly := true))
+  cutBoundedRoundTrips
+
+elab "verex_type_bounds" : tactic => typeBounds
 
 /-- Smaller bounds for a speculative call-observation proof. The ordinary
 solver retains every signed and magnitude fact when this attempt fails. -/
@@ -1525,29 +2059,71 @@ def abstractRankTables (goal : MVarId) : MetaM MVarId := do
           hypotheses := hypotheses.push decl.fvarId
       return some hypotheses
     let some hypotheses := hypotheses? | continue
+    -- A generalization that fails has reverted the hypotheses, assigning the
+    -- goal: the state is restored, so the goal stays the one to prove.
+    let saved ← saveState
     try
       let (_, _, next) ← goal.withContext <|
         goal.generalizeHyp #[{ expr := table, xName? := some `ranks }] hypotheses
       goal := next
-    catch _ => pure ()
+    catch _ => saved.restore
   return goal
+
+/-- Abstract the sites `select` picks in a goal to variables named `name`,
+every occurrence of a site at once; a site in the type of a local that is no
+proposition stays. -/
+private def abstractSites (goal : MVarId) (select : Lean.Expr → Bool) (name : Name) :
+    MetaM MVarId := do
+  let values ← goal.withContext do
+    let mut terms := #[← instantiateMVars (← goal.getType)]
+    for decl in ← getLCtx do
+      unless decl.isImplementationDetail do terms := terms.push (← instantiateMVars decl.type)
+    return sitesWhere (fun e => select e && !e.hasMVar && !e.hasLooseBVars) terms
+  let mut goal := goal
+  for value in values do
+    let hypotheses? ← goal.withContext do
+      let mut hypotheses := #[]
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let type ← instantiateMVars decl.type
+        if value.occurs type then
+          unless ← isProp type do return none
+          hypotheses := hypotheses.push decl.fvarId
+      return some hypotheses
+    let some hypotheses := hypotheses? | continue
+    -- As for rank tables: a failed generalization leaves the state as it was.
+    let saved ← saveState
+    try
+      let (_, _, next) ← goal.withContext <|
+        goal.generalizeHyp #[{ expr := value, xName? := some name }] hypotheses
+      goal := next
+    catch _ => saved.restore
+  return goal
+
+/-- Abstract the function values of a goal to variables: `grind` reads a
+function value (`functionOf`, `functionOfGeneric`: a closure with its rows,
+sharing, captures and typing certificate) only as a whole, equal to itself,
+and its parts make up much of a behavior fact. -/
+def abstractFunctionValues (goal : MVarId) : MetaM MVarId :=
+  abstractSites goal (fun e => e.isAppOf ``VerexIR.Proofs.Denote.functionOf ||
+    e.isAppOf ``VerexIR.Proofs.Denote.functionOfGeneric) `function
 
 /-- Introduce the binders and premises a goal states, through the
 `Obligation` markers heading them; whether any was introduced. -/
 def introduceThroughMarkers (goal : MVarId) : MetaM (MVarId × Bool) := do
   let mut goal := goal
-  let mut introduced := false
+  let mut introduced := #[]
   repeat
     let target ← goal.withContext (instantiateMVars (← goal.getType))
     if target.isAppOfArity ``VerexIR.Proofs.Obligation 4 then
       if verex.keepObligationMarkers.get (← getOptions) then break
       goal ← goal.replaceTargetDefEq (target.getArg! 3)
     else if target.isForall then
-      let (_, next) ← goal.intro1P
+      let (local_, next) ← goal.intro1P
       goal := next
-      introduced := true
+      introduced := introduced.push local_
     else break
-  return (goal, introduced)
+  return (goal, !introduced.isEmpty)
 
 /-- Reads of one array at positions `omega` proves equal, spelled alike:
 `grind` relates its arithmetic to its congruence closure only through the
@@ -1713,7 +2289,8 @@ private def assertProductBounds (goal : MVarId) : MetaM MVarId := goal.withConte
 /-- `grind` over a leaf's own facts, within an attempt's budget. The callees'
 contracts, which the call rule has consumed, and the continuations bound in
 the context are cleared first; `grind` would instantiate the contracts at
-every term they match. An equation between arrays is taken element by
+every term they match. Rank tables and function values are abstracted to
+variables, which is all `grind` reads of them. An equation between arrays is taken element by
 element (`arraysByElements`), and reads at equal positions are spelled alike
 (`identifyReads`). Vectors and certified integers compare as themselves,
 not by their arrays and values, the saturation's form of a goal about them
@@ -1732,7 +2309,12 @@ elab "verex_grind" : tactic => focusGoal do
   let mut goal := goal
   for fvarId in victims.reverse do
     goal ← goal.tryClear fvarId
-  let some elements ← arraysByElements (← abstractRankTables goal) | replaceMainGoal []
+  let abstracted ← abstractFunctionValues (← abstractRankTables goal)
+  -- `grind` proves the goal handed to it, never an assigned one, which
+  -- `getMainGoal` would skip.
+  if ← abstracted.isAssigned then throwError "internal: the abstracted leaf is assigned"
+  let some elements ← arraysByElements abstracted
+    | replaceMainGoal []
   setGoals [elements]
   evalTactic (← `(tactic|
     try simp only [← VerexIR.SpecVector.eq_iff_values, ← VerexIR.SpecInt.eq_iff_val] at *))
@@ -2066,18 +2648,20 @@ private def substituteDefEq (goal : MVarId) (replaced : FVarId) (value : Lean.Ex
 /-- The value a new local named `name` shadows reads as `old(x)` in the
 source: the visible data local of that name, other than `except`, is renamed
 `old_name`, where that name is free. -/
-private def renameShadowed (goal : MVarId) (name : Name) (except : FVarId) : MetaM MVarId := do
+private def renameShadowed (goal : MVarId) (name : Name) (except : FVarId) (binding := true) :
+    MetaM MVarId := do
   let shadowed ← goal.withContext do
     (← getLCtx).findDeclM? fun other => do
       if other.isImplementationDetail || other.fvarId == except || other.userName != name then
         return none
       return if ← isProp other.type then none else some other.fvarId
+  let old := Name.mkSimple s!"old_{name}"
+  if ← goal.withContext (nameTaken old) then return goal
   match shadowed with
-  | some other =>
-      let old := Name.mkSimple s!"old_{name}"
-      let taken ← goal.withContext do return ((← getLCtx).findFromUserName? old).isSome
-      if taken then pure goal else goal.withContext (goal.rename other old)
-  | none => pure goal
+  | some other => goal.withContext (renameScoped goal other old)
+  -- A new binding of the name displaces the latest entry of an earlier one
+  -- whose local is gone; a value's part taking its name is no new binding.
+  | none => if binding then renameLatestEntry goal name.toString (some except) old else pure goal
 
 /-- An `old_x` whose `x` is gone, substituted by it, is the source's `x`
 again: the value did not change. -/
@@ -2092,7 +2676,7 @@ private def restoreShadowed (goal : MVarId) : MetaM MVarId := do
       if ((← getLCtx).findFromUserName? base).isSome then return found
       return found.push (decl.fvarId, base)
   for (fvarId, base) in olds do
-    goal ← goal.withContext (goal.rename fvarId base)
+    goal ← goal.withContext (renameScoped goal fvarId base)
   return goal
 
 /-- The names the components of a row-valued local take, from the local's
@@ -2128,7 +2712,7 @@ private def componentNames (goal : MVarId) (fvarId : FVarId) :
   let tailUnit := (← whnfD tail).isConstOf ``PUnit
   let headName := if isMap || (index == 0 && tailUnit) then base else base.appendIndexAfter index
   let tailName := Name.mkNum (Name.str base "tail") (index + 1)
-  let goal ← renameShadowed goal headName fvarId
+  let goal ← renameShadowed goal headName fvarId (binding := false)
   return (goal, #[{ varNames := [headName, tailName] }])
 
 /-- The carrier a typed map reads: `SpecMap.ofEntries key value x` is the map
@@ -2341,6 +2925,18 @@ def decideEquivalences (goal : MVarId) : MetaM MVarId := goal.withContext do
     goal := (← goal.replace decl.fvarId proof (some statement)).mvarId
   return goal
 
+/-- A fresh name for an earlier value or fact that a later one of the same
+name displaces (`old_g_result`, then `old_g_result_1`, …): the latest keeps
+the ordinary name. -/
+def oldUserName (name : Name) : MetaM Name := do
+  let base := Name.mkSimple s!"old_{name}"
+  let mut old := base
+  let mut index := 1
+  while ← nameTaken old do
+    old := Name.mkSimple s!"{base}_{index}"
+    index := index + 1
+  return old
+
 /-- Split every conjunctive or existential hypothesis into its parts,
 every row-valued variable into its components, every slot an invariant
 asserts defined into its value, and every equivalence with a constant side
@@ -2453,8 +3049,23 @@ elab "verex_split_hypotheses" : tactic => focusGoal do
         progress := true
       else if let some name := clauseName? then
         -- A clause assumed takes the clause's source name; a marker stays, as
-        -- the clause is normal already and the marker says so.
-        goal ← goal.withContext (goal.rename fvarId name)
+        -- the clause is normal already and the marker says so. The clause
+        -- of an earlier call of the same callee keeps its fact under an old
+        -- name, as the earlier call's result does; the same statement again,
+        -- a copy a proof made, keeps its own name.
+        let (previous?, statement) ← goal.withContext do
+          let previous? := ((← getLCtx).findFromUserName? name).filter (·.fvarId != fvarId)
+          return (previous?, ← instantiateMVars (← fvarId.getType))
+        match previous? with
+        | some previous =>
+            if (← instantiateMVars previous.type) == statement then
+              inspected.modify (·.insert fvarId (← goal.withContext fvarId.getUserName, statement))
+            else
+              let old ← goal.withContext (oldUserName name)
+              goal ← goal.withContext (goal.rename previous.fvarId old)
+              inspected.modify (·.insert previous.fvarId (old, ← instantiateMVars previous.type))
+              goal ← goal.withContext (goal.rename fvarId name)
+        | none => goal ← goal.withContext (goal.rename fvarId name)
         progress := true
       else if let some unit := unit? then
         -- A row's tail of no fields is its one value, by definition.
@@ -2490,7 +3101,8 @@ elab "verex_split_hypotheses" : tactic => focusGoal do
                 -- the value it shadows is the source's `old`.
                 let name := (ty.getArg! 4).bindingName!
                 let shadowed ← renameShadowed subgoal.mvarId name value.fvarId!
-                let named ← shadowed.rename value.fvarId! name
+                let named ← renameScoped shadowed value.fvarId! name
+                let named ← bindScopeEntries named #[value.fvarId!]
                 named.replaceLocalDeclDefEq hypothesis.fvarId! read)
           | _ => throwError "a slot has a case besides its definedness"
         let some next := defined | throwError "a slot has no defined case"
@@ -2903,7 +3515,8 @@ partial def isVariantObservation (type : Lean.Expr) : Bool :=
 
 /-- The variants an authored proof chooses, without enumerating variants
 inside their fields. Eliminate cases contradicted by observed tags before
-splitting the next value; normalize payload observations afterwards. -/
+splitting the next value; normalize payload observations afterwards, and
+bound the payloads (`verex_type_bounds`). -/
 elab "verex_cases " values:ident,+ : tactic => focusGoal do
   let mut goals := #[(← getMainGoal)]
   let (ctx, simprocs) ← normalization
@@ -2920,7 +3533,10 @@ elab "verex_cases " values:ident,+ : tactic => focusGoal do
       let (result, _) ← simpGoal goal ctx simprocs (simplifyTarget := false)
         (fvarIdsToSimp := tags)
       return result.map (·.2)
-  replaceMainGoal goals.toList
+  setGoals goals.toList
+  -- The payloads' bounds, under which their round trips read as the values.
+  evalTactic (← `(tactic| all_goals verex_type_bounds))
+
 
 /-- Substitute every hypothesis equating a local variable to a term, by
 syntactic shape alone: no hypothesis is unfolded to find one. -/
@@ -3541,33 +4157,64 @@ private def contextDischargeCore (context : LocalContext) (condition : Lean.Expr
     return some (← instantiateMVars proof)
   catch _ => return none
 
-/-- Normalization only asks for cheap side conditions. A large connected
-context must not turn an undecided tag or payload test into an unbounded
-arithmetic search. Failure restores any speculative metavariable assignments. -/
-private def boundedContextDischarge (context : LocalContext) (condition : Lean.Expr)
-    (atoms : FVarIdSet) : MetaM (Option Lean.Expr) := do
-  let enclosing ← readThe Core.Context
-  let now ← IO.getNumHeartbeats
+/-- A side decision under its budget: at most `sideDecisionHeartbeats`,
+and no more than the enclosing computation has left. Failure restores any
+speculative metavariable assignments. -/
+private def withSideBudget {m : Type → Type} [Monad m] [MonadLiftT MetaM m]
+    [MonadWithReaderOf Core.Context m] [MonadRuntimeException m] [MonadExcept Exception m]
+    (decide : m (Option Lean.Expr)) : m (Option Lean.Expr) := do
+  let enclosing ← (readThe Core.Context : MetaM _)
+  let now ← (IO.getNumHeartbeats : MetaM Nat)
   let remaining := if enclosing.maxHeartbeats == 0 then sideDecisionHeartbeats
     else enclosing.initHeartbeats + enclosing.maxHeartbeats - now
   let budget := max 1 (min remaining sideDecisionHeartbeats)
-  let saved ← saveState
+  let saved ← (saveState : MetaM _)
   let result ← tryCatchRuntimeEx
     (withTheReader Core.Context
-      (fun context => { context with initHeartbeats := now, maxHeartbeats := budget })
-      (contextDischargeCore context condition atoms))
+      (fun context => { context with initHeartbeats := now, maxHeartbeats := budget }) decide)
     fun failure => do
       if failure.isMaxHeartbeat then return none
       throw failure
-  if result.isNone then saved.restore
+  if result.isNone then (saved.restore : MetaM Unit)
   return result
+
+/-- Normalization only asks for cheap side conditions. A large connected
+context must not turn an undecided tag or payload test into an unbounded
+arithmetic search. -/
+private def boundedContextDischarge (context : LocalContext) (condition : Lean.Expr)
+    (atoms : FVarIdSet) : MetaM (Option Lean.Expr) :=
+  withSideBudget (contextDischargeCore context condition atoms)
+
+/-- A condition in the normal form of the context, by its parts: a
+conjunction part by part, as the context splits it. -/
+private partial def dischargeParts (context : LocalContext) (condition : Lean.Expr) :
+    MetaM (Option Lean.Expr) := do
+  if condition.isConstOf ``True then return some (mkConst ``True.intro)
+  if let some (left, right) := condition.and? then
+    let some first ← dischargeParts context left | return none
+    let some second ← dischargeParts context right | return none
+    return some (mkApp4 (mkConst ``And.intro) left right first second)
+  boundedContextDischarge context condition (collectFVars {} condition).fvarSet
+
+/-- A premise a lemma states in a role's spelling, which the normalization
+has rewritten in the hypotheses (`¬AbortsNewFrom` as its specification
+form): the premise in the same normal form, matched by its parts. -/
+private def normalizedDischarge (context : LocalContext) (condition : Lean.Expr) :
+    SimpM (Option Lean.Expr) := withSideBudget do
+  let normal ← Simp.simp condition
+  if normal.expr == condition then return none
+  let some proof ← dischargeParts context normal.expr | return none
+  match normal.proof? with
+  | some equation => return some (← mkEqMPR equation proof)
+  | none => return some proof
 
 /-- The discharger of the normalization's side conditions, over a leaf's
 context: a condition about a variable simp introduced under a binder has no
 fact in the context and is not attempted; otherwise a hypothesis states it
 at reducible transparency, or omega proves it from the hypotheses connected
 to it through shared variables, not from the whole context, whose size the
-condition's cost would otherwise follow. -/
+condition's cost would otherwise follow. A lemma's premise is matched in the
+normal form the context has, so a lemma may state a role's own atom. -/
 private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.HashMap Lean.Expr (Option Lean.Expr))) :
     Simp.Discharge := fun condition => do
   let condition ← instantiateMVars condition
@@ -3583,7 +4230,11 @@ private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.Has
     return result
   if atoms.any fun fvarId => !context.contains fvarId then return none
   let started ← IO.getNumHeartbeats
-  let result ← boundedContextDischarge context condition atoms
+  let mut result ← boundedContextDischarge context condition atoms
+  -- Arithmetic went to omega; any other condition is matched again in the
+  -- normal form the context has.
+  if result.isNone && !arithmeticProposition condition then
+    result ← normalizedDischarge context condition
   decided.modify (·.insert condition result)
   if verex.solverDebug.get (← getOptions) then
     let finished ← IO.getNumHeartbeats
@@ -3834,6 +4485,41 @@ private def normalizeContext (target : Bool) : TacticM Unit := withMainContext d
           IO.println s!"      dependent conditional hypothesis {decl.userName}: {((toString (← ppExpr type)).replace "\n" " " |>.take 160).toString}"
 
 elab "verex_normalize_context" : tactic => normalizeContext true
+
+/-- The role predicates of the context read in their specification forms
+(`vir_denote_spec`), then the normal form of what changed. Only the goal and
+the facts that mention a predicate the set reads are rewritten; the
+hypotheses already normal are cached and skipped. -/
+elab "verex_spec_forms" : tactic => focusGoal do
+  if (← getGoals).isEmpty then return
+  let some extension ← getSimpExtension? `vir_denote_spec | return
+  let theorems ← extension.getTheorems
+  let heads := [theorems.pre, theorems.post].foldl (init := ({} : NameSet)) fun found tree =>
+    tree.root.foldl (init := found) fun found key _ =>
+      match key with
+      | .const name _ => found.insert name
+      | _ => found
+  let mentions (e : Lean.Expr) : Bool :=
+    (e.find? fun term => match term.getAppFn with
+      | .const name _ => heads.contains name
+      | _ => false).isSome
+  let goal ← getMainGoal
+  let (targets, target) ← goal.withContext do
+    let targets ← (← goal.getNondepPropHyps).filterM fun fvarId => do
+      return mentions (← instantiateMVars (← fvarId.getType))
+    return (targets, mentions (← instantiateMVars (← goal.getType)))
+  if targets.isEmpty && !target then return
+  let { ctx, simprocs, .. } ← mkSimpContext (← `(tactic| simp only [vir_denote_spec]))
+    (eraseLocal := false)
+  let ctx ← Simp.mkContext { ctx.config with failIfUnchanged := false } ctx.simpTheorems
+    ctx.congrTheorems
+  let (result, _) ← simpGoal goal ctx simprocs (simplifyTarget := target) (fvarIdsToSimp := targets)
+  match result with
+  | none => replaceMainGoal []
+  | some (_, next) =>
+      if next == goal then return
+      replaceMainGoal [next]
+      normalizeContext true
 
 /-- Add normalized copies of facts used by dependent terms. The original
 proofs stay in place, so reducing a carrier conversion cannot invalidate the

@@ -8,7 +8,7 @@ verex proofs where
 
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
 
-verify assert_no_duplicate by
+verify assert_no_duplicate by lean =>
   verex_obligations
   verex_on
   | aborts_if_1 =>

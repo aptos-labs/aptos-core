@@ -38,7 +38,7 @@ theorem triangular_bounds (i : Int) (lo : 0 ≤ i) (hi : i ≤ 1000) :
   · exact triangular_nonneg i h
   · exact Int.mul_nonneg_of_nonpos_of_nonpos (by omega) (by omega)
 
-verify sum_range by
+verify sum_range by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first | omega |
@@ -46,7 +46,7 @@ verify sum_range by
     have step := triangular_step i.val (by omega)
     simp only [triangular_div] at *
     first | omega | grind
-verify sum_from by
+verify sum_from by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first | omega |
@@ -55,7 +55,7 @@ verify sum_from by
     have step := triangular_step i.val (by omega)
     simp only [triangular_div] at *
     first | omega | grind
-verify sum_skip_first by
+verify sum_skip_first by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first | omega |

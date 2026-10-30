@@ -268,7 +268,7 @@ h✝ : key = VerexIR.StorageKey.address addr2
         arguments := VerexIR.Proofs.Denote.NRow.nil }
       key
 tests/sources/functional/ModifiesSchemaTest.move:33:5: error: verex verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof in `tests/sources/functional/ModifiesSchemaTest.proof.lean`:
-  verify mutate_at_wrapper2 by
+  verify mutate_at_wrapper2 by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry

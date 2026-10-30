@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/verify_only_list.move:8:9: error: the specification clause `ensures result == 2` is not established
 tests/sources/functional/verify_only_list.move:7:5: error: verex verification failed: the automatic verification of `first` failed; provide a proof in `tests/sources/functional/verify_only_list.proof.lean`:
-  verify first by
+  verify first by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/verify_only_list.move:7:5: error: verex verification fa
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_only_list.move:13:9: error: the specification clause `ensures result == 3` is not established
 tests/sources/functional/verify_only_list.move:12:5: error: verex verification failed: the automatic verification of `second` failed; provide a proof in `tests/sources/functional/verify_only_list.proof.lean`:
-  verify second by
+  verify second by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

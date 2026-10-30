@@ -125,8 +125,8 @@ closure where no table entry states a precondition
 (`verex_requires_everywhere`).
 
 Authored proofs and the names they use are native: no proof file spells a
-runtime value or an encoding, and a module's map laws under its
-specification functions' names are the typed maps' laws (`ensureMapLaws`,
+runtime value or an encoding, and a module's map lemmas, named from its
+specification functions, are the typed maps' lemmas (`ensureMapLemmas`,
 `VerexIR.SpecMap.*`).
 
 ## Specialized contracts
@@ -163,7 +163,19 @@ theorem, interface or self hypothesis states (`specializationCertificates`,
   caller's types: a quantifier over a type argument's integers binds an
   integer with the type's membership (`forallCertified`), and a type
   parameter's order is the caller's order at the argument
-  (`respellInducedFamily`, `NTy.readOrder`).
+  (`respellInducedFamily`, `NTy.readOrder`). An operation at the induced
+  frame, a field's selection or a variant's projection included, is spelled
+  at the caller's frame with the types and the indices it takes (`Var`,
+  `Which`, `Choices`) substituted (`respellOperation?`), where the two
+  convert; the canonical family pass of a leaf does the same
+  (`canonicalFamilies`), so that a step's expression over a generic
+  callee's result spells the callee's contract as the leaf states it. An
+  operation converts only where it reduces on its indices alone. A
+  variant's projection does not: it matches on the choice and the value
+  together, which keeps it an atom where the value is unknown, as the
+  automatic normal form needs. A step proof's leaf respells it by an
+  equation proved case by case on the value (`whichProjectFamily`); the
+  automatic normal form keeps the callee's spelling.
 
 ## Not changed
 

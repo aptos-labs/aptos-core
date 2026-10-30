@@ -1,19 +1,21 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:74:9: error: the specification clause `ensures ∀ (i in 0 .. a.length), a[i].value == 1` is not established
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:72:5: error: verex verification failed: the automatic verification of `set_both` exceeded its budget of 1000000 maxHeartbeats; provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
-  verify set_both by
+  verify set_both by lean =>
     verex_obligations
     verex_on
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:86:9: error: the specification clause `ensures ∀ (i in 0 .. entries.length),
         entries[i].value == old(entries)[i].value` is not established
 tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:84:5: error: verex verification failed: the automatic verification of `mirror_keys_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_wrapper_mut.proof.lean`:
-  verify mirror_keys_wrong by
+  verify mirror_keys_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

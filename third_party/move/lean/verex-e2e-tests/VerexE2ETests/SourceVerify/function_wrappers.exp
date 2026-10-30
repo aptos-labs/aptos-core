@@ -1,7 +1,7 @@
 VerexE2ETests/SourceVerify/function_wrappers.move:20:9: error: the data invariant `invariant ∀ (value : u64; result : u64),
         ensures_of<this.0>(value, result) ==> result == 0` does not hold where a value is constructed
 VerexE2ETests/SourceVerify/function_wrappers.move:41:5: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof in `VerexE2ETests/SourceVerify/function_wrappers.proof.lean`:
-  verify invalid by
+  verify invalid by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/behavioral_wide_arity.move:60:9: error: the specification clause `aborts_if o == 0` is not established
 tests/sources/functional/closures/behavioral_wide_arity.move:59:5: error: verex verification failed: the automatic verification of `run_concrete_wrong` failed; provide a proof in `tests/sources/functional/closures/behavioral_wide_arity.proof.lean`:
-  verify run_concrete_wrong by
+  verify run_concrete_wrong by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

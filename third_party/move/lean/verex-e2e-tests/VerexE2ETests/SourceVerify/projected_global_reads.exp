@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/projected_global_reads.move:45:9: error: the specification clause `ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + 2` is not established
 VerexE2ETests/SourceVerify/projected_global_reads.move:42:5: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/projected_global_reads.proof.lean`:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

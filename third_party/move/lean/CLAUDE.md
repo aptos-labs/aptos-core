@@ -83,6 +83,7 @@ source does not show is in the status directory.
 
 | Directory | Contents |
 |---|---|
+| [`doc/user/`](doc/user/) | The Verex Book: concise user documentation for VerexSL and the proof language, for expert users; not a replacement for the designs. |
 | [`doc/designs/`](doc/designs/) | The current designs (below). |
 | [`doc/plan/`](doc/plan/) | [`roadmap.md`](doc/plan/roadmap.md): what is open, by track, in priority order. Approved but unscheduled plans beside it ([`native-function-values.md`](doc/plan/native-function-values.md), [`unsafe-pointers.md`](doc/plan/unsafe-pointers.md)). |
 | [`doc/status/`](doc/status/) | [`prover-test-problems.md`](doc/status/prover-test-problems.md): what the Move Prover's tests show under Verex and why; [`assumptions.md`](doc/status/assumptions.md): the hypotheses of the public theorems nothing discharges; [`measurement-debts.md`](doc/status/measurement-debts.md); [`verification-benchmarks.md`](doc/status/verification-benchmarks.md): the nightly benchmark and its history. |
@@ -101,7 +102,7 @@ Designs:
 - [`verex-sl.md`](doc/designs/verex-sl.md): the profile-aware Verex source language.
 - [`prophetic-references.md`](doc/designs/prophetic-references.md): the prophecy ownership model of references.
 - [`static-memory.md`](doc/designs/static-memory.md): one typed memory per resource type.
-- [`intrinsic-maps.md`](doc/designs/intrinsic-maps.md): the abstract map value of intrinsic map types, roles, validity, typed map laws.
+- [`intrinsic-maps.md`](doc/designs/intrinsic-maps.md): the abstract map value of intrinsic map types, roles, validity, typed map lemmas.
 - [`ghost-fields.md`](doc/designs/ghost-fields.md): ghost fields and validity slots.
 - [`state-labels.md`](doc/designs/state-labels.md): state labels as memory variables.
 - [`higher-order-functions.md`](doc/designs/higher-order-functions.md): closures in VIR, runtime, denotation, behavioral predicates, the typed carrier of function types.

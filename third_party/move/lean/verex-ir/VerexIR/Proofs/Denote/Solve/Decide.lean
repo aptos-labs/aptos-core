@@ -427,6 +427,43 @@ private def mapPositionFacts (goal : MVarId) (known : Array Lean.Expr := #[]) :
       if let some inhabited ← instanceOf inhabiteds map ``Inhabited then
         facts ← push facts (mkAppOptM ``VerexIR.SpecMap.keyAt_rank
           #[none, none, decEq, inhabited, map, key, found])
+    -- A key's neighbour the context states: none, the key is last (first);
+    -- one, it is present a position on (back): `SpecMap.nextKey_none`,
+    -- `nextKey_some`, `prevKey_none`, `prevKey_some`. The key's presence is a
+    -- premise where the context does not state it.
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let term ← instantiateMVars decl.type
+      let some (_, lhs, rhs) := term.eq? | continue
+      let neighbour (e : Lean.Expr) := e.isAppOf ``VerexIR.SpecMap.nextKey? ||
+        e.isAppOf ``VerexIR.SpecMap.prevKey?
+      let flipped := !neighbour lhs
+      let (call, result) := if flipped then (rhs, lhs) else (lhs, rhs)
+      unless neighbour call && call.getAppNumArgs ≥ 3 do continue
+      let next := call.isAppOf ``VerexIR.SpecMap.nextKey?
+      unless result.isAppOf ``Option.none || result.isAppOf ``Option.some do continue
+      let map := call.getArg! (call.getAppNumArgs - 2)
+      let key := call.appArg!
+      if literal map then continue
+      let some (_, valid) := valids.find? (·.1 == map) | continue
+      let proof ← if flipped then mkEqSymm decl.toExpr else pure decl.toExpr
+      let neighbourFacts (present : Lean.Expr) : MetaM (Array Lean.Expr) := do
+        if result.isAppOf ``Option.none then
+          return #[← mkAppM (if next then ``VerexIR.SpecMap.nextKey_none
+            else ``VerexIR.SpecMap.prevKey_none) #[valid, present, proof]]
+        let found ← mkAppM (if next then ``VerexIR.SpecMap.nextKey_some
+          else ``VerexIR.SpecMap.prevKey_some) #[valid, present, proof]
+        return #[← mkAppM ``And.left #[found], ← mkAppM ``And.right #[found]]
+      let stated := present.find? fun (other, presentKey, _) => other == map && presentKey == key
+      let derived ← try
+          match stated with
+          | some (_, _, found) => neighbourFacts found
+          | none =>
+              let presence ← mkEq (← mkAppM ``VerexIR.SpecMap.hasKey #[map, key]) (mkConst ``Bool.true)
+              withLocalDeclD `present presence fun premise => do
+                (← neighbourFacts premise).mapM (mkLambdaFVars #[premise])
+        catch _ => pure #[]
+      for fact in derived do facts ← push facts (pure fact)
     -- A typed map's size is a count; a table's map fits its carrier.
     let mut sized : Array Lean.Expr := #[]
     for term in terms do
@@ -525,17 +562,17 @@ private def mapPositionFacts (goal : MVarId) (known : Array Lean.Expr := #[]) :
         let parts := construction.getAppArgs
         if construction.isAppOfArity ``VerexIR.SpecMap.takeEntries 4 ||
             construction.isAppOfArity ``VerexIR.SpecMap.dropEntries 4 then
-          let law := if construction.isAppOfArity ``VerexIR.SpecMap.takeEntries 4 then
+          let lemma := if construction.isAppOfArity ``VerexIR.SpecMap.takeEntries 4 then
               ``VerexIR.SpecMap.valid_takeEntries
             else ``VerexIR.SpecMap.valid_dropEntries
-          return ← mkAppOptM law #[parts[0]!, parts[1]!, none, parts[2]!, valid, parts[3]!]
-        let law := if construction.isAppOfArity ``VerexIR.SpecMap.updateAll 7 then
+          return ← mkAppOptM lemma #[parts[0]!, parts[1]!, none, parts[2]!, valid, parts[3]!]
+        let lemma := if construction.isAppOfArity ``VerexIR.SpecMap.updateAll 7 then
             ``VerexIR.SpecMap.valid_updateAll
           else if construction.isAppOfArity ``VerexIR.SpecMap.update 7 then
             ``VerexIR.SpecMap.valid_update
           else ``VerexIR.SpecMap.valid_remove
         let explicit : Array Lean.Expr := (parts.extract 0 5).push valid ++ parts.extract 5 parts.size
-        mkAppOptM law (explicit.map some)
+        mkAppOptM lemma (explicit.map some)
     for (map, index) in reads do
       if literal map then continue
       -- A position the context bounds below; its bound above is a premise
@@ -597,7 +634,8 @@ elab "verex_map_positions" : tactic => focusGoal do
   if (← getGoals).isEmpty then return
   let reads (e : Lean.Expr) := (e.find? fun sub =>
     sub.isConstOf ``VerexIR.SpecMap.keyAt || sub.isConstOf ``VerexIR.SpecMap.rank ||
-      sub.isConstOf ``VerexIR.SpecMap.size).isSome
+      sub.isConstOf ``VerexIR.SpecMap.size || sub.isConstOf ``VerexIR.SpecMap.nextKey? ||
+      sub.isConstOf ``VerexIR.SpecMap.prevKey?).isSome
   let read ← (← getMainGoal).withContext do
     if reads (← instantiateMVars (← (← getMainGoal).getType)) then return true
     (← getLCtx).anyM fun decl => do
@@ -927,7 +965,7 @@ elab "verex_ground_arithmetic" : tactic => focusGoal do
         if maps.contains hyp then return false
         let type ← instantiateMVars (← hyp.getType)
         return vars.any fun var => type.hasAnyFVar (· == var)
-    -- The laws of the reads of a literal map and the equality of literal
+    -- The lemmas of the reads of a literal map and the equality of literal
     -- values; the whole normal form would cost a leaf's budget here.
     let pairs := mkIdent `VerexIR.Proofs.Denote.pairInjectionRows
     simpMainAt (← `(tactic| simp only [VerexIR.Proofs.Obligation_eq, vir_denote_eval,
@@ -2072,7 +2110,7 @@ elab_rules : tactic
     throwError "no hypothesis states the existential at a witness"
 
 /-- Discharge a frame directly from the writes in its target. Only memory
-update laws and stated inequalities participate; no context normalization
+update lemmas and stated inequalities participate; no context normalization
 or entry relation is needed once the relevant memory has been linked. -/
 def closeFrameWrites (goal : MVarId) : MetaM Bool := do
   let target ← goal.withContext (instantiateMVars (← goal.getType))
@@ -2344,9 +2382,36 @@ elab "verex_modus_ponens" : tactic => focusGoal do
   let goal ← assertFacts goal `implied facts
   setGoals [← goal.tryClearMany used]
 
+/-- Whether an application of a constant may reduce at reducible
+transparency: the constant is reducible, or `whnfCore` reduces it at any
+transparency (a projection of a structure, a recursor, a matcher). -/
+private def headMayReduce (head : Name) : MetaM Bool := do
+  if ← isReducible head then return true
+  let env ← getEnv
+  if (env.getProjectionFnInfo? head).isSome || isAuxRecursor env head then return true
+  if (env.find? head) matches some (.recInfo _) then return true
+  isMatcher head
+
+/-- Whether two terms cannot unify at reducible transparency by their heads:
+applications of different constants, neither of which may reduce. -/
+private def headsDiffer (left right : Lean.Expr) : MetaM Bool := do
+  let .const leftHead _ := left.getAppFn | return false
+  let .const rightHead _ := right.getAppFn | return false
+  if leftHead == rightHead then return false
+  return !(← headMayReduce leftHead) && !(← headMayReduce rightHead)
+
+/-- Whether a quantified hypothesis's conclusion cannot have the goal as an
+instance: its relation, or a side of an equation, has another head. -/
+private def conclusionDiffers (conclusion target : Lean.Expr) : MetaM Bool := do
+  if ← headsDiffer conclusion target then return true
+  match conclusion.eq?, target.eq? with
+  | some (_, left, right), some (_, goalLeft, goalRight) =>
+      return (← headsDiffer left goalLeft) || (← headsDiffer right goalRight)
+  | _, _ => return false
+
 /-- A goal that is an instance of a quantified hypothesis: the hypothesis
 applied at reducible transparency, its premises closed by omega or by a
-hypothesis. -/
+hypothesis. A hypothesis whose conclusion's head differs is not tried. -/
 elab "verex_instance" : tactic => focusGoal do
   let initial ← saveState
   let (goal, _) ← introduceThroughMarkers (← getMainGoal)
@@ -2360,7 +2425,11 @@ elab "verex_instance" : tactic => focusGoal do
         if let some unfolded := unfoldNegatedConclusion ty then
           return found.push (← mkExpectedTypeHint decl.toExpr unfolded)
       return found.push decl.toExpr
+  let target ← goal.withContext do instantiateMVars (← goal.getType)
   for candidate in candidates.reverse do
+    let conclusion := (← goal.withContext do instantiateMVars (← inferType candidate)).getForallBody
+    if !conclusion.hasLooseBVars || !(conclusion.getAppFn.isBVar) then
+      if ← goal.withContext (conclusionDiffers conclusion target) then continue
     let saved ← saveState
     try
       let premises ← withReducible (goal.apply candidate)
@@ -3576,8 +3645,8 @@ elab "verex_prepared_applies" : tactic => focusGoal do
 
 /-- Whether a leaf holds terms omega reads as atoms that `grind` relates:
 observations of a map value (`hasKey`, `valueAt`, `keyAt`, `size`, `rank`),
-whose laws are its lemmas, behavioral predicates (`ensures_of`, `aborts_of`,
-`result_of`, `state_of`), whose laws the contracts and invariants state, or
+which the map lemmas relate, behavioral predicates (`ensures_of`, `aborts_of`,
+`result_of`, `state_of`), whose lemmas the contracts and invariants state, or
 applications of a recursive specification function (`f.spec`), equal at
 equal arguments. -/
 elab "verex_has_atoms" : tactic => focusGoal do
@@ -3813,13 +3882,13 @@ elab "verex_memory_invariants" : tactic => focusGoal do
       let value := written.getArg! 4
       if value.isAppOfArity ``Option.none 1 then
         let [holds] ← goal.apply (mkConst ``VerexIR.Proofs.Denote.MemoryInvariants.set_none)
-          | throwError "the removal law did not leave its obligation"
+          | throwError "the removal lemma did not leave its obligation"
         return ← establish holds fuel
-      let law := if value.isAppOfArity ``Option.some 2 then
+      let lemma := if value.isAppOfArity ``Option.some 2 then
           ``VerexIR.Proofs.Denote.MemoryInvariants.set_some
         else ``VerexIR.Proofs.Denote.MemoryInvariants.set
-      let [holds, stored] ← goal.apply (mkConst law)
-        | throwError "the write law did not leave its two obligations"
+      let [holds, stored] ← goal.apply (mkConst lemma)
+        | throwError "the write lemma did not leave its two obligations"
       return (← establish holds fuel) ++ [stored]
   replaceMainGoal (← establish (← getMainGoal) 256)
   -- Select the invariant of each written resource before running the leaf
@@ -4351,8 +4420,8 @@ invariant is owed at entry and after each iteration, any other clause by the
 function. -/
 private def clauseFailure (origin : Option Provenance) (snippet : String) : MessageData :=
   match origin with
-  | some .loopEntry => m!"the loop invariant `{snippet}` is not established at entry"
-  | some .loopIteration => m!"the loop invariant `{snippet}` is not preserved by an iteration"
+  | some (.loopEntry _) => m!"the loop invariant `{snippet}` is not established at entry"
+  | some (.loopIteration _) => m!"the loop invariant `{snippet}` is not preserved by an iteration"
   | some .assertion => m!"the assertion `{snippet}` does not hold"
   | some .mutationEnd => m!"the data invariant `{snippet}` does not hold where a mutation ends"
   | some .construction =>

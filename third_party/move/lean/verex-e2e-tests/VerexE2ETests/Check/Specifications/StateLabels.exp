@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/StateLabels.lean:53:4: error: the specification clause `ensures ∃ (S : StateDomain), (..S |~ increased(addr)) && (S.. |~ increased(addr))` is not established
 VerexE2ETests/Check/Specifications/StateLabels.lean:50:7: error: verex verification failed: the automatic verification of `bump_once` failed; provide a proof in the module:
-  verify bump_once by
+  verify bump_once by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/Check/Specifications/StateLabels.lean:50:7: error: verex verificat
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/StateLabels.lean:72:4: error: the specification clause `ensures ∃ (S : StateDomain), (..S |~ grew(old(c), c)) && (S.. |~ grew(old(c), c))` is not established
 VerexE2ETests/Check/Specifications/StateLabels.lean:70:7: error: verex verification failed: the automatic verification of `inc_once` failed; provide a proof in the module:
-  verify inc_once by
+  verify inc_once by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

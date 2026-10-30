@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/signed_int/artithmetic.move:130:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:129:5: error: verex verification failed: the automatic verification of `div_by_zero_i64_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify div_by_zero_i64_incorrect by
+  verify div_by_zero_i64_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/signed_int/artithmetic.move:129:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:151:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:150:5: error: verex verification failed: the automatic verification of `overflow_i8_add_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i8_add_incorrect by
+  verify overflow_i8_add_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/signed_int/artithmetic.move:150:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:167:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:166:5: error: verex verification failed: the automatic verification of `overflow_i16_add_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i16_add_incorrect by
+  verify overflow_i16_add_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -25,7 +25,7 @@ tests/sources/functional/signed_int/artithmetic.move:166:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:183:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:182:5: error: verex verification failed: the automatic verification of `overflow_i32_add_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i32_add_incorrect by
+  verify overflow_i32_add_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -33,7 +33,7 @@ tests/sources/functional/signed_int/artithmetic.move:182:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:199:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:198:5: error: verex verification failed: the automatic verification of `overflow_i64_add_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i64_add_incorrect by
+  verify overflow_i64_add_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -41,7 +41,7 @@ tests/sources/functional/signed_int/artithmetic.move:198:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:215:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:214:5: error: verex verification failed: the automatic verification of `overflow_i128_add_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i128_add_incorrect by
+  verify overflow_i128_add_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -49,7 +49,7 @@ tests/sources/functional/signed_int/artithmetic.move:214:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:231:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:230:5: error: verex verification failed: the automatic verification of `overflow_i256_add_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i256_add_incorrect by
+  verify overflow_i256_add_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -57,7 +57,7 @@ tests/sources/functional/signed_int/artithmetic.move:230:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:252:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:251:5: error: verex verification failed: the automatic verification of `overflow_i8_mul_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i8_mul_incorrect by
+  verify overflow_i8_mul_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -65,7 +65,7 @@ tests/sources/functional/signed_int/artithmetic.move:251:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:268:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:267:5: error: verex verification failed: the automatic verification of `overflow_i16_mul_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i16_mul_incorrect by
+  verify overflow_i16_mul_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -73,7 +73,7 @@ tests/sources/functional/signed_int/artithmetic.move:267:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:284:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:283:5: error: verex verification failed: the automatic verification of `overflow_i32_mul_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i32_mul_incorrect by
+  verify overflow_i32_mul_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -81,7 +81,7 @@ tests/sources/functional/signed_int/artithmetic.move:283:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:300:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:299:5: error: verex verification failed: the automatic verification of `overflow_i64_mul_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i64_mul_incorrect by
+  verify overflow_i64_mul_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -89,7 +89,7 @@ tests/sources/functional/signed_int/artithmetic.move:299:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:315:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:314:5: error: verex verification failed: the automatic verification of `overflow_i128_mul_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i128_mul_incorrect by
+  verify overflow_i128_mul_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -97,7 +97,7 @@ tests/sources/functional/signed_int/artithmetic.move:314:5: error: verex verific
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/artithmetic.move:330:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/artithmetic.move:329:5: error: verex verification failed: the automatic verification of `overflow_i256_mul_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/artithmetic.proof.lean`:
-  verify overflow_i256_mul_incorrect by
+  verify overflow_i256_mul_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

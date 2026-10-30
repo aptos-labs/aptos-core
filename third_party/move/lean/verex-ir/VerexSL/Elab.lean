@@ -347,6 +347,11 @@ private partial def pathSegments (stx : Syntax) : Array String :=
     #[stx.reprint.getD stx.prettyPrint.pretty |>.trimAscii |>.toString]
   else stx.getArgs.flatMap pathSegments
 
+/-- A path's first segment. -/
+private partial def firstSegment (stx : Syntax) : Syntax :=
+  if stx.isIdent || stx.isNatLit?.isSome then stx
+  else (stx.getArgs.find? (fun child => child.getPos?.isSome)).map firstSegment |>.getD stx
+
 /-- Replace a path's first segment, an identifier or a numeric literal. -/
 private partial def replaceFirstSegment (stx : Syntax) (segment : Syntax) : Syntax × Bool :=
   if stx.isIdent || stx.isNatLit?.isSome then (segment, true)
@@ -386,7 +391,8 @@ where
         | none => match aliases first with
             | some address => pure (address, some first)
             | none => return (stx, found)
-      let literal := Syntax.mkNumLit address (SourceInfo.fromRef stx)
+      -- The address takes the alias's place and range, as written.
+      let literal := Syntax.mkNumLit address (SourceInfo.fromRef (firstSegment stx) (canonical := true))
       let (rewritten, _) := replaceFirstSegment stx literal
       let found ← match alias? with
         | none => pure found
@@ -1903,16 +1909,20 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
   else if stx.isOfKind ``verexSpecFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
       | throw "a specification function must have a name"
-    let types := signatureTypeChildren stx
-    let some result := types.back?
-      | throw s!"specification function `{name.getId}` must have a result type"
+    -- The result type, omitted where the body determines it.
+    let result := stx.getArgs.findSome? fun child =>
+      if child.getNumArgs == 2 && child[0].isToken ":" && isTypeSyntax child[1] then
+        some child[1]
+      else none
     let expressions := exprChildren stx
+    if result.isNone && expressions.isEmpty then
+      throw s!"specification function `{name.getId}` without a body must have a result type"
     pure (.item (.specFunction {
       name := name.getId.getString!
       isOpaque := containsAtom "opaque" stx
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       parameters := ← (childrenOfKind ``verexParameterSyntax stx).mapM parameterOf
-      result := ← typeOf result
+      result := ← result.mapM typeOf
       decreases := ← ((childrenOfKind ``verexSpecDecreasesSyntax stx)[0]?.bind
         (exprChildren · |>.back?)).mapM expressionOf
       body := ← expressions.back?.mapM expressionOf
@@ -2030,24 +2040,26 @@ private def logDiagnostics (stx : Syntax)
       | none => stx
     logAt ref message severity
 
-/-- Lower and validate a unit, reporting each diagnostic at its source range,
-or at the command when it has none. -/
-def compileAt (stx : Syntax) (unit : CompilationUnit) :
-    CommandElabM VerexIR.Validation.ValidatedUnit := do
+/-- A diagnostic of lowering or validation: its byte range, severity, and
+message. -/
+abbrev CompileDiagnostic := Option (Nat × Nat) × MessageSeverity × String
+
+/-- Lower and validate a unit, or its diagnostics. -/
+def compileUnit (unit : CompilationUnit) :
+    Except (Array CompileDiagnostic) VerexIR.Validation.ValidatedUnit := do
   let raw ← match lower unit with
     | Except.ok raw => pure raw
     | Except.error diagnostics =>
-        logDiagnostics stx <| diagnostics.map fun diagnostic =>
+        throw <| diagnostics.map fun diagnostic =>
           (diagnostic.span.map fun span => (span.startByte, span.endByte),
             match diagnostic.severity with
             | .error => .error
             | .warning => .warning,
             s!"{diagnostic.code}: {diagnostic.message}")
-        throwAbortCommand
   match validate raw with
   | Except.ok validated => pure validated
   | Except.error diagnostics =>
-      logDiagnostics stx <| diagnostics.map fun diagnostic =>
+      throw <| diagnostics.map fun diagnostic =>
         (diagnostic.primary.bind (raw.tables.locations[·.index]?) |>.bind (·.primary)
             |>.map fun range => (range.startByte, range.endByte),
           match diagnostic.severity with
@@ -2055,6 +2067,15 @@ def compileAt (stx : Syntax) (unit : CompilationUnit) :
           | .warning => .warning
           | .info => .information,
           s!"{diagnostic.code}: {diagnostic.message}")
+
+/-- Lower and validate a unit, reporting each diagnostic at its source range,
+or at the command when it has none. -/
+def compileAt (stx : Syntax) (unit : CompilationUnit) :
+    CommandElabM VerexIR.Validation.ValidatedUnit := do
+  match compileUnit unit with
+  | .ok validated => pure validated
+  | .error diagnostics =>
+      logDiagnostics stx diagnostics
       throwAbortCommand
 
 /-- Convert one parsed Verex namespace/module command into the frontend AST used

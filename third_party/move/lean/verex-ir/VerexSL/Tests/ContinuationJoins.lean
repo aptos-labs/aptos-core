@@ -287,7 +287,7 @@ error: the specification clause `ensures result >= 0` is not established
 error: the specification clause `ensures result <= 18446744073709551615` is not established
 ---
 error: verex verification failed: the automatic verification of `limits` failed; provide a proof in the module:
-  verify limits by
+  verify limits by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -303,7 +303,7 @@ verify 0x42::continuation_joins::limits
 -- Authored routing retains its existing paths; invariant loops use the checked loop rule.
 #fresh_verification in
 set_option verex.sharedContinuations true in
-verify 0x42::continuation_joins::one by
+verify 0x42::continuation_joins::one by lean =>
   verex_obligations
   all_goals verex_solve
 set_option verex.sharedContinuations true in
@@ -325,7 +325,7 @@ verify 0x42::continuation_joins::unrolled_diamonds
 error: the bound `pragma unroll = 1` of a loop is not established
 ---
 error: verex verification failed: the automatic verification of `unrolled_outrun` failed; provide a proof in the module:
-  verify unrolled_outrun by
+  verify unrolled_outrun by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -345,7 +345,7 @@ verify 0x42::continuation_joins::one
 error: the specification clause `ensures result == 11` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -362,7 +362,7 @@ verify 0x42::continuation_joins::wrong
 error: the assertion `x == 1` does not hold
 ---
 error: verex verification failed: the automatic verification of `wrong_checked` failed; provide a proof in the module:
-  verify wrong_checked by
+  verify wrong_checked by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -379,7 +379,7 @@ verify 0x42::continuation_joins::wrong_checked
 error: the loop invariant `x <= 1` is not preserved by an iteration
 ---
 error: verex verification failed: the automatic verification of `wrong_invariant` failed; provide a proof in the module:
-  verify wrong_invariant by
+  verify wrong_invariant by lean =>
     verex_obligations
     verex_on
     | invariant_2_step => verex_prepare; sorry

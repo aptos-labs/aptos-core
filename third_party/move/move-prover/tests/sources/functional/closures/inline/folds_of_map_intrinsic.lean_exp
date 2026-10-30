@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:128:9: error: the specification clause `ensures result == «spec_fold$lambda$3»(v, spec_new::<u64, u64>(), v.length)` is not established
 tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:126:5: error: verex verification failed: the automatic verification of `collect_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_map_intrinsic.proof.lean`:
-  verify collect_wrong by
+  verify collect_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

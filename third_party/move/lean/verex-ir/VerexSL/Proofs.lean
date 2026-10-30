@@ -14,7 +14,7 @@ import VerexMove.Proofs
 verex proofs for "pool_u64.move"
 verex proofs where
 
-verify buy_in by
+verify buy_in by lean =>
   …
 ```
 

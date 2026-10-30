@@ -10,7 +10,7 @@ open VerexIR.Proofs.Denote
 
 -- Inlining count_all does not import its proof block. Instantiate its proved
 -- count lemma at u64 to discharge the caller's entry, exit, and back edge.
-verify use_concrete by
+verify use_concrete by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals

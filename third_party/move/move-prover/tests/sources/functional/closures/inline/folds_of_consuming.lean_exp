@@ -15,7 +15,7 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:42:5: error: th
             > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_consuming.move:48:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:47:5: error: verex verification failed: the automatic verification of `sum_literal` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
-  verify sum_literal by
+  verify sum_literal by lean =>
     verex_obligations
     verex_on
     | invariant_5_step => verex_prepare; sorry
@@ -47,7 +47,7 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:52:5: error: th
               > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_consuming.move:58:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:57:5: error: verex verification failed: the automatic verification of `digits_forward` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
-  verify digits_forward by
+  verify digits_forward by lean =>
     verex_obligations
     verex_on
     | invariant_5_step => verex_prepare; sorry
@@ -75,7 +75,7 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:62:5: error: th
               > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_consuming.move:71:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:70:5: error: verex verification failed: the automatic verification of `digits_reverse` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
-  verify digits_reverse by
+  verify digits_reverse by lean =>
     verex_obligations
     verex_on
     | invariant_5_step => verex_prepare; sorry
@@ -98,7 +98,7 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:75:5: error: th
             > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_consuming.move:84:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:83:5: error: verex verification failed: the automatic verification of `sum_noncopy` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
-  verify sum_noncopy by
+  verify sum_noncopy by lean =>
     verex_obligations
     verex_on
     | invariant_5_step => verex_prepare; sorry

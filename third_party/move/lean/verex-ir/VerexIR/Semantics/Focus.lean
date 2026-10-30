@@ -12,7 +12,7 @@ descends into and the focused field's siblings; the resource with a value
 at the focus is `focusValue`.  Every place operation the bracket performs
 — reading the focus, holing it, writing it back, finding the hole and
 filling it, retiring the borrow that rested on it — is stated here once
-over the path, so the bracket laws are path-generic: a flat resource, a
+over the path, so the bracket lemmas are path-generic: a flat resource, a
 nested one, and a struct with siblings around the focus are one shape.
 
 Siblings are `Plain`, loan-free, as every typed erasure is.  The walkers

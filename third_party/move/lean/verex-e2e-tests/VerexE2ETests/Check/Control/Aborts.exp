@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Control/Aborts.lean:97:4: error: the specification clause `ensures result == value + 1` is not established
 VerexE2ETests/Check/Control/Aborts.lean:95:7: error: verex verification failed: the automatic verification of `off_by_one` failed; provide a proof in the module:
-  verify off_by_one by
+  verify off_by_one by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

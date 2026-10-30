@@ -15,7 +15,7 @@ set_option verex.sharedContinuations true
 error: the specification clause `ensures result == x + 1` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

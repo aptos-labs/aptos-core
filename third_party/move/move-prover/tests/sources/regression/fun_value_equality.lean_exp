@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/fun_value_equality.move:18:9: error: the specification clause `ensures p != q` is not established
 tests/sources/regression/fun_value_equality.move:16:5: error: verex verification failed: the automatic verification of `two_params` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify two_params by
+  verify two_params by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/regression/fun_value_equality.move:16:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:28:9: error: the specification clause `ensures s.cb != p` is not established
 tests/sources/regression/fun_value_equality.move:27:5: error: verex verification failed: the automatic verification of `param_and_field` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify param_and_field by
+  verify param_and_field by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/regression/fun_value_equality.move:27:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:38:9: error: the specification clause `ensures a.cb != b.cb` is not established
 tests/sources/regression/fun_value_equality.move:37:5: error: verex verification failed: the automatic verification of `two_fields` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify two_fields by
+  verify two_fields by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -25,7 +25,7 @@ tests/sources/regression/fun_value_equality.move:37:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:76:9: error: the specification clause `ensures result == false` is not established
 tests/sources/regression/fun_value_equality.move:75:5: error: verex verification failed: the automatic verification of `boxed_params` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify boxed_params by
+  verify boxed_params by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -33,7 +33,7 @@ tests/sources/regression/fun_value_equality.move:75:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:88:9: error: the specification clause `ensures result == false` is not established
 tests/sources/regression/fun_value_equality.move:87:5: error: verex verification failed: the automatic verification of `captured_params` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify captured_params by
+  verify captured_params by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -41,7 +41,7 @@ tests/sources/regression/fun_value_equality.move:87:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:98:9: error: the specification clause `ensures (p, 1) != (q, 1)` is not established
 tests/sources/regression/fun_value_equality.move:97:5: error: verex verification failed: the automatic verification of `tupled_params` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify tupled_params by
+  verify tupled_params by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -49,7 +49,7 @@ tests/sources/regression/fun_value_equality.move:97:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:107:9: error: the specification clause `ensures result == false` is not established
 tests/sources/regression/fun_value_equality.move:106:5: error: verex verification failed: the automatic verification of `field_and_closure` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify field_and_closure by
+  verify field_and_closure by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -57,7 +57,7 @@ tests/sources/regression/fun_value_equality.move:106:5: error: verex verificatio
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/fun_value_equality.move:58:5: error: the data invariant `f : Fn(u64) -> u64 has Copy, Drop` does not hold where a value is constructed
 tests/sources/regression/fun_value_equality.move:122:5: error: verex verification failed: the automatic verification of `boxed_equal` failed; provide a proof in `tests/sources/regression/fun_value_equality.proof.lean`:
-  verify boxed_equal by
+  verify boxed_equal by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry

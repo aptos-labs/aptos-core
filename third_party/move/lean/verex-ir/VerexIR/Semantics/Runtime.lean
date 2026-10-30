@@ -477,7 +477,7 @@ def RuntimeValue.variant? : RuntimeValue → Option String
 
 /-! ## Storage keys
 
-Global memory is a map, and a map's laws — reading back what was written,
+Global memory is a map, and a map's lemmas — reading back what was written,
 and leaving every other key alone — need key equality to be decidable.
 Runtime values as a whole do not have it: `RuntimeValue` recurses through
 arrays, so its derived `BEq` is a `partial` definition with no equations,
@@ -530,7 +530,7 @@ theorem RuntimeValue.storageKey?_eq_some {value : RuntimeValue} {key : StorageKe
 Global memory is a finite map from keys to published resources.  Its
 operations are the vocabulary a specification speaks, so a program's read of
 a key and a clause's read of the same key are one term with nothing between
-them.  The array of entries is an implementation of the map; the laws below
+them.  The array of entries is an implementation of the map; the lemmas below
 are what execution and specification both rely on, and no consumer outside
 this section looks at the entries. -/
 
@@ -700,7 +700,7 @@ theorem insertSlot_sorted {slot : GlobalSlot} :
         · exact greater
         · exact sorted.1 _ ⟨member, member_in, rfl⟩
 
-/-! The map laws.  Distinct keys are disjoint locations, which is what lets a
+/-! The map lemmas.  Distinct keys are disjoint locations, which is what lets a
 contract frame the global memory it does not modify. -/
 
 private theorem listFind?_filter_ne {entries : List GlobalSlot} {written query : GlobalKey}
@@ -888,11 +888,11 @@ theorem ext {left right : GlobalMap} (sorted : left.Sorted) (sorted' : right.Sor
   exact list_ext sorted sorted' fun key => by
     simpa only [lookup, ← Array.find?_toList] using same key
 
-/-! The map is an abstraction, and these laws are its whole interface.
+/-! The map is an abstraction, and these lemmas are its whole interface.
 Sealing the operations keeps it that way: against a state a contract
 quantifies over, none of them has a normal form, and unfolding one would
 expose the search or filter behind the map to every reduction that walks
-past.  A write therefore stays the folded `insert`/`erase` the laws read. -/
+past.  A write therefore stays the folded `insert`/`erase` the lemmas read. -/
 
 attribute [irreducible] lookup erase insert
 

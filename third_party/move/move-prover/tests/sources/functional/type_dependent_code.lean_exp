@@ -309,7 +309,7 @@ invariantHolds✝ : True
 tests/sources/functional/type_dependent_code.move:11:9: error: the specification clause `aborts_if exists<S<X> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:12:9: error: the specification clause `aborts_if exists<S<u8> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:10:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof in the module:
-  verify test1 by
+  verify test1 by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
@@ -629,7 +629,7 @@ invariantHolds✝ : True
 tests/sources/functional/type_dependent_code.move:27:9: error: the specification clause `aborts_if exists<S<T1> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:28:9: error: the specification clause `aborts_if exists<S<T2> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:26:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof in the module:
-  verify test2 by
+  verify test2 by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
@@ -638,7 +638,7 @@ tests/sources/functional/type_dependent_code.move:26:5: error: verex verificatio
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/type_dependent_code.move:50:9: error: the specification clause `ensures global<S<u8> >(account.address).x == 0` is not established
 tests/sources/functional/type_dependent_code.move:49:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof in the module:
-  verify test1 by
+  verify test1 by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -646,7 +646,7 @@ tests/sources/functional/type_dependent_code.move:49:5: error: verex verificatio
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
 tests/sources/functional/type_dependent_code.move:65:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof in the module:
-  verify test2 by
+  verify test2 by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

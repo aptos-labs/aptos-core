@@ -23,7 +23,7 @@ example : SpecMap.keyAt (SpecMap.updateAll .sequence ([] : SpecMap Int Int) [2, 
       = 1 ∧ SpecMap.size (SpecMap.updateAll .sequence ([] : SpecMap Int Int) [2, 1, 2] [5, 4, 6]) = 2 := by
   verex_normalize
 
--- With a symbolic key the map keeps its `updateAll` form and the laws
+-- With a symbolic key the map keeps its `updateAll` form and the lemmas
 -- reading it.
 example (k : Int) : SpecMap.hasKey (SpecMap.updateAll (.ordered SpecMap.intOrder)
     ([] : SpecMap Int Int) [k, 1] [5, 4]) 1 = true := by

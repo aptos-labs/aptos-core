@@ -2,7 +2,7 @@ VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:21:4: error: the
       (S |~ exists<R>(addr))` is not established
 VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:23:4: error: the specification clause `ensures false` is not established
 VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:18:7: error: verex verification failed: the automatic verification of `negated` failed; provide a proof in the module:
-  verify negated by
+  verify negated by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -13,7 +13,7 @@ VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:31:4: error: the
       (S |~ exists<R>(addr))` is not established
 VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:33:4: error: the specification clause `ensures false` is not established
 VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:28:7: error: verex verification failed: the automatic verification of `antecedent` failed; provide a proof in the module:
-  verify antecedent by
+  verify antecedent by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -22,7 +22,7 @@ VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:28:7: error: ver
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:39:4: error: the specification clause `aborts_if false` is not established
 VerexE2ETests/Check/Specifications/DefinedStateLabelErrors.lean:38:7: error: verex verification failed: the automatic verification of `absent` failed; provide a proof in the module:
-  verify absent by
+  verify absent by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

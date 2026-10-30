@@ -8,7 +8,7 @@ verex proofs where
 
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
-verify constant_product by
+verify constant_product by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals

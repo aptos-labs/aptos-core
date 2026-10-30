@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/serialize_model.move:34:9: error: the specification clause `ensures result == spec.result[1]` is not established
 tests/sources/functional/serialize_model.move:32:5: error: verex verification failed: the automatic verification of `bcs_test1_incorrect` failed; provide a proof in `tests/sources/functional/serialize_model.proof.lean`:
-  verify bcs_test1_incorrect by
+  verify bcs_test1_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -9,7 +9,7 @@ tests/sources/functional/generic_invariants.move:49:5: error: the module invaria
         && exists<Storage<X, Y> >(@0x26)
         ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` does not hold after a write of memory it reads
 tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_u64_bool` failed; provide a proof in the module:
-  verify 0x2::S::publish_u64_bool by
+  verify 0x2::S::publish_u64_bool by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
@@ -30,11 +30,10 @@ tests/sources/functional/generic_invariants.move:49:5: error: the specification 
         && exists<Storage<X, Y> >(@0x26)
         ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` is not established
 tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_u64_y` failed; provide a proof in the module:
-  verify 0x2::S::publish_u64_y by
+  verify 0x2::S::publish_u64_y by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
-    | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
@@ -52,11 +51,10 @@ tests/sources/functional/generic_invariants.move:49:5: error: the specification 
         && exists<Storage<X, Y> >(@0x26)
         ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` is not established
 tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_x_bool` failed; provide a proof in the module:
-  verify 0x2::S::publish_x_bool by
+  verify 0x2::S::publish_x_bool by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
-    | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
@@ -72,10 +70,9 @@ tests/sources/functional/generic_invariants.move:49:5: error: the specification 
         && exists<Storage<X, Y> >(@0x26)
         ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` is not established
 tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_x_y` failed; provide a proof in the module:
-  verify 0x2::S::publish_x_y by
+  verify 0x2::S::publish_x_y by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
-    | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

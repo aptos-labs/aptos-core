@@ -20,6 +20,12 @@ encodings, runtime accessors, and injectivity.  Precomputed here so that a
 normalization names only the per-target constants. -/
 register_simp_attr vir_denote_norm
 
+/-- The specification forms of the normal form's role predicates: how an
+intrinsic operation's atom (an abort predicate, an observation) reads in a
+specification's vocabulary. Applied where a proof meets a clause, on the
+authored path; the automatic normal form keeps the atoms. -/
+register_simp_attr vir_denote_spec
+
 /-- Ground evaluation: literal arithmetic, comparisons, casts, string
 equality, and decided conditionals, so a normalization settles the guards
 of an operation at literal arguments. -/

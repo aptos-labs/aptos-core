@@ -1672,8 +1672,8 @@ where
       signatureDomain context.unit parameter.typeUse.typeId "a lemma parameter"
   /-- The arguments of a lemma instance as the bundle its definitions take:
   a native parameter's native value, any other's clause value. -/
-  lemmaBundle (reference : VerexIR.QualifiedRef) (arguments : Array ExprId) :
-      MetaM Lean.Expr := do
+  lemmaBundle (reference : VerexIR.QualifiedRef) (arguments : Array ExprId)
+      (typeArguments? : Option VerexIR.Proofs.Denote.NRow := none) : MetaM Lean.Expr := do
     let domains ← lemmaDomains reference
     unless arguments.size == domains.size do
       throwError "a lemma instance's argument count differs from the lemma's"
@@ -1681,12 +1681,18 @@ where
     let mut values : Array Lean.Expr := #[]
     for (argument, domain, index) in (arguments.zip domains).zipIdx.map (fun ((a, d), i) => (a, d, i)) do
       let value ← match natives.find? (·.1 == index) with
-        | some (_, nty) => nativeOfClause (← context.carriers) nty (← translate context argument)
+        | some (_, nty) =>
+            -- A native parameter at the type the lemma's instance gives it.
+            let nty := match typeArguments? with
+              | some row => nty.subst row
+              | none => nty
+            nativeOfClause (← context.carriers) nty (← translate context argument)
         | none => bundleComponent domain (← translate context argument)
       values := values.push value
     bundleOf values
   /-- A lemma's definition applied to what the position reads. -/
-  lemmaApplied (reference : VerexIR.QualifiedRef) (name : Name) : MetaM Lean.Expr := do
+  lemmaApplied (reference : VerexIR.QualifiedRef) (name : Name)
+      (frame? : Option Lean.Expr := none) : MetaM Lean.Expr := do
     let reads := lemmaReads reference
     let mut applied := mkConst name
     if reads.unit || reads.requires || lemmaTakesFrame context.unit reference reads.state ||
@@ -1702,7 +1708,9 @@ where
             position does not take"
       applied := mkApp applied table
     if lemmaTakesFrame context.unit reference reads.state then
-      applied := mkApp applied (← context.frame)
+      applied := mkApp applied (← match frame? with
+        | some frame => pure frame
+        | none => context.frame)
     if reads.state then applied := mkApp applied (← currentState)
     return applied
   /-- Define a lemma's statement once, each part over the bundle of its
@@ -1825,9 +1833,24 @@ where
     match operation with
     | .specification (.lemma reference _) =>
         let names ← ensureLemmaDefinitions reference
-        let bundle ← lemmaBundle reference arguments
-        let owes := mkApp (← lemmaApplied reference names.requires) bundle
-        let gives := mkApp (← lemmaApplied reference names.ensures) bundle
+        -- A generic lemma's instance is at the frame its type arguments
+        -- induce over the position's; at the position's own type parameters
+        -- in order, that frame is the position's.
+        let row? ← if instantiations.isEmpty then pure none else do
+          let natives ← definitionTypeArguments instantiations
+          let some row := natives.toList.mapM (fun type? => type?)
+            | throwError "a lemma instance's type argument has no native type"
+          let identity := row.zipIdx.all fun (type, index) => match type with
+            | .param position => position == index
+            | _ => false
+          if identity then pure none
+          else pure (some (row.foldr VerexIR.Proofs.Denote.NRow.cons .nil))
+        let frame? ← row?.mapM fun row => do
+          pure (mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate)
+            (← context.unitExpr) (← quoteTypeArgs.quoteTypeArgsRow row) (← context.frame))
+        let bundle ← lemmaBundle reference arguments row?
+        let owes := mkApp (← lemmaApplied reference names.requires frame?) bundle
+        let gives := mkApp (← lemmaApplied reference names.ensures frame?) bundle
         mkAppM (if context.lemmaQuantified then ``VerexIR.Proofs.LemmaInstance
           else ``VerexIR.Proofs.LemmaApplication) #[owes, gives]
     | .specification (.functionCall reference _) =>

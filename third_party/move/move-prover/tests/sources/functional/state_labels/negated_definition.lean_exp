@@ -3,7 +3,7 @@ tests/sources/functional/state_labels/negated_definition.move:16:9: error: the s
         && ((..S |~ exists<R>(addr)))` is not established
 tests/sources/functional/state_labels/negated_definition.move:17:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/state_labels/negated_definition.move:13:5: error: verex verification failed: the automatic verification of `write_negated` failed; provide a proof in `tests/sources/functional/state_labels/negated_definition.proof.lean`:
-  verify write_negated by
+  verify write_negated by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -14,7 +14,7 @@ tests/sources/functional/state_labels/negated_definition.move:26:9: error: the s
         && ((..S |~ exists<R>(addr)))` is not established
 tests/sources/functional/state_labels/negated_definition.move:28:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/state_labels/negated_definition.move:23:5: error: verex verification failed: the automatic verification of `write_in_antecedent` failed; provide a proof in `tests/sources/functional/state_labels/negated_definition.proof.lean`:
-  verify write_in_antecedent by
+  verify write_in_antecedent by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

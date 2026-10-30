@@ -94,7 +94,7 @@ verex module 0x42::table_allocation where
 error: the specification clause `ensures get(result, 1u8) == 4` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_value` failed; provide a proof in the module:
-  verify wrong_value by
+  verify wrong_value by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

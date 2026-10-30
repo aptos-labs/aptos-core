@@ -77,7 +77,7 @@ verex module 0x42::loop_unroll_bound where
 error: the bound `pragma unroll = 1` of a loop is not established
 ---
 error: verex verification failed: the automatic verification of `outrun` failed; provide a proof in the module:
-  verify outrun by
+  verify outrun by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry

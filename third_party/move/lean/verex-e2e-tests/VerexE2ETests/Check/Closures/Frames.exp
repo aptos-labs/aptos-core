@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Closures/Frames.lean:132:7: error: the precondition of `apply` at call 1 is not established
 VerexE2ETests/Check/Closures/Frames.lean:132:7: error: verex verification failed: the automatic verification of `apply_bump_incorrect` failed; provide a proof in the module:
-  verify apply_bump_incorrect by
+  verify apply_bump_incorrect by lean =>
     verex_obligations
     verex_on
     | requires_of_apply_at_call_1 => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/Check/Closures/Frames.lean:132:7: error: verex verification failed
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Closures/Frames.lean:150:4: error: the specification clause `ensures exists<Config>(x) == old(exists<Config>(x))` is not established
 VerexE2ETests/Check/Closures/Frames.lean:147:7: error: verex verification failed: the automatic verification of `apply_any` failed; provide a proof in the module:
-  verify apply_any by
+  verify apply_any by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -16,7 +16,7 @@ VerexE2ETests/Check/Closures/Frames.lean:147:7: error: verex verification failed
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Closures/Frames.lean:179:7: error: the precondition of `apply_writes` at call 1 is not established
 VerexE2ETests/Check/Closures/Frames.lean:179:7: error: verex verification failed: the automatic verification of `writes_config_incorrect` failed; provide a proof in the module:
-  verify writes_config_incorrect by
+  verify writes_config_incorrect by lean =>
     verex_obligations
     verex_on
     | requires_of_apply_writes_at_call_1 => verex_prepare; sorry

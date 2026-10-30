@@ -8,7 +8,7 @@ verex proofs where
 
 -- Five increasing unsigned integers have product zero, or at least
 -- 1 * 2 * 3 * 4 * 5 = 120. In either case their product cannot be 72.
-verify mul5 by
+verify mul5 by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   by_cases zero : a.val = 0

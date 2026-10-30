@@ -1731,7 +1731,7 @@ theorem removeGlobalLoan_of_free (loans : List (Nat × GlobalKey)) (loan : Nat)
         simp only [removeGlobalLoan, h, Bool.false_eq_true, if_false, ih restFree]
 
 /-- Retirement changes only the selected identity's lookup. No registry
-shape or resource payload is exposed to consumers of this law. -/
+shape or resource payload is exposed to consumers of this lemma. -/
 theorem globalLoanKeyIn?_remove_other (loans : List (Nat × GlobalKey))
     (retired loan : Nat) (different : retired ≠ loan) :
     globalLoanKeyIn? (removeGlobalLoan loans retired) loan =

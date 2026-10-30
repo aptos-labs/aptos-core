@@ -259,9 +259,9 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | τ, .lit value =>
       return mkAppN (mkConst ``Term.lit) #[unitExpr, shape, context, ← toExpr τ, ← quoteCarrier τ value]
   | τ, .var x => return mkAppN (mkConst ``Term.var) #[unitExpr, shape, context, ← toExpr τ, ← quoteVar x]
-  | .int width signed, .checked op failure left right =>
+  | .int width signed, .checked site op failure left right =>
       return mkAppN (mkConst ``Term.checked) #[unitExpr, shape, context, Lean.toExpr width,
-        Lean.toExpr signed, Lean.toExpr op, Lean.toExpr failure, ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
+        Lean.toExpr signed, Lean.toExpr site, Lean.toExpr op, Lean.toExpr failure, ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
   | .int width signed, .modular op left right =>
       return mkAppN (mkConst ``Term.modular) #[unitExpr, shape, context, Lean.toExpr width,
         Lean.toExpr signed, Lean.toExpr op, ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
@@ -282,15 +282,16 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | .int width false, .bitwise op left right =>
       return mkAppN (mkConst ``Term.bitwise) #[unitExpr, shape, context, Lean.toExpr width, Lean.toExpr op,
         ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
-  | .int width false, @Term.shift _ _ _ _ distanceWidth left failure value distance =>
+  | .int width false, @Term.shift _ _ _ _ distanceWidth site left failure value distance =>
       return mkAppN (mkConst ``Term.shift) #[unitExpr, shape, context, Lean.toExpr width,
-        Lean.toExpr distanceWidth, Lean.toExpr left, Lean.toExpr failure, ← quoteTerm unitExpr value,
+        Lean.toExpr distanceWidth, Lean.toExpr site, Lean.toExpr left, Lean.toExpr failure, ← quoteTerm unitExpr value,
         ← quoteTerm unitExpr distance]
-  | .int width' signed', @Term.cast _ _ _ width signed _ _ failure value =>
+  | .int width' signed', @Term.cast _ _ _ width signed _ _ site failure value =>
       return mkAppN (mkConst ``Term.cast) #[unitExpr, shape, context, Lean.toExpr width, Lean.toExpr signed,
-        Lean.toExpr width', Lean.toExpr signed', Lean.toExpr failure, ← quoteTerm unitExpr value]
-  | τ, .ite condition thenBranch elseBranch =>
-      return mkAppN (mkConst ``Term.ite) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr condition,
+        Lean.toExpr width', Lean.toExpr signed', Lean.toExpr site, Lean.toExpr failure, ← quoteTerm unitExpr value]
+  | τ, .ite site condition thenBranch elseBranch =>
+      return mkAppN (mkConst ``Term.ite) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr site,
+        ← quoteTerm unitExpr condition,
         ← quoteTerm unitExpr thenBranch, ← quoteTerm unitExpr elseBranch]
   | τ, @Term.let_ _ _ _ σ _ x value body =>
       return mkAppN (mkConst ``Term.let_) #[unitExpr, shape, context, ← toExpr σ, ← toExpr τ, ← quoteVar x,
@@ -303,11 +304,13 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
         ← quoteTerm unitExpr value]
   | τ, .const value =>
       return mkAppN (mkConst ``Term.const) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value]
-  | τ, .throw0 kind =>
-      return mkAppN (mkConst ``Term.throw0) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr kind]
-  | τ, @Term.throw1 _ _ _ _ width signed kind code =>
+  | τ, .throw0 site kind =>
+      return mkAppN (mkConst ``Term.throw0) #[unitExpr, shape, context, ← toExpr τ,
+        Lean.toExpr site, Lean.toExpr kind]
+  | τ, @Term.throw1 _ _ _ _ width signed site kind code =>
       return mkAppN (mkConst ``Term.throw1) #[unitExpr, shape, context, ← toExpr τ,
-        Lean.toExpr width, Lean.toExpr signed, Lean.toExpr kind, ← quoteTerm unitExpr code]
+        Lean.toExpr width, Lean.toExpr signed, Lean.toExpr site, Lean.toExpr kind,
+        ← quoteTerm unitExpr code]
   | τ, .return_ value =>
       return mkAppN (mkConst ``Term.return_) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value]
   | τ, .break_ nest =>
@@ -370,9 +373,9 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
         capturedExpr, suppliedExpr, Lean.toExpr handle, weaveExpr, Lean.toExpr typeArgs,
         ← quoteTypeArgs θ, shapeExpr, Lean.toExpr shared, rowsProof, sharingProof, belowProof,
         ← quoteArgs unitExpr captures]
-  | _, @Term.invoke _ _ _ σs shared invokeShape function arguments =>
+  | _, @Term.invoke _ _ _ σs shared site invokeShape function arguments =>
       return mkAppN (mkConst ``Term.invoke) #[unitExpr, shape, context, ← quoteRow σs,
-        Lean.toExpr shared, ← quoteShape invokeShape, ← quoteTerm unitExpr function,
+        Lean.toExpr shared, Lean.toExpr site, ← quoteShape invokeShape, ← quoteTerm unitExpr function,
         ← quoteArgs unitExpr arguments]
   | .tuple σs, .tuple elements =>
       return mkAppN (mkConst ``Term.tuple) #[unitExpr, shape, context, ← quoteRow σs, ← quoteArgs unitExpr elements]
@@ -435,35 +438,36 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
       return mkAppN (mkConst ``Term.length) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr vector]
   | .address, .signerAddress signer =>
       return mkAppN (mkConst ``Term.signerAddress) #[unitExpr, shape, context, ← quoteTerm unitExpr signer]
-  | τ, @Term.index _ _ _ _ width signed vector position =>
+  | τ, @Term.index _ _ _ _ width signed site vector position =>
       return mkAppN (mkConst ``Term.index) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position]
-  | .unit, @Term.checkIndex _ _ _ τ width signed failure vector position =>
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position]
+  | .unit, @Term.checkIndex _ _ _ τ width signed site failure vector position =>
       return mkAppN (mkConst ``Term.checkIndex) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, Lean.toExpr failure, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position]
+        Lean.toExpr signed, Lean.toExpr site, Lean.toExpr failure, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position]
   | .vector τ, .push vector element =>
       return mkAppN (mkConst ``Term.push) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr vector,
         ← quoteTerm unitExpr element]
-  | .vector τ, @Term.insert _ _ _ _ width signed vector position element =>
+  | .vector τ, @Term.insert _ _ _ _ width signed site vector position element =>
       return mkAppN (mkConst ``Term.insert) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position, ← quoteTerm unitExpr element]
-  | .tuple (.cons τ (.cons (.vector _) .nil)), @Term.remove _ _ _ _ width signed vector position =>
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position, ← quoteTerm unitExpr element]
+  | .tuple (.cons τ (.cons (.vector _) .nil)), @Term.remove _ _ _ _ width signed site vector position =>
       return mkAppN (mkConst ``Term.remove) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position]
-  | .vector τ, @Term.swap _ _ _ _ width signed vector left right =>
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr position]
+  | .vector τ, @Term.swap _ _ _ _ width signed site vector left right =>
       return mkAppN (mkConst ``Term.swap) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr left, ← quoteTerm unitExpr right]
   | .vector τ, .concat left right =>
       return mkAppN (mkConst ``Term.concat) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr left,
         ← quoteTerm unitExpr right]
-  | .vector τ, @Term.slice _ _ _ _ width signed vector start stop =>
+  | .vector τ, @Term.slice _ _ _ _ width signed site vector start stop =>
       return mkAppN (mkConst ``Term.slice) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr start, ← quoteTerm unitExpr stop]
-  | .vector τ, @Term.reverseSlice _ _ _ _ width signed vector start stop =>
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr start, ← quoteTerm unitExpr stop]
+  | .vector τ, @Term.reverseSlice _ _ _ _ width signed site vector start stop =>
       return mkAppN (mkConst ``Term.reverseSlice) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr width,
-        Lean.toExpr signed, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr start, ← quoteTerm unitExpr stop]
-  | .unit, @Term.destroyEmpty _ _ _ τ vector =>
-      return mkAppN (mkConst ``Term.destroyEmpty) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr vector]
+        Lean.toExpr signed, Lean.toExpr site, ← quoteTerm unitExpr vector, ← quoteTerm unitExpr start, ← quoteTerm unitExpr stop]
+  | .unit, @Term.destroyEmpty _ _ _ τ site vector =>
+      return mkAppN (mkConst ``Term.destroyEmpty) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr site,
+        ← quoteTerm unitExpr vector]
   | .bool, @Term.contains _ _ _ τ vector needle =>
       return mkAppN (mkConst ``Term.contains) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr vector,
         ← quoteTerm unitExpr needle]
@@ -488,9 +492,9 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | τ, .seqAfter value effect =>
       return mkAppN (mkConst ``Term.seqAfter) #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value,
         ← quoteTerm unitExpr effect]
-  | τ, @Term.globalRead _ _ _ κ _ arguments key =>
+  | τ, @Term.globalRead _ _ _ κ _ site arguments key =>
       return mkAppN (mkConst ``Term.globalRead) #[unitExpr, shape, context, ← toExpr κ, ← toExpr τ,
-        ← quoteRow arguments, ← quoteTerm unitExpr key]
+        Lean.toExpr site, ← quoteRow arguments, ← quoteTerm unitExpr key]
   | .bool, @Term.globalContains _ _ _ κ τ arguments key =>
       return mkAppN (mkConst ``Term.globalContains) #[unitExpr, shape, context, ← toExpr κ, ← toExpr τ,
         ← quoteRow arguments, ← quoteTerm unitExpr key]
@@ -524,114 +528,145 @@ partial def quoteArms {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   let prefix_ := #[unitExpr, ← quoteShape ρ, ← quoteRow Γ, ← quoteNTy σ, ← quoteNTy τ]
   match arms with
   | .nil mismatch => return mkAppN (mkConst ``Arms.nil) (prefix_.push (Lean.toExpr mismatch))
-  | .cons pattern body rest =>
+  | .cons arm pattern body rest =>
       return mkAppN (mkConst ``Arms.cons)
-        (prefix_ ++ #[← quotePat pattern, ← quoteTerm unitExpr body, ← quoteArms unitExpr rest])
-  | .guarded pattern guard body rest =>
+        (prefix_ ++ #[Lean.toExpr arm, ← quotePat pattern, ← quoteTerm unitExpr body,
+          ← quoteArms unitExpr rest])
+  | .guarded arm pattern guard body rest =>
       return mkAppN (mkConst ``Arms.guarded) (prefix_ ++
-        #[← quotePat pattern, ← quoteTerm unitExpr guard, ← quoteTerm unitExpr body, ← quoteArms unitExpr rest])
+        #[Lean.toExpr arm, ← quotePat pattern, ← quoteTerm unitExpr guard, ← quoteTerm unitExpr body, ← quoteArms unitExpr rest])
 end
 
 mutual
 /-- Fold over the calls a term makes, in evaluation order: each callee
 with the type arguments of the call, and their native row where it has
-them. -/
+them; and over its sites a path's decisions name, each by its kind (`abort`
+for a throw, `op` for an operation that may abort, `if`, `loop`,
+`invoke`, `match`). -/
 partial def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
+    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (atSite : String → Nat → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ : NRow} → {τ : NTy} → Term unit ρ Γ τ → α → α
-  | _, _, .checked _ _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .modular _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .compare _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .equal _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .equalErased _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .not operand, found => operand.foldCalls visit found
-  | _, _, .logical _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .bitwise _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .shift _ _ value distance, found => distance.foldCalls visit (value.foldCalls visit found)
-  | _, _, .cast _ value, found => value.foldCalls visit found
-  | _, _, .ite condition thenBranch elseBranch, found =>
-      elseBranch.foldCalls visit (thenBranch.foldCalls visit (condition.foldCalls visit found))
-  | _, _, .let_ _ value body, found => body.foldCalls visit (value.foldCalls visit found)
-  | _, _, .drop value body, found => body.foldCalls visit (value.foldCalls visit found)
-  | _, _, .assign _ value, found => value.foldCalls visit found
-  | _, _, .const value, found => value.foldCalls visit found
-  | _, _, .throw1 _ code, found => code.foldCalls visit found
-  | _, _, .return_ value, found => value.foldCalls visit found
-  | _, _, .loop _ body, found => body.foldCalls visit found
+  | _, _, .checked site _ _ left right, found =>
+      right.foldCalls visit atSite (left.foldCalls visit atSite (atSite "op" site found))
+  | _, _, .modular _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .compare _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .equal _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .equalErased _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .not operand, found => operand.foldCalls visit atSite found
+  | _, _, .logical _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .bitwise _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .shift site _ _ value distance, found =>
+      distance.foldCalls visit atSite (value.foldCalls visit atSite (atSite "op" site found))
+  | _, _, .cast site _ value, found => value.foldCalls visit atSite (atSite "op" site found)
+  | _, _, .ite site condition thenBranch elseBranch, found =>
+      let found := match site with
+        | some site => atSite "if" site found
+        | none => found
+      elseBranch.foldCalls visit atSite (thenBranch.foldCalls visit atSite
+        (condition.foldCalls visit atSite found))
+  | _, _, .let_ _ value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
+  | _, _, .drop value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
+  | _, _, .assign _ value, found => value.foldCalls visit atSite found
+  | _, _, .const value, found => value.foldCalls visit atSite found
+  | _, _, .throw0 site _, found => atSite "abort" site found
+  | _, _, .throw1 site _ code, found => code.foldCalls visit atSite (atSite "abort" site found)
+  | _, _, .return_ value, found => value.foldCalls visit atSite found
+  | _, _, .loop site body, found => body.foldCalls visit atSite (atSite "loop" site found)
   | _, _, .assume _, found => found
-  | _, _, .ghostRead slot, found => slot.foldCalls visit found
-  | _, _, .ghostSlot value, found => value.foldCalls visit found
-  | _, _, .ghostInit _ _ value, found => value.foldCalls visit found
-  | _, _, .call _ handle _ arguments, found => arguments.foldCalls visit (visit handle #[] none found)
+  | _, _, .ghostRead slot, found => slot.foldCalls visit atSite found
+  | _, _, .ghostSlot value, found => value.foldCalls visit atSite found
+  | _, _, .ghostInit _ _ value, found => value.foldCalls visit atSite found
+  | _, _, .call _ handle _ arguments, found => arguments.foldCalls visit atSite (visit handle #[] none found)
   | _, _, .callGeneric _ handle typeArgs θ _ arguments, found =>
-      arguments.foldCalls visit (visit handle typeArgs (some θ) found)
+      arguments.foldCalls visit atSite (visit handle typeArgs (some θ) found)
   -- An invocation of a closure runs its target, whose theorem a proof uses.
   | _, _, .closure handle _ _ _ _ _ _ _ captures, found =>
-      captures.foldCalls visit (visit handle #[] none found)
+      captures.foldCalls visit atSite (visit handle #[] none found)
   | _, _, .closureGeneric handle _ typeArgs θ _ _ _ _ _ captures, found =>
-      captures.foldCalls visit (visit handle typeArgs (some θ) found)
-  | _, _, .invoke _ function arguments, found =>
-      arguments.foldCalls visit (function.foldCalls visit found)
-  | _, _, .tuple elements, found => elements.foldCalls visit found
-  | _, _, .pack _ _ fields, found => fields.foldCalls visit found
-  | _, _, .variant _ _ _ _ fields, found => fields.foldCalls visit found
-  | _, _, .field _ value, found => value.foldCalls visit found
-  | _, _, .isVariant _ value, found => value.foldCalls visit found
-  | _, _, .payload _ _ value, found => value.foldCalls visit found
-  | _, _, .letRow _ value body, found => body.foldCalls visit (value.foldCalls visit found)
-  | _, _, .letFields _ value body, found => body.foldCalls visit (value.foldCalls visit found)
-  | _, _, .caseOf scrutinee arms, found => arms.foldCalls visit (scrutinee.foldCalls visit found)
-  | _, _, .deref value, found => value.foldCalls visit found
-  | _, _, .mutate _ value, found => value.foldCalls visit found
-  | _, _, .writePlace _ _ _ value, found => value.foldCalls visit found
-  | _, _, .vectorLit _ elements, found => elements.foldCalls visit found
-  | _, _, .length vector, found => vector.foldCalls visit found
-  | _, _, .signerAddress signer, found => signer.foldCalls visit found
-  | _, _, .index vector position, found => position.foldCalls visit (vector.foldCalls visit found)
-  | _, _, .checkIndex _ vector position, found => position.foldCalls visit (vector.foldCalls visit found)
-  | _, _, .push vector element, found => element.foldCalls visit (vector.foldCalls visit found)
-  | _, _, .insert vector position element, found =>
-      element.foldCalls visit (position.foldCalls visit (vector.foldCalls visit found))
-  | _, _, .remove vector position, found => position.foldCalls visit (vector.foldCalls visit found)
-  | _, _, .swap vector left right, found => right.foldCalls visit (left.foldCalls visit (vector.foldCalls visit found))
-  | _, _, .concat left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .slice vector start stop, found => stop.foldCalls visit (start.foldCalls visit (vector.foldCalls visit found))
-  | _, _, .reverseSlice vector start stop, found =>
-      stop.foldCalls visit (start.foldCalls visit (vector.foldCalls visit found))
-  | _, _, .destroyEmpty vector, found => vector.foldCalls visit found
-  | _, _, .contains vector needle, found => needle.foldCalls visit (vector.foldCalls visit found)
-  | _, _, .indexOf vector needle, found => needle.foldCalls visit (vector.foldCalls visit found)
-  | _, _, .order _ left right, found => right.foldCalls visit (left.foldCalls visit found)
-  | _, _, .seqAfter value effect, found => effect.foldCalls visit (value.foldCalls visit found)
+      captures.foldCalls visit atSite (visit handle typeArgs (some θ) found)
+  | _, _, .invoke site _ function arguments, found =>
+      arguments.foldCalls visit atSite (function.foldCalls visit atSite (atSite "invoke" site found))
+  | _, _, .tuple elements, found => elements.foldCalls visit atSite found
+  | _, _, .pack _ _ fields, found => fields.foldCalls visit atSite found
+  | _, _, .variant _ _ _ _ fields, found => fields.foldCalls visit atSite found
+  | _, _, .field _ value, found => value.foldCalls visit atSite found
+  | _, _, .isVariant _ value, found => value.foldCalls visit atSite found
+  | _, _, .payload _ _ value, found => value.foldCalls visit atSite found
+  | _, _, .letRow _ value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
+  | _, _, .letFields _ value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
+  | _, _, .caseOf scrutinee arms, found => arms.foldCalls visit atSite (scrutinee.foldCalls visit atSite found)
+  | _, _, .deref value, found => value.foldCalls visit atSite found
+  | _, _, .mutate _ value, found => value.foldCalls visit atSite found
+  | _, _, .writePlace _ _ _ value, found => value.foldCalls visit atSite found
+  | _, _, .vectorLit _ elements, found => elements.foldCalls visit atSite found
+  | _, _, .length vector, found => vector.foldCalls visit atSite found
+  | _, _, .signerAddress signer, found => signer.foldCalls visit atSite found
+  | _, _, .index site vector position, found =>
+      position.foldCalls visit atSite (vector.foldCalls visit atSite (atSite "op" site found))
+  | _, _, .checkIndex site _ vector position, found =>
+      position.foldCalls visit atSite (vector.foldCalls visit atSite (atSite "op" site found))
+  | _, _, .push vector element, found => element.foldCalls visit atSite (vector.foldCalls visit atSite found)
+  | _, _, .insert site vector position element, found =>
+      element.foldCalls visit atSite (position.foldCalls visit atSite
+        (vector.foldCalls visit atSite (atSite "op" site found)))
+  | _, _, .remove site vector position, found =>
+      position.foldCalls visit atSite (vector.foldCalls visit atSite (atSite "op" site found))
+  | _, _, .swap site vector left right, found =>
+      right.foldCalls visit atSite (left.foldCalls visit atSite
+        (vector.foldCalls visit atSite (atSite "op" site found)))
+  | _, _, .concat left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .slice site vector start stop, found =>
+      stop.foldCalls visit atSite (start.foldCalls visit atSite
+        (vector.foldCalls visit atSite (atSite "op" site found)))
+  | _, _, .reverseSlice site vector start stop, found =>
+      stop.foldCalls visit atSite (start.foldCalls visit atSite
+        (vector.foldCalls visit atSite (atSite "op" site found)))
+  | _, _, .destroyEmpty site vector, found => vector.foldCalls visit atSite (atSite "op" site found)
+  | _, _, .contains vector needle, found => needle.foldCalls visit atSite (vector.foldCalls visit atSite found)
+  | _, _, .indexOf vector needle, found => needle.foldCalls visit atSite (vector.foldCalls visit atSite found)
+  | _, _, .order _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+  | _, _, .seqAfter value effect, found => effect.foldCalls visit atSite (value.foldCalls visit atSite found)
   | _, _, .assertion _, found => found
   | _, _, .anchor _, found => found
   | _, _, .mutationEnd _, found => found
   | _, _, .memoryWritten _, found => found
-  | _, _, .constructed _ value, found => value.foldCalls visit found
-  | _, _, .globalRead _ key, found => key.foldCalls visit found
-  | _, _, .globalContains _ _ key, found => key.foldCalls visit found
-  | _, _, .globalBorrow _ _ key, found => key.foldCalls visit found
-  | _, _, .globalPublish _ _ key value, found => value.foldCalls visit (key.foldCalls visit found)
-  | _, _, .globalTake _ _ key, found => key.foldCalls visit found
-  | _, _, .ghostStore _ _ key value, found => value.foldCalls visit (key.foldCalls visit found)
+  | _, _, .constructed _ value, found => value.foldCalls visit atSite found
+  | _, _, .globalRead site _ key, found => key.foldCalls visit atSite (atSite "op" site found)
+  | _, _, .globalContains _ _ key, found => key.foldCalls visit atSite found
+  | _, _, .globalBorrow site _ key, found => key.foldCalls visit atSite (atSite "op" site found)
+  | _, _, .globalPublish site _ key value, found =>
+      value.foldCalls visit atSite (key.foldCalls visit atSite (atSite "op" site found))
+  | _, _, .globalTake site _ key, found => key.foldCalls visit atSite (atSite "op" site found)
+  | _, _, .ghostStore _ _ key value, found => value.foldCalls visit atSite (key.foldCalls visit atSite found)
   | _, _, _, found => found
 
 partial def _root_.VerexIR.Proofs.Denote.Args.foldCalls {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
+    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (atSite : String → Nat → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ σs : NRow} → Args unit ρ Γ σs → α → α
   | _, _, .nil, found => found
-  | _, _, .cons head tail, found => tail.foldCalls visit (head.foldCalls visit found)
+  | _, _, .cons head tail, found => tail.foldCalls visit atSite (head.foldCalls visit atSite found)
 
 partial def _root_.VerexIR.Proofs.Denote.Arms.foldCalls {α : Type}
-    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
+    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (atSite : String → Nat → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ : NRow} → {σ τ : NTy} → Arms unit ρ Γ σ τ → α → α
   | _, _, _, .nil _, found => found
-  | _, _, _, .cons _ body rest, found => rest.foldCalls visit (body.foldCalls visit found)
-  | _, _, _, .guarded _ guard body rest, found =>
-      rest.foldCalls visit (body.foldCalls visit (guard.foldCalls visit found))
+  | _, _, _, .cons arm _ body rest, found =>
+      rest.foldCalls visit atSite (body.foldCalls visit atSite (armSite arm found))
+  | _, _, _, .guarded arm _ guard body rest, found =>
+      rest.foldCalls visit atSite (body.foldCalls visit atSite
+        (guard.foldCalls visit atSite (armSite arm found)))
+where
+  /-- The source `match` an arm belongs to. -/
+  armSite (arm : Option (Nat × String)) (found : α) : α :=
+    match arm with
+    | some (site, _) => atSite "match" site found
+    | none => found
 end
 
 /-- The callees a term calls, in order of first occurrence. -/
@@ -639,6 +674,7 @@ def _root_.VerexIR.Proofs.Denote.Term.callees {unit : ValidatedUnit} {ρ : Resul
     {τ : NTy}
     (term : Term unit ρ Γ τ) (found : Array FunctionHandle) : Array FunctionHandle :=
   term.foldCalls (fun handle _ _ found => if found.contains handle then found else found.push handle)
+    (fun _ _ found => found)
     found
 
 /-- The mutable parameters of a compiled function as a literal. -/
@@ -1197,7 +1233,7 @@ def proofRequest (ns : ValidatedNamespace) (function : String) (leaves : Array S
     | none => m!"in the module"
   let alternatives := leaves.foldl (init := m!"") fun text leaf =>
     text ++ m!"\n    | {leaf} => verex_prepare; sorry"
-  m!"provide a proof {place}:\n  verify {function} by\n    verex_obligations\n    \
+  m!"provide a proof {place}:\n  verify {function} by lean =>\n    verex_obligations\n    \
     verex_on{alternatives}\n    | _ => verex_decide\n  (`verex_prepare` states a leaf in source \
     form; `trace_state` after it shows the goal)"
 
@@ -1253,7 +1289,7 @@ private partial def patternLocals (ns : ValidatedNamespace) (pattern : VerexIR.P
 
 /-- The locals an expression tree reads from its context: those it binds
 itself, by a quantifier, a `let`, or a match arm, are its own. -/
-private partial def referencedLocals (ns : ValidatedNamespace) (id : VerexIR.ExprId)
+partial def referencedLocals (ns : ValidatedNamespace) (id : VerexIR.ExprId)
     (found : Array Nat := #[]) (bound : Array Nat := #[]) : Array Nat :=
   match ns.expressions[id.index]? with
   | none => found
@@ -1533,6 +1569,74 @@ def callSites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     let number := counts.getD name 0 + 1
     counts := counts.insert name number
     sites := sites.push (loopSite namespaceIndex index, name, number, overall)
+  return sites
+
+/-- The sites of a body a path's decisions name, by kind in source order:
+each site, its kind, and its number among the sites of the kind
+(`doc/plan/proof-language.md`, "Obligation addressing"). The kinds are the
+compiled body's (`Term.foldCalls`): an `abort` is a throw, of an `abort` or
+an `assert!`; an `op` is an operation that may abort; an `if` is a
+conditional the compiler takes as one of the source's decisions; a
+`loop` is a loop, and the conditional heading a `while` loop is its
+`loopHeader`, numbered as the loop; a `match` is one, and the conditional
+testing an arm of one an import pass lowered (`ExprOrigin.matchArm`) its
+`matchArm`, labeled by the arm's variant, with the untested last arm's
+variant as its `matchElse`. -/
+def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex : Nat)
+    (root : VerexIR.ExprId) (kinds : Std.HashMap Nat String) :
+    Array (Nat × String × Nat × String) := Id.run do
+  let kindOf (id : VerexIR.ExprId) := (ns.expressions[id.index]?).map (·.kind)
+  let isBreak (id : VerexIR.ExprId) := (kindOf id).any (· matches .break_ ..)
+  -- Each site with its kind and source range; a lowered `match`'s arms as
+  -- the match, the arm's variant and the untested last arm's.
+  let mut found : Array (String × VerexIR.Proofs.ObligationRange × Nat) := #[]
+  let mut arms : Array (VerexIR.Proofs.ObligationRange × Nat × String × Option String) := #[]
+  let mut headers : Array (Nat × Nat) := #[]
+  let mut pending := #[root]
+  let mut visited : Std.HashSet Nat := {}
+  while let some id := pending.back? do
+    pending := pending.pop
+    if visited.contains id.index then continue
+    visited := visited.insert id.index
+    let some expression := ns.expressions[id.index]? | continue
+    if expression.kind matches .spec _ then continue
+    let range := Contract.locRange unit expression.loc
+    match kinds[loopSite namespaceIndex id.index]?, expression.origin with
+    | some "if", some (.matchArm site variant last) =>
+        arms := arms.push (Contract.locRange unit site, id.index, variant, last)
+    | some "abort", some (.matchMismatch _) => pure ()
+    | some kind, _ => found := found.push (kind, range, id.index)
+    | none, _ => pure ()
+    if let .loop _ body := expression.kind then
+      if let some (.ifElse _ _ (some elseBranch)) := kindOf body then
+        if isBreak elseBranch then headers := headers.push (id.index, body.index)
+    pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
+  -- A loop's heading is no source conditional.
+  found := found.filter fun (kind, _, index) => kind != "if" || !headers.any (·.2 == index)
+  -- A lowered `match` is one site, at its source range.
+  for (range, _, _, _) in arms do
+    unless found.any (fun (kind, other, _) => kind == "match" && other == range) do
+      found := found.push ("match", range, 0)
+  let ordered := found.qsort fun (_, a, i) (_, b, j) =>
+    a.startByte < b.startByte || (a.startByte == b.startByte && i < j)
+  let mut counts : Std.HashMap String Nat := {}
+  let mut sites := #[]
+  let mut numbered : Array (VerexIR.Proofs.ObligationRange × Nat) := #[]
+  for (kind, range, index) in ordered do
+    let number := counts.getD kind 0 + 1
+    counts := counts.insert kind number
+    if kind == "match" then numbered := numbered.push (range, number)
+    -- A lowered match has no site of its own, only its arms'.
+    unless kind == "match" && index == 0 do
+      sites := sites.push (loopSite namespaceIndex index, kind, number, "")
+  for (range, index, variant, last) in arms do
+    if let some (_, number) := numbered.find? (·.1 == range) then
+      sites := sites.push (loopSite namespaceIndex index, "matchArm", number, variant)
+      if let some last := last then
+        sites := sites.push (loopSite namespaceIndex index, "matchElse", number, last)
+  for (loopIndex, header) in headers do
+    if let some (_, _, number, _) := sites.find? (·.1 == loopSite namespaceIndex loopIndex) then
+      sites := sites.push (loopSite namespaceIndex header, "loopHeader", number, "")
   return sites
 
 /-- The types a clause reads the locals of a function at: a reference local

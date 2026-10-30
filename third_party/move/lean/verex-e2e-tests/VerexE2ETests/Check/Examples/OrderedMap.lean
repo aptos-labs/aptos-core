@@ -97,10 +97,10 @@ verex module 0x42::ordered_map where
     intro lt
     exact atMiddle (Std.TransCmp.lt_trans (sorted middle i h0 (by omega) hsize) lt)
 
-  verify! lower_bound_loop by
+  verify! lower_bound_loop by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    case requires_of_lower_bound_loop_1 =>
+    case requires_3_of_lower_bound_loop_at_call_2 =>
       apply search_above (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (high := high.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -108,7 +108,7 @@ verex module 0x42::ordered_map where
         | omega
         | infer_instance
         | (rw [‹(_ : Array _)[_]? = some _›]; assumption)
-    case requires_of_lower_bound_loop_7 =>
+    case requires_2_of_lower_bound_loop_at_call_1 =>
       apply search_below (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (low := low.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -194,7 +194,7 @@ verex module 0x42::ordered_map where
       rw [i2] at h
       exact absurd h (above index (Int.le_refl _) hi)
 
-  verify contains by
+  verify contains by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case ensures_1_1 =>
@@ -285,7 +285,7 @@ verex module 0x42::ordered_map where
       rw [a2] at step
       exact above index (Int.le_refl _) hi step
 
-  verify borrow by
+  verify borrow by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals first
@@ -395,7 +395,7 @@ verex module 0x42::ordered_map where
       simp only [id] at step
       rw [step, if_neg (by omega), if_neg (by omega)]
 
-  verify add by
+  verify add by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case ensures_2_1 | ensures_2_2 =>
@@ -476,7 +476,7 @@ verex module 0x42::ordered_map where
       simp only [id] at step
       rw [step, if_neg (by omega)]
 
-  verify remove by
+  verify remove by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case ensures_2 =>

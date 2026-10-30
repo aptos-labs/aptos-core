@@ -52,7 +52,7 @@ private def fieldNames (unit : ValidatedUnit) (source : VerexIR.StructHandle)
 fields, or, for an intrinsic map owner, its leading fields, its ghosts, and
 the map itself, which takes the base name, as the Move source names the
 whole value. -/
-private def componentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle) (base : String)
+def componentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle) (base : String)
     (count : Nat) : List String :=
   let owner : Option (List String) := do
     let layout ← VerexIR.Validation.ownerLayout? unit source.namespaceId source.structId
@@ -69,6 +69,12 @@ private def componentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle
     pure names
   owner.getD ((fieldNames unit source none count).map (s!"{base}_{·}"))
 
+/-- The names of the payload components of a variant `variant` of an enum
+value, from `base`: `base_variant_f` of a field `f`. -/
+def variantComponentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle) (base variant : String)
+    (count : Nat) : List String :=
+  (fieldNames unit source (some variant) count).map (s!"{base}_{variant}_{·}")
+
 /-- The `rcases` pattern destructuring a native value of a type into its
 scalar parts, named from `base`.  A variant value becomes one alternative
 per variant; the empty tail of the variant sum closes its case. -/
@@ -78,8 +84,7 @@ private partial def carrierPattern (unit : ValidatedUnit) (base : String) : NTy 
       rowPattern (fields.toList.zip (componentNames unit source base fields.length))
   | .enum source _ names rows _ =>
       let alternatives := (names.zip rows.toList).map fun (name, fields) =>
-        rowPattern (fields.toList.zip
-          ((fieldNames unit source (some name) fields.length).map (s!"{base}_{name}_{·}")))
+        rowPattern (fields.toList.zip (variantComponentNames unit source base name fields.length))
       "(" ++ " | ".intercalate (alternatives ++ ["(⟨⟩ : Empty)"]) ++ ")"
   | .ref referent => s!"⟨{carrierPattern unit base referent}, «{base}_final»⟩"
   -- A binder is written escaped, as a source name may be a Lean keyword.
@@ -88,6 +93,66 @@ where
   rowPattern (parts : List (NTy × String)) : String :=
     if parts.isEmpty then "_"
     else "⟨" ++ ", ".intercalate (parts.map fun (σ, name) => carrierPattern unit name σ) ++ ", _⟩"
+
+/-- The names in scope at every step of a function's proof, with their
+specification types: each local with a source name, as `x`, `x'` and
+`old_x`, and each callee's result as the leaf names it: in evaluation
+order, the last call's result `g_result`, the earlier ones `old_g_result`,
+`old_g_result_1`, …, a tuple's components `…_k`; and whether the value is a
+mutable reference, its loan and current value, which a specification reads
+through. A name given twice is an error. -/
+def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Except String (Array (String × String × Bool)) := do
+  let generics := declaration.signature.generics
+  let reference (typeId : VerexIR.TypeId) : Bool :=
+    match unit.tables.types[typeId.index]? with
+    | some (.reference reference) => reference.kind == .mutable
+    | _ => false
+  let mut scope := #[]
+  for localDecl in declaration.locals do
+    let name := localDecl.name
+    unless (name.front.isAlpha || name.front == '_') && name.all (fun c => c.isAlphanum || c == '_') do
+      continue
+    if scope.any (·.1 == name) then continue
+    let type ← Print.specificationTypeText unit ns generics localDecl.type.typeId
+    let isReference := reference localDecl.type.typeId
+    scope := scope ++ #[(name, type, isReference), (name ++ "'", type, isReference),
+      ("old_" ++ name, type, isReference)]
+  let .structured root := declaration.body | return scope
+  -- The calls in evaluation order: a call's arguments before it.
+  let mut calls : Array (String × VerexIR.TypeId) := #[]
+  let mut work : List (VerexIR.ExprId × Bool) := [(root, false)]
+  for _ in [0:2 * ns.expressions.size + 2] do
+    let (id, expanded) :: rest := work | break
+    work := rest
+    let some expression := ns.expressions[id.index]? | continue
+    if expanded then
+      let .operation (.call (.function reference)) _ _ _ := expression.kind | continue
+      let some callee := unit.tables.names[reference.name.index]? | continue
+      calls := calls.push (callee.name, expression.typeId)
+    else
+      work := ((VerexIR.Validation.expressionChildren expression.kind).toList.map (·, false)) ++
+        (id, true) :: work
+  let callees := calls.foldl (init := #[]) fun found (callee, _) =>
+    if found.contains callee then found else found.push callee
+  for callee in callees do
+    let ofCallee := calls.filter (·.1 == callee)
+    for (_, typeId) in ofCallee, position in [0:ofCallee.size] do
+      let name := if position + 1 == ofCallee.size then s!"{callee}_result"
+        else if position == 0 then s!"old_{callee}_result"
+        else s!"old_{callee}_result_{position}"
+      let results ← match unit.tables.types[typeId.index]? with
+        | some (.tuple elements) => elements.zipIdx.mapM fun (element, index) => do
+            pure (s!"{name}_{index}", ← Print.specificationTypeText unit ns generics element,
+              reference element)
+        | some .unit => pure #[]
+        | _ => pure #[(name, ← Print.specificationTypeText unit ns generics typeId, reference typeId)]
+      for (resultName, type, isReference) in results do
+        if scope.any (·.1 == resultName) then
+          throw s!"`{resultName}` names two values in scope: a result of `{callee}` and another"
+        scope := scope.push (resultName, type, isReference)
+  return scope
 
 /-- The argument pattern naming a function's parameters. -/
 private def argumentPattern (unit : ValidatedUnit)
@@ -102,6 +167,36 @@ private def argumentPattern (unit : ValidatedUnit)
     match Parser.runParserCategory (← getEnv) `rcasesPat text with
     | .ok pattern => pure ⟨pattern⟩
     | .error message => throwError m!"internal: argument pattern `{text}`: {message}"
+
+/-- The introduction of a step proof's arguments (`verexArguments`): each
+parameter a local of its name, the scope's names recorded for the target
+(`verex_scope_names`) and the parameters' scope entries bound
+(`verex_scope_bind`), then each parameter taken apart as the argument
+pattern takes it, which rewrites its entry. -/
+private def scopedArguments (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (params : NRow) :
+    CommandElabM (TSyntax `tactic) := do
+  let names := declaration.signature.parameters.mapIdx fun index parameter =>
+    if parameter.name.isEmpty then s!"argument{index}" else parameter.name
+  let scope ← match functionScope unit ns declaration with
+    | .ok scope => pure scope
+    | .error message => throwError message
+  let quoted (names : Array String) := ", ".intercalate (names.toList.map fun name => s!"\"{name}\"")
+  let mut lines := #[]
+  unless names.isEmpty do
+    lines := lines.push s!"rcases verexArguments with ⟨{", ".intercalate (names.toList.map (s!"«{·}»"))}, _⟩"
+  lines := lines.push s!"verex_scope_names [{quoted (scope.map (·.1))}] \
+    [{quoted (scope.filterMap fun (name, _, reference) => if reference then some name else none)}] \
+    [{quoted (declaration.locals.map (·.name))}]"
+  unless names.isEmpty do
+    lines := lines.push s!"verex_scope_bind [{", ".intercalate (names.toList.map (s!"«{·}»"))}]"
+  for (τ, name) in params.toList.zip names.toList do
+    let pattern := carrierPattern unit name τ
+    unless pattern == s!"«{name}»" do lines := lines.push s!"all_goals rcases «{name}» with {pattern}"
+  let text := "(" ++ "\n ".intercalate lines.toList ++ ")"
+  match Parser.runParserCategory (← getEnv) `tactic text with
+  | .ok tactic => pure ⟨tactic⟩
+  | .error message => throwError m!"internal: scoped arguments `{text}`: {message}"
 
 /-- Compare certificate types without treating holes as proof obligations. -/
 def certificateTypesMatch (actual expected : Lean.Expr) : MetaM Bool := do
@@ -1231,6 +1326,10 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
   -- backtrack past it.
   let state ← VerexIR.Proofs.Denote.targetState
   state.proofName.set ((← Term.getDeclName?).getD theorem_.getId)
+  state.selectorUses.set #[]
+  state.scopeNames.set none
+  state.scopeLocals.set #[]
+  state.routedKeys.set none
   let main ← Lean.Elab.Tactic.getMainGoal
   -- The streams are the thread's: what the proof prints is kept for the
   -- report, as the tactics leave it. An exception passes with the state
@@ -1239,6 +1338,7 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
   try
     IO.withStdout (.ofBuffer printed) <| IO.withStderr (.ofBuffer printed) <|
       Lean.Elab.Tactic.evalTactic proof
+    VerexIR.Proofs.Denote.reportUnusedSelectors
     VerexIR.Proofs.Denote.declareHiddenTheorems (← instantiateMVars (mkMVar main))
   finally
     state.proofName.set .anonymous
@@ -1343,6 +1443,9 @@ command's own. -/
 structure AuthoredScript where
   tactic : TSyntax ``Lean.Parser.Tactic.tacticSeq
   file : Option ParsedFile := none
+  /-- A proof in steps, whose leaves read the function's scope through
+  scope entries (`ScopeEntry`). -/
+  steps : Bool := false
 
 /-- Whether a model's proof routes a generic function: a callee it reaches,
 inlined, through its contract, or native, that is generic. Such a proof is over every
@@ -1717,7 +1820,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
         inlined := inlined.push (callee, calleeNs, calleeDeclaration, calleeCompiled)
         worklist := calleeCompiled.body.callees worklist
         unless generic do
-          instantiated := calleeCompiled.body.foldCalls recordGenericCall instantiated
+          instantiated := calleeCompiled.body.foldCalls recordGenericCall (fun _ _ found => found) instantiated
         edges := edges.push (callee, calleeCompiled.body.callees #[])
         modelMembers := modelMembers.push (callee, calleeKey, true)
     else if throughContract &&
@@ -1764,7 +1867,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
       -- As the target's own: a generic target's calls are proved over every
       -- family and instantiation, with no empty-instantiation frames.
       unless generic do
-        instantiated := calleeCompiled.body.foldCalls recordGenericCall instantiated
+        instantiated := calleeCompiled.body.foldCalls recordGenericCall (fun _ _ found => found) instantiated
       edges := edges.push (callee, calleeCompiled.body.callees #[])
       let certificate := Name.str (Name.str namespaceName calleeKey) "compiledSemantics"
       unless (← getEnv).contains certificate do
@@ -2235,9 +2338,9 @@ private def specializationCertificates (m : Member) (callees : Callees m.unit)
     !callees.modelMembers.any fun (other, _, inlined) => inlined && other == member
   let contracts := callees.contracts ++ contracted.map fun (member, name) =>
     (member, typedContractName m.segments name)
-  let mut calls : Array (FunctionHandle × TypeArgs) := m.compiled.body.foldCalls collect #[]
+  let mut calls : Array (FunctionHandle × TypeArgs) := m.compiled.body.foldCalls collect (fun _ _ found => found) #[]
   for (_, _, _, inlined) in callees.inlined do
-    calls := inlined.body.foldCalls collect calls
+    calls := inlined.body.foldCalls collect (fun _ _ found => found) calls
   let mut seen : Array (FunctionHandle × NRow) := #[]
   let mut certificates : Array Term := #[]
   for (callee, θ) in calls do
@@ -2304,16 +2407,34 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
   let calls ← sites.mapM fun (site, callee, number, overall) =>
     `(callSite| ($(Syntax.mkNumLit (toString site)), $(Syntax.mkStrLit callee),
       $(Syntax.mkNumLit (toString number)), $(Syntax.mkNumLit (toString overall))))
+  -- Every invariant clause keyed by what it is.
+  let invariantClauses := (unit.namespaces.map fun invariantNs =>
+    (invariantNs.structs.flatMap fun declaration =>
+      (declaration.contract.conditions.filter (·.kind == .structInvariant)).map fun condition =>
+        ("data invariant", Contract.locRange unit condition.loc)) ++
+    (invariantNs.invariants.map fun invariant =>
+      ("module invariant", Contract.locRange unit invariant.condition.loc))).flatten
+  let keyed ← invariantClauses.mapM fun (kind, range) =>
+    `(invariantClause| ($(Syntax.mkStrLit kind), $(Syntax.mkStrLit range.file),
+      $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
+  let kinds := m.compiled.body.foldCalls (fun _ _ _ found => found)
+    (fun kind site found => found.insert site kind) ({} : Std.HashMap Nat String)
+  let sourceSites : Array (Nat × String × Nat × String) := match declaration.body with
+    | .structured root => bodySites unit ns namespaceIndex root kinds
+    | _ => #[]
+  let sited ← sourceSites.mapM fun (site, kind, number, label) =>
+    `(sourceSite| ($(Syntax.mkNumLit (toString site)), $(Syntax.mkStrLit kind),
+      $(Syntax.mkNumLit (toString number)), $(Syntax.mkStrLit label)))
   let solveTactic ← withRef reference `(tactic| verex_solve_goals $flags* [$loopPairs,*]
     with [$calleePairs,*] using [$instantiationCertificates,*]
     specializing [$specializations,*] unrolling [$unrollPairs,*]
     requiring [$preconditionPairs,*] writing [$writes,*] naming [$names,*]
-    calling [$calls,*] numbering [$numbers,*])
+    calling [$calls,*] numbering [$numbers,*] siting [$sited,*] keying [$keyed,*])
   let obligationsTactic ← withRef reference `(tactic| verex_obligations $flags* [$loopPairs,*]
     with [$calleePairs,*] using [$instantiationCertificates,*]
     specializing [$specializations,*] unrolling [$unrollPairs,*]
     requiring [$preconditionPairs,*] writing [$writes,*] naming [$names,*]
-    calling [$calls,*] numbering [$numbers,*])
+    calling [$calls,*] numbering [$numbers,*] siting [$sited,*] keying [$keyed,*])
   return (solveTactic, obligationsTactic)
 
 /-- The introduction of the typed theorem's goal: a loop invariant reading
@@ -2336,11 +2457,21 @@ private def introductionTactic (m : Member) (stored : Contract.StoredInvariants)
     | _ => false
   let readsStart := readsStart || (stored.predicate.isSome &&
     loopsKeepStoredInvariants unit handle.namespaceId ns declaration compiled.params)
+  -- A proof in steps binds the parameters' scope entries before taking
+  -- them apart.
+  let steps := m.script?.any (·.steps)
+  let arguments := mkIdent `verexArguments
   if readsStart then
-    `(tactic| (intro verexArguments initialState $assumed:ident $permitted:ident
-               have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm verexArguments
+    let destructure ← if steps then scopedArguments unit ns declaration compiled.params
+      else `(tactic| rcases $arguments:ident with $pattern:rcasesPat)
+    `(tactic| (intro $arguments:ident initialState $assumed:ident $permitted:ident
+               have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments
                  initialState
-               rcases verexArguments with $pattern:rcasesPat))
+               $destructure:tactic))
+  else if steps then
+    `(tactic| (intro $arguments:ident
+               $(← scopedArguments unit ns declaration compiled.params):tactic
+               all_goals intro initialState $assumed:ident $permitted:ident))
   else `(tactic| rintro $pattern:rcasesPat initialState $assumed:ident $permitted:ident)
 
 /-- What a theorem assuming typing knows of its unit: global memory typed by
@@ -2787,7 +2918,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
           callee.namespaceId == handle.namespaceId &&
           VerexIR.SemanticOperations.ownParametersIn unit handle typeArgs &&
           !found.contains (callee, typeArgs)
-        then found.push (callee, typeArgs) else found) #[]
+        then found.push (callee, typeArgs) else found) (fun _ _ found => found) #[]
   -- The assumed steps of the lemmas its own proof applies.
   let trustDeps : Array Name ← liftTermElabM do
     (functionLemmas ns declaration).foldlM (init := #[]) fun found lemma => do
@@ -2804,7 +2935,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     assumptionDeps := if ownAssumptions then #[(handle, function)] else #[]
     trustDeps := trustDeps
     edges := #[(handle, worklist)]
-    instantiated := if generic then ownCalls else compiled.body.foldCalls recordGenericCall #[]
+    instantiated := if generic then ownCalls else compiled.body.foldCalls recordGenericCall (fun _ _ found => found) #[]
     contractTargets := contractClosureTargets unit handle.namespaceId ns declaration }
   callees := { callees with calleePairs := callees.calleePairs ++ callees.behaviorPairs }
   -- Each generic call at the empty instantiation instantiates its callee's

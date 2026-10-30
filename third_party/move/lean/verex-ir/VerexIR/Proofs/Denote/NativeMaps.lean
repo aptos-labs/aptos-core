@@ -193,7 +193,7 @@ reads them (`NTy.read`). -/
 section NativeViews
 variable [Carriers]
 
--- The typed map's removal laws: a removed key is absent, the others keep
+-- The typed map's removal lemmas: a removed key is absent, the others keep
 -- their values, the size drops by the key's presence, the positions after
 -- the key's rank shift, and the map stays valid.
 attribute [vir_denote_norm, grind =] VerexIR.SpecMap.hasKey_remove VerexIR.SpecMap.valueAt_remove
@@ -411,9 +411,9 @@ dsimproc ↓ [vir_denote, vir_denote_norm] canonicalTableCarriers (SpecMap.ofEnt
   let args := (e.getAppArgs.set! 0 key).set! 1 value
   return .done (mkAppN e.getAppFn args)
 
-/-! ## Typed map laws
+/-! ## Typed map lemmas
 
-The laws of the typed map, and the entries of a table built from its
+The lemmas of the typed map, and the entries of a table built from its
 list. -/
 
 attribute [simp, vir_denote_norm] SpecMap.hasKey_update SpecMap.valueAt_update
@@ -428,7 +428,7 @@ attribute [simp, vir_denote_norm] SpecMap.keyAt_update_present SpecMap.rank_upda
 attribute [simp, vir_denote_norm] SpecMap.valid_update SpecMap.valid_remove
   SpecMap.keyAt_remove_ordered
 
--- The bulk operations' laws: sizes and keys of several entries set, of a
+-- The bulk operations' lemmas: sizes and keys of several entries set, of a
 -- prefix or a suffix, and of a replaced key, as the roles' abort
 -- conditions permit them.
 attribute [simp, vir_denote_norm] SpecMap.valid_updateAll SpecMap.hasKey_updateAll_add_all
@@ -439,6 +439,7 @@ attribute [simp, vir_denote_norm] SpecMap.valid_updateAll SpecMap.hasKey_updateA
   SpecMap.hasKey_replaceKey
 
 attribute [simp, vir_denote_norm] SpecMap.length_keys SpecMap.length_values
+attribute [vir_denote_norm] SpecMap.getElem_keys_toNat
 
 open Lean Meta in
 /-- An abort condition over literal lists, decided. -/
@@ -500,7 +501,7 @@ literal lists, and its observations. -/
 def evalGroundMap (e : Lean.Expr) : SimpM Simp.DStep := do
   if e.hasFVar || e.hasMVar || e.hasLooseBVars then return .continue
   -- Keys of a native type decide their equality by the family's instance,
-  -- whose unfolding is not evaluation; their reads go by the laws.
+  -- whose unfolding is not evaluation; their reads go by the lemmas.
   let some keyType := e.getAppArgs[0]? | return .continue
   unless [``Int, ``Nat, ``Bool, ``String].any keyType.isConstOf do return .continue
   let some value ← (try groundLiteral? e catch _ => pure none) | return .continue
@@ -572,7 +573,7 @@ attribute [vir_denote_norm] Prod.mk.injEq SpecVector.mk.injEq SpecInt.mk.injEq A
 -- Tests of variant names and other Boolean equalities evaluate.
 attribute [vir_denote_norm] beq_self_eq_true beq_iff_eq beq_eq_false_iff_ne
 
--- The decisions and literal comparisons the laws leave behind evaluate.
+-- The decisions and literal comparisons the lemmas leave behind evaluate.
 attribute [vir_denote_norm] Int.reduceEq Int.reduceLT Int.reduceLE Nat.reduceEqDiff
   decide_eq_true_eq decide_eq_false_iff_not decide_true decide_false Bool.or_false Bool.false_or
   Bool.or_true Bool.true_or Bool.and_true Bool.true_and Bool.and_false Bool.false_and
@@ -787,7 +788,7 @@ private def rewriteByAny (e : Lean.Expr) (lemmas : List Name) : SimpM Simp.Step 
 
 open Lean Meta in
 /-- A closed observation of a typed map built from literals evaluates: its
-value, under typed maps. The laws need the map valid, which a chain of
+value, under typed maps. The lemmas need the map valid, which a chain of
 literal constructions discharges only within simp's depth; evaluation needs
 nothing. -/
 private def evaluateLiteralObservation (e : Lean.Expr) : SimpM Simp.DStep := do

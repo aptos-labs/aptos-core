@@ -230,7 +230,7 @@ Boolean atom, and `bv_decide` decides the result.
   tactic macro among its items could not be used by them. A top-level
   `verify path` remains for a `#guard_msgs` rejection and for a module
   declared in another file.
-- `verify f by tactics` proves `f`'s goal by the tactics. `verex_obligations`
+- `verify f by lean => tactics` proves `f`'s goal by the tactics. `verex_obligations`
   runs the walk without deciding a leaf: every leaf stays a goal tagged by
   what it owes (`ensures_2`, `aborts_if_1`, `invariant_1_step`,
   `modifies_1`, `requires_1_of_g_at_call_2`), suffixed `_1`, `_2`, … where several
@@ -387,7 +387,14 @@ restated up to prophecy resolution (the RustHorn model of
   mutation carries the lender's future.
 
 Choice and resolution are `Spec.choose` and `Spec.assume`; `wp` reads them
-as a universally quantified value and a hypothesis. A loan's death
+as a universally quantified value and a hypothesis. A local's borrow chooses
+through `prophecyOf x p`, which is `Spec.choose` marked with the borrowed
+local and path: its rule (`wp_prophecyOf`) gives the value with an inert
+premise `Prophecy x p π`, which the walk consumes where it introduces `π`:
+a step proof binds a whole local's prophecy as the value written back,
+`x'` (`doc/plan/proof-language.md`, "Semantics and lowering"), any other
+proof drops it. Both are generic in the value's type and carry no family,
+so the rule needs no instance. A loan's death
 resolves each of its holders that still holds a reference; a holder it
 moved from resolves nothing. A loop that only writes through a reference
 local keeps its prophecy. Callees are collected through every inlined

@@ -115,3 +115,62 @@ no proof spells an `FV_τ` constructor outside `split` or `lean =>`. 4:
 Rust function pointers in the mapper. Open: the sharing marks in
 `NTy.function` are Move's calling convention inside the type and should
 become derived data of the target.
+
+**Step 2b, decided** (2026-10-28):
+
+- A generic target is verified at a skolem frame, where every function
+  value is a variable and only the interface's laws apply (construction,
+  invocation, equality, order); closure sites are enumerable where
+  monomorphization says, at the base frame. A unit's function values are a
+  class, `FunctionCarriers unit` (a carrier per function type, its
+  `TypedFunctions`, and two laws: every value's closure is one the unit
+  types, every closure the unit types decodes), with exactly one instance
+  per unit constant, declared where the unit is registered, before any
+  theorem. `Carriers.runtime unit`, `Skolems unit`, `Memory unit` and
+  `Comp unit` keep their spellings under the instance: storage holds the
+  unit's function values, the base frame's transports stay identities, and
+  `Carriers.instantiate` keeps forwarding function carriers to the outer
+  family at the substituted rows. A field of the frame would allow two
+  frames of one unit at different function values, where memory needs one.
+  `FunctionCarriers.runtime unit` (`RuntimeFunction`) is a definition, not
+  an instance: the instance of a unit without a generated block and of the
+  library's tests. The agreement holds for every unit and instance.
+- Generated per link set (the unit and the dependencies its theorems
+  relocate), once, before the unit's first target theorem
+  (`ensureFunctionCarriers`, beside `ensureRequiresTable`): one indexed
+  family `FV : NRow → Sharing → NRow → Type`, a constructor per closure site
+  at its closed rows (a site inside a generic function once per
+  instantiation the link set uses) and `foreign (key : ForeignClosure unit p
+  s r)` at every index. A capture's carrier is spelled concretely (`NTy.carrier`
+  at the family under definition is not a strictly positive occurrence) and
+  checked once by `rfl` against `NTy.carrier` at the base frame; the
+  encoder and decoder match on the index and the sites, and the
+  `TypedFunctions` laws are generated per constructor. A `split` of a
+  function value at the base frame is `cases`, whose index selects the sites
+  of its type.
+- Construction and dispatch at the base frame are generated equations of
+  the normal form: `functionOf` of a site's target, mask and instantiation is
+  its constructor, the meanings' invocation of a constructor is the target's
+  invocation at the woven arguments, of `foreign k` the hypothesis
+  `invokeForeign k`. At an abstract frame nothing reduces.
+- Per function type one hypothesis bundle for `foreign` (`invokeForeign`:
+  definedness under the uninterpreted `requiresForeign`, coherence across
+  frames, the declared predicates and frame) replaces `verexInvoke`, its
+  definedness and coherence binders and the per-member routing; generic
+  targets are constructors at their instantiation. `FunctionTyped`,
+  `ClosureTypedAt` and the solver's carrier typing rule go: typing holds by
+  construction.
+
+Sub-steps, one commit each, each with the step's gates: (i) the class
+`FunctionCarriers`, its laws for the runtime package, the declarations
+under its instance, and the runtime instance emitted at each unit's
+registration, a refactor that changes no outcome or cost; (ii) closure sites
+(target, instantiation, mask, captured row, function type, grouped by type
+and mutual where captures hold closures, over the link set), with a fixture
+printing them; (iii) the generated datatypes and construction, `.closure`
+and `.closureGeneric` denoting constructors, the typing machinery deleted;
+(iv) invocation by the generated match, the foreign bundle, the
+`closureMeaning_closureOf_*` lemmas deleted, the two proof files under
+`lean =>` updated; (v) equality, order and storage derived from the
+generated structure. Kept for step 3: `RequiresOf` through
+`ClosureMask.compose` and the requires table.

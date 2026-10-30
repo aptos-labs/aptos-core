@@ -147,7 +147,7 @@ theorem get_of_perm [Inhabited V] {left right : List (K × V)} (perm : left.Perm
           simp [get, h.1, ih h.2]
     rw [none left present, none right absent]
 
-/-! ## Laws of the sequence discipline -/
+/-! ## Lemmas of the sequence discipline -/
 
 theorem containsB_replaceFirst (entries : List (K × V)) (key : K) (value : V) (probe : K) :
     containsB (replaceFirst key value entries) probe = containsB entries probe := by
@@ -369,7 +369,7 @@ def ordDel (key : K) : List (K × V) → List (K × V)
   | [] => []
   | entry :: rest => if entry.1 = key then rest else entry :: ordDel key rest
 
-/-! ## Laws of the ordered discipline -/
+/-! ## Lemmas of the ordered discipline -/
 
 section OrderedLaws
 variable (rank : KeyOrder K)
@@ -1123,6 +1123,87 @@ theorem nextKey_some [Inhabited K] {order : KeyOrder K} {map : SpecMap K V} {key
   · simp at found
 
 omit [DecidableEq K] in
+theorem prevKey_at [Inhabited K] {order : KeyOrder K} {m : SpecMap K V}
+    (valid : Valid (.ordered order) m) {i : Int} (low : 0 ≤ i) (high : i < size m) :
+    prevKey? order m (keyAt m i) = if 0 < i then some (keyAt m (i - 1)) else none := by
+  have read (j : Nat) (hj : j < m.length) :
+      m[j].1 = keyAt m j := by
+    simp only [keyAt, Int.natCast_nonneg, Int.not_lt.mpr, if_false,
+      Int.toNat_natCast, List.getElem?_eq_getElem hj, Option.map_some, Option.getD_some]
+  have below (j : Nat) (hj : j < m.length) :
+      (order.compare m[j].1 (keyAt m i) == .lt) = decide ((j : Int) < i) := by
+    rw [read j hj]
+    by_cases before : (j : Int) < i
+    · rw [order_keyAt_lt valid (by omega) before high]; simp [before]
+    · by_cases same : (j : Int) = i
+      · rw [same, Std.ReflCmp.compare_self (cmp := order.compare)]; simp
+      · rw [Std.OrientedCmp.eq_swap (cmp := order.compare),
+          order_keyAt_lt valid low (by omega) (by simp only [size]; omega)]
+        simp [before]
+  have belowPrefix : m.filter (fun entry => order.compare entry.1 (keyAt m i) == .lt) =
+      m.take i.toNat := by
+    conv => lhs; arg 2; rw [← List.take_append_drop i.toNat m]
+    rw [List.filter_append, List.filter_eq_self.mpr, List.filter_eq_nil_iff.mpr, List.append_nil]
+    · intro entry mem
+      obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem mem
+      rw [List.getElem_drop, below _ (by simp at hj; omega)]; simp; omega
+    · intro entry mem
+      obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem mem
+      rw [List.getElem_take, below _ (by simp at hj; omega)]; simp at hj ⊢; omega
+  unfold prevKey?
+  have bound : i.toNat < m.length := by simp only [size] at high; omega
+  rw [belowPrefix, List.getLast?_eq_getElem?, List.length_take, List.getElem?_take,
+    show min i.toNat m.length = i.toNat by omega]
+  split
+  next positive =>
+    have previous : i.toNat - 1 < m.length := by omega
+    rw [if_pos (by omega), List.getElem?_eq_getElem previous, Option.map_some, read _ previous,
+      show ((i.toNat - 1 : Nat) : Int) = i - 1 by omega]
+  next first =>
+    rw [if_neg (by omega), Option.map_none]
+
+/-- No predecessor of a present key means that key is first. -/
+theorem prevKey_none [Inhabited K] {order : KeyOrder K} {map : SpecMap K V} {key : K}
+    (valid : Valid (.ordered order) map) (present : hasKey map key = true)
+    (absent : prevKey? order map key = none) : rank map key = 0 := by
+  have low := rank_nonneg map key
+  have high := rank_lt_size present
+  rw [← keyAt_rank present, prevKey_at valid low high] at absent
+  split at absent
+  · simp at absent
+  · omega
+
+/-- A predecessor is present at the previous position. -/
+theorem prevKey_some [Inhabited K] {order : KeyOrder K} {map : SpecMap K V} {key prev : K}
+    (valid : Valid (.ordered order) map) (present : hasKey map key = true)
+    (found : prevKey? order map key = some prev) :
+    hasKey map prev = true ∧ rank map prev + 1 = rank map key := by
+  have low := rank_nonneg map key
+  have high := rank_lt_size present
+  rw [← keyAt_rank present, prevKey_at valid low high] at found
+  split at found
+  · have equal := Option.some.inj found
+    rw [← equal]
+    exact ⟨hasKey_keyAt (by omega) (by omega), by rw [rank_keyAt valid (by omega) (by omega)]; omega⟩
+  · simp at found
+
+omit [DecidableEq K] in
+/-- A key's successor is a key of the map: it has what every key has. -/
+theorem nextKey_satisfies {order : KeyOrder K} {map : SpecMap K V} {property : K → Prop}
+    (keys : KeysSatisfy property map) {key next : K}
+    (found : nextKey? order map key = some next) : property next := by
+  obtain ⟨entry, hit, rfl⟩ := Option.map_eq_some_iff.mp found
+  exact keys entry (List.mem_of_find?_eq_some hit)
+
+omit [DecidableEq K] in
+/-- A key's predecessor is a key of the map. -/
+theorem prevKey_satisfies {order : KeyOrder K} {map : SpecMap K V} {property : K → Prop}
+    (keys : KeysSatisfy property map) {key prev : K}
+    (found : prevKey? order map key = some prev) : property prev := by
+  obtain ⟨entry, hit, rfl⟩ := Option.map_eq_some_iff.mp found
+  exact keys entry (List.mem_filter.mp (List.mem_of_getLast? hit)).1
+
+omit [DecidableEq K] in
 /-- The returned key sequence has the map's cardinality. -/
 theorem size_of_keys {map : SpecMap K V} {keys : List K} (same : keys = map.map Prod.fst) :
     (keys.length : Int) = size map := by simp [same, size]
@@ -1446,6 +1527,20 @@ instance (keys : List K) (values : List V) : Decidable (AbortsUpsertAll keys val
 
 omit [DecidableEq K] in
 theorem length_keys (map : SpecMap K V) : (keys map).length = map.length := List.length_map ..
+
+omit [DecidableEq K] in
+/-- A read of the key list at a position is the key at the position. -/
+theorem getElem_keys [Inhabited K] (map : SpecMap K V) (n : Nat) (h : n < (keys map).length) :
+    (keys map)[n] = keyAt map n := by
+  have bound : n < map.length := by simpa only [keys, List.length_map] using h
+  simp only [keys, keyAt, List.getElem_map, Int.not_lt.mpr (Int.natCast_nonneg n), if_false,
+    Int.toNat_natCast, List.getElem?_eq_getElem bound, Option.map_some, Option.getD_some]
+
+omit [DecidableEq K] in
+/-- The key vector read at a nonnegative integer position, as Move reads it. -/
+theorem getElem_keys_toNat [Inhabited K] (map : SpecMap K V) {index : Int} (low : 0 ≤ index)
+    (h : index.toNat < (keys map).length) : (keys map)[index.toNat] = keyAt map index := by
+  rw [getElem_keys, Int.toNat_of_nonneg low]
 
 omit [DecidableEq K] in
 theorem length_values (map : SpecMap K V) : (values map).length = map.length := List.length_map ..

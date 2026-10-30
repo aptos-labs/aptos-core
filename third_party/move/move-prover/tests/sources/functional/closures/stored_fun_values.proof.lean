@@ -25,7 +25,7 @@ theorem stored_invariants_outside {unit : Validation.ValidatedUnit}
   · apply holds resource key value
     simpa only [frame resource same] using read
 
-verify use_counter_modifier by
+verify use_counter_modifier by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first
@@ -36,7 +36,7 @@ verify use_counter_modifier by
        simp only [vir_denote, vir_denote_norm, vir_denote_eval]
      · assumption)
 
-verify use_config_aware_modifier by
+verify use_config_aware_modifier by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first

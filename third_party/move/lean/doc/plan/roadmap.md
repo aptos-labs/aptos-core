@@ -15,11 +15,14 @@ Designs: [`denotation.md`](../designs/denotation.md),
 [`lemmas.md`](../designs/lemmas.md).
 
 - **Native verification, remaining items.** BigOrderedMap's
-  `test_verify_modify`; the cost of generic map targets; reframe laws for
+  `test_verify_modify`; the cost of generic map targets; reframe lemmas for
   enum and table fields of a parameter's type, and an opaque specification
   function read through the runtime frame for an invariant applying it to
   move; the transport of a definition taking types but no frame (SC2);
   addresses as `u256` values.
+- **Quantifier syntax aligned with Move.** VerexSL's `∀ (i : T), P` should
+  move toward Move's spelling, `forall i: T @ P`, with `forall` and `@`
+  also accepted as symbol tokens.
 - **Function values as native data**: [`native-function-values.md`](native-function-values.md),
   steps 2b and 3. Ordered with the proof language
   ([`proof-language.md`](proof-language.md)): that plan's L0–L2

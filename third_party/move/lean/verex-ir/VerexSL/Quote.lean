@@ -121,6 +121,7 @@ deriving instance ToExpr for Condition
 deriving instance ToExpr for Frame
 deriving instance ToExpr for SpecBlock
 deriving instance ToExpr for ExprKind
+deriving instance ToExpr for ExprOrigin
 deriving instance ToExpr for VerexIR.Expr
 deriving instance ToExpr for PatternKind
 deriving instance ToExpr for Pattern

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/intrinsic_map_rank_bulk.move:119:9: error: the specification clause `ensures spec_key_at(result, 0) == keys[0]` is not established
 tests/sources/functional/intrinsic_map_rank_bulk.move:116:5: error: verex verification failed: the automatic verification of `build_wrong` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank_bulk.proof.lean`:
-  verify build_wrong by
+  verify build_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

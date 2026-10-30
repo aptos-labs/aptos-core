@@ -168,7 +168,7 @@ private def initialTables (unit : CompilationUnit) : Result Tables := do
     throw #[.error "VEREX-NAMESPACE-DUPLICATE"
       "a compilation unit cannot declare the same namespace twice"]
   let base : Tables := {
-    files := #[{ name := unit.sourceName }]
+    files := #[{ name := unit.sourceName }] ++ unit.sources.map ({ name := · })
     namespaces := namespaceRefs }
   return unit.namespaces.zipIdx.foldl (fun tables (sourceNs, index) =>
     sourceNs.items.foldl (predeclareItemNames · ⟨index⟩ ·) tables) base
@@ -246,12 +246,18 @@ private def addLoc (span : Span) : LowerM LocId := do
   if span.endByte < span.startByte then
     failAt "VEREX-SOURCE-RANGE" "a source range ends before it starts" (some span)
   let state ← get
+  -- The source a range lies in, by its band (`sourceBand`).
+  let file := span.startByte / sourceBand
+  if span.endByte / sourceBand != file then
+    failAt "VEREX-SOURCE-RANGE" "a source range spans two sources" (some span)
+  unless file < state.tables.files.size do
+    failAt "VEREX-SOURCE-RANGE" "a source range lies in no source of the unit" (some span)
   let id : LocId := ⟨state.tables.locations.size⟩
   let location : Location := {
     primary := some {
-      file := ⟨0⟩
-      startByte := span.startByte
-      endByte := span.endByte } }
+      file := ⟨file⟩
+      startByte := span.startByte - file * sourceBand
+      endByte := span.endByte - file * sourceBand } }
   set { state with tables := {
     state.tables with locations := state.tables.locations.push location } }
   return id
@@ -281,12 +287,33 @@ private def internType (type : VerexIR.Ty) : LowerM TypeId := do
       return id
 
 private def pushExpression (loc : LocId) (typeId : TypeId)
-    (kind : ExprKind) : LowerM ExprId := do
+    (kind : ExprKind) (origin : Option ExprOrigin := none) : LowerM ExprId := do
   let state ← get
   let id : ExprId := ⟨state.output.expressions.size⟩
   set { state with output := { state.output with
-    expressions := state.output.expressions.push { loc, typeId, kind } } }
+    expressions := state.output.expressions.push { loc, typeId, kind, origin } } }
   return id
+
+/-- A match lowered to variant tests, from its arms' tests, variants and
+bodies: each arm's conditional records the match and the arm's variant
+(`ExprOrigin.matchArm`), so that verification addresses a path through it as
+the match's; the last arm, or an untested one, is taken without a test. -/
+private def matchChain (loc : LocId) (typeId : TypeId)
+    (arms : Array (Option ExprId × String × ExprId)) : LowerM (Option ExprId) := do
+  let mut result? : Option ExprId := none
+  let mut untested : Option String := none
+  for (condition?, variant, armBody) in arms.reverse do
+    match result?, condition? with
+    | some fallback, some condition =>
+        result? := some (← pushExpression loc typeId (.ifElse condition armBody (some fallback))
+          (some (.matchArm loc variant untested)))
+        untested := none
+    | _, _ =>
+        result? := some armBody
+        untested := some variant
+  return result?
+
+
 
 private def markReceiverSurface (id : ExprId) (span : Span) : LowerM Unit := do
   let state ← get
@@ -1345,6 +1372,13 @@ private def resolvedPatternConstructor (owner : Located Ty) (variant : Option St
     else owner
   pure (resultOwner, resolvedVariant)
 
+
+/-- The variant a match arm's pattern takes, `_` for another pattern. -/
+private def armVariant (pattern : BindingPattern) : LowerM String := do
+  match pattern with
+  | .constructor owner variant _ _ => pure ((← resolvedPatternConstructor owner variant).2.getD "_")
+  | _ => pure "_"
+
 private def fieldsNamed (declaration : SourceNominal) (field : String) : Array FieldDecl :=
   match declaration.ghosts.find? (·.name == field) with
   | some ghost => #[ghost]
@@ -1994,6 +2028,16 @@ private def resolveExternalRef (segments : Array String) : LowerM QualifiedRef :
   let (tables, name) := internName tables namespaceId localName
   set { state with tables }
   return { namespaceId, name }
+
+/-- The declared result type of a called specification function: one whose
+result is inferred from its body is not callable. -/
+private def declaredSpecResult (declaration : SpecFunctionDecl) (span : Span) :
+    LowerM (Located Ty) := do
+  let some result := declaration.result
+    | failAt "VEREX-SPEC-RESULT-UNDECLARED"
+        s!"specification function `{declaration.name}` is called here and must declare its result type"
+        (some span)
+  return result
 
 private def resolveLocalSpecRef (segments : Array String) :
     LowerM (QualifiedRef × SpecFunctionDecl) := do
@@ -4688,7 +4732,8 @@ private partial def lowerGenericCallExpr (context : ExprContext) (expected : Opt
             (some span)
       let lowered ← arguments.zip parameterTypes |>.mapM fun (argument, type) =>
         lowerExpr context (some type) argument
-      let declaredResult := (← lowerTypeUse declarationTypes declaration.result).typeId
+      let declaredResult := (← lowerTypeUse declarationTypes
+        (← declaredSpecResult declaration span)).typeId
       let resultType ← projectSpecTypeId
         (← instantiateTypeId instantiations declaredResult span)
       let id ← pushExpression loc resultType <|
@@ -4950,7 +4995,8 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
         inferred ← inferTypeArguments context.specification inferred
           parameterType value.2 argument.span
         lowered := lowered.push value
-      let rawResult := (← lowerTypeUse sourceTypes declaration.result).typeId
+      let rawResult := (← lowerTypeUse sourceTypes
+        (← declaredSpecResult declaration span)).typeId
       let projectedResult ← projectSpecTypeId rawResult
       if let some expected := expected then
         inferred ← inferTypeArguments context.specification inferred
@@ -5040,11 +5086,12 @@ private partial def lowerBlockExpr (context : ExprContext) (expected : Option Ty
     (statements : Array Statement) (result : Option Expr) :
     LowerM (ExprId × TypeId) := do
   let unitType ← internType .unit
-  -- Canonical source attaches a loop specification using a trailing
-  -- `where` region. VIR keeps the verifier-oriented order, with logical
-  -- bindings and invariant assumptions before the loop. Accept the
-  -- source order here and restore that semantic order while lowering, so
-  -- render/parse/render remains lossless.
+  -- Source attaches a loop specification after the loop (`spec do`), or as
+  -- a `while`'s trailing `where` region. VIR holds it in the loop, as the
+  -- Move Prover reads a loop's invariants: in the heading's condition of a
+  -- `while`, at the head of the body of any other loop. A specification
+  -- before a loop is no loop's, so that a loop nested at the head of
+  -- another's body cannot take the outer loop's invariants.
   let isLoopSpecification (conditions : Array (SpecificationConditionKind × Expr)) : Bool :=
     !conditions.isEmpty &&
       conditions.any (fun condition => condition.1 == .loopInvariant) &&
@@ -5059,11 +5106,26 @@ private partial def lowerBlockExpr (context : ExprContext) (expected : Option Ty
           (statements.push (.expression spec), none)
         else (statements, result)
     | _ => (statements, result)
+  let attachSpecification (loopExpr specExpr : Expr) : Expr :=
+    match loopExpr with
+    | .loop (.ifElse condition thenBranch (some stop@(.break_ none _ none)) ifSpan) span label =>
+        let condition := match condition with
+          | .block statements (some actual) blockSpan =>
+              .block (statements.push (.expression specExpr)) (some actual) blockSpan
+          | condition => .block #[.expression specExpr] (some condition) span
+        .loop (.ifElse condition thenBranch (some stop) ifSpan) span label
+    | .loop body span label =>
+        let body := match body with
+          | .block statements result blockSpan =>
+              .block (#[.expression specExpr] ++ statements) result blockSpan
+          | body => .block #[.expression specExpr] (some body) span
+        .loop body span label
+    | loopExpr => loopExpr
   let rec normalizeLoopSpecifications : List Statement → List Statement
     | .expression loopExpr@(.loop ..) ::
         .expression specExpr@(.specBlock conditions _ _) :: rest =>
         if isLoopSpecification conditions then
-          .expression specExpr :: .expression loopExpr ::
+          .expression (attachSpecification loopExpr specExpr) ::
             normalizeLoopSpecifications rest
         else
           .expression loopExpr :: normalizeLoopSpecifications
@@ -5318,7 +5380,7 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
               {String.intercalate ", " missing.toList})"
             (some span)
         let mut resultType? := expected
-        let mut lowered : Array (Option ExprId × ExprId) := #[]
+        let mut lowered : Array (Option ExprId × String × ExprId) := #[]
         for (pattern, guard, body) in arms do
           unless guard.isNone do
             failAt "VEREX-VALUE-MATCH-GUARD"
@@ -5375,18 +5437,9 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
           match resultType? with
           | some resultType => ensureType resultType loweredBody.2 body.span
           | none => unless loweredBody.2 == neverType do resultType? := some loweredBody.2
-          lowered := lowered.push (condition?, loweredBody.1)
+          lowered := lowered.push (condition?, ← armVariant pattern, loweredBody.1)
         let typeId := resultType?.getD neverType
-        let mut result? : Option ExprId := none
-        for (condition?, armBody) in lowered.reverse do
-          result? ← match result?, condition? with
-            | none, _ => pure (some armBody)
-            | some _, none => pure (some armBody)
-            | some fallback, some condition => do
-                let branch ← pushExpression loc typeId <|
-                  .ifElse condition armBody (some fallback)
-                pure (some branch)
-        let some result := result? | unreachable!
+        let some result ← matchChain loc typeId lowered | unreachable!
         return (result, typeId)
   | false, .local _ _, some (.reference reference) =>
       -- A constructor match through a reference binds references to the
@@ -5430,7 +5483,7 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
             {String.intercalate ", " missing.toList})"
           (some span)
       let mut resultType? := expected
-      let mut lowered : Array (Option ExprId × ExprId) := #[]
+      let mut lowered : Array (Option ExprId × String × ExprId) := #[]
       for (pattern, guard, body) in arms do
         unless guard.isNone do
           failAt "VEREX-REFERENCE-MATCH-GUARD"
@@ -5508,18 +5561,9 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
         match resultType? with
         | some resultType => ensureType resultType loweredBody.2 body.span
         | none => unless loweredBody.2 == neverType do resultType? := some loweredBody.2
-        lowered := lowered.push (condition?, armBody)
+        lowered := lowered.push (condition?, ← armVariant pattern, armBody)
       let typeId := resultType?.getD neverType
-      let mut result? : Option ExprId := none
-      for (condition?, armBody) in lowered.reverse do
-        result? ← match result?, condition? with
-          | none, _ => pure (some armBody)
-          | some _, none => pure (some armBody)
-          | some fallback, some condition => do
-              let branch ← pushExpression loc typeId <|
-                .ifElse condition armBody (some fallback)
-              pure (some branch)
-      let some result := result? | unreachable!
+      let some result ← matchChain loc typeId lowered | unreachable!
       return (result, typeId)
   | _, _, _ => lowerOrdinary
 
@@ -6379,21 +6423,31 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
       locals := locals.push localDecl
       localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
       declarations := declarations.push localInfo
-  let result ← lowerTypeUse typeContext declaration.result
+  let declared ← declaration.result.mapM (lowerTypeUse typeContext)
   let unitType ← internType .unit
-  let results := if result.typeId == unitType then #[] else #[result]
   let (origin, _) ← addOriginAndAlignment loc
   let context : ExprContext := {
     types := typeContext
     generics
     locals := parameterLocalTypes
     declarations
-    returnType := result.typeId
+    returnType := (declared.map (·.typeId)).getD unitType
     specification := true }
-  let body ← declaration.body.mapM fun source => do
-    let lowered ← lowerExpr context (some result.typeId) source
-    ensureType result.typeId lowered.2 source.span
-    pure lowered.1
+  -- Without a declared result type, the body's type is the result.
+  let (body, result) ← match declaration.body, declared with
+    | some source, some result => do
+        let lowered ← lowerExpr context (some result.typeId) source
+        ensureType result.typeId lowered.2 source.span
+        pure (some lowered.1, result)
+    | some source, none => do
+        let lowered ← lowerExpr context none source
+        pure (some lowered.1, { typeId := lowered.2, loc := ← addLoc source.span })
+    | none, some result => pure (none, result)
+    | none, none =>
+        failAt "VEREX-SPEC-FUNCTION-RESULT"
+          s!"specification function `{declaration.name}` without a body must have a result type"
+          (some declaration.span)
+  let results := if result.typeId == unitType then #[] else #[result]
   -- A recursive definition's measure is a mathematical integer.
   let decreases ← declaration.decreases.mapM fun source => do
     let intType ← internType (.integer .unbounded true)

@@ -640,6 +640,32 @@ mutual
     typeTextFuel unit ns binders id (unit.tables.types.size + 1)
 end
 
+/-- A type of a namespace as its rendering spells it, a reference as its
+referent: the type a specification value of it has. -/
+def specificationTypeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (binders : Array VerexIR.GenericBinder) (id : TypeId) : Except String String := do
+  let id := match unit.tables.types[id.index]? with
+    | some (.reference reference) => reference.referent
+    | _ => id
+  typeTextFuel unit (← PrintNamespace.of unit ns) binders id (unit.tables.types.size + 1)
+
+/-- A specification type's text with the generic binders `binders` read as
+the type texts `arguments`, as a call instantiates its callee's types. -/
+def instantiatedTypeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (binders : Array VerexIR.GenericBinder) (arguments : Array String) (id : TypeId) :
+    Except String String := do
+  -- Each binder printed as a name no source holds, then replaced.
+  let placeholder (index : Nat) : String := s!"verex_type_argument_{index}_"
+  let named := binders.zipIdx.map fun (binder, index) => { binder with name := placeholder index }
+  let text ← specificationTypeText unit ns named id
+  return arguments.zipIdx.reverse.foldl
+    (fun text (argument, index) => text.replace (placeholder index) argument) text
+
+/-- The generic binders of a declaration as its rendering spells them. -/
+def genericBindersText (unit : ValidatedUnit) (binders : Array VerexIR.GenericBinder) :
+    Except String String :=
+  return " ".intercalate (← binders.mapM (binderText unit)).toList
+
 private def byteVectorText? (values : Array ConstValue) : Option String := do
   let bytes ← values.mapM fun
     | .integer value => if 0 <= value && value <= 255 then some value.toNat else none
@@ -2639,11 +2665,86 @@ private def enumDecisionArms? (context : Context) (scrutinee : ExprId)
               aliases := aliases.push (localId, sourceIdentifier fieldName)
           | _ => failure
         covered := covered.push variantDecl.name
-        result := result.push (some (sourceIdentifier variant), aliases)
+        result := result.push (some variant, aliases)
     | _ => failure
   if !wildcard && !declaration.variants.all (fun variant => covered.contains variant.name) then
     none
   else some (referenceKind, result)
+
+/-- The pattern of an arm of a match printed from variant tests, its payload
+unbound: `Owner::V { f := _ }`, or `_` for an arm of another pattern. The
+arm's body reads the payload by field selection, or binds it itself. -/
+private def variantPatternText (context : Context) (scrutineeType : TypeId)
+    (variant : Option String) : Except String String := do
+  let some variant := variant | return "_"
+  let patternType := match context.unit.tables.types[scrutineeType.index]? with
+    | some (.reference reference) => reference.referent
+    | _ => scrutineeType
+  let some (Ty.nominal owner _) := context.unit.tables.types[patternType.index]?
+    | throw "a match's scrutinee does not have a nominal type"
+  let some declaration := nominalAt? context.unit owner
+    | throw "a match's scrutinee references a missing nominal declaration"
+  let some variantDecl := declaration.variants.find? fun candidate =>
+      (context.unit.tables.names[candidate.name.index]?.map (·.name)).getD "" == variant
+    | throw s!"a match arm references missing variant `{variant}`"
+  let entries ← variantDecl.fields.mapM fun field => do
+    pure s!"{← nameAt context.unit field.name} := _"
+  let ownerText ← typeText context.unit context.ns context.binders patternType
+  pure (ownerText ++ "::" ++ sourceIdentifier variant ++ " { " ++ commaSep entries ++ " }")
+
+/-- The arms of a match an import pass or the source lowering turned into
+variant tests (`ExprOrigin.matchArm`), from its first conditional: the value
+the arms test, each tested arm's variant and body, and the arm taken
+untested, with its variant where it names one. `none` where an arm's test is
+not one variant test, as of an arm with a nested pattern or a guard. -/
+private def matchChain? (ns : ValidatedNamespace) (first : VerexIR.Expr) :
+    Option (ExprId × Array (String × ExprId) × ExprId × Option String) := do
+  let some (ExprOrigin.matchArm site _ _) := first.origin | none
+  let mut current := first
+  let mut arms : Array (String × ExprId) := #[]
+  let mut scrutinee? : Option ExprId := none
+  for _ in [0:ns.expressions.size] do
+    let .ifElse test armBody (some fallback) := current.kind | none
+    let some (ExprOrigin.matchArm armSite variant last) := current.origin | none
+    guard (armSite == site)
+    let testNode ← ns.expressions[test.index]?
+    let .operation (.data (.testVariants _ variants)) _ values _ := testNode.kind | none
+    guard (variants == #[variant] && values.size == 1)
+    scrutinee? := scrutinee? <|> some values[0]!
+    arms := arms.push (variant, armBody)
+    let next ← ns.expressions[fallback.index]?
+    if next.kind matches .ifElse .. && next.origin.any (· matches .matchArm site ..) then
+      current := next
+    else
+      -- An untested arm of another pattern than a variant is `_`.
+      return (← scrutinee?, arms, fallback, last.filter (· != "_"))
+  none
+
+/-- Whether a match printed from variant tests reads back as the same tests:
+VerexSL lowers a match on an immutable local of a reference type, or of a
+copyable enum, to them, as `enumDecisionArms?` prints a match node. A match
+of a move-only enum by value has no such form: it prints as the tests. -/
+private def printsAsMatch (context : Context) (scrutinee : ExprId) : Bool := Id.run do
+  if context.specification then return false
+  let some value := context.ns.expressions[scrutinee.index]? | return false
+  -- A test through a reference reads the referent.
+  let value := match value.kind with
+    | .operation (.reference .dereference) _ #[inner] _ =>
+        (context.ns.expressions[inner.index]?).getD value
+    | _ => value
+  let localId? := match value.kind with
+    | .localVar localId => some localId
+    | .operation (.read place) _ _ _ | .operation (.copy place) _ _ _ =>
+        localPlace? context.ns place
+    | _ => none
+  let some localId := localId? | return false
+  let some localDecl := context.locals[localId.index]? | return false
+  if localDecl.mutable then return false
+  match context.unit.tables.types[value.typeId.index]? with
+  | some (.reference _) => return true
+  | some (.nominal owner _) =>
+      return (nominalAt? context.unit owner).any (·.abilities.contains .copy)
+  | _ => return false
 
 /-- Does this statement's text end inside a block of its own? A separator
 there would attach to that block's last entry rather than to the statement
@@ -3972,6 +4073,24 @@ private partial def expressionText (context : Context) (id : ExprId)
       if entries.isEmpty then pure "()" else
         pure (blockText entries)
   | .ifElse condition thenBranch elseBranch =>
+      -- A match turned into variant tests prints as the match.
+      if let some (scrutinee, tested, untested, lastVariant) :=
+          (matchChain? context.ns expression).filter (printsAsMatch context ·.1) then
+        let some scrutineeNode := context.ns.expressions[scrutinee.index]?
+          | throw "a match references a missing scrutinee"
+        let scrutineeText ← expressionText context scrutinee (fuel - 1)
+        let scrutineeText := if context.ns.profile == some .move then
+            implicitDerefReceiverText scrutineeText
+          else scrutineeText
+        let mut entries : Array String := #[]
+        for (variant, body) in tested do
+          let body ← expressionText context body (fuel - 1) tailPosition statementPosition
+          entries := entries.push
+            s!"| {← variantPatternText context scrutineeNode.typeId (some variant)} => {body}"
+        let body ← expressionText context untested (fuel - 1) tailPosition statementPosition
+        entries := entries.push
+          s!"| {← variantPatternText context scrutineeNode.typeId lastVariant} => {body}"
+        return s!"match {scrutineeText} with\n{indent (lines entries)}"
       let condition ← expressionText context condition (fuel - 1)
       -- A block-valued condition spans lines; only a parenthesized form keeps
       -- the following `then` attached to this `if`.
@@ -4009,8 +4128,10 @@ private partial def expressionText (context : Context) (id : ExprId)
         throw "a match expression has no arms"
       if let some (referenceKind, decisions) := enumDecisionArms? context scrutinee arms then
         let scrutineeText ← expressionText context scrutinee (fuel - 1)
-        let mut result? : Option String := none
-        for (arm, variant, aliases) in (arms.zip decisions).reverse do
+        let some scrutineeNode := context.ns.expressions[scrutinee.index]?
+          | throw "a match references a missing scrutinee"
+        let mut entries : Array String := #[]
+        for (arm, variant, aliases) in arms.zip decisions do
           let active := if referenceKind == some .mutable then context else { context with
             fieldAliasLocals := (if referenceKind == some .shared then aliases.map (·.1)
               else #[]) ++ context.fieldAliasLocals
@@ -4033,12 +4154,9 @@ private partial def expressionText (context : Context) (id : ExprId)
                   body ++ statementTerminator context.ns arm.body body
                 else s!"return {body}"
               body := blockText (declarations.push result)
-          result? := some <| match result?, variant with
-            | some fallback, some variant =>
-                let grouped (text : String) := if text.contains '\n' then s!"({text})" else text
-                s!"if {scrutineeText} is {variant} then {grouped body} else {grouped fallback}"
-            | _, _ => body
-        return result?.getD "()"
+          entries := entries.push
+            s!"| {← variantPatternText context scrutineeNode.typeId variant} => {body}"
+        return s!"match {scrutineeText} with\n{indent (lines entries)}"
       let scrutinee ← expressionText context scrutinee (fuel - 1)
       let arms ← arms.mapM fun arm => do
         let guard ← match arm.guard with
@@ -5092,7 +5210,8 @@ private def dependencyInterfaceItem? : Item → Option Item
       body := none
       contract := #[]
       pragmas := #[] }
-  | .specFunction declaration => some <| .specFunction {
+  -- A specification function whose result is inferred is not callable.
+  | .specFunction declaration => declaration.result.map fun _ => .specFunction {
       declaration with isOpaque := true, body := none }
   | .lemma declaration => some <| .lemma {
       declaration with decreases := #[], contract := #[], proof := #[] }

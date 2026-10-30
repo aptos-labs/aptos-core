@@ -80,7 +80,7 @@ verex module 0x42::state_label_call_observations where
 error: the specification clause `ensures result == 1` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_result` failed; provide a proof in the module:
-  verify wrong_result by
+  verify wrong_result by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

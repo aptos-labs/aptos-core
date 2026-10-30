@@ -183,7 +183,7 @@ variable (ρ : Nat → Nat) (inside : Nat → Prop)
 
 end Equations
 
-/-! ## Laws -/
+/-! ## Lemmas -/
 
 mutual
 /-- Renaming twice is renaming by the composite. -/

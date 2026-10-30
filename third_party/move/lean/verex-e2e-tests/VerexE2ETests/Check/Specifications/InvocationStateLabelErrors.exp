@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/InvocationStateLabelErrors.lean:22:4: error: the specification clause `aborts_if false` is not established
 VerexE2ETests/Check/Specifications/InvocationStateLabelErrors.lean:21:7: error: verex verification failed: the automatic verification of `caller` failed; provide a proof in the module:
-  verify caller by
+  verify caller by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

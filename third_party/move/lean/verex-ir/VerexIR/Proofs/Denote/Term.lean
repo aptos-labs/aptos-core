@@ -657,7 +657,7 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   /-- A read of a local slot. -/
   | var {Γ : NRow} {τ : NTy} (x : Var Γ τ) : Term unit ρ Γ τ
   /-- Checked integer arithmetic. -/
-  | checked {Γ : NRow} {width : Nat} {signed : Bool} (op : CheckedOp)
+  | checked {Γ : NRow} {width : Nat} {signed : Bool} (site : Nat) (op : CheckedOp)
       (failure : ThrowKind) (left right : Term unit ρ Γ (.int width signed)) :
       Term unit ρ Γ (.int width signed)
   /-- Modular integer arithmetic, wrapped into the width. -/
@@ -681,15 +681,17 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   | bitwise {Γ : NRow} {width : Nat} (op : BitOp)
       (left right : Term unit ρ Γ (.int width false)) : Term unit ρ Γ (.int width false)
   /-- Checked shift of an unsigned integer, left (`true`) or right. -/
-  | shift {Γ : NRow} {width distanceWidth : Nat} (left : Bool) (failure : ThrowKind)
+  | shift {Γ : NRow} {width distanceWidth : Nat} (site : Nat) (left : Bool) (failure : ThrowKind)
       (value : Term unit ρ Γ (.int width false))
       (distance : Term unit ρ Γ (.int distanceWidth false)) :
       Term unit ρ Γ (.int width false)
   /-- Checked conversion between integer types. -/
   | cast {Γ : NRow} {width : Nat} {signed : Bool} {width' : Nat} {signed' : Bool}
-      (failure : ThrowKind)
+      (site : Nat) (failure : ThrowKind)
       (value : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.int width' signed')
-  | ite {Γ : NRow} {τ : NTy} (condition : Term unit ρ Γ .bool)
+  /-- A conditional, with its site where it is one of the source's decisions
+  (not an `&&`, an `||` or an `assert!`). -/
+  | ite {Γ : NRow} {τ : NTy} (site : Option Nat) (condition : Term unit ρ Γ .bool)
       (thenBranch elseBranch : Term unit ρ Γ τ) : Term unit ρ Γ τ
   /-- Bind a slot, then continue.  The slot stays written afterwards, as
   the runtime frame's does. -/
@@ -701,10 +703,11 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   | assign {Γ : NRow} {σ : NTy} (x : Var Γ σ) (value : Term unit ρ Γ σ) : Term unit ρ Γ .unit
   /-- A named constant: its closed initializer. -/
   | const {Γ : NRow} {τ : NTy} (value : Term unit ρ .nil τ) : Term unit ρ Γ τ
-  /-- Throw with no argument.  A throw has every type. -/
-  | throw0 {Γ : NRow} {τ : NTy} (kind : ThrowKind) : Term unit ρ Γ τ
-  /-- Throw with one evaluated integer argument, such as an abort code. -/
-  | throw1 {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (kind : ThrowKind)
+  /-- Throw with no argument, at its site.  A throw has every type. -/
+  | throw0 {Γ : NRow} {τ : NTy} (site : Nat) (kind : ThrowKind) : Term unit ρ Γ τ
+  /-- Throw with one evaluated integer argument, such as an abort code, at
+  its site. -/
+  | throw1 {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat) (kind : ThrowKind)
       (code : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ τ
   /-- Return the function's result.  A return has every type. -/
   | return_ {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ ρ.bodyType) : Term unit ρ Γ τ
@@ -750,7 +753,7 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       Term unit ρ Γ (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
   /-- An invocation of a function value on evaluated arguments, after the
   value itself; its value is the function's result. -/
-  | invoke {Γ σs : NRow} {shared : Sharing} (shape : ResultShape)
+  | invoke {Γ σs : NRow} {shared : Sharing} (site : Nat) (shape : ResultShape)
       (function : Term unit ρ Γ (.function σs shared shape.row))
       (arguments : Args unit ρ Γ σs) : Term unit ρ Γ shape.bodyType
   /-- A tuple of evaluated elements. -/
@@ -816,37 +819,43 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   /-- The address a signer holds. -/
   | signerAddress {Γ : NRow} (signer : Term unit ρ Γ .signer) : Term unit ρ Γ .address
   /-- An element by position; aborts outside the vector. -/
-  | index {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+  | index {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+      (vector : Term unit ρ Γ (.vector τ))
       (position : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ τ
   /-- The bounds check of an element place. -/
-  | checkIndex {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (failure : ThrowKind)
+  | checkIndex {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat) (failure : ThrowKind)
       (vector : Term unit ρ Γ (.vector τ))
       (position : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ .unit
   /-- A vector with one more element at its back, as a value. -/
   | push {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) (element : Term unit ρ Γ τ) :
       Term unit ρ Γ (.vector τ)
   /-- A vector with an element inserted at a position; aborts past its end. -/
-  | insert {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
-      (position : Term unit ρ Γ (.int width signed))
+  | insert {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+      (vector : Term unit ρ Γ (.vector τ)) (position : Term unit ρ Γ (.int width signed))
       (element : Term unit ρ Γ τ) : Term unit ρ Γ (.vector τ)
   /-- The element at a position with the vector without it; aborts outside
   the vector. -/
-  | remove {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+  | remove {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+      (vector : Term unit ρ Γ (.vector τ))
       (position : Term unit ρ Γ (.int width signed)) :
       Term unit ρ Γ (.tuple (.cons τ (.cons (.vector τ) .nil)))
   /-- A vector with two elements exchanged; aborts outside the vector. -/
-  | swap {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+  | swap {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+      (vector : Term unit ρ Γ (.vector τ))
       (left right : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.vector τ)
   /-- The concatenation of two vectors. -/
   | concat {Γ : NRow} {τ : NTy} (left right : Term unit ρ Γ (.vector τ)) : Term unit ρ Γ (.vector τ)
   /-- The half-open slice of a vector; aborts on an invalid range. -/
-  | slice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+  | slice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+      (vector : Term unit ρ Γ (.vector τ))
       (start stop : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.vector τ)
   /-- A vector with a half-open range reversed; aborts on an invalid range. -/
-  | reverseSlice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+  | reverseSlice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+      (vector : Term unit ρ Γ (.vector τ))
       (start stop : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.vector τ)
   /-- Consume an empty vector; aborts on a nonempty one. -/
-  | destroyEmpty {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) : Term unit ρ Γ .unit
+  | destroyEmpty {Γ : NRow} {τ : NTy} (site : Nat) (vector : Term unit ρ Γ (.vector τ)) :
+      Term unit ρ Γ .unit
   /-- Whether some element equals the needle. -/
   | contains {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) (needle : Term unit ρ Γ τ) :
       Term unit ρ Γ .bool
@@ -892,7 +901,8 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   | constructed {Γ : NRow} {τ : NTy} (site : Nat) (value : Term unit ρ Γ τ) : Term unit ρ Γ τ
   /-- The resource of type `τ`, with its declaration's type arguments, at a
   key; aborts when none is published. -/
-  | globalRead {Γ : NRow} {κ τ : NTy} (arguments : NRow) (key : Term unit ρ Γ κ) : Term unit ρ Γ τ
+  | globalRead {Γ : NRow} {κ τ : NTy} (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ) :
+      Term unit ρ Γ τ
   /-- Whether a resource of type `τ` is published at a key. -/
   | globalContains {Γ : NRow} {κ : NTy} (τ : NTy) (arguments : NRow) (key : Term unit ρ Γ κ) :
       Term unit ρ Γ .bool
@@ -931,10 +941,13 @@ inductive Args (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
 a value no arm takes makes, if its profile has one (`patternMismatchThrow?`). -/
 inductive Arms (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → NTy → NTy → Type where
   | nil {Γ : NRow} {σ τ : NTy} (mismatch : Option Failure) : Arms unit ρ Γ σ τ
-  | cons {Γ : NRow} {σ τ : NTy} (pattern : Pat Γ σ) (body : Term unit ρ Γ τ) (rest : Arms unit ρ Γ σ τ) :
-      Arms unit ρ Γ σ τ
+  /-- An arm, with the site of the source's `match` it belongs to and the
+  variant it takes (`_` for another pattern), none for a destructuring. -/
+  | cons {Γ : NRow} {σ τ : NTy} (arm : Option (Nat × String)) (pattern : Pat Γ σ)
+      (body : Term unit ρ Γ τ) (rest : Arms unit ρ Γ σ τ) : Arms unit ρ Γ σ τ
   /-- An arm taken only where its guard, evaluated after the binding, holds. -/
-  | guarded {Γ : NRow} {σ τ : NTy} (pattern : Pat Γ σ) (guard : Term unit ρ Γ .bool)
+  | guarded {Γ : NRow} {σ τ : NTy} (arm : Option (Nat × String)) (pattern : Pat Γ σ)
+      (guard : Term unit ρ Γ .bool)
       (body : Term unit ρ Γ τ) (rest : Arms unit ρ Γ σ τ) : Arms unit ρ Γ σ τ
 end
 
@@ -1551,6 +1564,30 @@ def assumptionOf {Γ : NRow} (entry : Option ((Γ' : NRow) × (HEnv Γ' → Memo
     assumptionOf (some ⟨Γ, holds⟩) env = holds env := by
   simp [assumptionOf]
 
+omit [Skolems unit] in
+/-- The prophecy a mutable borrow of the local `x` at `path` chooses: any
+value, chosen through a mark of the borrow (`Prophecy`). Generic in the
+value's type, as `Spec.choose` is, so that its rule needs no carriers. -/
+def prophecyOf {α : Type} {Γ : NRow} {τ σ : NTy} (_x : Var Γ τ) (_path : Proj τ σ) :
+    Spec (Memory unit) Failure α :=
+  Spec.choose
+
+omit [Skolems unit] in
+/-- `value` is the prophecy of a mutable borrow of the local `x` at `path`:
+no constraint, a mark the walk reads where it introduces the value, to name
+it as the value written back (`x'`). -/
+@[irreducible] def Prophecy {α : Type} {Γ : NRow} {τ σ : NTy} (_x : Var Γ τ) (_path : Proj τ σ)
+    (_value : α) : Prop :=
+  True
+
+omit [Skolems unit] in
+theorem wp_prophecyOf {α : Type} {Γ : NRow} {τ σ : NTy} (x : Var Γ τ) (path : Proj τ σ)
+    (ensures : α → Memory unit → Prop) (aborts : Failure → Prop) (state : Memory unit) :
+    wp (prophecyOf (unit := unit) x path) ensures aborts state ↔
+      ∀ value, Prophecy x path value → ensures value state := by
+  unfold prophecyOf Prophecy
+  simp [wp_choose]
+
 /-- Any value of a type. -/
 def arbitraryIn {ρ : ResultShape} {Γ : NRow} {τ : NTy} (entry : HEnv Γ) :
     Comp unit (Flow ρ Γ τ.carrier) :=
@@ -1652,6 +1689,71 @@ verification can name the invariants owed there. Semantically no step. -/
 def memoryWrittenAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (entry : HEnv Γ) :
     Comp unit (Flow ρ Γ Unit) :=
   Spec.pure (.value () entry)
+
+/-- An abort, marked with its site so that verification can name the paths
+aborting there. Semantically the abort itself. -/
+def abortAt {α : Type} (_site : Nat) (failure : Failure) : Comp unit α :=
+  Spec.abort failure
+
+/-- A branch of a conditional, marked with the conditional's site and the
+branch taken, so that verification can name the paths through it.
+Semantically the branch itself. -/
+def branchAt {α : Type} (_site : Nat) (_taken : Bool) (meaning : Comp unit α) : Comp unit α :=
+  meaning
+
+/-- A branch, marked where its conditional is one of the source's
+decisions. -/
+def branchIn {α : Type} : Option Nat → Bool → Comp unit α → Comp unit α
+  | some site, taken, meaning => branchAt site taken meaning
+  | none, _, meaning => meaning
+
+/-- What a path through a branch owes, marked with the conditional's site and
+the branch taken, so that verification records the path's decision.
+Reducible: the normal form and the deciders see what it owes. -/
+@[reducible] def Taken (_site : Nat) (_taken : Bool) (holds : Prop) : Prop :=
+  holds
+
+/-- An arm of a `match`, marked with the match's site and the variant the arm
+takes, so that verification can name the paths through it. Semantically
+the arm itself. -/
+def armAt {α : Type} (_site : Nat) (_variant : String) (meaning : Comp unit α) : Comp unit α :=
+  meaning
+
+/-- An arm, marked where it belongs to a source `match`. -/
+def armIn {α : Type} : Option (Nat × String) → Comp unit α → Comp unit α
+  | some (site, variant), meaning => armAt site variant meaning
+  | none, meaning => meaning
+
+/-- What a path through an arm owes, marked with the match's site and the
+variant taken, so that verification records the path's decision.
+Reducible: the normal form and the deciders see what it owes. -/
+@[reducible] def Matched (_site : Nat) (_variant : String) (holds : Prop) : Prop :=
+  holds
+
+/-- An operation that may abort, marked with its site so that verification
+can name the paths aborting in it. Semantically the operation itself. -/
+def opAt {α : Type} (_site : Nat) (meaning : Comp unit α) : Comp unit α :=
+  meaning
+
+/-- The abort condition a failure at a site owes, marked with the site so
+that verification records where the path aborts (`doc/plan/proof-language.md`,
+"Obligation addressing"). Reducible: the normal form and the deciders see
+the condition. -/
+@[reducible] def AbortsAt (_site : Nat) (holds : Prop) : Prop :=
+  holds
+
+/-- An operation a proof places facts after (`after op k`), as `opAt`; the
+paths continuing after it carry the site (`AfterAt`). Semantically the
+operation itself. -/
+def opAfterAt {α : Type} (_site : Nat) (meaning : Comp unit α) : Comp unit α :=
+  meaning
+
+/-- What a path owes after an operation, marked with the operation's site so
+that verification meets the point on every path continuing there, however
+the normal form distributes the path. Not reducible: the normal form
+rewrites inside it but does not distribute across it. -/
+def AfterAt (_site : Nat) (holds : Prop) : Prop :=
+  holds
 
 /-- A call's meaning, marked with the call's site so that verification can
 name the invariants owed after it. Semantically the meaning itself. -/
@@ -1760,10 +1862,10 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
       match x.get env with
       | some value => Spec.pure (.value value env)
       | none => Spec.bottom
-  | _, _, .checked op failure left right, env =>
+  | _, _, .checked site op failure left right, env =>
       Flow.bind (left.denote meanings env) fun l env =>
         Flow.bind (right.denote meanings env) fun r env =>
-          Spec.bind (op.run failure l r) fun value => Spec.pure (.value value env)
+          Spec.bind (opAt site (op.run failure l r)) fun value => Spec.pure (.value value env)
   | _, _, .modular op left right, env =>
       Flow.bind (left.denote meanings env) fun l env =>
         Flow.bind (right.denote meanings env) fun r env => Spec.pure (.value (op.run l r) env)
@@ -1789,18 +1891,19 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
   | _, _, .bitwise op left right, env =>
       Flow.bind (left.denote meanings env) fun l env =>
         Flow.bind (right.denote meanings env) fun r env => Spec.pure (.value (op.run l r) env)
-  | _, _, .shift left failure value distance, env =>
+  | _, _, .shift site left failure value distance, env =>
       Flow.bind (value.denote meanings env) fun v env =>
         Flow.bind (distance.denote meanings env) fun d env =>
-          Spec.bind (if left then checkedShiftLeft failure v d
-            else checkedShiftRight failure v d) fun result => Spec.pure (.value result env)
-  | _, .int width' signed', .cast failure value, env =>
+          Spec.bind (opAt site (if left then checkedShiftLeft failure v d
+            else checkedShiftRight failure v d)) fun result => Spec.pure (.value result env)
+  | _, .int width' signed', .cast site failure value, env =>
       Flow.bind (value.denote meanings env) fun v env =>
-        Spec.bind (checkedInt failure width' signed' v.val) fun result =>
+        Spec.bind (opAt site (checkedInt failure width' signed' v.val)) fun result =>
           Spec.pure (.value result env)
-  | _, _, .ite condition thenBranch elseBranch, env =>
+  | _, _, .ite site condition thenBranch elseBranch, env =>
       Flow.bind (condition.denote meanings env) fun b env =>
-        if (b : Bool) then thenBranch.denote meanings env else elseBranch.denote meanings env
+        if (b : Bool) then branchIn site true (thenBranch.denote meanings env)
+        else branchIn site false (elseBranch.denote meanings env)
   | _, _, .let_ x value body, env =>
       Flow.bind (value.denote meanings env) fun v env => body.denote meanings (x.set v env)
   | _, _, .drop value body, env =>
@@ -1809,10 +1912,10 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
       Flow.bind (value.denote meanings env) fun v env => Spec.pure (.value () (x.set v env))
   | _, _, .const value, env =>
       Spec.bind (value.denote meanings ()) fun flow => Spec.pure (flow.rebase env)
-  | _, _, .throw0 kind, _ => Spec.abort (Failure.ofInts kind #[])
-  | _, _, .throw1 kind code, env =>
+  | _, _, .throw0 site kind, _ => abortAt site (Failure.ofInts kind #[])
+  | _, _, .throw1 site kind code, env =>
       Flow.bind (code.denote meanings env) fun value _ =>
-        Spec.abort (Failure.ofInts kind #[value.val])
+        abortAt site (Failure.ofInts kind #[value.val])
   | _, _, .return_ value, env =>
       Flow.bind (value.denote meanings env) fun v env => Spec.pure (.return_ (ρ.ofBody v) env)
   | _, _, .break_ nest, env => Spec.pure (.break_ nest env)
@@ -1842,10 +1945,10 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
               shape shared handle values
               (closureOfGeneric_typed meanings.typeInstantiation typeArgs θ weave shape rows
                 sharing below frame values)) env)
-  | _, _, .invoke shape function arguments, env =>
+  | _, _, .invoke site shape function arguments, env =>
       Flow.bind (function.denote meanings env) fun closure env =>
         Flow.bind (arguments.denote meanings env) fun values env =>
-          Spec.bind (meanings.invoke _ _ shape closure values) fun result =>
+          Spec.bind (opAt site (meanings.invoke _ _ shape closure values)) fun result =>
             Spec.pure (.value (shape.toBody result) env)
   | _, _, .tuple elements, env =>
       Flow.bind (elements.denote meanings env) fun values env => Spec.pure (.value values env)
@@ -1906,7 +2009,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
       | some value =>
           match path.get? env value with
           | some component =>
-              Spec.bind Spec.choose fun prophecy =>
+              Spec.bind (prophecyOf x path) fun prophecy =>
                 match path.set? env prophecy value with
                 | some lent => Spec.pure (.value (component, prophecy) (x.set lent env))
                 | none => Spec.bottom
@@ -1922,36 +2025,36 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
         Spec.pure (.value (vectorLength values) env)
   | _, _, .signerAddress signer, env =>
       Flow.bind (signer.denote meanings env) fun value env => Spec.pure (.value value env)
-  | _, _, .index vector position, env =>
+  | _, _, .index site vector position, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
-          if i.val < 0 then Spec.abort (Failure.ofInts .abort #[i.val])
+          if i.val < 0 then abortAt site (Failure.ofInts .abort #[i.val])
           else match values.values[i.val.toNat]? with
             | some element => Spec.pure (.value element env)
-            | none => Spec.abort (Failure.ofInts .abort #[i.val])
-  | _, _, .checkIndex failure vector position, env =>
+            | none => abortAt site (Failure.ofInts .abort #[i.val])
+  | _, _, .checkIndex site failure vector position, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
           if 0 ≤ i.val ∧ i.val < values.values.size then Spec.pure (.value () env)
-          else Spec.abort (Failure.ofInts failure #[1])
+          else abortAt site (Failure.ofInts failure #[1])
   | _, _, .push vector element, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (element.denote meanings env) fun e env =>
           match SpecVector.ofArray? (values.values.push e) with
           | some vector => Spec.pure (.value vector env)
           | none => Spec.bottom
-  | _, _, .insert vector position element, env =>
+  | _, _, .insert site vector position element, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
           Flow.bind (element.denote meanings env) fun e env =>
-            if i.val < 0 ∨ values.values.size < i.val.toNat then Spec.abort (Failure.ofInts .abort #[i.val])
+            if i.val < 0 ∨ values.values.size < i.val.toNat then abortAt site (Failure.ofInts .abort #[i.val])
             else match SpecVector.ofArray? (values.values.insertIdxIfInBounds i.val.toNat e) with
               | some vector => Spec.pure (.value vector env)
               | none => Spec.bottom
-  | _, _, .remove vector position, env =>
+  | _, _, .remove site vector position, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
-          if i.val < 0 then Spec.abort (Failure.ofInts .abort #[i.val])
+          if i.val < 0 then abortAt site (Failure.ofInts .abort #[i.val])
           else match values.values[i.val.toNat]? with
             | some element =>
                 match SpecVector.ofArray? (values.values.eraseIdxIfInBounds i.val.toNat) with
@@ -1959,19 +2062,19 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
                     Spec.pure (.value ((element, (remaining, ())) :
                       HList (.cons _ (.cons (.vector _) .nil))) env)
                 | none => Spec.bottom
-            | none => Spec.abort (Failure.ofInts .abort #[i.val])
-  | _, _, .swap vector left right, env =>
+            | none => abortAt site (Failure.ofInts .abort #[i.val])
+  | _, _, .swap site vector left right, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (left.denote meanings env) fun i env =>
           Flow.bind (right.denote meanings env) fun j env =>
             if i.val < 0 ∨ j.val < 0 ∨ values.values.size ≤ i.val.toNat ∨
                 values.values.size ≤ j.val.toNat then
-              Spec.abort (Failure.ofInts .abort #[i.val, j.val])
+              abortAt site (Failure.ofInts .abort #[i.val, j.val])
             else match values.values[i.val.toNat]? with
-              | none => Spec.abort (Failure.ofInts .abort #[i.val, j.val])
+              | none => abortAt site (Failure.ofInts .abort #[i.val, j.val])
               | some a =>
                 match values.values[j.val.toNat]? with
-                | none => Spec.abort (Failure.ofInts .abort #[i.val, j.val])
+                | none => abortAt site (Failure.ofInts .abort #[i.val, j.val])
                 | some b =>
                   match SpecVector.ofArray?
                       ((values.values.set! i.val.toNat b).set! j.val.toNat a) with
@@ -1983,27 +2086,27 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
           match SpecVector.ofArray? (l.values ++ r.values) with
           | some vector => Spec.pure (.value vector env)
           | none => Spec.bottom
-  | _, _, .slice vector start stop, env =>
+  | _, _, .slice site vector start stop, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (start.denote meanings env) fun a env =>
           Flow.bind (stop.denote meanings env) fun b env =>
             if a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat then
-              Spec.abort (Failure.ofInts .abort #[a.val, b.val])
+              abortAt site (Failure.ofInts .abort #[a.val, b.val])
             else match SpecVector.ofArray? (values.values.extract a.val.toNat b.val.toNat) with
               | some vector => Spec.pure (.value vector env)
               | none => Spec.bottom
-  | _, _, .reverseSlice vector start stop, env =>
+  | _, _, .reverseSlice site vector start stop, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (start.denote meanings env) fun a env =>
           Flow.bind (stop.denote meanings env) fun b env =>
             if a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat then
-              Spec.abort (Failure.ofInts .abort #[a.val, b.val])
+              abortAt site (Failure.ofInts .abort #[a.val, b.val])
             else match SpecVector.ofArray? (reverseSlice values.values a.val.toNat b.val.toNat) with
               | some vector => Spec.pure (.value vector env)
               | none => Spec.bottom
-  | _, _, .destroyEmpty vector, env =>
+  | _, _, .destroyEmpty site vector, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
-        if values.values.isEmpty then Spec.pure (.value () env) else Spec.abort (Failure.ofInts .abort #[])
+        if values.values.isEmpty then Spec.pure (.value () env) else abortAt site (Failure.ofInts .abort #[])
   | _, _, @Term.contains _ _ _ τ vector needle, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (needle.denote meanings env) fun n env =>
@@ -2037,11 +2140,11 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
   | _, _, .memoryWritten site, env => memoryWrittenAt site env
   | _, _, .constructed site value, env =>
       Flow.bind (value.denote meanings env) fun v env => constructedAt site v env
-  | _, τ, @Term.globalRead _ _ _ κ _ arguments key, env =>
+  | _, τ, @Term.globalRead _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
         Spec.bind Spec.get fun memory =>
           match memory (Skolems.resource τ arguments) (κ.storageKey k) with
-          | none => Spec.abort (Failure.ofInts .abort #[])
+          | none => abortAt site (Failure.ofInts .abort #[])
           | some value => Spec.pure (.value (Skolems.ofRuntime τ value) env)
   | _, _, @Term.globalContains _ _ _ κ τ arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
@@ -2052,7 +2155,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
       Flow.bind (anchorAt site env) fun _ env =>
         Spec.bind Spec.get fun memory =>
           match memory (Skolems.resource τ arguments) (κ.storageKey k) with
-          | none => Spec.abort (Failure.ofInts .abort #[])
+          | none => abortAt site (Failure.ofInts .abort #[])
           | some value =>
               Spec.bind Spec.choose fun prophecy =>
                 Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
@@ -2064,7 +2167,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
         Flow.bind (anchorAt site env) fun _ env =>
           Spec.bind Spec.get fun memory =>
             match memory (Skolems.resource τ arguments) (κ.storageKey k) with
-            | some _ => Spec.abort (Failure.ofInts .abort #[])
+            | some _ => abortAt site (Failure.ofInts .abort #[])
             | none =>
                 Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
                     (κ.storageKey k) (some (Skolems.toRuntime τ v))))
@@ -2082,7 +2185,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
       Flow.bind (anchorAt site env) fun _ env =>
         Spec.bind Spec.get fun memory =>
           match memory (Skolems.resource τ arguments) (κ.storageKey k) with
-          | none => Spec.abort (Failure.ofInts .abort #[])
+          | none => abortAt site (Failure.ofInts .abort #[])
           | some value =>
               Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
                   (κ.storageKey k) none))
@@ -2109,16 +2212,16 @@ def Arms.denote {unit : VerexIR.Validation.ValidatedUnit}
     Arms unit ρ Γ σ τ → σ.carrier → HEnv Γ → Comp unit (Flow ρ Γ τ.carrier)
   | _, _, _, .nil (some failure), _, _ => Spec.abort failure
   | _, _, _, .nil none, _, _ => Spec.bottom
-  | _, _, _, .cons pattern body rest, value, env =>
+  | _, _, _, .cons arm pattern body rest, value, env =>
       match pattern.bindValue value env with
-      | some bound => body.denote meanings bound
+      | some bound => armIn arm (body.denote meanings bound)
       | none => rest.denote meanings value env
-  | _, _, _, .guarded pattern guard body rest, value, env =>
+  | _, _, _, .guarded arm pattern guard body rest, value, env =>
       match pattern.bindValue value env with
       | some bound =>
           Spec.bind Spec.get fun memory =>
             Flow.bind (guard.denote meanings bound) fun holds guarded =>
-              if holds then body.denote meanings guarded
+              if holds then armIn arm (body.denote meanings guarded)
               else Spec.bind (Spec.set memory) fun _ => rest.denote meanings value env
       | none => rest.denote meanings value env
 end
@@ -2367,7 +2470,7 @@ theorem Flow.pure_shortCircuit_and {ρ : ResultShape} {Γ : NRow}
       Spec.pure (.value (decide (p ∧ q)) env) := by
   by_cases hp : p <;> by_cases hq : q <;> simp [hp, hq]
 
-/-- The corresponding sharing law for the two true paths of a pure `||`. -/
+/-- The corresponding sharing lemma for the two true paths of a pure `||`. -/
 theorem Flow.pure_shortCircuit_or {ρ : ResultShape} {Γ : NRow}
     (p q : Prop) [Decidable p] [Decidable q] (env : HEnv Γ) :
     (if p then (Spec.pure (.value true env) : Comp unit (Flow ρ Γ Bool))
@@ -2395,6 +2498,107 @@ theorem Flow.pure_shortCircuit_or {ρ : ResultShape} {Γ : NRow}
     (error : Failure) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.abort error) next = Spec.abort error := by
   simp [Flow.bind]
+@[simp] theorem Flow.bind_abortAt {ρ : ResultShape} {Γ : NRow} {α β : Type} (site : Nat)
+    (error : Failure) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
+    Flow.bind (abortAt site error) next = abortAt site error := by
+  simp [Flow.bind, abortAt]
+omit [Skolems unit] in
+/-- Binding after a marked failure stays that failure. -/
+@[simp] theorem abortAt_bind {α β : Type} (site : Nat) (error : Failure)
+    (next : α → Comp unit β) : Spec.bind (abortAt site error) next = abortAt site error := by
+  simp [abortAt]
+
+omit [Skolems unit] in
+/-- A path aborting at a site owes the abort condition at its failure, marked
+with the site. -/
+@[simp] theorem wp_abortAt {α : Type} (site : Nat) (error : Failure)
+    (ensures : α → Memory unit → Prop) (aborts : Failure → Prop) (initial : Memory unit) :
+    wp (abortAt site error) ensures aborts initial ↔ AbortsAt site (aborts error) := by
+  unfold abortAt AbortsAt
+  exact wp_abort _ _ _ _
+
+omit [Skolems unit] in
+/-- An operation at a site owes the abort condition of each of its failures,
+marked with the site. -/
+@[simp] theorem wp_opAt {α : Type} (site : Nat) (meaning : Comp unit α)
+    (ensures : α → Memory unit → Prop) (aborts : Failure → Prop) (initial : Memory unit) :
+    wp (opAt site meaning) ensures aborts initial ↔
+      wp meaning ensures (fun error => AbortsAt site (aborts error)) initial :=
+  Iff.rfl
+
+omit [Skolems unit] in
+/-- An operation a proof places facts after owes, on the paths continuing
+after it, its postcondition marked with the site. -/
+@[simp] theorem wp_opAfterAt {α : Type} (site : Nat) (meaning : Comp unit α)
+    (ensures : α → Memory unit → Prop) (aborts : Failure → Prop) (initial : Memory unit) :
+    wp (opAfterAt site meaning) ensures aborts initial ↔
+      wp meaning (fun value state => AfterAt site (ensures value state))
+        (fun error => AbortsAt site (aborts error)) initial :=
+  Iff.rfl
+
+omit [Skolems unit] in
+/-- A path through a branch owes what the branch does, marked with the
+branch. -/
+@[simp] theorem wp_branchAt {α : Type} (site : Nat) (taken : Bool) (meaning : Comp unit α)
+    (ensures : α → Memory unit → Prop) (aborts : Failure → Prop) (initial : Memory unit) :
+    wp (branchAt site taken meaning) ensures aborts initial ↔
+      Taken site taken (wp meaning ensures aborts initial) :=
+  Iff.rfl
+
+/-- A branch computing a value takes no path of its own: the conditional is
+one of values (`&&`, `||`, an `if` of values), as the normal form merges it. -/
+@[simp] theorem branchAt_value {ρ : ResultShape} {Γ : NRow} {α : Type} (site : Nat) (taken : Bool)
+    (value : α) (env : HEnv Γ) :
+    branchAt (unit := unit) site taken (Spec.pure (Flow.value value env : Flow ρ Γ α)) =
+      (Spec.pure (Flow.value value env) : Comp unit (Flow ρ Γ α)) := rfl
+
+omit [Skolems unit] in
+/-- A path through an arm owes what the arm does, marked with the arm. -/
+@[simp] theorem wp_armAt {α : Type} (site : Nat) (variant : String) (meaning : Comp unit α)
+    (ensures : α → Memory unit → Prop) (aborts : Failure → Prop) (initial : Memory unit) :
+    wp (armAt site variant meaning) ensures aborts initial ↔
+      Matched site variant (wp meaning ensures aborts initial) :=
+  Iff.rfl
+
+omit [Skolems unit] in
+@[simp] theorem branchIn_some {α : Type} (site : Nat) (taken : Bool) (meaning : Comp unit α) :
+    branchIn (some site) taken meaning = branchAt site taken meaning := rfl
+
+omit [Skolems unit] in
+@[simp] theorem branchIn_none {α : Type} (taken : Bool) (meaning : Comp unit α) :
+    branchIn none taken meaning = meaning := rfl
+
+omit [Skolems unit] in
+@[simp] theorem armIn_some {α : Type} (site : Nat) (variant : String) (meaning : Comp unit α) :
+    armIn (some (site, variant)) meaning = armAt site variant meaning := rfl
+
+omit [Skolems unit] in
+@[simp] theorem armIn_none {α : Type} (meaning : Comp unit α) : armIn none meaning = meaning := rfl
+
+/-- An arm computing a value takes no path of its own, as a branch computing
+one does not (`branchAt_value`). -/
+@[simp] theorem armAt_value {ρ : ResultShape} {Γ : NRow} {α : Type} (site : Nat) (variant : String)
+    (value : α) (env : HEnv Γ) :
+    armAt (unit := unit) site variant (Spec.pure (Flow.value value env : Flow ρ Γ α)) =
+      (Spec.pure (Flow.value value env) : Comp unit (Flow ρ Γ α)) := rfl
+
+@[simp] theorem Matched_true (site : Nat) (variant : String) : Matched site variant True = True :=
+  rfl
+
+/-- An abort condition that always holds owes nothing at its site. -/
+@[simp] theorem AbortsAt_true (site : Nat) : AbortsAt site True = True := rfl
+@[simp] theorem AfterAt_true (site : Nat) : AfterAt site True = True := rfl
+
+/-- A branch owing nothing owes nothing on its path. -/
+@[simp] theorem Taken_true (site : Nat) (taken : Bool) : Taken site taken True = True := rfl
+
+omit [Skolems unit] in
+@[simp] theorem opAt_pure {α : Type} (site : Nat) (value : α) :
+    opAt (unit := unit) site (Spec.pure value) = Spec.pure value := rfl
+
+omit [Skolems unit] in
+@[simp] theorem opAt_abort {α : Type} (site : Nat) (error : Failure) :
+    opAt (unit := unit) (α := α) site (Spec.abort error) = abortAt site error := rfl
 
 
 theorem wp_flowBind {ρ : ResultShape} {Γ : NRow} {α β : Type}
@@ -2531,7 +2735,8 @@ theorem wp_memoryWrittenAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : 
 
 /-- A call owing nothing after it is its meaning. -/
 theorem wp_callAt {α : Type} (site : Nat) (meaning : Comp unit α) (ensures : α → Memory unit → Prop)
-    (aborts : Failure → Prop) (initial : Memory unit) (runs : wp meaning ensures aborts initial) :
+    (aborts : Failure → Prop) (initial : Memory unit)
+    (runs : wp meaning ensures (fun error => AbortsAt site (aborts error)) initial) :
     wp (callAt site meaning) ensures aborts initial :=
   runs
 
@@ -2551,7 +2756,7 @@ theorem wp_callAt_checked {α : Type} (site : Nat) (meaning : Comp unit α)
     (owed : Memory unit → Memory unit → Prop) (ensures : α → Memory unit → Prop)
     (aborts : Failure → Prop) (initial : Memory unit)
     (runs : wp meaning (fun result final => CallChecked (owed initial final)
-      (ensures result final)) aborts initial) :
+      (ensures result final)) (fun error => AbortsAt site (aborts error)) initial) :
     wp (callAt site meaning) ensures aborts initial :=
   wp_mono runs (fun _ _ checked => checked.2 checked.1) (fun _ failed => failed)
 
@@ -2618,7 +2823,11 @@ attribute [vir_denote] Term.denote Args.denote Arms.denote Function.denote Resul
   HList.ofGround
   ResultShape.toBody
   ResultShape.finish Flow.iterate Flow.rebase Flow.bind_pure_value Flow.bind_pure_return
-  Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort finish_value finish_return finish_break
+  Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort Flow.bind_abortAt abortAt_bind
+  wp_abortAt wp_opAt opAt_pure opAt_abort wp_branchAt branchIn_some branchIn_none
+  AbortsAt_true Taken_true
+  wp_armAt armIn_some armIn_none Matched_true
+  finish_value finish_return finish_break
   finish_continue Mutables.resolve_nil Mutables.resolve_cons Option.bind_some Option.bind_none
   Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_index Proj.get?_variant Proj.get?_ghost
   Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_index Proj.set?_variant Proj.set?_ghost
@@ -2698,7 +2907,7 @@ mutual
 partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Term unit ρ Γ τ → String
   | _, _, .lit value => describeValue value
   | _, _, .var x => s!"local{x.index}"
-  | _, _, .checked op failure left right =>
+  | _, _, .checked _ op failure left right =>
       s!"({left.describe} {repr op} {right.describe} ! {repr failure})"
   | _, _, .modular op left right => s!"({left.describe} {repr op} {right.describe} wrapping)"
   | _, _, .compare op left right => s!"({left.describe} {repr op} {right.describe})"
@@ -2710,18 +2919,18 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .logical conjunction left right =>
       s!"({left.describe} {if conjunction then "&&" else "||"} {right.describe})"
   | _, _, .bitwise op left right => s!"({left.describe} {repr op} {right.describe})"
-  | _, _, .shift left failure value distance =>
+  | _, _, .shift _ left failure value distance =>
       s!"({value.describe} {if left then "<<" else ">>"} {distance.describe} ! {repr failure})"
-  | _, _, @Term.cast _ _ _ _ _ width signed failure value =>
+  | _, _, @Term.cast _ _ _ _ _ width signed _ failure value =>
       s!"({value.describe} as int {width} {signed} ! {repr failure})"
-  | _, _, .ite condition thenBranch elseBranch =>
+  | _, _, .ite _ condition thenBranch elseBranch =>
       s!"(if {condition.describe} then {thenBranch.describe} else {elseBranch.describe})"
   | _, _, .let_ x value body => s!"(let local{x.index} := {value.describe}; {body.describe})"
   | _, _, .drop value body => s!"({value.describe}; {body.describe})"
   | _, _, .assign x value => s!"(local{x.index} := {value.describe})"
   | _, _, .const value => s!"const({value.describe})"
-  | _, _, .throw0 kind => s!"throw {repr kind}"
-  | _, _, .throw1 kind code => s!"throw {repr kind}({code.describe})"
+  | _, _, .throw0 _ kind => s!"throw {repr kind}"
+  | _, _, .throw1 _ kind code => s!"throw {repr kind}({code.describe})"
   | _, _, .return_ value => s!"return {value.describe}"
   | _, _, .break_ nest => s!"break {nest}"
   | _, _, .continue_ nest => s!"continue {nest}"
@@ -2734,7 +2943,7 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types> \
         mask {weave.mask}({captures.describe})"
-  | _, _, .invoke _ function arguments =>
+  | _, _, .invoke _ _ function arguments =>
       s!"invoke {function.describe}({arguments.describe})"
   | _, _, .callGeneric _ handle typeArgs _ _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types>\
@@ -2760,20 +2969,20 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .vectorLit _ elements => s!"vector[{elements.describe}]"
   | _, _, .length vector => s!"{vector.describe}.length"
   | _, _, .signerAddress signer => s!"{signer.describe}.address"
-  | _, _, .index vector position => s!"{vector.describe}[{position.describe}]"
-  | _, _, .checkIndex _ vector position => s!"check({vector.describe}[{position.describe}])"
+  | _, _, .index _ vector position => s!"{vector.describe}[{position.describe}]"
+  | _, _, .checkIndex _ _ vector position => s!"check({vector.describe}[{position.describe}])"
   | _, _, .push vector element => s!"push({vector.describe}, {element.describe})"
-  | _, _, .insert vector position element =>
+  | _, _, .insert _ vector position element =>
       s!"insert({vector.describe}, {position.describe}, {element.describe})"
-  | _, _, .remove vector position => s!"remove({vector.describe}, {position.describe})"
-  | _, _, .swap vector left right =>
+  | _, _, .remove _ vector position => s!"remove({vector.describe}, {position.describe})"
+  | _, _, .swap _ vector left right =>
       s!"swap({vector.describe}, {left.describe}, {right.describe})"
   | _, _, .concat left right => s!"concat({left.describe}, {right.describe})"
-  | _, _, .slice vector start stop =>
+  | _, _, .slice _ vector start stop =>
       s!"slice({vector.describe}, {start.describe}, {stop.describe})"
-  | _, _, .reverseSlice vector start stop =>
+  | _, _, .reverseSlice _ vector start stop =>
       s!"reverseSlice({vector.describe}, {start.describe}, {stop.describe})"
-  | _, _, .destroyEmpty vector => s!"destroyEmpty({vector.describe})"
+  | _, _, .destroyEmpty _ vector => s!"destroyEmpty({vector.describe})"
   | _, _, .contains vector needle => s!"contains({vector.describe}, {needle.describe})"
   | _, _, .indexOf vector needle => s!"indexOf({vector.describe}, {needle.describe})"
   | _, _, .order _ left right => s!"order({left.describe}, {right.describe})"
@@ -2788,7 +2997,7 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .ghostRead slot => s!"ghostRead({slot.describe})"
   | _, _, .mutationEnd site => s!"mutationEnd@{site}"
   | _, _, .constructed site value => s!"constructed@{site}({value.describe})"
-  | _, τ, .globalRead _ key => s!"global[{repr τ}]({key.describe})"
+  | _, τ, .globalRead _ _ key => s!"global[{repr τ}]({key.describe})"
   | _, _, .globalContains τ _ key => s!"exists[{repr τ}]({key.describe})"
   | _, .ref τ, .globalBorrow _ _ key => s!"&mut global[{repr τ}]({key.describe})"
   | _, _, @Term.globalPublish _ _ _ _ τ _ _ key value =>
@@ -2806,8 +3015,8 @@ partial def Args.describe {ρ : ResultShape} : {Γ σs : NRow} → Args unit ρ 
 partial def Arms.describe {ρ : ResultShape} : {Γ : NRow} → {σ τ : NTy} → Arms unit ρ Γ σ τ → String
   | _, _, _, .nil none => ""
   | _, _, _, .nil (some failure) => s!"| _ => throw {repr failure.1}"
-  | _, _, _, .cons pattern body rest => s!"| {pattern.describe} => {body.describe} {rest.describe}"
-  | _, _, _, .guarded pattern guard body rest =>
+  | _, _, _, .cons _ pattern body rest => s!"| {pattern.describe} => {body.describe} {rest.describe}"
+  | _, _, _, .guarded _ pattern guard body rest =>
       s!"| {pattern.describe} if {guard.describe} => {body.describe} {rest.describe}"
 end
 

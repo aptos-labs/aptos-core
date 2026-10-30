@@ -1,3 +1,9 @@
 routed: the second call's precondition
 routed: a call's precondition
 routed: a call's precondition
+routed: the assert! aborts
+routed: the multiplication aborts
+routed: the else branch
+routed: the loop's exit
+routed: an iteration
+routed: the Split arm

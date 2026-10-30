@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/WrongIncrement.lean:12:4: error: the specification clause `ensures result == value` is not established
 VerexE2ETests/Check/Specifications/WrongIncrement.lean:11:7: error: verex verification failed: the automatic verification of `wrong_increment` failed; provide a proof in the module:
-  verify wrong_increment by
+  verify wrong_increment by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

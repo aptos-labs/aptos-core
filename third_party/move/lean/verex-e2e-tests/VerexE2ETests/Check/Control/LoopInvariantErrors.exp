@@ -1,7 +1,7 @@
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:16:16: error: the loop invariant `i < n` is not established at entry
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:16:16: error: the loop invariant `i < n` is not preserved by an iteration
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:18:7: error: verex verification failed: the automatic verification of `bad_entry` failed; provide a proof in the module:
-  verify bad_entry by
+  verify bad_entry by lean =>
     verex_obligations
     verex_on
     | invariant_1_entry => verex_prepare; sorry
@@ -10,7 +10,7 @@ VerexE2ETests/Check/Control/LoopInvariantErrors.lean:18:7: error: verex verifica
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:30:4: error: the specification clause `ensures result == n` is not established
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:29:7: error: verex verification failed: the automatic verification of `weak_exit` failed; provide a proof in the module:
-  verify weak_exit by
+  verify weak_exit by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -18,7 +18,7 @@ VerexE2ETests/Check/Control/LoopInvariantErrors.lean:29:7: error: verex verifica
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:39:16: error: the loop invariant `i == 0` is not preserved by an iteration
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:41:7: error: verex verification failed: the automatic verification of `bad_step` failed; provide a proof in the module:
-  verify bad_step by
+  verify bad_step by lean =>
     verex_obligations
     verex_on
     | invariant_1_step => verex_prepare; sorry
@@ -26,7 +26,7 @@ VerexE2ETests/Check/Control/LoopInvariantErrors.lean:41:7: error: verex verifica
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:52:4: error: the specification clause `ensures result == 1` is not established
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:51:7: error: verex verification failed: the automatic verification of `bad_default` failed; provide a proof in the module:
-  verify bad_default by
+  verify bad_default by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -34,7 +34,7 @@ VerexE2ETests/Check/Control/LoopInvariantErrors.lean:51:7: error: verex verifica
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:62:16: error: the loop invariant `i == 0` is not preserved by an iteration
 VerexE2ETests/Check/Control/LoopInvariantErrors.lean:66:7: error: verex verification failed: the automatic verification of `split_annotation` failed; provide a proof in the module:
-  verify split_annotation by
+  verify split_annotation by lean =>
     verex_obligations
     verex_on
     | invariant_1_step => verex_prepare; sorry

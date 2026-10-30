@@ -6,7 +6,7 @@ tests/sources/functional/closures/amm_example.move:148:9: error: the specificati
 tests/sources/functional/closures/amm_example.move:152:9: error: the specification clause `ensures (reserve_in + amount_in) * (reserve_out - result)
         >= reserve_in * reserve_out` is not established
 tests/sources/functional/closures/amm_example.move:129:5: error: verex verification failed: the automatic verification of `constant_product_with_fee` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
-  verify constant_product_with_fee by
+  verify constant_product_with_fee by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -20,7 +20,7 @@ tests/sources/functional/closures/amm_example.move:178:9: error: the specificati
 tests/sources/functional/closures/amm_example.move:182:9: error: the specification clause `aborts_if reserve_in + effective_in == 0` is not established
 tests/sources/functional/closures/amm_example.move:185:9: error: the specification clause `ensures result == reserve_out * effective_in / (reserve_in + effective_in)` is not established
 tests/sources/functional/closures/amm_example.move:173:5: error: verex verification failed: the automatic verification of `constant_product_with_fee_non_compliant` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
-  verify constant_product_with_fee_non_compliant by
+  verify constant_product_with_fee_non_compliant by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -32,7 +32,7 @@ tests/sources/functional/closures/amm_example.move:223:9: error: the specificati
 tests/sources/functional/closures/amm_example.move:233:9: error: the specification clause `ensures pool.reserve_x * pool.reserve_y
         >= old(pool.reserve_x) * old(pool.reserve_y)` is not established
 tests/sources/functional/closures/amm_example.move:218:5: error: verex verification failed: the automatic verification of `swap` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
-  verify swap by
+  verify swap by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -57,7 +57,7 @@ tests/sources/functional/closures/amm_example.move:43:9: error: the data invaria
           * (r_out - (S.. |~ result_of<this.0>(client, r_in, r_out, amt)))
           >= r_in * r_out` does not hold where a value is constructed
 tests/sources/functional/closures/amm_example.move:247:5: error: verex verification failed: the automatic verification of `create_constant_product_pool` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
-  verify create_constant_product_pool by
+  verify create_constant_product_pool by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry
@@ -93,7 +93,7 @@ tests/sources/functional/closures/amm_example.move:43:9: error: the data invaria
           * (r_out - (S.. |~ result_of<this.0>(client, r_in, r_out, amt)))
           >= r_in * r_out` does not hold where a value is constructed
 tests/sources/functional/closures/amm_example.move:255:5: error: verex verification failed: the automatic verification of `create_noncompliant_fee_pool` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
-  verify create_noncompliant_fee_pool by
+  verify create_noncompliant_fee_pool by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry
@@ -109,7 +109,7 @@ tests/sources/functional/closures/amm_example.move:36:9: error: the data invaria
           ==> (S.. |~ result_of<this.0>(client, r_in, r_out, a1))
             <= (S.. |~ result_of<this.0>(client, r_in, r_out, a2))` does not hold where a value is constructed
 tests/sources/functional/closures/amm_example.move:264:5: error: verex verification failed: the automatic verification of `create_compliant_fee_pool` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
-  verify create_compliant_fee_pool by
+  verify create_compliant_fee_pool by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry

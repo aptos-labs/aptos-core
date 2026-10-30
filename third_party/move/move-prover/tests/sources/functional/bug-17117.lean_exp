@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bug-17117.move:82:13: error: the assertion `r.x == y` does not hold
 tests/sources/functional/bug-17117.move:79:5: error: verex verification failed: the automatic verification of `test_input_param_as_mut_ref` failed; provide a proof in `tests/sources/functional/bug-17117.proof.lean`:
-  verify test_input_param_as_mut_ref by
+  verify test_input_param_as_mut_ref by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

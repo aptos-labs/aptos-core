@@ -11,6 +11,51 @@ namespace VerexIR.Proofs.Denote
 
 open Lean Meta Elab Tactic
 
+/-- A fact a proof step gave, by its name (`doc/plan/proof-language.md`,
+"Closers"): a hidden mark beside the hypothesis, so that the block's normal
+form takes the hypothesis of that name as a rule. The mark depends on
+nothing: a rewriting, a substitution or a case split carries it along as
+they carry the hypothesis's name. -/
+structure BlockFact (name : String) : Prop where
+  intro ::
+
+/-- A path's context prepared once for the obligations a proof's `on` steps
+prove (`verex_step_prepare`): a hidden mark the leaves split from the path
+carry, so that each leaf prepares only what its clause adds. -/
+structure PathPrepared : Prop where
+  intro ::
+
+/-- Prepare a completed path's context once, before its clauses split
+(`verex_prepare values`), where a proof's `on` step takes one of its clauses,
+and mark the goals `PathPrepared`. -/
+elab "verex_step_prepare" : tactic => focusGoal do
+  -- Only a path with a clause a proof's `on` step takes.
+  unless ← (← targetState).pathRouted.get do return
+  evalTactic (← `(tactic| verex_prepare values))
+  let marked ← (← getGoals).mapM fun goal => goal.withContext do
+    let (mark, goal) ← (← goal.assert `pathPrepared (mkConst ``PathPrepared)
+      (mkConst ``PathPrepared.intro)).intro1P
+    goal.withContext do goal.setFVarKind mark .implDetail
+    return goal
+  setGoals marked
+
+/-- Whether a goal's path was prepared (`PathPrepared`). -/
+def pathPrepared (goal : MVarId) : MetaM Bool := goal.withContext do
+  (← getLCtx).anyM fun decl => return decl.type.isConstOf ``PathPrepared
+
+/-- The cases of an optional value held as a vector, the layout of a struct
+with one vector field (`SemanticOperations.optionalLayout?`): no element,
+one, or more, each an equation of the value. -/
+theorem optionVector_cases {α : Type} (x : SpecVector α × Unit) :
+    (∃ bounded, x = (⟨[].toArray, bounded⟩, ())) ∨
+    (∃ value bounded, x = (⟨[value].toArray, bounded⟩, ())) ∨
+    (∃ first second rest bounded, x = (⟨(first :: second :: rest).toArray, bounded⟩, ())) := by
+  obtain ⟨⟨⟨values⟩, bounded⟩, ⟨⟩⟩ := x
+  match values with
+  | [] => exact Or.inl ⟨bounded, rfl⟩
+  | [value] => exact Or.inr (Or.inl ⟨value, bounded, rfl⟩)
+  | first :: second :: rest => exact Or.inr (Or.inr ⟨first, second, rest, bounded, rfl⟩)
+
 /-- Apply each top-level preparation step to every surviving case. Nested
 blocks retain Lean's ordinary tactic semantics. -/
 elab "verex_each" steps:tacticSeq : tactic => do
@@ -49,7 +94,7 @@ macro "verex_prepare" &"typed" &"splitting" " [" values:ident,* "]" : tactic =>
   `(tactic| (verex_prepare values splitting [$values,*]; all_goals verex_name_maps))
 
 /-- Reduce closed map observations directly, avoiding a rewrite proof for
-every list cell. Leave symbolic observations available to mathematical laws.
+every list cell. Leave symbolic observations available to mathematical lemmas.
 These procedures are opt-in: they are not in the global simp inventory. -/
 private def evaluateClosedMap : Simp.DSimproc := fun expression => do
   if expression.hasFVar || expression.hasExprMVar || expression.hasLooseBVars then

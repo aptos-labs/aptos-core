@@ -79,7 +79,7 @@ error: the specification clause `aborts_if false` is not established
 error: the specification clause `ensures result == 2` is not established
 ---
 error: verex verification failed: the automatic verification of `two_budgeted` failed; provide a proof in the module:
-  verify two_budgeted by
+  verify two_budgeted by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -90,13 +90,13 @@ error: verex verification failed: the automatic verification of `two_budgeted` f
 #guard_msgs in
 verify 0x42::abstract_owners::two_budgeted
 
--- The map laws under the module's specification function names.
+-- The map lemmas, named from the module's specification functions.
 /--
-info: «0x42».abstract_owners.get_set {K V : Type} [DecidableEq K] [Inhabited V] (discipline : VerexIR.SpecMap.Discipline K)
-  (map : VerexIR.SpecMap K V) (key : K) (value : V) (probe : K) :
+info: «0x42».abstract_owners.lemma_get_set {K V : Type} [DecidableEq K] [Inhabited V]
+  (discipline : VerexIR.SpecMap.Discipline K) (map : VerexIR.SpecMap K V) (key : K) (value : V) (probe : K) :
   (VerexIR.SpecMap.update discipline map key value).valueAt probe = if probe = key then value else map.valueAt probe
 -/
 #guard_msgs in
-#check «0x42».abstract_owners.get_set
+#check «0x42».abstract_owners.lemma_get_set
 
 end VerexSL.Tests.Check.Specifications.AbstractOwners

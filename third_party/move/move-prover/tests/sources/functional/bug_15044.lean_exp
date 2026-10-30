@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bug_15044.move:12:5: error: the bound `pragma unroll = 5` of a loop is not established
 tests/sources/functional/bug_15044.move:12:5: error: verex verification failed: the automatic verification of `compare_u8_vector` failed; provide a proof in `tests/sources/functional/bug_15044.proof.lean`:
-  verify compare_u8_vector by
+  verify compare_u8_vector by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry

@@ -43,7 +43,7 @@ a✝¹ : value.val = 10
 a✝ : value = value✝
 ⊢ False
 tests/sources/functional/references.move:75:5: error: verex verification failed: the automatic verification of `mut_ref_incorrect` failed; provide a proof in `tests/sources/functional/references.proof.lean`:
-  verify mut_ref_incorrect by
+  verify mut_ref_incorrect by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry

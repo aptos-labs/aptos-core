@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/uninterpreted_spec_fun_congruence.move:83:9: error: the specification clause `ensures ∀ (j in 0 .. v.length), v[j].data == old(v)[j].data` is not established
 tests/sources/functional/uninterpreted_spec_fun_congruence.move:81:5: error: verex verification failed: the automatic verification of `scramble_all_wrong` failed; provide a proof in `tests/sources/functional/uninterpreted_spec_fun_congruence.proof.lean`:
-  verify scramble_all_wrong by
+  verify scramble_all_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/uninterpreted_spec_fun_congruence.move:81:5: error: ver
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/uninterpreted_spec_fun_congruence.move:94:13: error: the assertion `false` does not hold
 tests/sources/functional/uninterpreted_spec_fun_congruence.move:90:5: error: verex verification failed: the automatic verification of `ghost_sensitive_function_is_not_move_congruent` failed; provide a proof in `tests/sources/functional/uninterpreted_spec_fun_congruence.proof.lean`:
-  verify ghost_sensitive_function_is_not_move_congruent by
+  verify ghost_sensitive_function_is_not_move_congruent by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

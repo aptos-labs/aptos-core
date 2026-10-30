@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/schema_apply.move:16:9: error: the precondition `requires [export] false` of `f` does not hold at call 1
 tests/sources/functional/schema_apply.move:2:5: error: verex verification failed: the automatic verification of `g` failed; provide a proof in `tests/sources/functional/schema_apply.proof.lean`:
-  verify g by
+  verify g by lean =>
     verex_obligations
     verex_on
     | requires_1_of_f_at_call_1 => verex_prepare; sorry

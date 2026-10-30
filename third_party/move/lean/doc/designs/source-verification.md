@@ -219,7 +219,7 @@ A specification is established in one of three ways, tried in this order:
    verex proofs for "foo.move"
    verex proofs where
 
-   verify f by
+   verify f by lean =>
      …
    ```
 
@@ -252,7 +252,7 @@ do and where:
 ```text
 foo.move:12:5: error: verex verification failed: the automatic verification
 of `f` exceeded its budget of 1000000 maxHeartbeats; provide a proof:
-`verify f by …` in `sources/foo.proof.lean` (`verify f by verex_obligations`
+`verify f by …` in `sources/foo.proof.lean` (`verify f by lean => verex_obligations`
 lists its obligations), or raise the budget with `pragma heartbeats = N`,
 in thousands of maxHeartbeats
 ```
@@ -260,7 +260,7 @@ in thousands of maxHeartbeats
 An obligation the solver cannot decide reports its clause and the same
 hint without the budget alternative. The file the hint names is the
 module's `proof_file` pragma, which the driver sets on every target module.
-`verify f by verex_obligations` shows the obligations: the leaves, one
+`verify f by lean => verex_obligations` shows the obligations: the leaves, one
 `case` each, reported as unsolved at the item; `all_goals verex_prepare`
 after it shows them in source form. A proof that fails reports at its
 tactic in the proof file, and the function's summary says the proof does
@@ -288,12 +288,12 @@ The automatic verification is `verex_obligations` followed by
   result `iter_next_result`; an assumed clause by the clause
   (`invariant_3`, `requires_1`, a callee's `iter_next_ensures_1`), a bound
   against a literal `count_upper`, a map's validity `m_valid`, an equation
-  defining a value `m'_eq`. The map laws are stated under the module's own
-  specification function names (`spec_get_set`, `spec_len_remove`,
-  `spec_contains_key_key_at`, …), one theorem per intrinsic map owner and
-  law. `verex_prepare only` names and normalizes without speculative map
+  defining a value `m'_eq`. The map lemmas are named from the module's own
+  specification functions (`lemma_get_set`, `lemma_len_remove`,
+  `lemma_contains_key_key_at`, …), one theorem per intrinsic map owner and
+  lemma. `verex_prepare only` names and normalizes without speculative map
   facts or variant enumeration; `verex_prepare typed` also names the maps
-  the leaf reads (`verex_name_maps`) as `SpecMap K V`, whose laws live in
+  the leaf reads (`verex_name_maps`) as `SpecMap K V`, whose lemmas live in
   `SpecMap`; `verex_prepare values splitting [x, y]` prepares source
   values and splits the named outer variants as they become available (a
   name absent from the path is skipped); `verex_prepare cases [x, y]`
@@ -305,7 +305,7 @@ The automatic verification is `verex_obligations` followed by
 - `verex_proof` is the structured interface:
 
   ```lean
-  verify f by
+  verify f by lean =>
     verex_proof preparing
       verex_prepare typed splitting [iter_next_result]
     | ensures_1 => exact result_property

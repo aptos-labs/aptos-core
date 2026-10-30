@@ -17,14 +17,14 @@ open VerexIR.Proofs.Denote
 @[vir_denote_norm] theorem parameter_transport [Carriers] (θ : TypeArgs) (index : Nat) :
     NTy.toSkolem θ (.param index) = id := rfl
 
-verify acquire by
+verify acquire by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals (repeat' verex_split)
   all_goals simp_all
   all_goals grind
 
-verify acquire_linear by
+verify acquire_linear by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals (repeat' verex_split)

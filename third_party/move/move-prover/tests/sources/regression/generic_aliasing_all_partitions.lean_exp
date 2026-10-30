@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/generic_aliasing_all_partitions.move:21:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:19:5: error: verex verification failed: the automatic verification of `three_way` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify three_way by
+  verify three_way by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:19:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:34:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:32:5: error: verex verification failed: the automatic verification of `four_way` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify four_way by
+  verify four_way by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:32:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:45:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:43:5: error: verex verification failed: the automatic verification of `pair` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify pair by
+  verify pair by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -25,7 +25,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:43:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:57:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:55:5: error: verex verification failed: the automatic verification of `true_in_every_case` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify true_in_every_case by
+  verify true_in_every_case by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -33,7 +33,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:55:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:73:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:71:5: error: verex verification failed: the automatic verification of `through_concrete` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify through_concrete by
+  verify through_concrete by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -41,7 +41,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:71:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:86:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:84:5: error: verex verification failed: the automatic verification of `across_structs` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify across_structs by
+  verify across_structs by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -49,7 +49,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:84:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:98:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:96:5: error: verex verification failed: the automatic verification of `through_nesting` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify through_nesting by
+  verify through_nesting by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -57,7 +57,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:96:5: error: verex
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:109:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:107:5: error: verex verification failed: the automatic verification of `never_alias` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify never_alias by
+  verify never_alias by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -65,7 +65,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:107:5: error: vere
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:131:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:128:5: error: verex verification failed: the automatic verification of `two_pairs` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify two_pairs by
+  verify two_pairs by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -73,7 +73,7 @@ tests/sources/regression/generic_aliasing_all_partitions.move:128:5: error: vere
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_all_partitions.move:143:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_all_partitions.move:141:5: error: verex verification failed: the automatic verification of `three_shared` failed; provide a proof in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean`:
-  verify three_shared by
+  verify three_shared by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

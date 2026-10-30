@@ -2,7 +2,7 @@ Move prover returns: exiting with verification errors
 tests/sources/functional/bitwise_features.move:61:17: error: the loop invariant `∀ (i in 0 .. old_n), features[i] == old_features[i]` is not preserved by an iteration
 tests/sources/functional/bitwise_features.move:81:9: error: the specification clause `ensures include == spec_contains(features, feature)` is not established
 tests/sources/functional/bitwise_features.move:76:5: error: verex verification failed: the automatic verification of `set` failed; provide a proof in `tests/sources/functional/bitwise_features.proof.lean`:
-  verify set by
+  verify set by lean =>
     verex_obligations
     verex_on
     | invariant_5_step => verex_prepare; sorry
@@ -14,7 +14,7 @@ tests/sources/functional/bitwise_features.move:141:17: error: the assertion `fea
 tests/sources/functional/bitwise_features.move:135:17: error: the loop invariant `∀ (j in 0 .. i),
         features.length > disable[j] / 8 && !spec_contains(features, disable[j])` is not preserved by an iteration
 tests/sources/functional/bitwise_features.move:147:5: error: verex verification failed: the automatic verification of `disable_feature_flags` failed; provide a proof in `tests/sources/functional/bitwise_features.proof.lean`:
-  verify disable_feature_flags by
+  verify disable_feature_flags by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

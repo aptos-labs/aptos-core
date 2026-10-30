@@ -10,7 +10,7 @@ open VerexIR.Proofs.Denote
 
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
-verify constant_product by
+verify constant_product by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals
@@ -53,7 +53,7 @@ theorem market_bounds (r o a e : Int) (hr : 0 ≤ r) (ho : 0 ≤ o)
     have extension := Int.mul_nonneg (Int.sub_nonneg_of_le hea) (Int.sub_nonneg_of_le bound)
     grind
 
-verify constant_product_with_fee by
+verify constant_product_with_fee by lean =>
   verex_obligations
   all_goals verex_paths
   all_goals (repeat' verex_split)
@@ -80,7 +80,7 @@ verify constant_product_with_fee by
          try dsimp only [fee] at boundFee factsFee
          omega)
 
-verify constant_product_with_fee_non_compliant by
+verify constant_product_with_fee_non_compliant by lean =>
   verex_obligations
   all_goals verex_paths
   all_goals (repeat' verex_split)
@@ -113,7 +113,7 @@ theorem ratio_monotone (r o a b : Int) (hr : 0 ≤ r) (ho : 0 ≤ o)
   apply Int.le_ediv_of_mul_le (by omega)
   grind
 
-verify create_constant_product_pool by
+verify create_constant_product_pool by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first
@@ -140,7 +140,7 @@ verify create_constant_product_pool by
        all_goals grind)
 
 -- Specialize the quantified pricing laws, then reduce its singleton result.
-verify swap by
+verify swap by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals try clear verexContinuation
@@ -185,7 +185,7 @@ theorem fee_monotone (r o a b fee : Int) {q1 q2 : Int}
   · rw [value1 (by omega), value2 (by omega)]
     exact ratio_monotone r o _ _ hr ho eff1 increasing (by omega)
 
-verify create_compliant_fee_pool by
+verify create_compliant_fee_pool by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:69:9: error: the specification clause `aborts_if spec_sum(v, v.length) > MAX_U64` is not established
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:68:5: error: verex verification failed: the automatic verification of `sum_via_callee` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean`:
-  verify sum_via_callee by
+  verify sum_via_callee by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/closures/inline/folds_of_callee_ensures.move:68:5: erro
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:91:9: error: the specification clause `aborts_if spec_sum(v, v.length) > MAX_U64` is not established
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:90:5: error: verex verification failed: the automatic verification of `sum_via_bare_callee` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean`:
-  verify sum_via_bare_callee by
+  verify sum_via_bare_callee by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -24,7 +24,7 @@ tests/sources/functional/closures/inline/folds_of_callee_ensures.move:141:5: err
             + v[_j_13]
             > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:146:5: error: verex verification failed: the automatic verification of `sum_field` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean`:
-  verify sum_field by
+  verify sum_field by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry
@@ -32,7 +32,7 @@ tests/sources/functional/closures/inline/folds_of_callee_ensures.move:146:5: err
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:189:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established
 tests/sources/functional/closures/inline/folds_of_callee_ensures.move:187:5: error: verex verification failed: the automatic verification of `sum_via_callee_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean`:
-  verify sum_via_callee_wrong by
+  verify sum_via_callee_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

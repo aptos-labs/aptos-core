@@ -83,6 +83,7 @@ private def kwApply := Lean.Parser.nonReservedSymbol "apply" true
 private def kwSplit := Lean.Parser.nonReservedSymbol "split" true
 private def kwLemma := Lean.Parser.nonReservedSymbol "lemma" true
 private def kwProof := Lean.Parser.nonReservedSymbol "proof" true
+private def kwLean := Lean.Parser.nonReservedSymbol "lean" true
 private def kwSpec := Lean.Parser.symbol "spec"
 private def kwFun := Lean.Parser.nonReservedSymbol "fun" true
 private def kwNamespace := Lean.Parser.nonReservedSymbol "namespace" true
@@ -887,7 +888,7 @@ declare_syntax_cat verexSpecDecreases
 syntax (name := verexSpecDecreasesSyntax) kwDecreases verexExpr:2 : verexSpecDecreases
 syntax (name := verexSpecFunctionItem) (priority := high)
   (docComment)? (verexAttributeListSyntax)? (kwOpaque)? kwSpec kwFun verexIdentifier verexGenericBinder* "(" verexParameter,* ")"
-    ":" verexType (verexSpecDecreases)? (":=" verexExpr)? : verexItem
+    (":" verexType)? (verexSpecDecreases)? (":=" verexExpr)? : verexItem
 /-- A lemma: its `requires` clauses imply its `ensures` clauses, established
 by the steps after `proof`. -/
 syntax (name := verexLemmaItem) (priority := high)
@@ -928,9 +929,15 @@ syntax (name := verexTheoremItem)
 /-- `open N …` opens namespaces for the module's theorems and authored proofs,
 wherever it stands among the items; `VerexIR` is always open for them. -/
 syntax (name := verexOpenItem) Lean.Parser.Command.open : verexItem
+/-- A step of an authored proof. -/
+declare_syntax_cat verexProofStep (behavior := symbol)
+/-- `lean => tac` runs Lean tactics on the goals of the step's scope. -/
+syntax (name := verexLeanStep) kwLean " => " Lean.Parser.Tactic.tacticSeq : verexProofStep
+/-- The steps of an authored proof, one per line. -/
+syntax verexProofBlock := many1Indent(verexProofStep)
 /-- `verify! f` runs in the editor, where `verex.skip_verify` skips the others. -/
 syntax (name := verexVerifyItem)
-  ("verify!" <|> "verify") verexIdentifier ("by" Lean.Parser.Tactic.tacticSeq)? : verexItem
+  ("verify!" <|> "verify") verexIdentifier ("by" verexProofBlock)? : verexItem
 
 syntax (name := verexNamespaceCommand)
   "verex" kwNamespace verexPath kwUsing verexProfile kwWhere

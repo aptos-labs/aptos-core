@@ -176,7 +176,7 @@ a✝ : ↑v.values.size ≤ i.val
 ⊢ state✝ = initialState✝
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:55:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), result[i] == v[i] + global<R>(a).v` is not established
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: verex verification failed: the automatic verification of `map_add_global` failed; provide a proof in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean`:
-  verify map_add_global by
+  verify map_add_global by lean =>
     verex_obligations
     verex_on
     | invariant_4_step => verex_prepare; sorry
@@ -357,7 +357,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow
 a✝ : ↑v.values.size ≤ i.val
 ⊢ state✝ = initialState✝
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: verex verification failed: the automatic verification of `map_add_global_bare` failed; provide a proof in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean`:
-  verify map_add_global_bare by
+  verify map_add_global_bare by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry

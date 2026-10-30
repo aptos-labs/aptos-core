@@ -47,7 +47,7 @@ verex module 0x42::vector_ranges where
 error: the specification clause `ensures ∃ (index in range(values)), index == values.length` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_upper` failed; provide a proof in the module:
-  verify wrong_upper by
+  verify wrong_upper by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

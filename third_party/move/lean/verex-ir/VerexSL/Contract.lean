@@ -124,15 +124,6 @@ partial def loopSpecifications (ns : ValidatedNamespace)
         if let some { kind := .spec block, .. } := ns.expressions[first.index]? then
           if block.conditions.any (·.kind == .loopInvariant) then
             found := found.push (root, block)
-  if let .block statements _ := expression.kind then
-    for index in [0:statements.size] do
-      if h : index + 1 < statements.size then
-        let specId := statements[index]
-        let loopId := statements[index + 1]
-        if let some { kind := .spec block, .. } := ns.expressions[specId.index]? then
-          if block.conditions.any (fun condition => condition.kind == .loopInvariant) then
-            if let some { kind := .loop .., .. } := ns.expressions[loopId.index]? then
-              found := found.push (loopId, block)
   for child in VerexIR.Validation.expressionChildren expression.kind do
     found := found ++ loopSpecifications ns child seen
   -- Unannotated loops still need a typed header invariant. Authored clauses
@@ -140,10 +131,10 @@ partial def loopSpecifications (ns : ValidatedNamespace)
   if let .loop .. := expression.kind then
     unless found.any (fun (site, _) => site == root) do
       found := found.push (root, { loc := expression.loc })
-  -- Several annotations can name one site: one preceding the loop, found
-  -- here, and the blocks its header begins with, found by the recursive
-  -- visit. The site's specification is all of their conditions, in order;
-  -- the default, discovered after them, adds none.
+  -- Several annotations can name one site: the blocks its heading's
+  -- condition holds and the one its body begins with. The site's
+  -- specification is all of their conditions, in order; the default,
+  -- discovered after them, adds none.
   found := found.foldl (fun acc (site, block) =>
     match acc.findIdx? (·.1 == site) with
     | some index => acc.modify index fun (site, previous) =>
@@ -3096,9 +3087,6 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       labelDefinitions
       labelEntry := some { memory := state, locals := padLocals (bound.map (some ∘ SlotBinders.entry)) }
       labelExit := some { memory := state, locals := padLocals (bound.map (some ∘ SlotBinders.entry)) } }
-  let translateAll (context : Context) (clauses : Array ExprId) :
-      MetaM (Array Lean.Expr) :=
-    clauses.mapM (translate context)
   let requiresTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state => do
       let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
@@ -3208,8 +3196,8 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let abortConditionTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state => do
       let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
-      let clauses ← translateAll (← bindLets (contextOf state bound) groups.lets false)
-        (groups.abortsIf.map (·.condition))
+      let context ← bindLets (contextOf state bound) groups.lets false
+      let clauses ← groups.abortsIf.mapM (translate context ·.condition)
       let body ← if declaredAborts then disjunction clauses
         else pure ((← modelAborts (contextOf state bound) bound).getD (mkConst ``False))
       mkLambdaFVars #[arguments, state] body
@@ -3254,7 +3242,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   clause the whole memory is unchanged.  With clauses, every listed resource
   type reads the same at every key other than its listed ones, and every
   other resource type reads the same everywhere; a loose frame leaves the
-  unlisted resource types open.  The memory's update laws discharge the
+  unlisted resource types open.  The memory's update lemmas discharge the
   frame and a caller frames with it.  A function with a body that declares
   no contract and plays no map or table role claims no frame: it is
   verified for the invariants it writes, and its callers inline it. -/

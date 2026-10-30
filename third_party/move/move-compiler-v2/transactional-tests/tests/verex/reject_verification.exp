@@ -2,7 +2,7 @@ processed 1 task
 task 0 lines 3-11:  publish [import VerexMove]
 Error: compilation errors:
  error: verex verification failed: the automatic verification of `wrong_increment` failed; provide a proof in the module:
-  verify wrong_increment by
+  verify wrong_increment by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

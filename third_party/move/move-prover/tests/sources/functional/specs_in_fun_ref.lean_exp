@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/specs_in_fun_ref.move:112:13: error: the assertion `x == y` does not hold
 tests/sources/functional/specs_in_fun_ref.move:120:5: error: verex verification failed: the automatic verification of `simple7` failed; provide a proof in `tests/sources/functional/specs_in_fun_ref.proof.lean`:
-  verify simple7 by
+  verify simple7 by lean =>
     verex_obligations
     verex_on
     | assert_2 => verex_prepare; sorry

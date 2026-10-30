@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:40:9: error: the specification clause `ensures result == w + w` is not established
 tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:38:5: error: verex verification failed: the automatic verification of `add_captured_local_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/spec_fun_ctx_collision.proof.lean`:
-  verify add_captured_local_wrong by
+  verify add_captured_local_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

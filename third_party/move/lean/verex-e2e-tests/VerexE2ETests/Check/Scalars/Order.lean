@@ -10,7 +10,7 @@ import VerexE2ETests.CheckSupport
 values of one type, `-1`, `0`, or `1`. On integers it is their natural order;
 at a type parameter it is an arbitrary total order, whose laws
 (`Std.TransCmp`, a typed order's) an authored proof uses. A
-`verify f by tactics` item runs the automatic solver first and hands the
+`verify f by lean => tactics` item runs the automatic solver first and hands the
 obligations it leaves to the tactics.
 -/
 
@@ -31,7 +31,7 @@ verex module 0x42::order where
   spec ordered3 where
     ensures result ==> core.prim.compare(a, c) < 0
     aborts_if false
-  verify ordered3 by
+  verify ordered3 by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     intro left right

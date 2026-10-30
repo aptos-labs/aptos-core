@@ -407,7 +407,11 @@ exceptional-outcome tags without shared rollback semantics.
 State observations are explicit anchors: function entry, block entry, loop
 entry, program point. A loop invariant records its loop and its `loopEntry`
 anchor; an in-body assertion its `programPoint`; a backend never infers the
-anchor from print position. Specification functions retain their authored
+anchor from print position. A loop's specification is held in the loop, as
+the Move Prover reads it: in the heading's condition of a `while`, at the
+head of the body of any other loop. A specification before a loop belongs
+to no loop, so a loop at the head of another's body never takes the outer
+loop's invariants. Specification functions retain their authored
 signatures (type parameters, parameters, result, uninterpreted and native
 flags, executable counterpart, `old` use, body, attached block) even when a
 logical intrinsic interprets applications generically; the retained

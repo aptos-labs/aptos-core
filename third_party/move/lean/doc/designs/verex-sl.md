@@ -856,6 +856,12 @@ spec module where
   axiom proposition
 ```
 
+A specification function with a body may omit its result type; the body's
+type is then the result, and the function is not callable
+(`VEREX-SPEC-RESULT-UNDECLARED`) nor part of the namespace's interface. A
+proof step's expression lowers as such a function, in the scope of its
+step.
+
 Module invariants and axioms are members of one `spec module where` block.
 An axiom is never an obligation; it is assumed at entry by every
 verification of the unit, as the Move Prover states its axioms globally. An

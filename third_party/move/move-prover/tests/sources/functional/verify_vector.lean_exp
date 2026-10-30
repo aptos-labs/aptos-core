@@ -4,7 +4,7 @@ tests/sources/functional/verify_vector.move:105:17: error: the loop invariant `â
 tests/sources/functional/verify_vector.move:106:17: error: the loop invariant `âˆ€ (j in front_index .. back_index + 1), v[j] == old(v)[j]` is not preserved by an iteration
 tests/sources/functional/verify_vector.move:118:9: error: the specification clause `ensures âˆ€ (i in 0 .. v.length), v[i] == old(v)[v.length - 1 - i]` is not established
 tests/sources/functional/verify_vector.move:116:5: error: verex verification failed: the automatic verification of `verify_reverse` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_reverse by
+  verify verify_reverse by lean =>
     verex_obligations
     verex_on
     | invariant_2_step => verex_prepare; sorry
@@ -15,7 +15,7 @@ tests/sources/functional/verify_vector.move:116:5: error: verex verification fai
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:133:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:133:5: error: verex verification failed: the automatic verification of `verify_reverse_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_reverse_with_unroll by
+  verify verify_reverse_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -26,7 +26,7 @@ tests/sources/functional/verify_vector.move:158:17: error: the loop invariant `â
 tests/sources/functional/verify_vector.move:167:9: error: the specification clause `ensures v[0 .. old(v).length] == old(v)` is not established
 tests/sources/functional/verify_vector.move:168:9: error: the specification clause `ensures v[old(v).length .. v.length] == old(other)` is not established
 tests/sources/functional/verify_vector.move:165:5: error: verex verification failed: the automatic verification of `verify_append` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_append by
+  verify verify_append by lean =>
     verex_obligations
     verex_on
     | invariant_6_step => verex_prepare; sorry
@@ -36,7 +36,7 @@ tests/sources/functional/verify_vector.move:165:5: error: verex verification fai
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:179:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:179:5: error: verex verification failed: the automatic verification of `verify_append_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_append_with_unroll by
+  verify verify_append_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -44,7 +44,7 @@ tests/sources/functional/verify_vector.move:179:5: error: verex verification fai
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:245:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:245:5: error: verex verification failed: the automatic verification of `verify_index_of_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_index_of_with_unroll by
+  verify verify_index_of_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -52,7 +52,7 @@ tests/sources/functional/verify_vector.move:245:5: error: verex verification fai
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:300:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:300:5: error: verex verification failed: the automatic verification of `verify_contains_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_contains_with_unroll by
+  verify verify_contains_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -64,7 +64,7 @@ tests/sources/functional/verify_vector.move:317:74: error: the loop invariant `â
 tests/sources/functional/verify_vector.move:343:9: error: the specification clause `ensures v[0 .. j] == old(v[0 .. j])` is not established
 tests/sources/functional/verify_vector.move:344:9: error: the specification clause `ensures v[j .. v.length] == old(v[j + 1 .. v.length])` is not established
 tests/sources/functional/verify_vector.move:340:5: error: verex verification failed: the automatic verification of `verify_remove` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_remove by
+  verify verify_remove by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry
@@ -76,7 +76,7 @@ tests/sources/functional/verify_vector.move:340:5: error: verex verification fai
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:361:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/verify_vector.move:361:5: error: verex verification failed: the automatic verification of `verify_remove_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_remove_with_unroll by
+  verify verify_remove_with_unroll by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry

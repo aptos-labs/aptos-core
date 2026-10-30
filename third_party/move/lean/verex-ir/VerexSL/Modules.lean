@@ -58,11 +58,12 @@ private def moduleClosure (environment : Environment) (own : Array String)
       (registeredModule? environment path).isSome
   return found
 
-/-- Elaborate a namespace command and register its unit, linking the
-registered modules at the paths `related` names for the unit the command's
-own uses give. -/
-def elaborateNamespaceWith (related : Environment → ValidatedUnit → Array (Array String))
-    (stx : Syntax) : CommandElabM Unit := Perf.withPhase .lowering do
+/-- Lower and validate a namespace command, linking the registered modules
+at the paths `related` names for the unit the command's own uses give: the
+unit, the namespace's path, and the path's syntax. -/
+def compileNamespaceWith (related : Environment → ValidatedUnit → Array (Array String))
+    (stx : Syntax) (compile : Syntax → CompilationUnit → CommandElabM ValidatedUnit := compileAt) :
+    CommandElabM (ValidatedUnit × Array String × Syntax) := do
   let (stx, unit) ← namespaceUnitOf stx
   let pathSyntax := (pathChildren stx)[0]!
   stageLog s!"{pathSyntax.reprint.getD ""}: unit"
@@ -80,7 +81,7 @@ def elaborateNamespaceWith (related : Environment → ValidatedUnit → Array (A
         throwErrorAt pathSyntax s!"the interface of `{"::".intercalate path.toList}` does not \
           elaborate: {error.message}"
   stageLog s!"interfaces ({interfaces.size})"
-  let validated ← compileAt stx { unit with namespaces := unit.namespaces ++ interfaces }
+  let validated ← compile stx { unit with namespaces := unit.namespaces ++ interfaces }
   stageLog "validated"
   let linked ← if modules.isEmpty then pure validated else
     match link validated (modules.map (·.2)) with
@@ -96,7 +97,14 @@ def elaborateNamespaceWith (related : Environment → ValidatedUnit → Array (A
     | .error message => throwErrorAt pathSyntax message
   stageLog "linked"
   -- The unit holds every type its generic frames require.
-  match registerUnit (← getEnv) (pathName sourceNs.path) linked.internRequiredTypes with
+  return (linked.internRequiredTypes, sourceNs.path, pathSyntax)
+
+/-- Elaborate a namespace command and register its unit
+(`compileNamespaceWith`). -/
+def elaborateNamespaceWith (related : Environment → ValidatedUnit → Array (Array String))
+    (stx : Syntax) : CommandElabM Unit := Perf.withPhase .lowering do
+  let (unit, path, pathSyntax) ← compileNamespaceWith related stx
+  match registerUnit (← getEnv) (pathName path) unit with
   | .ok environment => setEnv environment
   | .error message => throwErrorAt pathSyntax message
 

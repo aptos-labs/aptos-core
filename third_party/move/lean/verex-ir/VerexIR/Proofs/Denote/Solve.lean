@@ -37,8 +37,8 @@ private def identifierPart (name : String) : String :=
 private def Provenance.key : Provenance → ObligationKey
   | .precondition callee call => { kind := "requires", callee := identifierPart callee, call }
   | .continuation callee call => { kind := "after", callee := identifierPart callee, call }
-  | .loopEntry => { kind := "invariant", phase := "entry" }
-  | .loopIteration => { kind := "invariant", phase := "step" }
+  | .loopEntry loop => { kind := "invariant", phase := "entry", loop }
+  | .loopIteration loop => { kind := "invariant", phase := "step", loop }
   | .assertion => { kind := "assert" }
   | .mutationEnd | .construction => { kind := "data invariant" }
   | .memoryWritten | .callReturned => { kind := "module invariant" }
@@ -46,6 +46,7 @@ private def Provenance.key : Provenance → ObligationKey
   | .unrollBound _ => { kind := "unroll" }
   | .storedWrite => { kind := "stored invariant" }
   | .ghostWrite => { kind := "ghost domain" }
+  | .pointAssert point index => { kind := "assert", index, point }
 
 /-- The key of a clause by its name, `kind_index` as the generator names a
 function's clauses (`ensures_2`, `aborts_if_1`), or the name itself. -/
@@ -67,14 +68,37 @@ private def leafKey (goal : MVarId) (provenance : Option Provenance)
   let named := ranges.findSome? fun range => (names.find? (·.1 == range)).map (·.2)
   let numbers ← (← targetState).preconditionNumbers.get
   let numbered := ranges.findSome? fun range => (numbers.find? (·.1 == range)).map (·.2)
+  let invariants ← (← targetState).invariantKeys.get
+  let invariant := ranges.findSome? fun range => (invariants.find? (·.1 == range)).map (·.2)
   return match provenance, named with
     | some (.precondition callee call), _ =>
         { (Provenance.precondition callee call).key with index := numbered }
-    | some .loopEntry, some name => { clauseKey name with phase := "entry" }
-    | some .loopIteration, some name => { clauseKey name with phase := "step" }
+    | some (.loopEntry loop), some name => { clauseKey name with phase := "entry", loop }
+    | some (.loopIteration loop), some name => { clauseKey name with phase := "step", loop }
     | _, some name => clauseKey name
-    | some origin, none => origin.key
-    | none, none => { kind := "leaf" }
+    -- An invariant a clause states, where the step owing it names no
+    -- invariant of its own (a stored or data invariant where a write or a
+    -- mutation ends).
+    | _, none => match invariant, provenance with
+      | some kind, some origin =>
+          if origin.key.kind.endsWith "invariant" then origin.key else { kind }
+      | some kind, none => { kind }
+      | none, some origin => origin.key
+      | none, none => { kind := "leaf" }
+
+/-- The keys of a path's clauses, as its leaves will have them (`leafKey`):
+each clause a range of its target or a stripped clause names, and the key
+its origin gives it. -/
+private def pathKeys (goal : MVarId) (provenance : Option Provenance)
+    (clauses : Array ObligationRange) (names : Array (ObligationRange × String)) :
+    MetaM (Array ObligationKey) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  let named := (obligationRanges target ++ clauses).filterMap fun range =>
+    (names.find? (·.1 == range)).map fun (_, name) => match provenance with
+      | some (.loopEntry loop) => { clauseKey name with phase := "entry", loop }
+      | some (.loopIteration loop) => { clauseKey name with phase := "step", loop }
+      | _ => clauseKey name
+  return named.push (← leafKey goal provenance clauses names)
 
 /-- Restore the context-dependent caches along with a failed automatic
 attempt. Measurements and budget debits deliberately survive rollback. -/
@@ -255,6 +279,9 @@ structure SolveContext where
   specializations : Array Lean.Expr := #[]
   handOver : Bool
   preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none
+  /-- The hooks of an authored proof at program points (`verex_obligations
+  at …`): each point's pattern, the hook's syntax, and its tactics. -/
+  points : Array (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := #[]
   labeled : Bool
   unrolls : Array (Nat × Nat)
   preconditions : Array (Lean.Expr × Lean.Expr)
@@ -263,6 +290,10 @@ structure SolveContext where
   number among the calls of the callee and among all calls, in source
   order. -/
   callSites : Array (Nat × String × Nat × Nat) := #[]
+  /-- The target's other sites a path's decisions name: each site, its kind
+  (`abort`, `op`, `if`, …), its number among the sites of the kind, in
+  source order, and a label (a `match` arm's variant). -/
+  sites : Array (Nat × String × Nat × String) := #[]
   ghostWrites : Array (Nat × ObligationRange)
   debug : Bool
   profile : Bool
@@ -274,6 +305,26 @@ structure SolveContext where
 site. -/
 private def SolveContext.callNumber (ctx : SolveContext) (site : Option Nat) : Option Nat :=
   site.bind fun site => (ctx.callSites.find? (·.1 == site)).map (·.2.2.1)
+
+/-- A site's number among the target's sites of a kind. -/
+private def SolveContext.siteNumber (ctx : SolveContext) (kind : String) (site : Nat) :
+    Option Nat :=
+  (ctx.sites.find? fun (other, otherKind, _) => other == site && otherKind == kind).map (·.2.2.1)
+
+/-- A loop's number in a key (`invariant 2 of loop 1 step`): its number among
+the target's loops, where it has several. -/
+private def SolveContext.loopKey (ctx : SolveContext) (site : Nat) : Option Nat :=
+  if (ctx.sites.filter (·.2.1 == "loop")).size > 1 then ctx.siteNumber "loop" site else none
+
+/-- A site's number among the target's sites of a kind, and its label. -/
+private def SolveContext.siteEntry (ctx : SolveContext) (kind : String) (site : Nat) :
+    Option (Nat × String) :=
+  (ctx.sites.find? fun (other, otherKind, _) => other == site && otherKind == kind).map (·.2.2)
+
+/-- Where a path aborting in a call aborts, by the call's site. -/
+private def SolveContext.callAbortSite (ctx : SolveContext) (site : Nat) : Option AbortSite :=
+  (ctx.callSites.find? (·.1 == site)).map fun (_, callee, number, overall) =>
+    .call number callee overall
 
 /-- Invocation-local measurements of the continuations the walker actually
 folds. These are dynamic instances, not static CFG sites: a later diamond
@@ -358,6 +409,27 @@ structure SolveState where
   of proof cases before any clause is decided. -/
   caseScheduled : Std.HashSet SharedBudgets.OwnerId := {}
   handed : Array (MVarId × ObligationKey) := #[]
+  /-- The source decisions on the path of the goal being stepped, which the
+  goals it queues take, each split adding its own (`queueDeciding`). -/
+  activeDecisions : Array Decision := #[]
+  goalDecisions : Std.HashMap MVarId (Array Decision) := {}
+  /-- The loop of each iteration's recursive hypothesis, as its keys name it
+  (`SolveContext.loopKey`). -/
+  recursiveLoops : Std.HashMap FVarId (Option Nat) := {}
+  /-- The hooks at program points some path reached, by index. -/
+  pointsUsed : Array Nat := #[]
+  /-- The points a goal's path passed whose hooks wait for the walker to
+  introduce the continuation's results and premises, which the goals it
+  queues take (`goalPoints`). -/
+  activePoints : Array ProgramPointKey := #[]
+  goalPoints : Std.HashMap MVarId (Array ProgramPointKey) := {}
+  /-- Whether the function's entry was reached (`entryStep`). -/
+  entryReached : Bool := false
+  /-- The binding index after the scope entries the walk has placed in
+  goals (`scopedBinder`), not yet in a context. -/
+  scopeIndex : Nat := 0
+  /-- The goals a loop's entry hooks already ran on. -/
+  pointsDone : Array (MVarId × ProgramPointKey) := #[]
   leaves : Nat := 0
   stageCost : Array (String × Nat) := #[]
 
@@ -386,6 +458,12 @@ private def queue (goals : List MVarId) (provenance : Option Provenance)
   modify fun s =>
     let s := { s with
       pending := s.pending ++ goals.toArray.map fun g => (g, provenance, clauses, callSite)
+      goalDecisions := goals.foldl (fun decisions goal =>
+        if s.activeDecisions.isEmpty then decisions.erase goal
+        else decisions.insert goal s.activeDecisions) s.goalDecisions
+      goalPoints := goals.foldl (fun points goal =>
+        if s.activePoints.isEmpty then points.erase goal
+        else points.insert goal s.activePoints) s.goalPoints
       prepared := if prepared then goals.foldl (·.insert ·) s.prepared else s.prepared }
     if !s.shared then s else { s with
       goalRegions := goals.foldl (fun regions goal => match s.activeRegion with
@@ -400,10 +478,57 @@ private def queue (goals : List MVarId) (provenance : Option Provenance)
       openedEntries := goals.foldl (fun opened goal =>
         if s.activeEntryOpened then opened.insert goal else opened.erase goal) s.openedEntries }
 
+/-- Queues `goals` as `queue` does, their path taking `decision` beside the
+decisions of the goal being stepped. -/
+private def queueDeciding (decision : Decision) (goals : List MVarId)
+    (provenance : Option Provenance) (clauses : Array ObligationRange) : SolveM Unit := do
+  let active := (← get).activeDecisions
+  modify fun s => { s with activeDecisions := active.push decision }
+  queue goals provenance clauses
+  modify fun s => { s with activeDecisions := active }
+
 /-- Records the cost of `stage` since `start`. -/
 private def charge (stage : String) (start : Nat) : SolveM Unit := do
   let now ← IO.getNumHeartbeats
   modify fun s => { s with stageCost := s.stageCost.push (stage, now - start) }
+
+/-- Queue the obligations a point's asserts owe among `goals`, each a leaf of
+its own (`.pointAssert`) at the point the path reached; the other goals. -/
+private def queueOwed (point : ProgramPointKey) (goals : List MVarId) (prepared : Bool := false) :
+    SolveM (List MVarId) := do
+  let owed ← (← targetState).pointOwed.get
+  let mut rest := []
+  for goal in goals do
+    match owed[goal]? with
+    | some (_, index) =>
+        -- Queued once: the leaf passes the end of its path later.
+        (← targetState).pointOwed.modify (·.erase goal)
+        queue [goal] (some (.pointAssert point index)) #[] prepared
+    | none => rest := rest ++ [goal]
+  return rest
+
+/-- Run the hooks an authored proof places at `point` (`verex_obligations
+at …`) on the current goals: what they establish there holds on every path
+through the point and is proved once for all of them. -/
+private def atPoint (ctx : SolveContext) (point : ProgramPointKey) : SolveM Unit := do
+  let hooks := ctx.points.zipIdx.filter (·.1.1.selects point)
+  if hooks.isEmpty then return
+  let started ← IO.getNumHeartbeats
+  for ((_, _, hook), index) in hooks do
+    modify fun s => { s with
+      pointsUsed := if s.pointsUsed.contains index then s.pointsUsed else s.pointsUsed.push index }
+    let mut next := #[]
+    for goal in ← getGoals do
+      setGoals [goal]
+      withOptions (verex.keepObligationMarkers.set · true) do evalTactic hook
+      next := next ++ (← getUnsolvedGoals).toArray
+    setGoals next.toList
+  setGoals (← queueOwed point (← getGoals))
+  -- The structural matchers read the logical head, as at solver entry.
+  setGoals (← (← getGoals).mapM fun next => next.withContext do
+    let target ← instantiateMVars (← next.getType)
+    if target.isMData then next.replaceTargetDefEq target.consumeMData else pure next)
+  charge "point" started
 
 /-- The target's closed equations, such as its generic calls' frame
 instantiations, apply wherever a body brings such a term into a goal. -/
@@ -752,6 +877,80 @@ private def callAtStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
   charge "call site" stageStart
   return true
 
+/-- An abort at its site the normal form has not reached: the abort condition
+at the failure, marked with the site (`wp_abortAt`), which the walker reads
+where it steps the goal next (`abortSite?`). -/
+private def abortStep (step : SolveStep) : SolveM Bool := do
+  let { goal, provenance, clauses, stageStart, .. } := step
+  let some _ ← abortAtGoal? goal | return false
+  setGoals [goal]
+  evalTactic (← `(tactic| rw [VerexIR.Proofs.Denote.wp_abortAt]))
+  queue (← getGoals) provenance clauses
+  charge "abort" stageStart
+  return true
+
+/-- A marker on what a path owes (`doc/plan/proof-language.md`, "Obligation
+addressing"): an abort at a site, a branch of a conditional, an arm of a
+`match`, or the continuation after an operation a proof names. -/
+private inductive PathMark where
+  | abort (site : Nat)
+  | branch (site : Nat) (taken : Bool)
+  | arm (site : Nat) (variant : String)
+  | after (site : Nat)
+
+/-- A goal's conclusion through branches and arms, at aborts and after
+operations (`Taken`, `Matched`, `AbortsAt`, `AfterAt`): its markers,
+outermost first, and the conclusion without them. -/
+private partial def pathMarkers? (e : Lean.Expr) :
+    MetaM (Option (Array PathMark × Lean.Expr)) := do
+  match e with
+  | .forallE name domain body info =>
+      return (← pathMarkers? body).map fun (marks, body) => (marks, .forallE name domain body info)
+  | .mdata data body =>
+      return (← pathMarkers? body).map fun (marks, body) => (marks, .mdata data body)
+  | _ =>
+    let (mark, inner) ← if e.isAppOfArity ``AbortsAt 2 then
+        pure ((← (evalNat (e.getArg! 0)).run).map PathMark.abort, e.getArg! 1)
+      else if e.isAppOfArity ``Taken 3 then
+        let taken := (e.getArg! 1).consumeMData.isConstOf ``Bool.true
+        pure ((← (evalNat (e.getArg! 0)).run).map (PathMark.branch · taken), e.getArg! 2)
+      else if e.isAppOfArity ``Matched 3 then
+        let variant := match (e.getArg! 1).consumeMData with
+          | .lit (.strVal variant) => variant
+          | _ => "_"
+        pure ((← (evalNat (e.getArg! 0)).run).map (PathMark.arm · variant), e.getArg! 2)
+      else if e.isAppOfArity ``AfterAt 2 then
+        pure ((← (evalNat (e.getArg! 0)).run).map PathMark.after, e.getArg! 1)
+      else return none
+    let some mark := mark | return none
+    return match ← pathMarkers? inner with
+      | some (marks, body) => some (#[mark] ++ marks, body)
+      | none => some (#[mark], inner)
+
+/-- The decision a path through a conditional takes: the source's `if`, the
+heading of a `while` loop, whose `then` continues it, or the test of an arm
+of a lowered `match`, whose `then` takes the arm and whose `else` may be
+the match's last arm. -/
+private def SolveContext.branchDecision (ctx : SolveContext) (site : Nat) (taken : Bool) :
+    Option Decision :=
+  match ctx.siteNumber "if" site, ctx.siteNumber "loopHeader" site,
+      ctx.siteEntry (if taken then "matchArm" else "matchElse") site with
+  | some number, _, _ => some (.branch number taken)
+  | none, some number, _ => some (.loop number !taken)
+  | none, none, some (number, variant) => some (.variant number variant)
+  | none, none, none => none
+
+/-- Where a path owing an abort condition at a site aborts: at a throw, an
+operation, an invocation, or a call of the target's own body. -/
+private def SolveContext.abortDecision (ctx : SolveContext) (site : Nat) : Option Decision :=
+  match ctx.siteNumber "abort" site, ctx.siteNumber "op" site, ctx.siteNumber "invoke" site,
+      ctx.callAbortSite site with
+  | some number, _, _, _ => some (.aborts (.abort number))
+  | none, some number, _, _ => some (.aborts (.op number))
+  | none, none, some number, _ => some (.aborts (.invoke number))
+  | none, none, none, some call => some (.aborts call)
+  | none, none, none, none => none
+
 /-- The invariants a call owes where it returns, as a cut. -/
 private def callCheckedStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
@@ -882,6 +1081,16 @@ assuming it. -/
 private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
   let some (site, arguments) ← loopGoal? goal | return false
+  -- The hooks at the loop's entry run on the goal the loop is applied to.
+  if let some loop := ctx.siteNumber "loop" site then
+    let point := ProgramPointKey.loopEntry loop
+    if ctx.points.any (·.1.selects point) && !(← get).pointsDone.contains (goal, point) then
+      setGoals [goal]
+      atPoint ctx point
+      let goals ← getGoals
+      modify fun s => { s with pointsDone := s.pointsDone ++ goals.toArray.map (·, point) }
+      queue goals provenance clauses (callSite := step.callSite)
+      return true
   if let some (_, bound) := ctx.unrolls.find? (·.1 == site) then
     let rule := mkAppN (mkConst ``wp_loopAt_unroll)
       (arguments.extract 0 5 ++ #[toExpr bound] ++ arguments.extract 5 10)
@@ -936,6 +1145,8 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       let introduced ← step.withContext do
         let locals := (← getLCtx).getFVarIds
         return locals.extract (locals.size - 5)
+      -- The back edges of the iteration are keyed by the loop.
+      modify fun s => { s with recursiveLoops := s.recursiveLoops.insert introduced[0]! (ctx.loopKey site) }
       let mut closed := false
       for (hypothesis, unwrap) in [(introduced[4]!, true), (introduced[1]!, false)] do
         match ← normalizeAroundClauses ctx.normalization step hypothesis false with
@@ -979,10 +1190,12 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
           report := report ++ m!" {label} {(mark - previous) / 1000}k;"
           previous := mark
         logInfo m!"{report} {(← getGoals).length} goals"
+      -- The hooks at the start of an iteration, once for all its paths.
+      if let some loop := ctx.siteNumber "loop" site then atPoint ctx (.loopStep loop)
       queue (← getGoals) provenance clauses
       setGoals [entryHolds]
       evalTactic (← `(tactic| try verex_normalize))
-      queue (← getGoals) (some .loopEntry) #[]
+      queue (← getGoals) (some (.loopEntry (ctx.loopKey site))) #[]
   | _ => throwError "the loop rule did not produce its two obligations"
   charge "loop" stageStart
   return true
@@ -1530,6 +1743,13 @@ private def specializedCall? (specializations : Array Lean.Expr) (theoremProof p
     saved.restore
   return none
 
+/-- A statement's conclusion, under its binders and premises, marked as
+what a path owes after the site (`AfterAt`). -/
+private partial def markConclusion (site : Nat) : Lean.Expr → Lean.Expr
+  | .forallE name domain body info => .forallE name domain (markConclusion site body) info
+  | .mdata data body => .mdata data (markConclusion site body)
+  | conclusion => mkApp2 (mkConst ``AfterAt) (mkNatLit site) conclusion
+
 /-- A call by the callee's theorem: what the theorem assumes and its
 precondition, then the continuation and the failures. A generic call meets
 the callee's contract specialized at its type arguments, where one is
@@ -1537,7 +1757,7 @@ given: its arguments and result at the caller's types. -/
 private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName : String)
     (theoremProof proofType : Lean.Expr) (theoremArguments : Array Lean.Expr)
     (proofSyntax : TSyntax `term) : SolveM Unit := do
-  let { goal, provenance, clauses, stageStart, .. } := step
+  let { goal, clauses, stageStart, .. } := step
   -- The theorem's meaning is the call's: its frame and instantiation are
   -- the call's, found before the rule's types are unified.
   goal.withContext do
@@ -1641,16 +1861,20 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         -- Keep successive results addressable in authored proofs. The latest
         -- call keeps the ordinary name; earlier results get a fresh old name.
         let subgoal ← match (← getLCtx).findFromUserName? name with
-          | some previous =>
-              let base := Name.mkSimple s!"old_{name}"
-              let mut old := base
-              let mut index := 1
-              while ((← getLCtx).findFromUserName? old).isSome do
-                old := Name.mkSimple s!"{base}_{index}"
-                index := index + 1
-              subgoal.rename previous.fvarId old
-          | none => pure subgoal
-        subgoal.replaceTargetDefEq (.forallE name domain body info)
+          | some previous => renameScoped subgoal previous.fvarId (← oldUserName name)
+          | none => renameLatestEntry subgoal name.toString none (← oldUserName name)
+        -- A call a proof places facts after: its continuation's conclusion
+        -- carries the call's site (`AfterAt`), met on every path after it.
+        let body := match step.callSite with
+          | some site =>
+              let named := ctx.callSites.find? (·.1 == site) |>.any fun (_, callee, number, overall) =>
+                ctx.points.any (·.1.selects (.after (.call number (identifierPart callee) overall)))
+              if named then markConclusion site body else body
+          | none => body
+        -- In a step proof, the result's scope entry comes with it.
+        let index := max (← nextScopeIndex) (← get).scopeIndex
+        modify fun s => { s with scopeIndex := index + 1 }
+        scopedBinderGoal subgoal name domain body info index
       else pure subgoal
     setGoals [subgoal]
     -- Unfold and normalize the contract in one pass. Two successive simp
@@ -1715,10 +1939,16 @@ private def callStep (ctx : SolveContext) (step : SolveStep) (isDenoted : Bool) 
 end, normalized so that its conjunction splits into leaves. -/
 private def recursiveStep (step : SolveStep) : SolveM Bool := do
   let { goal, stageStart, .. } := step
+  -- The loop the back edge is of, by its recursive hypothesis.
+  let loop ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
+    let .fvar recursive := (target.getArg! 3).getAppFn | return none
+    return ((← get).recursiveLoops[recursive]?).getD none
   let some subgoals ← recursiveHypothesis? goal | return false
   setGoals subgoals
   evalTactic (← `(tactic| all_goals (try verex_normalize)))
-  queue (← getGoals) (some .loopIteration) #[]
+  queue (← getGoals) (some (.loopIteration loop)) #[]
   charge "recursive" stageStart
   return true
 
@@ -2033,6 +2263,7 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
   if ctx.handOver then
     (← targetState).leafOrigins.modify (·.insert goal (provenance, clauses))
     let key ← leafKey goal provenance clauses ctx.names
+    (← targetState).leafDecisions.modify (·.insert goal (← get).activeDecisions)
     modify fun s => { s with handed := s.handed.push (goal, key) }
     return
   -- Verification is native (`doc/designs/native-verification.md`).
@@ -2085,15 +2316,59 @@ private def prepareObligations (ctx : SolveContext) (step : SolveStep) : SolveM 
         return declaration.isLet && declaration.userName == continuationName
     then return false
   setGoals [goal]
+  -- Whether a proof's `on` steps take several of the path's clauses, which
+  -- then share the path's preparation; a path with one such clause leaves
+  -- it to its leaf.
+  let routed ← match ← (← targetState).routedKeys.get with
+    | none => pure true
+    | some (patterns, all) => do
+        let keys ← pathKeys goal provenance clauses ctx.names
+        let taken := if all then keys else keys.filter fun key => patterns.any (·.selects key)
+        pure (taken.size ≥ 2)
+  (← targetState).pathRouted.set routed
   withOptions (verex.keepObligationMarkers.set · true) do
     evalTactic preparing
   -- Substitution and generalization can leave target annotations. The
   -- structural matchers read the logical head, just as at solver entry.
-  let goals ← (← getUnsolvedGoals).mapM fun next => next.withContext do
+  let goals ← queueOwed .exit (← getUnsolvedGoals) true
+  let goals ← goals.mapM fun next => next.withContext do
     let target ← instantiateMVars (← next.getType)
     if target.isMData then next.replaceTargetDefEq target.consumeMData else pure next
   queue goals provenance clauses true
   charge "authored preparation" stageStart
+  return true
+
+/-- The operations and invocations a hook names (`after op k`), marked so
+that every path continuing after one carries its site (`opAfterAt`). -/
+private def markPointSites (ctx : SolveContext) (goal : MVarId) : MetaM MVarId := do
+  let named := ctx.sites.filterMap fun (site, kind, number, _) =>
+    if (kind == "op" && ctx.points.any (·.1 == .after (.op number))) ||
+        (kind == "invoke" && ctx.points.any (·.1 == .after (.invoke number))) then some site
+    else none
+  if named.isEmpty then return goal
+  goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    unless (target.find? (·.isAppOf ``opAt)).isSome do return goal
+    let marked := target.replace fun e =>
+      if e.isAppOf ``opAt && e.getAppNumArgs ≥ 2 then
+        let site := e.getArg! (e.getAppNumArgs - 2)
+        if site.rawNatLit?.any named.contains || site.nat?.any named.contains then
+          some (mkAppN (.const ``opAfterAt e.getAppFn.constLevels!) e.getAppArgs)
+        else none
+      else none
+    if marked == target then return goal
+    goal.replaceTargetDefEq marked
+
+/-- The function's entry: the first goal of the root path that is a step of
+its body, where the hooks `at entry` run. -/
+private def entryStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
+  if (← get).entryReached || !ctx.points.any (·.1 == .entry) then return false
+  let target ← step.goal.withContext (instantiateMVars (← step.goal.getType))
+  unless target.isAppOf ``VerexIR.Proofs.wp do return false
+  modify fun s => { s with entryReached := true }
+  setGoals [step.goal]
+  atPoint ctx .entry
+  queue (← getGoals) step.provenance step.clauses (callSite := step.callSite)
   return true
 
 /-- Advance the walker until it queues successors or reaches a decision.
@@ -2105,21 +2380,59 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   let isDenoted := (← get).denoted.contains goal
   let prepared := ctx.preparing?.isSome && (← get).prepared.contains goal
   let (goal, clauses) ← match provenance with
-    | some .loopEntry | some .loopIteration | some .assertion | some .mutationEnd
+    | some (.loopEntry _) | some (.loopIteration _) | some .assertion | some .mutationEnd
     | some .construction | some .memoryWritten | some .callReturned
     | some (.precondition _ _) =>
         stripObligations goal clauses
     | _ => pure (goal, clauses)
+  let goal ← markPointSites ctx goal
+  -- A path through a branch or an arm takes it, and one owing the abort
+  -- condition at a site aborts there: the markers come off, and the path
+  -- takes the decisions.
+  let (goal, after) ← match ← goal.withContext do pathMarkers? (← instantiateMVars (← goal.getType)) with
+    | some (marks, stripped) =>
+        let decisions := marks.filterMap fun
+          | .branch site taken => ctx.branchDecision site taken
+          | .arm site variant => (ctx.siteNumber "match" site).map (.variant · variant)
+          | .abort site => ctx.abortDecision site
+          | .after _ => none
+        modify fun s => { s with activeDecisions := s.activeDecisions ++ decisions }
+        let after := marks.filterMap fun
+          | .after site => match ctx.callSites.find? (·.1 == site), ctx.siteNumber "op" site,
+                ctx.siteNumber "invoke" site with
+              | some (_, callee, number, overall), _, _ =>
+                  some (ProgramPointKey.after (.call number (identifierPart callee) overall))
+              | none, some number, _ => some (.after (.op number))
+              | none, none, some number => some (.after (.invoke number))
+              | none, none, none => none
+          | _ => none
+        pure (← goal.replaceTargetDefEq stripped, after)
+    | none => pure (goal, #[])
+  -- Where a path continues after a call or an operation a proof names, the
+  -- point's hooks wait until the walker has introduced the call's results
+  -- and clauses or the operation's range conditions, under their names.
+  modify fun s => { s with activePoints := s.activePoints ++ after }
+  let pending := (← get).activePoints
+  unless pending.isEmpty do
+    let target ← goal.withContext do instantiateMVars (← goal.getType)
+    unless target.consumeMData.isForall do
+      modify fun s => { s with activePoints := #[] }
+      setGoals [goal]
+      for point in pending do atPoint ctx point
+      queue (← getGoals) provenance clauses (callSite := step.callSite)
+      return none
   if prepared then modify fun s => { s with prepared := s.prepared.insert goal }
   if ← goal.isAssigned then return none
   setGoals [goal]
   let step := { step with goal, clauses }
   if ctx.debug then IO.println s!"→ {← debugHead goal}"
+  if ← entryStep ctx step then return none
   if ← prepareAutomatic ctx step then return none
   if ← sharedExitStep ctx step then return none
   if ← exitStep ctx step then return none
   if ← assumeStep ctx step then return none
   if ← callAtStep ctx step then return none
+  if ← abortStep step then return none
   if ← callCheckedStep ctx step then return none
   if ← bindStep ctx step then return none
   if ← unrollStep ctx step then return none
@@ -2252,8 +2565,13 @@ private partial def traverse (ctx : SolveContext) : SolveM Unit := do
           modify fun s => { s with regions := s.regions.modify index fun region =>
             { region with node := { region.node with sealed := true, finished := true } } }
       continue
-    modify fun s => if !ctx.shared then { s with pending := s.pending.pop } else { s with
+    modify fun s => if !ctx.shared then { s with
       pending := s.pending.pop
+      activeDecisions := s.goalDecisions[goal]?.getD #[]
+      activePoints := s.goalPoints[goal]?.getD #[] } else { s with
+      pending := s.pending.pop
+      activeDecisions := s.goalDecisions[goal]?.getD #[]
+      activePoints := s.goalPoints[goal]?.getD #[]
       activeRegion := s.goalRegions[goal]?
       activeOwners := s.goalOwners[goal]?.getD #[]
       activeDebits := s.goalDebits[goal]?.getD #[]
@@ -2288,12 +2606,15 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     (ghostWrites : Array (Nat × ObligationRange) := #[])
     (preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none)
     (specializations : Array Lean.Expr := #[])
-    (callSites : Array (Nat × String × Nat × Nat) := #[]) :
+    (callSites : Array (Nat × String × Nat × Nat) := #[])
+    (sites : Array (Nat × String × Nat × String) := #[])
+    (points : Array (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := #[]) :
     TacticM Unit := do
   (← targetState).assertedBounds.set {}
   (← targetState).leafReports.set (#[], #[])
   (← targetState).leafOrigins.set {}
   (← targetState).leafKeys.set {}
+  (← targetState).leafDecisions.set {}
   (← targetState).leafPaths.set {}
   (← targetState).clauseRanges.set names
   (← targetState).failedLeaves.set #[]
@@ -2329,11 +2650,13 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     specializations := specializations
     handOver := handOver
     preparing? := if handOver then preparing? else none
+    points := if handOver then points else #[]
     labeled := labeled
     unrolls := unrolls
     preconditions := preconditions
     names := names
     callSites := callSites
+    sites := sites
     ghostWrites := ghostWrites
     debug := debug
     profile := verex.solverProfile.get (← getOptions)
@@ -2353,6 +2676,10 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       (← targetState).preparationProofs.set previousPreparation
       (← targetState).preparationOwners.set previousOwners
       unless handOver do orderAutomaticReports messagesBefore
+  -- A hook at a point no path reaches is an error of the proof.
+  for ((point, hook, _), index) in ctx.points.zipIdx do
+    unless final.pointsUsed.contains index do
+      logErrorAt hook m!"no path reaches the point `{point.text}`"
   let stageCost := final.stageCost
   let handed := final.handed
   let leaves := final.leaves
@@ -2444,6 +2771,13 @@ syntax "(" num ", " str ", " num ", " num ")" : callSite
 source range. -/
 declare_syntax_cat preconditionNumber
 syntax "(" num ", " str ", " num ", " num ")" : preconditionNumber
+/-- A site of the target a path's decision names: the site, its kind, its
+number among the target's sites of the kind, and a label. -/
+declare_syntax_cat sourceSite
+syntax "(" num ", " str ", " num ", " str ")" : sourceSite
+/-- An invariant clause by its key and its source range. -/
+declare_syntax_cat invariantClause
+syntax "(" str ", " str ", " num ", " num ")" : invariantClause
 
 /-- The arguments of a function's obligations: loops and in-body assertions
 by the predicates given as `(site, function, predicate)` triples, calls by
@@ -2454,12 +2788,58 @@ syntax obligationArguments := solveFlag* " [" term,* "]"
   (" unrolling" " [" term,* "]")? (" requiring" " [" term,* "]")?
   (" writing" " [" ghostWriteSite,* "]")? (" naming" " [" obligationName,* "]")?
   (" calling" " [" callSite,* "]")? (" numbering" " [" preconditionNumber,* "]")?
+  (" siting" " [" sourceSite,* "]")? (" keying" " [" invariantClause,* "]")?
+
+/-- Where a selector says a path aborts (`AbortSite`): `call 1 of g`, `call
+2` among all calls, `abort 1`, `op 3`, `invoke 1`. -/
+declare_syntax_cat verexSite (behavior := symbol)
+syntax (name := siteCall) &"call" num (&"of" ident)? : verexSite
+syntax (name := siteAbort) &"abort" num : verexSite
+syntax (name := siteOp) &"op" num : verexSite
+syntax (name := siteInvoke) &"invoke" num : verexSite
+
+/-- A program point of a hook (`ProgramPointKey`): the function's entry, a
+loop's entry or the start of its iteration. -/
+declare_syntax_cat verexPoint (behavior := symbol)
+syntax (name := pointEntry) &"entry" : verexPoint
+syntax (name := pointExit) &"exit" : verexPoint
+syntax (name := pointLoop) &"loop" num (&"entry" <|> &"step") : verexPoint
+
+/-- Tactics run where the walk reaches a point, `at` one or `after` a site,
+once for every path through it. -/
+syntax verexPointHook := ppLine ((&"at" verexPoint) <|> (&"after" verexSite)) " => " tacticSeq
 
 /-- Split a function's goal into its leaves, each named by what it owes, and
 leave them to the proof (`verex_solve`, `verex_decide`, …). In a `verify f
-by …` item, plain `verex_obligations` is the obligations of `f`. -/
+by …` item, plain `verex_obligations` is the obligations of `f`. Hooks at
+points run on the paths through them; `preparing` runs on each path's
+end. -/
 syntax (name := verexObligations) "verex_obligations" (obligationArguments)?
-  (&"preparing" tacticSeq)? : tactic
+  withPosition((colGe verexPointHook)*) (&"preparing" tacticSeq)? : tactic
+
+/-- The point a hook's syntax names, a call without its callee counted among
+all calls. -/
+def pointPattern (stx : Syntax) : TacticM ProgramPointKey :=
+  match stx with
+  | `(verexPointHook| at entry => $_) => pure .entry
+  | `(verexPointHook| at exit => $_) =>
+      throwErrorAt stx "`at exit` is the end of every path: `preparing` runs there"
+  | `(verexPointHook| at loop $k:num entry => $_) => pure (.loopEntry k.getNat)
+  | `(verexPointHook| at loop $k:num step => $_) => pure (.loopStep k.getNat)
+  | `(verexPointHook| after call $k:num of $callee:ident => $_) =>
+      pure (.after (.call k.getNat callee.getId.toString 0))
+  | `(verexPointHook| after call $k:num => $_) => pure (.after (.call k.getNat "" 0))
+  | `(verexPointHook| after op $k:num => $_) => pure (.after (.op k.getNat))
+  | `(verexPointHook| after invoke $k:num => $_) => pure (.after (.invoke k.getNat))
+  | `(verexPointHook| after abort $_:num => $_) =>
+      throwErrorAt stx "an abort has no continuation: `after abort` names no point"
+  | _ => throwErrorAt stx "unexpected point"
+
+/-- A hook's point, its syntax and its tactics. -/
+def pointHook (stx : TSyntax ``verexPointHook) :
+    TacticM (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := do
+  let point ← pointPattern stx
+  return (point, stx, ⟨stx.raw[stx.raw.getNumArgs - 1]⟩)
 /-- Split a function's goal into its leaves and decide each as it is
 reached, or report the clause it owes: `verex_obligations` followed by
 `verex_solve` on every leaf. -/
@@ -2467,7 +2847,8 @@ syntax "verex_solve_goals" (obligationArguments)? : tactic
 
 /-- Generate the obligations, handing them over or solving each. -/
 private def obligations (arguments : Option (TSyntax ``obligationArguments)) (handOver : Bool)
-    (preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none) :
+    (preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none)
+    (points : Array (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := #[]) :
     TacticM Unit := do
   match arguments with
   | none =>
@@ -2481,7 +2862,8 @@ private def obligations (arguments : Option (TSyntax ``obligationArguments)) (ha
       $[unrolling [$bounds:term,*]]?
       $[requiring [$required:term,*]]? $[writing [$writes:ghostWriteSite,*]]?
       $[naming [$named:obligationName,*]]? $[calling [$calls':callSite,*]]?
-      $[numbering [$numbered:preconditionNumber,*]]?) => do
+      $[numbering [$numbered:preconditionNumber,*]]? $[siting [$sited:sourceSite,*]]?
+      $[keying [$keyed:invariantClause,*]]?) => do
       let loops := some loops
       if verex.solverDebug.get (← getOptions) then
         logInfo m!"normalized verification condition:\n{← getMainGoal}"
@@ -2550,15 +2932,24 @@ private def obligations (arguments : Option (TSyntax ``obligationArguments)) (ha
               number.getNat)
         | _ => throwError "a precondition number must be `(number, file, start, end)`"
       (← targetState).preconditionNumbers.set preconditionNumbers
+      let invariantKeys ← ((keyed.map (·.getElems)).getD #[]).mapM fun
+        | `(invariantClause| ($kind:str, $file:str, $start:num, $stop:num)) =>
+            pure ({ file := file.getString, startByte := start.getNat, endByte := stop.getNat },
+              kind.getString)
+        | _ => throwError "an invariant clause must be `(key, file, start, end)`"
+      (← targetState).invariantKeys.set invariantKeys
+      let sites ← ((sited.map (·.getElems)).getD #[]).mapM fun
+        | `(sourceSite| ($site:num, $kind:str, $number:num, $label:str)) =>
+            pure (site.getNat, kind.getString, number.getNat, label.getString)
+        | _ => throwError "a site must be `(site, kind, number, label)`"
       let flagged (kind : Name) := flags.any (·.raw.isOfKind kind)
       solveGoals invariants callees equations handOver (flagged ``labeledFlag) unrolls
-        preconditions names ghostWrites preparing? specializations callSites
+        preconditions names ghostWrites preparing? specializations callSites sites points
   | _ => throwError "unexpected obligation arguments"
 
 elab_rules : tactic
-  | `(tactic| verex_obligations $[$arguments]? preparing $preparing:tacticSeq) =>
-      obligations arguments true (some preparing)
-  | `(tactic| verex_obligations $[$arguments]?) => obligations arguments true
+  | `(tactic| verex_obligations $[$arguments]? $hooks:verexPointHook* $[preparing $preparing?]?) => do
+      obligations arguments true preparing? (← hooks.mapM pointHook)
   | `(tactic| verex_solve_goals $[$arguments]?) => obligations arguments false
 
 /-! ## Tactics of authored proofs
@@ -2569,14 +2960,13 @@ leaves it owes, which these or any other tactics decide. -/
 /-- The paths of a clause's goal, one goal each, tagged `clause_k`: the
 conjunction split, and each conjunct's locals and hypotheses introduced as
 its path had them. A goal that is one leaf stays as it is. -/
-elab "verex_paths" : tactic => focusGoal do
-  let goal ← getMainGoal
-  let some paths := (← (← targetState).leafPaths.get)[goal]? | return
+def splitPaths (goal : MVarId) : MetaM (Array MVarId) := do
+  let some paths := (← (← targetState).leafPaths.get)[goal]? | return #[goal]
   let tag ← goal.getTag
   let key := ((← (← targetState).leafKeys.get)[tag]?).getD { kind := toString tag }
   let mut goals := #[]
   let mut current := goal
-  for (name, provenance, clauses, details) in paths, index in [0:paths.size] do
+  for (name, provenance, clauses, details, decisions) in paths, index in [0:paths.size] do
     -- The conjunction taken apart by its statement: unification would
     -- reduce a path's `let` binders away.
     let conjunct ← if index + 1 < paths.size then do
@@ -2592,9 +2982,22 @@ elab "verex_paths" : tactic => focusGoal do
     let next ← markDetails next (fvars.zip details)
     next.setTag name
     (← targetState).leafOrigins.modify (·.insert next (provenance, clauses))
+    (← targetState).leafDecisions.modify (·.insert next decisions)
     (← targetState).leafKeys.modify (·.insert name key)
     goals := goals.push next
-  setGoals goals.toList
+  return goals
+
+@[inherit_doc splitPaths]
+elab "verex_paths" : tactic => focusGoal do
+  replaceMainGoal (← splitPaths (← getMainGoal)).toList
+
+/-- A goal's local context, declaration by declaration: goals of one path
+share it. -/
+def goalContextKey (goal : MVarId) : MetaM (Array (FVarId × Lean.Expr × Option Lean.Expr)) :=
+  goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      return found.push (decl.fvarId, ← instantiateMVars decl.type,
+        ← decl.value?.mapM instantiateMVars)
 
 /-- Prove selected clauses with the same context as one conjunction. Their
 preparation, case analysis, and intermediate facts can then be shared. Every
@@ -2616,14 +3019,9 @@ elab "verex_group " name:ident " := " clauses:ident,+ : tactic => do
   for clause in requested do
     unless found.contains clause do throwError "no obligation named `{clause}`"
   let first := selected[0]!
-  let contextKey (goal : MVarId) : MetaM (Array (FVarId × Lean.Expr × Option Lean.Expr)) :=
-    goal.withContext do
-      (← getLCtx).foldlM (init := #[]) fun found decl => do
-        return found.push (decl.fvarId, ← instantiateMVars decl.type,
-          ← decl.value?.mapM instantiateMVars)
-  let context ← contextKey first
+  let context ← goalContextKey first
   for goal in selected do
-    unless (← contextKey goal) == context do
+    unless (← goalContextKey goal) == context do
       throwError "the selected obligations have different contexts; group clauses on the same path"
   let statements ← selected.mapM fun goal => goal.withContext do
     instantiateMVars (← goal.getType)
@@ -2722,7 +3120,7 @@ private partial def typedMaps (e : Lean.Expr) (found : Array (Lean.Expr × FVarI
 
 /-- Name the typed maps of a prepared leaf: each `SpecMap.ofEntries key value
 x` with a source-named carrier `x` becomes a map value named `x`, over which
-the laws read directly, with its size bounds (`x_size_bounds`) in place of
+the lemmas read directly, with its size bounds (`x_size_bounds`) in place of
 the carrier's own. The carrier is the map written back (`writeBackCarrier`),
 whose read is the map (`x_read`). -/
 def nameTypedMaps : TacticM Unit := focusGoal do
@@ -2845,11 +3243,13 @@ def nameTypedMaps : TacticM Unit := focusGoal do
     replaceMainGoal [goal]
 
 /-- Name the maps of a prepared leaf (`nameTypedMaps`), after abstracting
-the rank tables they are ordered by. -/
+the rank tables they are ordered by, with the bounds of the values read from
+the named maps (`typeBounds`). -/
 elab "verex_name_maps" : tactic => focusGoal do
   nameTypedMaps
   if (← getGoals).isEmpty then return
   replaceMainGoal [← abstractRankTables (← getMainGoal)]
+  typeBounds
 
 /-- Finish authored preparation, retaining source markers while the structural
 walker still needs them to name the clauses of a shared path. -/
@@ -2886,6 +3286,7 @@ macro "verex_prepare" " only" : tactic => `(tactic| (
   all_goals verex_reduce_projections
   all_goals try verex_trivial
   all_goals verex_normalize_context
+  all_goals verex_spec_forms
   all_goals verex_split_hypotheses
   all_goals verex_subst_vars
   all_goals verex_reduce_projections
@@ -2922,8 +3323,9 @@ declare_syntax_cat verexKey (behavior := symbol)
 syntax (name := keyEnsures) &"ensures" num : verexKey
 syntax (name := keyAbortsIf) &"aborts_if" num : verexKey
 syntax (name := keyAbortsWith) &"aborts_with" num : verexKey
-syntax (name := keyAssert) &"assert" num : verexKey
-syntax (name := keyInvariant) &"invariant" num (&"entry" <|> &"step") : verexKey
+syntax (name := keyAssert) &"assert" num
+  (&"of" ((&"at" verexPoint) <|> (&"after" verexSite)))? : verexKey
+syntax (name := keyInvariant) &"invariant" num (&"of" &"loop" num)? (&"entry" <|> &"step") : verexKey
 syntax (name := keyRequires) &"requires" (num)? &"of" ident (&"at" &"call" num)? : verexKey
 syntax (name := keyDataInvariant) &"data" &"invariant" : verexKey
 syntax (name := keyModuleInvariant) &"module" &"invariant" : verexKey
@@ -2931,17 +3333,44 @@ syntax (name := keyStoredInvariant) &"stored" &"invariant" : verexKey
 syntax (name := keyLemmaRequires) &"lemma" &"requires" : verexKey
 syntax (name := keyGhostDomain) &"ghost" &"domain" : verexKey
 
+/-- A point as a key or a step spells it: `at` and a point (`entry`, `exit`,
+`loop k entry|step`), or `after` and a site. -/
+def pointOfSyntax {m : Type → Type} [Monad m] [MonadError m] (keyword point : Syntax) :
+    m ProgramPointKey := do
+  let number (stx : Syntax) : Nat := stx.isNatLit?.getD 0
+  if keyword.isAtom && keyword.getAtomVal == "at" then
+    if point.isOfKind ``pointEntry then return .entry
+    if point.isOfKind ``pointExit then return .exit
+    if point.isOfKind ``pointLoop then
+      let phase := point[2]
+      let phase := if phase.isAtom then phase.getAtomVal else phase[0].getAtomVal
+      return if phase == "entry" then .loopEntry (number point[1]) else .loopStep (number point[1])
+  else
+    if point.isOfKind ``siteCall then
+      let callee := if point[2].getNumArgs == 2 then point[2][1].getId.toString else ""
+      return .after (.call (number point[1]) callee 0)
+    if point.isOfKind ``siteOp then return .after (.op (number point[1]))
+    if point.isOfKind ``siteInvoke then return .after (.invoke (number point[1]))
+    if point.isOfKind ``siteAbort then
+      throwErrorAt point "an abort has no continuation: `after abort` names no point"
+  throwErrorAt point "unexpected point"
+
 /-- The key a key's syntax states, its omitted parts any. -/
-private def keyPattern (stx : Syntax) : TacticM ObligationKey :=
+def keyPattern {m : Type → Type} [Monad m] [MonadError m] (stx : Syntax) : m ObligationKey := do
+  -- `assert k of at p` or `assert k of after s`: an assert of a point step.
+  if stx.isOfKind ``keyAssert && stx[2].getNumArgs > 0 then
+    let parts := stx[2][1]
+    let point ← pointOfSyntax parts[0] parts[1]
+    return { kind := "assert", index := stx[1].isNatLit?.getD 0, point }
   match stx with
   | `(verexKey| ensures $k:num) => pure { kind := "ensures", index := k.getNat }
   | `(verexKey| aborts_if $k:num) => pure { kind := "aborts_if", index := k.getNat }
   | `(verexKey| aborts_with $k:num) => pure { kind := "aborts_with", index := k.getNat }
   | `(verexKey| assert $k:num) => pure { kind := "assert", index := k.getNat }
-  | `(verexKey| invariant $k:num entry) =>
-      pure { kind := "invariant", index := k.getNat, phase := "entry" }
-  | `(verexKey| invariant $k:num step) =>
-      pure { kind := "invariant", index := k.getNat, phase := "step" }
+  | `(verexKey| invariant $k:num $[of loop $loop?:num]? entry) =>
+      pure { kind := "invariant", index := k.getNat, phase := "entry", loop := loop?.map (·.getNat) }
+  | `(verexKey| invariant $k:num $[of loop $loop?:num]? step) =>
+      pure { kind := "invariant", index := k.getNat, phase := "step", loop := loop?.map (·.getNat) }
   | `(verexKey| requires $[$k?:num]? of $callee:ident $[at call $call?:num]?) =>
       pure { kind := "requires", index := k?.map (·.getNat), callee := callee.getId.toString,
              call := call?.map (·.getNat) }
@@ -2952,53 +3381,139 @@ private def keyPattern (stx : Syntax) : TacticM ObligationKey :=
   | `(verexKey| ghost domain) => pure { kind := "ghost domain" }
   | _ => throwErrorAt stx "unexpected obligation key"
 
+/-- `verex_step_routing [all] k, …`: the obligations a proof's `on` steps
+take, and with `all` an `on _` taking the rest (`TargetState.routedKeys`). -/
+syntax (name := verexStepRouting) "verex_step_routing" (&"all")? verexKey,* : tactic
+
+@[tactic verexStepRouting] def evalStepRouting : Tactic := fun stx => do
+  let keys ← stx[2].getSepArgs.mapM keyPattern
+  (← targetState).routedKeys.set (some (keys, stx[1].getNumArgs > 0))
+
+/-- Report each selector of the proof's `verex_on` alternatives that took no
+path, with the decisions of the paths of the obligations it names. -/
+def reportUnusedSelectors : TacticM Unit := do
+  for (stx, stated, used, paths) in ← (← targetState).selectorUses.get do
+    unless used do
+      logErrorAt stx m!"no path takes `when {stated}`; the paths' decisions: \
+        {if paths.isEmpty then "no path" else "; ".intercalate (paths.map (s!"[{·}]")).toList}"
+  (← targetState).selectorUses.set #[]
+
+
+/-- A source decision a selector states (`Decision`): `if 1 then`, `match 2
+Some`, `loop 1 exits`, `aborts at call 1 of add_shares`. -/
+declare_syntax_cat verexDecision (behavior := symbol)
+syntax (name := decisionThen) &"if" num &"then" : verexDecision
+syntax (name := decisionElse) &"if" num &"else" : verexDecision
+syntax (name := decisionVariant) &"match" num ident : verexDecision
+syntax (name := decisionExits) &"loop" num &"exits" : verexDecision
+syntax (name := decisionContinues) &"loop" num &"continues" : verexDecision
+syntax (name := decisionAborts) &"aborts" &"at" verexSite : verexDecision
+
+/-- The decision a selector's syntax states, a call without its callee
+counted among all calls. -/
+def decisionPattern (stx : Syntax) : TacticM Decision :=
+  match stx with
+  | `(verexDecision| if $k:num then) => pure (.branch k.getNat true)
+  | `(verexDecision| if $k:num else) => pure (.branch k.getNat false)
+  | `(verexDecision| match $k:num $variant:ident) => pure (.variant k.getNat variant.getId.toString)
+  | `(verexDecision| loop $k:num exits) => pure (.loop k.getNat true)
+  | `(verexDecision| loop $k:num continues) => pure (.loop k.getNat false)
+  | `(verexDecision| aborts at call $k:num of $callee:ident) =>
+      pure (.aborts (.call k.getNat callee.getId.toString 0))
+  | `(verexDecision| aborts at call $k:num) => pure (.aborts (.call k.getNat "" 0))
+  | `(verexDecision| aborts at abort $k:num) => pure (.aborts (.abort k.getNat))
+  | `(verexDecision| aborts at op $k:num) => pure (.aborts (.op k.getNat))
+  | `(verexDecision| aborts at invoke $k:num) => pure (.aborts (.invoke k.getNat))
+  | _ => throwErrorAt stx "unexpected decision"
+
 /-- An obligation an alternative of `verex_on` takes: by its key, or by its
 tag. -/
 syntax verexOnItem := verexKey <|> ident
 
 declare_syntax_cat verexOnPattern
-syntax (name := verexOnClauses) verexOnItem,+ : verexOnPattern
+syntax (name := verexOnClauses) verexOnItem,+ (&"when" verexDecision,+)? : verexOnPattern
 syntax (name := verexOnDefault) "_" : verexOnPattern
 
 /-- The leaves an alternative of `verex_on` takes: those owing one of the
-obligations it names, or every leaf no earlier alternative takes. -/
+obligations it names, on paths its selector takes, or every leaf no earlier
+alternative takes. -/
 syntax verexOnAlternative := "| " verexOnPattern " => " tacticSeq
 
 /-- Prove each leaf by the first alternative naming the obligation it owes,
 or by the `_` alternative: `verex_on | ensures 1, requires 1 of g at call 2
 => tac | _ => tac'`. An alternative names an obligation by its key, any part
 the key omits matching, or by its tag (`ensures_1`), where several leaves
-owe one obligation the tag with its number. A leaf no alternative takes is
+owe one obligation the tag with its number. A selector, `| aborts_if 1 when
+aborts at abort 1 => tac`, takes the paths whose source decisions it states
+out of their obligation's goal; the paths it does not take go to the later
+alternatives, and a selector taking no path is an error listing the
+decisions of the obligation's paths. A leaf no alternative takes is
 attempted by `verex_decide` only; if undecided it stays a goal, as do the
 goals an alternative leaves. Named alternatives run directly, without
 attempting automation first. -/
 syntax (name := verexOn) "verex_on" withPosition((ppDedent(ppLine) colGe verexOnAlternative)+) :
   tactic
 
-@[tactic verexOn] def evalVerexOn : Tactic := fun stx => do
-  let alternatives ← stx[1].getArgs.mapM fun alternative => do
-    let pattern := alternative[1]
-    -- Each item a key or a tag; none for the `_` alternative.
-    let items ← if pattern.isOfKind ``verexOnDefault then pure none else
-      some <$> pattern[0].getSepArgs.mapM fun item => do
-        let item := item[0]
-        if item.isIdent then pure (Sum.inr item.getId) else Sum.inl <$> keyPattern item
-    pure (items, alternative[3])
-  let keys ← (← targetState).leafKeys.get
-  let mut remaining := #[]
-  let mut aborted := false
+/-- An alternative of a routing (`routeLeaves`): the obligations it names,
+each a key or a tag (none for the default), its selector, the syntax a
+selector taking no path is reported at, and its tactics. -/
+structure RouteAlternative where
+  items : Option (Array (Sum ObligationKey Name))
+  selector : Array Decision
+  reference : Syntax
+  steps : Syntax
+  deriving Inhabited
+
+/-- A leaf's obligation key, by its tag, and the tag's leaf name. -/
+def leafKeyOf (goal : MVarId) : TacticM (ObligationKey × Name) := do
+  let leaf := (← goal.getTag).components.head?.getD .anonymous
+  return (((← (← targetState).leafKeys.get)[leaf]?).getD { kind := toString leaf }, leaf)
+
+/-- Whether an alternative's items name a leaf's obligation; a tag omitting
+the loop of an invariant (`invariant_2_step`) names it as a key does. -/
+def namesLeaf (items : Array (Sum ObligationKey Name)) (key : ObligationKey) (leaf : Name) : Bool :=
+  items.any fun
+    | .inl pattern => pattern.selects key
+    | .inr name => name == key.tag || name == { key with loop := none }.tag || name == leaf
+
+/-- The alternative a leaf goes to: the first naming its obligation, on a
+path its selector takes, or the default. -/
+def chosenAlternative (alternatives : Array RouteAlternative) (goal : MVarId) :
+    TacticM (Option Nat) := do
+  let (key, leaf) ← leafKeyOf goal
+  let decisions := ((← (← targetState).leafDecisions.get)[goal]?).getD #[]
+  return alternatives.findIdx? fun alternative => match alternative.items with
+    | none => true
+    | some items => namesLeaf items key leaf &&
+        alternative.selector.all fun pattern => decisions.any (pattern.selects ·)
+
+/-- Prove each leaf by the first alternative naming the obligation it owes,
+on a path its selector takes, or by the default alternative; a leaf no
+alternative takes is attempted by `verex_decide` only. -/
+def routeLeaves (alternatives : Array RouteAlternative) : TacticM Unit := do
+  let keyOf := leafKeyOf
+  let names := namesLeaf
+  -- A goal an alternative with a selector names is taken apart into its
+  -- paths, which the alternatives then take one by one.
+  let mut work := #[]
   for goal in ← getGoals do
     if ← goal.isAssigned then continue
-    let tag ← goal.getTag
-    let leaf := tag.components.head?.getD .anonymous
-    let key := (keys[leaf]?).getD { kind := toString leaf }
-    let chosen := alternatives.find? fun (items, _) => match items with
-      | none => true
-      | some items => items.any fun
-          | .inl pattern => pattern.selects key
-          | .inr name => name == key.tag || name == leaf
+    let (key, leaf) ← keyOf goal
+    if alternatives.any (fun alternative =>
+        !alternative.selector.isEmpty && alternative.items.any (names · key leaf)) then
+      work := work ++ (← splitPaths goal)
+    else work := work.push goal
+  let decisionsOf ← (← targetState).leafDecisions.get
+  let mut taken := alternatives.map fun _ => false
+  let mut remaining := #[]
+  let mut aborted := false
+  for goal in work do
+    let (key, _) ← keyOf goal
+    let chosen ← chosenAlternative alternatives goal
     let steps ← match chosen with
-      | some (_, steps) => pure steps
+      | some index =>
+          taken := taken.set! index true
+          pure alternatives[index]!.steps
       | none => pure (← `(tactic| try verex_decide)).raw
     setGoals [goal]
     let saved ← saveState
@@ -3026,8 +3541,41 @@ syntax (name := verexOn) "verex_on" withPosition((ppDedent(ppLine) colGe verexOn
       Core.setMessageLog log
       admitGoal goal
       aborted := true
+  -- What each selector took, for the proof's report of a selector taking no
+  -- path (`reportUnusedSelectors`).
+  for alternative in alternatives, used in taken do
+    let some items := alternative.items | continue
+    let selector := alternative.selector
+    if selector.isEmpty then continue
+    let mut paths := #[]
+    for goal in work do
+      let (key, leaf) ← keyOf goal
+      if names items key leaf then
+        let decisions := decisionsOf[goal]?.getD #[]
+        paths := paths.push (", ".intercalate (decisions.map (·.text)).toList)
+    let stated := ", ".intercalate (selector.map (·.text)).toList
+    (← targetState).selectorUses.modify fun uses =>
+      match uses.findIdx? (·.1 == alternative.reference) with
+      | some index => uses.modify index fun (stx, text, before, seen) =>
+          (stx, text, before || used, seen ++ paths)
+      | none => uses.push (alternative.reference, stated, used, paths)
+  -- Outside a target's proof (`verex_proof`), this is the whole proof.
+  if (← (← targetState).proofName.get).isAnonymous then reportUnusedSelectors
   if aborted then throwAbortTactic
   setGoals remaining.toList
+
+@[tactic verexOn] def evalVerexOn : Tactic := fun stx => do
+  routeLeaves (← stx[1].getArgs.mapM fun alternative => do
+    let pattern := alternative[1]
+    if pattern.isOfKind ``verexOnDefault then
+      return { items := none, selector := #[], reference := pattern, steps := alternative[3] }
+    let items ← pattern[0].getSepArgs.mapM fun item => do
+      let item := item[0]
+      if item.isIdent then pure (Sum.inr item.getId) else Sum.inl <$> keyPattern item
+    -- The optional `when …` holds the keyword and the decisions.
+    let selector ← if pattern[1].getNumArgs == 2 then pattern[1][1].getSepArgs.mapM decisionPattern
+      else pure #[]
+    return { items := some items, selector, reference := pattern, steps := alternative[3] })
 
 /-- Prove a step a lemma's proof owes: what its lemma applications require,
 its assertions, and its case splits. -/

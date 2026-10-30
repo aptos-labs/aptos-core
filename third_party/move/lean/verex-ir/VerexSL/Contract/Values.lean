@@ -155,8 +155,12 @@ partial def quoteRows : VerexIR.Proofs.Denote.NRows → MetaM Lean.Expr
 end
 
 /-- The literal of type arguments, with their inhabitability decided. -/
-def quoteTypeArgs (θ : VerexIR.Proofs.Denote.TypeArgs) : MetaM Lean.Expr := do
-  let row ← quoteRow θ.1
+def quoteTypeArgs (θ : VerexIR.Proofs.Denote.TypeArgs) : MetaM Lean.Expr :=
+  quoteTypeArgsRow θ.1
+where
+  /-- The literal of a row of type arguments, its inhabitability decided. -/
+  quoteTypeArgsRow (row : VerexIR.Proofs.Denote.NRow) : MetaM Lean.Expr := do
+  let row ← quoteRow row
   let inhabitable (row : Lean.Expr) :=
     mkApp3 (mkConst ``Eq [1]) (mkConst ``Bool)
       (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.inhabitable) row) (mkConst ``Bool.true)

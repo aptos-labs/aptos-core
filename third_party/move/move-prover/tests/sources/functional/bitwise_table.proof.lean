@@ -8,7 +8,7 @@ verex proofs where
 
 -- The table holds 22 at the first key after both additions; the borrow
 -- reads it, and the write stores `22 & 1`.
-verify add_R by
+verify add_R by lean =>
   verex_obligations
   verex_on
   | ensures_1 =>

@@ -8,7 +8,7 @@ verex proofs where
 
 -- The expansion of the square proves the result; the abort conditions need
 -- the square's sign where the deciders do not establish them.
-verify square_of_sum by
+verify square_of_sum by lean =>
   verex_obligations
   verex_on
   | ensures_1 =>

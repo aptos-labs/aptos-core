@@ -8,7 +8,7 @@ verex proofs where
 
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
 
-verify count_even_concrete by
+verify count_even_concrete by lean =>
   have even_prefix (i : Int) (low : 0 ≤ i) (high : i ≤ 6) :
       «spec_fold$lambda$0».spec unit (Skolems.runtime unit)
         (({ values := #[⟨1, by decide⟩, ⟨2, by decide⟩, ⟨3, by decide⟩, ⟨4, by decide⟩,

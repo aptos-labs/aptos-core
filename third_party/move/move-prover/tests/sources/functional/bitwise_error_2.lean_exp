@@ -3,7 +3,7 @@ tests/sources/functional/bitwise_error_2.move:20:9: error: the specification cla
         == (old(s.s) << global<«Ghost$x»>(@0x0).v)
           % 340282366920938463463374607431768211456` is not established
 tests/sources/functional/bitwise_error_2.move:19:5: error: verex verification failed: the automatic verification of `shift` failed; provide a proof in `tests/sources/functional/bitwise_error_2.proof.lean`:
-  verify shift by
+  verify shift by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

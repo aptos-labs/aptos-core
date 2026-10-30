@@ -1,7 +1,7 @@
 VerexE2ETests/SourceVerify/behavior_label_witness.move:38:9: error: the specification clause `ensures ∃ (S : StateDomain),
         !(S.. |~ aborts_of<function[Fn(&mut Counter) -> u64](checked_inc)>(c))` is not established
 VerexE2ETests/SourceVerify/behavior_label_witness.move:36:5: error: verex verification failed: the automatic verification of `reset_to_limit` failed; provide a proof in `VerexE2ETests/SourceVerify/behavior_label_witness.proof.lean`:
-  verify reset_to_limit by
+  verify reset_to_limit by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

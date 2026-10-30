@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Scalars/BitVectors.lean:50:4: error: the specification clause `ensures result == byte` is not established
 VerexE2ETests/Check/Scalars/BitVectors.lean:47:7: error: verex verification failed: the automatic verification of `toggled` failed; provide a proof in the module:
-  verify toggled by
+  verify toggled by lean =>
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/Check/Scalars/BitVectors.lean:47:7: error: verex verification fail
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Scalars/BitVectors.lean:64:4: error: the specification clause `ensures result & (1 << bit % 8) % 256 != byte & (1 << bit % 8) % 256` is not established
 VerexE2ETests/Check/Scalars/BitVectors.lean:63:7: error: verex verification failed: the automatic verification of `toggled_without_bv` failed; provide a proof in the module:
-  verify toggled_without_bv by
+  verify toggled_without_bv by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

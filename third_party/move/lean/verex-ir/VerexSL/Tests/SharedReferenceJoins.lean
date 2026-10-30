@@ -70,7 +70,7 @@ verex module 0x42::shared_reference_joins where
 error: the specification clause `ensures first == old(first) && second == old(second) && third == old(third)` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
-  verify wrong by
+  verify wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

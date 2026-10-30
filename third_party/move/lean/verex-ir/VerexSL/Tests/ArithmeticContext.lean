@@ -104,7 +104,7 @@ verex module 0x42::authored_context_sharing where
     ensures result >= x
 
 verify 0x42::authored_context_sharing::source
-verify 0x42::authored_context_sharing::copy_twice by
+verify 0x42::authored_context_sharing::copy_twice by lean =>
   verex_obligations
   verex_group_contexts
   all_goals verex_prepare only

@@ -27,7 +27,7 @@ theorem swap_erase_last {α : Type} (xs : Array α) (i : Nat) (within : i < xs.s
     · simp [same]
     · simp [same, Nat.ne_of_lt hk, Ne.symm same]
 
-verify verify_swap_remove by
+verify verify_swap_remove by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have within : i.val.toNat < v.values.size := by omega
@@ -49,7 +49,7 @@ verify verify_swap_remove by
     simp only [Array.size_eraseIdx, Array.size_swapIfInBounds]
     omega
 
-verify verify_model_swap_remove by
+verify verify_model_swap_remove by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have within : i.val.toNat < v.values.size := by omega

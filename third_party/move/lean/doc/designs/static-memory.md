@@ -108,7 +108,7 @@ unconditional even when abort conditions excuse `ensures`.
 - A modifies frame states, for each listed resource type, that every key
   other than its listed ones reads the same, and that every other
   resource type reads the same (a loose frame leaves those open); a
-  caller frames with it by the memory's update laws.
+  caller frames with it by the memory's update lemmas.
 - **Data invariants of values**, as the Prover checks them: owed where a
   value is constructed (`Term.constructed`) and where a mutation of a
   local whose type carries one ends, at the death of a loan of the local
@@ -122,7 +122,7 @@ unconditional even when abort conditions excuse `ensures`.
   declaration's invariant; `MemoryInvariants storedInvariant memory`
   states it of every stored value. A function reaching a declaration that
   has one requires it at entry and ensures it at exit; any other function
-  reaching memory ensures that it keeps it. A write keeps it by its law
+  reaching memory ensures that it keeps it. A write keeps it by its lemma
   (`MemoryInvariants.set`) where the value written satisfies its own, and a
   read adds the value's invariant to what a proof knows. The invariant of
   a stored value is stated at its resource's own type arguments
@@ -180,7 +180,7 @@ about memory typing is left to a function's proof or to its callers.
 
 ## Solver
 
-The memory's update laws, the frame's resolution and transports, and a
+The memory's update lemmas, the frame's resolution and transports, and a
 stage that reads memory as the leaf's case splits fixed it
 (`verex_memory_reads`), before a split and at a leaf, so that a clause's
 read meets the program's. Callee frames apply to memory reads directly.

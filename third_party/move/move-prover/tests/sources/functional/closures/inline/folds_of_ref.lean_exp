@@ -21,7 +21,7 @@ tests/sources/functional/closures/inline/folds_of_ref.move:41:55: error: the loo
             ).count
               > 18446744073709551614))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: verex verification failed: the automatic verification of `weighted_via_ref` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean`:
-  verify weighted_via_ref by
+  verify weighted_via_ref by lean =>
     verex_obligations
     verex_on
     | apply_2 => verex_prepare; sorry
@@ -47,7 +47,7 @@ tests/sources/functional/closures/inline/folds_of_ref.move:89:5: error: the loop
               > 18446744073709551614))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of_ref.move:100:9: error: the specification clause `ensures v.length == 1 ==> result == 2` is not established
 tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: verex verification failed: the automatic verification of `weighted_via_ref_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean`:
-  verify weighted_via_ref_wrong by
+  verify weighted_via_ref_wrong by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry

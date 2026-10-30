@@ -5,14 +5,14 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/math_fixed8.move:47:5: error: verex verification failed: the automatic verification of `pow_raw` exceeded its budget of 1000000 maxHeartbeats; provide a proof in `tests/sources/functional/math_fixed8.proof.lean`:
-  verify pow_raw by
+  verify pow_raw by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/math_fixed8.move:82:9: error: the specification clause `aborts_if x / LN2 > 3` is not established
 tests/sources/functional/math_fixed8.move:79:5: error: verex verification failed: the automatic verification of `exp_raw` failed; provide a proof in `tests/sources/functional/math_fixed8.proof.lean`:
-  verify exp_raw by
+  verify exp_raw by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

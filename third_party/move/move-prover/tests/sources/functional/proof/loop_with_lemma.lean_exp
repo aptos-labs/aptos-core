@@ -7,7 +7,7 @@ warning: proof uses trusted assumption
 
 tests/sources/functional/proof/loop_with_lemma.move:54:14: error: the assertion `_result > n` does not hold
 tests/sources/functional/proof/loop_with_lemma.move:51:5: error: verex verification failed: the automatic verification of `count_up` failed; provide a proof in `tests/sources/functional/proof/loop_with_lemma.proof.lean`:
-  verify count_up by
+  verify count_up by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

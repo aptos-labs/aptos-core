@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/bp_forwarding.move:178:9: error: the specification clause `ensures ∀ (i in 0 .. entries.length), entries[i].value == 2` is not established
 tests/sources/functional/closures/inline/bp_forwarding.move:177:5: error: verex verification failed: the automatic verification of `set_values_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/bp_forwarding.proof.lean`:
-  verify set_values_wrong by
+  verify set_values_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
