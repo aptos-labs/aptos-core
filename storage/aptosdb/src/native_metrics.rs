@@ -22,6 +22,15 @@ pub static ORDER_WRITES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static COLLATERAL_WRITES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_collateral_writes_total",
+        "Collateral writes applied by NativeStateCommitter",
+        &["kind"]
+    )
+    .unwrap()
+});
+
 /// Chunks executed past the position base and not yet folded into it.
 pub static POSITION_OVERLAY_LAYERS: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
