@@ -40,4 +40,4 @@ Complete OpenAPI specification is available at `/api/v1/spec`
 - [Aptos Documentation](https://aptos.dev)
 
 ## Contributing
-We welcome community contributions! Please review our [contribution guidelines](../CONTRIBUTING.md) before submitting a pull request.
+We welcome community contributions! Please review our [contribution guidelines](../../CONTRIBUTING.md) before submitting a pull request.
