@@ -852,10 +852,9 @@ impl DbReader for AptosDB {
         gauged_api("get_state_item_count", || match kind {
             StateKind::MainState => {
                 self.error_if_state_merkle_pruned("State merkle", version)?;
-                self.ledger_db
-                    .metadata_db()
-                    .get_usage(version)
-                    .map(|usage| usage.items())
+                // State sync pages through JMT leaves by index, so it needs the leaf count. Usage
+                // will stop matching it once hot state isn't written through to cold state.
+                self.state_store.get_value_count(version)
             },
             StateKind::Position => self.position_store_reader()?.item_count(version),
         })
@@ -935,8 +934,6 @@ impl DbReader for AptosDB {
     fn get_hot_state_item_count(&self, version: Version) -> Result<usize> {
         gauged_api("get_hot_state_item_count", || {
             self.error_if_hot_state_merkle_pruned("Hot state merkle", version)?;
-            // TODO(HotState): read from hot state usage tracking once it exists, as cold's
-            // `get_state_item_count` does, rather than the hot JMT root node's leaf count.
             self.state_store.get_hot_state_item_count(version)
         })
     }
