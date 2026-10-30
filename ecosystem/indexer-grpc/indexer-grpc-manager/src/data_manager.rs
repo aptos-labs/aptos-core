@@ -32,6 +32,22 @@ use std::{
 use tokio::sync::{mpsc::channel, oneshot::Receiver, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, trace, warn};
 
+fn update_cached_file_store_version(
+    cached_version: &AtomicU64,
+    file_store_version: u64,
+    version_can_go_backward: bool,
+) {
+    if version_can_go_backward {
+        cached_version.store(file_store_version, Ordering::SeqCst);
+    } else {
+        let file_store_version_before_update =
+            cached_version.fetch_max(file_store_version, Ordering::SeqCst);
+        if file_store_version_before_update > file_store_version {
+            panic!("File store version is going backward, data might be corrupted. {file_store_version_before_update} v.s. {file_store_version}");
+        }
+    }
+}
+
 struct Cache {
     start_version: u64,
     file_store_version: AtomicU64,
@@ -407,14 +423,44 @@ impl DataManager {
     ) {
         let file_store_version = self.file_store_reader.get_latest_version().await;
         if let Some(file_store_version) = file_store_version {
-            let file_store_version_before_update = cache
-                .file_store_version
-                .fetch_max(file_store_version, Ordering::SeqCst);
+            update_cached_file_store_version(
+                &cache.file_store_version,
+                file_store_version,
+                version_can_go_backward,
+            );
             FILE_STORE_VERSION_IN_CACHE.set(file_store_version as i64);
             info!("Updated file_store_version in cache to {file_store_version}.");
-            if !version_can_go_backward && file_store_version_before_update > file_store_version {
-                panic!("File store version is going backward, data might be corrupted. {file_store_version_before_update} v.s. {file_store_version}");
-            };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_cached_file_store_version_allows_backward_update() {
+        let cached_version = AtomicU64::new(100);
+
+        update_cached_file_store_version(&cached_version, 90, true);
+
+        assert_eq!(cached_version.load(Ordering::SeqCst), 90);
+    }
+
+    #[test]
+    fn test_update_cached_file_store_version_moves_forward() {
+        let cached_version = AtomicU64::new(90);
+
+        update_cached_file_store_version(&cached_version, 100, false);
+
+        assert_eq!(cached_version.load(Ordering::SeqCst), 100);
+    }
+
+    #[test]
+    #[should_panic(expected = "File store version is going backward")]
+    fn test_update_cached_file_store_version_rejects_backward_update() {
+        let cached_version = AtomicU64::new(100);
+
+        update_cached_file_store_version(&cached_version, 90, false);
     }
 }
