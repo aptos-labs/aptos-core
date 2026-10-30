@@ -49,7 +49,7 @@ def contentHash (path : System.FilePath) : IO UInt64 :=
   return (← IO.FS.readBinFile path).hash
 
 /-- `verex proofs where` and the items that follow: a proof file's `verify`
-items, theorems, and `open` items. -/
+items, `lemma` items, theorems, and `open` items. -/
 syntax (name := verexProofsCommand)
   "verex" &"proofs" "where" ppLine manyIndent(verexItem) : command
 
@@ -166,9 +166,9 @@ def elabProofs : CommandElab := fun stx => do
     throwErrorAt keywords m!"the proofs of `{name}` are verified above"
   for item in stx[stx.getNumArgs - 1].getArgs do
     unless item.isOfKind ``verexVerifyItem || item.isOfKind ``verexTheoremItem ||
-        item.isOfKind ``verexOpenItem do
-      throwErrorAt item "a proof file holds `verify` items, theorems, and `open` items; \
-        this item belongs to the module"
+        item.isOfKind ``verexOpenItem || item.isOfKind ``verexLemmaProofItem do
+      throwErrorAt item "a proof file holds `verify` items, `lemma` items, theorems, and `open` \
+        items; this item belongs to the module"
   let since ← unreportedCount
   verifyDeferredModule module stx
   relocateForeignMessages keywords since

@@ -13,7 +13,7 @@ Abrupt flows retain their original destinations and postconditions.
 
 namespace VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- The postcondition before a value continuation: normal exits establish
 the join's entry predicate, while abrupt flows bypass the continuation. -/

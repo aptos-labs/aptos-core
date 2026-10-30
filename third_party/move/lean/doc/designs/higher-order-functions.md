@@ -99,8 +99,10 @@ and the runtime family implements it by the closures the runtime holds
 (handle, mask, instantiation, and captures as runtime values that hold no
 loan), so equality, ordering, storage in structs, and passing are those of
 any value. `Term.closure handle weave results captures` builds the function
-value of a target without type arguments (`functionOf`),
-`Term.closureGeneric` one with them (`functionOfGeneric`); the `Weave`
+value of a target without type arguments (`Skolems.construct`, a frame
+operation seen in leaves only through its two equations),
+`Term.closureGeneric` one with them (`functionOfGeneric`, construction at
+the induced instantiation); the `Weave`
 relates the target's parameter row to the captured and supplied rows, and
 the compiler checks that its mask is the program's. `Term.invoke shape f
 args` denotes `closureMeaning executable σs shared shape f args`: the
@@ -112,9 +114,16 @@ A known closure invokes as a call of its target (`Denote/Closures.lean`):
 `closureRun_closureOf` equates the run with the target's
 `propheticMeaning` on the woven arguments; for a generic target,
 `propheticMeaning_subst` carries the meaning to the family the type
-arguments induce, the form a direct call with type arguments has. The
-normalizer applies both, so the solver uses the target's theorem as for a
-direct call, and closure targets join a function's callees. Since
+arguments induce, the form a direct call with type arguments has. At the
+base frame a closure site of a target without type arguments is a
+constructor of the link set's generated family: construction is the
+constructor and invoking the constructor is the target's call
+(`construct…`, `invoke…`, registered as `SiteEquations` and applied by the
+normalizer), a function value at an abstract frame reduces no further. The
+solver reads a known function value, a construction or a site's
+constructor, by the proof that its closure is its target's at its captures
+(`LiteralValue`), so the target's theorem is used as for a direct call,
+and closure targets join a function's callees. Since
 `invoke`'s denotation is defined from the big-step meaning, its case of
 the agreement is by definition.
 
@@ -191,7 +200,7 @@ unit's `invoke`) on native arguments from a start with the globals of `S`
 | `aborts_of<f>(x)` | the invocation aborts from a start at `S` |
 | `ensures_of<f>(x, r)` | the invocation returns `r` from a start at `S`, leaving the globals of `T` |
 | `result_of<f>(x)` | the result the invocation returns from a start at `S`, read at every default where it returns none |
-| `requires_of<f>(x)` | the target's declared precondition at the captures and `x`, read from the module's table (`RequiresTable`); true for a target no closure of the module has |
+| `requires_of<f>(x)` | the target's declared precondition at the captures and `x`, read by the link set's requires meaning (`functionRequires`); of a value no closure site encodes, the uninterpreted `requiresForeign` |
 
 A contract states partial correctness, not that a run exists, so
 `result_of` of a known function value is its target's result only where
@@ -205,17 +214,21 @@ assumes the same (`bodyReads`).
 
 `requires_of` names a contract: a Move function's meaning has no
 precondition, but a caller needs the target's precondition to use its
-verified contract. The table maps each target of the module's closures to
-its `requires` over its arguments (`buildDeclaredRequires`), one
-`vir_denote_norm` equation per target; a precondition stating a behavioral
-predicate would read the table itself and is rejected. A verified target's
+verified contract. The requires meaning maps each closure site's
+constructor to its target's `requires` at the woven arguments
+(`buildDeclaredRequires`), one `vir_denote_norm` equation per constructor;
+a precondition stating a behavioral predicate would read the meaning
+itself, and a contract reading it is rejected. Calling a function value
+asserts no `requires_of`, as in the Move Prover: definedness of a call
+needs a site's precondition, of a value no site encodes nothing. A verified target's
 theorem then yields what the Prover asserts as compliance: under
 `requires_of`, `ensures_of` implies the postcondition and `aborts_of` the
 `aborts_if`.
 
 **Literal closures.** Of a closure whose target, weave, and captures a leaf
-sees, the predicates reduce to the target: `requires_of` to its table entry
-at the woven arguments (`requiresOf_closureOf`), `ensures_of` and
+sees, the predicates reduce to the target: `requires_of` to its declared
+precondition at the woven arguments (the generated `requires` equations,
+off the base frame through `requiresOf_construct`), `ensures_of` and
 `aborts_of` to runs of its prophetic meaning (`ensuresOf_closureOf`,
 `abortsOf_closureOf`), which the solver reads by the target's theorem, or,
 for a target without one, by its body, as the Move Prover infers the
@@ -307,10 +320,10 @@ outcome in which the target's results do not decode at the function type
 by preservation of runtime typing for `EvalFunction`, which the agreement
 proof also needs, not by an assumption on every function-typed input (it
 would have to be conditioned on `requires_of` and fails for targets
-without a theorem). `requires_of` is a case split over the targets a proof
-can name, a definition generated per unit mapping each verified function's
-handle to its `requires` at the woven arguments and every other target to
-`True`; the closed-world theorem restricts the split to the unit's
+without a theorem). `requires_of` is a case split over the values a proof
+can name, a definition generated per link set mapping each closure site's
+constructor to its target's `requires` at the woven arguments and every
+other value to the uninterpreted `requiresForeign`; the closed-world theorem restricts the split to the unit's
 closures. A contract using a predicate takes the executable unit as a
 parameter, which the theorem already quantifies, since the meaning is the
 unit's.
@@ -407,12 +420,15 @@ family's function carrier (`Carriers.functionCarrier`), and the family
 provides its interface (`TypedFunctions`): each value's runtime closure, and
 the value a runtime closure is where the family types it; the codec,
 equality without ghost slots (an opaque key, `erased`), and order derive
-from them. The runtime family's carrier is the closures the unit types
+from them; of known function values the normalizer reads them off the
+closure's target, mask and instantiation and its captures as native values
+(`erased_eq_closureOf`, `order_closureOf`, and at different keys
+`erased_eq_closureOf_ne`, `order_closureOf_ne`). The runtime family's carrier is the closures the unit types
 (`RuntimeFunction`, its own type so that no verification condition unfolds
 a function value to its closure), an induced family's the outer family's at
 the substituted rows, and the ground family has none. A closure's
 construction is a value of the carrier where the family types it
-(`functionOf`, `FunctionTyped`), invocation an invocation meaning over
+(`Skolems.construct`, typed by its site, `SiteTyped`), invocation an invocation meaning over
 values of the carrier (`InvokeMeaning`), and the behavioral predicates are
 stated over those values. The runtime family is built at a unit
 (`Carriers.runtime unit`), and so is every frame (`Skolems unit`), so
@@ -438,12 +454,14 @@ runtime closure checks its typing, so the codec stays tight; an inhabitant
 of a function type is a typed closure of the unit, if one exists
 (`NTy.inhabitable`), not a default.
 
-A specification is generic in its unit, so a literal function value it
-writes binds its typing (`bindCuts`), and the leaf, at the verified unit,
-decides it by one check the kernel evaluates (`closureTypingCheck`,
-`FunctionTyped.ofCheck`). The normal form spells every literal's typing
-that way, whether it came from the program, a clause, or a solver rule, so
-that a literal's occurrences meet syntactically.
+A closure is constructed with its site's typing (`SiteTyped`: its target's
+rows and sharing at its instantiation are the frame's resolution of its
+rows, and the instantiation is faithful), which a closure node carries. A
+specification is generic in its unit, so a literal function value it writes
+is typed by the unit's check (`SiteTyped.ofCheck`, `closureTypingCheck`)
+whose proof it binds (`bindCuts`); a literal a specification writes is a
+closure site of the link set, whose check the generated block proves once
+by evaluation, and the leaf reads the binding off that theorem.
 
 **Coherent frames.** A generic function is verified once, at a skolem
 frame (D3, [`denotation.md`](denotation.md)). Its type parameters appear
@@ -506,8 +524,9 @@ Memory is typed for every resource type the readings agree on, function
 fields included, and an unseen invocation's typing is derived from the
 invoked value's carrier, so contracts do not assume it of function
 parameters. The rule for an invocation of a function value a proof does
-not see needs the closure's typing (`ClosureTyped`), from the carrier, and
-its arguments' semantic types and its results' decoding (`RowTyped`,
+not see (`wp_closureMeaning_unseen_at`) takes the closure's typing
+(`ClosureTyped`) from the carrier (`FunctionCarriers.admits` through the
+frame's transport, where the readings agree), and its arguments' semantic types and its results' decoding (`RowTyped`,
 `RowDecodes`), facts of the rows at the frame, decided at rows the frame
 resolves to scalars (`ScalarAt`); a generic function whose function-typed
 parameter's rows mention its type parameters assumes that its frame

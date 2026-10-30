@@ -136,8 +136,8 @@ def loopGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.loopAt 7 do return none
-    let some site ← (evalNat (action.getArg! 4)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.loopAt 8 do return none
+    let some site ← (evalNat (action.getArg! 5)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The in-body assertion a goal's weakest precondition is over, if any: its
@@ -147,8 +147,8 @@ def assertionGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.assertAt 6 do return none
-    let some site ← (evalNat (action.getArg! 4)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.assertAt 7 do return none
+    let some site ← (evalNat (action.getArg! 5)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The end of a mutation a goal's weakest precondition is over, if any: its
@@ -158,8 +158,8 @@ def mutationEndGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.mutationEndAt 6 do return none
-    let some site ← (evalNat (action.getArg! 4)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.mutationEndAt 7 do return none
+    let some site ← (evalNat (action.getArg! 5)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The end of a write of global memory a goal's weakest precondition is
@@ -170,8 +170,8 @@ def memoryWrittenGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr))
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.memoryWrittenAt 6 do return none
-    let some site ← (evalNat (action.getArg! 4)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.memoryWrittenAt 7 do return none
+    let some site ← (evalNat (action.getArg! 5)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The site of the abort a goal's weakest precondition is over, if any
@@ -192,8 +192,8 @@ def callAtGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.callAt 5 do return none
-    let some site ← (evalNat (action.getArg! 3)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.callAt 6 do return none
+    let some site ← (evalNat (action.getArg! 4)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The in-body assumption a goal's weakest precondition is over, if any:
@@ -203,7 +203,7 @@ def assumeGoal? (goal : MVarId) : MetaM (Option (Array Lean.Expr)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.assumeAt 7 do return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.assumeAt 8 do return none
     return some (action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The invariants owed where a call returns and what follows, if a goal
@@ -221,8 +221,8 @@ def constructionGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) 
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.constructedAt 8 do return none
-    let some site ← (evalNat (action.getArg! 5)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.constructedAt 9 do return none
+    let some site ← (evalNat (action.getArg! 6)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The ghost write a goal's weakest precondition is over, if any: its site,
@@ -232,8 +232,8 @@ def ghostWriteGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.ghostAt 8 do return none
-    let some site ← (evalNat (action.getArg! 5)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.ghostAt 9 do return none
+    let some site ← (evalNat (action.getArg! 6)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- The state anchor a goal's weakest precondition is over, if any: its
@@ -243,8 +243,8 @@ def anchorGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.anchorAt 6 do return none
-    let some site ← (evalNat (action.getArg! 4)).run | return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.anchorAt 7 do return none
+    let some site ← (evalNat (action.getArg! 5)).run | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
 
 /-- Whether the path records the anchor of a site: the solver records one
@@ -261,9 +261,9 @@ the anchors recorded last on the path. -/
 partial def resolveAnchors (goal : MVarId) (predicate : Lean.Expr) :
     MetaM Lean.Expr := goal.withContext do
   let .lam _ type _ _ := predicate | return predicate
-  unless type.isAppOfArity ``VerexIR.Proofs.Denote.AnchorOf 4 do return predicate
-  let some site ← (evalNat (type.getArg! 2)).run
-    | throwError m!"an anchor site must be a numeral, not {type.getArg! 2}"
+  unless type.isAppOfArity ``VerexIR.Proofs.Denote.AnchorOf 5 do return predicate
+  let some site ← (evalNat (type.getArg! 3)).run
+    | throwError m!"an anchor site must be a numeral, not {type.getArg! 3}"
   let mut saved := none
   for declaration in ← getLCtx do
     let recorded ← instantiateMVars declaration.type
@@ -438,8 +438,8 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 8 then
-      return some (action.getArg! 4, action)
+    if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 then
+      return some (action.getArg! 5, action)
     let head := action.getAppFn
     if head.isFVar && callees.any (·.1 == head) then return some (head, action)
     return none
@@ -465,11 +465,13 @@ states, its other implicit arguments inferred: no frame is synthesized from a
 goal's context, which holds none. -/
 private def mkAppAtFrame (name : Name) (unit executable frame : Lean.Expr)
     (arguments : Array Lean.Expr) : MetaM Lean.Expr := do
-  -- The unit, its executable and the frame lead the rule's binders, in
-  -- either order of the frame and the executable.
-  let roles ← forallBoundedTelescope (← getConstInfo name).type (some 3) fun binders _ =>
+  -- The unit, its function values, its executable and the frame lead the
+  -- rule's binders, in either order of the frame and the executable.
+  let functions ← functionCarriersOfFrame frame
+  let roles ← forallBoundedTelescope (← getConstInfo name).type (some 4) fun binders _ =>
     binders.mapM fun binder => do
       let decl ← binder.fvarId!.getDecl
+      if decl.type.isAppOf ``FunctionCarriers then return functions
       if decl.binderInfo.isInstImplicit then return frame
       if decl.type.isAppOf ``VerexIR.Validation.ExecutableUnit then return executable
       return unit
@@ -500,33 +502,31 @@ private structure BehaviorView where
 
 /-- The parts of an `ensures_of` or `aborts_of` statement. -/
 private def behaviorView? (statement : Lean.Expr) : Option BehaviorView :=
-  if statement.isAppOfArity ``VerexIR.Proofs.EnsuresOf 11 then
+  if statement.isAppOfArity ``VerexIR.Proofs.EnsuresOf 12 then
     some {
-      run? := some { result := statement.getArg! 8, post := statement.getArg! 10 }
-      invoke := statement.getArg! 2, supplied := statement.getArg! 3
-      shared := statement.getArg! 4, shape := statement.getArg! 5
-      function := statement.getArg! 6, arguments := statement.getArg! 7
+      run? := some { result := statement.getArg! 9, post := statement.getArg! 11 }
+      invoke := statement.getArg! 3, supplied := statement.getArg! 4
+      shared := statement.getArg! 5, shape := statement.getArg! 6
+      function := statement.getArg! 7, arguments := statement.getArg! 8
+      state := statement.getArg! 10 }
+  else if statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 then
+    some {
+      run? := none, invoke := statement.getArg! 3, supplied := statement.getArg! 4
+      shared := statement.getArg! 5, shape := statement.getArg! 6
+      function := statement.getArg! 7, arguments := statement.getArg! 8
       state := statement.getArg! 9 }
-  else if statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 9 then
-    some {
-      run? := none, invoke := statement.getArg! 2, supplied := statement.getArg! 3
-      shared := statement.getArg! 4, shape := statement.getArg! 5
-      function := statement.getArg! 6, arguments := statement.getArg! 7
-      state := statement.getArg! 8 }
   else none
 
-/-- A literal function value (`functionOf`) inside an expression. Its
-arguments: the unit, the frame, the parameter row, shared flags and result
-row, the target, the mask, the instantiation, the captured row, the
-captures, and the typing. -/
-private def literalFunction? (e : Lean.Expr) : Option Lean.Expr :=
-  e.find? (·.isAppOfArity ``functionOf 11)
+/-- A known function value (`LiteralValue`: a construction or a closure
+site's constructor) inside an expression. -/
+private def literalFunction? (environment : Environment) (e : Lean.Expr) : Option Lean.Expr :=
+  e.find? (isLiteralValue environment)
 
 /-- The executable unit an invocation meaning runs: the closures' meaning
 over it (`closureMeaning`); none for a model's meaning. -/
 private def executableOf? (invoke : Lean.Expr) : Option Lean.Expr :=
   let invoke := invoke.consumeMData
-  if invoke.isAppOfArity ``closureMeaning 3 then some (invoke.getArg! 1) else none
+  if invoke.isAppOfArity ``closureMeaning 4 then some (invoke.getArg! 2) else none
 
 /-- Whether a statement is `ensures_of` or `aborts_of` under premises. -/
 private partial def states (statement : Lean.Expr) : Bool :=
@@ -538,11 +538,12 @@ private partial def states (statement : Lean.Expr) : Bool :=
 /-- Behavioral contract derivation only handles literal closures. An abstract
 function value has no target theorem to re-derive, so trying to avoid that
 work by preparing the whole context would add only speculative cost. -/
-private partial def statesLiteralBehavior (statement : Lean.Expr) : Bool :=
-  if statement.isArrow then statesLiteralBehavior statement.bindingBody!
+private partial def statesLiteralBehavior (environment : Environment) (statement : Lean.Expr) :
+    Bool :=
+  if statement.isArrow then statesLiteralBehavior environment statement.bindingBody!
   else
     match behaviorView? (unmarked statement) with
-    | some view => (literalFunction? view.function).isSome
+    | some view => (literalFunction? environment view.function).isSome
     | none => false
 
 /-- Whether a premise of a goal's binders states `ensures_of` or `aborts_of`. -/
@@ -566,11 +567,14 @@ def introduceBehaviors (goal : MVarId) : TacticM MVarId := do
   return (← goal.intro1P).2
 
 /-- Whether an alternative is an abort of a literal closure. -/
-private partial def literalAbortAlternative (statement : Lean.Expr) : Bool :=
+private partial def literalAbortAlternative (environment : Environment) (statement : Lean.Expr) :
+    Bool :=
   let statement := unmarked statement
   if statement.isAppOfArity ``Or 2 then
-    literalAbortAlternative (statement.getArg! 0) || literalAbortAlternative (statement.getArg! 1)
-  else statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 9 && statesLiteralBehavior statement
+    literalAbortAlternative environment (statement.getArg! 0) ||
+      literalAbortAlternative environment (statement.getArg! 1)
+  else
+    statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 && statesLiteralBehavior environment statement
 
 /-- Expose the abort alternatives of a literal closure's contract before
 reading another invocation's result. A disjunction only states that one run
@@ -583,7 +587,7 @@ def behaviorAlternatives? (goal : MVarId) : TacticM (Option (List MVarId)) := do
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
         let statement := unmarked (← instantiateMVars decl.type)
-        if statement.isAppOfArity ``Or 2 && literalAbortAlternative statement then
+        if statement.isAppOfArity ``Or 2 && literalAbortAlternative (← getEnv) statement then
           return some (decl.fvarId, statement)
       return none
     | return none
@@ -596,10 +600,11 @@ def behaviorAlternatives? (goal : MVarId) : TacticM (Option (List MVarId)) := do
 private def decidedTrue (statement : Lean.Expr) : MetaM Lean.Expr := do
   mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq statement (mkConst ``Bool.true))
 
-/-- The weave and the captured and supplied rows of a literal function
+/-- The weave and the captured and supplied rows of a known function
 value. -/
-private def closureWeave? (function : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr × Lean.Expr)) := do
-  let mask := function.getArg! 6
+private def closureWeave? (literal : LiteralValue) :
+    MetaM (Option (Lean.Expr × Lean.Expr × Lean.Expr)) := do
+  let mask := literal.mask
   unless mask.isAppOfArity ``Weave.mask 4 do return none
   let weave := mask.appArg!
   let rows := (← whnfR (← inferType weave)).getAppArgs
@@ -611,11 +616,11 @@ target, weave, and captures it sees, and whose target is a verified
 callee: where the leaf establishes the target's precondition at the woven
 arguments, what the target's contract ensures of the run, or the failures it
 permits (`ensuresOf_closureOf_verified`, `abortsOf_closureOf_verified`).
-`none` where the table's entry closes the goal. -/
+`none` where the requires meaning closes the goal. -/
 def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr)) :
     TacticM (Option MVarId) := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
-  -- `requires_of`: the target's entry in the table.
+  -- `requires_of`: the value's requires meaning.
   if (unmarked target).isAppOf ``VerexIR.Proofs.RequiresOf then
     let state ← saveState
     try
@@ -647,9 +652,10 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
     -- A predicate over a model's invocation meaning is read by its run
     -- (`modelDenotedRun`).
     let some executable := executableOf? view.invoke | continue
-    let some closure := literalFunction? view.function | continue
+    let some found := literalFunction? (← getEnv) view.function | continue
+    let some closure ← literalValue? found | continue
     let some (weave, captured, _) ← closureWeave? closure | continue
-    let handle := closure.getArg! 5
+    let handle := closure.handle
     -- A target the call rule inlines is listed by its theorem as well.
     let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
         unless ← isDefEq candidate handle do return false
@@ -662,7 +668,7 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
     unless meaning.isAppOf ``propheticMeaning do continue
     -- Fix the target theorem's family before unifying its dependent contract.
     -- Scalar argument carriers alone do not determine this implicit family.
-    unless ← isDefEq (meaning.getArg! 2) (closure.getArg! 1) do continue
+    unless ← isDefEq (meaning.getArg! 3) closure.frame do continue
     let verified ← instantiateMVars (mkAppN theoremProof theoremArguments)
     -- A closure of a target without type arguments runs at the empty
     -- instantiation, which the runtime frame is coherent with.
@@ -671,8 +677,9 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
     let rule := if view.run?.isSome then ``VerexIR.Proofs.ensuresOf_closureOf_verified
       else ``VerexIR.Proofs.abortsOf_closureOf_verified
     let implication? ← try
-        some <$> mkAppAtFrame rule (type.getArg! 0) executable (closure.getArg! 1)
-          #[weave, capturedFree, coherent, closure.getArg! 9, view.arguments, verified, stated]
+        some <$> mkAppAtFrame rule (type.getArg! 0) executable closure.frame
+          #[weave, capturedFree, coherent, closure.captures, view.arguments, verified, stated,
+            closure.closed]
       catch ex =>
         if verex.solverDebug.get (← getOptions) then
           IO.println s!"behavior dispatch skipped: {← ex.toMessageData.toString}"
@@ -810,14 +817,15 @@ and whose typed values are representable, which hypotheses state
 (`memoryTyped`). -/
 private def proveMemoryTyped (facts : Array Lean.Expr) (goal : MVarId) : TacticM Bool := do
   let type ← goal.withContext do instantiateMVars (← goal.getType)
-  let_expr VerexIR.Proofs.MemoryTyped unit memory := type | return false
+  let_expr VerexIR.Proofs.MemoryTyped unit functions memory := type | return false
   let find (constant : Name) : TacticM (Option Lean.Expr) := facts.findM? fun fact => do
     let factType ← goal.withContext do instantiateMVars (← inferType fact)
     unless factType.isAppOfArity constant 1 do return false
     goal.withContext (isDefEq (factType.getArg! 0) unit)
   let some resources ← find ``VerexIR.Proofs.ResourcesTyped | return false
   let some representable ← find ``VerexIR.Proofs.OwnersRepresentable | return false
-  goal.assign (mkApp4 (mkConst ``VerexIR.Proofs.memoryTyped) unit resources representable memory)
+  goal.assign
+    (mkApp5 (mkConst ``VerexIR.Proofs.memoryTyped) unit functions resources representable memory)
   return true
 
 /-- Inspect a frame under a source clause's diagnostic marker. -/
@@ -838,14 +846,14 @@ private partial def frameFactProof (fact : Lean.Expr) : MetaM Lean.Expr := do
 /-- The parameter row and function value of a stored frame hypothesis. -/
 private def framedFact? (type : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
   let type ← frameFactType type
-  if type.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 7 then
-    return some (type.getArg! 3, type.getArg! 6)
-  if type.isAppOfArity ``VerexIR.Proofs.FramedAt 8 then
-    return some (type.getArg! 3, type.getArg! 7)
-  if type.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAtOf 7 then
-    return some (type.getArg! 3, type.getArg! 6)
-  if type.isAppOfArity ``VerexIR.Proofs.FramedAtOf 8 then
-    return some (type.getArg! 3, type.getArg! 7)
+  if type.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 8 then
+    return some (type.getArg! 4, type.getArg! 7)
+  if type.isAppOfArity ``VerexIR.Proofs.FramedAt 9 then
+    return some (type.getArg! 4, type.getArg! 8)
+  if type.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAtOf 8 then
+    return some (type.getArg! 4, type.getArg! 7)
+  if type.isAppOfArity ``VerexIR.Proofs.FramedAtOf 9 then
+    return some (type.getArg! 4, type.getArg! 8)
   return none
 
 /-- A run of a function value a hypothesis frames (`KeepsMemoryAt`,
@@ -857,32 +865,32 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
   let kept? ← goal.withContext do
     let some ensures := (← getLCtx).findFromUserName? `verexEnsures | return none
     let ensuresType ← instantiateMVars ensures.type
-    unless ensuresType.isAppOfArity ``VerexIR.Proofs.EnsuresOf 11 do return none
-    let some executable := executableOf? (ensuresType.getArg! 2) | return none
+    unless ensuresType.isAppOfArity ``VerexIR.Proofs.EnsuresOf 12 do return none
+    let some executable := executableOf? (ensuresType.getArg! 3) | return none
     for fact in facts do
       let factType ← frameFactType (← inferType fact)
       let some (row, closure) ← framedFact? factType | continue
       unless factType.isAppOf ``VerexIR.Proofs.FramedAt ||
           factType.isAppOf ``VerexIR.Proofs.KeepsMemoryAt do continue
-      unless ← isDefEq closure (action.getArg! 6) do
-        if verex.solverDebug.get (← getOptions) then logInfo m!"frame closure mismatch: {closure} vs {action.getArg! 6}"
+      unless ← isDefEq closure (action.getArg! 7) do
+        if verex.solverDebug.get (← getOptions) then logInfo m!"frame closure mismatch: {closure} vs {action.getArg! 7}"
         continue
-      unless ← isDefEq (factType.getArg! 1) executable do continue
+      unless ← isDefEq (factType.getArg! 2) executable do continue
       let typed ← mkFreshExprMVar (← mkAppM ``VerexIR.Proofs.MemoryTyped
-        #[ensuresType.getArg! 0, ensuresType.getArg! 9])
+        #[ensuresType.getArg! 0, ensuresType.getArg! 10])
       unless ← proveMemoryTyped facts typed.mvarId! do continue
       let plain := mkApp (mkConst ``NRow.refFree) row
       unless ← isDefEq plain (mkConst ``Bool.true) do continue
-      let shape := ensuresType.getArg! 5
+      let shape := ensuresType.getArg! 6
       let shapePlain := mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape])
       unless ← isDefEq shapePlain (mkConst ``Bool.true) do continue
       let kept := mkAppN (← frameFactProof fact) #[← decidedTrue plain,
-        ← decidedTrue shapePlain, ensuresType.getArg! 7, ensuresType.getArg! 8,
-        ensuresType.getArg! 9, ensuresType.getArg! 10, ← instantiateMVars typed, ensures.toExpr]
+        ← decidedTrue shapePlain, ensuresType.getArg! 8, ensuresType.getArg! 9,
+        ensuresType.getArg! 10, ensuresType.getArg! 11, ← instantiateMVars typed, ensures.toExpr]
       try check kept catch error =>
         if verex.solverDebug.get (← getOptions) then logInfo m!"frame application: {error.toMessageData}"
         continue
-      return some (kept, factType.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 7)
+      return some (kept, factType.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 8)
     return none
   let some (kept, keeps) := kept? | return goal
   let (equation, next) ← goal.withContext do
@@ -897,10 +905,10 @@ theorem, or by evaluation where the frame is the runtime frame or one a
 call's type arguments induce. -/
 def scalarAt? (facts : Array Lean.Expr) (goal : MVarId) : TacticM Bool := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
-  unless target.isAppOfArity ``VerexIR.Proofs.ScalarAt 3 do return false
+  unless target.isAppOfArity ``VerexIR.Proofs.ScalarAt 4 do return false
   for fact in facts do
     let factType ← goal.withContext do instantiateMVars (← inferType fact)
-    unless factType.isAppOfArity ``VerexIR.Proofs.ScalarAt 3 do continue
+    unless factType.isAppOfArity ``VerexIR.Proofs.ScalarAt 4 do continue
     if ← goal.withContext do isDefEq factType target then
       goal.assign fact
       return true
@@ -923,52 +931,9 @@ def scalarAt? (facts : Array Lean.Expr) (goal : MVarId) : TacticM Bool := do
     state.restore
     return false
 
-/-- A function value a carrier holds, at rows the frame resolves to scalars:
-typed by the carrier where the unit's readings agree, which a hypothesis
-states (`ClosureTypedAt.ofCarrier`). -/
-private def carrierClosureTyped? (facts : Array Lean.Expr) (goal : MVarId) : TacticM Bool := do
-  let target ← goal.withContext do instantiateMVars (← goal.getType)
-  unless target.isAppOfArity ``VerexIR.Proofs.ClosureTypedAt 6 do return false
-  let state ← saveState
-  try
-    let premises ← goal.withContext do
-      let rule ← mkConstWithFreshMVarLevels ``VerexIR.Proofs.ClosureTypedAt.ofCarrier
-      let (arguments, _, conclusion) ← forallMetaTelescope (← inferType rule)
-      arguments[1]!.mvarId!.assign (target.getArg! 1)
-      unless ← isDefEq conclusion target do throwError "not a carrier's value"
-      let agreement ← instantiateMVars (← inferType arguments[2]!)
-      let some fact ← facts.findM? fun fact => do
-          let factType ← instantiateMVars (← inferType fact)
-          pure (factType.isAppOfArity ``VerexIR.Proofs.TypesAgree 1) <&&>
-            isDefEq factType agreement
-        | throwError "the unit's readings are not known to agree"
-      arguments[2]!.mvarId!.assign fact
-      let representability ← instantiateMVars (← inferType arguments[3]!)
-      let some representable ← facts.findM? fun fact => do
-          let factType ← instantiateMVars (← inferType fact)
-          pure (factType.isAppOfArity ``VerexIR.Proofs.OwnersRepresentable 1) <&&>
-            isDefEq factType representability
-        | throwError "the unit's typed values are not known to be representable"
-      arguments[3]!.mvarId!.assign representable
-      goal.assign (mkAppN rule arguments)
-      pure (arguments.extract (arguments.size - 3) arguments.size)
-    for premise in premises do
-      let .mvar id ← instantiateMVars premise | continue
-      if ← id.isAssigned then continue
-      let type ← id.getType
-      if type.isAppOfArity ``Eq 3 then
-        unless ← id.withContext (isDefEq premise (← mkEqRefl (type.getArg! 1))) do
-          throwError "a row holds a reference"
-      else unless ← scalarAt? facts id do throwError "a row is not scalar at the frame"
-    return true
-  catch _ =>
-    state.restore
-    return false
-
-/-- The literal function value a function value is: `functionOf …`. -/
-private def literalClosure? (e : Lean.Expr) : Option Lean.Expr :=
-  let e := e.consumeMData
-  if e.isAppOfArity ``functionOf 11 then some e else none
+/-- Whether a function value is a known one (`LiteralValue`). -/
+private def isKnownFunction (e : Lean.Expr) : MetaM Bool :=
+  return isLiteralValue (← getEnv) e.consumeMData
 
 /-- An invocation of a function value the proof does not see: the rule with
 the theorem's typing assumptions (`wp_closureMeaning_unseen_at`). Its
@@ -978,8 +943,8 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := (target.getArg! 3).consumeMData
-    unless action.isAppOfArity ``closureMeaning 8 do return none
-    if (literalClosure? (action.getArg! 6)).isSome then return none
+    unless action.isAppOfArity ``closureMeaning 9 do return none
+    if ← isKnownFunction (action.getArg! 7) then return none
     let original ← saveState
     let result ← do
       -- A closure read from a resource gets its field frame from that value's
@@ -1011,7 +976,7 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
         let target ← instantiateMVars (← goal.getType)
         unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
         let action := (target.getArg! 3).consumeMData
-        unless action.isAppOfArity ``closureMeaning 8 do return none
+        unless action.isAppOfArity ``closureMeaning 9 do return none
         let mut facts := #[]
         for declaration in ← getLCtx do
           if declaration.isImplementationDetail then continue
@@ -1033,10 +998,10 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
           let mut found := false
           if type.isAppOfArity ``Eq 3 then
             found ← isDefEq argument (← mkEqRefl (type.getArg! 1))
-          else if type.isAppOfArity ``VerexIR.Proofs.MemoryTyped 2 then
+          else if type.isAppOfArity ``VerexIR.Proofs.MemoryTyped 3 then
             found ← proveMemoryTyped facts id
-          else if type.isAppOfArity ``VerexIR.Proofs.ClosureTypedAt 6 then
-            found ← carrierClosureTyped? facts id
+          else if type.isAppOfArity ``VerexIR.Proofs.ScalarAt 4 then
+            found ← scalarAt? facts id
           else
             for fact in facts do
               if ← isDefEq (← inferType fact) type then
@@ -1059,59 +1024,6 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
     if result.isNone then original.restore
     return result
 
-/-- A literal closure of a non-generic target at rows its frame resolves to
-scalars: the check, evaluated by the kernel over the goal's unit
-(`ClosureTypedAt.ofClosureOf`). -/
-def literalClosureTyped? (goal : MVarId) : TacticM Bool := do
-  let target ← goal.withContext do instantiateMVars (← goal.getType)
-  unless target.isAppOfArity ``VerexIR.Proofs.ClosureTypedAt 6 do return false
-  let some literal := literalClosure? (target.getArg! 5) | return false
-  let state ← saveState
-  try
-    let check ← goal.withContext do
-      let rule ← mkConstWithFreshMVarLevels ``VerexIR.Proofs.ClosureTypedAt.ofClosureOf
-      let ruleType ← inferType rule
-      let (arguments, _, conclusion) ← forallMetaTelescope ruleType
-      -- The frame the typing is stated at: the goal's.
-      arguments[1]!.mvarId!.assign (target.getArg! 1)
-      unless ← isDefEq conclusion target do throwError "not a literal closure"
-      -- The literal's frame and captures, and that its closure is the
-      -- literal's (`functionOf_closure`).
-      let names := ruleType.getForallBinderNames
-      let closed := mkAppN (mkConst ``functionOf_closure) literal.getAppArgs
-      for (name, value) in [(`Θc, literal.getArg! 1), (`capturedRow, literal.getArg! 8),
-          (`captures, literal.getArg! 9), (`closed, closed)] do
-        let some index := names.idxOf? name | throwError "the rule has no {name}"
-        unless ← isDefEq arguments[index]! value do throwError "{name} does not fit"
-      let premises := arguments.extract (arguments.size - 5) arguments.size
-      -- The rows as the frames resolve them: a frame evaluates where it is
-      -- the runtime frame or one a call's type arguments induce, and
-      -- resolves a type without parameters to itself.
-      for premise in premises.extract 0 4 do
-        let .mvar id := premise | throwError "a row premise is not open"
-        setGoals [id]
-        evalTactic (← `(tactic| first
-          | rfl
-          | (simp only [VerexIR.Proofs.Denote.NRow.resolved,
-              VerexIR.Proofs.Denote.Skolems.resolve_instantiate,
-              VerexIR.Proofs.Denote.Skolems.resolve_runtime,
-              VerexIR.Proofs.Denote.Skolems.resolve_paramFree, VerexIR.Proofs.Denote.NTy.paramFree,
-              VerexIR.Proofs.Denote.NRow.paramFree, VerexIR.Proofs.Denote.NRows.paramFree,
-              VerexIR.Proofs.Denote.NTy.subst, VerexIR.Proofs.Denote.NRow.subst,
-              VerexIR.Proofs.Denote.NRows.subst, VerexIR.Proofs.Denote.NRow.getD,
-              Bool.and_true, Bool.true_and]
-             rfl)))
-        unless (← getGoals).isEmpty do throwError "a row is not scalar"
-      goal.assign (mkAppN rule arguments)
-      let some (Lean.Expr.mvar check) := premises[4]? | throwError "no check"
-      pure check
-    setGoals [check]
-    evalTactic (← `(tactic| decide +kernel))
-    return true
-  catch _ =>
-    state.restore
-    return false
-
 /-- A literal closure keeps a frame (`FramedAt`, `KeepsMemoryAt`) where its
 target's theorem applies at every typed memory and its frame lies within it
 (`FramedAt.ofVerified`), or else where its target's body keeps it, an
@@ -1122,12 +1034,12 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     (callees : Array (Lean.Expr × String × Lean.Expr)) : TacticM (Option (List MVarId)) := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
   let target := if target.isAppOfArity ``VerexIR.Proofs.Obligation 4 then target.appArg! else target
-  let target ← if target.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 7 then
+  let target ← if target.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 8 then
       goal.withContext (whnfR target) else pure target
-  unless target.isAppOfArity ``VerexIR.Proofs.FramedAt 8 do return none
+  unless target.isAppOfArity ``VerexIR.Proofs.FramedAt 9 do return none
   if verex.solverDebug.get (← getOptions) then logInfo "frame: inspecting closure"
   let held ← goal.withContext do
-    let plain := mkApp (mkConst ``NRow.refFree) (target.getArg! 3)
+    let plain := mkApp (mkConst ``NRow.refFree) (target.getArg! 4)
     if ← isDefEq plain (mkConst ``Bool.false) then
       some <$> mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.false))
         (← mkEq plain (mkConst ``Bool.false))
@@ -1136,21 +1048,23 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     goal.assign (← goal.withContext do
       mkAppOptM ``VerexIR.Proofs.FramedAt.of_refFree_false
         #[target.getArg! 0, target.getArg! 1, target.getArg! 2, target.getArg! 3,
-          target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7, held])
+          target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7, target.getArg! 8,
+          held])
     return some []
   -- A frame at the frame a call's type arguments induce is the frame read in
   -- the caller's view, at the caller's (`FramedAt.of_instantiate`): a stored
   -- closure's frame a generic callee requires is the one its caller holds.
   if let some (θ, outer) ← goal.withContext do
-      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ θ outer := (target.getArg! 2).consumeMData
+      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer :=
+          (target.getArg! 3).consumeMData
         | return none
       return some (θ, outer) then
     let next? ← try goal.withContext do
       let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
         (← mkEq (mkApp (mkConst ``NRow.refFree) (← mkAppM ``Subtype.val #[θ])) (mkConst ``Bool.true))
       let rule ← mkAppOptM ``VerexIR.Proofs.FramedAt.of_instantiate
-        #[target.getArg! 0, target.getArg! 1, outer, θ, free, target.getArg! 3, target.getArg! 4,
-          target.getArg! 5, target.getArg! 6, target.getArg! 7]
+        #[target.getArg! 0, target.getArg! 1, target.getArg! 2, outer, θ, free, target.getArg! 4,
+          target.getArg! 5, target.getArg! 6, target.getArg! 7, target.getArg! 8]
       let [next] ← goal.apply rule | return none
       pure (some next)
       catch _ => pure none
@@ -1162,17 +1076,18 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
       let some (_, closure) ← framedFact? decl.type | continue
-      unless ← isDefEq closure (target.getArg! 7) do continue
+      unless ← isDefEq closure (target.getArg! 8) do continue
       let narrow ← whnfR (← frameFactType decl.type)
-      unless narrow.isAppOfArity ``VerexIR.Proofs.FramedAt 8 do continue
-      let .forallE _ argumentsType _ _ ← whnfR (← inferType (target.getArg! 6)) | continue
-      let memoryType := mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) (target.getArg! 0)
+      unless narrow.isAppOfArity ``VerexIR.Proofs.FramedAt 9 do continue
+      let .forallE _ argumentsType _ _ ← whnfR (← inferType (target.getArg! 7)) | continue
+      let memoryType :=
+        mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) (target.getArg! 0) (target.getArg! 1)
       let withinType ← withLocalDeclD `verexArguments argumentsType fun args =>
         withLocalDeclD `pre memoryType fun pre =>
           withLocalDeclD `post memoryType fun post => do
             mkForallFVars #[args, pre, post] (← mkArrow
-              (mkApp3 (narrow.getArg! 6) args pre post).headBeta
-              (mkApp3 (target.getArg! 6) args pre post).headBeta)
+              (mkApp3 (narrow.getArg! 7) args pre post).headBeta
+              (mkApp3 (target.getArg! 7) args pre post).headBeta)
       let within ← mkFreshExprSyntheticOpaqueMVar withinType
       unless ← closesBy within.mvarId! (← `(tactic| (
           intro _ _ _ $(mkIdent `verexFrame):ident
@@ -1182,7 +1097,7 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
               (simp only [vir_denote_norm, vir_denote_eval] at $(mkIdent `verexFrame):ident ⊢
                grind)))) do continue
       return some (← mkAppAtFrame ``VerexIR.Proofs.FramedAt.mono
-          (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
+          (target.getArg! 0) (target.getArg! 2) (target.getArg! 3)
         #[← mkExpectedTypeHint (← frameFactProof decl.toExpr) narrow, ← instantiateMVars within])
     return none
     catch _ => pure none
@@ -1191,14 +1106,14 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     goal.assign proof
     return some []
   if verex.solverDebug.get (← getOptions) then logInfo "frame: checking literal target"
-  let some closure := literalClosure? (target.getArg! 7) | return none
-  let mask := closure.getArg! 6
+  let some closure ← goal.withContext (literalValue? (target.getArg! 8)) | return none
+  let mask := closure.mask
   unless mask.isAppOfArity ``Weave.mask 4 do return none
   goal.withContext do
   let weave := mask.appArg!
   let rows := (← whnfR (← inferType weave)).getAppArgs
   let some captured := rows[1]? | return none
-  let handle := closure.getArg! 5
+  let handle := closure.handle
   let free := fun (statement : Lean.Expr) => do
     mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq statement (mkConst ``Bool.true))
   let coherent ← mkAppM ``coherent_runtime
@@ -1213,14 +1128,14 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     let (theoremArguments, _, statement) ← forallMetaTelescope (← inferType theoremProof)
     let meaning := statement.getArg! 4
     unless meaning.isAppOf ``propheticMeaning do throwError "not a function's meaning"
-    unless ← isDefEq (meaning.getArg! 2) (target.getArg! 2) do
+    unless ← isDefEq (meaning.getArg! 3) (target.getArg! 3) do
       throwError "the closure and its target theorem use different type families"
     let rule ← mkAppAtFrame ``VerexIR.Proofs.FramedAt.ofVerified
-        (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
-      #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured), target.getArg! 5,
-        closure.getArg! 7, coherent, closure.getArg! 9, closure.getArg! 10,
+        (target.getArg! 0) (target.getArg! 2) (target.getArg! 3)
+      #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured), target.getArg! 6,
+        closure.instantiation, coherent, closure.captures, closure.value, closure.closed,
         ← instantiateMVars (mkAppN theoremProof theoremArguments)]
-    let rule := mkApp rule (target.getArg! 6)
+    let rule := mkApp rule (target.getArg! 7)
     -- The natives the target's theorem assumes, the caller assumes too.
     for argument in theoremArguments do
       if let .mvar id ← instantiateMVars argument then
@@ -1266,10 +1181,10 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
       compiled? := some (statement.getArg! 2).appArg!
   let some compiled := compiled? | return none
   try
-    let rule ← mkAppAtFrame ``VerexIR.Proofs.FramedAt.ofBody (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
-      #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured), target.getArg! 5,
-        closure.getArg! 7, coherent, closure.getArg! 9, closure.getArg! 10]
-    let rule := mkApp rule (target.getArg! 6)
+    let rule ← mkAppAtFrame ``VerexIR.Proofs.FramedAt.ofBody (target.getArg! 0) (target.getArg! 2) (target.getArg! 3)
+      #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured), target.getArg! 6,
+        closure.instantiation, coherent, closure.captures, closure.value, closure.closed]
+    let rule := mkApp rule (target.getArg! 7)
     let .forallE _ keptType _ _ ← whnfR (← inferType rule) | throwError "no body premise"
     let kept ← mkFreshExprSyntheticOpaqueMVar keptType
     let proof ← instantiateMVars (mkApp rule kept)
@@ -1312,8 +1227,15 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
     let ruleType ← inferType rule
     let (arguments, _, _) ← forallMetaTelescope ruleType
     let names := ruleType.getForallBinderNames
-    for (name, value) in [(`σs, aborts.getArg! 3), (`shared, aborts.getArg! 4),
-        (`shape, aborts.getArg! 5), (`function, aborts.getArg! 6), (`args, aborts.getArg! 7)] do
+    -- The unit, its function values and the frame, as the predicate states them.
+    for argument in arguments do
+      let type ← whnfR (← inferType argument)
+      if type.isAppOf ``Skolems then
+        unless ← isDefEq argument (aborts.getArg! 2) do throwError "frame does not fit"
+      else if type.isAppOf ``FunctionCarriers then
+        unless ← isDefEq argument (aborts.getArg! 1) do throwError "function values do not fit"
+    for (name, value) in [(`σs, aborts.getArg! 4), (`shared, aborts.getArg! 5),
+        (`shape, aborts.getArg! 6), (`function, aborts.getArg! 7), (`args, aborts.getArg! 8)] do
       let some index := names.idxOf? name | throwError "the rule has no {name}"
       unless ← isDefEq arguments[index]! value do throwError "{name} does not fit"
     let some premise := arguments.back? | throwError "the rule has no premise"
@@ -1329,11 +1251,10 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
       if type.isAppOfArity ``Eq 3 then
         unless ← isDefEq argument (← mkEqRefl (type.getArg! 1)) do
           throwError "a row is not scalar"
-      else if type.isAppOfArity ``VerexIR.Proofs.MemoryTyped 2 then
+      else if type.isAppOfArity ``VerexIR.Proofs.MemoryTyped 3 then
         unless ← proveMemoryTyped facts id do throwError "memory is not typed"
-      else if type.isAppOfArity ``VerexIR.Proofs.ClosureTypedAt 6 then
-        unless ← (literalClosureTyped? id) <||> (carrierClosureTyped? facts id) do
-          throwError "the closure is not typed"
+      else if type.isAppOfArity ``VerexIR.Proofs.ScalarAt 4 then
+        unless ← scalarAt? facts id do throwError "a row is not scalar at the frame"
       else
         let some fact ← facts.findM? fun fact => do isDefEq (← inferType fact) type
           | throwError "a premise is not held"
@@ -1344,8 +1265,8 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
     -- once the premises fix every argument of the rule.
     let some stated := (← instantiateMVars premiseType).not? | throwError "no invocation"
     let spelled := fun (e : Lean.Expr) =>
-      if e == stated.getArg! 6 then some (aborts.getArg! 6)
-      else if e == stated.getArg! 7 then some (aborts.getArg! 7) else none
+      if e == stated.getArg! 7 then some (aborts.getArg! 7)
+      else if e == stated.getArg! 8 then some (aborts.getArg! 8) else none
     mkExpectedTypeHint proof ((← instantiateMVars (← inferType proof)).replace spelled)
   let (_, next) ← goal.withContext do
     (← goal.assert `verexReturns (← inferType proof) proof).intro1P
@@ -1373,15 +1294,16 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
 
 /-- The `result_of` reads of a term: those of function values a closure
 literal builds, outside binders. -/
-private def resultOfReads (terms : Array Lean.Expr) : Array Lean.Expr :=
+private def resultOfReads (environment : Environment) (terms : Array Lean.Expr) :
+    Array Lean.Expr :=
   sitesWhere (fun e =>
-    (e.isAppOfArity ``VerexIR.Proofs.ResultOf 10 ||
-      e.isAppOfArity ``VerexIR.Proofs.StateOf 9) && !e.hasLooseBVars &&
-      (literalFunction? (e.getArg! 6)).isSome) terms
+    (e.isAppOfArity ``VerexIR.Proofs.ResultOf 11 ||
+      e.isAppOfArity ``VerexIR.Proofs.StateOf 10) && !e.hasLooseBVars &&
+      (literalFunction? environment (e.getArg! 7)).isSome) terms
 
 /-- The `aborts_of` of the invocation a `result_of` or `state_of` reads. -/
 private def readAborts (read : Lean.Expr) : Lean.Expr :=
-  mkAppN (mkConst ``VerexIR.Proofs.AbortsOf) (read.getAppArgs.extract 0 9)
+  mkAppN (mkConst ``VerexIR.Proofs.AbortsOf) (read.getAppArgs.extract 0 10)
 
 /-- A leaf that reads `result_of` of a literal closure where it knows
 neither that the invocation aborts nor that it does not, case by case on
@@ -1393,7 +1315,7 @@ def abortCases? (goal : MVarId) : TacticM (Option (List MVarId)) := do
       let facts ← contextFacts goal
       unless ← facts.anyM (fun fact => do
           return (← instantiateMVars (← inferType fact)).isAppOfArity
-            ``VerexIR.Proofs.Terminating 2) do
+            ``VerexIR.Proofs.Terminating 3) do
         return none
       let target ← instantiateMVars (← goal.getType)
       let mut statements := #[target]
@@ -1401,7 +1323,7 @@ def abortCases? (goal : MVarId) : TacticM (Option (List MVarId)) := do
         if decl.isImplementationDetail then continue
         let type ← instantiateMVars decl.type
         statements := statements.push type
-      for read in resultOfReads statements do
+      for read in resultOfReads (← getEnv) statements do
         let aborts := readAborts read
         if statements.any (fun statement => (statement.find? (· == aborts)).isSome) then continue
         -- A known abort decision needs no fresh case split; definitional
@@ -1409,7 +1331,7 @@ def abortCases? (goal : MVarId) : TacticM (Option (List MVarId)) := do
         let known ← facts.anyM fun fact => do
           let type := unmarked (← instantiateMVars (← inferType fact))
           let predicate := type.not?.getD type
-          unless predicate.isAppOfArity ``VerexIR.Proofs.AbortsOf 9 do return false
+          unless predicate.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 do return false
           withReducible (isDefEq predicate aborts)
         if known then continue
         return some aborts
@@ -1432,25 +1354,25 @@ private def hasKnownInvocation (aborts : Lean.Expr) : MetaM Bool := do
     let type ← instantiateMVars decl.type
     -- A named call's run, marked read where the call took its contract.
     let type := if type.isAppOfArity ``VerexIR.Proofs.Denoted 1 then type.appArg! else type
-    if type.isAppOfArity ``VerexIR.Proofs.EnsuresOf 11 then
+    if type.isAppOfArity ``VerexIR.Proofs.EnsuresOf 12 then
       runs := runs.push type
     -- A result is stated at every default it is read at.
     let mut equation := type
     while equation.isForall do equation := equation.bindingBody!
     if let some (_, lhs, rhs) := equation.eq? then
-      if lhs.isAppOfArity ``VerexIR.Proofs.ResultOf 10 && !(readAborts lhs).hasLooseBVars &&
+      if lhs.isAppOfArity ``VerexIR.Proofs.ResultOf 11 && !(readAborts lhs).hasLooseBVars &&
           !rhs.hasLooseBVars then
         if ← withReducible (isDefEq (readAborts lhs) aborts) then results := results.push rhs
-      if lhs.isAppOfArity ``VerexIR.Proofs.StateOf 9 then
+      if lhs.isAppOfArity ``VerexIR.Proofs.StateOf 10 then
         if ← withReducible (isDefEq lhs state) then states := states.push rhs
   if results.isEmpty || states.isEmpty then return false
   for run in runs do
     -- The run's invocation from its pre-state, as `aborts_of` states it.
     let actual := mkAppN (mkConst ``VerexIR.Proofs.AbortsOf)
-      (run.getAppArgs.extract 0 8 |>.push (run.getArg! 9))
+      (run.getAppArgs.extract 0 9 |>.push (run.getArg! 10))
     unless ← withReducible (isDefEq actual aborts) do continue
-    unless ← results.anyM (fun value => withReducible (isDefEq value (run.getArg! 8))) do continue
-    if ← states.anyM (fun value => withReducible (isDefEq value (run.getArg! 10))) then
+    unless ← results.anyM (fun value => withReducible (isDefEq value (run.getArg! 9))) do continue
+    if ← states.anyM (fun value => withReducible (isDefEq value (run.getArg! 11))) then
       return true
   return false
 
@@ -1462,7 +1384,7 @@ an invocation at another's result is met once that result is read. -/
 def terminatingRuns (goal : MVarId) : TacticM MVarId := do
   let saved ← getGoals
   let terminating ← goal.withContext do (← contextFacts goal).anyM fun fact => do
-    return (← instantiateMVars (← inferType fact)).isAppOfArity ``VerexIR.Proofs.Terminating 2
+    return (← instantiateMVars (← inferType fact)).isAppOfArity ``VerexIR.Proofs.Terminating 3
   unless terminating do return goal
   let mut current := goal
   let mut handled : Array Lean.Expr := #[]
@@ -1489,8 +1411,8 @@ def terminatingRuns (goal : MVarId) : TacticM MVarId := do
               negation ← mkEqMP rewritten.eqProof negation
             catch _ => pure ()
           let some aborts := (← instantiateMVars (← inferType negation)).not? | continue
-          unless aborts.isAppOfArity ``VerexIR.Proofs.AbortsOf 9 &&
-              (literalFunction? (aborts.getArg! 6)).isSome do continue
+          unless aborts.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 &&
+              (literalFunction? (← getEnv) (aborts.getArg! 7)).isSome do continue
           unless handled.contains aborts || found.any (·.2 == aborts) do
             unless ← hasKnownInvocation aborts do
               found := found.push (negation, aborts)
@@ -1515,10 +1437,11 @@ def terminatingRuns (goal : MVarId) : TacticM MVarId := do
 /-! ## Invocations over a model's meaning
 
 In a unit verified through its model (`doc/designs/ghost-fields.md`) an
-invocation denotes the theorem's invocation meaning at the frame. A literal
-closure of a routed member is rewritten to the member's meaning on the woven
-arguments by the theorem's routing hypothesis (`invokeRoutes_…`,
-`invokeAt_closureOf`); any other invocation is unseen, defined where the
+invocation denotes the theorem's invocation meaning at the frame. At the
+base frame, a closure site's constructor of a routed member is rewritten to
+the member's meaning on the woven arguments by the theorem's routing
+hypothesis of the site (`invokeRoutes_…`); any other invocation is unseen,
+defined where the
 target's declared precondition holds (`verexInvokeDefined`), its runs and
 aborts stated by the behavioral predicates and the frames stated of the
 value (`wp_invoke_unseen`). -/
@@ -1566,15 +1489,13 @@ def routedInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := do
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
   let some invocation ← goal.withContext (modelInvocation? (target.getArg! 3))
     | return none
-  unless (literalClosure? invocation.function).isSome do return none
+  unless ← isKnownFunction invocation.function do return none
   let lemmas ← goal.withContext routingLemmas
   if lemmas.isEmpty then return none
   let saved ← saveState
   try
     setGoals [goal]
-    evalTactic (← `(tactic| simp only [$lemmas,*, VerexIR.Proofs.Denote.invokeAt_closureOf_none,
-      VerexIR.Proofs.Denote.invokeAt_closureOf_one,
-      VerexIR.Proofs.Denote.Weave.compose]))
+    evalTactic (← `(tactic| simp only [$lemmas,*, VerexIR.Proofs.Denote.Weave.compose]))
     let [next] ← getGoals | throwError "the routing left several goals"
     let rewritten ← next.withContext do instantiateMVars (← next.getType)
     if rewritten == target then throwError "no routing hypothesis matches"
@@ -1594,14 +1515,14 @@ private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial
   let mut goal := goal
   for fact in facts do
     let factType ← goal.withContext do frameFactType (← inferType fact)
-    let keeps := factType.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAtOf 7
-    unless keeps || factType.isAppOfArity ``VerexIR.Proofs.FramedAtOf 8 do continue
-    let (row, framed) := if keeps then (factType.getArg! 3, factType.getArg! 6)
-      else (factType.getArg! 3, factType.getArg! 7)
+    let keeps := factType.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAtOf 8
+    unless keeps || factType.isAppOfArity ``VerexIR.Proofs.FramedAtOf 9 do continue
+    let (row, framed) := if keeps then (factType.getArg! 4, factType.getArg! 7)
+      else (factType.getArg! 4, factType.getArg! 8)
     let kept? ← goal.withContext do
       unless ← isDefEq framed invocation.function do return none
       unless ← isDefEq row invocation.supplied do return none
-      unless ← isDefEq (factType.getArg! 2) invocation.invoke do return none
+      unless ← isDefEq (factType.getArg! 3) invocation.invoke do return none
       let typed ← mkFreshExprMVar (← mkAppM ``VerexIR.Proofs.MemoryTyped
         #[factType.getArg! 0, initial])
       unless ← proveMemoryTyped facts typed.mvarId! do return none
@@ -1630,7 +1551,7 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
   let some invocation ← goal.withContext (modelInvocation? (target.getArg! 3))
     | return none
-  if (literalClosure? invocation.function).isSome then return none
+  if ← isKnownFunction invocation.function then return none
   let original ← saveState
   -- A closure read from a resource gets its frame from that value's stored
   -- invariant (`unseenInvocation?`).
@@ -1670,9 +1591,9 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
     stage.set "rule"
     -- The meaning's type as spelled: `InvokeMeaning` is an abbreviation.
     let meaningType ← instantiateMVars (← inferType invocation.invoke)
-    unless meaningType.isAppOfArity ``InvokeMeaning 2 do return none
-    let rule ← mkAppOptM' (mkApp2 (mkConst ``VerexIR.Proofs.wp_invoke_unseen)
-        (meaningType.getArg! 0) (meaningType.getArg! 1))
+    unless meaningType.isAppOfArity ``InvokeMeaning 3 do return none
+    let rule ← mkAppOptM' (mkApp3 (mkConst ``VerexIR.Proofs.wp_invoke_unseen)
+        (meaningType.getArg! 0) (meaningType.getArg! 1) (meaningType.getArg! 2))
       #[some invocation.invoke, some invocation.supplied, some invocation.shared,
         some invocation.shape, some invocation.function, some invocation.arguments, some initial,
         some (target.getArg! 4), some (target.getArg! 5), some (mkApp definedAt requires)]
@@ -1694,15 +1615,24 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
     let returns ← keptMemoryOf returns invocation initial
       (.fvar introduced[0]!) (.fvar introduced[1]!) (.fvar introduced[2]!) facts
     let (_, fails) ← fails.introN 3 [`verexError, `verexAborted, `verexAborts]
-    -- The precondition declared of the value's target, read off the table:
-    -- decided where no target declares one.
+    -- The precondition declared of the value: a hypothesis the contract
+    -- states, or, of a known value, its target's.
     stage.set "precondition"
     let requiresGoal := requires.mvarId!
-    let decided ← closesBy requiresGoal (← `(tactic| (
-      verex_requires_everywhere
-      intro _ _ _
-      verex_unfold_head
-      simp only [implies_true, ite_self])))
+    -- A unit none of whose closure sites' targets declares a precondition
+    -- defines every invocation (the generated `functionRequires_everywhere`).
+    let environment ← getEnv
+    let everywhere? : Option Name := do
+      guard (requiresType.isAppOfArity ``VerexIR.Proofs.RequiresOf 10)
+      let name := (← (requiresType.getArg! 3).getAppFn.constName?).appendAfter "_everywhere"
+      guard (environment.contains name)
+      pure name
+    let decided ← match everywhere? with
+      | some name => closesBy requiresGoal (← `(tactic| exact $(mkCIdent name) _ _ _ _ _ _))
+      | none => pure false
+    let decided ← if decided then pure true else closesBy requiresGoal (← `(tactic| first
+      | assumption
+      | (verex_behavior; done)))
     if debug then
       IO.println s!"model unseen invocation applied; precondition decided: {decided}"
     return some ([returns, fails] ++ if decided then [] else [requiresGoal]))
@@ -1713,6 +1643,21 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
   if result.isNone then original.restore
   return result
 
+/-- A routing hypothesis at a function value: its binders but the
+invocation's arguments instantiated so that the value it routes is the
+given one, as `∀ args, invoke … value args = self …`. -/
+private def routesOf? (decl : Lean.LocalDecl) (value : Lean.Expr) : MetaM Lean.Expr := do
+  let (binders, _, statement) ← forallMetaTelescope (← instantiateMVars decl.type)
+  let some (_, lhs, _) := statement.eq? | throwError "a routing hypothesis is no equation"
+  let some argsBinder := binders.back? | throwError "a routing hypothesis takes no arguments"
+  unless lhs.getAppNumArgs ≥ 2 && (← isDefEq (lhs.getArg! (lhs.getAppNumArgs - 2)) value) do
+    throwError "another function value"
+  withLocalDeclD `args (← instantiateMVars (← inferType argsBinder)) fun args => do
+    argsBinder.mvarId!.assign args
+    let routes ← instantiateMVars (mkAppN decl.toExpr binders)
+    if routes.hasExprMVar then throwError "the routing leaves binders open"
+    mkLambdaFVars #[args] routes
+
 /-- A frame of a literal closure over a model's meaning (`FramedAtOf`,
 `KeepsMemoryAtOf`): by the routed target's meaning on the woven arguments,
 an obligation over every argument and typed memory
@@ -1721,10 +1666,10 @@ within it (`FramedAtOf.mono`). The goals left. -/
 def routedClosureFrame? (goal : MVarId) : TacticM (Option (List MVarId)) := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
   let target := if target.isAppOfArity ``VerexIR.Proofs.Obligation 4 then target.appArg! else target
-  let target ← if target.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAtOf 7 then
+  let target ← if target.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAtOf 8 then
       goal.withContext (whnfR target) else pure target
-  unless target.isAppOfArity ``VerexIR.Proofs.FramedAtOf 8 do return none
-  let closureValue := target.getArg! 7
+  unless target.isAppOfArity ``VerexIR.Proofs.FramedAtOf 9 do return none
+  let closureValue := target.getArg! 8
   -- A frame a hypothesis states of the same function value, within it.
   let stated ← try goal.withContext do
     for decl in ← getLCtx do
@@ -1732,15 +1677,16 @@ def routedClosureFrame? (goal : MVarId) : TacticM (Option (List MVarId)) := do
       let some (_, closure) ← framedFact? decl.type | continue
       unless ← isDefEq closure closureValue do continue
       let narrow ← whnfR (← frameFactType decl.type)
-      unless narrow.isAppOfArity ``VerexIR.Proofs.FramedAtOf 8 do continue
-      let .forallE _ argumentsType _ _ ← whnfR (← inferType (target.getArg! 6)) | continue
-      let memoryType := mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) (target.getArg! 0)
+      unless narrow.isAppOfArity ``VerexIR.Proofs.FramedAtOf 9 do continue
+      let .forallE _ argumentsType _ _ ← whnfR (← inferType (target.getArg! 7)) | continue
+      let memoryType :=
+        mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) (target.getArg! 0) (target.getArg! 1)
       let withinType ← withLocalDeclD `verexArguments argumentsType fun args =>
         withLocalDeclD `pre memoryType fun pre =>
           withLocalDeclD `post memoryType fun post => do
             mkForallFVars #[args, pre, post] (← mkArrow
-              (mkApp3 (narrow.getArg! 6) args pre post).headBeta
-              (mkApp3 (target.getArg! 6) args pre post).headBeta)
+              (mkApp3 (narrow.getArg! 7) args pre post).headBeta
+              (mkApp3 (target.getArg! 7) args pre post).headBeta)
       let within ← mkFreshExprSyntheticOpaqueMVar withinType
       unless ← closesBy within.mvarId! (← `(tactic| (
           intro _ _ _ $(mkIdent `verexFrame):ident
@@ -1749,8 +1695,8 @@ def routedClosureFrame? (goal : MVarId) : TacticM (Option (List MVarId)) := do
           | verex_bounded
               (simp only [vir_denote_norm, vir_denote_eval] at $(mkIdent `verexFrame):ident ⊢
                grind)))) do continue
-      return some (← mkAppOptM' (mkApp2 (mkConst ``VerexIR.Proofs.FramedAtOf.mono)
-          (target.getArg! 0) (target.getArg! 1))
+      return some (← mkAppOptM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAtOf.mono)
+          (target.getArg! 0) (target.getArg! 1) (target.getArg! 2))
         #[none, none, none, none, none, none, none,
           some (← mkExpectedTypeHint (← frameFactProof decl.toExpr) narrow),
           some (← instantiateMVars within)])
@@ -1759,36 +1705,26 @@ def routedClosureFrame? (goal : MVarId) : TacticM (Option (List MVarId)) := do
   if let some proof := stated then
     goal.assign proof
     return some []
-  let some closure := literalClosure? closureValue | return none
-  let mask := closure.getArg! 6
+  let some closure ← goal.withContext (literalValue? closureValue) | return none
+  let mask := closure.mask
   unless mask.isAppOfArity ``Weave.mask 4 do return none
   let weave := mask.appArg!
   let state ← saveState
   try
     goal.withContext do
-    -- The routing hypothesis of the target, at the closure's mask,
-    -- instantiation and captures, leaving the invocation's row, shape and
-    -- arguments quantified.
+    -- The routing hypothesis of the site at the value's captures, leaving
+    -- the invocation's arguments quantified.
     let mut routed? := none
     for decl in ← getLCtx do
       unless decl.userName.toString.startsWith "invokeRoutes_" do continue
       let attempt ← saveState
       try
-        -- The hypothesis at the closure's frame, mask, instantiation, and
-        -- captures, spelled out: a captures row left open does not unify
-        -- with a literal's type.
-        let type ← instantiateMVars decl.type
-        let leading := type.getForallBinderNames.length - 1
-        let explicit := #[closure.getArg! 6, closure.getArg! 7, closure.getArg! 8,
-          closure.getArg! 9, closure.getArg! 2, closure.getArg! 3, closure.getArg! 10]
-        let arguments := if leading == 8 then #[closure.getArg! 1] ++ explicit else explicit
-        let routes := mkAppN decl.toExpr arguments
-        let rule ← mkAppOptM' (mkApp2 (mkConst ``VerexIR.Proofs.FramedAtOf.ofRouted)
-            (target.getArg! 0) (target.getArg! 1))
-          #[none, none, none, none, none, none, none, some weave,
-            some (closure.getArg! 7), some (closure.getArg! 9), some (closure.getArg! 3),
-            some (target.getArg! 5), some (closure.getArg! 10), some routes,
-            some (target.getArg! 6)]
+        let routes ← routesOf? decl closure.value
+        let rule ← mkAppOptM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAtOf.ofRouted)
+            (target.getArg! 0) (target.getArg! 1) (target.getArg! 2))
+          #[some (target.getArg! 3), none, none, none, some (target.getArg! 6), none, some weave,
+            some closure.captures, some (target.getArg! 5), some closure.value, some routes,
+            some (target.getArg! 7)]
         let .forallE _ keptType _ _ ← whnfR (← inferType rule)
           | throwError "the frame rule leaves no obligation"
         let kept ← mkFreshExprSyntheticOpaqueMVar keptType (← goal.getTag)
@@ -1824,7 +1760,7 @@ which it holds of each run or abort (`forall_ok_of_wp`, `of_aborts_of_wp`),
 which the call rule inlines. The hypothesis stays, marked read. -/
 private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr))
     (hypothesis : FVarId) (stated : Lean.Expr) (view : BehaviorView) : TacticM (Option MVarId) := do
-  unless (literalFunction? view.function).isSome do return none
+  unless (literalFunction? (← getEnv) view.function).isSome do return none
   -- The run or abort of the closure's invocation, as the predicate defines it.
   let action := mkAppN view.invoke
     #[view.supplied, view.shared, view.shape, view.function, view.arguments]
@@ -1844,9 +1780,8 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
   -- The invocation routed to the target's meaning on the woven arguments.
   let lemmas ← goal.withContext routingLemmas
   setGoals [goal]
-  evalTactic (← `(tactic| simp only [$lemmas,*, VerexIR.Proofs.Denote.invokeAt_closureOf_none,
-      VerexIR.Proofs.Denote.invokeAt_closureOf_one,
-    VerexIR.Proofs.Denote.Weave.compose] at $(mkIdent `verexRun):ident))
+  evalTactic (← `(tactic| simp only [$lemmas,*, VerexIR.Proofs.Denote.Weave.compose]
+    at $(mkIdent `verexRun):ident))
   let goal ← getMainGoal
   goal.withContext do
   let runVar := (← getLCtx).findFromUserName? `verexRun |>.map (·.fvarId) |>.getD runVar
@@ -1874,10 +1809,11 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
     let verified := mkAppN theoremProof theoremArguments
     let implication ← if view.run?.isSome then
         mkAppOptM ``VerexIR.Proofs.runOfSatisfies
-          #[none, none, none, none, none, some verified, none, none, none, none, some (.fvar runVar)]
+          #[none, none, none, none, none, none, some verified, none, none, none, none,
+            some (.fvar runVar)]
       else
         mkAppOptM ``VerexIR.Proofs.abortOfSatisfies
-          #[none, none, none, none, none, some verified, none, none, some (.fvar runVar)]
+          #[none, none, none, none, none, none, some verified, none, none, some (.fvar runVar)]
     let implication ← instantiateMVars implication
     let constants ← contractConstants (← inferType theoremProof)
     let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
@@ -1914,7 +1850,7 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
   unless ← isDefEq left action do throwError "an inlined target's refinement does not meet its run"
   let refinement ← instantiateMVars (mkAppN theoremProof binders)
   let body ← instantiateMVars body
-  let unfoldNames := match body.getAppFn.constName?, body.getAppArgs[4]? with
+  let unfoldNames := match body.getAppFn.constName?, body.getAppArgs[5]? with
     | some ``VerexIR.Proofs.Denote.Function.denoteWith, some (.const name _) =>
         [name, name.getPrefix ++ `body, name.getPrefix ++ `mutables, name.getPrefix ++ `params,
           name.getPrefix ++ `locals, name.getPrefix ++ `shape, name.getPrefix ++ `row]
@@ -1978,9 +1914,10 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
   let some executable := executableOf? view.invoke
     | return ← modelDenotedRun goal callees hypothesis stated view
   let ensures := view.run?.isSome
-  let some closure := literalFunction? view.function | return none
+  let some found := literalFunction? (← getEnv) view.function | return none
+  let some closure ← literalValue? found | return none
   let some (weave, captured, _) ← closureWeave? closure | throwError "no weave"
-  let handle := closure.getArg! 5
+  let handle := closure.handle
   -- The runs of a target with a theorem are read by its contract
   -- (`dispatchBehavior`); its aborts by its body, which states them where
   -- the contract need not, as the Move Prover derives them.
@@ -2002,7 +1939,8 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
       pure (some resultVar)
     let .fvar finalVar := run.post | throwError "final not a variable"
     let run ← mkAppAtFrame ``VerexIR.Proofs.ensuresOf_closureOf (type.getArg! 0) executable
-      (closure.getArg! 1) #[weave, capturedFree, coherent, closure.getArg! 9, view.arguments, stated]
+      closure.frame #[weave, capturedFree, coherent, closure.captures, view.arguments, stated,
+        closure.closed]
     let runType ← inferType run
     let goal ← goal.replaceLocalDeclDefEq hypothesis
       (mkApp (mkConst ``VerexIR.Proofs.Denoted) (← instantiateMVars (← hypothesis.getType)))
@@ -2026,7 +1964,8 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
     return some next
   else
     let run ← mkAppAtFrame ``VerexIR.Proofs.abortsOf_closureOf (type.getArg! 0) executable
-      (closure.getArg! 1) #[weave, capturedFree, coherent, closure.getArg! 9, view.arguments, stated]
+      closure.frame #[weave, capturedFree, coherent, closure.captures, view.arguments, stated,
+        closure.closed]
     let goal ← goal.replaceLocalDeclDefEq hypothesis
       (mkApp (mkConst ``VerexIR.Proofs.Denoted) (← instantiateMVars (← hypothesis.getType)))
     goal.withContext do
@@ -2052,6 +1991,7 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
 and its clause's marker. -/
 def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr)) :
     TacticM (Option MVarId) := do
+  let environment ← getEnv
   let candidates ← goal.withContext do
     -- The statement under its premises and marker, found without
     -- traversing the context's types: this runs at every conjunction.
@@ -2060,7 +2000,7 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
       while type.isArrow do type := type.bindingBody!
       let statement := unmarked type
       let some view := behaviorView? statement | none
-      if (literalFunction? view.function).isSome then some statement else none
+      if (literalFunction? environment view.function).isSome then some statement else none
     let stating ← (← getLCtx).foldlM (init := #[]) fun found decl => do
       if decl.isImplementationDetail then return found
       let type ← instantiateMVars decl.type
@@ -2111,9 +2051,9 @@ def rewriteResultOf (goal : MVarId) : TacticM (Option MVarId) := goal.withContex
     let mut type ← instantiateMVars declaration.type
     while type.isForall do type := type.bindingBody!
     unless type.isAppOfArity ``Eq 3 do continue
-    if (type.getArg! 1).isAppOfArity ``VerexIR.Proofs.ResultOf 10 then
+    if (type.getArg! 1).isAppOfArity ``VerexIR.Proofs.ResultOf 11 then
       facts := facts.push (declaration.fvarId, false)
-    else if (type.getArg! 1).isAppOfArity ``VerexIR.Proofs.StateOf 9 then
+    else if (type.getArg! 1).isAppOfArity ``VerexIR.Proofs.StateOf 10 then
       facts := facts.push (declaration.fvarId, true)
   if facts.isEmpty then return some goal
   let cut := mkIdent `VerexIR.Proofs.Denote.cutNamedValue
@@ -2206,24 +2146,21 @@ private def obligesBehavior (target : Lean.Expr) (continuations : Array Name := 
   statesBehavior (← owedStatements target) continuations
 
 /-- That a function value the goal owes a behavioral predicate of names a
-call's target: a literal capturing nothing (`functionOf`) of the target at
-the call's parameter row and instantiation, spelled as the goal spells it,
-typed at the leaf's unit (`functionTypedProof?`), and whose closure is the
-closure naming the target (`functionOf_closure`). The goal's literal may
-read its typing from a binder its clause states (`bindCuts`). -/
+call's target: a known function value capturing nothing (`LiteralValue`) of
+the target at the call's parameter row and instantiation, spelled as the
+goal spells it, and whose closure is the closure naming the target. -/
 private def namingLiteral? (target : Lean.Expr) (continuations : Array Name)
     (handle full instantiation : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let environment ← getEnv
   findReached? (← owedStatements target) continuations fun next => do
-    for literal in sitesWhere (·.isAppOfArity ``functionOf 11) #[next] do
-      let arguments := literal.getAppArgs.pop
-      if arguments.any (·.hasLooseBVars) then continue
-      unless (literal.getArg! 8).isConstOf ``NRow.nil do continue
-      unless ← isDefEq (literal.getArg! 5) handle do continue
-      unless ← isDefEq (literal.getArg! 2) full do continue
-      unless ← isDefEq (literal.getArg! 7) instantiation do continue
-      let some typed ← functionTypedProof? (mkAppN (mkConst ``FunctionTyped) arguments)
-        | continue
-      return some (mkAppN (mkConst ``functionOf_closure) (arguments.push typed))
+    for value in sitesWhere (isLiteralValue environment) #[next] do
+      let literal? ← if value.hasLooseBVars then siteOfConstruct? value else literalValue? value
+      let some literal := literal? | continue
+      unless literal.captured.consumeMData.isConstOf ``NRow.nil do continue
+      unless ← isDefEq literal.handle handle do continue
+      unless ← isDefEq literal.parameters full do continue
+      unless ← isDefEq literal.instantiation instantiation do continue
+      return some literal.closed
     return none
 
 /-- A call of a target taking and returning no reference, where the goal
@@ -2243,10 +2180,11 @@ def namedCall (goal : MVarId) (throughContract : Bool)
   -- finds.
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return goal
   let meaning := target.getArg! 3
-  unless meaning.isAppOfArity ``propheticMeaning 8 do return goal
-  let (unit, executable, frame) := (meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2)
-  let some naming ← goal.withContext (namingLiteral? target continuations (meaning.getArg! 4)
-      (meaning.getArg! 5) (meaning.getArg! 3))
+  unless meaning.isAppOfArity ``propheticMeaning 9 do return goal
+  let (unit, functions, executable, frame) :=
+    (meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2, meaning.getArg! 3)
+  let some naming ← goal.withContext (namingLiteral? target continuations (meaning.getArg! 5)
+      (meaning.getArg! 6) (meaning.getArg! 4))
     | return goal
   let saved ← saveState
   let hypothesis? (constant : Name) : TacticM (Option Lean.Expr) := goal.withContext do
@@ -2264,7 +2202,7 @@ def namedCall (goal : MVarId) (throughContract : Bool)
         let shiftsSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax shifts)
         let namingSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax naming)
         let rule ← goal.withContext <| Lean.Elab.Term.exprToSyntax
-          (mkApp3 (mkConst ``VerexIR.Proofs.wp_named_typed) unit executable frame)
+          (mkApp4 (mkConst ``VerexIR.Proofs.wp_named_typed) unit functions executable frame)
         -- A rule whose row conditions fail must fail here, not elaborate
         -- them as `sorry`.
         Term.withoutErrToSorry <| withoutRecover <|
@@ -2283,7 +2221,7 @@ def namedCall (goal : MVarId) (throughContract : Bool)
       setGoals [goal]
       let namingSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax naming)
       let rule ← goal.withContext <| Lean.Elab.Term.exprToSyntax
-        (mkApp3 (mkConst ``VerexIR.Proofs.wp_named) unit frame executable)
+        (mkApp4 (mkConst ``VerexIR.Proofs.wp_named) unit functions frame executable)
       Term.withoutErrToSorry <| withoutRecover <|
         evalTactic (← `(tactic| refine $rule $namingSyntax ?_))
       let [named] ← getGoals
@@ -2338,21 +2276,21 @@ def bindRule? (goal : MVarId) : MetaM (Option (MVarId × Bool × Array Lean.Expr
   let conditions := #[target.getArg! 4, target.getArg! 5, target.getArg! 6]
   let rule ← if action.isAppOfArity ``VerexIR.Proofs.Spec.bind 6 then
       mkAppM ``VerexIR.Proofs.wp_bind (#[action.getArg! 4, action.getArg! 5] ++ conditions)
-    else if action.isAppOfArity ``VerexIR.Proofs.Denote.Flow.bind 8 then
-      let inner := (action.getArg! 6).consumeMData.headBeta
-      if inner.isAppOfArity ``VerexIR.Proofs.Denote.Flow.bind 8 then
+    else if action.isAppOfArity ``VerexIR.Proofs.Denote.Flow.bind 9 then
+      let inner := (action.getArg! 7).consumeMData.headBeta
+      if inner.isAppOfArity ``VerexIR.Proofs.Denote.Flow.bind 9 then
         -- Flows associate to the right, so that the goal's continuation
         -- stays out of the inner bind's arms.
         pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_flowBind_flowBind)
-          (action.getAppArgs.extract 0 4 ++
-            #[inner.getArg! 4, inner.getArg! 5, action.getArg! 5, inner.getArg! 6,
-              inner.getArg! 7, action.getArg! 7] ++ conditions))
+          (action.getAppArgs.extract 0 5 ++
+            #[inner.getArg! 5, inner.getArg! 6, action.getArg! 6, inner.getArg! 7,
+              inner.getArg! 8, action.getArg! 8] ++ conditions))
       else if inner.isAppOfArity ``VerexIR.Proofs.Spec.bind 6 then
         -- A flow after a bind binds inside the bind's continuation, where the
         -- goal's continuation appears once.
         pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_flowBind_specBind)
-          ((action.getAppArgs.extract 0 6).push (inner.getArg! 2) ++
-            #[inner.getArg! 4, inner.getArg! 5, action.getArg! 7] ++ conditions))
+          ((action.getAppArgs.extract 0 7).push (inner.getArg! 2) ++
+            #[inner.getArg! 4, inner.getArg! 5, action.getArg! 8] ++ conditions))
       else
       -- The flow's own skolem family and types instantiate the rule.
       pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_flowBind) (action.getAppArgs ++ conditions))

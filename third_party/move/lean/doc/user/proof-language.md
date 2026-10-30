@@ -184,7 +184,10 @@ verify same_flag by                  -- callee requires ∃ (y : T; k : u64), y 
 
 A call's results are named in a proof by the callee and the call: in
 `twice`, which calls `inc` twice, the first result is `old_inc_result` and
-the second `inc_result`.
+the second `inc_result`. A local the body binds is named at a point after
+its binding where the walk still runs the body, as after a call: after
+`after call 1 of remove { }`, `shareholder_index` of `let (_,
+shareholder_index) := …` reads the position the search found.
 
 A `split` of an iterator takes its variants apart; from
 `test_verify_iter_walk_mut_symbolic`, which writes `7` at every position of
@@ -229,7 +232,11 @@ verify square_of_sum by              -- fun square_of_sum(a, b) := (a + b) * (a 
     assert (a + b) * (a + b) == a * a + 2 * a * b + b * b by ring
     apply lemma_mul_nonneg(a + b, a + b)
   }
+  on _ { }
 ```
+
+A premise owed at a point reads the bounds of the values in scope, here
+`0 <= a + b` from `a` and `b` being `u64`.
 
 An `assert` at a point is an obligation of its own, as an `assert` of a Move
 proof block is, keyed by the point: `assert 1 of at entry`, `assert 2 of after
@@ -265,7 +272,7 @@ key's paths.
 | `decide` | the default: a fact stated by a hypothesis (or its disjunct, an equation either way round), a contradiction in the facts in scope, an instance of a quantified hypothesis, reflexivity, or linear arithmetic over the facts in scope; a hypothesis `p ==> q` or `p <==> q` gives `q` where `p` is stated. Bounded; no search |
 | `arith` | linear arithmetic with the stated bounds, no case splits |
 | `eval` | closed maps, literal vectors, ground arithmetic |
-| `ring` | polynomial identities over the integers, `e₁ == e₂` |
+| `ring` | polynomial identities over the integers, `e₁ == e₂`, the facts in scope hidden |
 | `congr` | equality through function applications and uninterpreted terms, with linear arithmetic; no open `if`, no existential |
 | `solve` | the automatic leaf under its cap — an explicit request for automation, charged as automatic work |
 | `apply φ, …` | the named lemmas at the stated arguments, then `decide` |
@@ -348,6 +355,22 @@ statement mentions `spec_rank` reads that role too.
 | `lemma_key_at_lt(m, i, j)` | integer keys, `i < j`: `spec_key_at(m, i) < spec_key_at(m, j)` |
 | `lemma_key_at_set_before(m, k, v, i)` | ordered, `k` missing, `i` before `k`'s new position: `spec_key_at(spec_set(m, k, v), i) == spec_key_at(m, i)` |
 | `lemma_key_at_set_after(m, k, v, i)` | ordered, `k` missing, `i` after `k`'s new position: `spec_key_at(spec_set(m, k, v), i) == spec_key_at(m, i - 1)` |
+| `lemma_contains_key_len_search_absurd(m, keys, k)` | `keys` distinct, of `m`'s length, every element a key, `k` a key, and no element equal to `k`: `false` |
+
+The last is the coverage of a map's keys by a vector: a search for a key in
+a vector that enumerates the map cannot fail. Its premise that no element
+equals `k` is what one side of `split std::vector::spec_contains(keys, k)`
+states, so the lemma closes that case under a guard:
+
+```text
+split std::vector::spec_contains(old(self).shareholders, shareholder)
+apply !std::vector::spec_contains(old(self).shareholders, shareholder) ==>
+  lemma_contains_key_len_search_absurd(old(self).shares, old(self).shareholders, shareholder)
+```
+
+A module reaches the lemmas of its own maps and of the maps of the modules
+it uses (`pool_u64` those of `simple_map`); where two owners give a lemma
+the same name, its own module's comes first.
 
 How the lemmas compose. Writing a value through an iterator at a position of
 `OrderedMap` — the borrow resolves the position to a key, so the write lands
@@ -433,16 +456,58 @@ over them is one `apply` per bound, then linear reasoning.
 **Vector lemmas.** Each of Move's vector operations — `update`,
 `push_back`, `pop_back`, `swap`, `remove`, `swap_remove`, the slice
 `v[a..b]`, `concat` — has a length lemma `lemma_vector_len_<op>` stating
-the result's length and an element lemma `lemma_vector_index_<op>(v, i)`
-stating `v'[i]` case-wise by the position's relation to the operation's
-index. The `vector_` keeps them apart from the map lemmas of an owner whose
-role functions are named alike. For `remove`:
+the result's length and an element lemma `lemma_vector_index_<op>` stating
+the result's element at a position `k` case-wise by the position's relation
+to the operation's index, one implication per case. The `vector_` keeps them
+apart from the map lemmas of an owner whose role functions are named alike.
+The parameters are the vector, the operation's operands, then the position:
+
+| Lemma | Parameters |
+|---|---|
+| `lemma_vector_len_remove`, `lemma_vector_index_remove` | `(v, i)`, `(v, i, k)` |
+| `lemma_vector_len_pop_back`, `lemma_vector_index_pop_back` | `(v)`, `(v, k)` |
+| `lemma_vector_len_swap`, `lemma_vector_index_swap` | `(v, i, j)`, `(v, i, j, k)` |
+| `lemma_vector_len_swap_remove`, `lemma_vector_index_swap_remove` | `(v, i)`, `(v, i, k)` |
+| `lemma_vector_len_push_back`, `lemma_vector_index_push_back` | `(v, e)`, `(v, e, k)` |
+| `lemma_vector_len_update`, `lemma_vector_index_update` | `(v, i, e)`, `(v, i, e, k)` |
+| `lemma_vector_len_concat`, `lemma_vector_index_concat` | `(v, w)`, `(v, w, k)` |
+| `lemma_vector_len_slice`, `lemma_vector_index_slice` | `(v, a, b)`, `(v, a, b, k)` |
+| `lemma_vector_index_of` | `(v, e)` |
+| `lemma_vector_ext` | `(v, w)` |
+
+`lemma_vector_index_of(v, e)` states the search `index_of` makes:
+`spec_contains(v, e) ==> index < len(v) && v[index] == e`, `index` the
+position the search returns.
+
+For `remove`:
 
 ```text
 lemma_vector_len_remove(v, i)     : len(remove(v, i)) == len(v) - 1
 lemma_vector_index_remove(v, i, k): k < i ==> v'[k] == v[k]
                                     i <= k ==> v'[k] == v[k + 1]
 ```
+
+From the `proof_lemmas` fixture, where `drop_at` removes the element at `i`
+and its `ensures` quantify over the result's positions `k`:
+
+```text
+verify drop_at by
+  on ensures 1 {
+    apply lemma_vector_len_remove(v, i)
+  }
+  on ensures 2 {
+    apply lemma_vector_index_remove(v, i, k)
+  }
+  on ensures 3 {
+    apply lemma_vector_index_remove(v, i, k)
+  }
+  on _ { }
+```
+
+Each case of the conclusion is a fact of its own, so `decide` takes the one
+whose condition the obligation states. A `forall` block gives what it asserts; its
+`apply` steps, and the cases of a `split` in it, are its means: each case
+must establish the block's `assert`s.
 
 Extensionality closes equalities of whole vectors:
 
@@ -464,18 +529,19 @@ with the same `requires`/`ensures` clauses and a block of steps:
 lemma effective_bound(a : Int, scale : Int)
   requires 0 <= a && 0 <= scale && scale <= 10000
   ensures 0 <= a * scale / 10000 && a * scale / 10000 <= a
-by {
+by
   apply lemma_mul_nonneg(a, scale)
   apply lemma_mul_mono(a, a, scale, 10000)
   apply lemma_div_nonneg(a * scale, 10000)
   apply lemma_div_le(a * scale, a, 10000)
-}
 ```
 
 Each `apply` owes its premise by `decide` from the facts before it, and the
-`ensures` closes by `decide` over the four conclusions. A lemma of a
-recursion group names its `decreases` measure and is proved by induction
-through `apply` of itself, as a `spec lemma` in the source is:
+`ensures` closes by `decide` over the four conclusions. A generic lemma
+names its type parameters, `lemma L<T>(v : Vector<T>, …)`. The block's steps
+hold for all the lemma's `ensures` at once; it has no `on` blocks. A lemma
+of a recursion group names its `decreases` measure and is proved by
+induction through `apply` of itself, as a `spec lemma` in the source is:
 
 ```lean
 spec lemma sum_bound(n : Int) decreases n where
@@ -486,7 +552,8 @@ spec lemma sum_bound(n : Int) decreases n where
     apply n > 0 ==> sum_bound(n - 1)
 ```
 
-`apply` reaches a file's lemmas as it reaches the module's.
+`apply` reaches a file's lemmas as it reaches the module's; the file's
+lemmas are verified before its `verify` items.
 
 ## The escape
 
@@ -494,20 +561,7 @@ spec lemma sum_bound(n : Int) decreases n where
 by lean => …`), as a step, or as a whole item (`verify f by lean => …`). It
 is for arguments that are genuinely about Lean terms; inside it the goal has
 the solver's prepared form. A proof that needs it signals a gap in the
-language or the lemma set, to be fixed there. The `proofs` fixture's
-`square_of_sum` is such an item today, a rewriting chain where the `ring`
-proof above is the intended form:
-
-```lean
-verify square_of_sum by lean =>
-  verex_obligations
-  verex_on
-  | ensures_1 =>
-    verex_prepare
-    rw [Int.add_mul, Int.mul_add, Int.mul_add, Int.mul_comm b.val a.val, Int.mul_assoc]
-    omega
-  | _ => …
-```
+language or the lemma set, to be fixed there.
 
 ## Writing proofs from a failure
 

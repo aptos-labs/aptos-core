@@ -449,7 +449,7 @@ section JoinRule
 
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 variable {ρ : ResultShape} {Γ : NRow}
 
 -- The continuation is checked under a disjunction that preserves each

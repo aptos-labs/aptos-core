@@ -133,6 +133,7 @@ closure, the supplied row and result shape, each parameter's entry value
 (a mutable reference's at the pre-state), and the pre-state. -/
 structure Invocation where
   unit : Lean.Expr
+  functions : Lean.Expr
   frame : Lean.Expr
   invoke : Lean.Expr
   function : Lean.Expr
@@ -148,8 +149,8 @@ structure Invocation where
 and final value, its final value `finals` gives or, settled, its entry. -/
 def Invocation.arguments (invocation : Invocation) (finals : Array Lean.Expr := #[]) :
     MetaM Lean.Expr := do
-  let carriers := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
-    invocation.frame
+  let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
+    invocation.functions invocation.frame
   let mut values : Array Lean.Expr := #[]
   let mut finalIndex := 0
   for (τ, entry) in invocation.row.toList.zip invocation.entries.toList do
@@ -166,7 +167,8 @@ meaning, row, shared flags, shape, and function value, then `rest`. -/
 def Invocation.predicate (invocation : Invocation) (predicate : Name) (rest : Array Lean.Expr) :
     MetaM Lean.Expr := do
   return mkAppN (mkConst predicate)
-    (#[invocation.unit, invocation.frame, invocation.invoke, ← quoteRow invocation.row,
+    (#[invocation.unit, invocation.functions, invocation.frame, invocation.invoke,
+      ← quoteRow invocation.row,
       toExpr invocation.shared, ← quoteShape invocation.shape, invocation.function] ++ rest)
 
 /-- A value of a specification binder at a type, as a bundle component: an
@@ -177,6 +179,26 @@ def bundleComponent (domain : Domain) (clause : Lean.Expr) : MetaM Lean.Expr :=
   | _ => pure clause
 
 mutual
+/-- A let binding a variable to a variant field whose type has no value to
+stand for it under another variant: the local, its carrier, and the
+selection (`Choices.select?`) of the translated base. -/
+private partial def Context.heldVariantField? (context : Context) (pattern : VerexIR.PatternId)
+    (initializer : ExprId) : MetaM (Option (VerexIR.LocalId × Lean.Expr × Lean.Expr)) := do
+  let some { kind := .variable localId, .. } := context.ns.patterns[pattern.index]? | return none
+  let some { kind := .operation (.data (.selectVariants reference fields)) _ #[base] _, .. } :=
+      context.ns.expressions[initializer.index]? | return none
+  let handle ← structHandleOf context reference
+  let some choices := VerexIR.SemanticOperations.variantFieldChoices? context.unit handle fields
+    | return none
+  let τ ← context.exprType base
+  let carriers ← context.carriers
+  let τExpr ← quoteNTy τ
+  let value ← translate context base
+  if (← typedVariantField? τ choices carriers τExpr value).isSome then return none
+  let some (fieldType, selection) ← typedVariantSelection? τ choices carriers τExpr value
+    | return none
+  return some (localId, carrierType carriers fieldType, selection)
+
 /-- Bind a specification let in its lexical scope, also used when a free
 state-label definition is read from another clause. -/
 private partial def Context.bindLet (context : Context) (pattern : VerexIR.PatternId)
@@ -301,8 +323,8 @@ private partial def translateStateChange (context : Context)
   let present ← slotPresent slot
   let condition := if operation matches .publish _ then mkNot present else present
   let frame ← context.frame
-  let unit ← frameUnit frame
-  let carrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResourceType.carrier) unit resource
+  let leading ← frameLeading frame
+  let carrier := mkAppN (mkConst ``VerexIR.Proofs.Denote.ResourceType.carrier) (leading.push resource)
   let mut valueCondition := mkConst ``True
   let value ← if operation matches .remove _ then
       pure (mkApp (mkConst ``Option.none [Level.zero]) carrier)
@@ -317,13 +339,13 @@ private partial def translateStateChange (context : Context)
         valueCondition ← withLocalDeclD `stored carrier fun held => do
           let someStored ← mkAppM ``Option.some #[held]
           let read := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.ofRuntime)
-            #[unit, frame, nativeType, held]
+            (leading ++ #[frame, nativeType, held])
           mkAppM ``Exists #[← mkLambdaFVars #[held]
             (← mkAppM ``And #[← mkEq slot someStored, ← mkEq read stored])]
         pure slot
       else
         let transport := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.toRuntime)
-          #[unit, frame, nativeType, stored]
+          (leading ++ #[frame, nativeType, stored])
         mkAppOptM ``Option.some #[carrier, transport]
   let memory ← mkAppM ``VerexIR.Proofs.Denote.Memory.set #[pre, resource, keyValue, value]
   let condition ← if operation matches .remove _ then pure condition
@@ -369,11 +391,13 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
         an invocation does not carry"
   let frame ← context.frame
   let unit ← frameUnit frame
+  let functions ← VerexIR.Proofs.Denote.functionCarriersOfFrame frame
   -- Over a model (`doc/designs/ghost-fields.md`), the model's invocation meaning
   -- at the frame; otherwise the executable's big-step run.
   let invoke ← match ← modelInvoke? executable frame with
     | some invoke => pure invoke
-    | none => pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.closureMeaning) #[unit, executable, frame])
+    | none => pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.closureMeaning)
+        #[unit, functions, executable, frame])
   -- A literal, and the literal a struct literal's field holds, is the
   -- function value of its target, typed at the leaf's unit.
   let mut literal := callableExpression
@@ -416,14 +440,15 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
     | none, none => do
         let some state := context.state | throwError "an invocation needs a pre-state"
         pure state
-  return { unit, frame, invoke, function, row, shared, shape, entries, pre }
+  return { unit, functions, frame, invoke, function, row, shared, shape, entries, pre }
 
 /-- A literal function value of a target without type parameters, its
 captures native, its mask the target's parameters woven, as the program
 spells a closure's (`Weave.mask`), so that both meet one form. It is a value
-of its function type where its target's typing holds, which a contract,
-generic in its unit, does not decide: the proposition reading it binds the
-typing (`bindCuts`), and a leaf at the verified unit decides it. -/
+of its function type typed by the unit's check (`SiteTyped.ofCheck`), which a
+contract, generic in its unit, does not decide: the proposition reading it
+binds the check (`bindCuts`), and a leaf at the verified unit reads it off
+the literal's closure site. -/
 private partial def functionLiteral (context : Context) (reference : VerexIR.QualifiedRef)
     (mask : Nat) (instantiations : Array VerexIR.GenericArgument) (arguments : Array ExprId) :
     MetaM Lean.Expr := do
@@ -442,14 +467,21 @@ private partial def functionLiteral (context : Context) (reference : VerexIR.Qua
     | throwError "a function value's target has no native rows"
   let shared := VerexIR.Proofs.Denote.closureShared context.unit handle mask
   let frame ← context.frame
-  let value := mkAppN (mkConst ``VerexIR.Proofs.Denote.functionOf)
-    #[← frameUnit frame, frame, ← quoteRow supplied, toExpr shared, ← quoteRow results,
+  let unit ← frameUnit frame
+  let functions ← VerexIR.Proofs.Denote.functionCarriersOfFrame frame
+  let value := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.construct)
+    ((← frameLeading frame) ++ #[frame, ← quoteRow supplied, toExpr shared, ← quoteRow results,
       toExpr handle, ← mkAppM ``VerexIR.Proofs.Denote.Weave.mask #[← weaveOf parameters mask],
       ← mkArrayLit (← mkAppM ``Prod #[mkConst ``TypeId, mkConst ``TypeId]) [],
-      ← quoteRow captured, captures]
-  let .forallE _ typing _ _ ← whnfR (← inferType value)
-    | throwError "internal: a function value takes its typing"
-  return mkApp value (← mkFreshExprMVar typing (kind := .syntheticOpaque))
+      ← quoteRow captured, captures])
+  let check ← mkEq (mkAppN (mkConst ``VerexIR.Proofs.Denote.closureTypingCheck)
+      #[unit, toExpr handle, value.getArg! 7, ← quoteRow captured, ← quoteRow supplied,
+        ← quoteRow results, toExpr shared])
+    (mkConst ``Bool.true)
+  let typed ← mkAppOptM ``VerexIR.Proofs.Denote.SiteTyped.ofCheck
+    #[unit, functions, frame, none, none, none, none, none, none,
+      ← mkFreshExprMVar check (kind := .syntheticOpaque)]
+  return mkApp value typed
 
 /-- An operand as a native value of its type. -/
 partial def nativeOperand (context : Context) (id : ExprId) :
@@ -599,7 +631,7 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
             | .stateDomain =>
                 let some skolems := active.skolems?
                   | throwError "a state label needs the contract's skolem instance"
-                let memory := mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) (← frameUnit skolems)
+                let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Memory) (← frameLeading skolems)
                 pure (binderName, memory, none, fun value => pure value)
             | _ => throwError "a quantifier domain must be a type, a range, or a vector"
           -- A state label also binds the value of each mutable reference
@@ -800,6 +832,19 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
       let elseTerm ← translate context elseBranch
       conditional test thenTerm elseTerm
   | .letDecl pattern (some initializer) body =>
+      -- A variant field of a type without a value to stand for it under
+      -- another variant, such as a function value: bound to what the
+      -- selection holds, in a Boolean clause.
+      if let some (localId, carrier, selection) ← context.heldVariantField? pattern initializer then
+        unless domainOf ty == .boolean do
+          throwError "a specification let binds a variant field of a type without a default \
+            value outside a Boolean clause, which generated contracts do not carry"
+        return ← withLocalDeclD `field carrier fun field => do
+          let held ← mkEq selection (← mkAppM ``Option.some #[field])
+          let body ← translate { context with
+            locals := context.locals.set! localId.index (some field)
+            oldLocals := context.oldLocals.set! localId.index (some field) } body
+          mkForallFVars #[field] (← mkArrow held body)
       translate (← context.bindLet pattern initializer) body
   | .block statements (some result) =>
       -- A block denotes its result after its statements: an assignment to a
@@ -1165,12 +1210,15 @@ where
       let quoted ← quoteNTy nty
       let resolved ← match frame?, types? with
         | some frame, _ =>
-            mkAppOptM ``VerexIR.Proofs.Denote.Skolems.resolve #[none, some frame, some quoted]
+            mkAppOptM ``VerexIR.Proofs.Denote.Skolems.resolve #[none, none, some frame, some quoted]
         | none, some types => pure (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.substWith) types quoted)
         | none, none => pure quoted
       pure (mkApp (mkConst ``VerexSL.Contract.SpecTypeArgument.native) resolved)
     let name := toString (← specDefinitionName context.unit member.reference) ++ ".outside"
-    let taken := parameters.filter fun parameter => some parameter != frame? && some parameter != types?
+    -- The unit's function values are the unit's: the value does not take them.
+    let taken ← parameters.filterM fun parameter => do
+      return some parameter != frame? && some parameter != types? &&
+        !(← inferType parameter).isAppOf ``VerexIR.Proofs.Denote.FunctionCarriers
     opaqueValue name typeArguments.toList member.resultType inhabited (taken.push bundle)
   /-- The types a recursive definition's type parameters stand for at a
   call: the call's type arguments, under the caller's family. -/
@@ -1392,13 +1440,14 @@ where
     -- A definition reading the executable unit, the table of declared
     -- preconditions, or storage, or taking a frame, takes the unit they are
     -- at first.
-    optionalLocal (reads.unit || reads.requires || shape.takesFrame) `unit
-      (mkConst ``ValidatedUnit) fun unit? =>
-    let atUnit (constant : Name) := mkApp (mkConst constant) (unit?.getD (mkConst ``Unit))
-    optionalLocal reads.unit `executable (atUnit ``VerexIR.Validation.ExecutableUnit)
+    withOptionalUnit (reads.unit || reads.requires || shape.takesFrame) fun unit? functions? =>
+    let atUnit (constant : Name) :=
+      mkAppN (mkConst constant) (#[unit?, functions?].filterMap fun parameter => parameter)
+    optionalLocal reads.unit `executable
+      (mkApp (mkConst ``VerexIR.Validation.ExecutableUnit) (unit?.getD (mkConst ``Unit)))
       fun executable =>
-    optionalLocal reads.requires `requiresTable (atUnit ``VerexIR.Proofs.RequiresTable)
-      fun requiresTable =>
+    optionalLocal reads.requires `requiresMeaning (atUnit ``VerexIR.Proofs.RequiresMeaning)
+      fun requiresMeaning =>
     -- A definition reading storage, or taking a native parameter or result,
     -- takes the family its reads resolve resource types at and its natives
     -- inhabit, before the memory.
@@ -1407,8 +1456,9 @@ where
     -- One taking no frame, but an uninterpreted value at its type
     -- parameters, takes the types they stand for (`definitionTypes`).
     optionalLocal shape.takesTypes `types typesType fun instantiation => do
-    let parameters := #[unit?, executable, requiresTable, frame, state, instantiation].filterMap
-      fun parameter => parameter
+    let parameters :=
+      #[unit?, functions?, executable, requiresMeaning, frame, state, instantiation].filterMap
+        fun parameter => parameter
     let types ← match instantiation with
       | some instantiation => pure (some instantiation)
       | none => frame.mapM frameTypes
@@ -1445,7 +1495,7 @@ where
         specCallStack := #[]
         typeArgumentTypes := shape.typeArgumentTypes
         definition, facts := #[]
-        executable, requiresTable, state, oldState := none, types
+        executable, requiresMeaning, state, oldState := none, types
         anchorLocals := #[], anchorState := none }
     -- A member's measures: its `decreases` clause, or, without one, each
     -- integer parameter in turn. A Move specification function states no
@@ -1697,14 +1747,14 @@ where
     let mut applied := mkConst name
     if reads.unit || reads.requires || lemmaTakesFrame context.unit reference reads.state ||
         reads.state then
-      applied := mkApp applied (← context.unitExpr)
+      applied := mkAppN applied (← context.leading)
     if reads.unit then
       let some executable := context.executable
         | throwError "a lemma reads the executable unit, which this position does not take"
       applied := mkApp applied executable
     if reads.requires then
-      let some table := context.requiresTable
-        | throwError "a lemma reads the table of declared preconditions, which this \
+      let some table := context.requiresMeaning
+        | throwError "a lemma reads the requires meaning, which this \
             position does not take"
       applied := mkApp applied table
     if lemmaTakesFrame context.unit reference reads.state then
@@ -1728,18 +1778,20 @@ where
       if present then withLocalDeclD binder type fun x => k (some x) else k none
     let takesFrame := lemmaTakesFrame context.unit reference reads.state
     -- What it reads besides its parameters is at a unit, taken first.
-    optionalLocal (reads.unit || reads.requires || takesFrame || reads.state) `unit
-      (mkConst ``ValidatedUnit) fun unit? =>
-    let atUnit (constant : Name) := mkApp (mkConst constant) (unit?.getD (mkConst ``Unit))
-    optionalLocal reads.unit `executable (atUnit ``VerexIR.Validation.ExecutableUnit)
+    withOptionalUnit (reads.unit || reads.requires || takesFrame || reads.state)
+      fun unit? functions? =>
+    let atUnit (constant : Name) :=
+      mkAppN (mkConst constant) (#[unit?, functions?].filterMap fun parameter => parameter)
+    optionalLocal reads.unit `executable
+      (mkApp (mkConst ``VerexIR.Validation.ExecutableUnit) (unit?.getD (mkConst ``Unit)))
       fun executable =>
-    optionalLocal reads.requires `requiresTable (atUnit ``VerexIR.Proofs.RequiresTable)
-      fun requiresTable =>
+    optionalLocal reads.requires `requiresMeaning (atUnit ``VerexIR.Proofs.RequiresMeaning)
+      fun requiresMeaning =>
     -- The family its reads resolve resource types at and its parameters
     -- are typed at, before the memory.
     optionalLocal takesFrame `frame (atUnit ``VerexIR.Proofs.Denote.Skolems) fun frame =>
     optionalLocal reads.state `state (atUnit ``VerexIR.Proofs.Denote.Memory) fun state => do
-    let parameters := #[unit?, executable, requiresTable, frame, state].filterMap
+    let parameters := #[unit?, functions?, executable, requiresMeaning, frame, state].filterMap
       fun parameter => parameter
     let types ← frame.mapM frameTypes
     let domains ← lemmaDomains reference
@@ -1770,7 +1822,7 @@ where
         results := #[], resultTypes := #[]
         specCallStack := #[], typeArgumentTypes := #[]
         definition := none, facts := #[]
-        executable, requiresTable, state, oldState := state, types
+        executable, requiresMeaning, state, oldState := state, types
         anchorLocals := #[], anchorState := none, lemmaQuantified := false }
     let conjunction (clauses : Array Lean.Expr) : MetaM Lean.Expr :=
       match clauses.back? with
@@ -1846,8 +1898,8 @@ where
           if identity then pure none
           else pure (some (row.foldr VerexIR.Proofs.Denote.NRow.cons .nil))
         let frame? ← row?.mapM fun row => do
-          pure (mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate)
-            (← context.unitExpr) (← quoteTypeArgs.quoteTypeArgsRow row) (← context.frame))
+          pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate)
+            ((← context.leading) ++ #[← quoteTypeArgs.quoteTypeArgsRow row, ← context.frame]))
         let bundle ← lemmaBundle reference arguments row?
         let owes := mkApp (← lemmaApplied reference names.requires frame?) bundle
         let gives := mkApp (← lemmaApplied reference names.ensures frame?) bundle
@@ -1898,15 +1950,15 @@ where
           let reads := shape.reads
           let mut applied := mkConst shape.name
           if reads.unit || reads.requires || shape.takesFrame then
-            applied := mkApp applied (← context.unitExpr)
+            applied := mkAppN applied (← context.leading)
           if reads.unit then
             let some executable := context.executable
               | throwError "a behavioral predicate reads the executable unit, which this \
                   contract does not take"
             applied := mkApp applied executable
           if reads.requires then
-            let some table := context.requiresTable
-              | throwError "`requires_of` reads the table of declared preconditions, which \
+            let some table := context.requiresMeaning
+              | throwError "`requires_of` reads the requires meaning, which \
                   this contract does not take"
             applied := mkApp applied table
           if shape.takesFrame then applied := mkApp applied (← context.frame)
@@ -2119,7 +2171,7 @@ where
         let outside ← if shape.natives.any (·.isSome) || shape.resultNative.isSome then do
             let frame ← context.frame
             let member ← memberOfShape shape reference (some (← frameCarriers frame))
-            outsideValue member #[← context.unitExpr, frame] (some frame) none
+            outsideValue member ((← frameLeading frame).push frame) (some frame) none
               shape.typeArgumentTypes bundle
           else outsideValue (← memberOfShape shape reference none) #[] none none #[] bundle
         atCall (← mkAppM ``ite #[bounds, expanded, outside])
@@ -2425,11 +2477,12 @@ where
         | .one (.ref _) => (domainOf ty).ofNative (← mkAppM ``Prod.fst #[value])
         | .one _ => (domainOf ty).ofNative value
     | .requiresOf =>
-        let some table := context.requiresTable
-          | throwError "`requires_of` reads the table of declared preconditions, which this \
+        let some table := context.requiresMeaning
+          | throwError "`requires_of` reads the requires meaning, which this \
               contract does not take"
         return mkAppN (mkConst ``VerexIR.Proofs.RequiresOf)
-          #[invocation.unit, invocation.frame, table, ← quoteRow invocation.row,
+          #[invocation.unit, invocation.functions, invocation.frame, table,
+            ← quoteRow invocation.row,
             toExpr invocation.shared, ← quoteRow invocation.shape.row, invocation.function,
             ← invocation.arguments, invocation.pre]
     | .unchangedOf | .foldsOf | .writeOf _ =>
@@ -2696,11 +2749,11 @@ partial def ensureDefinitionTransport (unit : ValidatedUnit) (source : Name)
   forallTelescope targetInfo.type fun binders _ => do
     let parameters := binders.pop
     let some frameIndex ← parameters.findIdxM? fun parameter => do
-        return (← inferType parameter).isAppOfArity ``VerexIR.Proofs.Denote.Skolems 1
+        return (← inferType parameter).isAppOfArity ``VerexIR.Proofs.Denote.Skolems 2
       | throwError m!"the definition `{source}` takes no frame, which its transport crosses"
     let frame := parameters[frameIndex]!
-    let unitExpr := (← inferType frame).appArg!
-    let induced := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) unitExpr θExpr frame
+    let induced := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate)
+      ((← frameLeading frame) ++ #[θExpr, frame])
     let sourceParameters := parameters.set! frameIndex induced
     let agree ← fixpointsAgree (← valueAt (groupOf members[0]!.1) sourceParameters)
       (← valueAt (groupOf members[0]!.2) parameters) members.size transports

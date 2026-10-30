@@ -1109,8 +1109,8 @@ private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Arra
     unless condition.auxiliary.isEmpty do
       throwError "a data invariant cannot carry auxiliary expressions"
     let proposition ← if readsMemory then
-        withLocalDeclD `memory (mkApp (mkConst ``VerexIR.Proofs.Denote.Memory)
-            (← invariantContext.unitExpr)) fun memory => do
+        withLocalDeclD `memory (mkAppN (mkConst ``VerexIR.Proofs.Denote.Memory)
+            (← invariantContext.leading)) fun memory => do
           mkForallFVars #[memory] (← translate
             { invariantContext with state := some memory, oldState := some memory }
             condition.expression) (usedOnly := true)
@@ -1218,6 +1218,7 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
     | throwError "a function-valued field's frame needs the executable unit"
   let skolems ← context.frame
   let unitExpr ← context.unitExpr
+  let functions ← VerexIR.Proofs.Denote.functionCarriersOfFrame skolems
   let carriers ← context.carriers
   let row ← quoteRow parameters
   let sharing := toExpr shared
@@ -1227,11 +1228,11 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
   let some frame := declaration.contract.parameterFrames.find? (·.parameter.index == index)
     | match invoke? with
       | some invoke =>
-          mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf) unitExpr skolems invoke)
-            #[row, sharing, shape, value]
+          mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf) unitExpr functions skolems
+            invoke) #[row, sharing, shape, value]
       | none =>
-          mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
-            unitExpr executable skolems) #[row, sharing, shape, value]
+          mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
+            unitExpr functions executable skolems) #[row, sharing, shape, value]
   if frame.modifiesAll then return mkConst ``True
   let some ns := context.unit.namespaces[owner.index]?
     | throwError "a field frame's namespace is out of range"
@@ -1249,7 +1250,7 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
     locals := locals.set! declaration.fields.size (some whole)
   let typeArgumentTypes := scope.map (Scoped.toNative? context.unit owner)
   let invocationType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row
-  let memoryType := mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) unitExpr
+  let memoryType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) unitExpr functions
   let frameTerm ← withLocalDeclD `invocation invocationType fun invocation =>
     withLocalDeclD `pre memoryType fun pre =>
     withLocalDeclD `post memoryType fun post => do
@@ -1270,11 +1271,11 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
       mkLambdaFVars #[invocation, pre, post] (← slotFrame pre post slots false)
   match invoke? with
   | some invoke =>
-      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAtOf) unitExpr skolems invoke)
+      mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.FramedAtOf) unitExpr functions skolems invoke)
         #[row, sharing, shape, frameTerm, value]
   | none =>
-      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAt)
-        unitExpr executable skolems) #[row, sharing, shape, frameTerm, value]
+      mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.FramedAt)
+        unitExpr functions executable skolems) #[row, sharing, shape, frameTerm, value]
 
 /-- The native type of a variant's field of an enum type. -/
 private def variantFieldType? (τ : VerexIR.Proofs.Denote.NTy) (variant : String) (index : Nat) :
@@ -1829,9 +1830,10 @@ def storedInvariantTerm (unit : ValidatedUnit) :
       -- frame its values are at.
       let generic := !(σ.nominalArguments? matches some .nil)
       let case? : Option Lean.Expr ⊕ String ←
-          withLocalDeclD `unit (mkConst ``ValidatedUnit) fun memoryUnit =>
-          withLocalDeclD `executable (unitReaderType unit memoryUnit) fun executable => do
-        let leading := if readsUnit then #[memoryUnit, executable] else #[memoryUnit]
+          withUnitVariable .default fun memoryUnit functions =>
+          withLocalDeclD `executable (unitReaderType unit memoryUnit functions) fun executable => do
+        let leading :=
+          if readsUnit then #[memoryUnit, functions, executable] else #[memoryUnit, functions]
         let atFrame (binder frame : Lean.Expr) : MetaM (Option Lean.Expr ⊕ String) := do
           let carrier := carrierType (← frameCarriers frame) (← quoteNTy σ)
           withLocalDeclD `value carrier fun value => do
@@ -1845,9 +1847,10 @@ def storedInvariantTerm (unit : ValidatedUnit) :
             let held ← conjunction (terms.map fun (term, range) => markObligation range term)
             return Sum.inl (some (← mkLambdaFVars (leading ++ #[binder, value]) held))
         withLocalDeclD `θ (mkConst ``VerexIR.Proofs.Denote.TypeArgs) fun θ =>
-          let runtime := mkApp (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) memoryUnit
+          let runtime := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) memoryUnit functions
           atFrame θ (if generic then
-              mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) memoryUnit θ runtime
+              mkApp4 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) memoryUnit functions θ
+                runtime
             else runtime)
       match case? with
       | .inr reason => unsupported := unsupported.push (owner, reason)
@@ -1863,9 +1866,9 @@ is typed at, then the executable unit where they read it. -/
 def storedInvariantAt (unit : ValidatedUnit) (predicate : Lean.Expr) (executable : Option Lean.Expr)
     (memory : Lean.Expr) : MetaM Lean.Expr := do
   let type ← whnfR (← inferType memory)
-  unless type.isAppOfArity ``VerexIR.Proofs.Denote.Memory 1 do
+  unless type.isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do
     throwError "internal: the stored invariants are applied to {memory}, not a memory"
-  let atUnit := mkApp predicate type.appArg!
+  let atUnit := mkApp2 predicate (type.getArg! 0) (type.getArg! 1)
   unless storedInvariantReadsUnit unit do return atUnit
   let some executable := executable
     | throwError "the stored invariants read the executable unit, which this contract does \
@@ -2044,15 +2047,16 @@ def mentionsFinal (ns : ValidatedNamespace) (root : ExprId) : Bool := Id.run do
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return false
 
-/-- A function's declared precondition over the runtime values of its
-arguments, as `requires_of` reads a closure target's
-(`VerexIR.Proofs.RequiresTable`): its `requires` clauses at every row of
-native arguments at the runtime frame those values encode, each parameter
-read from its argument, a reference as the value it passes. -/
+/-- A function's declared precondition over native values of its
+arguments, as `requires_of` reads a closure site's target: its `requires`
+clauses at a row of its arguments at the frame `frameOf` gives (the base
+frame, or the frame a generic target's instantiation induces), each
+parameter read from its argument, a reference as the value it passes. A
+function of the unit, its function values, the arguments and the state. -/
 def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
-    :
+    (frameOf : Lean.Expr → Lean.Expr → MetaM Lean.Expr) :
     MetaM Lean.Expr := do
   let groups ← groupConditions unit declaration.contract.conditions
   let localTypes ← declaration.locals.mapM fun localDecl => do
@@ -2064,39 +2068,35 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
       | throwError "a parameter has no native type"
     pure nty
   let row ← quoteRow (VerexIR.Proofs.Denote.NRow.ofList parameterTypes.toList)
-  let values := mkApp (mkConst ``Array [Level.zero]) (mkConst ``VerexIR.RuntimeValue)
-  withLocalDeclD `unit (mkConst ``ValidatedUnit) fun unitExpr =>
-  withLocalDeclD `arguments values fun arguments =>
-    withLocalDeclD `state (mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) unitExpr) fun state => do
-      let frame := mkApp (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) unitExpr
-      let carriers ← frameCarriers frame
-      let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row
-      let requires ← withLocalDeclD `args argumentsType fun args => do
-        let natives ← rowProjections frame args (rowElementTypes row)
-        let mut locals : Array (Option Lean.Expr) := Array.replicate declaration.locals.size none
-        for (parameter, nty, nativeValue, index) in
-            ((declaration.signature.parameters.zip parameterTypes).zip natives).zipIdx.map
-              fun (((parameter, nty), nativeValue), index) => (parameter, nty, nativeValue, index) do
-          let some ty := unit.tables.types[(specTypeId unit parameter.typeUse.typeId).index]?
-            | throwError "a parameter has an unknown type"
-          let current ← match nty with
-            | .ref referent => do
-                let carrier := carrierType carriers (← quoteNTy referent)
-                pure (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier nativeValue)
-            | _ => pure nativeValue
-          locals := locals.set! index (some (← (domainOf ty).binderOfNative current))
-        let context : Context :=
-          { unit, namespaceId, ns, locals, localTypes
-            localNames := declaration.locals.map (·.name)
-            oldLocals := locals, results := #[]
-            types := some (← frameTypes frame)
-            state := some state, oldState := some state }
-        let context ← bindLets context groups.lets false
-        let clauses ← groups.requires.mapM (translate context ·.1)
-        let encoded ← mkAppM ``List.toArray
-          #[mkApp3 (mkConst ``VerexIR.Proofs.Denote.HList.encode) carriers row args]
-        mkForallFVars #[args] (← mkArrow (← mkEq encoded arguments) (← conjunction clauses))
-      mkLambdaFVars #[unitExpr, arguments, state] requires
+  withUnitVariable .default fun unitExpr functions => do
+    let frame ← frameOf unitExpr functions
+    let carriers ← frameCarriers frame
+    let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row
+    withLocalDeclD `args argumentsType fun args =>
+    withLocalDeclD `state (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) unitExpr functions)
+      fun state => do
+      let natives ← rowProjections frame args (rowElementTypes row)
+      let mut locals : Array (Option Lean.Expr) := Array.replicate declaration.locals.size none
+      for (parameter, nty, nativeValue, index) in
+          ((declaration.signature.parameters.zip parameterTypes).zip natives).zipIdx.map
+            fun (((parameter, nty), nativeValue), index) => (parameter, nty, nativeValue, index) do
+        let some ty := unit.tables.types[(specTypeId unit parameter.typeUse.typeId).index]?
+          | throwError "a parameter has an unknown type"
+        let current ← match nty with
+          | .ref referent => do
+              let carrier := carrierType carriers (← quoteNTy referent)
+              pure (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier nativeValue)
+          | _ => pure nativeValue
+        locals := locals.set! index (some (← (domainOf ty).binderOfNative current))
+      let context : Context :=
+        { unit, namespaceId, ns, locals, localTypes
+          localNames := declaration.locals.map (·.name)
+          oldLocals := locals, results := #[]
+          types := some (← frameTypes frame)
+          state := some state, oldState := some state }
+      let context ← bindLets context groups.lets false
+      let clauses ← groups.requires.mapM (translate context ·.1)
+      mkLambdaFVars #[unitExpr, functions, args, state] (← conjunction clauses)
 
 /-- Whether a function's body is verified: it has one, and neither its
 specification nor its module sets `pragma verify = false`. -/
@@ -2991,7 +2991,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (typeInstantiation : Option Lean.Expr := none)
     (nativeModel : Option NativeModel := none)
     (executable : Option Lean.Expr := none)
-    (requiresTable : Option Lean.Expr := none)
+    (requiresMeaning : Option Lean.Expr := none)
     (stored : StoredInvariants := {}) :
     MetaM Lean.Expr := do
   let uses := frameUses unit namespaceId declaration
@@ -3069,7 +3069,8 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     signature.params
   let resultType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResultShape.carrier) ((← frameCarriers signature.skolems))
     signature.shape
-  let runtimeState := mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) (← frameUnit signature.skolems)
+  let runtimeState := mkAppN (mkConst ``VerexIR.Proofs.Denote.Memory)
+    (← frameLeading signature.skolems)
   let failure := mkConst ``VerexIR.Proofs.Failure
   /- In a one-state clause a parameter denotes its entry value; in
   `ensures` it denotes the current value — the prophecy of a mutable
@@ -3083,7 +3084,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       localNames := declaration.locals.map (·.name)
       oldLocals := padLocals (bound.map fun binders => some binders.entry)
       results := #[]
-      state := some state, oldState := some state, executable, requiresTable
+      state := some state, oldState := some state, executable, requiresMeaning
       labelDefinitions
       labelEntry := some { memory := state, locals := padLocals (bound.map (some ∘ SlotBinders.entry)) }
       labelExit := some { memory := state, locals := padLocals (bound.map (some ∘ SlotBinders.entry)) } }
@@ -3131,7 +3132,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               resultFinals := finals
               resultComponents := components
               resultTypes := resultSlots.map (·.physical)
-              state := some final, oldState := some state, executable, requiresTable
+              state := some final, oldState := some state, executable, requiresMeaning
               labelDefinitions
               labelEntry := some {
                 memory := state, locals := padLocals (parameterBound.map (some ∘ SlotBinders.entry)) }
@@ -3307,18 +3308,21 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           for invoked in #[row, type.getArg! 2] do
             if mentionsInvocableParameter invoked then
               conjuncts := conjuncts.push
-                (mkApp3 (mkConst ``VerexIR.Proofs.ScalarAt) unitExpr signature.skolems invoked)
+                (mkAppN (mkConst ``VerexIR.Proofs.ScalarAt)
+                  ((← frameLeading signature.skolems) ++ #[signature.skolems, invoked]))
           -- Over a model, the frame is of the model's invocations.
           let invoke? ← modelInvoke? executable signature.skolems
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>
               conjuncts := conjuncts.push (← match invoke? with
                 | some invoke =>
-                    mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf) unitExpr
-                      signature.skolems invoke) #[row, sharing, shape, value]
+                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
+                      ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
+                      #[row, sharing, shape, value]
                 | none =>
-                    mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.KeepsMemoryAt) unitExpr executable
-                      signature.skolems) #[row, sharing, shape, value])
+                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
+                      ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+                      #[row, sharing, shape, value])
           | some frame =>
               -- The closed frame but for the targets, the formals bound to
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.
@@ -3342,11 +3346,13 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                       mkLambdaFVars #[invocation, pre, post] (← slotFrame pre post slots false)
                 conjuncts := conjuncts.push (← match invoke? with
                   | some invoke =>
-                      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAtOf) unitExpr
-                        signature.skolems invoke) #[row, sharing, shape, frameTerm, value]
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.FramedAtOf)
+                        ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
+                        #[row, sharing, shape, frameTerm, value]
                   | none =>
-                      mkAppM' (mkApp3 (mkConst ``VerexIR.Proofs.FramedAt) unitExpr executable
-                        signature.skolems) #[row, sharing, shape, frameTerm, value])
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.FramedAt)
+                        ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+                        #[row, sharing, shape, frameTerm, value])
       mkLambdaFVars #[arguments, initial] (← conjunction conjuncts)
   let contract ← mkAppOptM ``VerexIR.Proofs.Contract.mk
     #[some runtimeState, some failure, some argumentsType, some resultType,
@@ -3500,6 +3506,10 @@ private def rootIdent (name : Name) : Ident :=
 def unitName (namespaceSegments : Array String) : Name :=
   Name.str (pathName namespaceSegments) "unit"
 
+/-- Name of the unit's function values instance (`FunctionCarriers`). -/
+def functionCarriersName (namespaceSegments : Array String) : Name :=
+  Name.str (pathName namespaceSegments) "functionCarriers"
+
 /-- Define the registered unit as a Lean literal, once per namespace. -/
 def ensureUnitDefinition (namespaceSegments : Array String)
     (unit : ValidatedUnit) : CommandElabM Name := do
@@ -3567,15 +3577,6 @@ def ensureUnitDefinitions (namespaceSegments : Array String)
 /-- Materialize a registered unit as a Lean definition. -/
 syntax (name := verexUnitCommand) "#verex_unit" verexPath : command
 
-@[command_elab verexUnitCommand]
-def elabVerexUnit : CommandElab := fun stx => do
-  let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
-  let segments := pathSegments pathSyntax
-  let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments)
-    | throwErrorAt stx s!"unknown Verex namespace `{pathName segments}`"
-  -- A hand-written proof needs the same quoted unit the generated script
-  -- uses, along with the typed twins of its declarations.
-  discard <| ensureUnitDefinitions segments unit
 
 /-- Name of the typed verification theorem over a function's native
 signature. -/

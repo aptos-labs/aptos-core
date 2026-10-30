@@ -10,7 +10,7 @@ must still require its actual postcondition. -/
 open Lean Meta Elab Tactic
 open VerexIR VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit}
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
 example (memory : Memory unit) (resource : ResourceType) (key : StorageKey)
     (first second : Option (resource.carrier unit)) :

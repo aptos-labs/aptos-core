@@ -19,7 +19,7 @@ arguments alone.
 namespace VerexIR.Proofs.Denote
 
 section Frames
-variable {unit : Validation.ValidatedUnit} [Θ : Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Θ : Skolems unit]
 
 /-- The target's native argument row: the captures and the supplied
 arguments, woven. -/
@@ -342,14 +342,6 @@ theorem closureOf_captures (handle : FunctionHandle) (mask : Nat)
     (typeInstantiation : Array (TypeId × TypeId)) {σs : NRow} (captures : HList σs) :
     (closureOf handle mask typeInstantiation captures).mask = mask := rfl
 
-/-! ## Invoking a routed target
-
-In a unit verified through its model (`doc/designs/ghost-fields.md`), a
-function value of a target the proof routes invokes the target's meaning:
-the captures and the supplied arguments composed by the value's mask and
-decoded at the target's parameters, the target's result read back at the
-invocation's shape, by their encodings. -/
-
 /-- Weaving native rows encodes as weaving their encodings. -/
 theorem Weave.encode_compose : {full captured supplied : NRow} →
     (weave : Weave full captured supplied) → (captures : HList captured) → (args : HList supplied) →
@@ -360,96 +352,6 @@ theorem Weave.encode_compose : {full captured supplied : NRow} →
       simp only [Weave.compose, HList.encode_cons, Weave.composeList, rest.encode_compose]
   | _, _, _, .supplied rest, captures, args => by
       simp only [Weave.compose, HList.encode_cons, Weave.composeList, rest.encode_compose]
-
-/-- Invoking a function value of a target without type parameters by the
-target's meaning, through the encodings: the captures and the supplied
-arguments composed by the value's mask, decoded at the target's parameters,
-and the target's result decoded at the invocation's shape. A value not of
-the target, or whose arguments or result do not decode, has no outcome and
-is undefined. -/
-def invokeAt (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
-    (self : HList π → Comp unit ρ.carrier) : InvokeMeaning :=
-  fun σs shared shape function args =>
-    let closure := (Carriers.functions σs shared shape.row).closure function
-    if closure.function = handle then
-      match (ClosureMask.compose closure.mask closure.captures.toList (HList.encode args)).bind
-          (rowCodec π).decode? with
-      | some full => Spec.bind (self full) fun result =>
-          match (resultCodec shape).decode? ((resultCodec ρ).encode result) with
-          | some value => Spec.pure value
-          | none => Spec.stuck
-      | none => Spec.stuck
-    else Spec.stuck
-
-/-- A literal closure of the routed target invokes it on the woven
-arguments, its result read back at the invocation's shape. -/
-theorem invokeAt_closureOf_read (handle : FunctionHandle) {π captured supplied : NRow}
-    (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
-    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) (shape : ResultShape) (shared : Sharing)
-    (typed : FunctionTyped supplied shared shape.row
-      handle weave.mask typeInstantiation captures)
-    (args : HList supplied) :
-    invokeAt handle π ρ self supplied shared shape
-        (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
-        args =
-      Spec.bind (self (weave.compose captures args)) fun result =>
-        match (resultCodec shape).decode? ((resultCodec ρ).encode result) with
-        | some value => Spec.pure value
-        | none => Spec.stuck := by
-  unfold invokeAt
-  simp only [functionOf_closure]
-  rw [if_pos (closureOf_function handle weave.mask typeInstantiation captures), closureOf_captures,
-    closureOf_mask, weave.compose_mask _ _ (HList.encode_length captured captures)
-      (HList.encode_length supplied args), ← weave.encode_compose]
-  simp only [Option.bind_some, HList.encode, Codec.decode_encode]
-
-/-- A literal closure of the routed target invokes it on the woven
-arguments. -/
-theorem invokeAt_closureOf (handle : FunctionHandle) {π captured supplied : NRow}
-    (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
-    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) (shared : Sharing)
-    (typed : FunctionTyped supplied shared ρ.row
-      handle weave.mask typeInstantiation captures)
-    (args : HList supplied) :
-    invokeAt handle π ρ self supplied shared ρ
-        (functionOf supplied shared ρ.row handle weave.mask typeInstantiation captures typed)
-        args =
-      self (weave.compose captures args) := by
-  rw [invokeAt_closureOf_read]
-  simp only [Codec.decode_encode]
-  exact Spec.bind_pure _
-
-/-- `invokeAt_closureOf` at a target without a result, spelled at its row:
-the form a rewrite matches. -/
-@[simp] theorem invokeAt_closureOf_none (handle : FunctionHandle) {π captured supplied : NRow}
-    (self : HList π → Comp unit ResultShape.none.carrier)
-    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) (shared : Sharing)
-    (typed : FunctionTyped supplied shared .nil
-      handle weave.mask typeInstantiation captures)
-    (args : HList supplied) :
-    invokeAt handle π .none self supplied shared .none
-        (functionOf supplied shared .nil handle weave.mask typeInstantiation captures typed)
-        args =
-      self (weave.compose captures args) :=
-  invokeAt_closureOf handle .none self weave typeInstantiation captures shared typed args
-
-/-- `invokeAt_closureOf` at a target with one result, spelled at its row. -/
-@[simp] theorem invokeAt_closureOf_one (handle : FunctionHandle) {π captured supplied : NRow}
-    (τ : NTy) (self : HList π → Comp unit (ResultShape.one τ).carrier)
-    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) (shared : Sharing)
-    (typed : FunctionTyped supplied shared (.cons τ .nil)
-      handle weave.mask typeInstantiation captures)
-    (args : HList supplied) :
-    invokeAt handle π (.one τ) self supplied shared (.one τ)
-        (functionOf supplied shared (.cons τ .nil) handle weave.mask typeInstantiation captures
-          typed)
-        args =
-      self (weave.compose captures args) :=
-  invokeAt_closureOf handle (.one τ) self weave typeInstantiation captures shared typed args
 
 /-- Lending a woven row is lending the supplied arguments and composing the
 captures' encodings among them by the weave's mask. -/
@@ -538,7 +440,7 @@ theorem Weave.lendArguments_compose_injective {full captured supplied : NRow}
 /-- Running a closure whose target, weave, and captures are known is running
 the target on the captures and the supplied arguments woven into its
 parameter row. -/
-theorem closureRun_closureOf {unit : VerexIR.Validation.ValidatedUnit}
+theorem closureRun_closureOf {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (handle : FunctionHandle) {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
@@ -645,7 +547,7 @@ mutual
 /-- A value lends at the target's family as at the caller's types. -/
 theorem NTy.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : NTy) →
     (prophecies : Bool) → (value : (τ.subst θ.1).carrier) → (loans : List Nat) →
-    @NTy.lend _ (Skolems.instantiate θ Θ) τ prophecies (NTy.toSkolem θ τ value) loans =
+    @NTy.lend _ _ (Skolems.instantiate θ Θ) τ prophecies (NTy.toSkolem θ τ value) loans =
       NTy.lend (τ.subst θ.1) prophecies value loans
   | .ref referent, prophecies, value, loan :: loans => by
       cases prophecies <;>
@@ -667,7 +569,7 @@ theorem NTy.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : N
 /-- A row lends at the target's family as at the caller's types. -/
 theorem NRow.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (row : NRow) →
     (prophecies : Bool) → (values : HList (NRow.subst θ.1 row)) → (loans : List Nat) →
-    @NRow.lend _ (Skolems.instantiate θ Θ) row prophecies (HList.toSkolem θ row values) loans =
+    @NRow.lend _ _ (Skolems.instantiate θ Θ) row prophecies (HList.toSkolem θ row values) loans =
       NRow.lend (NRow.subst θ.1 row) prophecies values loans
   | .nil, _, _, _ => rfl
   | .cons τ rest, prophecies, values, loans => by
@@ -679,7 +581,7 @@ end
 theorem argumentsResolve_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (σs : NRow) →
     (values : HList (NRow.subst θ.1 σs)) → (loans : List Nat) → (returned : Array RuntimeValue) →
     (exports : List (Nat × RuntimeValue)) →
-    (@argumentsResolve _ (Skolems.instantiate θ Θ) σs (HList.toSkolem θ σs values) loans returned
+    (@argumentsResolve _ _ (Skolems.instantiate θ Θ) σs (HList.toSkolem θ σs values) loans returned
         exports ↔
       argumentsResolve (NRow.subst θ.1 σs) values loans returned exports)
   | .nil, _, _, _, _ => Iff.rfl
@@ -705,7 +607,7 @@ theorem ResultShape.lend_ofSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
     (shape : ResultShape) → (prophecies : Bool) →
     (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) → (loans : List Nat) →
     (shape.subst θ.1).lend prophecies (ResultShape.ofSkolem θ shape result) loans =
-      @ResultShape.lend _ (Skolems.instantiate θ Θ) shape prophecies result loans
+      @ResultShape.lend _ _ (Skolems.instantiate θ Θ) shape prophecies result loans
   | .none, _, _, loans => by cases loans <;> rfl
   | .one τ, prophecies, result, loans => by
       conv => rhs; rw [← NTy.toSkolem_ofSkolem θ τ result]
@@ -731,27 +633,27 @@ theorem NTy.toSkolem_ofSkolem_shape (θ : TypeArgs) : (shape : ResultShape) →
 
 theorem lendArguments_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow)
     (args : HList (NRow.subst θ.1 σs)) (loans : List Nat) :
-    @lendArguments _ (Skolems.instantiate θ Θ) σs (HList.toSkolem θ σs args) loans =
+    @lendArguments _ _ (Skolems.instantiate θ Θ) σs (HList.toSkolem θ σs args) loans =
       lendArguments (NRow.subst θ.1 σs) args loans := by
   unfold lendArguments
   rw [NRow.lend_toSkolem θ free]
 
 /-- A callee's run at the caller's types is its run at the family its type
 arguments induce, read back in the caller's view. -/
-theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit}
+theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle) (θ : TypeArgs)
     (free : θ.1.refFree = true) (σs : NRow) (shape : ResultShape)
     (args : HList (NRow.subst θ.1 σs)) :
     propheticRun executable typeInstantiation handle (NRow.subst θ.1 σs) (shape.subst θ.1) args =
-      Spec.bind (@propheticRun _ executable (Skolems.instantiate θ Θ) typeInstantiation handle σs shape
+      Spec.bind (@propheticRun _ _ executable (Skolems.instantiate θ Θ) typeInstantiation handle σs shape
         (HList.toSkolem θ σs args)) fun result => Spec.pure (ResultShape.ofSkolem θ shape result) := by
   have lend (values : HList (NRow.subst θ.1 σs)) (loans : List Nat) :=
     lendArguments_toSkolem θ free σs values loans
   have resolve (values : HList (NRow.subst θ.1 σs)) := argumentsResolve_toSkolem θ free σs values
   have result (prophecies : Bool) (value : (shape.subst θ.1).carrier) (loans : List Nat) :
       (shape.subst θ.1).lend prophecies value loans =
-        @ResultShape.lend _ (Skolems.instantiate θ Θ) shape prophecies
+        @ResultShape.lend _ _ (Skolems.instantiate θ Θ) shape prophecies
           (ResultShape.toSkolem θ shape value) loans := by
     conv => lhs; rw [← ResultShape.ofSkolem_toSkolem θ shape value]
     exact ResultShape.lend_ofSkolem θ free shape prophecies _ loans
@@ -829,24 +731,24 @@ def ResultShape.functionOfSkolem (θ : TypeArgs) (σs : NRow) (shared : Sharing)
 
 /-- A run of a closure at the family a call's type arguments induce is its
 run at the caller's types, read in the callee's view. -/
-theorem closureRun_instantiate {unit : VerexIR.Validation.ValidatedUnit}
+theorem closureRun_instantiate {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (closure : ClosureValue) (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow)
     (shape : ResultShape) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
-    @closureRun _ executable (Skolems.instantiate θ Θ) closure σs shape args =
+    @closureRun _ _ executable (Skolems.instantiate θ Θ) closure σs shape args =
       Spec.bind (closureRun executable closure (NRow.subst θ.1 σs) (shape.subst θ.1)
           (HList.ofSkolem θ σs args))
         fun result => Spec.pure (ResultShape.toSkolem θ shape result) := by
   have lend (loans : List Nat) :
       lendArguments (NRow.subst θ.1 σs) (HList.ofSkolem θ σs args) loans =
-        @lendArguments _ (Skolems.instantiate θ Θ) σs args loans := by
+        @lendArguments _ _ (Skolems.instantiate θ Θ) σs args loans := by
     rw [← lendArguments_toSkolem θ free σs, HList.toSkolem_ofSkolem]
   have lendAt (values : HList (NRow.subst θ.1 σs)) (loans : List Nat) :=
     lendArguments_toSkolem θ free σs values loans
   have resolve (values : HList (NRow.subst θ.1 σs)) := argumentsResolve_toSkolem θ free σs values
   have result (prophecies : Bool)
       (value : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) (loans : List Nat) :
-      @ResultShape.lend _ (Skolems.instantiate θ Θ) shape prophecies value loans =
+      @ResultShape.lend _ _ (Skolems.instantiate θ Θ) shape prophecies value loans =
         (shape.subst θ.1).lend prophecies (ResultShape.ofSkolem θ shape value) loans :=
     (ResultShape.lend_ofSkolem θ free shape prophecies value loans).symm
   simp only [closureRun, Spec.bind, Spec.pure]
@@ -910,13 +812,13 @@ theorem closureRun_instantiate {unit : VerexIR.Validation.ValidatedUnit}
 
 /-- An invocation of a function value at the family a call's type arguments
 induce is its invocation at the caller's types, read in the callee's view. -/
-theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
+theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
     (shape : ResultShape)
     (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
     (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
-    @closureMeaning _ executable (Skolems.instantiate θ Θ) σs shared shape function args =
+    @closureMeaning _ _ executable (Skolems.instantiate θ Θ) σs shared shape function args =
       Spec.bind (closureMeaning executable (NRow.subst θ.1 σs) shared (shape.subst θ.1)
           (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args))
         fun result => Spec.pure (ResultShape.toSkolem θ shape result) := by
@@ -928,22 +830,22 @@ omit [Θ : Skolems unit] in
 type arguments induce: invoking a function value at the induced frame is
 invoking it at the outer frame on the arguments read in the outer view, the
 result carried back, as both views hold the same runtime values. -/
-def InvokeMeaning.Coherent (invoke : (Θ : Skolems unit) → @InvokeMeaning unit Θ) : Prop :=
+def InvokeMeaning.Coherent (invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ) : Prop :=
   ∀ (Θ : Skolems unit) (θ : TypeArgs), θ.1.refFree = true → ∀ (σs : NRow) (shared : Sharing)
     (shape : ResultShape)
     (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
     (args : @HList (Skolems.instantiate θ Θ).toCarriers σs),
     invoke (Skolems.instantiate θ Θ) σs shared shape function args =
       Spec.bind (invoke Θ (NRow.subst θ.1 σs) shared (shape.subst θ.1)
-          (@ResultShape.functionOfSkolem _ Θ θ σs shared shape function) (HList.ofSkolem θ σs args))
+          (@ResultShape.functionOfSkolem _ _ Θ θ σs shared shape function) (HList.ofSkolem θ σs args))
         fun result => Spec.pure (ResultShape.toSkolem θ shape result)
 
 omit [Θ : Skolems unit] in
 /-- The executable's invocation meaning is coherent (`closureMeaning_instantiate`). -/
 theorem closureMeaning_coherent (executable : VerexIR.Validation.ExecutableUnit unit) :
-    InvokeMeaning.Coherent fun Θ => @closureMeaning _ executable Θ :=
+    InvokeMeaning.Coherent fun Θ => @closureMeaning _ _ executable Θ :=
   fun Θ θ free σs shared shape function args =>
-    @closureMeaning_instantiate _ executable Θ θ free σs shared shape function args
+    @closureMeaning_instantiate _ _ executable Θ θ free σs shared shape function args
 
 /-- A contract at the frame type arguments induce, read in the caller's
 view. -/
@@ -1029,7 +931,7 @@ theorem satisfies_run_ofSkolem (executable : VerexIR.Validation.ExecutableUnit u
     (contract : Contract (Memory unit) Failure (@HList (Skolems.instantiate θ Θ).toCarriers σs)
       (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape))
     (verified : Satisfies
-      (@propheticRun _ executable (Skolems.instantiate θ Θ) typeInstantiation handle σs shape)
+      (@propheticRun _ _ executable (Skolems.instantiate θ Θ) typeInstantiation handle σs shape)
       contract) :
     Satisfies
       (propheticRun executable typeInstantiation handle (NRow.subst θ.1 σs) (shape.subst θ.1))
@@ -1101,18 +1003,17 @@ end
 family they induce, read back in the caller's view, where that frame is
 coherent with the closure's instantiation: the form of a direct call with
 type arguments. -/
-theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit}
+theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (θ : TypeArgs) (free : θ.1.refFree = true) {full captured supplied : NRow}
     (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
     (shape : ResultShape) (handle : FunctionHandle) (outer : Array (TypeId × TypeId))
     (typeArgs : Array TypeUse)
-    (coherent : @Coherent unit (Skolems.instantiate θ Θ) handle
+    (coherent : @Coherent unit _ (Skolems.instantiate θ Θ) handle
       (frameInstantiation unit handle outer typeArgs))
     (captures : HList (NRow.subst θ.1 captured)) (shared : Sharing)
-    (typed : FunctionTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
-      handle weave.mask (frameInstantiation unit handle outer typeArgs)
-      captures)
+    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs) (NRow.subst θ.1 captured))
     (args : HList (NRow.subst θ.1 supplied)) :
     closureMeaning executable (NRow.subst θ.1 supplied) shared (shape.subst θ.1)
       (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed) args =
@@ -1125,7 +1026,7 @@ theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit
       (NRow.refFree_subst θ.1 free captured capturedFree) _ captures,
     propheticRun_subst executable _ handle θ free full shape]
   simp only [closedGeneric]
-  rw [@propheticMeaning_of_coherent _ _ (Skolems.instantiate θ Θ) _ _ coherent]
+  rw [@propheticMeaning_of_coherent _ _ _ (Skolems.instantiate θ Θ) _ _ coherent]
 
 /-- Supplying every parameter composes the arguments alone. -/
 theorem Weave.compose_supplying : (row : NRow) → (args : HList row) →
@@ -1136,7 +1037,7 @@ theorem Weave.compose_supplying : (row : NRow) → (args : HList row) →
 
 /-- A known closure run is the closure naming its target run at the woven
 arguments. -/
-theorem closureRun_closureOf_woven {unit : VerexIR.Validation.ValidatedUnit}
+theorem closureRun_closureOf_woven {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (handle : FunctionHandle) {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
@@ -1153,60 +1054,10 @@ theorem closureRun_closureOf_woven {unit : VerexIR.Validation.ValidatedUnit}
 
 end Frames
 
-/-- Invoking a known closure without type arguments at the runtime frame,
-which runs in the empty instantiation, is calling its target: the form of a
-direct call, whose callee theorem a proof applies. -/
-theorem closureMeaning_closureOf_nil {unit : VerexIR.Validation.ValidatedUnit}
-    (executable : VerexIR.Validation.ExecutableUnit unit)
-    (handle : FunctionHandle) {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (free : captured.refFree = true)
-    (captures : @HList (Carriers.runtime unit) captured) (shared : Sharing) (shape : ResultShape)
-    (typed : @FunctionTyped unit (Skolems.runtime unit) supplied shared shape.row
-      handle weave.mask #[] captured captures)
-    (args : @HList (Carriers.runtime unit) supplied) :
-    letI : Skolems unit := Skolems.runtime unit
-    closureMeaning executable supplied shared shape
-        (functionOf supplied shared shape.row handle weave.mask #[] captures typed) args =
-      propheticMeaning executable #[] handle full shape (weave.compose captures args) := by
-  letI : Skolems unit := Skolems.runtime unit
-  rw [propheticMeaning_of_coherent (coherent_runtime unit handle), closureMeaning_functionOf]
-  exact closureRun_closureOf executable handle weave free #[] captures shape args
-
-/-- `closureMeaning_closureOf_nil` at a target without a result, spelled at
-its row: the form a rewrite matches. -/
-theorem closureMeaning_closureOf_nil_none {unit : VerexIR.Validation.ValidatedUnit}
-    (executable : VerexIR.Validation.ExecutableUnit unit)
-    (handle : FunctionHandle) {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (free : captured.refFree = true)
-    (captures : @HList (Carriers.runtime unit) captured) (shared : Sharing)
-    (typed : @FunctionTyped unit (Skolems.runtime unit) supplied shared .nil
-      handle weave.mask #[] captured captures)
-    (args : @HList (Carriers.runtime unit) supplied) :
-    letI : Skolems unit := Skolems.runtime unit
-    closureMeaning executable supplied shared .none
-        (functionOf supplied shared .nil handle weave.mask #[] captures typed) args =
-      propheticMeaning executable #[] handle full .none (weave.compose captures args) :=
-  closureMeaning_closureOf_nil executable handle weave free captures shared .none typed args
-
-/-- `closureMeaning_closureOf_nil` at a target with one result, spelled at
-its row. -/
-theorem closureMeaning_closureOf_nil_one {unit : VerexIR.Validation.ValidatedUnit}
-    (executable : VerexIR.Validation.ExecutableUnit unit)
-    (handle : FunctionHandle) {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (free : captured.refFree = true)
-    (captures : @HList (Carriers.runtime unit) captured) (shared : Sharing) (τ : NTy)
-    (typed : @FunctionTyped unit (Skolems.runtime unit) supplied shared (.cons τ .nil)
-      handle weave.mask #[] captured captures)
-    (args : @HList (Carriers.runtime unit) supplied) :
-    letI : Skolems unit := Skolems.runtime unit
-    closureMeaning executable supplied shared (.one τ)
-        (functionOf supplied shared (.cons τ .nil) handle weave.mask #[] captures typed) args =
-      propheticMeaning executable #[] handle full (.one τ) (weave.compose captures args) :=
-  closureMeaning_closureOf_nil executable handle weave free captures shared (.one τ) typed args
-
--- An invocation of a known closure is its target's call: the normalizer
--- weaves the arguments and decides that the captures hold no reference.
-attribute [vir_denote] closureMeaning_closureOf_nil_none closureMeaning_closureOf_nil_one
+-- An invocation of a known closure is its target's call (the generated
+-- equations of a link set's sites): the normalizer weaves the arguments and
+-- decides that the captures hold no reference.
+attribute [vir_denote]
   Weave.compose Weave.subst NTy.refFree
   NRow.refFree NRows.refFree
 
@@ -1235,8 +1086,8 @@ def rewriteInducedFrame (rule : Name) (e : Lean.Expr) : SimpM Step := do
 open Lean Meta Simp in
 /-- An invocation inside a callee inlined at type arguments is the
 invocation at the caller's types (`closureMeaning_instantiate`). -/
-simproc [vir_denote] invokeInducedFrame (@closureMeaning _ _ ?frame _ _ _ _ _) := fun e => do
-  unless e.getAppNumArgs == 8 && (e.getArg! 2).consumeMData.isAppOf ``Skolems.instantiate do
+simproc [vir_denote] invokeInducedFrame (@closureMeaning _ ?functions _ ?frame _ _ _ _ _) := fun e => do
+  unless e.getAppNumArgs == 9 && (e.getArg! 3).consumeMData.isAppOf ``Skolems.instantiate do
     return .continue
   rewriteInducedFrame ``closureMeaning_instantiate e
 
@@ -1244,19 +1095,20 @@ open Lean Meta in
 /-- A proof of `Coherent unit handle typeInstantiation` by evaluation, of a
 unit, family, and instantiation without free variables (`Coherent.ofCheck`). -/
 def coherentByEvaluation (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let_expr Coherent unitExpr family handle typeInstantiation := condition | return none
+  let_expr Coherent unitExpr functions family handle typeInstantiation := condition | return none
   if condition.hasFVar || condition.hasMVar then return none
-  let check := mkApp4 (mkConst ``coherentCheck) unitExpr family handle typeInstantiation
+  let check := mkApp5 (mkConst ``coherentCheck) unitExpr functions family handle typeInstantiation
   let decided ← mkDecideProof (← mkEq check (mkConst ``Bool.true))
   return some (mkAppN (mkConst ``Coherent.ofCheck)
-    #[unitExpr, family, handle, typeInstantiation, decided])
+    #[unitExpr, functions, family, handle, typeInstantiation, decided])
 
 open Lean Meta in
 /-- A proof of a frame's coherence: a hypothesis the closure's creation took,
 or evaluation. -/
 def coherentProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let_expr Coherent unitExpr family handle typeInstantiation := condition | return none
-  let frame := mkAppN (mkConst ``ClosureFrame) #[unitExpr, family, handle, typeInstantiation]
+  let_expr Coherent unitExpr functions family handle typeInstantiation := condition | return none
+  let frame := mkAppN (mkConst ``ClosureFrame)
+    #[unitExpr, functions, family, handle, typeInstantiation]
   let local? ← (← getLCtx).findDeclRevM? fun declaration => do
     if declaration.isImplementationDetail then return none
     if ← isDefEq declaration.type condition then return some declaration.toExpr
@@ -1271,14 +1123,15 @@ open Lean Meta in
 /-- A proof of a closure's target frame: a hypothesis its creation took, or
 evaluation of its coherence and faithfulness. -/
 def closureFrameProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let_expr ClosureFrame unitExpr family handle typeInstantiation := condition | return none
+  let_expr ClosureFrame unitExpr functions family handle typeInstantiation := condition
+    | return none
   let local? ← (← getLCtx).findDeclRevM? fun declaration => do
     if declaration.isImplementationDetail then return none
     if ← isDefEq declaration.type condition then return some declaration.toExpr
     return none
   if let some proof := local? then return some proof
   let some coherent ← coherentByEvaluation
-      (mkAppN (mkConst ``Coherent) #[unitExpr, family, handle, typeInstantiation])
+      (mkAppN (mkConst ``Coherent) #[unitExpr, functions, family, handle, typeInstantiation])
     | return none
   let check := mkApp3 (mkConst ``closureFaithful) unitExpr handle typeInstantiation
   let faithful ← mkDecideProof (← mkEq check (mkConst ``Bool.true))
@@ -1287,7 +1140,7 @@ def closureFrameProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
 open Lean Meta Simp in
 /-- Create a closure with type arguments where its target's frame is
 coherent and faithful (`Spec.given_of`). -/
-simproc [vir_denote] givenClosureFrame (Spec.given (@ClosureFrame _ ?family _ _) _) := fun e => do
+simproc [vir_denote] givenClosureFrame (Spec.given (@ClosureFrame _ ?functions ?family _ _) _) := fun e => do
   let_expr Spec.given _ _ _ condition continuation := e | return .continue
   let some holds ← closureFrameProof? (← instantiateMVars condition) | return .continue
   let proof ← mkAppM ``Spec.given_of #[holds, continuation]
@@ -1300,21 +1153,21 @@ weave and type arguments substitute, which the equation's index cannot match,
 so the equation is instantiated by unification, its function value first, and
 its reference-freedom conditions are decided. -/
 simproc [vir_denote] invokeGenericClosure
-    (@closureMeaning _ _ ?frame _ _ _ _ _) := fun e => do
+    (@closureMeaning _ ?functions _ ?frame _ _ _ _ _) := fun e => do
   -- The pattern leaves the function value open: spelled as a generic
   -- closure, its type would fix the rows to their substitution.
-  unless e.getAppNumArgs == 8 && (e.getArg! 6).isAppOf ``functionOfGeneric do return .continue
+  unless e.getAppNumArgs == 9 && (e.getArg! 7).isAppOf ``functionOfGeneric do return .continue
   let equation ← mkConstWithFreshMVarLevels ``closureMeaning_closureOfGeneric
   let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
   let some (_, lhs, rhs) := statement.eq? | return .continue
   -- The function value first: the rows the invocation spells substitute the
   -- ones its weave and type arguments carry.
-  unless ← isDefEq (lhs.getArg! 6) (e.getArg! 6) do return .continue
+  unless ← isDefEq (lhs.getArg! 7) (e.getArg! 7) do return .continue
   unless ← isDefEq lhs e do return .continue
   for argument in arguments do
     if (← instantiateMVars argument).isMVar then
       let condition ← instantiateMVars (← inferType argument)
-      if condition.isAppOfArity ``Coherent 4 then
+      if condition.isAppOfArity ``Coherent 5 then
         -- The target's frame is coherent as the closure's creation took it.
         let some proof ← coherentProof? condition | return .continue
         unless ← isDefEq argument proof do return .continue
@@ -1324,5 +1177,111 @@ simproc [vir_denote] invokeGenericClosure
   let proof ← instantiateMVars (mkAppN equation arguments)
   if proof.hasMVar then return .continue
   return .visit { expr := ← instantiateMVars rhs, proof? := some proof }
+
+/-! ## Equality and order of known function values
+
+A known function value's closure is its target's at its captures
+(`closureOf`), so its equality key and its order are read off its target,
+mask and instantiation and its captures as native values: of two values at
+one key, their captures' equality without ghosts (`HList.equal`) and their
+captures' order (`HList.order`); of two at different keys, unequal and
+ordered by the keys (`closureKeyOrder`). -/
+
+section Comparison
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+
+/-- Two known function values at one key are equal without ghost slots
+where their captures are. -/
+theorem erased_eq_closureOf {parameters results : NRow} {shared : Sharing}
+    {left right : (NTy.function parameters shared results).carrier} {handle : FunctionHandle}
+    {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)} {captured : NRow}
+    {leftCaptures rightCaptures : HList captured}
+    (closedLeft : (Carriers.functions parameters shared results).closure left =
+      closureOf handle mask typeInstantiation leftCaptures)
+    (closedRight : (Carriers.functions parameters shared results).closure right =
+      closureOf handle mask typeInstantiation rightCaptures) :
+    ((Carriers.functions parameters shared results).erased left =
+        (Carriers.functions parameters shared results).erased right) =
+      (HList.equal false captured leftCaptures rightCaptures = true) := by
+  simp only [TypedFunctions.erased, closedLeft, closedRight, ClosureValue.erased, ErasedClosure.mk.injEq,
+    closureOf, ClosureValue.encode, RuntimeValue.eraseGhosts_closure, RuntimeValue.closure.injEq,
+    true_and, HList.equal_codec, HList.encode, decide_eq_true_eq]
+  exact propext (toArray_inj_iff _ _)
+
+/-- Two known function values at one key order as their captures. -/
+theorem order_closureOf (rank : ValueRanks) {parameters results : NRow} {shared : Sharing}
+    {left right : (NTy.function parameters shared results).carrier} {handle : FunctionHandle}
+    {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)} {captured : NRow}
+    {leftCaptures rightCaptures : HList captured}
+    (closedLeft : (Carriers.functions parameters shared results).closure left =
+      closureOf handle mask typeInstantiation leftCaptures)
+    (closedRight : (Carriers.functions parameters shared results).closure right =
+      closureOf handle mask typeInstantiation rightCaptures) :
+    (Carriers.functions parameters shared results).order rank left right =
+      HList.order rank captured leftCaptures rightCaptures := by
+  simp only [TypedFunctions.order, closedLeft, closedRight, ClosureValue.order, closureOf,
+    compareInstantiation, Std.compare_self, Ordering.eq_then, List.toList_toArray, HList.encode,
+    HList.order_codec]
+
+/-- The order of closure keys: the target's rank and identity, then the
+mask. -/
+def closureKeyOrder (rank : ValueRanks) (handle handle' : FunctionHandle) (mask mask' : Nat) :
+    Ordering :=
+  ((compare (rank.function handle) (rank.function handle')).then
+    ((compare handle.namespaceId.index handle'.namespaceId.index).then
+      (compare handle.functionId.index handle'.functionId.index))).then (compare mask mask')
+
+/-- Known function values at different keys of one instantiation order as
+their keys. -/
+theorem order_closureOf_ne (rank : ValueRanks) {parameters results : NRow} {shared : Sharing}
+    {left right : (NTy.function parameters shared results).carrier} {handle handle' : FunctionHandle}
+    {mask mask' : Nat} {typeInstantiation : Array (TypeId × TypeId)}
+    {captured captured' : NRow} {leftCaptures : HList captured} {rightCaptures : HList captured'}
+    (closedLeft : (Carriers.functions parameters shared results).closure left =
+      closureOf handle mask typeInstantiation leftCaptures)
+    (closedRight : (Carriers.functions parameters shared results).closure right =
+      closureOf handle' mask' typeInstantiation rightCaptures)
+    (different : (handle, mask) ≠ (handle', mask')) :
+    (Carriers.functions parameters shared results).order rank left right =
+      closureKeyOrder rank handle handle' mask mask' := by
+  simp only [TypedFunctions.order, closedLeft, closedRight, ClosureValue.order, closureOf,
+    closureKeyOrder, compareInstantiation, Std.compare_self, Ordering.eq_then]
+  generalize RuntimeValue.orderList rank _ _ = rest
+  by_cases same : handle = handle'
+  · subst same
+    have masks : mask ≠ mask' := fun h => different (by rw [h])
+    simp only [Std.compare_self, Ordering.eq_then]
+    cases h : compare mask mask' <;> simp_all
+  · have indices : compare handle.namespaceId.index handle'.namespaceId.index ≠ .eq ∨
+        compare handle.functionId.index handle'.functionId.index ≠ .eq := by
+      obtain ⟨⟨n⟩, ⟨f⟩⟩ := handle
+      obtain ⟨⟨n'⟩, ⟨f'⟩⟩ := handle'
+      simp only [ne_eq, Nat.compare_eq_eq]
+      refine Classical.or_iff_not_imp_left.mpr fun first second => same ?_
+      rw [Classical.not_not.mp first, second]
+    generalize compare (rank.function handle) (rank.function handle') = a at *
+    generalize compare handle.namespaceId.index handle'.namespaceId.index = b at *
+    generalize compare handle.functionId.index handle'.functionId.index = c at *
+    cases a <;> cases b <;> cases c <;> simp_all [Ordering.then]
+
+/-- Known function values at different keys are not equal. -/
+theorem erased_eq_closureOf_ne {parameters results : NRow} {shared : Sharing}
+    {left right : (NTy.function parameters shared results).carrier} {handle handle' : FunctionHandle}
+    {mask mask' : Nat} {typeInstantiation typeInstantiation' : Array (TypeId × TypeId)}
+    {captured captured' : NRow} {leftCaptures : HList captured} {rightCaptures : HList captured'}
+    (closedLeft : (Carriers.functions parameters shared results).closure left =
+      closureOf handle mask typeInstantiation leftCaptures)
+    (closedRight : (Carriers.functions parameters shared results).closure right =
+      closureOf handle' mask' typeInstantiation' rightCaptures)
+    (different : (handle, mask, typeInstantiation) ≠ (handle', mask', typeInstantiation')) :
+    ((Carriers.functions parameters shared results).erased left =
+        (Carriers.functions parameters shared results).erased right) = False := by
+  simp only [TypedFunctions.erased, closedLeft, closedRight, ClosureValue.erased, ErasedClosure.mk.injEq,
+    closureOf, ClosureValue.encode, RuntimeValue.eraseGhosts_closure, RuntimeValue.closure.injEq,
+    eq_iff_iff, iff_false, not_and]
+  intro h m i _
+  exact different (by rw [h, m, i])
+
+end Comparison
 
 end VerexIR.Proofs.Denote

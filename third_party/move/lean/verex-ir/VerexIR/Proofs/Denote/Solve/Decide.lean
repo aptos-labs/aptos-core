@@ -1663,7 +1663,7 @@ private def splitFirst (variants : Bool) : TacticM Unit := focusGoal do
         if e.getAppNumArgs == 2 && e.getAppFn.isFVar then modify (·.insert e.getAppFn.fvarId!)
       let (_, applied) ← collect.run {}
       applied.toList.anyM fun id => do
-        return (← whnfR (← inferType (.fvar id))).isAppOfArity ``VerexIR.Proofs.Denote.Memory 1
+        return (← whnfR (← inferType (.fvar id))).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2
     unless splittable do
       -- A single feasible constructor is useful progress too. Discarding
       -- it would repeat the same preparation in this owner's leaf attempt.
@@ -1837,8 +1837,9 @@ family they live in. -/
 private partial def pointLocals (value : Lean.Expr) :
     TacticM (Option (Lean.Expr × Array (Lean.Expr × Lean.Expr))) := do
   let flow ← instantiateMVars (← inferType value)
-  unless flow.isAppOfArity ``Flow 5 do return none
-  let carriers := mkApp2 (mkConst ``Skolems.toCarriers) (flow.getArg! 0) (flow.getArg! 1)
+  unless flow.isAppOfArity ``Flow 6 do return none
+  let carriers :=
+    mkApp3 (mkConst ``Skolems.toCarriers) (flow.getArg! 0) (flow.getArg! 1) (flow.getArg! 2)
   let value ← whnfR value
   unless value.isAppOf ``VerexIR.Proofs.Denote.Flow.value do return none
   let rec walk (row env : Lean.Expr) (found : Array (Lean.Expr × Lean.Expr)) :
@@ -1851,7 +1852,7 @@ private partial def pointLocals (value : Lean.Expr) :
     let found := if entry.isAppOfArity ``Option.some 2 then
         found.push (row.getArg! 0, entry.getArg! 1) else found
     walk (row.getArg! 1) (env.getArg! 3) found
-  return some (carriers, ← walk (flow.getArg! 3) value.appArg! #[])
+  return some (carriers, ← walk (flow.getArg! 4) value.appArg! #[])
 
 /-- Whether a binder's domain is one a state label binds: a memory, or a
 copy of a mutable parameter at its clause domain (an integer's `Int`, a
@@ -1884,9 +1885,9 @@ private def localInDomain (τ value domain : Lean.Expr) : MetaM (Option Lean.Exp
 def programPoints : MetaM (Array (Lean.Expr × Lean.Expr)) := do
   let mut points := #[]
   for decl in ← getLCtx do
-    if decl.type.isAppOfArity ``ProgramPoint 7 then
+    if decl.type.isAppOfArity ``ProgramPoint 8 then
       let type ← instantiateMVars decl.type
-      points := points.push (type.getArg! 5, type.getArg! 6)
+      points := points.push (type.getArg! 6, type.getArg! 7)
   return points
 
 /-- An existential goal whose body some hypothesis states at a witness, or
@@ -3679,7 +3680,7 @@ private def isFrame (type : Lean.Expr) : MetaM Bool :=
     unless afterHead.isFVar && beforeHead.isFVar && afterHead != beforeHead &&
         after.getAppArgs == before.getAppArgs do
       return false
-    return (← whnfR (← inferType afterHead)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 1
+    return (← whnfR (← inferType afterHead)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2
 
 /-- Decide that two memory slots differ, from the context. -/
 macro "verex_keys_differ" : tactic => `(tactic| verex_focus ( (
@@ -3738,19 +3739,19 @@ private partial def storedInvariantsProof? (memory : Lean.Expr) (fuel : Nat := 8
   let rec conjunct (proof type : Lean.Expr) : Nat → MetaM (Option Lean.Expr)
     | 0 => pure none
     | depth + 1 => do
-      if type.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 3 &&
-          type.getArg! 2 == memory then
+      if type.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
+          type.getArg! 3 == memory then
         return some proof
       if let some (left, right) := type.and? then
         if let some found ← conjunct (mkApp3 (mkConst ``And.left) left right proof) left depth then
           return some found
         return ← conjunct (mkApp3 (mkConst ``And.right) left right proof) right depth
-      if type.isArrow && type.bindingBody!.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 3 &&
-          type.bindingBody!.getArg! 2 == memory then
+      if type.isArrow && type.bindingBody!.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
+          type.bindingBody!.getArg! 3 == memory then
         let premise := type.bindingDomain!
-        if premise.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 3 &&
-            premise.getArg! 2 != memory then
-          if let some held ← storedInvariantsProof? (premise.getArg! 2) (fuel - 1) then
+        if premise.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
+            premise.getArg! 3 != memory then
+          if let some held ← storedInvariantsProof? (premise.getArg! 3) (fuel - 1) then
             return some (mkApp proof held)
       return none
   for declaration in ← getLCtx do
@@ -3783,10 +3784,10 @@ private def argumentsInhabitable? (resource : Lean.Expr) : TacticM (Option Lean.
 /-- The frame a resource is read at: the instance's own type arguments over
 the runtime frame where they are decided inhabitable, otherwise the frame
 whose resolution spells the resource (a reader at a generic frame). -/
-private def resourceFrame? (unit σ arguments resource : Lean.Expr) :
+private def resourceFrame? (unit functions σ arguments resource : Lean.Expr) :
     TacticM (Option (Lean.Expr × Option Lean.Expr)) := do
   let atFrame (frame : Lean.Expr) : TacticM Bool := do
-    let atInstance := mkApp4 (mkConst ``Skolems.resource) unit frame σ arguments
+    let atInstance := mkApp5 (mkConst ``Skolems.resource) unit functions frame σ arguments
     withDefault (isDefEq resource atInstance)
   if let some inhabitable ← argumentsInhabitable? resource then
     let predicate ← withLocalDeclD `row (mkConst ``NRow) fun row => do
@@ -3796,11 +3797,11 @@ private def resourceFrame? (unit σ arguments resource : Lean.Expr) :
     let resourceArguments ← whnfR (mkApp (mkConst ``ResourceType.arguments) resource)
     let θ := mkApp4 (mkConst ``Subtype.mk [Level.one]) (mkConst ``NRow) predicate
       resourceArguments inhabitable
-    let frame := mkApp3 (mkConst ``Skolems.instantiate) unit θ
-      (mkApp (mkConst ``Skolems.runtime) unit)
+    let frame := mkApp4 (mkConst ``Skolems.instantiate) unit functions θ
+      (mkApp2 (mkConst ``Skolems.runtime) unit functions)
     if ← atFrame frame then return some (frame, some θ)
   let type ← whnfR (mkApp (mkConst ``ResourceType.type) resource)
-  let_expr Skolems.resolve _ frame _ := type | return none
+  let_expr Skolems.resolve _ _ frame _ := type | return none
   if ← atFrame frame then return some (frame, none) else return none
 
 /-- A stored value's invariant (`StoredCase`) as the case of the value at its
@@ -3812,16 +3813,16 @@ the stored invariant; none where the resource is not one of the
 declaration's. -/
 private def storedCase? (type : Lean.Expr) (direct : Bool := false) :
     TacticM (Option (Lean.Expr × (Lean.Expr → MetaM Lean.Expr) × (Lean.Expr → MetaM Lean.Expr))) := do
-  unless type.isAppOfArity ``StoredCase 6 do return none
-  let #[unit, σ, arguments, holds, resource, value] := type.getAppArgs | return none
-  let some (frame, θ?) ← resourceFrame? unit σ arguments resource | return none
+  unless type.isAppOfArity ``StoredCase 7 do return none
+  let #[unit, functions, σ, arguments, holds, resource, value] := type.getAppArgs | return none
+  let some (frame, θ?) ← resourceFrame? unit functions σ arguments resource | return none
   match θ? with
   | some θ =>
-      let atInstance := mkApp4 (mkConst ``Skolems.resource) unit frame σ arguments
+      let atInstance := mkApp5 (mkConst ``Skolems.resource) unit functions frame σ arguments
       let same ← mkExpectedTypeHint (← mkEqRefl resource) (← mkEq resource atInstance)
       -- A read of a declaration without type parameters (`direct`) is of the
       -- stored value itself, as its invariant is stated at the runtime frame.
-      let read := mkApp4 (mkConst ``Skolems.ofRuntime) unit frame σ value
+      let read := mkApp5 (mkConst ``Skolems.ofRuntime) unit functions frame σ value
       let read ← if direct && arguments.isConstOf ``NRow.nil then do
           if ← withDefault (isDefEq read value) then pure value else pure read
         else pure read
@@ -3829,11 +3830,12 @@ private def storedCase? (type : Lean.Expr) (direct : Bool := false) :
       let inhabitable := θ.appArg!
       return some (statement,
         fun held => mkAppOptM ``StoredCase.intro
-          #[none, none, none, none, none, none, inhabitable, same, held],
+          #[none, none, none, none, none, none, none, inhabitable, same, held],
         fun fact => mkExpectedTypeHint (mkApp2 fact inhabitable same) statement)
   | none =>
       -- The declaration's parameters and the bound of its type, decided.
-      let mut atFrame := mkAppN (mkConst ``StoredCase.atFrame) #[unit, frame, σ, arguments, holds]
+      let mut atFrame :=
+        mkAppN (mkConst ``StoredCase.atFrame) #[unit, functions, frame, σ, arguments, holds]
       for _ in [0:2] do
         let .forallE _ condition _ _ ← whnfR (← inferType atFrame) | return none
         atFrame := mkApp atFrame (← mkDecideProof condition)
@@ -3868,18 +3870,18 @@ elab "verex_memory_invariants" : tactic => focusGoal do
     | fuel + 1 => goal.withContext do
       let target ← instantiateMVars (← goal.getType)
       if target.isArrow && target.bindingBody!.isAppOfArity
-          ``VerexIR.Proofs.Denote.MemoryInvariants 3 then
+          ``VerexIR.Proofs.Denote.MemoryInvariants 4 then
         let (_, goal) ← goal.intro1P
         return ← establish goal fuel
-      unless target.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 3 do
+      unless target.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 do
         throwError "the leaf owes no stored invariants"
-      if let some proof ← storedInvariantsProof? (target.getArg! 2) then
+      if let some proof ← storedInvariantsProof? (target.getArg! 3) then
         goal.assign proof
         return []
-      let written := target.getArg! 2
-      unless written.isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 5 do
+      let written := target.getArg! 3
+      unless written.isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 6 do
         throwError "no hypothesis states the stored invariants of the memory written"
-      let value := written.getArg! 4
+      let value := written.getArg! 5
       if value.isAppOfArity ``Option.none 1 then
         let [holds] ← goal.apply (mkConst ``VerexIR.Proofs.Denote.MemoryInvariants.set_none)
           | throwError "the removal lemma did not leave its obligation"
@@ -3904,8 +3906,8 @@ elab "verex_memory_invariants" : tactic => focusGoal do
 /-- Whether a goal states the stored invariants of a memory a write made. -/
 def writesStoredInvariants (goal : MVarId) : MetaM Bool := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
-  return target.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 3 &&
-    (target.getArg! 2).isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 5
+  return target.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
+    (target.getArg! 3).isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 6
 
 /-- Whether a leaf states the stored invariants of a memory it reads. -/
 def readsStoredInvariants (goal : MVarId) : MetaM Bool := goal.withContext do
@@ -3940,7 +3942,7 @@ elab "verex_stored_reads" : tactic => focusGoal do
       let_expr Eq _ read held := type | continue
       unless held.isAppOfArity ``Option.some 2 && read.getAppNumArgs == 2 do continue
       let memory := read.appFn!.appFn!
-      unless (← whnfR (← inferType memory)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 1 do continue
+      unless (← whnfR (← inferType memory)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do continue
       let some holds ← storedInvariantsProof? memory | continue
       let fact ← normalized
         (← mkAppM ``VerexIR.Proofs.Denote.MemoryInvariants.read #[holds, declaration.toExpr])

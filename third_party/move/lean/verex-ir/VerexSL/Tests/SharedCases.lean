@@ -105,7 +105,7 @@ example (b : Bool) :
 -- before preparing the clause. Its logical conjuncts retain one owner.
 section ObservedVariants
 open VerexIR.Proofs.Denote
-variable {unit : VerexIR.Validation.ValidatedUnit} [Skolems unit]
+variable {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 set_option quotPrecheck false
 local notation "rows" => (NRows.cons .nil (.cons (.cons (.int 64 false) .nil) .nil))
 

@@ -85,7 +85,7 @@ elab "check_shared " memory:("keeping_memory ")? closed:("without_entries ")?
 set_option maxHeartbeats 1000000
 set_option Elab.async false
 
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 variable {ρ : ResultShape} {Γ : NRow}
 
 -- Failure and abrupt-flow arms bypass the normal continuation. A matcher

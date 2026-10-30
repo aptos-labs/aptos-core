@@ -130,6 +130,44 @@ def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
         s!"`{function}` is declared by several Verex modules ({", ".intercalate names}); \
           qualify it with its module path"
 
+/-- Print the closure sites of a registered unit's link set, grouped by
+function type into mutual blocks (`closureSites`). -/
+syntax (name := verexClosureSitesCommand) "#verex_closure_sites" verexPath : command
+
+@[command_elab verexClosureSitesCommand]
+def elabVerexClosureSites : CommandElab := fun stx => do
+  let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
+  let name := pathName (pathSegments pathSyntax)
+  let some unit := VerexSL.registeredUnit? (← getEnv) name
+    | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
+  logInfoAt stx (displayClosureSites unit (groupClosureSites (closureSites unit)))
+
+/-- Declare a registered unit's function values and print them, a
+constructor per closure site (`ensureFunctionCarriers`). -/
+syntax (name := verexFunctionValuesCommand) "#verex_function_values" verexPath : command
+
+@[command_elab verexFunctionValuesCommand]
+def elabVerexFunctionValues : CommandElab := fun stx => do
+  let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
+  let name := pathName (pathSegments pathSyntax)
+  let some unit := VerexSL.registeredUnit? (← getEnv) name
+    | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
+  discard <| ensureFunctionCarriers (pathSegments pathSyntax) unit
+  let sites := closureSites unit
+  logInfoAt stx (if sites.isEmpty then "no closure sites" else displayFunctionValues unit sites)
+
+@[command_elab VerexSL.Contract.verexUnitCommand]
+def elabVerexUnit : CommandElab := fun stx => do
+  let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
+  let segments := pathSegments pathSyntax
+  let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments)
+    | throwErrorAt stx s!"unknown Verex namespace `{pathName segments}`"
+  -- A hand-written proof needs the same quoted unit, and its function
+  -- values, the generated script uses, along with the typed twins of its
+  -- declarations.
+  discard <| ensureUnitInstance segments unit
+  discard <| ensureUnitDefinitions segments unit
+
 /-- A function a module verifies: its name, the syntax errors are reported
 at, and its authored proof, if any. -/
 private structure VerificationTarget where
@@ -561,6 +599,14 @@ def markVerified (environment : Environment) (name : Name) : Environment :=
     | some module => modules.insert name { module with verified := true }
     | none => modules
 
+/-- The lemma items of a proof file's items, not descending into its Lean
+items. -/
+private partial def proofLemmaItems (stx : Syntax) : Array Syntax :=
+  stx.getArgs.foldl (fun found child =>
+    if child.isOfKind ``verexLemmaProofItem then found.push child
+    else if child.isOfKind ``verexTheoremItem then found
+    else found ++ proofLemmaItems child) #[]
+
 /-- The items of a module and of its proof file's `verex proofs where`
 command, each with the file it was parsed from where not the command's own. -/
 private structure ItemSource where
@@ -684,7 +730,18 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
         else some ⟨functionKey unit ⟨⟨index⟩, ⟨functionIndex⟩⟩, pathSyntax, none, false, false,
           module.file⟩
   let targets := targets ++ writers
-  if targets.isEmpty then return
+  -- The lemma items of the proof file; a module holds `spec lemma`s.
+  let proofLemmas ← sources.toList.zipIdx.toArray.flatMapM fun (source, position) => do
+    let found := proofLemmaItems source.stx
+    if position == 0 then
+      for item in found do
+        logErrorAt item "a `lemma` item belongs to a proof file; a module states `spec lemma`"
+      return #[]
+    let fileName ← match source.file with
+      | some file => pure file.name
+      | none => getFileName
+    return found.map (·, fileName)
+  if targets.isEmpty && proofLemmas.isEmpty then return
   -- The expressions of the items' steps, lowered once for the module.
   let stepped ← items.filterMapM fun (item, file) => do
     unless item.isOfKind ``verexVerifyItem do return none
@@ -695,7 +752,8 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
       | some file => pure file.name
       | none => getFileName
     return some (item, identifier.getId.toString (escape := false), block, fileName)
-  lowerStepExpressions invariantRelatedModules unit module.stx module.file stepped
+  lowerStepExpressions invariantRelatedModules unit module.stx module.file stepped proofLemmas
+  if targets.isEmpty then return
   stageLog s!"module {moduleNamespace}: verification start"
   verifyScheduled unit segments opens targets
   stageLog s!"module {moduleNamespace}: verification done"

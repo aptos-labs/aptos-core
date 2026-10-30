@@ -84,14 +84,16 @@ theorem GlobalsTyped.plain {unit : ValidatedUnit} {state : RuntimeState}
 
 /-- A memory whose runtime encodings are typed: every slot at its key's
 type. -/
-def MemoryTyped (unit : ValidatedUnit) (memory : Denote.Memory unit) : Prop :=
+def MemoryTyped (unit : ValidatedUnit) [Denote.FunctionCarriers unit]
+    (memory : Denote.Memory unit) : Prop :=
   ∀ start : RuntimeState, Denote.Encodes unit memory start.globals →
     ∃ globals : GlobalMap, globals.normalize unit = start.globals ∧
       GlobalsTyped unit { start with globals := globals }
 
 /-- A memory's runtime encoding holds no loan: every slot is the encoding of
 a native value. -/
-theorem Denote.Encodes.plain {unit : ValidatedUnit} {memory : Denote.Memory unit}
+theorem Denote.Encodes.plain {unit : ValidatedUnit} [FunctionCarriers unit]
+    {memory : Denote.Memory unit}
     {globals : GlobalMap} (encodes : Denote.Encodes unit memory globals) :
     ∀ slot ∈ globals.entries, SemanticOperations.Plain slot.value := by
   intro slot member
@@ -135,12 +137,12 @@ theorem EvalFunction_holeFree {unit : ValidatedUnit} {executable : ExecutableUni
 
 section
 open Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Results of `results` that hold no hole decode at a result shape, read up
 to normalization: the values a run returns represent the results its
 meaning returns (`functionRuns`). -/
-def RowDecodes (unit : ValidatedUnit) [Skolems unit] (shape : ResultShape)
+def RowDecodes (unit : ValidatedUnit) [FunctionCarriers unit] [Skolems unit] (shape : ResultShape)
     (results : List SemTy) : Prop :=
   ∀ (loans : LoanTypes) (values : Array RuntimeValue), HasTypes unit loans values.toList results →
     (Outcome.returned values).holeFree = true →
@@ -191,7 +193,8 @@ theorem lendArguments_refFree {σs : NRow} (free : σs.refFree = true) {args : H
 /-- A run of a typed closure on typed arguments from typed global memory has
 no undefined outcome: every run of its target returns results that decode
 at the invocation's type. -/
-theorem closureRun_defined {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+theorem closureRun_defined {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
     (closure : ClosureValue) {σs : NRow} {shape : ResultShape} (args : HList σs)
     (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
@@ -230,7 +233,8 @@ theorem closureRun_defined {unit : ValidatedUnit} (executable : ExecutableUnit u
 
 /-- The weakest precondition of such a run: what its runs and aborts
 establish. -/
-theorem wp_closureRun_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+theorem wp_closureRun_typed {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
     (closure : ClosureValue) {σs : NRow} {shape : ResultShape} (args : HList σs)
     (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
@@ -373,7 +377,7 @@ end Lending
 
 section Lending
 open Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- A flat row lends as its entries, each mutable one under the next loan. -/
 theorem Denote.NRow.lend_lentFlat : (row : NRow) → row.lentFlat = true → (values : HList row) →
@@ -584,7 +588,7 @@ theorem RunsAgree.plain {unit : ValidatedUnit} {executable : ExecutableUnit unit
 
 /-- Equal runtime stores determine their named slots; agreement at unnamed
 resource types determines the rest of a semantic memory. -/
-private theorem memory_eq_of_encodes {unit : ValidatedUnit}
+private theorem memory_eq_of_encodes {unit : ValidatedUnit} [Denote.FunctionCarriers unit]
     {left right pre : Denote.Memory unit} {leftState rightState : RuntimeState}
     (leftEncoded : Denote.StorageEncodes unit left leftState)
     (rightEncoded : Denote.StorageEncodes unit right rightState)
@@ -731,7 +735,8 @@ theorem readResults_agree {ρ ρ₂ : Nat → Nat} (injective₂ : Function.Inje
 /-- Runs of the target of a closure holding no loan, on its captures and
 plain arguments with mutable ones lent from starts at the same memory,
 agree up to injective renamings of their loans. -/
-private theorem lentRuns_agree {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+private theorem lentRuns_agree {unit : ValidatedUnit} [Denote.FunctionCarriers unit]
+    {executable : ExecutableUnit unit}
     (agrees : RunsAgree executable) {function : FunctionHandle} {mask : Nat}
     {typeInstantiation : Array (TypeId × TypeId)} {captures : Array RuntimeValue}
     {mutable : List Bool} {arguments : List RuntimeValue} {state : Denote.Memory unit}
@@ -805,7 +810,7 @@ two runs are equal, which `result_of` and `state_of` read. -/
 section Determinism
 open Denote
 open SemanticOperations
-variable {unit : ValidatedUnit} [Skolems unit]
+variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Arguments of the same entry values pass the same entry values. -/
 private theorem entries_of_settle {σs : NRow} {args args' : HList σs}
@@ -933,7 +938,7 @@ section Rule
 
 open Denote
 open SemanticOperations
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Results lent at a reference-free shape hold no loan. -/
 theorem ResultShape.lend_plain : (shape : ResultShape) → shape.row.refFree = true →
@@ -959,7 +964,8 @@ from typed global memory, has the weakest precondition its behavioral
 predicates state: a run is one `ensures_of` names, `aborts_of` does not
 hold, and its result and final memory are `result_of` and `state_of`; an
 abort is one `aborts_of` names. -/
-theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+theorem wp_closureMeaning_unseen {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
     (agrees : RunsAgree executable) {σs : NRow} {shared : Sharing} {shape : ResultShape}
     (function : (NTy.function σs shared shape.row).carrier)
@@ -994,7 +1000,7 @@ end Rule
 section Rows
 
 open Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- The semantic type of a scalar native type: what its encodings inhabit,
 and a typed value decodes at. -/
@@ -1009,7 +1015,8 @@ def Denote.NTy.scalarType? : NTy → Option SemTy
   | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .table _ _ | .ghost _ | .ref _
   | .param _ | .function .. => none
 
-theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
+theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {loans : LoanTypes} :
     (τ : NTy) → {type : SemTy} → τ.scalarType? = some type → (value : τ.carrier) →
       HasType unit loans (τ.encode value) type
   | .bool, _, scalar, value => by
@@ -1038,7 +1045,8 @@ theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [Skolems unit] {loans :
   | .function .., _, scalar, _ => by
       simp [NTy.scalarType?] at scalar
 
-theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
+theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {loans : LoanTypes} :
     (τ : NTy) → {type : SemTy} → τ.scalarType? = some type → {value : RuntimeValue} →
       HasType unit loans value type → value.holeFree? = true → ∃ decoded, τ.encode decoded = value
   | .bool, _, scalar, value, typed, _ => by
@@ -1087,7 +1095,8 @@ theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [Skolems unit] {loan
       simp [NTy.scalarType?] at scalar
 
 /-- A scalar encoding normalizes to itself. -/
-theorem Denote.NTy.normalize_encode_scalar {unit : ValidatedUnit} [Skolems unit] :
+theorem Denote.NTy.normalize_encode_scalar {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] :
     (τ : NTy) → {type : SemTy} → τ.scalarType? = some type → (value : τ.carrier) →
       SemanticOperations.normalize unit (τ.encode value) = τ.encode value
   | .bool, _, _, _ | .int _ _, _, _, _ | .num, _, _, _ | .address, _, _, _ | .signer, _, _, _
@@ -1107,7 +1116,8 @@ theorem normalize_of_hasType_scalar {unit : ValidatedUnit} {loans : LoanTypes} {
     subst scalar <;> cases typed <;> simp
 
 /-- A scalar result decodes at its native type. -/
-theorem RowDecodes.scalar {unit : ValidatedUnit} [Skolems unit] {τ : NTy} {type : SemTy}
+theorem RowDecodes.scalar {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {τ : NTy} {type : SemTy}
     (scalar : τ.scalarType? = some type) : RowDecodes unit (.one τ) [type] := by
   intro loans values typed holeFree
   obtain ⟨list⟩ := values
@@ -1133,7 +1143,8 @@ def Denote.NRow.scalarTypes? : NRow → Option (List SemTy)
   | .cons τ rest => do some ((← τ.scalarType?) :: (← NRow.scalarTypes? rest))
 
 /-- A row of scalar native values encodes as values of its semantic types. -/
-theorem Denote.NRow.encode_hasTypes {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
+theorem Denote.NRow.encode_hasTypes {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {loans : LoanTypes} :
     (row : NRow) → {types : List SemTy} → row.scalarTypes? = some types → (values : HList row) →
       HasTypes unit loans (HList.encode values) types
   | .nil, _, scalar, _ => by
@@ -1198,7 +1209,8 @@ theorem HasTypes.toObserved {unit : ValidatedUnit} {loans : LoanTypes} :
 
 /-- Results decode at the types their shared references observe, so at
 those references. -/
-theorem RowDecodes.ofObserved {unit : ValidatedUnit} [Skolems unit] {shape : ResultShape}
+theorem RowDecodes.ofObserved {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {shape : ResultShape}
     {types : List SemTy} (decodes : RowDecodes unit shape (types.map observedType)) :
     RowDecodes unit shape types := fun loans values typed holeFree =>
   decodes loans values (HasTypes.toObserved typed) holeFree
@@ -1210,35 +1222,23 @@ def Denote.NRow.invocable : NRow → Bool
   | .cons τ rest => (τ.scalarType?.isSome || τ matches .param _) && NRow.invocable rest
 
 /-- Semantic types every value of a row encodes at. -/
-def RowTyped (unit : ValidatedUnit) [Skolems unit] (row : NRow) (types : List SemTy) : Prop :=
+def RowTyped (unit : ValidatedUnit) [FunctionCarriers unit]
+    [Skolems unit] (row : NRow) (types : List SemTy) : Prop :=
   ∀ values : HList row, HasTypes unit (fun _ => none) (HList.encode values) types
 
 /-- A row whose types the frame resolves to scalars is typed at their
 semantic types. -/
-theorem RowTyped.ofResolved {unit : ValidatedUnit} [Skolems unit] {row : NRow} {types : List SemTy}
+theorem RowTyped.ofResolved {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {row : NRow} {types : List SemTy}
     (scalar : row.resolved.scalarTypes? = some types) : RowTyped unit row types := fun values => by
   rw [← HList.encode_toRuntime row values]
-  exact @NRow.encode_hasTypes unit (Skolems.runtime unit) (fun _ => none) row.resolved types scalar
+  exact @NRow.encode_hasTypes unit _ (Skolems.runtime unit) (fun _ => none) row.resolved types scalar
     (HList.toRuntime row values)
 
 /-- A row the frame resolves to scalars: the rows the rule for an invocation
 of a function value a proof cannot see is decided at. -/
-def ScalarAt (unit : ValidatedUnit) [Skolems unit] (row : NRow) : Prop :=
+def ScalarAt (unit : ValidatedUnit) [FunctionCarriers unit] [Skolems unit] (row : NRow) : Prop :=
   row.resolved.scalarTypes?.isSome = true
-
-/-- A function value typed at a native function type of scalars and type
-parameters: semantic rows its target's typing states, at which the
-parameter row's values are typed and typed results decode at the result
-row. Vacuous at other rows. -/
-def ClosureTypedAt (unit : ValidatedUnit) [Skolems unit] (parameters : NRow) (shared : Sharing)
-    (results : NRow) (function : (NTy.function parameters shared results).carrier) : Prop :=
-  parameters.invocable = true → results.invocable = true →
-    let closure := (Carriers.functions parameters shared results).closure function
-    ∃ parameterTypes resultTypes targetTypes, targetTypes.map observedType = parameterTypes ∧
-      ClosureTyped unit closure.function closure.mask closure.typeInstantiation closure.captures
-        targetTypes resultTypes ∧
-      RowTyped unit parameters parameterTypes ∧
-      ∀ shape : ResultShape, shape.row = results → RowDecodes unit shape resultTypes
 
 omit [Skolems unit] in
 /-- A row of scalar types holds no reference. -/
@@ -1271,7 +1271,7 @@ theorem HasTypes.map_normalize_of_scalar {unit : ValidatedUnit} {loans : LoanTyp
             HasTypes.map_normalize_of_scalar rest tail tailTyped]
 
 /-- Results of a scalar row decode at their result shape. -/
-theorem RowDecodes.ofScalar {unit : ValidatedUnit} [Skolems unit] :
+theorem RowDecodes.ofScalar {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit] :
     (shape : ResultShape) → {types : List SemTy} → shape.row.scalarTypes? = some types →
       RowDecodes unit shape types
   | .none, _, scalar => by
@@ -1290,7 +1290,7 @@ theorem RowDecodes.ofScalar {unit : ValidatedUnit} [Skolems unit] :
 
 /-- Results of a reference-free shape whose row the frame resolves to
 scalars decode at their semantic types. -/
-theorem RowDecodes.ofResolved {unit : ValidatedUnit} [Skolems unit] :
+theorem RowDecodes.ofResolved {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit] :
     (shape : ResultShape) → {types : List SemTy} → shape.row.refFree = true →
       shape.row.resolved.scalarTypes? = some types → RowDecodes unit shape types
   | .none, _, _, scalar => by
@@ -1315,11 +1315,11 @@ theorem RowDecodes.ofResolved {unit : ValidatedUnit} [Skolems unit] :
               rename_i value
               simp only [Outcome.holeFree, List.all_toArray, List.all_cons, List.all_nil,
                 Bool.and_true] at holeFree
-              obtain ⟨decoded, encoded⟩ := @NTy.decode_of_hasType unit (Skolems.runtime unit) loans
+              obtain ⟨decoded, encoded⟩ := @NTy.decode_of_hasType unit _ (Skolems.runtime unit) loans
                 (Skolems.resolve τ) type head value headTyped holeFree
               have fixed : SemanticOperations.normalize unit value = value := by
                 rw [← encoded]
-                exact @NTy.normalize_encode_scalar unit (Skolems.runtime unit) _ _ head decoded
+                exact @NTy.normalize_encode_scalar unit _ (Skolems.runtime unit) _ _ head decoded
               refine ⟨Skolems.ofRuntime τ decoded, ?_⟩
               simp only [ResultShape.lend, NTy.lend_refFree τ τFree false _ [], List.map_toArray,
                 List.map_cons, List.map_nil, fixed]
@@ -1348,7 +1348,8 @@ theorem Denote.ResultShape.lend_encode : (shape : ResultShape) → shape.row.ref
 the function value naming the target at the call's entry values and, with
 its returned reference settled, is the result and final memory `result_of`
 and `state_of` read of it. -/
-theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
+theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
     (agrees : RunsAgree executable)
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
     {shape : ResultShape} (fullFlat : full.lentFlat = true) (shapeFlat : shape.row.lentFlat = true)
@@ -1383,34 +1384,10 @@ theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       (fun settled => stateOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled),
     continued.2.1, continued.2.2⟩
 
-/-- The rule at an invocation of a function value of rows of scalars and type
-parameters, typed at them: `wp_closureMeaning_unseen` with the typing and
-decoding its typing states. -/
-theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    [Skolems unit] (natives : NativesTyped executable)
-    (agrees : RunsAgree executable) {σs : NRow} {shared : Sharing} {shape : ResultShape}
-    (function : (NTy.function σs shared shape.row).carrier)
-    (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
-    (typed : ClosureTypedAt unit σs shared shape.row function) {initial : Memory unit}
-    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
-    (returns : ∀ result final,
-      EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
-      ¬AbortsOf (closureMeaning executable) σs shared shape function args initial →
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) →
-      StateOf (closureMeaning executable) σs shared shape function args initial = final →
-      ensures result final)
-    (fails : ∀ error, AbortsOf (closureMeaning executable) σs shared shape function args initial →
-      aborts error) :
-    wp (closureMeaning executable σs shared shape function args) ensures aborts initial := by
-  obtain ⟨_, resultTypes, targetTypes, -, typed, -, decodes⟩ := typed invocable shapeInvocable
-  exact wp_closureMeaning_unseen executable natives agrees function args free shapeFree typed
-    (decodes shape rfl) returns fails
-
 /-- Runs of the unit's functions end, at a family: an invocation of a typed
 closure on typed arguments from typed global memory returns or aborts. -/
-def TerminatingAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit] : Prop :=
+def TerminatingAt {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit] : Prop :=
   ∀ (closure : ClosureValue) (σs : NRow) (shape : ResultShape) (args : HList σs)
     (parameters results : List SemTy) (initial : Memory unit),
     σs.refFree = true → shape.row.refFree = true →
@@ -1425,37 +1402,8 @@ omit [Skolems unit] in
 /-- Runs of the unit's functions end, at every family: the Move Prover's
 assumption of every function. A theorem that reads `result_of` of a known
 function value holds it as a hypothesis, which no proof discharges. -/
-def Terminating {unit : ValidatedUnit}
-    (executable : ExecutableUnit unit) : Prop := ∀ Θ : Skolems unit, @TerminatingAt _ executable Θ
-
-/-- A typed invocation of rows of scalars and type parameters that does not
-abort returns, where runs end: a run `ensures_of` names, whose result and
-final memory `result_of` and `state_of` read. -/
-theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    [Skolems unit] (terminating : Terminating executable)
-    (agrees : RunsAgree executable) {σs : NRow} {shared : Sharing} {shape : ResultShape}
-    (function : (NTy.function σs shared shape.row).carrier)
-    (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
-    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
-    (typed : ClosureTypedAt unit σs shared shape.row function)
-    {initial : Memory unit} (globals : MemoryTyped unit initial)
-    (unaborted : ¬AbortsOf (closureMeaning executable) σs shared shape function args initial) :
-    ∃ result final,
-      EnsuresOf (closureMeaning executable) σs shared shape function args result initial final ∧
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
-        default = result) ∧
-      StateOf (closureMeaning executable) σs shared shape function args initial = final := by
-  obtain ⟨parameterTypes, resultTypes, targetTypes, observed, typed, rowTyped, decodes⟩ :=
-    typed invocable shapeInvocable
-  rcases terminating ‹_› _ σs shape args targetTypes resultTypes initial free shapeFree
-      typed (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals with
-    ⟨error, aborted⟩ | ⟨result, final, run⟩
-  · exact absurd ⟨error, aborted⟩ unaborted
-  · have flat := NRow.lentFlat_of_refFree σs free
-    have shapeFlat := NRow.lentFlat_of_refFree shape.row shapeFree
-    have settled := ResultShape.settled_of_refFree shape shapeFree result
-    exact ⟨result, final, run, resultOf_eq_of_ok agrees flat shapeFlat rfl run settled,
-      stateOf_eq_of_ok agrees flat shapeFlat rfl run settled⟩
+def Terminating {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) : Prop := ∀ Θ : Skolems unit, @TerminatingAt _ _ executable Θ
 
 /-- The rows of semantic types a closure of a non-generic target is typed
 at: its target's parameters split by the mask into the captured and the
@@ -1500,44 +1448,12 @@ theorem ClosureTyped.ofTypes {unit : ValidatedUnit} {function : FunctionHandle} 
     .inl ⟨rfl, fun _ _ _ resolves => ?_⟩, bound, capturesTyped, rfl⟩
   rwa [empty] at resolves
 
-/-- A function value whose closure is a literal closure of a non-generic
-target, built at a frame `Θc`, at rows whose types the frame resolves to the
-scalar rows its target's types are or observe, is typed at them. -/
-theorem ClosureTypedAt.ofClosureOf {unit : ValidatedUnit} [Skolems unit] {parameters results : NRow}
-    {shared : Sharing} {handle : FunctionHandle} {mask : Nat} (Θc : Skolems unit)
-    {capturedRow : NRow} (captures : @HList Θc.toCarriers capturedRow)
-    (function : (NTy.function parameters shared results).carrier)
-    (closed : (Carriers.functions parameters shared results).closure function =
-      @closureOf _ Θc handle mask #[] capturedRow captures)
-    {capturedTypes parameterTypes resultTypes : List SemTy}
-    (capturedScalar : (@NRow.resolved _ Θc capturedRow).scalarTypes? = some capturedTypes)
-    (parametersScalar : parameters.resolved.scalarTypes? = some parameterTypes)
-    (resultsScalar : results.resolved.scalarTypes? = some resultTypes)
-    (resultsFree : results.refFree = true)
-    (types : (closureTypes? unit handle mask).map
-      (fun (captured, targetTypes, results) => (captured, targetTypes.map observedType, results)) =
-      some (capturedTypes, parameterTypes, resultTypes)) :
-    ClosureTypedAt unit parameters shared results function := by
-  intro _ _
-  simp only [closed]
-  obtain ⟨⟨captured, targetTypes, targetResults⟩, declared, mapped⟩ :=
-    Option.map_eq_some_iff.mp types
-  simp only [Prod.mk.injEq] at mapped
-  obtain ⟨rfl, observed, rfl⟩ := mapped
-  have typedCaptures := @RowTyped.ofResolved unit Θc capturedRow _ capturedScalar captures
-  refine ⟨_, _, targetTypes, observed, ClosureTyped.ofTypes declared
-    ⟨(HList.encode captures).toArray, ?_, by simpa using typedCaptures⟩,
-    RowTyped.ofResolved parametersScalar, fun shape row => ?_⟩
-  · show _ = (HList.encode captures).toArray
-    rw [List.map_toArray, HasTypes.map_normalize_of_scalar _ capturedScalar typedCaptures]
-  subst row
-  exact RowDecodes.ofResolved shape resultsFree resultsScalar
-
 /-- A function value whose runs on arguments of `parameters` from typed
 global memory keep a frame: what a function-typed parameter's `modifies_of`
 permits an invocation to change, at its arguments. Vacuous at rows with
 references. -/
-def FramedAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
+def FramedAt {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
     (parameters : NRow) (shared : Sharing) (shape : ResultShape)
     (frame : HList parameters → Memory unit → Memory unit → Prop)
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
@@ -1549,13 +1465,15 @@ def FramedAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems 
 
 /-- A function value whose runs leave global memory as they found it: the
 frame of a function-typed parameter that declares no `modifies_of`. -/
-abbrev KeepsMemoryAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
+abbrev KeepsMemoryAt {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
     (parameters : NRow) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
   FramedAt executable parameters shared shape (fun _ pre post => post = pre) function
 
 /-- A frame holds of a function value wherever a narrower one does. -/
-theorem FramedAt.mono {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
+theorem FramedAt.mono {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
     {parameters : NRow} {shared : Sharing} {shape : ResultShape}
     {narrow wide : HList parameters → Memory unit → Memory unit → Prop}
     {function : (NTy.function parameters shared shape.row).carrier}
@@ -1569,7 +1487,8 @@ theorem FramedAt.mono {unit : ValidatedUnit} {executable : ExecutableUnit unit} 
 value where the frame read in the caller's view does at the caller's: the
 value's runs at the induced frame are its runs at the caller's types
 (`closureMeaning_instantiate`). -/
-theorem FramedAt.of_instantiate {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+theorem FramedAt.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit}
     [Θ : Skolems unit] (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
     {shared : Sharing} {shape : ResultShape}
     {frame : @HList (Skolems.instantiate θ Θ).toCarriers parameters → Memory unit → Memory unit →
@@ -1578,7 +1497,7 @@ theorem FramedAt.of_instantiate {unit : ValidatedUnit} {executable : ExecutableU
     (framed : FramedAt executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
       (fun args => frame (HList.toSkolem θ parameters args))
       (shape.functionOfSkolem θ parameters shared function)) :
-    @FramedAt unit executable (Skolems.instantiate θ Θ) parameters shared shape frame function := by
+    @FramedAt unit _ executable (Skolems.instantiate θ Θ) parameters shared shape frame function := by
   intro parametersFree shapeFree args result pre post typed ensures
   unfold EnsuresOf at ensures
   rw [closureMeaning_instantiate executable θ free parameters shared shape function args] at ensures
@@ -1591,7 +1510,8 @@ theorem FramedAt.of_instantiate {unit : ValidatedUnit} {executable : ExecutableU
     (HList.ofSkolem θ parameters args) value pre _ typed run
   simpa only [HList.toSkolem_ofSkolem] using this
 
-theorem FramedAt.of_refFree_false {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit}
     [Skolems unit] {parameters : NRow} {shared : Sharing} {shape : ResultShape}
     {frame : HList parameters → Memory unit → Memory unit → Prop}
     {function : (NTy.function parameters shared shape.row).carrier}
@@ -1602,36 +1522,40 @@ theorem FramedAt.of_refFree_false {unit : ValidatedUnit} {executable : Executabl
 /-- A literal closure keeps a frame where every run of its target from
 typed memory, at any arguments, keeps it: the frame its body establishes,
 whatever its precondition. -/
-theorem FramedAt.ofBody {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
+theorem FramedAt.ofBody {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
     {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
     (capturedFree : captured.refFree = true) {shared : Sharing} (shape : ResultShape)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
-    (typed : FunctionTyped supplied shared shape.row
-      handle weave.mask typeInstantiation captures)
+    (function : (NTy.function supplied shared shape.row).carrier)
+    (closed : (Carriers.functions supplied shared shape.row).closure function =
+      closureOf handle weave.mask typeInstantiation captures)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
     (kept : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
       wp (propheticMeaning executable typeInstantiation handle full shape (weave.compose captures args))
         (fun _ post => frame args pre post) (fun _ => True) pre) :
     FramedAt executable supplied shared shape frame
-      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed) := by
+      function := by
   intro _ _ args result pre post memoryTyped ensures
   have holds := kept args pre memoryTyped
   rw [← closureMeaning_closureOf_coherent executable weave capturedFree coherent captures shared
-    shape typed args] at holds
+    shape function closed args] at holds
   exact holds.1 result post ensures
 
 /-- A literal closure of a verified target keeps a frame where the target's
 theorem applies at every typed memory and its frame lies within it. -/
-theorem FramedAt.ofVerified {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
+theorem FramedAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
     {handle : FunctionHandle}
     {full captured supplied : NRow} (weave : Weave full captured supplied)
     (capturedFree : captured.refFree = true) {shared : Sharing} (shape : ResultShape)
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
-    (typed : FunctionTyped supplied shared shape.row
-      handle weave.mask typeInstantiation captures)
+    (function : (NTy.function supplied shared shape.row).carrier)
+    (closed : (Carriers.functions supplied shared shape.row).closure function =
+      closureOf handle weave.mask typeInstantiation captures)
     {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
     (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
@@ -1641,11 +1565,11 @@ theorem FramedAt.ofVerified {unit : ValidatedUnit} {executable : ExecutableUnit 
     (framed : ∀ (args : HList supplied) (pre post : Memory unit) (result : shape.carrier),
       contract.frame (weave.compose captures args) pre result post → frame args pre post) :
     FramedAt executable supplied shared shape frame
-      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed) := by
+      function := by
   intro _ _ args result pre post memoryTyped ensures
   obtain ⟨assumed, permitted⟩ := held args pre memoryTyped
   exact framed args pre post result
-    (ensuresOf_closureOf_verified weave capturedFree coherent captures args verified ensures
+    (ensuresOf_closureOf_verified weave capturedFree coherent captures args verified ensures closed
       assumed permitted).2.1
 
 end Rows
@@ -1660,7 +1584,7 @@ predicates are (`EnsuresOfAt`, `AbortsOfAt`). -/
 section Model
 
 open Denote
-variable {unit : ValidatedUnit} [Skolems unit]
+variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- A function value whose invocations over a meaning, from typed memory,
 keep a frame: what a function-typed parameter's `modifies_of` permits an
@@ -1688,35 +1612,22 @@ theorem FramedAtOf.mono {invoke : InvokeMeaning} {parameters : NRow} {shared : S
   fun args result pre post typed run =>
     within args pre post (framed args result pre post typed run)
 
-/-- A literal closure of a routed target keeps a frame where the target's
-meaning on the woven arguments keeps it, from every typed memory. -/
-theorem FramedAtOf.ofRouted {invoke : InvokeMeaning} {handle : FunctionHandle}
-    {π captured supplied : NRow} {ρ : ResultShape} {self : HList π → Comp unit ρ.carrier}
-    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) {shared : Sharing} {shape : ResultShape}
-    (typed : FunctionTyped supplied shared shape.row
-      handle weave.mask typeInstantiation captures)
+/-- A function value routed to a target's meaning on the woven arguments
+keeps a frame where that meaning keeps it, from every typed memory. -/
+theorem FramedAtOf.ofRouted {invoke : InvokeMeaning} {full captured supplied : NRow}
+    {shape : ResultShape} {self : HList full → Comp unit shape.carrier}
+    (weave : Weave full captured supplied) (captures : HList captured) {shared : Sharing}
+    (function : (NTy.function supplied shared shape.row).carrier)
     (routes : ∀ (args : HList supplied),
-      invoke supplied shared shape
-          (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
-          args =
-        invokeAt handle π ρ self supplied shared shape
-          (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
-          args)
+      invoke supplied shared shape function args = self (weave.compose captures args))
     {frame : HList supplied → Memory unit → Memory unit → Prop}
     (kept : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
       wp (self (weave.compose captures args)) (fun _ post => frame args pre post) (fun _ => True)
         pre) :
-    FramedAtOf invoke supplied shared shape frame
-      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed) := by
+    FramedAtOf invoke supplied shared shape frame function := by
   intro args result pre post memoryTyped run
-  rw [routes, invokeAt_closureOf_read] at run
-  obtain ⟨value, middle, ran, read⟩ := (Spec.bind_ok _ _).mp run
-  split at read
-  · obtain ⟨_, same⟩ := (Spec.pure_ok).mp read
-    rw [same]
-    exact (kept args pre memoryTyped).1 value middle ran
-  · exact ((Spec.stuck_ok _ _ _).mp read).elim
+  rw [routes] at run
+  exact (kept args pre memoryTyped).1 result post run
 
 /-- An invocation of a function value the proof does not see, over a
 meaning: defined by hypothesis, its runs and aborts stated by the

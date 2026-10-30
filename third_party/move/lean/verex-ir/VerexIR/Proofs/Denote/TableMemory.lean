@@ -18,7 +18,7 @@ namespace VerexIR.Proofs.Denote.TableMemory
 
 open VerexIR.Validation
 
-variable {unit : ValidatedUnit}
+variable {unit : ValidatedUnit} [FunctionCarriers unit]
 
 /-- The fixed logical slot of allocation history. Its address elements and
 empty scope are independent of a callee's type parameters, and the collection

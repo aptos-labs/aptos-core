@@ -540,127 +540,133 @@ end
 mutual
 /-- Fold over the calls a term makes, in evaluation order: each callee
 with the type arguments of the call, and their native row where it has
-them; and over its sites a path's decisions name, each by its kind (`abort`
+them; over its closures, each by its target, mask, and native type
+arguments; and over its sites a path's decisions name, each by its kind (`abort`
 for a throw, `op` for an operation that may abort, `if`, `loop`,
 `invoke`, `match`). -/
-partial def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
+partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
     (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
-    (atSite : String → Nat → α → α) {unit : ValidatedUnit}
+    (atSite : String → Nat → α → α)
+    (atClosure : FunctionHandle → Nat → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ : NRow} → {τ : NTy} → Term unit ρ Γ τ → α → α
   | _, _, .checked site _ _ left right, found =>
-      right.foldCalls visit atSite (left.foldCalls visit atSite (atSite "op" site found))
-  | _, _, .modular _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
-  | _, _, .compare _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
-  | _, _, .equal _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
-  | _, _, .equalErased _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
-  | _, _, .not operand, found => operand.foldCalls visit atSite found
-  | _, _, .logical _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
-  | _, _, .bitwise _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+      right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .modular _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .compare _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .equal _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .equalErased _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .not operand, found => operand.foldNodes visit atSite atClosure found
+  | _, _, .logical _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .bitwise _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
   | _, _, .shift site _ _ value distance, found =>
-      distance.foldCalls visit atSite (value.foldCalls visit atSite (atSite "op" site found))
-  | _, _, .cast site _ value, found => value.foldCalls visit atSite (atSite "op" site found)
+      distance.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .cast site _ value, found => value.foldNodes visit atSite atClosure (atSite "op" site found)
   | _, _, .ite site condition thenBranch elseBranch, found =>
       let found := match site with
         | some site => atSite "if" site found
         | none => found
-      elseBranch.foldCalls visit atSite (thenBranch.foldCalls visit atSite
-        (condition.foldCalls visit atSite found))
-  | _, _, .let_ _ value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
-  | _, _, .drop value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
-  | _, _, .assign _ value, found => value.foldCalls visit atSite found
-  | _, _, .const value, found => value.foldCalls visit atSite found
+      elseBranch.foldNodes visit atSite atClosure (thenBranch.foldNodes visit atSite atClosure
+        (condition.foldNodes visit atSite atClosure found))
+  | _, _, .let_ _ value body, found => body.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
+  | _, _, .drop value body, found => body.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
+  | _, _, .assign _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .const value, found => value.foldNodes visit atSite atClosure found
   | _, _, .throw0 site _, found => atSite "abort" site found
-  | _, _, .throw1 site _ code, found => code.foldCalls visit atSite (atSite "abort" site found)
-  | _, _, .return_ value, found => value.foldCalls visit atSite found
-  | _, _, .loop site body, found => body.foldCalls visit atSite (atSite "loop" site found)
+  | _, _, .throw1 site _ code, found => code.foldNodes visit atSite atClosure (atSite "abort" site found)
+  | _, _, .return_ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .loop site body, found => body.foldNodes visit atSite atClosure (atSite "loop" site found)
   | _, _, .assume _, found => found
-  | _, _, .ghostRead slot, found => slot.foldCalls visit atSite found
-  | _, _, .ghostSlot value, found => value.foldCalls visit atSite found
-  | _, _, .ghostInit _ _ value, found => value.foldCalls visit atSite found
-  | _, _, .call _ handle _ arguments, found => arguments.foldCalls visit atSite (visit handle #[] none found)
+  | _, _, .ghostRead slot, found => slot.foldNodes visit atSite atClosure found
+  | _, _, .ghostSlot value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .ghostInit _ _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .call _ handle _ arguments, found => arguments.foldNodes visit atSite atClosure (visit handle #[] none found)
   | _, _, .callGeneric _ handle typeArgs θ _ arguments, found =>
-      arguments.foldCalls visit atSite (visit handle typeArgs (some θ) found)
+      arguments.foldNodes visit atSite atClosure (visit handle typeArgs (some θ) found)
   -- An invocation of a closure runs its target, whose theorem a proof uses.
-  | _, _, .closure handle _ _ _ _ _ _ _ captures, found =>
-      captures.foldCalls visit atSite (visit handle #[] none found)
-  | _, _, .closureGeneric handle _ typeArgs θ _ _ _ _ _ captures, found =>
-      captures.foldCalls visit atSite (visit handle typeArgs (some θ) found)
+  | _, _, .closure handle weave _ _ _ _ _ _ captures, found =>
+      captures.foldNodes visit atSite atClosure
+        (atClosure handle weave.mask #[] none (visit handle #[] none found))
+  | _, _, .closureGeneric handle weave typeArgs θ _ _ _ _ _ captures, found =>
+      captures.foldNodes visit atSite atClosure
+        (atClosure handle weave.mask typeArgs (some θ) (visit handle typeArgs (some θ) found))
   | _, _, .invoke site _ function arguments, found =>
-      arguments.foldCalls visit atSite (function.foldCalls visit atSite (atSite "invoke" site found))
-  | _, _, .tuple elements, found => elements.foldCalls visit atSite found
-  | _, _, .pack _ _ fields, found => fields.foldCalls visit atSite found
-  | _, _, .variant _ _ _ _ fields, found => fields.foldCalls visit atSite found
-  | _, _, .field _ value, found => value.foldCalls visit atSite found
-  | _, _, .isVariant _ value, found => value.foldCalls visit atSite found
-  | _, _, .payload _ _ value, found => value.foldCalls visit atSite found
-  | _, _, .letRow _ value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
-  | _, _, .letFields _ value body, found => body.foldCalls visit atSite (value.foldCalls visit atSite found)
-  | _, _, .caseOf scrutinee arms, found => arms.foldCalls visit atSite (scrutinee.foldCalls visit atSite found)
-  | _, _, .deref value, found => value.foldCalls visit atSite found
-  | _, _, .mutate _ value, found => value.foldCalls visit atSite found
-  | _, _, .writePlace _ _ _ value, found => value.foldCalls visit atSite found
-  | _, _, .vectorLit _ elements, found => elements.foldCalls visit atSite found
-  | _, _, .length vector, found => vector.foldCalls visit atSite found
-  | _, _, .signerAddress signer, found => signer.foldCalls visit atSite found
+      arguments.foldNodes visit atSite atClosure (function.foldNodes visit atSite atClosure (atSite "invoke" site found))
+  | _, _, .tuple elements, found => elements.foldNodes visit atSite atClosure found
+  | _, _, .pack _ _ fields, found => fields.foldNodes visit atSite atClosure found
+  | _, _, .variant _ _ _ _ fields, found => fields.foldNodes visit atSite atClosure found
+  | _, _, .field _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .isVariant _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .payload _ _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .letRow _ value body, found => body.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
+  | _, _, .letFields _ value body, found => body.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
+  | _, _, .caseOf scrutinee arms, found => arms.foldNodes visit atSite atClosure (scrutinee.foldNodes visit atSite atClosure found)
+  | _, _, .deref value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .mutate _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .writePlace _ _ _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .vectorLit _ elements, found => elements.foldNodes visit atSite atClosure found
+  | _, _, .length vector, found => vector.foldNodes visit atSite atClosure found
+  | _, _, .signerAddress signer, found => signer.foldNodes visit atSite atClosure found
   | _, _, .index site vector position, found =>
-      position.foldCalls visit atSite (vector.foldCalls visit atSite (atSite "op" site found))
+      position.foldNodes visit atSite atClosure (vector.foldNodes visit atSite atClosure (atSite "op" site found))
   | _, _, .checkIndex site _ vector position, found =>
-      position.foldCalls visit atSite (vector.foldCalls visit atSite (atSite "op" site found))
-  | _, _, .push vector element, found => element.foldCalls visit atSite (vector.foldCalls visit atSite found)
+      position.foldNodes visit atSite atClosure (vector.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .push vector element, found => element.foldNodes visit atSite atClosure (vector.foldNodes visit atSite atClosure found)
   | _, _, .insert site vector position element, found =>
-      element.foldCalls visit atSite (position.foldCalls visit atSite
-        (vector.foldCalls visit atSite (atSite "op" site found)))
+      element.foldNodes visit atSite atClosure (position.foldNodes visit atSite atClosure
+        (vector.foldNodes visit atSite atClosure (atSite "op" site found)))
   | _, _, .remove site vector position, found =>
-      position.foldCalls visit atSite (vector.foldCalls visit atSite (atSite "op" site found))
+      position.foldNodes visit atSite atClosure (vector.foldNodes visit atSite atClosure (atSite "op" site found))
   | _, _, .swap site vector left right, found =>
-      right.foldCalls visit atSite (left.foldCalls visit atSite
-        (vector.foldCalls visit atSite (atSite "op" site found)))
-  | _, _, .concat left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
+      right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure
+        (vector.foldNodes visit atSite atClosure (atSite "op" site found)))
+  | _, _, .concat left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
   | _, _, .slice site vector start stop, found =>
-      stop.foldCalls visit atSite (start.foldCalls visit atSite
-        (vector.foldCalls visit atSite (atSite "op" site found)))
+      stop.foldNodes visit atSite atClosure (start.foldNodes visit atSite atClosure
+        (vector.foldNodes visit atSite atClosure (atSite "op" site found)))
   | _, _, .reverseSlice site vector start stop, found =>
-      stop.foldCalls visit atSite (start.foldCalls visit atSite
-        (vector.foldCalls visit atSite (atSite "op" site found)))
-  | _, _, .destroyEmpty site vector, found => vector.foldCalls visit atSite (atSite "op" site found)
-  | _, _, .contains vector needle, found => needle.foldCalls visit atSite (vector.foldCalls visit atSite found)
-  | _, _, .indexOf vector needle, found => needle.foldCalls visit atSite (vector.foldCalls visit atSite found)
-  | _, _, .order _ left right, found => right.foldCalls visit atSite (left.foldCalls visit atSite found)
-  | _, _, .seqAfter value effect, found => effect.foldCalls visit atSite (value.foldCalls visit atSite found)
+      stop.foldNodes visit atSite atClosure (start.foldNodes visit atSite atClosure
+        (vector.foldNodes visit atSite atClosure (atSite "op" site found)))
+  | _, _, .destroyEmpty site vector, found => vector.foldNodes visit atSite atClosure (atSite "op" site found)
+  | _, _, .contains vector needle, found => needle.foldNodes visit atSite atClosure (vector.foldNodes visit atSite atClosure found)
+  | _, _, .indexOf vector needle, found => needle.foldNodes visit atSite atClosure (vector.foldNodes visit atSite atClosure found)
+  | _, _, .order _ left right, found => right.foldNodes visit atSite atClosure (left.foldNodes visit atSite atClosure found)
+  | _, _, .seqAfter value effect, found => effect.foldNodes visit atSite atClosure (value.foldNodes visit atSite atClosure found)
   | _, _, .assertion _, found => found
   | _, _, .anchor _, found => found
   | _, _, .mutationEnd _, found => found
   | _, _, .memoryWritten _, found => found
-  | _, _, .constructed _ value, found => value.foldCalls visit atSite found
-  | _, _, .globalRead site _ key, found => key.foldCalls visit atSite (atSite "op" site found)
-  | _, _, .globalContains _ _ key, found => key.foldCalls visit atSite found
-  | _, _, .globalBorrow site _ key, found => key.foldCalls visit atSite (atSite "op" site found)
+  | _, _, .constructed _ value, found => value.foldNodes visit atSite atClosure found
+  | _, _, .globalRead site _ key, found => key.foldNodes visit atSite atClosure (atSite "op" site found)
+  | _, _, .globalContains _ _ key, found => key.foldNodes visit atSite atClosure found
+  | _, _, .globalBorrow site _ key, found => key.foldNodes visit atSite atClosure (atSite "op" site found)
   | _, _, .globalPublish site _ key value, found =>
-      value.foldCalls visit atSite (key.foldCalls visit atSite (atSite "op" site found))
-  | _, _, .globalTake site _ key, found => key.foldCalls visit atSite (atSite "op" site found)
-  | _, _, .ghostStore _ _ key value, found => value.foldCalls visit atSite (key.foldCalls visit atSite found)
+      value.foldNodes visit atSite atClosure (key.foldNodes visit atSite atClosure (atSite "op" site found))
+  | _, _, .globalTake site _ key, found => key.foldNodes visit atSite atClosure (atSite "op" site found)
+  | _, _, .ghostStore _ _ key value, found => value.foldNodes visit atSite atClosure (key.foldNodes visit atSite atClosure found)
   | _, _, _, found => found
 
-partial def _root_.VerexIR.Proofs.Denote.Args.foldCalls {α : Type}
+partial def _root_.VerexIR.Proofs.Denote.Args.foldNodes {α : Type}
     (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
-    (atSite : String → Nat → α → α) {unit : ValidatedUnit}
+    (atSite : String → Nat → α → α)
+    (atClosure : FunctionHandle → Nat → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ σs : NRow} → Args unit ρ Γ σs → α → α
   | _, _, .nil, found => found
-  | _, _, .cons head tail, found => tail.foldCalls visit atSite (head.foldCalls visit atSite found)
+  | _, _, .cons head tail, found => tail.foldNodes visit atSite atClosure (head.foldNodes visit atSite atClosure found)
 
-partial def _root_.VerexIR.Proofs.Denote.Arms.foldCalls {α : Type}
+partial def _root_.VerexIR.Proofs.Denote.Arms.foldNodes {α : Type}
     (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
-    (atSite : String → Nat → α → α) {unit : ValidatedUnit}
+    (atSite : String → Nat → α → α)
+    (atClosure : FunctionHandle → Nat → Array VerexIR.TypeUse → Option TypeArgs → α → α) {unit : ValidatedUnit}
     {ρ : ResultShape} :
     {Γ : NRow} → {σ τ : NTy} → Arms unit ρ Γ σ τ → α → α
   | _, _, _, .nil _, found => found
   | _, _, _, .cons arm _ body rest, found =>
-      rest.foldCalls visit atSite (body.foldCalls visit atSite (armSite arm found))
+      rest.foldNodes visit atSite atClosure (body.foldNodes visit atSite atClosure (armSite arm found))
   | _, _, _, .guarded arm _ guard body rest, found =>
-      rest.foldCalls visit atSite (body.foldCalls visit atSite
-        (guard.foldCalls visit atSite (armSite arm found)))
+      rest.foldNodes visit atSite atClosure (body.foldNodes visit atSite atClosure
+        (guard.foldNodes visit atSite atClosure (armSite arm found)))
 where
   /-- The source `match` an arm belongs to. -/
   armSite (arm : Option (Nat × String)) (found : α) : α :=
@@ -669,6 +675,14 @@ where
     | none => found
 end
 
+/-- Fold over the calls and decision sites of a term (`Term.foldNodes`
+without its closures). -/
+def _root_.VerexIR.Proofs.Denote.Term.foldCalls {α : Type}
+    (visit : FunctionHandle → Array VerexIR.TypeUse → Option TypeArgs → α → α)
+    (atSite : String → Nat → α → α) {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
+    {τ : NTy} (term : Term unit ρ Γ τ) (found : α) : α :=
+  term.foldNodes visit atSite (fun _ _ _ _ found => found) found
+
 /-- The callees a term calls, in order of first occurrence. -/
 def _root_.VerexIR.Proofs.Denote.Term.callees {unit : ValidatedUnit} {ρ : ResultShape} {Γ : NRow}
     {τ : NTy}
@@ -676,6 +690,220 @@ def _root_.VerexIR.Proofs.Denote.Term.callees {unit : ValidatedUnit} {ρ : Resul
   term.foldCalls (fun handle _ _ found => if found.contains handle then found else found.push handle)
     (fun _ _ found => found)
     found
+
+/-! ## Closure sites
+
+The closure sites of a link set (`doc/plan/native-function-values.md`,
+"Closures are data"): data only, which the generated function carriers
+are built from. -/
+
+/-- A function type: its parameters, sharing marks, and results. -/
+structure FunctionType where
+  parameters : NRow
+  shared : Sharing
+  results : NRow
+  deriving DecidableEq, Repr, Inhabited
+
+/-- A closure site at closed rows: its target at an instantiation, the mask
+of the captured parameters, the captured row, and the function type it is
+a value of. -/
+structure ClosureSite where
+  target : FunctionHandle
+  instantiation : NRow
+  /-- The runtime type instantiation its closures carry. -/
+  typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)
+  mask : Nat
+  captured : NRow
+  type : FunctionType
+  deriving DecidableEq, Repr, Inhabited
+
+/-- The function types of one mutual block, each with its sites;
+`recursive` where a captured row holds a type of the block. -/
+structure ClosureSiteGroup where
+  types : Array (FunctionType × Array ClosureSite)
+  recursive : Bool
+  deriving Repr, Inhabited
+
+mutual
+/-- The function types a type holds values of, outside function types. -/
+partial def _root_.VerexIR.Proofs.Denote.NTy.heldFunctionTypes (found : Array FunctionType) :
+    NTy → Array FunctionType
+  | .function parameters shared results =>
+      let type := { parameters, shared, results }
+      if found.contains type then found else found.push type
+  | .tuple elements => elements.heldFunctionTypes found
+  | .struct _ _ fields => fields.heldFunctionTypes found
+  | .enum _ _ _ rows _ => rows.heldFunctionTypes found
+  | .vector element | .ghost element | .ref element => element.heldFunctionTypes found
+  | .table key value => value.heldFunctionTypes (key.heldFunctionTypes found)
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .param _ => found
+
+partial def _root_.VerexIR.Proofs.Denote.NRow.heldFunctionTypes (found : Array FunctionType) :
+    NRow → Array FunctionType
+  | .nil => found
+  | .cons τ rest => rest.heldFunctionTypes (τ.heldFunctionTypes found)
+
+partial def _root_.VerexIR.Proofs.Denote.NRows.heldFunctionTypes (found : Array FunctionType) :
+    NRows → Array FunctionType
+  | .nil => found
+  | .cons fields rest => rest.heldFunctionTypes (fields.heldFunctionTypes found)
+end
+
+/-- The function body a link set's sites are read from: its model in a unit
+declaring ghost fields. -/
+private def siteBody? (unit : ValidatedUnit) (handle : FunctionHandle) : Option (Function unit) :=
+  match (if declaresGhosts unit then compileModelFunction unit handle
+      else compileFunction unit handle) with
+  | .ok compiled => some compiled
+  | .error _ => none
+
+/-- A closure's site in a body run at the closed instantiation `outer`, whose
+runtime type instantiation is `outerRuntime`. -/
+private def closureSiteAt? (unit : ValidatedUnit) (outer : NRow)
+    (outerRuntime : Array (VerexIR.TypeId × VerexIR.TypeId)) (target : FunctionHandle) (mask : Nat)
+    (typeArgs : Array VerexIR.TypeUse) (θ : Option TypeArgs) : Option ClosureSite := do
+  let instantiation := match θ with
+    | some θ => NRow.subst outer θ.1
+    | none => .nil
+  let (captured, supplied, results) ← closureRows? unit target mask
+  some { target, instantiation, mask
+         typeInstantiation := frameInstantiation unit target outerRuntime typeArgs
+         captured := NRow.subst instantiation captured
+         type := { parameters := NRow.subst instantiation supplied
+                   shared := closureShared unit target mask
+                   results := NRow.subst instantiation results } }
+
+/-- The closure sites of a unit's link set, once each: those of every
+function without type parameters and, transitively, of each callee and
+closure target at the closed instantiation the link set uses it at; and
+the literal function values its specifications write. -/
+def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
+  let mut pending : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId)) := #[]
+  for ns in unit.namespaces, index in [0:unit.namespaces.size] do
+    for declaration in ns.functions, functionIndex in [0:ns.functions.size] do
+      unless declaration.signature.generics.any (·.kind == .typeArg) do
+        pending := pending.push (⟨⟨index⟩, ⟨functionIndex⟩⟩, .nil, #[])
+  let mut seen := pending
+  let mut sites : Array ClosureSite := #[]
+  let mut next := 0
+  while h : next < pending.size do
+    let (handle, outer, outerRuntime) := pending[next]
+    next := next + 1
+    let some compiled := siteBody? unit handle | continue
+    let (instances, found) := compiled.body.foldNodes
+      (fun callee typeArgs θ (instances, found) =>
+        let called := (callee, (θ.map fun θ => NRow.subst outer θ.1).getD .nil,
+          frameInstantiation unit callee outerRuntime typeArgs)
+        (if instances.contains called then instances else instances.push called, found))
+      (fun _ _ found => found)
+      (fun target mask typeArgs θ (instances, found) =>
+        match closureSiteAt? unit outer outerRuntime target mask typeArgs θ with
+        | some site => (instances, if found.contains site then found else found.push site)
+        | none => (instances, found))
+      ((#[] : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId))), sites)
+    sites := found
+    for called in instances do
+      unless seen.contains called do
+        seen := seen.push called
+        pending := pending.push called
+  -- A literal function value a specification writes, of a target without
+  -- type parameters capturing no function value, is a site at the base
+  -- frame as well.
+  for ns in unit.namespaces, index in [0:unit.namespaces.size] do
+    for expression in ns.expressions do
+      let .operation (.call (.closure reference mask)) instantiations _ _ := expression.kind
+        | continue
+      unless instantiations.isEmpty do continue
+      let some target := VerexIR.SemanticOperations.resolveFunction? unit ⟨index⟩ reference
+        | continue
+      let some site := closureSiteAt? unit .nil #[] target mask #[] none | continue
+      unless site.captured.closureFree && site.captured.paramFree && site.type.parameters.paramFree &&
+          site.type.results.paramFree do continue
+      unless sites.contains site do sites := sites.push site
+  return sites
+
+/-- Sites grouped by function type, in order of first occurrence, and the
+types into mutual blocks where captured rows hold each other's values; a
+block follows the blocks its captures hold. -/
+def groupClosureSites (sites : Array ClosureSite) : Array ClosureSiteGroup := Id.run do
+  let mut types : Array (FunctionType × Array ClosureSite) := #[]
+  for site in sites do
+    match types.findIdx? (·.1 == site.type) with
+    | some index => types := types.modify index fun (type, own) => (type, own.push site)
+    | none => types := types.push (site.type, #[site])
+  -- The types each type's captures hold, then reachability, reflexive.
+  let edges : Array (Array Nat) := types.map fun (_, own) =>
+    let held := own.foldl (fun held site => site.captured.heldFunctionTypes held) #[]
+    held.filterMap fun type => types.findIdx? (·.1 == type)
+  let mut reach : Array (Array Nat) := (Array.range types.size).map (#[·])
+  let mut changed := true
+  while changed do
+    changed := false
+    for index in [0:types.size] do
+      for step in reach[index]! do
+        for target in edges[step]! do
+          unless reach[index]!.contains target do
+            reach := reach.modify index (·.push target)
+            changed := true
+  let mut groups : Array (Nat × ClosureSiteGroup) := #[]
+  let mut placed : Array Nat := #[]
+  for index in [0:types.size] do
+    if placed.contains index then continue
+    let members := (Array.range types.size).filter fun other =>
+      reach[index]!.contains other && reach[other]!.contains index
+    placed := placed ++ members
+    let recursive := members.size > 1 || edges[index]!.contains index
+    groups := groups.push (reach[index]!.size,
+      { types := members.map (types[·]!), recursive })
+  -- A block reaches strictly fewer types than any block holding its values.
+  return (groups.insertionSort fun left right => left.1 < right.1).map (·.2)
+
+mutual
+/-- A native type for display. -/
+partial def displayType (unit : ValidatedUnit) : NTy → String
+  | .unit => "()"
+  | .bool => "bool"
+  | .int width signed => s!"{if signed then "i" else "u"}{width}"
+  | .num => "num"
+  | .address => "address"
+  | .signer => "signer"
+  | .string => "string"
+  | .bytes => "bytes"
+  | .tuple elements => s!"({displayRow unit elements})"
+  | .struct source arguments _ | .enum source arguments _ _ _ =>
+      let name := ((VerexIR.SemanticOperations.structName? unit source).map (·.name)).getD
+        s!"struct#{source.namespaceId.index}.{source.structId}"
+      if arguments == .nil then name else s!"{name}<{displayRow unit arguments}>"
+  | .vector element => s!"vector<{displayType unit element}>"
+  | .table key value => s!"table<{displayType unit key}, {displayType unit value}>"
+  | .ghost slot => s!"ghost<{displayType unit slot}>"
+  | .ref referent => s!"&mut {displayType unit referent}"
+  | .param index => s!"#{index}"
+  | .function parameters shared results => displayFunctionType unit { parameters, shared, results }
+
+partial def displayRow (unit : ValidatedUnit) (row : NRow) : String :=
+  ", ".intercalate (row.toList.map (displayType unit))
+
+/-- A function type for display, a shared position marked `&`. -/
+partial def displayFunctionType (unit : ValidatedUnit) (type : FunctionType) : String :=
+  let marked (row : NRow) (marks : List Bool) : String :=
+    ", ".intercalate (row.toList.zipIdx.map fun (τ, index) =>
+      (if marks.getD index false then "&" else "") ++ displayType unit τ)
+  s!"|{marked type.parameters type.shared.parameters}| -> \
+    ({marked type.results type.shared.results})"
+end
+
+/-- The groups of a unit's closure sites for display, one line per group,
+type, and site. -/
+def displayClosureSites (unit : ValidatedUnit) (groups : Array ClosureSiteGroup) : String :=
+  "\n".intercalate <| groups.toList.zipIdx.flatMap fun (group, index) =>
+    s!"group {index}{if group.recursive then " (recursive)" else ""}" ::
+      group.types.toList.flatMap fun (type, sites) =>
+        s!"  {displayFunctionType unit type}" :: sites.toList.map fun site =>
+          let instantiation := if site.instantiation == .nil then ""
+            else s!"<{displayRow unit site.instantiation}>"
+          s!"    {functionKey unit site.target}{instantiation} mask {site.mask} \
+            captures ({displayRow unit site.captured})"
 
 /-- The mutable parameters of a compiled function as a literal. -/
 def quoteMutables {Γ : NRow} : Mutables Γ → MetaM Lean.Expr
@@ -713,11 +941,6 @@ def verifiedName (segments : Array String) (function : String) : Name :=
 The authored contract is translated once over runtime rows
 (`buildContract`); its typed form is over the compiler's argument row and
 result shape, and its public form is the runtime-row view of that. -/
-
-/-- Name of a module's table of declared preconditions, which `requires_of`
-reads. -/
-def requiresTableName (segments : Array String) : Name :=
-  Name.str (pathName segments) "requiresTable"
 
 /-- Name of a unit's predicate of the data invariants of its stored
 resources. -/
@@ -757,27 +980,28 @@ def addAbbrev (name : Name) (value : Lean.Expr) : TermElabM Unit := do
 and twin bridge abstracts over. -/
 private def withSkolems {n : Type → Type} [MonadControlT MetaM n] [Monad n] {α : Type}
     (k : Lean.Expr → n α) : n α :=
-  withLocalDecl `unit .implicit (mkConst ``ValidatedUnit) fun unit =>
-    withLocalDecl `Θ .instImplicit (mkApp (mkConst ``Skolems) unit) k
+  Contract.withUnitVariable .implicit fun unit functions =>
+    withLocalDecl `Θ .instImplicit (mkApp2 (mkConst ``Skolems) unit functions) k
 
 /-- Run `k` over a unit, an executable unit of it, and a frame at it: the
 binders of an artifact that reads the executable. -/
 def withExecutableSkolems {n : Type → Type} [MonadControlT MetaM n] [Monad n] {α : Type}
     (unit : ValidatedUnit) (k : Lean.Expr → Lean.Expr → n α) : n α :=
-  withLocalDecl `unit .implicit (mkConst ``ValidatedUnit) fun unitExpr =>
+  Contract.withUnitVariable .implicit fun unitExpr functions =>
     -- A unit verified through its model reads it from a model
     -- (`ModelUnit`, `doc/designs/ghost-fields.md`).
-    withLocalDeclD `executable (Contract.unitReaderType unit unitExpr) fun executable =>
-      withLocalDecl `Θ .instImplicit (mkApp (mkConst ``Skolems) unitExpr) (k executable)
+    withLocalDeclD `executable (Contract.unitReaderType unit unitExpr functions) fun executable =>
+      withLocalDecl `Θ .instImplicit (mkApp2 (mkConst ``Skolems) unitExpr functions) (k executable)
 
-/-- The binders of a frame: its unit and itself. -/
+/-- The binders of a frame: its unit, the unit's function values, and
+itself. -/
 def frameBinders (skolems : Lean.Expr) : MetaM (Array Lean.Expr) := do
-  return #[← Contract.frameUnit skolems, skolems]
+  return (← Contract.frameLeading skolems).push skolems
 
 /-- The binders of an artifact over an executable unit and a frame: the unit,
-the executable, and the frame. -/
+its function values, the executable, and the frame. -/
 def executableBinders (executable skolems : Lean.Expr) : MetaM (Array Lean.Expr) := do
-  return #[← Contract.frameUnit skolems, executable, skolems]
+  return (← Contract.frameLeading skolems) ++ #[executable, skolems]
 
 /-- The quoted native signature of a function, which its contract is
 stated over. -/
@@ -931,10 +1155,10 @@ def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Validate
   overFrame fun binders executable skolems => do
     let signature ← quoteNativeSignature skolems params result
     let types ← Contract.frameTypes skolems
-    let build (typeInstantiation requiresTable : Option Lean.Expr) :=
+    let build (typeInstantiation requiresMeaning : Option Lean.Expr) :=
       buildContract unit ⟨namespaceIndex⟩ ns declaration signature
         (types := types) (typeInstantiation := typeInstantiation)
-        (nativeModel := nativeModel) (executable := executable) (requiresTable := requiresTable)
+        (nativeModel := nativeModel) (executable := executable) (requiresMeaning := requiresMeaning)
         (stored := stored)
     -- One stating `requires_of` takes the table of declared preconditions
     -- at the unit, last.
@@ -942,9 +1166,10 @@ def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Validate
         MetaM Lean.Expr := do
       if let some executable := executable then
         if Contract.contractReadsRequires unit ⟨namespaceIndex⟩ declaration then
-          let tableType := mkApp (mkConst ``VerexIR.Proofs.RequiresTable)
-            (← Contract.executableUnit executable)
-          return ← withLocalDeclD `requiresTable tableType fun table => do
+          let unitExpr ← Contract.executableUnit executable
+          let tableType := mkApp2 (mkConst ``VerexIR.Proofs.RequiresMeaning) unitExpr
+            (← functionCarriersOf unitExpr)
+          return ← withLocalDeclD `requiresMeaning tableType fun table => do
             mkLambdaFVars (binders.push table) (← build typeInstantiation (some table))
       mkLambdaFVars binders (← build typeInstantiation none)
     if isGeneric declaration then
@@ -1000,13 +1225,14 @@ def ensureSpecialization (unit : ValidatedUnit) (generic : Name) (θ : TypeArgs)
   -- The generic contract read in the caller's view at the frame `θ` induces.
   let readAt (binders : Array Lean.Expr) : MetaM Lean.Expr := do
     let some frameIndex ← binders.findIdxM? fun binder => do
-        return (← inferType binder).isAppOfArity ``Skolems 1
+        return (← inferType binder).isAppOfArity ``Skolems 2
       | throwError m!"the contract `{generic}` is not over a frame"
     let frame := binders[frameIndex]!
-    let unitExpr := (← inferType frame).appArg!
-    let induced := mkApp3 (mkConst ``Skolems.instantiate) unitExpr θExpr frame
+    let #[unitExpr, functions] ← Contract.frameLeading frame | unreachable!
+    let induced := mkApp4 (mkConst ``Skolems.instantiate) unitExpr functions θExpr frame
     mkAppOptM ``VerexIR.Proofs.Contract.ofSkolem
-      #[unitExpr, frame, θExpr, none, none, mkAppN (mkConst generic) (binders.set! frameIndex induced)]
+      #[unitExpr, functions, frame, θExpr, none, none,
+        mkAppN (mkConst generic) (binders.set! frameIndex induced)]
   let contractType ← inferType (mkConst generic)
   -- Each condition normalized over its arguments, with its equation.
   let (contract, equations) ← forallTelescope contractType fun binders _ => do
@@ -1070,19 +1296,22 @@ def publicContractOf (params : NRow) (result : ResultShape) (generic : Bool) (ty
   let shape ← quoteShape result
   -- The runtime form relates runtime globals to typed memory by the unit's
   -- resource types: it always takes the unit and an executable unit of it.
-  withLocalDecl `unit .implicit (mkConst ``ValidatedUnit) fun unitExpr =>
+  Contract.withUnitVariable .implicit fun unitExpr functions =>
   withLocalDeclD `executable (Contract.executableType unitExpr) fun executable => do
-    let runtime := mkApp (mkConst ``Skolems.runtime) unitExpr
-    let atFrame (frame : Lean.Expr) := if readsUnit then mkApp3 typed unitExpr executable frame
-      else mkApp2 typed unitExpr frame
+    let runtime := mkApp2 (mkConst ``Skolems.runtime) unitExpr functions
+    let atFrame (frame : Lean.Expr) :=
+      if readsUnit then mkApp4 typed unitExpr functions executable frame
+      else mkApp3 typed unitExpr functions frame
     let close (binders : Array Lean.Expr) (contract : Lean.Expr → MetaM Lean.Expr) :
         MetaM Lean.Expr :=
       if readsUnit && readsRequires then
-        withLocalDeclD `requiresTable (mkApp (mkConst ``VerexIR.Proofs.RequiresTable) unitExpr)
-          fun table => do
-            mkLambdaFVars (#[unitExpr, executable] ++ binders.push table) (← contract table)
+        withLocalDeclD `requiresMeaning
+            (mkApp2 (mkConst ``VerexIR.Proofs.RequiresMeaning) unitExpr functions) fun table => do
+          mkLambdaFVars (#[unitExpr, functions, executable] ++ binders.push table)
+            (← contract table)
       else do
-        mkLambdaFVars (#[unitExpr, executable] ++ binders) (← contract (mkConst ``Unit.unit))
+        mkLambdaFVars (#[unitExpr, functions, executable] ++ binders)
+          (← contract (mkConst ``Unit.unit))
     let applyTable (typed : Lean.Expr) (table : Lean.Expr) : Lean.Expr :=
       if readsUnit && readsRequires then mkApp typed table else typed
     if generic then
@@ -1090,20 +1319,21 @@ def publicContractOf (params : NRow) (result : ResultShape) (generic : Bool) (ty
         #[← mkAppM ``Prod #[mkConst ``VerexIR.TypeId, mkConst ``VerexIR.TypeId]]
       withLocalDeclD `θ (mkConst ``TypeArgs) fun θ =>
       withLocalDeclD `typeInstantiation instantiationType fun instantiation => do
-        let frame := mkApp3 (mkConst ``Skolems.instantiate) unitExpr θ runtime
+        let frame := mkApp4 (mkConst ``Skolems.instantiate) unitExpr functions θ runtime
         let arguments ← mkAppM ``Subtype.val #[θ]
         close #[θ, instantiation] fun table => do
           let typed := (applyTable (mkApp (atFrame frame) instantiation) table).headBeta
           let read ← mkAppOptM ``VerexIR.Proofs.Contract.ofSkolem
-            #[some unitExpr, some runtime, some θ, some row, some shape, some typed]
+            #[some unitExpr, some functions, some runtime, some θ, some row, some shape, some typed]
           mkAppOptM ``VerexIR.Proofs.Contract.prophetic
-            #[some unitExpr, some runtime, some (mkApp2 (mkConst ``NRow.subst) arguments row),
+            #[some unitExpr, some functions, some runtime,
+              some (mkApp2 (mkConst ``NRow.subst) arguments row),
               some (mkApp2 (mkConst ``ResultShape.subst) arguments shape), some read]
     else
       close #[] fun table => do
         let typed := (applyTable (atFrame runtime) table).headBeta
         mkAppOptM ``VerexIR.Proofs.Contract.prophetic
-          #[some unitExpr, some runtime, some row, some shape, some typed]
+          #[some unitExpr, some functions, some runtime, some row, some shape, some typed]
 
 /-- The declarations whose stored invariants a unit's predicate states, and
 those whose invariants it does not carry, keyed by the predicate's name.
@@ -1135,7 +1365,7 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
     -- Over the unit memory is typed at, then the executable unit where an
     -- invariant reads it.
     let readsUnit := Contract.storedInvariantReadsUnit unit
-    let leadingCount := if readsUnit then 2 else 1
+    let leadingCount := if readsUnit then 3 else 2
     -- A constant and its equation, which the solver's normalization unfolds
     -- where the constant is applied to all its arguments.
     let define (constant : Name) (value : Lean.Expr) (arity : Nat) : TermElabM Unit := do
@@ -1160,12 +1390,13 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
       let constant := name ++ Name.mkSimple s!"case{index}"
       define constant case (leadingCount + 2)
       constants := constants.push constant
-    let predicate ← withLocalDeclD `unit (mkConst ``ValidatedUnit) fun unitExpr =>
-      withLocalDeclD `executable (Contract.unitReaderType unit unitExpr) fun executable =>
+    let predicate ← Contract.withUnitVariable .default fun unitExpr functions =>
+      withLocalDeclD `executable (Contract.unitReaderType unit unitExpr functions) fun executable =>
       withLocalDeclD `resource (mkConst ``ResourceType) fun resource =>
-        withLocalDeclD `value (mkApp2 (mkConst ``ResourceType.carrier) unitExpr resource)
+        withLocalDeclD `value (mkApp3 (mkConst ``ResourceType.carrier) unitExpr functions resource)
           fun held => do
-          let leading := if readsUnit then #[unitExpr, executable] else #[unitExpr]
+          let leading :=
+            if readsUnit then #[unitExpr, functions, executable] else #[unitExpr, functions]
           let handle? := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.handle?)
             (mkApp (mkConst ``VerexIR.Proofs.Denote.ResourceType.type) resource)
           let mut selected := mkConst ``True
@@ -1175,7 +1406,8 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
             let arguments ← quoteRow arguments
             let test ← mkEq handle? (← mkAppM ``Option.some #[toExpr owner])
             let case := mkAppN (mkConst ``VerexIR.Proofs.Denote.StoredCase)
-              #[unitExpr, ← quoteNTy σ, arguments, mkAppN (mkConst constant) leading, resource, held]
+              #[unitExpr, functions, ← quoteNTy σ, arguments, mkAppN (mkConst constant) leading,
+                resource, held]
             selected ← mkAppM ``ite #[test, case, selected]
           mkLambdaFVars leading (← mkLambdaFVars #[resource, held] selected)
     define name predicate (leadingCount + 2)
@@ -1661,7 +1893,14 @@ private def overExecutable (outer : Lean.Expr) (readsUnit : Bool)
 
 /-- Global memory at an executable's unit. -/
 private def memoryAt (executable : Lean.Expr) : MetaM Lean.Expr := do
-  return mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) (← Contract.executableUnit executable)
+  let unit ← Contract.executableUnit executable
+  return mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) unit (← functionCarriersOf unit)
+
+/-- The type of what a state anchor at a site records, at the frame in
+scope. -/
+private def anchorOfType (site : Nat) (rowType : Lean.Expr) : MetaM Lean.Expr := do
+  let frame ← frameInScope
+  return mkAppN (mkConst ``AnchorOf) ((← Contract.frameLeading frame) ++ #[frame, toExpr site, rowType])
 
 /-- The function-typed parameters without a frame that a body does not
 reassign: they keep memory. -/
@@ -1947,7 +2186,7 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
       let some anchorSite := anchorSite? namespaceId ns root label
         | throwError m!"an in-body assertion reads the state anchor {label}, which its \
             function does not save"
-      pure (label, ← mkAppM ``AnchorOf #[Lean.toExpr anchorSite, rowType])
+      pure (label, ← anchorOfType anchorSite rowType)
     let first := fun (e : Lean.Expr) =>
       mkApp3 (mkConst ``Prod.fst [.zero, .zero]) envType stateType e
     let second := fun (e : Lean.Expr) =>
@@ -2389,7 +2628,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
     let some ty := unit.tables.types[resource.typeId.index]? | continue
     let some (written, _, _) := Contract.nominalDeclaration? unit ty | continue
     let site := loopSite namespaceId.index id.index
-    let anchorType ← mkAppM ``AnchorOf #[Lean.toExpr site, rowType]
+    let anchorType ← anchorOfType site rowType
     let condition ← overExecutable outer readsUnit fun executable =>
       withLocalDeclD `start argumentsType fun start =>
       withLocalDeclD `startState stateType fun startState =>
@@ -2415,7 +2654,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
       let some ty := unit.tables.types[resource.typeId.index]? | continue
       let some (written, _, _) := Contract.nominalDeclaration? unit ty | continue
       let site := loopSite namespaceId.index update.expression.index
-      let anchorType ← mkAppM ``AnchorOf #[Lean.toExpr site, rowType]
+      let anchorType ← anchorOfType site rowType
       let condition ← overExecutable outer readsUnit fun executable =>
         withLocalDeclD `start argumentsType fun start =>
         withLocalDeclD `startState stateType fun startState =>

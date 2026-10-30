@@ -762,7 +762,7 @@ theorem admits_function {unit : ValidatedUnit} {parameters : NRow} {shared : Sha
 
 /-- A frame's function value is admitted at the frame's resolution of its
 function type: its transport to the runtime family keeps its encoding. -/
-theorem Skolems.admits_carrier {unit : ValidatedUnit} [Θ : Skolems unit]
+theorem Skolems.admits_carrier {unit : ValidatedUnit} [FunctionCarriers unit] [Θ : Skolems unit]
     {parameters results : NRow} {shared : Sharing}
     (function : (NTy.function parameters shared results).carrier) :
     NTy.admits unit (.function parameters.resolved shared results.resolved)
@@ -785,15 +785,24 @@ theorem Denote.NRow.TypedAs.scalarTypes_eq {unit : ValidatedUnit} :
       rw [NRow.TypedAs.scalarTypes_eq tail restFound, NTy.readsUnique τ head (.scalar found)]
 
 /-- A frame's function value at rows the frame resolves to scalars is typed
-by its carrier where the unit's readings agree, as the rule for an unseen
-invocation takes it. -/
-theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : TypesAgree unit)
+by its carrier (`FunctionCarriers.admits` through the frame's transport,
+`Skolems.admits_carrier`) where the unit's readings agree: semantic rows its
+target's typing states, at which the parameter row's values are typed and
+typed results decode at the result row. -/
+private theorem closureTyped_ofCarrier {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] (agree : TypesAgree unit)
     (representable : OwnersRepresentable unit) {parameters results : NRow} {shared : Sharing}
     (function : (NTy.function parameters shared results).carrier)
     (resultsFree : results.refFree = true) (parametersScalar : ScalarAt unit parameters)
     (resultsScalar : ScalarAt unit results) :
-    ClosureTypedAt unit parameters shared results function := by
-  intro _ _
+    ∃ parameterTypes resultTypes targetTypes, targetTypes.map observedType = parameterTypes ∧
+      ClosureTyped unit ((Carriers.functions parameters shared results).closure function).function
+        ((Carriers.functions parameters shared results).closure function).mask
+        ((Carriers.functions parameters shared results).closure function).typeInstantiation
+        ((Carriers.functions parameters shared results).closure function).captures
+        targetTypes resultTypes ∧
+      RowTyped unit parameters parameterTypes ∧
+      ∀ shape : ResultShape, shape.row = results → RowDecodes unit shape resultTypes := by
   obtain ⟨parameterTypes, parametersScalar⟩ := Option.isSome_iff_exists.mp parametersScalar
   obtain ⟨resultTypes, resultsScalar⟩ := Option.isSome_iff_exists.mp resultsScalar
   have admitted := Skolems.admits_carrier function
@@ -816,10 +825,72 @@ theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : 
   subst row
   exact RowDecodes.ofObserved (RowDecodes.ofResolved shape resultsFree resultsScalar)
 
+/-- The rule at an invocation of a function value a proof does not see, at
+rows the frame resolves to scalars: `wp_closureMeaning_unseen` with the
+value's typing from its carrier (`closureTyped_ofCarrier`). -/
+theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
+    [Skolems unit] (natives : NativesTyped executable)
+    (agrees : RunsAgree executable) (agree : TypesAgree unit)
+    (representable : OwnersRepresentable unit) {σs : NRow} {shared : Sharing}
+    {shape : ResultShape} (function : (NTy.function σs shared shape.row).carrier)
+    (args : HList σs) (_invocable : σs.invocable = true)
+    (_shapeInvocable : shape.row.invocable = true)
+    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (parametersScalar : ScalarAt unit σs) (resultsScalar : ScalarAt unit shape.row)
+    {initial : Memory unit}
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    (returns : ∀ result final,
+      EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
+      ¬AbortsOf (closureMeaning executable) σs shared shape function args initial →
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
+        default = result) →
+      StateOf (closureMeaning executable) σs shared shape function args initial = final →
+      ensures result final)
+    (fails : ∀ error, AbortsOf (closureMeaning executable) σs shared shape function args initial →
+      aborts error) :
+    wp (closureMeaning executable σs shared shape function args) ensures aborts initial := by
+  obtain ⟨_, resultTypes, targetTypes, -, typed, -, decodes⟩ :=
+    closureTyped_ofCarrier agree representable function shapeFree parametersScalar resultsScalar
+  exact wp_closureMeaning_unseen executable natives agrees function args free shapeFree typed
+    (decodes shape rfl) returns fails
+
+/-- An invocation of rows the frame resolves to scalars that does not
+abort returns, where runs end: a run `ensures_of` names, whose result and
+final memory `result_of` and `state_of` read. -/
+theorem returns_of_terminating {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
+    [Skolems unit] (terminating : Terminating executable)
+    (agrees : RunsAgree executable) {σs : NRow} {shared : Sharing} {shape : ResultShape}
+    (function : (NTy.function σs shared shape.row).carrier)
+    (args : HList σs) (_invocable : σs.invocable = true)
+    (_shapeInvocable : shape.row.invocable = true)
+    (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
+    (agree : TypesAgree unit) (representable : OwnersRepresentable unit)
+    (parametersScalar : ScalarAt unit σs) (resultsScalar : ScalarAt unit shape.row)
+    {initial : Memory unit} (globals : MemoryTyped unit initial)
+    (unaborted : ¬AbortsOf (closureMeaning executable) σs shared shape function args initial) :
+    ∃ result final,
+      EnsuresOf (closureMeaning executable) σs shared shape function args result initial final ∧
+      (∀ default, ResultOf (closureMeaning executable) σs shared shape function args initial
+        default = result) ∧
+      StateOf (closureMeaning executable) σs shared shape function args initial = final := by
+  obtain ⟨parameterTypes, resultTypes, targetTypes, observed, typed, rowTyped, decodes⟩ :=
+    closureTyped_ofCarrier agree representable function shapeFree parametersScalar resultsScalar
+  rcases terminating ‹_› _ σs shape args targetTypes resultTypes initial free shapeFree
+      typed (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals with
+    ⟨error, aborted⟩ | ⟨result, final, run⟩
+  · exact absurd ⟨error, aborted⟩ unaborted
+  · have flat := NRow.lentFlat_of_refFree σs free
+    have shapeFlat := NRow.lentFlat_of_refFree shape.row shapeFree
+    have settled := ResultShape.settled_of_refFree shape shapeFree result
+    exact ⟨result, final, run, resultOf_eq_of_ok agrees flat shapeFlat rfl run settled,
+      stateOf_eq_of_ok agrees flat shapeFlat rfl run settled⟩
+
 /-- Every runtime encoding of a memory has a typed representation, for a unit
 whose resource types correspond to their keys' types and whose typed values
 are representable. -/
-theorem memoryTyped (unit : ValidatedUnit) (resources : ResourcesTyped unit)
+theorem memoryTyped (unit : ValidatedUnit) [FunctionCarriers unit] (resources : ResourcesTyped unit)
     (representable : OwnersRepresentable unit) (memory : Memory unit) :
     MemoryTyped unit memory := by
   intro start encodes

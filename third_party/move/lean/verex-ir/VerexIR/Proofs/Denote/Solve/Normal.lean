@@ -85,7 +85,7 @@ private def bindActionStep (e : Lean.Expr) : Simp.SimpM Simp.Step := do
 
 simproc ↓ [vir_denote_norm] bindAction (VerexIR.Proofs.Spec.bind _ _) := bindActionStep
 
-simproc ↓ [vir_denote_norm] flowBindAction (@VerexIR.Proofs.Denote.Flow.bind _ ?skolems _ _ _ _ _ _) :=
+simproc ↓ [vir_denote_norm] flowBindAction (@VerexIR.Proofs.Denote.Flow.bind _ ?functions ?skolems _ _ _ _ _ _) :=
   bindActionStep
 
 
@@ -319,9 +319,9 @@ elab_rules : tactic
 call's type arguments induce. -/
 private def inducedFrame? (frame : Lean.Expr) : Option (Lean.Expr × Lean.Expr × Lean.Expr) := do
   let frame := frame.consumeMData
-  guard (frame.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.instantiate 3)
-  let θ := frame.getArg! 1
-  pure (θ, frame.getArg! 2, ← substitutionRow? θ)
+  guard (frame.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.instantiate 4)
+  let θ := frame.getArg! 2
+  pure (θ, frame.getArg! 3, ← substitutionRow? θ)
 
 /-- A literal failure, as compiled code throws one (a pattern mismatch), in
 the form the clause naming its abort code reads (`Failure.ofInts`). -/
@@ -337,23 +337,25 @@ outer frame carries it at the type's substitution, evaluated
 (`Skolems.ofRuntime_instantiate`): it then meets the outer frame's
 transports, also where the value's type needs the substitution evaluated. -/
 dsimproc ↓ [vir_denote, vir_denote_norm] ofRuntimeOuterFrame
-    (@VerexIR.Proofs.Denote.Skolems.ofRuntime _ ?frame _ _) := fun e => do
-  let_expr VerexIR.Proofs.Denote.Skolems.ofRuntime unit frame τ value := e | return .continue
+    (@VerexIR.Proofs.Denote.Skolems.ofRuntime _ ?functions ?frame _ _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.Skolems.ofRuntime unit functions frame τ value := e
+    | return .continue
   let some (θ, outer, row) := inducedFrame? frame | return .continue
   let some substituted := substituteNTy row τ | return .continue
-  let carriers := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit outer
+  let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer
   return .visit (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) carriers θ τ
-    (mkApp4 e.getAppFn unit outer substituted value))
+    (mkApp5 e.getAppFn unit functions outer substituted value))
 
 /-- A value carried from an induced frame to the runtime family, as the
 outer frame carries it (`Skolems.toRuntime_instantiate`, `ofRuntimeOuterFrame`). -/
 dsimproc ↓ [vir_denote, vir_denote_norm] toRuntimeOuterFrame
-    (@VerexIR.Proofs.Denote.Skolems.toRuntime _ ?frame _ _) := fun e => do
-  let_expr VerexIR.Proofs.Denote.Skolems.toRuntime unit frame τ value := e | return .continue
+    (@VerexIR.Proofs.Denote.Skolems.toRuntime _ ?functions ?frame _ _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.Skolems.toRuntime unit functions frame τ value := e
+    | return .continue
   let some (θ, outer, row) := inducedFrame? frame | return .continue
   let some substituted := substituteNTy row τ | return .continue
-  let carriers := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit outer
-  return .visit (mkApp4 e.getAppFn unit outer substituted
+  let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer
+  return .visit (mkApp5 e.getAppFn unit functions outer substituted
     (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.ofSkolem) carriers θ τ value))
 
 /-- Whether a term rebuilds a value from its components: the value itself,
@@ -471,12 +473,12 @@ simproc ↓ [vir_denote, vir_denote_norm] variantNameTransport
     (@VerexIR.Proofs.Denote.variantName ?carriers _ _ _) :=
   fun e => do
     let_expr VerexIR.Proofs.Denote.variantName carriers _ _ value := e | return .continue
-    let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit outer := carriers.consumeMData
+    let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit functions outer := carriers.consumeMData
       | return .continue
     let_expr VerexIR.Proofs.Denote.variantCarrier.ofSkolem _ θ names rows v := value
       | return .continue
     let proof := mkAppN (mkConst ``VerexIR.Proofs.Denote.variantName_ofSkolem)
-      #[unit, outer, θ, names, rows, v]
+      #[unit, functions, outer, θ, names, rows, v]
     let some (_, _, name) := (← inferType proof).eq? | return .continue
     return .visit { expr := name, proof? := some proof }
 
@@ -488,19 +490,21 @@ observation is the one at the callee's (`variantName_ofSkolem`,
 private def variantOuterFamily (transport : Name) (e : Lean.Expr) : SimpM Simp.Step := do
   let e := e.consumeMData
   -- `variantName` takes the family's carriers, `variantPayload` the frame.
-  let (unit, skolems, names, rows, value, carried) ← match e.getAppArgs with
-    | #[unit, skolems, names, rows, value] => pure (unit, skolems, names, rows, value, false)
+  let (unit, functions, skolems, names, rows, value, carried) ← match e.getAppArgs with
+    | #[unit, functions, skolems, names, rows, value] =>
+        pure (unit, functions, skolems, names, rows, value, false)
     | #[carriers, names, rows, value] =>
-        let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit skolems := carriers.consumeMData
+        let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit functions skolems :=
+            carriers.consumeMData
           | return .continue
-        pure (unit, skolems, names, rows, value, true)
+        pure (unit, functions, skolems, names, rows, value, true)
     | _ => return .continue
-  let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ θ outer := skolems.consumeMData
+  let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := skolems.consumeMData
     | return .continue
   let some row := substitutionRow? θ | return .continue
   let some substituted := substituteNRows row rows | return .continue
   let some (result, equation) ← (try withTransparency .default do
-      let transported := mkAppN (mkConst transport) #[unit, outer, θ, names, rows, value]
+      let transported := mkAppN (mkConst transport) #[unit, functions, outer, θ, names, rows, value]
       let some (_, atOuter, _) := (← inferType transported).eq? | return none
       let ofSkolem := atOuter.appArg!
       let_expr VerexIR.Proofs.Denote.variantCarrier.ofSkolem carriers _ _ _ _ := ofSkolem
@@ -515,9 +519,9 @@ private def variantOuterFamily (transport : Name) (e : Lean.Expr) : SimpM Simp.S
       let proof ← mkEqTrans (← mkEqSymm transported) (← mkCongrArg observe identity)
       let result := if carried then
           mkAppN e.getAppFn
-            #[mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit outer, names,
-              substituted, value]
-        else mkAppN e.getAppFn #[unit, outer, names, substituted, value]
+            #[mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer,
+              names, substituted, value]
+        else mkAppN e.getAppFn #[unit, functions, outer, names, substituted, value]
       pure (some (result, ← mkExpectedTypeHint proof (← mkEq e result)))
     catch _ => pure none)
     | return .continue
@@ -873,9 +877,9 @@ dsimproc [vir_denote, vir_denote_norm] varSelectConstructor
 the value's constructors (`Which.project?`) definitionally: the payload
 where the injections agree, nothing otherwise. -/
 dsimproc [vir_denote, vir_denote_norm] whichProjectConstructor
-    (@VerexIR.Proofs.Denote.Which.project? _ ?skolems _ _ _ _ _) := fun e => do
+    (@VerexIR.Proofs.Denote.Which.project? _ ?functions ?skolems _ _ _ _ _) := fun e => do
   let e := e.consumeMData
-  let_expr VerexIR.Proofs.Denote.Which.project? unit skolems _ _ σs choice value := e
+  let_expr VerexIR.Proofs.Denote.Which.project? unit _ skolems _ _ σs choice value := e
     | return .continue
   let mut depth := 0
   let mut choice := choice.consumeMData
@@ -918,9 +922,9 @@ together, which keeps it an atom where the value is unknown. A step proof's
 leaf reads a callee's results so (`verex_step_obligation`); the automatic
 normal form keeps the callee's spelling. -/
 simproc_decl whichProjectFamily
-    (@VerexIR.Proofs.Denote.Which.project? _ ?skolems _ _ _ _ _) := fun e => do
+    (@VerexIR.Proofs.Denote.Which.project? _ ?functions ?skolems _ _ _ _ _) := fun e => do
   let e := e.consumeMData
-  unless e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 7 && !e.hasLooseBVars do
+  unless e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 8 && !e.hasLooseBVars do
     return .continue
   let some (respelled, _) ← FamilyTransport.respelledOperation? e | return .continue
   let valueType ← inferType e.appArg!
@@ -937,10 +941,10 @@ payload, or nothing, typed as the map spells its result. A contract spells
 the map at the caller's family and the projection at the callee's, which
 no lemma on the option matches across. -/
 dsimproc ↓ [vir_denote, vir_denote_norm] optionMapProjectConstructor
-    (Option.map _ (@VerexIR.Proofs.Denote.Which.project? _ ?skolems _ _ _ _ _)) := fun e => do
+    (Option.map _ (@VerexIR.Proofs.Denote.Which.project? _ ?functions ?skolems _ _ _ _ _)) := fun e => do
   let e := e.consumeMData
   let_expr Option.map _ β function projection := e | return .continue
-  let_expr VerexIR.Proofs.Denote.Which.project? _ _ _ _ _ choice value := projection
+  let_expr VerexIR.Proofs.Denote.Which.project? _ _ _ _ _ _ choice value := projection
     | return .continue
   let mut depth := 0
   let mut choice := choice.consumeMData
@@ -1285,118 +1289,52 @@ simproc ↓ [vir_denote_norm] existsNamedValue (∃ _ : VerexIR.SpecInt _ _, _) 
   return .visit { expr := rest.instantiate1 certified, proof? := some (← mkPropExt proof) }
 
 /-- Whether an expression states a value a clause defines (`bindCuts`): a
-certified integer by its value, or the typing of a literal function value. -/
+certified integer by its value, or the check of a literal function value. -/
 private def statesDefinedValue (e : Lean.Expr) : Bool :=
   (e.find? fun sub => (sub.isAppOfArity ``Exists 2 &&
     (sub.getArg! 0).isAppOfArity ``VerexIR.SpecInt 2) ||
-      sub.isAppOfArity ``FunctionTyped 10).isSome
+      sub.isAppOfArity ``closureTypingCheck 7).isSome
 
 open Lean Meta Simp in
-/-- A literal function value's typing a leaf's clause binds, decided at the
-leaf's unit (`functionTypedProof?`). -/
-simproc ↓ [vir_denote_norm] existsClosureTyped (@Exists _ _) := fun e => do
+/-- The check of a literal function value a leaf's clause binds, where the
+literal is a closure site's: the site's generated check (`siteCheckProof?`). -/
+simproc ↓ [vir_denote_norm] existsClosureChecked (@Exists _ _) := fun e => do
   let_expr Exists domain body := e | return .continue
-  let some proof ← functionTypedProof? domain | return .continue
-  let iff ← mkAppOptM ``exists_prop_of_true #[domain, body, proof]
+  let some proof ← siteCheckProof? domain | return .continue
+  let iff := mkApp3 (mkConst ``exists_prop_of_true) domain body proof
   return .visit { expr := body.beta #[proof], proof? := some (← mkPropExt iff) }
 
 open Lean Meta Simp in
-/-- A literal function value's typing a leaf's clause states, decided at the
-leaf's unit. -/
-simproc ↓ [vir_denote_norm] closureTypedDecided (@FunctionTyped _ ?frame _ _ _ _ _ _ _ _) :=
-    fun e => do
-  let some proof ← functionTypedProof? e | return .continue
-  return .done { expr := mkConst ``True, proof? := some (← mkEqTrue proof) }
-
-open Lean Meta Simp in
-/-- A literal function value's typing in one spelling, decided at the
-leaf's unit (`functionTypedProof?`) over the value's own arguments: the
-proofs of one proposition are one value, so that the literal's occurrences
-meet, whether its typing came from the program, a clause's binder, or a
-rule. -/
-dsimproc [vir_denote, vir_denote_norm] canonicalFunctionTyping
-    (@functionOf _ ?frame _ _ _ _ _ _ _ _ _) := fun e => do
-  unless e.isAppOfArity ``functionOf 11 do return .continue
-  let arguments := e.getAppArgs
-  -- Already the check at the value's own arguments: unit, frame, target,
-  -- mask, captured, supplied and result rows, shared flags, captures.
-  let typed := arguments.back!
-  if typed.isAppOfArity ``FunctionTyped.ofCheck 10 &&
-      #[(0, 0), (1, 1), (2, 5), (3, 6), (4, 8), (5, 2), (6, 4), (7, 3), (9, 9)].all
-        fun (here, there) => typed.getArg! here == arguments[there]! then
-    return .continue
-  let some typed ← functionTypedProof? (mkAppN (mkConst ``FunctionTyped) arguments.pop)
-    | return .continue
-  return .done (mkAppN e.getAppFn (arguments.pop.push typed))
-
-/-- A list of Boolean literals. -/
-private partial def boolList? (e : Lean.Expr) : Option (List Bool) :=
-  let e := e.consumeMData
-  if e.isAppOfArity ``List.nil 1 then some []
-  else if e.isAppOfArity ``List.cons 3 then
-    let head := (e.getArg! 1).consumeMData
-    let flag := if head.isConstOf ``Bool.true then some true
-      else if head.isConstOf ``Bool.false then some false else none
-    match flag, boolList? (e.getArg! 2) with
-    | some flag, some rest => some (flag :: rest)
-    | _, _ => none
-  else none
-
-/-- A literal of sharing marks. -/
-private def sharing? (e : Lean.Expr) : Option Sharing := do
-  let e := e.consumeMData
-  guard (e.isAppOfArity ``Sharing.mk 2)
-  return { parameters := ← boolList? (e.getArg! 0), results := ← boolList? (e.getArg! 1) }
-
-/-- The shared flags of a target's parameters, from a closure's weave and the
-flags of its supplied parameters: a captured parameter is no reference. -/
-private partial def wovenShared (weave : Lean.Expr) (shared : List Bool) : Option (List Bool) :=
-  let weave := weave.consumeMData
-  if weave.isConstOf ``Weave.nil then if shared.isEmpty then some [] else none
-  else if weave.isAppOfArity ``Weave.captured 5 then (false :: ·) <$> wovenShared weave.appArg! shared
-  else if weave.isAppOfArity ``Weave.supplied 5 then
-    match shared with
-    | flag :: rest => (flag :: ·) <$> wovenShared weave.appArg! rest
-    | [] => none
-  else none
-
-open Lean Meta Simp in
-/-- A behavioral predicate of a literal function value capturing values,
+/-- A behavioral predicate of a closure site's constructor capturing values,
 as of the function value naming its target at the woven arguments
 (`ensuresOf_closureOf_woven`, `abortsOf_closureOf_woven`): the named value
-a literal of the target capturing nothing, typed at the leaf's unit
-(`functionTypedProof?`). -/
-private def wovenBehavior (rule : Name) (e : Lean.Expr) : SimpM Step := do
-  unless e.getAppNumArgs > 6 do return .continue
-  let function := (e.getArg! 6).consumeMData
-  unless function.isAppOfArity ``functionOf 11 do return .continue
-  unless (function.getArg! 8).isAppOfArity ``NRow.cons 2 do return .continue
-  let mask := function.getArg! 6
-  unless mask.isAppOfArity ``Weave.mask 4 do return .continue
-  let weave := mask.appArg!
-  let some shared := sharing? (function.getArg! 3) | return .continue
-  let some named_parameters := wovenShared weave shared.parameters | return .continue
-  let full := mask.getArg! 0
-  let (unit, frame, results, handle, instantiation) :=
-    (function.getArg! 0, function.getArg! 1, function.getArg! 4, function.getArg! 5,
-      function.getArg! 7)
-  let named_shared := toExpr { shared with parameters := named_parameters }
-  let namedMask := mkAppN (mkConst ``Weave.mask)
-    #[full, mkConst ``NRow.nil, full, mkApp (mkConst ``Weave.supplying) full]
-  let some typed ← functionTypedProof? (mkAppN (mkConst ``FunctionTyped)
-      #[unit, frame, full, named_shared, results, handle, namedMask, instantiation,
-        mkConst ``NRow.nil, mkConst ``Unit.unit])
-    | return .continue
-  let namedArguments := #[unit, frame, full, named_shared, results, handle, namedMask,
-    instantiation, mkConst ``NRow.nil, mkConst ``Unit.unit, typed]
-  let named := mkAppN (mkConst ``functionOf) namedArguments
-  let naming := mkAppN (mkConst ``functionOf_closure) namedArguments
+a literal of the target capturing nothing, typed by the site's generated
+`named` theorem. -/
+private def wovenBehavior (rule : Name) (e : Lean.Expr) : SimpM Step := withDefault do
+  unless e.getAppNumArgs > 7 do return .continue
+  let function := (e.getArg! 7).consumeMData
+  let .const constructor _ := function.getAppFn | return .continue
+  let some entry := siteEquationsAt? (← getEnv) constructor | return .continue
+  let some namedTyping := entry.named | return .continue
+  let some literal ← literalValue? function | return .continue
+  unless (literal.captured.consumeMData).isAppOfArity ``NRow.cons 2 do return .continue
+  let typing ← unfoldLiterals (← inferType (mkConst namedTyping))
+  let typed ← mkExpectedTypeHint (mkConst namedTyping) typing
+  unless typing.isAppOfArity ``SiteTyped 10 do return .continue
+  let namedArguments := (typing.getAppArgs.extract 0 9).push (mkConst ``NRow.nil)
+    |>.push (mkConst ``Unit.unit) |>.push typed
+  let named := mkAppN (mkConst ``Skolems.construct) namedArguments
+  let naming := mkAppN (mkConst ``Skolems.closure_construct) namedArguments
   let equation ← mkConstWithFreshMVarLevels rule
   let equationType ← inferType equation
   let (arguments, _, statement) ← forallMetaTelescope equationType
   let some (_, lhs, rhs) := statement.eq? | return .continue
-  unless ← isDefEq lhs e do return .continue
   let names := equationType.getForallBinderNames
+  unless ← isDefEq lhs e do return .continue
+  let some closedIndex := names.idxOf? `closed | return .continue
+  unless ← isDefEq (← inferType arguments[closedIndex]!) (← inferType literal.closed) do
+    return .continue
+  unless ← isDefEq arguments[closedIndex]! literal.closed do return .continue
   for (name, value) in [(`named, named), (`naming, naming)] do
     let some index := names.idxOf? name | return .continue
     unless ← isDefEq arguments[index]! value do return .continue
@@ -1411,21 +1349,21 @@ open Lean Meta Simp in
 /-- `ensures_of` of a literal function value capturing values, as of the
 function value naming its target (`wovenBehavior`). -/
 simproc [vir_denote_norm] wovenEnsuresOf
-    (@VerexIR.Proofs.EnsuresOf _ ?frame _ _ _ _ _ _ _ _ _) :=
+    (@VerexIR.Proofs.EnsuresOf _ ?functions ?frame _ _ _ _ _ _ _ _ _) :=
   wovenBehavior ``VerexIR.Proofs.ensuresOf_closureOf_woven
 
 open Lean Meta Simp in
 /-- `aborts_of` of a literal function value capturing values, as of the
 function value naming its target (`wovenBehavior`). -/
 simproc [vir_denote_norm] wovenAbortsOf
-    (@VerexIR.Proofs.AbortsOf _ ?frame _ _ _ _ _ _ _) :=
+    (@VerexIR.Proofs.AbortsOf _ ?functions ?frame _ _ _ _ _ _ _) :=
   wovenBehavior ``VerexIR.Proofs.abortsOf_closureOf_woven
 
 /-- The values a leaf's clauses define (`bindCuts`): an integer by its value
 (`∃ x, x.val = e ∧ p x`) as a certified local of that value where the path
 names one (`existsNamedValue`), otherwise as the value cut to the width with
 its range a conjunct (`SpecInt.exists_val_cut_unsigned`); a literal function
-value's typing decided at the leaf's unit (`existsClosureTyped`). At the
+value's check, a closure site's, by its generated check (`existsClosureChecked`). At the
 leaf, after the path has named its locals; the normal form keeps a clause's
 as stated. -/
 elab "verex_defined_values" : tactic => focusGoal do
@@ -1443,8 +1381,7 @@ elab "verex_defined_values" : tactic => focusGoal do
       ``SpecInt.exists_val_cut_signed] do
     theorems ← theorems.addConst name
   let simprocs ← ({} : Simprocs).add ``existsNamedValue (post := false)
-  let simprocs ← simprocs.add ``existsClosureTyped (post := false)
-  let simprocs ← simprocs.add ``closureTypedDecided (post := false)
+  let simprocs ← simprocs.add ``existsClosureChecked (post := false)
   let ctx ← Simp.mkContext (config := { failIfUnchanged := false }) (simpTheorems := #[theorems])
     (congrTheorems := ← getSimpCongrTheorems)
   match ← simpGoal goal ctx #[simprocs] (simplifyTarget := target) (fvarIdsToSimp := stating) with
@@ -1513,6 +1450,7 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.Denote.wp_branchAt VerexIR.Proofs.Denote.branchIn_some
   VerexIR.Proofs.Denote.branchIn_none VerexIR.Proofs.Denote.AbortsAt_true VerexIR.Proofs.Denote.Taken_true
   VerexIR.Proofs.Denote.wp_armAt VerexIR.Proofs.Denote.armIn_some VerexIR.Proofs.Denote.armIn_none
+  VerexIR.Proofs.Denote.wp_dispatchAt VerexIR.Proofs.Denote.Dispatched_true
   VerexIR.Proofs.Denote.Matched_true
   VerexIR.Proofs.Denote.abortAt_bind VerexIR.Proofs.Denote.Flow.bind_abortAt
   VerexIR.Proofs.Denote.ResultShape.bodyType Bool.not_eq_true decide_eq_true_eq Bool.and_eq_true
@@ -1860,22 +1798,22 @@ private def behaviorInducedFrame (frameIndex : Nat) (rules : List Name) : Simpro
     unless step matches .continue .. do return step
   return .continue
 
-simproc [vir_transport] ensuresOfInducedFrame (@VerexIR.Proofs.EnsuresOf _ ?frame _ _ _ _ _ _ _ _ _) :=
-  behaviorInducedFrame 1 [``VerexIR.Proofs.closureMeaning_ensuresOf_instantiate,
+simproc [vir_transport] ensuresOfInducedFrame (@VerexIR.Proofs.EnsuresOf _ ?functions ?frame _ _ _ _ _ _ _ _ _) :=
+  behaviorInducedFrame 2 [``VerexIR.Proofs.closureMeaning_ensuresOf_instantiate,
     ``VerexIR.Proofs.ModelUnit.ensuresOf_instantiate]
-simproc [vir_transport] abortsOfInducedFrame (@VerexIR.Proofs.AbortsOf _ ?frame _ _ _ _ _ _ _) :=
-  behaviorInducedFrame 1 [``VerexIR.Proofs.closureMeaning_abortsOf_instantiate,
+simproc [vir_transport] abortsOfInducedFrame (@VerexIR.Proofs.AbortsOf _ ?functions ?frame _ _ _ _ _ _ _) :=
+  behaviorInducedFrame 2 [``VerexIR.Proofs.closureMeaning_abortsOf_instantiate,
     ``VerexIR.Proofs.ModelUnit.abortsOf_instantiate]
 simproc [vir_transport] resultOfInducedFrame
-    (@VerexIR.Proofs.ResultOf _ ?frame _ _ _ _ _ _ _ _) :=
-  behaviorInducedFrame 1 [``VerexIR.Proofs.closureMeaning_resultOf_instantiate,
+    (@VerexIR.Proofs.ResultOf _ ?functions ?frame _ _ _ _ _ _ _ _) :=
+  behaviorInducedFrame 2 [``VerexIR.Proofs.closureMeaning_resultOf_instantiate,
     ``VerexIR.Proofs.ModelUnit.resultOf_instantiate]
-simproc [vir_transport] stateOfInducedFrame (@VerexIR.Proofs.StateOf _ ?frame _ _ _ _ _ _ _) :=
-  behaviorInducedFrame 1 [``VerexIR.Proofs.closureMeaning_stateOf_instantiate,
+simproc [vir_transport] stateOfInducedFrame (@VerexIR.Proofs.StateOf _ ?functions ?frame _ _ _ _ _ _ _) :=
+  behaviorInducedFrame 2 [``VerexIR.Proofs.closureMeaning_stateOf_instantiate,
     ``VerexIR.Proofs.ModelUnit.stateOf_instantiate]
 simproc [vir_transport] requiresOfInducedFrame
-    (@VerexIR.Proofs.RequiresOf _ ?frame _ _ _ _ _ _ _) :=
-  behaviorInducedFrame 1 [``VerexIR.Proofs.requiresOf_instantiate]
+    (@VerexIR.Proofs.RequiresOf _ ?functions ?frame _ _ _ _ _ _ _) :=
+  behaviorInducedFrame 2 [``VerexIR.Proofs.requiresOf_instantiate]
 
 -- Behavioral predicates at the outer frame (above), the substitutions they
 -- read evaluated, and the type arguments' freedom from references decided.

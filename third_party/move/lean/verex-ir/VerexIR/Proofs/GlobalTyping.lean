@@ -950,7 +950,7 @@ theorem holdsAt_val (pointerWidth : Option Nat) {width : Nat} {signed : Bool}
   simp [StaticTyping.holdsAt, StaticTyping.targetWidth, fits]
 
 section
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Every runtime value a closed native type holding no reference admits
 (`NTy.admits`) has a typed runtime representation: a runtime value

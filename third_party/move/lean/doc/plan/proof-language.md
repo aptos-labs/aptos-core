@@ -534,12 +534,11 @@ arithmetic and vector lemmas below exist. `effective_bound`, from the paper's
 lemma effective_bound(a : Int, scale : Int)
   requires 0 <= a && 0 <= scale && scale <= 10000
   ensures 0 <= a * scale / 10000 && a * scale / 10000 <= a
-by {
+by
   apply lemma_mul_nonneg(a, scale)
   apply lemma_mul_mono(a, a, scale, 10000)
   apply lemma_div_nonneg(a * scale, 10000)
   apply lemma_div_le(a * scale, a, 10000)
-}
 ```
 
 Each `apply` owes its premise by `decide` from the facts before it, and the
@@ -585,6 +584,14 @@ preparation supplies ("Normal-form fixes"). Four (`nextKey_none`,
 validity and its key list, which no role names; only `big_ordered_map`'s
 proofs apply them, and they enter the table with that module's rewrite
 (L4), with the roles or specification functions that state those notions.
+The coverage of a map's keys by a vector (`map_key_search_absurd`,
+`MapCoverage.lean`) is a map lemma of the `has_key` and `len` roles,
+`lemma_contains_key_len_search_absurd(m, keys, k)` for an owner binding
+`spec_contains_key` and `spec_len`: a distinct vector of the map's size whose
+elements are keys of it holds every key, so a failed search for a key is
+absurd. A module reaches the lemmas of its own maps first, then those of the
+maps of the modules it uses.
+
 A prelude of role-generic `spec lemma`s is added only if a Move proof block
 must `apply` a map lemma; Move has no construct that quantifies a `spec
 lemma` over a role's binding.
@@ -1376,6 +1383,48 @@ decides from a literal map (`iter_across_upsert`); the walk's cost before
 any block (`back_key_rank`, `ground_enum_123`, `iter_prev_loop`,
 `keys_for_loop` and the three walks); the iterator items' validity
 disjunctions; L4 features (`leaf_iter`, `leaf_walk_sum`).
+
+L4 so far, the part that serves no function value (`proof_lemmas` and
+`proofs` in `verex-e2e-tests/VerexE2ETests/SourceVerify`): lemma items, with
+the grammar above, lowered as a `spec lemma` of the module's copy that lowers
+the step expressions, their theorems proved by their blocks
+(`verex_lemma_steps`) before the `verify` items that apply them, a lemma
+applying itself in a recursion group under its `decreases`; the arithmetic
+table and the vector table (`lemma_vector_len_<op>`, `lemma_vector_index_<op>`
+for `remove`, `pop_back`, `swap`, `swap_remove`, `push_back`, `update`,
+`concat`, the slice, `lemma_vector_index_of` for the search `index_of` makes,
+and `lemma_vector_ext`; `StepLemmas.lean`), the element
+lemmas stated over the read a clause reads elements by; the map coverage
+theorem as the map lemma `lemma_<has_key>_<len>_search_absurd(m, keys, k)`
+(`lemma_contains_key_len_search_absurd` for `simple_map`); the lemmas of the
+maps of the modules a module uses; `ring`. A lemma's conjunction is given as
+one fact per part, and a premise owed at a point reads the bounds of the
+values in scope. Open: `on ensures k` inside a lemma item (its block runs
+over all its clauses); the unfolding of a recursive specification function
+as a lemma; a division lemma meets the body's Euclidean quotient only after
+N2's one spelling of a quotient. A point binds the locals the body has
+bound there (the slots of the environment the walk carries, a reference's
+current value), each under a binder of its name with its equation; a slot
+holding a value already in scope is read by that value's name. A local
+bound in code the walk has reduced to values holds no slot, so a point
+after a call is where a body's `let` comes into scope.
+A reference-typed name's prophecy is `r'`: a call's returned reference
+`g_result'`, bound with the result's entry, a local reference from its
+slot. At the data invariants a `&mut` parameter owes, as at an `ensures`,
+`x'` is its final value. A scope name's own definition is kept as stated
+(`named = x + 1`); the others fold into its name. A `forall` step's fact is
+given one part per conjunct.
+`pool_u64::deduct_shares`: the non-removal paths and the removal's length
+bound verify; the not-found search closes by the coverage lemma. Open on the
+removal path: the vector's distinctness after the removal, the length and
+the key membership of the map named after the removal (`old_value`), and the
+`ensures` read by membership. The map's size lemmas are computed by the
+normal form before the term folds into the map's name, so a lemma about
+`spec_remove(…)` gives nothing about `old_value`; and membership's
+spelling (`v[i]? = some e`) differs from the element read. N2's rule for
+membership (`e ∈ v ↔ ∃ i, … v[i]?.getD default = e`) was tried and
+reverted: `DenotePerformance` was unchanged (+0.00%), but
+`Specifications/SpecFunctions`'s automatic `push` no longer verifies.
 
 Ordering against [`native-function-values.md`](native-function-values.md),
 decided: that plan's step 2a (the function carrier interface) comes first,

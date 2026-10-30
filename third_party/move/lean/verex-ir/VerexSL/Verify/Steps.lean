@@ -3,6 +3,7 @@
 
 import VerexSL.Verify.Members
 import VerexSL.Verify.SpecForm
+import VerexIR.Proofs.Denote.StepLemmas
 
 /-!
 # The proof language
@@ -31,6 +32,8 @@ syntax (name := closerSolve) &"solve" : verexCloser
 /-- Equality through applications and uninterpreted terms, with linear
 arithmetic over the facts in scope; no case split. -/
 syntax (name := closerCongr) &"congr" : verexCloser
+/-- A polynomial identity over the integers, the facts in scope hidden. -/
+syntax (name := closerRing) &"ring" : verexCloser
 /-- Lemmas at the stated arguments, then `decide`. -/
 syntax (name := closerApply) &"apply" verexExpr,+ : verexCloser
 /-- Lean tactics on the fact's goal. -/
@@ -90,6 +93,18 @@ obligation's proof. -/
 syntax (name := stepIf) "if " verexExpr verexStepBlock (" else " verexStepBlock)? :
   verexProofStep
 
+private def kwLemmaItem := Lean.Parser.nonReservedSymbol "lemma" true
+private def kwRequiresItem := Lean.Parser.nonReservedSymbol "requires" true
+private def kwEnsuresItem := Lean.Parser.nonReservedSymbol "ensures" true
+private def kwDecreasesItem := Lean.Parser.nonReservedSymbol "decreases" true
+
+/-- `lemma L<T, …>(x : T, …) requires … ensures … by block` states a lemma in
+the specification vocabulary beside the source, proved by its steps: a
+`spec lemma` of the module whose proof is the block. -/
+syntax (name := verexLemmaProofItem) kwLemmaItem ident ("<" ident,+ ">")? "(" verexParameter,* ")"
+  (ppLine kwRequiresItem verexExpr)* (ppLine kwEnsuresItem verexExpr)+
+  (ppLine kwDecreasesItem verexExpr)? " by" verexProofBlock : verexItem
+
 /-! ## Step expressions
 
 A step's expression is lowered by the module's own lowering, in an
@@ -113,12 +128,12 @@ structure StepExpression where
 
 /-- A step expression lowered: the copy it is lowered in, the expression, the
 locals of the declaration holding it (the scope, as its parameters), and,
-for an application of a map lemma, the lemma's `SpecMap` theorem. -/
+for an application of a built-in lemma, the lemma's theorem. -/
 structure LoweredStep where
   unit : ValidatedUnit
   expression : VerexIR.ExprId
   locals : Array VerexIR.LocalDecl
-  mapLemma : Option Name := none
+  builtin : Option Name := none
 
 /-- The lowered step expressions of the module being verified, by the file
 and range of their expressions. -/
@@ -148,14 +163,14 @@ def loweredStep? (environment : Environment) (key : String × Nat × Nat) : Opti
   (loweredStepsExtension.getState environment).findSome? fun (k, step) =>
     if k == key then some step else none
 
-/-- What a map lemma's parameter is: the map, a key or a value at the map's
-types, or an integer. -/
+/-- What a built-in lemma's parameter is: the map, a key or a value at the
+map's types, an integer, a vector, or an element at the vector's type. -/
 inductive LemmaParameterKind where
-  | map | key | value | int
+  | map | key | value | int | vector | element
   deriving BEq, Inhabited
 
-/-- A parameter of a map lemma: its name in the lemma's item, its kind, and
-the binder of the lemma's theorem it fills. -/
+/-- A parameter of a built-in lemma: its name in the lemma's item, its kind,
+and the binder of the lemma's theorem it fills. -/
 structure LemmaParameter where
   name : String
   kind : LemmaParameterKind
@@ -189,7 +204,11 @@ def mapLemmas : Array MapLemma :=
   let key (name : String) (binder : Name := `key) : LemmaParameter := { name, kind := .key, binder }
   let int (name : String) (binder : Name) : LemmaParameter := { name, kind := .int, binder }
   let value : LemmaParameter := { name := "v", kind := .value, binder := `value }
-  #[{ name := fun r => lemmaName [r .get, r .set], theorem_ := ``VerexIR.SpecMap.valueAt_update
+  let keys : LemmaParameter := { name := "keys", kind := .vector, binder := `keys }
+  #[{ name := fun r => lemmaName [r .hasKey, r .len, "search", "absurd"]
+      theorem_ := ``VerexIR.Proofs.Denote.StepLemmas.contains_key_len_search_absurd
+      roles := #[.hasKey, .len], parameters := #[map, keys, key "k"] },
+    { name := fun r => lemmaName [r .get, r .set], theorem_ := ``VerexIR.SpecMap.valueAt_update
       roles := #[.get, .set], parameters := #[map, key "k", value, key "p" `probe] },
     { name := fun r => lemmaName [r .hasKey, r .set], theorem_ := ``VerexIR.SpecMap.hasKey_update
       roles := #[.hasKey, .set], parameters := #[map, key "k", value, key "p" `probe] },
@@ -233,6 +252,71 @@ def mapLemmas : Array MapLemma :=
       theorem_ := ``VerexIR.SpecMap.keyAt_update_after
       roles := #[.keyAt, .set, .rank], parameters := #[map, key "k", value, int "i" `index] }]
 
+/-- A built-in lemma over integers and vectors (`doc/plan/proof-language.md`,
+"Lemmas"): its name, its theorem, and its parameters. Its statement is the
+theorem's at an application's arguments (`lemmaInstance`). -/
+structure BuiltinLemma where
+  name : String
+  theorem_ : Name
+  parameters : Array LemmaParameter
+
+/-- The arithmetic and vector lemmas. -/
+def builtinLemmas : Array BuiltinLemma :=
+  let param (name : String) (kind : LemmaParameterKind) : LemmaParameter :=
+    { name, kind, binder := Name.mkSimple name }
+  let ints (names : List String) := names.toArray.map (param · .int)
+  let entry (name : String) (theorem_ : Name) (parameters : Array LemmaParameter) : BuiltinLemma :=
+    { name, theorem_ := `VerexIR.Proofs.Denote.StepLemmas ++ theorem_, parameters }
+  let v := param "v" .vector
+  let e := param "e" .element
+  #[entry "lemma_mul_nonneg" `mul_nonneg (ints ["a", "b"]),
+    entry "lemma_mul_mono" `mul_mono (ints ["a", "b", "c", "d"]),
+    entry "lemma_mul_strict_mono" `mul_strict_mono (ints ["a", "b", "c"]),
+    entry "lemma_div_nonneg" `div_nonneg (ints ["x", "c"]),
+    entry "lemma_div_le" `div_le (ints ["x", "q", "c"]),
+    entry "lemma_div_lt" `div_lt (ints ["x", "q", "c"]),
+    entry "lemma_le_div" `le_div (ints ["x", "q", "c"]),
+    entry "lemma_div_mono" `div_mono (ints ["x", "y", "c"]),
+    entry "lemma_div_mul_le" `div_mul_le (ints ["x", "c"]),
+    entry "lemma_div_add_mul" `div_add_mul (ints ["x", "b", "c"]),
+    entry "lemma_mod_small" `mod_small (ints ["x", "c"]),
+    entry "lemma_shl_mul" `shl_mul (ints ["x", "k"]),
+    entry "lemma_shr_div" `shr_div (ints ["x", "k"]),
+    entry "lemma_vector_len_remove" `vector_len_remove #[v, param "i" .int],
+    entry "lemma_vector_index_remove" `vector_index_remove #[v, param "i" .int, param "k" .int],
+    entry "lemma_vector_len_pop_back" `vector_len_pop_back #[v],
+    entry "lemma_vector_index_pop_back" `vector_index_pop_back #[v, param "k" .int],
+    entry "lemma_vector_len_swap" `vector_len_swap #[v, param "i" .int, param "j" .int],
+    entry "lemma_vector_index_swap" `vector_index_swap
+      #[v, param "i" .int, param "j" .int, param "k" .int],
+    entry "lemma_vector_len_swap_remove" `vector_len_swap_remove #[v, param "i" .int],
+    entry "lemma_vector_index_swap_remove" `vector_index_swap_remove
+      #[v, param "i" .int, param "k" .int],
+    entry "lemma_vector_len_push_back" `vector_len_push_back #[v, e],
+    entry "lemma_vector_index_push_back" `vector_index_push_back #[v, e, param "k" .int],
+    entry "lemma_vector_len_update" `vector_len_update #[v, param "i" .int, e],
+    entry "lemma_vector_index_update" `vector_index_update
+      #[v, param "i" .int, e, param "k" .int],
+    entry "lemma_vector_len_concat" `vector_len_concat #[v, param "w" .vector],
+    entry "lemma_vector_index_concat" `vector_index_concat #[v, param "w" .vector, param "k" .int],
+    entry "lemma_vector_len_slice" `vector_len_slice #[v, param "a" .int, param "b" .int],
+    entry "lemma_vector_index_slice" `vector_index_slice
+      #[v, param "a" .int, param "b" .int, param "k" .int],
+    entry "lemma_vector_index_of" `vector_index_of #[v, e],
+    entry "lemma_vector_contains_remove" `vector_contains_remove #[v, param "i" .int, e],
+    entry "lemma_vector_ext" `vector_ext #[v, param "w" .vector]]
+
+/-- The `spec lemma` item of a built-in lemma, a signature that types an
+application's arguments: a vector's elements at a type parameter. -/
+def builtinLemmaItem (lemma : BuiltinLemma) : String :=
+  let typeOf : LemmaParameterKind → String
+    | .vector => "Vector<T>" | .element => "T" | _ => "Int"
+  let generic := lemma.parameters.any fun parameter =>
+    parameter.kind == .vector || parameter.kind == .element
+  let parameters := ", ".intercalate (lemma.parameters.toList.map fun parameter =>
+    s!"{parameter.name} : {typeOf parameter.kind}")
+  s!"spec lemma {lemma.name}{if generic then " {T}" else ""}({parameters}) where\n  ensures true"
+
 /-- The names of the lemmas of a namespace's intrinsic maps, each with its
 `SpecMap` theorem: those whose roles an owner binds. -/
 def namespaceMapLemmaNames (ns : ValidatedNamespace) : Array (String × Name) := Id.run do
@@ -273,13 +357,14 @@ def specRoles (unit : ValidatedUnit) : String := Id.run do
 `SpecMap` theorem, and its `spec lemma` item: a signature that types an
 application's arguments, the map at the owner's type, a key and a value at
 its type parameters. -/
-def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace) :
+def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (printing : ValidatedNamespace := ns) (included : VerexIR.NameId → Bool := fun _ => true) :
     Except String (Array (String × Name × String)) := do
   let nameOf (reference : VerexIR.QualifiedRef) : Option String :=
     (ns.tables.names[reference.name.index]?).map (·.name)
   let mut found := #[]
   for intrinsic in ns.intrinsics do
-    unless intrinsic.model == "map" do continue
+    unless intrinsic.model == "map" && included intrinsic.owner do continue
     let bound (role : VerexIR.MapSpecRole) : Option String :=
       (intrinsic.specBindings.find? (·.role == role.name)).bind fun binding =>
         nameOf binding.target
@@ -288,7 +373,7 @@ def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     let some getFunction := ns.specFunctions.find? fun declaration =>
         (ns.tables.names[declaration.name.index]?.map (·.name)) == some get | continue
     let generics := getFunction.signature.generics
-    let typeText (id : VerexIR.TypeId) := Print.specificationTypeText unit ns generics id
+    let typeText (id : VerexIR.TypeId) := Print.specificationTypeText unit printing generics id
     let some mapParameter := getFunction.signature.parameters[0]? | continue
     let some keyParameter := getFunction.signature.parameters[1]? | continue
     let some valueResult := getFunction.signature.results[0]? | continue
@@ -296,7 +381,8 @@ def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     let keyType ← typeText keyParameter.typeUse.typeId
     let valueType ← typeText valueResult.typeId
     let typeOf : LemmaParameterKind → String
-      | .map => mapType | .key => keyType | .value => valueType | .int => "Int"
+      | .map => mapType | .key | .element => keyType | .value => valueType | .int => "Int"
+      | .vector => s!"Vector<{keyType}>"
     let binders ← Print.genericBindersText unit generics
     for mapLemma in mapLemmas do
       unless mapLemma.roles.all (fun role => (bound role).isSome) do continue
@@ -321,7 +407,7 @@ private partial def stepExpression (lets : Array (Name × Syntax)) (stx : Syntax
     | none => stx
   else if stx.isOfKind ``verexSpecificationOldExpr && stx[2].isOfKind ``verexLocalExpr then
     let name := stx[2][0].getId
-    mkNode ``verexLocalExpr #[mkIdentFrom stx (Name.mkSimple s!"old_{name}")]
+    mkNode ``verexLocalExpr #[mkIdentFrom stx (Name.mkSimple s!"old_{name}") (canonical := true)]
   else match stx with
     | .node info kind arguments => .node info kind (arguments.map (stepExpression lets))
     | _ => stx
@@ -662,22 +748,24 @@ def calleeTypeArguments? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Val
 /-- The name a step item's template holds its expression's place by. -/
 private def placeholder : Name := `verex_step_expression
 
-/-- The template with its placeholder replaced by `expression`. -/
-private partial def splice (expression : Syntax) : Syntax → Syntax
+/-- The template with each placeholder replaced by its expression. -/
+private partial def spliceAll (replacements : Array (Name × Syntax)) : Syntax → Syntax
   | stx@(.node info kind arguments) =>
-      if kind == ``verexLocalExpr && stx[0].getId == placeholder then expression
-      else .node info kind (arguments.map (splice expression))
+      match kind == ``verexLocalExpr, replacements.find? (·.1 == stx[0].getId) with
+      | true, some (_, expression) => expression
+      | _, _ => .node info kind (arguments.map (spliceAll replacements))
   | stx => stx
+
+/-- The template with its placeholder replaced by `expression`. -/
+private def splice (expression : Syntax) : Syntax → Syntax :=
+  spliceAll #[(placeholder, expression)]
 
 /-- The item a step's expression lowers in, named `«f__step_k»`: a
 specification function whose body is the expression, or, for a lemma
 formula, a lemma whose proof applies it; its parameters are the scope. -/
-private def stepItem (unit : ValidatedUnit) (function : String) (index : Nat)
-    (generics : Array VerexIR.GenericBinder) (scope : Array (String × String))
-    (step : StepExpression) : CommandElabM Syntax := do
-  let binders ← match Print.genericBindersText unit generics with
-    | .ok text => pure (if text.isEmpty then "" else " " ++ text)
-    | .error message => throwErrorAt step.expression message
+private def stepItem (function : String) (index : Nat) (binders : String)
+    (scope : Array (String × String)) (step : StepExpression) : CommandElabM Syntax := do
+  let binders := if binders.isEmpty then "" else " " ++ binders
   let stepBinders := step.binders.map fun (name, type) =>
     (name, (type.reprint.getD "Int").trimAscii.toString)
   let parameters := scope.filter (fun (name, _) => !stepBinders.any (·.1 == name)) ++ stepBinders
@@ -698,7 +786,8 @@ not registered), and record them for the steps' tactics. A diagnostic of a
 step expression is reported at it. -/
 def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Array String))
     (unit : ValidatedUnit) (moduleCommand : Syntax) (moduleFile : Option ParsedFile)
-    (items : Array (Syntax × String × Syntax × String)) : CommandElabM Unit := do
+    (items : Array (Syntax × String × Syntax × String))
+    (proofLemmas : Array (Syntax × String) := #[]) : CommandElabM Unit := do
   modifyEnv (specRolesExtension.setState · (specRoles unit))
   let mut synthesized := #[]
   let mut pending := #[]
@@ -772,21 +861,79 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     let witnesses (step : Syntax) : Array String :=
       ((step.getPos?).bind fun position => witnessed.find? (·.1 == position.byteIdx)).map (·.2)
         |>.getD #[]
+    let binders ← match Print.genericBindersText unit declaration.signature.generics with
+      | .ok text => pure text
+      | .error message => throwErrorAt item message
     for step in blockExpressions block (witnesses := witnesses) do
       let index := synthesized.size
       -- In the proof file's band: its positions are not the module's.
       synthesized := synthesized.push
-        (shifted proofBand (← stepItem unit function index declaration.signature.generics scope step))
+        (shifted proofBand (← stepItem function index binders scope step))
       pending := pending.push (step, s!"{function}__step_{index}", file)
+  -- A lemma item is a `spec lemma` of the copy, its clauses at their places
+  -- in the proof file; its steps lower in the scope of its parameters.
+  let mut lemmaDeclarations := #[]
+  for (item, file) in proofLemmas do
+    let name := item[1].getId.toString (escape := false)
+    let generics := if item[2].getNumArgs > 0 then item[2][1].getSepArgs.map
+      (·.getId.toString (escape := false)) else #[]
+    let binders := " ".intercalate (generics.toList.map fun generic => "{" ++ generic ++ "}")
+    let parameters := item[4].getSepArgs
+    let scope ← parameters.mapM fun parameter => do
+      let some identifier := parameter.find? (·.isIdent)
+        | throwErrorAt parameter "a lemma's parameter is named"
+      let some type := parameter[parameter.getNumArgs - 1].reprint
+        | throwErrorAt parameter "a lemma's parameter has a type"
+      pure (identifier.getId.toString (escape := false), type.trimAscii.toString)
+    let clauses := item[6].getArgs.map (("requires", ·[1])) ++ item[7].getArgs.map (("ensures", ·[1]))
+    let placeholderOf (position : Nat) : Name := Name.mkSimple s!"verex_lemma_clause_{position}"
+    let measure := if item[8].getNumArgs > 0 then
+      s!" decreases {placeholderOf clauses.size}" else ""
+    let declared := ", ".intercalate (scope.toList.map fun (name, type) => s!"«{name}» : {type}")
+    let lines := clauses.zipIdx.toList.map fun ((kind, _), position) =>
+      s!"\n  {kind} {placeholderOf position}"
+    let text := s!"spec lemma «{name}»{if binders.isEmpty then "" else " " ++ binders}({declared})\
+      {measure} where" ++ String.join lines
+    let template ← match Parser.runParserCategory (← getEnv) `verexItem text with
+      | .ok template => pure template
+      | .error message => throwErrorAt item m!"the lemma does not parse as a `spec lemma`: {message}"
+    let replacements := clauses.zipIdx.map (fun ((_, expression), position) =>
+      (placeholderOf position, expression)) ++
+      (if item[8].getNumArgs > 0 then #[(placeholderOf clauses.size, item[8][1])] else #[])
+    synthesized := synthesized.push (shifted proofBand (spliceAll replacements (atRangeOf item template)))
+    lemmaDeclarations := lemmaDeclarations.push (name, item, file)
+    for step in blockExpressions item[10] do
+      let index := synthesized.size
+      synthesized := synthesized.push (shifted proofBand (← stepItem name index binders scope step))
+      pending := pending.push (step, s!"{name}__step_{index}", file)
   if synthesized.isEmpty then return
-  -- The lemmas of the module's maps, which an `apply` names; a name the
-  -- module declares stays its own.
+  -- The built-in lemmas an `apply` names: those of the module's maps and of
+  -- the maps of other modules its expressions hold, its own first, then the
+  -- arithmetic and vector lemmas; a name the module declares stays its own.
   let some own := unit.namespaces[0]? | return
   let declared := (own.lemmas.map (·.name) ++ own.specFunctions.map (·.name) ++
     own.functions.map (·.name)).filterMap fun name => (unit.tables.names[name.index]?).map (·.name)
-  let moduleLemmas ← match namespaceMapLemmas unit own with
-    | .ok found => pure (found.filter fun (name, _, _) => !declared.contains name)
-    | .error message => throwErrorAt moduleCommand message
+  let nominalOf? (type : VerexIR.TypeId) : Option VerexIR.NameId :=
+    match unit.tables.types[type.index]? with
+    | some (.nominal name _) => some name
+    | some (.reference reference) => match unit.tables.types[reference.referent.index]? with
+      | some (.nominal name _) => some name
+      | _ => none
+    | _ => none
+  let held (owner : VerexIR.NameId) : Bool :=
+    own.expressions.any fun expression => nominalOf? expression.typeId == some owner
+  let mut moduleLemmas : Array (String × Name × String) := #[]
+  for ns in unit.namespaces do
+    let found ← match namespaceMapLemmas unit ns own
+        (if ns.identity == own.identity then fun _ => true else held) with
+      | .ok found => pure found
+      | .error message => throwErrorAt moduleCommand message
+    for entry@(name, _, _) in found do
+      unless declared.contains name || moduleLemmas.any (·.1 == name) do
+        moduleLemmas := moduleLemmas.push entry
+  for lemma in builtinLemmas do
+    unless declared.contains lemma.name || moduleLemmas.any (·.1 == lemma.name) do
+      moduleLemmas := moduleLemmas.push (lemma.name, lemma.theorem_, builtinLemmaItem lemma)
   let environment ← getEnv
   -- The lemmas laid out one after another in their band.
   let mut lemmaItems := #[]
@@ -796,14 +943,15 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     | .ok item => lemmaItems := lemmaItems.push (shifted offset item)
     | .error message => throwErrorAt moduleCommand m!"a map lemma does not parse: {message}"
     offset := offset + text.utf8ByteSize + 1
-  let proofFiles := pending.foldl (init := #[]) fun found (_, _, file) =>
-    if found.contains file then found else found.push file
+  let proofFiles := (pending.map (·.2.2) ++ lemmaDeclarations.map (·.2.2)).foldl (init := #[])
+    fun found file => if found.contains file then found else found.push file
   let some proofFile := proofFiles[0]? | return
   unless proofFiles.size == 1 do
     throwErrorAt moduleCommand "the step expressions of a module come from one proof file"
   -- Each source fits its band.
   let fits (stx : Syntax) : Bool := (stx.getTailPos? true).all (·.byteIdx < sourceBand)
-  unless fits moduleCommand && pending.all (fits ·.1.expression) && offset < lemmaBand + sourceBand do
+  unless fits moduleCommand && pending.all (fits ·.1.expression) &&
+      lemmaDeclarations.all (fits ·.2.1) && offset < lemmaBand + sourceBand do
     throwErrorAt moduleCommand m!"VEREX-SOURCE-RANGE: a source exceeds {sourceBand} bytes"
   let last := moduleCommand.getNumArgs - 1
   -- The module keeps its own range: the items spliced into it are of other
@@ -824,45 +972,69 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
       if (← diagnostics.get).isEmpty then logException error
       pure none
   -- A diagnostic in the proof file's band is reported at the step expression
-  -- whose range holds it.
+  -- or the lemma item whose range holds it.
+  let holds (stx : Syntax) : Option (Nat × Nat) → Bool
+    | some (start, stop) => start / sourceBand == 1 &&
+        (stx.getPos? true).any (·.byteIdx + proofBand ≤ start) &&
+        (stx.getTailPos? true).any (stop ≤ ·.byteIdx + proofBand)
+    | none => false
   for (range, severity, message) in ← diagnostics.get do
-    let at? := pending.find? fun (step, _, _) => match range with
-      | some (start, stop) => start / sourceBand == 1 &&
-          (step.expression.getPos? true).any (·.byteIdx + proofBand ≤ start) &&
-          (step.expression.getTailPos? true).any (stop ≤ ·.byteIdx + proofBand)
-      | none => false
-    logAt ((at?.map (·.1.expression)).getD moduleCommand) message severity
+    let at? := ((pending.find? fun (step, _, _) => holds step.expression range).map
+      (·.1.expression)) <|> ((lemmaDeclarations.find? fun (_, item, _) => holds item range).map (·.2.1))
+    logAt (at?.getD moduleCommand) message severity
   let some (copy, _, _) := copy | return
   let some ns := copy.namespaces[0]? | return
   let nameOf (name : VerexIR.NameId) := (copy.tables.names[name.index]?).map (·.name)
   let mut recorded := #[]
-  for (step, name, file) in pending do
+  -- What each lemma item's steps apply: its recursion group.
+  let lemmaReference (name : String) : Option VerexIR.QualifiedRef :=
+    (ns.lemmas.find? (nameOf ·.name == some name)).map fun lemma => { namespaceId := ⟨0⟩, name := lemma.name }
+  let mut stepApplications : StepApplications := #[]
+  for ((step : StepExpression), (name : String), (file : String)) in pending do
     let some key := stepKey file step.expression | continue
     if step.apply then
       let some lemma := ns.lemmas.find? (nameOf ·.name == some name) | continue
       let some condition := lemma.proof[0]? | continue
       -- The lemma it applies: a map lemma is proved where it is applied.
-      let applied := match ns.expressions[condition.expression.index]? with
-        | some { kind := .operation (.specification (.lemma reference _)) .., .. } => some reference
-        | _ => none
-      let mapLemma := applied.bind fun reference => do
+      let applied : Option VerexIR.QualifiedRef :=
+        (ns.expressions[condition.expression.index]?).bind fun expression =>
+          match expression.kind with
+          | .operation (.specification (.lemma reference _)) .. => some reference
+          | _ => none
+      let builtin := applied.bind fun reference => do
         let appliedName ← nameOf reference.name
         (moduleLemmas.find? (·.1 == appliedName)).map (·.2.1)
       -- A lemma of the module is applied by its definitions, which its own
-      -- verification declared; a map lemma is expanded where it is applied.
-      if let (some reference, none) := (applied, mapLemma) then
+      -- verification declared; a built-in lemma is expanded where it is
+      -- applied.
+      if let (some reference, none) := (applied, builtin) then
         try discard <| liftTermElabM (Contract.ensureLemmaDefinitions copy reference)
         catch error =>
           logErrorAt step.expression m!"the lemma's statement does not translate: \
             {error.toMessageData}"
           continue
+        -- A step of a lemma item applying a lemma.
+        if let some (owner, _, _) := lemmaDeclarations.find? fun (owner, _, _) =>
+            name.startsWith s!"{owner}__step_" then
+          if let some ownerReference := lemmaReference owner then
+            stepApplications := match stepApplications.findIdx? (·.1 == ownerReference) with
+              | some position => stepApplications.modify position fun (o, applied) =>
+                  (o, if applied.contains reference then applied else applied.push reference)
+              | none => stepApplications.push (ownerReference, #[reference])
       recorded := recorded.push (key,
-        { unit := copy, expression := condition.expression, locals := lemma.locals, mapLemma })
+        { unit := copy, expression := condition.expression, locals := lemma.locals, builtin })
     else
       let some function := ns.specFunctions.find? (nameOf ·.name == some name) | continue
       let some body := function.body | continue
       recorded := recorded.push (key, { unit := copy, expression := body, locals := function.locals })
   modifyEnv (loweredStepsExtension.modifyState · (· ++ recorded))
+  -- The lemma items, proved by their blocks, before the `verify` items that
+  -- apply them.
+  let roots := lemmaDeclarations.filterMap fun (name, _, _) => lemmaReference name
+  let blocks := lemmaDeclarations.filterMap fun (name, item, _) =>
+    (lemmaReference name).map (·, item[10])
+  verifyLemmas copy #[] roots (lemmaDeclarations.map fun (name, item, _) => (name, item[1]))
+    moduleCommand blocks stepApplications
 
 /-! ## Steps at a leaf -/
 
@@ -877,8 +1049,9 @@ private def leafCarriers? : MetaM (Option Lean.Expr) := do
     if decl.isImplementationDetail then continue
     let type ← instantiateMVars decl.type
     if type.isAppOfArity ``NTy.carrier 2 then return some (type.getArg! 0)
-    if family.isNone && type.isAppOfArity ``Skolems 1 then
-      family := some (mkApp2 (mkConst ``Skolems.toCarriers) type.appArg! decl.toExpr)
+    if family.isNone && type.isAppOfArity ``Skolems 2 then
+      family := some (mkApp3 (mkConst ``Skolems.toCarriers) (type.getArg! 0) (type.getArg! 1)
+        decl.toExpr)
   return family
 
 /-- The last local of a name that is no hypothesis: where a leaf holds the
@@ -983,9 +1156,10 @@ private def scopeEntries : MetaM (Array (String × Lean.Expr)) := do
 bound. -/
 def stepBaseContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Context := do
   let some ns := step.unit.namespaces[0]? | throwErrorAt reference "the step's module is missing"
+  -- A lemma over integers alone holds no native value: its steps read none.
   let some carriers ← leafCarriers?
-    | throwErrorAt reference "the obligation has no native value a step can read"
-  let some (_, frame) := Contract.carriersFrame? carriers
+    | return { unit := step.unit, namespaceId := ⟨0⟩, ns, locals := #[], results := #[] }
+  let some (_, _, frame) := Contract.carriersFrame? carriers
     | throwErrorAt reference "the obligation's carriers have no frame"
   let executable ← (← getLCtx).foldlM (init := none) fun found decl => do
     if found.isSome then return found
@@ -1144,6 +1318,12 @@ arithmetic alone (`lia` with no case split: no instantiation, no ring, no
 extensionality). -/
 syntax (name := blockCongrTactic) "verex_block_congr" : tactic
 
+/-- `ring` (`closerRing`): the goal in the block's normal form, a conjunction
+part by part, each a polynomial identity by the `grind` ring module alone,
+the facts in scope hidden: no case split, no instantiation, bounded by
+`ringSteps` and `ringMaxDegree`. -/
+syntax (name := blockRingTactic) "verex_block_ring" : tactic
+
 /-- The tactic a closer stands for. -/
 def closerTactic (closer : Syntax) : TacticM (TSyntax `tactic) := do
   if closer.isOfKind ``closerDecide then blockDecide
@@ -1151,6 +1331,7 @@ def closerTactic (closer : Syntax) : TacticM (TSyntax `tactic) := do
   else if closer.isOfKind ``closerEval then `(tactic| verex_typed_close)
   else if closer.isOfKind ``closerSolve then `(tactic| verex_solve)
   else if closer.isOfKind ``closerCongr then `(tactic| verex_block_congr)
+  else if closer.isOfKind ``closerRing then `(tactic| verex_block_ring)
   else if closer.isOfKind ``closerLean then
     let script : TSyntax ``Lean.Parser.Tactic.tacticSeq := ⟨closer[2]⟩
     `(tactic| ($script))
@@ -1498,9 +1679,21 @@ private def reduceDefinitions (goal : MVarId) (changed : Option (Array Name) := 
   -- Only a definition whose term holds another's, or that an alias renames,
   -- changes.
   let aliased := !rules.aliases.isEmpty || !rules.aliasesReversed.isEmpty
-  let targets := candidates.filterMap fun (definition, _, term) =>
-    if aliased || all.any (fun (other, _, otherTerm) => other != definition && mayHold term otherTerm)
-    then some definition else none
+  -- A scope name's own definition is kept as stated: the others fold into
+  -- its name, never it into theirs.
+  let scopedNames ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      let some (_, _, value) := scopeEntry? (← instantiateMVars decl.type) | return found
+      return match localName? value with
+        | some x => found.push x
+        | none => found
+  let definesScoped (definition : FVarId) : MetaM Bool := goal.withContext do
+    let some (_, lhs, rhs) := (← instantiateMVars (← definition.getType)).eq? | return false
+    return [lhs, rhs].any fun side => (localName? side).any scopedNames.contains
+  let targets ← candidates.filterMapM fun (definition, _, term) => do
+    if ← definesScoped definition then return none
+    return if aliased || all.any (fun (other, _, otherTerm) => other != definition && mayHold term otherTerm)
+      then some definition else none
   if targets.isEmpty then return goal
   -- All at once, each without itself (`simpGoal`), the definitions read
   -- before their subterms: a term folds into the largest definition it is,
@@ -1618,6 +1811,16 @@ private def giveFact (goal : MVarId) (name : Name) (statement proof : Lean.Expr)
   if (← next.getDecl).lctx.contains fact then return some (← markFact next fact)
   return some next
 
+/-- A fact's proof carried along the equation of its statement to its normal
+form. The equation's left side is the statement up to definitional
+unfolding, which may pass an irreducible constructor's projection
+(`eraseBounded_values`); the kernel checks that conversion. -/
+private def castFact (equality proof : Lean.Expr) : MetaM Lean.Expr := do
+  let some (_, statement, normal) := (← whnfR (← inferType equality)).eq?
+    | mkEqMP equality proof
+  return mkApp4 (mkConst ``Eq.mp [Level.zero]) statement normal equality
+    (← mkExpectedTypeHint proof statement)
+
 /-- Give a goal the fact `name : statement`, proved by `proof`, normalized
 once (`giveFact`). -/
 private def giveNormal (goal : MVarId) (name : Name) (statement proof : Lean.Expr)
@@ -1625,7 +1828,7 @@ private def giveNormal (goal : MVarId) (name : Name) (statement proof : Lean.Exp
   let (normal, equality?) ← normalForm goal statement rules?
   let proof ← goal.withContext do
     match equality? with
-    | some equality => mkEqMP equality proof
+    | some equality => castFact equality proof
     | none => pure proof
   giveFact goal name normal proof
 
@@ -1699,6 +1902,40 @@ private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
     goal := next
   return some goal
 
+/-- The goal as an instance of a quantified fact, each premise of the
+instance in the block's normal form, then stated by a hypothesis or decided by
+arithmetic: the premise matching a lemma's premises have
+(`doc/plan/proof-language.md`, "Closers"). Whether it closes the goal. -/
+private def blockInstance (goal : MVarId) : TacticM Bool := do
+  let target ← goal.withContext do instantiateMVars (← goal.getType)
+  if target.isConstOf ``False then return false
+  let candidates ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      return if (← whnfR (← instantiateMVars decl.type)).isForall then found.push decl.toExpr
+        else found
+  for candidate in candidates.reverse do
+    let saved ← saveState
+    try
+      let premises ← withReducible (goal.apply candidate)
+      let mut closed := true
+      for premise in premises do
+        if ← premise.isAssigned then continue
+        unless ← goal.withContext (isProp (← premise.getType)) do
+          closed := false
+          break
+        let some normal ← normalizeFact premise none | continue
+        setGoals [normal]
+        try evalTactic (← `(tactic| first | verex_assumption | omega))
+        catch _ => pure ()
+        unless (← getUnsolvedGoals).isEmpty do
+          closed := false
+          break
+      if closed then return true
+    catch _ => pure ()
+    saved.restore
+  return false
+
 @[tactic blockDecideTactic] def evalBlockDecide : Tactic := fun _ => do
   let goal ← getMainGoal
   if ← closeByStatement goal then
@@ -1722,8 +1959,12 @@ private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
     evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_instance |
       omega))
   else
-    evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | omega |
-      verex_instance))
+    try
+      evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | omega |
+        verex_instance))
+    catch failure =>
+      unless ← blockInstance goal do throw failure
+      setGoals []
 
 /-- Settle the equations of names and values a case split leaves in a goal's
 context (`settle`), as a fact of such an equation is: a split computes the
@@ -1756,36 +1997,81 @@ private def prepareCases (cases : Array MVarId) : TacticM (List MVarId) := do
   evalTactic (← `(tactic| all_goals verex_type_bounds))
   getGoals
 
-/-- Whether a binder of a map lemma's theorem is filled other than by a
-parameter: the discipline or the order, which the map's owner gives, a type,
-an instance, or a premise, which the lemma owes. -/
+/-- Whether a binder of a built-in lemma's theorem is filled other than by a
+parameter: the discipline or the order, which a map's owner gives, the
+fallback of a vector's elements, the read a clause reads them by and its
+injectivity, a type, an instance, or a premise, which the lemma owes. -/
 private def lemmaBinderFilled (name : Name) (type : Lean.Expr) : MetaM Bool := do
-  if name == `discipline || name == `order then return true
+  if name == `discipline || name == `order || name == `fallback || name == `read ||
+      name == `injective || name == `eq || name == `sound then return true
   if (← whnfD type).isSort then return true
   if (← isClass? type).isSome then return true
   isProp type
 
--- The table checked against its theorems when this module is built: each
+/-- The theorem and the parameters of the built-in lemma `theorem_` is. -/
+private def builtinParameters? (theorem_ : Name) : Option (Array LemmaParameter) :=
+  (mapLemmas.find? (·.theorem_ == theorem_)).map (·.parameters) <|>
+    (builtinLemmas.find? (·.theorem_ == theorem_)).map (·.parameters)
+
+-- The tables checked against their theorems when this module is built: each
 -- theorem resolves, each parameter fills a binder of it, and every other
--- binder is the discipline, the order, a type, an instance or a premise.
+-- binder is the discipline, the order, the fallback, a type, an instance or
+-- a premise.
 run_meta do
-  for mapLemma in mapLemmas do
-    let info ← getConstInfo mapLemma.theorem_
+  let entries := mapLemmas.map (fun lemma => (lemma.theorem_, lemma.parameters)) ++
+    builtinLemmas.map fun lemma => (lemma.theorem_, lemma.parameters)
+  for (theorem_, parameters) in entries do
+    let info ← getConstInfo theorem_
     forallTelescopeReducing info.type fun binders _ => do
       let names ← binders.mapM fun binder => return (← binder.fvarId!.getDecl).userName
-      for parameter in mapLemma.parameters do
+      for parameter in parameters do
         unless names.contains parameter.binder do
-          throwError "map lemma {mapLemma.theorem_}: parameter `{parameter.name}` names no binder \
+          throwError "built-in lemma {theorem_}: parameter `{parameter.name}` names no binder \
             `{parameter.binder}`"
       for binder in binders, name in names do
-        if mapLemma.parameters.any (·.binder == name) then continue
+        if parameters.any (·.binder == name) then continue
         unless ← lemmaBinderFilled name (← inferType binder) do
-          throwError "map lemma {mapLemma.theorem_}: binder `{name}` is filled by nothing"
+          throwError "built-in lemma {theorem_}: binder `{name}` is filled by nothing"
 
-/-- A map lemma's instance at its application: its theorem at the translated
-arguments, a map as its owner's typed map, a key or a value as the typed
-value the map holds it as, and the map's discipline as its owner gives it.
-The instance's proof, its statement, and its premises as goals. -/
+/-- How a clause reads a vector's elements of native type `τ`, carried as
+`carrier`, and the proof that the read tells elements apart: an integer by
+its value, a Boolean as a proposition, any other value itself. -/
+private def elementRead (carrier : Lean.Expr) (τ : NTy) : MetaM (Lean.Expr × Lean.Expr) := do
+  withLocalDeclD `element carrier fun element => do
+    let integer (width signed : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+      return (← mkLambdaFVars #[element] (← mkAppM ``VerexIR.SpecInt.val #[element]),
+        mkApp2 (mkConst ``VerexIR.Proofs.Denote.StepLemmas.int_read_injective) width signed)
+    match τ with
+    | .int width signed =>
+        integer (mkApp (mkConst ``VerexIR.IntWidth.bits) (mkNatLit width)) (toExpr signed)
+    | .num => integer (mkConst ``VerexIR.IntWidth.unbounded) (toExpr true)
+    | .bool =>
+        return (← mkLambdaFVars #[element]
+            (mkApp3 (mkConst ``Eq [Level.one]) (mkConst ``Bool) element (mkConst ``Bool.true)),
+          mkConst ``VerexIR.Proofs.Denote.StepLemmas.bool_read_injective)
+    | _ =>
+        return (← mkLambdaFVars #[element] element,
+          mkApp (mkConst ``VerexIR.Proofs.Denote.StepLemmas.self_read_injective) carrier)
+
+/-- The equality a search compares a vector's elements of quoted native type
+`τ` by (`NTy.eqb`), and its soundness, where the type holds no reference and
+no ghost. -/
+private def elementEquality (carriers τ : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  let decided (flag : Name) : MetaM Lean.Expr := do
+    let statement ← mkEq (mkApp (mkConst flag) τ) (mkConst ``Bool.true)
+    unless ← withDefault (isDefEq (mkApp (mkConst flag) τ) (mkConst ``Bool.true)) do
+      throwError "a search compares elements holding a reference or a ghost"
+    mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) statement
+  return (mkApp2 (mkConst ``NTy.eqb) carriers τ,
+    mkApp4 (mkConst ``NTy.eqb_iff) carriers τ (← decided ``NTy.refFree)
+      (← decided ``NTy.ghostFree))
+
+/-- A built-in lemma's instance at its application: its theorem at the
+translated arguments, a map as its owner's typed map, a key or a value as the
+typed value the map holds it as, the map's discipline as its owner gives it,
+an integer, a vector or an element as the clause states it, and a vector's
+fallback as a clause reads one. The instance's proof, its statement, and its
+premises as goals. -/
 def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lemmaTheorem : Name) :
     TacticM (Lean.Expr × Lean.Expr × List MVarId) := goal.withContext do
   let context ← stepContext step reference
@@ -1794,22 +2080,19 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
     | throwErrorAt reference "an `apply` names a lemma at its arguments"
   unless (Contract.lemmaOf? step.unit lemmaReference).isSome do
     throwErrorAt reference "the lemma does not resolve"
-  let some mapLemma := mapLemmas.find? (·.theorem_ == lemmaTheorem)
-    | throwErrorAt reference "the lemma is not in the table of map lemmas"
-  let carriers ← context.carriers
+  let some parameters := builtinParameters? lemmaTheorem
+    | throwErrorAt reference "the lemma is not in the tables of built-in lemmas"
   -- The map's owner, whose views read the keys and values.
-  let some mapIndex := mapLemma.parameters.findIdx? (·.kind == .map)
-    | throwErrorAt reference "a lemma over no map is applied at no arguments"
-  let some mapArgument := arguments[mapIndex]? | throwErrorAt reference "the lemma lacks its map"
-  let owner ← Contract.nativeOwner carriers (← context.exprType mapArgument)
-    (← Contract.translate context mapArgument)
-  let table := owner.typed
-  let some ownerType := (context.ns.expressions[mapArgument.index]?).bind fun expression =>
-      context.valueTypeOf? expression.typeId
-    | throwErrorAt reference "the lemma's map has no type"
-  let some model := Contract.mapModel? step.unit ownerType
-    | throwErrorAt reference "the lemma's map is not an intrinsic map"
-  let discipline ← table.discipline model
+  let owner? ← (parameters.findIdx? (·.kind == .map)).mapM fun mapIndex => do
+    let some mapArgument := arguments[mapIndex]? | throwErrorAt reference "the lemma lacks its map"
+    let owner ← Contract.nativeOwner (← context.carriers) (← context.exprType mapArgument)
+      (← Contract.translate context mapArgument)
+    let some ownerType := (context.ns.expressions[mapArgument.index]?).bind fun expression =>
+        context.valueTypeOf? expression.typeId
+      | throwErrorAt reference "the lemma's map has no type"
+    let some model := Contract.mapModel? step.unit ownerType
+      | throwErrorAt reference "the lemma's map is not an intrinsic map"
+    return (owner.typed, ← owner.typed.discipline model)
   let typed (view : NativeMaps.TypedView) (argument : VerexIR.ExprId) : MetaM Lean.Expr := do
     let clause ← Contract.translate context argument
     match_expr clause.consumeMData with
@@ -1817,12 +2100,34 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
     | _ => pure ()
     Contract.TypedTable.typedOf view (← context.exprType argument) clause
   let mut values : Array (Name × Lean.Expr) := #[]
-  for parameter in mapLemma.parameters, argument in arguments do
-    let value ← match parameter.kind with
-      | .map => pure table.map
-      | .key => typed table.keys argument
-      | .value => typed table.values argument
-      | .int => Contract.translate context argument
+  let mut fallback := none
+  let mut read := none
+  let mut search := none
+  let mut elementType := none
+  for parameter in parameters, argument in arguments do
+    let value ← match parameter.kind, owner? with
+      | .map, some (table, _) => pure table.map
+      | .key, some (table, _) => typed table.keys argument
+      | .value, some (table, _) => typed table.values argument
+      | .int, _ => Contract.translate context argument
+      | .element, _ => do
+          -- At the vector's element type, an integer read at its width.
+          let (value, ε) ← Contract.nativeOperand context argument
+          match elementType with
+          | some τ => Contract.coerceNative (← context.carriers) ε τ value
+          | none => pure value
+      | .vector, _ => do
+          -- The elements' fallback, as a clause reads a vector.
+          if fallback.isNone then
+            if let .vector τ ← context.exprType argument then
+              let carriers ← context.carriers
+              let quoted ← Contract.quoteNTy τ
+              fallback := some (← Contract.typedInhabitant carriers quoted)
+              read := some (← elementRead (Contract.carrierType carriers quoted) τ)
+              search := some (← elementEquality carriers quoted)
+              elementType := some τ
+          Contract.translate context argument
+      | _, none => throwErrorAt reference "a map lemma is applied at no map"
     values := values.push (parameter.binder, value)
   let theorem_ ← mkConstWithFreshMVarLevels lemmaTheorem
   let (holes, _, statement) ← forallMetaTelescopeReducing (← inferType theorem_)
@@ -1834,18 +2139,35 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
   for hole in holes, name in names do
     if let some (_, value) := values.find? (·.1 == name) then
       unless ← isDefEq hole value do
-        throwErrorAt reference m!"the lemma's `{name}` does not fit its theorem"
-    else if name == `discipline then
-      discard <| isDefEq hole discipline
-    else if name == `order then
-      if discipline.isAppOfArity ``VerexIR.SpecMap.Discipline.ordered 2 then
-        discard <| isDefEq hole (discipline.getArg! 1)
-  -- Instances by their types; the premises are what the lemma owes.
+        throwErrorAt reference m!"the lemma's `{name}` does not fit its theorem: {← inferType value} \
+          against {← inferType hole}"
+  for hole in holes, name in names do
+    if name == `fallback || name == `read || name == `injective || name == `eq ||
+        name == `sound then
+      let value? := if name == `fallback then fallback else if name == `read then read.map (·.1)
+        else if name == `injective then read.map (·.2)
+        else if name == `eq then search.map (·.1) else search.map (·.2)
+      let some value := value? | throwErrorAt reference "the lemma reads no vector"
+      unless ← isDefEq hole value do
+        throwErrorAt reference m!"the vector's `{name}` does not fit the lemma's theorem"
+    else if let some (_, discipline) := owner? then
+      if name == `discipline then
+        discard <| isDefEq hole discipline
+      else if name == `order then
+        if discipline.isAppOfArity ``VerexIR.SpecMap.Discipline.ordered 2 then
+          discard <| isDefEq hole (discipline.getArg! 1)
+  -- Instances by their types, the keys' equality as the map's owner
+  -- decides it; the premises are what the lemma owes.
   let mut premises := #[]
   for hole in holes do
     if ← hole.mvarId!.isAssigned then continue
     let type ← instantiateMVars (← inferType hole)
     if (← isClass? type).isSome then
+      if let some (table, _) := owner? then
+        if type.isAppOfArity ``DecidableEq 1 then
+          if ← isDefEq type (← inferType table.keys.decEq) then
+            hole.mvarId!.assign table.keys.decEq
+            continue
       hole.mvarId!.assign (← synthInstance type)
     else if ← isProp type then
       -- An opaque goal: only its closer proves it, never a unification.
@@ -1890,10 +2212,12 @@ private def loweredAt (expression : Syntax) : TacticM LoweredStep := do
 
 /-- At a program point, the walk's hypotheses carry their clauses' markers,
 which name the leaves after it; a fact proved there reads them unmarked, in
-its own goal. -/
+its own goal, with the bounds of the values in scope, which a leaf's
+preparation states. -/
 private def readUnmarked : TacticM Unit := do
   if verex.pointFacts.get (← getOptions) then
     evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at *))
+    evalTactic (← `(tactic| all_goals verex_type_bounds))
 
 /-- Prove `goal` by `prove`, its hypotheses read unmarked first, which may
 close it already: whether it is closed. The goals left are those `prove`
@@ -1938,7 +2262,7 @@ lemma's premise is proved by `closer` and its theorem gives its conclusion
 private def lemmaConclusion (application : Syntax) (closer : TSyntax `tactic) (goal : MVarId)
     (rules : BlockRules) : TacticM (Lean.Expr × Lean.Expr) := do
   let lowered ← loweredAt application
-  match lowered.mapLemma with
+  match lowered.builtin with
   | some mapLemma =>
       -- The lemma's theorem at the arguments; its premises are owed in the
       -- leaf's form.
@@ -1959,7 +2283,26 @@ private def lemmaConclusion (application : Syntax) (closer : TSyntax `tactic) (g
         let proof ← match equality? with
           | some equality => mkEqMPR equality owed
           | none => pure owed
-        lemmaFacts proof translated
+        -- The conclusion as stated, its definitions unfolded.
+        let (proof, statement) ← lemmaFacts proof translated
+        return (← mkExpectedTypeHint proof statement, statement)
+
+/-- Give a goal a lemma's conclusion, normalized once, each part of a
+conjunction a fact of its own (`name`, `name_1`, …): a case-wise conclusion
+gives one implication per case. -/
+private partial def giveConclusion (goal : MVarId) (name : Name) (statement proof : Lean.Expr)
+    (rules : BlockRules) : TacticM (Option MVarId) := do
+  let (normal, equality?) ← normalForm goal statement rules
+  let proof ← goal.withContext do
+    match equality? with
+    | some equality => castFact equality proof
+    | none => pure proof
+  let rec give (goal : MVarId) (name : Name) (next : Nat) (statement proof : Lean.Expr) :
+      TacticM (Option MVarId) := do
+    let_expr And left right := statement | giveFact goal name statement proof
+    let some goal ← give goal name (next + 1) left (mkProj ``And 0 proof) | return none
+    give goal (Name.mkSimple s!"{name}_{next}") (next + 1) right (mkProj ``And 1 proof)
+  give goal name 1 normal proof
 
 /-- `apply c ==> … ==> L(a)` at the goal: the lemma's conclusion under the
 guards, its premises owed under them (`lemmaConclusion`), becomes the fact
@@ -1971,7 +2314,7 @@ def applyFormula (formula : Syntax) (closer : TSyntax `tactic) (goal : MVarId) (
   let rules ← blockRules goal
   if guards.isEmpty then
     let (proof, statement) ← lemmaConclusion application closer goal rules
-    return ← giveNormal goal name statement proof rules
+    return ← giveConclusion goal name statement proof rules
   -- The guards in the leaf's normal form, as the closer reads them.
   let conditions ← guards.mapM fun guard => do
     let condition ← goal.withContext do translateStep (← loweredAt guard) guard
@@ -1985,7 +2328,7 @@ def applyFormula (formula : Syntax) (closer : TSyntax `tactic) (goal : MVarId) (
       let (proof, statement) ← lemmaConclusion application closer within.mvarId! rules
       return (← mkLambdaFVars held (← instantiateMVars proof),
         ← mkForallFVars held (← instantiateMVars statement))
-  giveNormal goal name statement proof rules
+  giveConclusion goal name statement proof rules
 
 /-- `apply φ, …` at each goal: each formula's conclusion a fact `fact.k.j`. -/
 def applyStep (formulas : Array Syntax) (closer : TSyntax `tactic) (index : String) :
@@ -2017,8 +2360,12 @@ def closerProof (closer? : Option Syntax) (index : String)
           let (negation, refuting) ← refuting.intro name
           let refuting ← markFact refuting negation
           let some refuting ← normalizeFact refuting (some name) | setGoals []
+          -- Settled as any fact of the block: a term it names folds into the name.
+          let some refuting ← settleFact refuting name | setGoals []
           setGoals [refuting]
-          let open_ ← run closer[1] s!"{index}c"
+          -- A step of the block that fails is reported where it stands.
+          let open_ ← try run closer[1] s!"{index}c"
+            catch failure => logException failure; throw failure
           for goal in open_ do
             withSpecForm <| logErrorAt closer m!"`decide` finds no contradiction in the block's facts:\
               {indentD (MessageData.ofGoal goal)}"
@@ -2376,6 +2723,31 @@ def normalizeTarget (goal : MVarId) : TacticM (Option MVarId) := do
     open_ := open_ ++ (← getUnsolvedGoals).toArray
   setGoals open_.toList
 
+/-- The steps and the degree the `ring` closer's Gröbner basis computation
+is bounded by. -/
+def ringSteps : Nat := 10000
+def ringMaxDegree : Nat := 16
+
+@[tactic blockRingTactic] def evalBlockRing : Tactic := fun _ => do
+  let (_, goal) ← (← getMainGoal).intros
+  let some goal ← normalizeTarget goal | replaceMainGoal []
+  let steps := Syntax.mkNumLit (toString ringSteps)
+  let degree := Syntax.mkNumLit (toString ringMaxDegree)
+  let mut open_ := #[]
+  for part in ← conjunctionParts goal do
+    let (_, part) ← part.intros
+    -- The identity alone: the facts in scope are hidden.
+    let part ← part.withContext do
+      let facts ← (← getLCtx).foldlM (init := #[]) fun found decl => do
+        if decl.isImplementationDetail then return found
+        return if ← isProp decl.type then found.push decl.fvarId else found
+      part.tryClearMany facts
+    setGoals [part]
+    evalTactic (← `(tactic| grobner (splits := 0) (ematch := 0) (ringSteps := $steps)
+      (ringMaxDegree := $degree)))
+    open_ := open_ ++ (← getUnsolvedGoals).toArray
+  setGoals open_.toList
+
 /-- Close the goals by `decide` in the block's normal form, their premises
 introduced and a conjunction part by part. The goals left open. -/
 def closeByDecide : TacticM (Array MVarId) := do
@@ -2503,6 +2875,8 @@ def proveGuarded (goal : MVarId) (guarded : GuardedBlock) (statement : Lean.Expr
   unless refuted do
     setGoals [inner]
     runBlock guarded.block s!"{index}_"
+    -- The block's facts as stated, in the normal form its steps gave them.
+    setGoals (← (← getGoals).filterMapM fun goal => normalizeFact goal none)
     let open_ ← closeByDecide
     unless open_.isEmpty do
       withSpecForm <| throwErrorAt guarded.reference m!"`decide` does not close the block's facts:\
@@ -2522,7 +2896,9 @@ def guardedStep (step : Syntax) (index : String) (runBlock : Syntax → String �
         | remaining := remaining.push goal; continue
       let proof ← proveGuarded goal guarded statement hypotheses
         (s!"{index}{(position.map (s!".{·}")).getD ""}") runBlock
-      if let some next ← giveNormal goal name statement proof then remaining := remaining.push next
+      -- Each part of a conjunction a fact of its own, as a lemma's.
+      if let some next ← giveConclusion goal name statement proof (← blockRules goal) then
+        remaining := remaining.push next
     setGoals remaining.toList
 
 /-- Prove a proposition a witness owes by `decide` in the block's normal
@@ -2654,7 +3030,8 @@ private def blockReadsMap (block : Syntax) (names : Array (String × Contract.Do
   if names.any (fun (_, _, τ) => τ matches .table ..) then return true
   for expression in blockExpressions block do
     unless expression.apply do continue
-    if (← loweredAt expression.expression).mapLemma.isSome then return true
+    if let some theorem_ := (← loweredAt expression.expression).builtin then
+      if mapLemmas.any (·.theorem_ == theorem_) then return true
   return false
 
 /-- Whether an obligation's statement reads a map: it holds a value of a
@@ -2716,6 +3093,37 @@ partial def runSteps (block : Syntax) (path : String := "") : TacticM Unit := do
       let script : TSyntax ``Lean.Parser.Tactic.tacticSeq := ⟨step[2]⟩
       evalTactic (← `(tactic| all_goals $script))
     else throwErrorAt step "this step is not supported yet"
+
+/-- A lemma item's steps over its theorem's goal, its premise taken apart:
+each parameter's binder entered under the parameter's name, the bounds of
+the values in scope stated, the block's steps, then `decide` over the facts
+for the conclusion. -/
+@[tactic verexLemmaSteps] def evalLemmaSteps : Tactic := fun stx => do
+  let pairs := stx[1].getArgs
+  let block := stx[3]
+  let mut entered := #[]
+  for goal in ← getGoals do
+    let mut goal := goal
+    -- Each parameter under its name; the premise as stated is not a fact.
+    let mut entries := #[]
+    for pair in pairs do
+      let some name := pair[0].isStrLit? | throwErrorAt pair "a parameter is named by a string"
+      let decl ← goal.withContext (getLocalDeclFromUserName pair[1].getId)
+      goal ← goal.rename decl.fvarId (Name.mkSimple name)
+      entries := entries.push (name, decl.toExpr)
+    if let some stated ← goal.withContext do
+        return ((← getLCtx).findFromUserName? `statedPremise).map (·.fvarId) then
+      goal ← goal.tryClear stated
+    entered := entered.push (← hideEntries (← addScopeEntries goal entries))
+  setGoals entered.toList
+  evalTactic (← `(tactic| all_goals verex_type_bounds))
+  setGoals (← (← getGoals).mapM reduceDefinitions)
+  runSteps block
+  let open_ ← closeByDecide
+  for goal in open_ do
+    withSpecForm <| logErrorAt block m!"`decide` does not close the lemma's conclusion from the \
+      block's facts:{indentD (MessageData.ofGoal goal)}"
+  setGoals open_.toList
 
 /-- An `on` step's proof of one obligation (internal: `verex_step_route`
 takes it): the leaf prepared once, its scope recorded, the block's steps,
@@ -2784,10 +3192,11 @@ elab "verex_unmark" : tactic => focusGoal do
     | none => return none
   let mut prepared := #[]
   for goal in ← getGoals do
-    -- At an `ensures`, a `&mut` parameter's value written back is its final
-    -- value.
+    -- At an `ensures` and at the data invariants a `&mut` parameter owes
+    -- when its mutation ends, its value written back is its final value.
     let (key, _) ← leafKeyOf goal
-    let goal ← if key.kind == "ensures" then bindFinals goal else pure goal
+    let goal ← if key.kind == "ensures" || key.kind == "data invariant" then bindFinals goal
+      else pure goal
     let needs ← leafNeeds goal
     -- The obligation reads a map where its clause does; a key naming no
     -- clause by its statement.
@@ -2818,6 +3227,82 @@ elab "verex_unmark" : tactic => focusGoal do
       {indentD (MessageData.ofGoal goal)}"
   setGoals open_.toList
 
+/-- The native types of a frame's row, as expressions. -/
+private partial def rowSlotTypes (row : Lean.Expr) : Array Lean.Expr :=
+  match row.consumeMData.getAppFn, row.consumeMData.getAppArgs with
+  | .const ``NRow.cons _, #[τ, rest] => #[τ] ++ rowSlotTypes rest
+  | _, _ => #[]
+
+/-- The values of a frame's slots, by declaration index: the components of an
+environment literal, `none` for a slot not written. -/
+private partial def frameSlots (env : Lean.Expr) : Array (Option Lean.Expr) :=
+  match env.consumeMData.getAppFn, env.consumeMData.getAppArgs with
+  | .const ``Prod.mk _, #[_, _, slot, rest] =>
+      let slot := match slot.consumeMData.getAppFn, slot.consumeMData.getAppArgs with
+        | .const ``Option.some _, #[_, value] => some value
+        | _, _ => none
+      #[slot] ++ frameSlots rest
+  | _, _ => #[]
+
+/-- At a program point, the locals the body has bound there, each its scope
+entry under its source name, where it has none (`doc/plan/proof-language.md`,
+"Obligation addressing": facts after a site name the variables in scope
+there): the slots of the environment the walk carries at the point; a
+mutable reference's entry holds its current value. The entries stay with the
+walk, so the obligations after the point read them. -/
+private def bindFrameLocals (goal : MVarId) : TacticM MVarId := goal.withContext do
+  let some (names, _) ← scopeTable? | return goal
+  let locals ← (← targetState).scopeLocals.get
+  let target ← instantiateMVars (← goal.getType)
+  let some flow := target.find? fun e =>
+      e.isAppOf ``VerexIR.Proofs.Denote.Flow.value || e.isAppOf ``VerexIR.Proofs.Denote.Flow.return_
+    | return goal
+  let bound := (← scopeEntries).map (·.1)
+  -- The slots' native types, from the frame's row: a reference's slot holds
+  -- its current value and its prophecy.
+  let types := rowSlotTypes (flow.getArg! 1)
+  let mut entries := #[]
+  for slot in frameSlots flow.appArg!, index in [0:locals.size] do
+    let some value := slot | continue
+    let some name := locals[index]? | continue
+    if bound.contains name || !names.contains name || value.hasLooseBVars then continue
+    -- A slot holding a value already in scope is read by that value's name.
+    if value.isFVar && (← scopeEntries).any (·.2 == value) then continue
+    -- A native tuple ends in the unit, so a pair of one carrier is a
+    -- reference's current value and prophecy.
+    let type ← whnfR (← inferType value)
+    let pairOfOne ← if type.isAppOfArity ``Prod 2 then isDefEq type.appFn!.appArg! type.appArg!
+      else pure false
+    let reference := (types[index]?).any (·.consumeMData.isAppOf ``NTy.ref) || pairOfOne
+    if reference then
+      entries := entries.push (name, pairProjections (← mkAppM ``Prod.fst #[value]))
+      -- A local reference's prophecy, as `r'`.
+      let written := name ++ "'"
+      if names.contains written && !bound.contains written then
+        entries := entries.push (written, pairProjections (← mkAppM ``Prod.snd #[value]))
+    else entries := entries.push (name, value)
+  -- Each value under a binder of the local's name with its equation, as a
+  -- call's result is: a substitution eliminating the binder keeps the entry
+  -- with the value.
+  let mut goal := goal
+  for (name, value) in entries do
+    if value.isFVar then
+      goal ← addScopeEntries goal #[(name, value)]
+      continue
+    let (named, next) ← goal.withContext do
+      let type ← inferType value
+      let target ← goal.getType
+      let binder := Name.mkSimple name
+      let motive ← withLocalDeclD binder type fun x => do
+        mkForallFVars #[x] (← mkArrow (← mkEq x value) target)
+      let next ← mkFreshExprSyntheticOpaqueMVar motive (← goal.getTag)
+      goal.assign (mkApp2 next value (← mkEqRefl value))
+      let (x, next) ← next.mvarId!.intro binder
+      let (_, next) ← next.intro (Name.mkSimple s!"{name}_eq")
+      return (x, next)
+    goal ← addScopeEntries next #[(name, mkFVar named)]
+  return goal
+
 /-- A point step's facts (internal: the hooks of `verify f by block`'s point
 steps): the block's steps run over the goal the walk
 reached, whose facts are given and settled at the obligations. -/
@@ -2829,7 +3314,7 @@ syntax (name := verexStepPoint) "verex_step_point" num verexProofStep : tactic
   let step := stx[2]
   let point ← pointOfSyntax step[0] step[1]
   let block := step[2]
-  setGoals (← (← getGoals).mapM fun goal => hideEntries goal)
+  setGoals (← (← getGoals).mapM fun goal => do hideEntries (← bindFrameLocals goal))
   withOptions (verex.pointFacts.set · true) do
     let mut number := offset
     let mut owed := #[]

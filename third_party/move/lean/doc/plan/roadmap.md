@@ -29,16 +29,6 @@ Designs: [`denotation.md`](../designs/denotation.md),
   interleaved with steps 2b and 3, then the language's function-value
   constructs (its L4). L0's keys of calls are done; its path decisions and
   selectors are next.
-- **Function-typed variant fields (open decision).** A specification that
-  reads an enum variant's function-typed field as a value has no native
-  read (`let f = old(State[a]).Continuation.0` in the paper example
-  `calculator`): the read under another variant needs a value of the
-  field's type, and a function type has none by its type alone
-  (`NTy.inhabitable`), and the function carrier interface of
-  [`native-function-values.md`](native-function-values.md) provides none;
-  a behavioral predicate of such a field is reported as not carried.
-  Either the read stays partial under its variant guard, or the carrier
-  provides a value of the type.
 - **Turned off, to fix.** The benchmark leaves out the paper example `amm`
   (`higher-order-paper-26/examples`): its authored proof
   (`amm_example.proof.lean`) is stated over runtime values and is written

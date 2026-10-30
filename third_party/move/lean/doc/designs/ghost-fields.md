@@ -133,7 +133,9 @@ it modifies, apply its `update`s, assume its `ensures`). Verex follows it:
   equation per routed member (a literal closure of the member invokes the
   member's meaning on the woven arguments, `invokeAt`), and the hypothesis
   that an invocation is defined where the target's declared precondition
-  holds (`RequiresOf`). The behavioral predicates and frames of a ghost
+  holds and, of a value no closure site encodes, always, as the Move Prover
+  calls function values without asserting `requires_of` (`RequiresOf` of
+  `functionRequires (fun … => True)`). The behavioral predicates and frames of a ghost
   unit are stated over that binder; a contract reading the unit takes a
   `ModelUnit` where another takes the executable. A closure of a target
   with type parameters carries no family: its invocation is not routed and

@@ -3,6 +3,7 @@
 
 import VerexIR.Proofs.Denote.Agreement
 import VerexIR.Proofs.Denote.Closures
+import VerexIR.Proofs.Denote.FunctionValues
 import VerexIR.Proofs.Behavior
 import VerexIR.Proofs.ClosureTyping
 import VerexIR.Proofs.Order
@@ -54,6 +55,24 @@ def decidedLemma (statement : Lean.Expr) : MetaM Lean.Expr := do
   -- The theorem closes over the free variables the statement mentions
   -- (the elements of a literal vector, whose size its bound decides).
   mkAuxTheorem statement (← mkDecideProof statement)
+
+/-- A unit's function values (`FunctionCarriers`): the instance declared
+with a unit constant, or the context's of a unit variable. -/
+def functionCarriersOf (unit : Lean.Expr) : MetaM Lean.Expr :=
+  synthInstance (mkApp (mkConst ``FunctionCarriers) unit)
+
+/-- The function values a frame (`Skolems unit functions`) is at. -/
+def functionCarriersOfFrame (frame : Lean.Expr) : MetaM Lean.Expr := do
+  let type ← whnfR (← inferType frame)
+  unless type.isAppOfArity ``Skolems 2 do throwError "internal: {frame} is not a frame"
+  return type.getArg! 1
+
+/-- The frame instance in scope (`Skolems`, whose unit and function values
+are outputs). -/
+def frameInScope : MetaM Lean.Expr := do
+  let unit ← mkFreshExprMVar (mkConst ``Validation.ValidatedUnit)
+  let functions ← mkFreshExprMVar (mkApp (mkConst ``FunctionCarriers) unit)
+  synthInstance (mkApp2 (mkConst ``Skolems) unit functions)
 
 /-- `focusGoal` for a tactic sequence. -/
 elab "verex_focus " steps:tacticSeq : tactic => focusGoal (evalTactic steps)
@@ -228,6 +247,9 @@ inductive Decision where
   | variant (number : Nat) (name : String)
   | loop (number : Nat) (exits : Bool)
   | aborts (site : AbortSite)
+  /-- The `number`-th invocation taking the arm of a closure site of
+  `target`, or of `foreign`. -/
+  | invoke (number : Nat) (target : String)
   deriving BEq, Inhabited
 
 /-- The decision as a selector spells it: `if 1 then`, `match 2 Some`,
@@ -240,6 +262,7 @@ def Decision.text : Decision → String
   | .aborts (.abort number) => s!"aborts at abort {number}"
   | .aborts (.op number) => s!"aborts at op {number}"
   | .aborts (.invoke number) => s!"aborts at invoke {number}"
+  | .invoke number target => s!"invoke {number} {target}"
 
 /-- Whether a path's decision is one a selector states: the same, a call
 without its callee counted among all calls. -/
@@ -614,12 +637,31 @@ def scopedBinderGoal (goal : MVarId) (name : Name) (domain body : Lean.Expr) (in
       | _ => throwError "internal: a mutable reference's carrier that is no pair"
     else pure (← getLevel domain, domain, .bvar 0)
   let arguments := #[mkStrLit name.toString, mkRawNatLit index, read, value]
+  -- A reference's prophecy, the second of its pair, as `name'`.
+  let written := name.toString ++ "'"
+  let prophecy? ← if references.contains name.toString && names.contains written then
+      match ← whnfD domain with
+      | .app (.app (.const ``Prod [u, v]) current) final =>
+          pure (some (#[mkStrLit written, mkRawNatLit index, final,
+            mkApp3 (mkConst ``Prod.snd [u, v]) current final (.bvar 0)], ← getLevel final))
+      | _ => pure none
+    else pure none
+  let body := body.liftLooseBVars 0 (if prophecy?.isSome then 2 else 1)
+  let body := match prophecy? with
+    | some (finalArguments, finalLevel) =>
+        .forallE (Name.mkSimple (written ++ "_scope"))
+          (mkAppN (mkConst ``ScopeEntry [finalLevel]) (finalArguments.map (·.liftLooseBVars 0 1)))
+          body .default
+    | none => body
   let withEntry := Lean.Expr.forallE name domain
     (.forallE (name.appendAfter "_scope") (mkAppN (mkConst ``ScopeEntry [level]) arguments)
-      (body.liftLooseBVars 0 1) .default) info
+      body .default) info
   let next ← mkFreshExprSyntheticOpaqueMVar withEntry (← goal.getTag)
-  goal.assign (.lam name domain (mkApp2 next (.bvar 0)
-    (mkAppN (mkConst ``ScopeEntry.intro [level]) arguments)) info)
+  let proofs := #[mkAppN (mkConst ``ScopeEntry.intro [level]) arguments] ++
+    match prophecy? with
+    | some (finalArguments, finalLevel) => #[mkAppN (mkConst ``ScopeEntry.intro [finalLevel]) finalArguments]
+    | none => #[]
+  goal.assign (.lam name domain (mkAppN next (#[.bvar 0] ++ proofs)) info)
   return next.mvarId!
 
 /-- Give the locals `fvarIds` of the scope's names their scope entries: their
@@ -949,10 +991,12 @@ continuation at a call boundary. A hypothesis of every leaf below the
 point, in program order, which the context's rewrites carry along. A state
 label's existential is witnessed at one: the state for its memory, the
 values of the locals for its copies of the mutable parameters. -/
-def ProgramPoint {unit : Validation.ValidatedUnit} [Skolems unit] {ρ : ResultShape} {Γ : NRow}
+def ProgramPoint {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {ρ : ResultShape} {Γ : NRow}
     {α : Type} (value : Flow ρ Γ α) (state : Memory unit) : Prop := True
 
-theorem ProgramPoint.intro {unit : Validation.ValidatedUnit} [Skolems unit] {ρ : ResultShape}
+theorem ProgramPoint.intro {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {ρ : ResultShape}
     {Γ : NRow} {α : Type} (value : Flow ρ Γ α) (state : Memory unit) :
     ProgramPoint value state := trivial
 
@@ -965,10 +1009,10 @@ def noteProgramPoint (goal : MVarId) (value state : Lean.Expr)
     if deduplicate then
       for decl in ← getLCtx do
         let type ← instantiateMVars decl.type
-        if type.isAppOfArity ``ProgramPoint 7 &&
-            type.getArg! 5 == value && type.getArg! 6 == state then return goal
+        if type.isAppOfArity ``ProgramPoint 8 &&
+            type.getArg! 6 == value && type.getArg! 7 == state then return goal
     let flow ← instantiateMVars (← inferType value)
-    unless flow.isAppOfArity ``Flow 5 do return goal
+    unless flow.isAppOfArity ``Flow 6 do return goal
     -- The point's implicit arguments are the flow's; its `Skolems` instance
     -- is a hypothesis, which instance synthesis would not find.
     let arguments := flow.getAppArgs ++ #[value, state]
@@ -1824,7 +1868,7 @@ elab "verex_memory_reads" : tactic => focusGoal do
       let some (_, lhs, _) := ty.eq? | continue
       let head := lhs.getAppFn
       unless head.isFVar && lhs.getAppNumArgs == 2 do continue
-      unless (← whnfR (← inferType head)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 1 do continue
+      unless (← whnfR (← inferType head)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do continue
       unless ← mentionsRead lhs target do continue
       found := found.push decl.fvarId
     pure found
@@ -1956,7 +2000,7 @@ elab "verex_has_memory_facts" : tactic => focusGoal do
   let applies ← goal.withContext do
     let mut memories : FVarIdSet := {}
     for decl in ← getLCtx do
-      if decl.type.isAppOfArity ``VerexIR.Proofs.Denote.Memory 1 then
+      if decl.type.isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 then
         memories := memories.insert decl.fvarId
     if memories.isEmpty then return false
     (← getLCtx).anyM fun decl => do
@@ -2069,6 +2113,283 @@ def abstractRankTables (goal : MVarId) : MetaM MVarId := do
     catch _ => saved.restore
   return goal
 
+/-- An expression with the literal abbreviations a generated block names
+unfolded (rows, sharing marks, types, site keys, and weaves: reducible
+constants without parameters of those types) and the site keys' fields
+read, so that a generated equation's sides are spelled as the program
+spells its values. -/
+def unfoldLiterals (e : Lean.Expr) : MetaM Lean.Expr := do
+  let environment ← getEnv
+  let literalType (type : Lean.Expr) : Bool :=
+    type.isConstOf ``NRow || type.isConstOf ``NTy || type.isConstOf ``Sharing ||
+      type.isConstOf ``SiteKey || type.isAppOf ``Weave
+  Meta.transform e (post := fun e => do
+    if let .const name [] := e then
+      if let some (.defnInfo info) := environment.find? name then
+        if literalType info.type && (← getReducibilityStatus name) == .reducible then
+          return .visit info.value
+    if e.isAppOfArity ``SiteKey.function 1 || e.isAppOfArity ``SiteKey.mask 1 ||
+        e.isAppOfArity ``SiteKey.typeInstantiation 1 then
+      return .done (← whnfR e)
+    return .done e)
+
+/-- A known function value: a construction (`Skolems.construct`) at any
+frame, or a closure site's constructor at the base frame. Its frame, target,
+mask, instantiation, captured row, captures, and the proof that its closure
+is the closure of those (`Skolems.closure_construct`, a site's generated
+`closure` equation). -/
+structure LiteralValue where
+  value : Lean.Expr
+  /-- The parameter row of its function type. -/
+  parameters : Lean.Expr
+  frame : Lean.Expr
+  handle : Lean.Expr
+  mask : Lean.Expr
+  instantiation : Lean.Expr
+  captured : Lean.Expr
+  captures : Lean.Expr
+  closed : Lean.Expr
+
+/-- Whether an expression is a closure site's constructor applied to its
+captures. -/
+def isSiteValue (environment : Environment) (e : Lean.Expr) : Bool :=
+  match e.getAppFn with
+  | .const name _ => e.getAppNumArgs == 1 && (siteEquationsAt? environment name).isSome
+  | _ => false
+
+/-- Whether an expression is a known function value (`LiteralValue`). -/
+def isLiteralValue (environment : Environment) (e : Lean.Expr) : Bool :=
+  e.isAppOfArity ``Skolems.construct 12 || isSiteValue environment e
+
+/-- The parts of a known function value. -/
+def literalValue? (e : Lean.Expr) : MetaM (Option LiteralValue) := do
+  let e := e.consumeMData
+  if e.isAppOfArity ``Skolems.construct 12 then
+    return some {
+      value := e, parameters := e.getArg! 3, frame := e.getArg! 2, handle := e.getArg! 6
+      mask := e.getArg! 7, instantiation := e.getArg! 8, captured := e.getArg! 9
+      captures := e.getArg! 10, closed := mkAppN (mkConst ``Skolems.closure_construct) e.getAppArgs }
+  let .const constructor _ := e.getAppFn | return none
+  unless e.getAppNumArgs == 1 do return none
+  let some entry := siteEquationsAt? (← getEnv) constructor | return none
+  let closedType ← unfoldLiterals (← instantiateMVars (← inferType (mkApp (mkConst entry.closure) e.appArg!)))
+  let closed ← mkExpectedTypeHint (mkApp (mkConst entry.closure) e.appArg!) closedType
+  let some (_, read, closure) := closedType.eq? | return none
+  unless closure.isAppOfArity ``closureOf 8 && read.isAppOfArity ``TypedFunctions.closure 3 do
+    return none
+  let functions := read.getArg! 1
+  unless functions.isAppOfArity ``Carriers.functions 4 do return none
+  return some {
+    value := e, parameters := functions.getArg! 1, frame := closure.getArg! 2
+    handle := closure.getArg! 3, mask := closure.getArg! 4, instantiation := closure.getArg! 5
+    captured := closure.getArg! 6, captures := e.appArg!, closed }
+
+/-- The unit constant of the base frame (`Skolems.runtime` at a unit
+constant), if a frame is it. -/
+def baseFrameUnit? (frame : Lean.Expr) : Option Name :=
+  let frame := frame.consumeMData
+  if frame.isAppOfArity ``Skolems.runtime 2 then (frame.getArg! 0).constName? else none
+
+/-- Whether two applications of one constant have defeq arguments, compared
+one by one: a mismatch does not unfold the constant, which over a unit's
+checks would evaluate them. -/
+def argumentsDefEq (left right : Lean.Expr) : MetaM Bool := do
+  let (left, right) := (left.consumeMData, right.consumeMData)
+  unless left.getAppFn.isConst && left.getAppFn.constName? == right.getAppFn.constName? &&
+      left.getAppNumArgs == right.getAppNumArgs do return false
+  for (l, r) in left.getAppArgs.zip right.getAppArgs do
+    unless ← isDefEq l r do return false
+  return true
+
+/-- The closure site's constructor a construction at the base frame is,
+read off its target, mask, instantiation and captures alone, whatever
+proof types it (a clause's may be bound). -/
+def siteOfConstruct? (e : Lean.Expr) : MetaM (Option LiteralValue) := withDefault do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``Skolems.construct 12 do return none
+  let arguments := e.getAppArgs
+  if arguments.pop.any (·.hasLooseBVars) then return none
+  let some unit := baseFrameUnit? (arguments[2]!) | return none
+  let closure := mkAppN (mkConst ``closureOf)
+    #[arguments[0]!, arguments[1]!, arguments[2]!, arguments[6]!, arguments[7]!, arguments[8]!,
+      arguments[9]!, arguments[10]!]
+  for entry in siteEquationsOf (← getEnv) unit do
+    let closed := mkApp (mkConst entry.closure) arguments[10]!
+    let saved ← saveState
+    try
+      let some (_, _, read) := (← instantiateMVars (← inferType closed)).eq? | continue
+      if ← argumentsDefEq read closure then
+        return ← literalValue? (mkApp (mkConst entry.constructor) arguments[10]!)
+    catch _ => pure ()
+    saved.restore
+  return none
+
+/-- Rewrite by an equation whose left-hand side unifies with the
+expression, its open equation premises decided. -/
+def rewriteByEquation? (rule : Name) (e : Lean.Expr) : MetaM (Option Simp.Step) :=
+    withDefault do
+  let saved ← saveState
+  let equation ← mkConstWithFreshMVarLevels rule
+  let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
+  let some (_, lhs, rhs) := statement.eq? | return none
+  unless ← isDefEq lhs e do saved.restore; return none
+  for argument in arguments do
+    if (← instantiateMVars argument).isMVar then
+      let condition ← instantiateMVars (← inferType argument)
+      unless condition.isAppOfArity ``Eq 3 && !condition.hasMVar do saved.restore; return none
+      unless (← whnf (← mkDecide condition)).isConstOf ``true do saved.restore; return none
+      unless ← isDefEq argument (← mkDecideProof condition) do saved.restore; return none
+  let proof ← instantiateMVars (mkAppN equation arguments)
+  if proof.hasMVar then saved.restore; return none
+  return some (.visit { expr := ← unfoldLiterals (← instantiateMVars rhs), proof? := some proof })
+
+open Lean Meta Simp in
+/-- A construction at the base frame of a closure site's key is the site's
+constructor (the generated `construct` equations). -/
+simproc [vir_denote, vir_denote_norm] constructSite
+    (@Skolems.construct _ ?functions ?frame _ _ _ _ _ _ _ _ _) := fun e => do
+  unless e.isAppOfArity ``Skolems.construct 12 do return .continue
+  let some unit := baseFrameUnit? (e.getArg! 2) | return .continue
+  for entry in siteEquationsOf (← getEnv) unit do
+    if let some step ← rewriteByEquation? entry.construct e then return step
+  return .continue
+
+open Lean Meta Simp in
+/-- `requires_of` of a construction at a frame, of rows without type
+parameters, is the requires meaning of the construction at the base frame
+(`requiresOf_construct_paramFree`), which `constructSite` reads. -/
+simproc [vir_denote, vir_denote_norm] requiresOfConstruct
+    (@VerexIR.Proofs.RequiresOf _ ?functions ?frame _ _ _ _ _ _ _) := fun e => do
+  unless e.isAppOfArity ``VerexIR.Proofs.RequiresOf 10 do return .continue
+  unless (e.getArg! 7).consumeMData.isAppOfArity ``Skolems.construct 12 do return .continue
+  if (baseFrameUnit? (e.getArg! 2)).isSome then return .continue
+  if let some step ← rewriteByEquation? ``VerexIR.Proofs.requiresOf_construct_paramFree e then
+    return step
+  return .continue
+
+open Lean Meta Simp in
+/-- Invoking a closure site's constructor at the base frame is calling its
+target on the woven arguments (the generated `invoke` equations). -/
+simproc [vir_denote, vir_denote_norm] invokeSite
+    (@closureMeaning _ ?functions _ ?frame _ _ _ _ _) := fun e => do
+  unless e.getAppNumArgs == 9 do return .continue
+  let function := (e.getArg! 7).consumeMData
+  let .const constructor _ := function.getAppFn | return .continue
+  let some entry := siteEquationsAt? (← getEnv) constructor | return .continue
+  let some invoke := entry.invoke | return .continue
+  let some (.visit result) ← rewriteByEquation? invoke e | return .continue
+  -- The arm, marked for the invocation's site (`dispatchKnownInvocation`).
+  let some proof := result.proof? | return .continue
+  -- `closureMeaning`'s unit and function values lead its arguments; the
+  -- invocation's result carrier is its type's last argument.
+  let type ← whnfR (← inferType e)
+  let some α := type.getAppArgs.back? | return .visit result
+  let marked := mkAppN (mkConst ``dispatchAt) #[e.getArg! 0, e.getArg! 1, α, mkNatLit 0,
+    mkStrLit entry.target, result.expr]
+  return .visit { expr := marked, proof? := some (← mkExpectedTypeHint proof (← mkEq e marked)) }
+
+/-- Rewrite by an equation about two known function values: its left-hand
+side unified with the expression, then its proofs that their closures are
+their targets' (`closedLeft`, `closedRight`) by the values' own, and its
+open premises decided. -/
+private def rewriteKnownPair? (rule : Name) (e : Lean.Expr) (left right : LiteralValue) :
+    MetaM (Option Simp.Step) := withDefault do
+  let saved ← saveState
+  let equation ← mkConstWithFreshMVarLevels rule
+  let equationType ← inferType equation
+  let (arguments, _, statement) ← forallMetaTelescope equationType
+  let some (_, lhs, rhs) := statement.eq? | return none
+  unless ← isDefEq lhs e do saved.restore; return none
+  let names := equationType.getForallBinderNames
+  for (name, closed) in [(`closedLeft, left.closed), (`closedRight, right.closed)] do
+    let some index := names.idxOf? name | saved.restore; return none
+    unless ← isDefEq (← inferType arguments[index]!) (← inferType closed) do
+      saved.restore; return none
+    unless ← isDefEq arguments[index]! closed do saved.restore; return none
+  for argument in arguments do
+    if (← instantiateMVars argument).isMVar then
+      let condition ← instantiateMVars (← inferType argument)
+      unless (← isProp condition) && !condition.hasMVar do saved.restore; return none
+      unless (← whnf (← mkDecide condition)).isConstOf ``true do saved.restore; return none
+      unless ← isDefEq argument (← mkDecideProof condition) do saved.restore; return none
+  let proof ← instantiateMVars (mkAppN equation arguments)
+  if proof.hasMVar then saved.restore; return none
+  return some (.visit { expr := ← unfoldLiterals (← instantiateMVars rhs), proof? := some proof })
+
+/-- Whether two known function values are at one key: target, mask and
+instantiation. -/
+private def sameKey (left right : LiteralValue) : MetaM Bool := withDefault do
+  isDefEq left.handle right.handle <&&> isDefEq left.mask right.mask <&&>
+    isDefEq left.instantiation right.instantiation
+
+open Lean Meta Simp in
+/-- The equality keys of two known function values: their captures' equality
+without ghosts at one key (`erased_eq_closureOf`), unequal at different keys
+(`erased_eq_closureOf_ne`). -/
+simproc [vir_denote, vir_denote_norm] knownFunctionsEqual
+    (@Eq _ (TypedFunctions.erased _ _) (TypedFunctions.erased _ _)) := fun e => do
+  let_expr Eq _ leftKey rightKey := e | return .continue
+  unless leftKey.isAppOfArity ``TypedFunctions.erased 3 &&
+      rightKey.isAppOfArity ``TypedFunctions.erased 3 do return .continue
+  let some left ← literalValue? leftKey.appArg! | return .continue
+  let some right ← literalValue? rightKey.appArg! | return .continue
+  let rule := if ← sameKey left right then ``erased_eq_closureOf else ``erased_eq_closureOf_ne
+  return (← rewriteKnownPair? rule e left right).getD .continue
+
+open Lean Meta Simp in
+/-- The order of two known function values: their captures' at one key
+(`order_closureOf`), their keys' at different keys of one instantiation
+(`order_closureOf_ne`). -/
+simproc [vir_denote, vir_denote_norm] knownFunctionsOrder
+    (TypedFunctions.order _ _ _ _) := fun e => do
+  unless e.isAppOfArity ``TypedFunctions.order 5 do return .continue
+  let some left ← literalValue? (e.getArg! 3) | return .continue
+  let some right ← literalValue? (e.getArg! 4) | return .continue
+  let rule := if ← sameKey left right then ``order_closureOf else ``order_closureOf_ne
+  return (← rewriteKnownPair? rule e left right).getD .continue
+
+attribute [vir_denote_norm] closureKeyOrder
+
+open Lean Meta Simp in
+/-- An invocation at a site, its arm known: the arm a site's constructor
+takes, which the invocation's rewriting marked (`invokeSite`) without the
+site, gets the site; an invocation of the family's `foreign` is marked. So
+the path records the arm (`dispatchAt`). -/
+dsimproc [vir_denote, vir_denote_norm] dispatchKnownInvocation (@opAt _ ?functions _ _ _) :=
+    fun e => do
+  unless e.isAppOfArity ``opAt 5 do return .continue
+  let arguments := e.getAppArgs
+  let invocation := arguments[4]!.consumeMData
+  let mark (target invocation : Lean.Expr) : Lean.Expr :=
+    mkAppN e.getAppFn (arguments.set! 4 (mkAppN (.const ``dispatchAt e.getAppFn.constLevels!)
+      #[arguments[0]!, arguments[1]!, arguments[2]!, arguments[3]!, target, invocation]))
+  if invocation.isAppOfArity ``dispatchAt 6 then
+    -- Marked without the site where the invocation was rewritten.
+    if (invocation.getArg! 3).rawNatLit? == some 0 || (invocation.getArg! 3).nat? == some 0 then
+      return .done (mark (invocation.getArg! 4) (invocation.getArg! 5))
+    return .continue
+  let head := invocation.getAppFn
+  unless head.isConstOf ``closureMeaning || head.isFVar do return .continue
+  unless invocation.getAppNumArgs ≥ 2 do return .continue
+  let function := (invocation.getArg! (invocation.getAppNumArgs - 2)).consumeMData
+  let .const constructor _ := function.getAppFn | return .continue
+  unless isForeignConstructor (← getEnv) constructor do return .continue
+  return .done (mark (mkStrLit "foreign") invocation)
+
+/-- The unit's check of a literal function value a clause writes, where the
+literal is a closure site's: the site's generated `check` theorem. -/
+def siteCheckProof? (check : Lean.Expr) : MetaM (Option Lean.Expr) := withDefault do
+  let_expr Eq _ checked _ := check | return none
+  unless checked.isAppOfArity ``closureTypingCheck 7 do return none
+  let some unit := (checked.getArg! 0).constName? | return none
+  for entry in siteEquationsOf (← getEnv) unit do
+    let proof := mkConst entry.check
+    let saved ← saveState
+    let some (_, stated, _) := (← inferType proof).eq? | continue
+    if ← argumentsDefEq stated checked then return some proof
+    saved.restore
+  return none
+
 /-- Abstract the sites `select` picks in a goal to variables named `name`,
 every occurrence of a site at once; a site in the type of a local that is no
 proposition stays. -/
@@ -2101,12 +2422,13 @@ private def abstractSites (goal : MVarId) (select : Lean.Expr → Bool) (name : 
   return goal
 
 /-- Abstract the function values of a goal to variables: `grind` reads a
-function value (`functionOf`, `functionOfGeneric`: a closure with its rows,
-sharing, captures and typing certificate) only as a whole, equal to itself,
+function value (`Skolems.construct`, `functionOfGeneric`, a site's constructor: a
+closure with its rows, sharing, captures and typing certificate) only as a whole, equal to itself,
 and its parts make up much of a behavior fact. -/
-def abstractFunctionValues (goal : MVarId) : MetaM MVarId :=
-  abstractSites goal (fun e => e.isAppOf ``VerexIR.Proofs.Denote.functionOf ||
-    e.isAppOf ``VerexIR.Proofs.Denote.functionOfGeneric) `function
+def abstractFunctionValues (goal : MVarId) : MetaM MVarId := do
+  let environment ← getEnv
+  abstractSites goal (fun e => e.isAppOf ``VerexIR.Proofs.Denote.Skolems.construct ||
+    e.isAppOf ``VerexIR.Proofs.Denote.functionOfGeneric || isSiteValue environment e) `function
 
 /-- Introduce the binders and premises a goal states, through the
 `Obligation` markers heading them; whether any was introduced. -/
@@ -3604,8 +3926,8 @@ def testedIn (expression : Lean.Expr) (found : Array FVarId) : MetaM (Array FVar
   let result ← IO.mkRef found
   Lean.Meta.forEachExpr expression fun e => do
     if e.isAppOfArity ``VerexIR.Proofs.Denote.variantName 4 ||
-        e.isAppOfArity ``VerexIR.Proofs.Denote.Choices.select? 7 ||
-        e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 7 then
+        e.isAppOfArity ``VerexIR.Proofs.Denote.Choices.select? 8 ||
+        e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 8 then
       if let .fvar x := e.appArg! then
         result.modify fun found => if found.contains x then found else found.push x
   result.get
@@ -4708,7 +5030,7 @@ elab "verex_context_memory_reads" : tactic => focusGoal do
       let some (_, lhs, _) := ty.eq? | continue
       let head := lhs.getAppFn
       unless head.isFVar && lhs.getAppNumArgs == 2 do continue
-      if (← whnfR (← inferType head)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 1 then
+      if (← whnfR (← inferType head)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 then
         reads := reads.push (decl.fvarId, lhs)
     if reads.isEmpty then return (#[], #[])
     let mut targets := #[]
@@ -4736,91 +5058,18 @@ elab "verex_unfold_head" : tactic => do
   let .const name _ := target.getAppFn | throwError "the goal's head is not a constant"
   replaceMainGoal [← Lean.Meta.unfoldTarget goal name]
 
-/-- The typing of a closure of a target without type parameters, at the
-frame its carriers are, in one spelling: the unit's check, which a leaf
-fixes and the kernel evaluates (`FunctionTyped.ofCheck`), once, as an
-auxiliary theorem of the theorem being proved (`hiddenTheorem`). An inline
-`Eq.refl true` would be evaluated again wherever elaboration checks it,
-over the whole unit. -/
-def functionTypedProof? (type : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let_expr FunctionTyped unit frame supplied shared results handle mask instantiation captured
-    captures := type | return none
-  let empty ← mkArrayLit (← mkAppM ``Prod #[mkConst ``VerexIR.TypeId, mkConst ``VerexIR.TypeId]) []
-  unless ← isDefEq instantiation empty do return none
-  let refl := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true)
-  let check := mkAppN (mkConst ``closureTypingCheck)
-    #[unit, handle, mask, captured, supplied, results, shared]
-  -- Outside a theorem's proof (`verex_proof`) nothing declares an
-  -- auxiliary theorem again: the check stays in place.
-  let checked ← if (← (← targetState).proofName.get).isAnonymous then pure refl
-    else hiddenTheorem (← mkEq check (mkConst ``Bool.true)) refl
-  return some (mkAppN (mkConst ``FunctionTyped.ofCheck) #[unit, frame, handle, mask, captured,
-    supplied, results, shared, checked, captures])
-
-/-- `requires_of` of any closure from the table's entries
-(`requiresOf_of_table`), at the goal's frame: the goal of every entry. -/
-elab "verex_requires_everywhere" : tactic => focusGoal do
-  let goal ← getMainGoal
-  let target ← goal.withContext do instantiateMVars (← goal.getType)
-  let target := if target.isAppOfArity ``VerexIR.Proofs.Obligation 4 then target.appArg! else target
-  unless target.isAppOfArity ``VerexIR.Proofs.RequiresOf 9 do
-    throwError "the goal states no precondition of a function value"
-  let #[unit, frame, table, σs, shared, results, function, args, state] := target.getAppArgs
-    | throwError "the goal states no precondition of a function value"
-  let rule := mkApp3 (mkConst ``VerexIR.Proofs.requiresOf_of_table) unit frame table
-  let .forallE _ everywhereType _ _ ← goal.withContext (do whnfR (← inferType rule))
-    | throwError "the table rule has no premise"
-  let everywhere ← goal.withContext (mkFreshExprSyntheticOpaqueMVar everywhereType)
-  goal.assign (mkAppN rule #[everywhere, σs, shared, results, function, args, state])
-  replaceMainGoal [everywhere.mvarId!]
-
-/-- Whether a native row is spelled with constructors only and holds no
-type parameter or function type: the types whose carriers and encodings do
-not read the frame (`NTy.carrier`, `NTy.encode`), so that a value of the row
-at one frame is one at any. -/
-private def frameFreeRow (row : Lean.Expr) : Bool :=
-  !row.hasFVar && !row.hasMVar && !row.hasLooseBVars &&
-    !(row.find? fun e => e.isConstOf ``NTy.param || e.isConstOf ``NTy.function).isSome
-
-/-- A table entry (`∀ args, HList.encode args = HList.encode values →
-requires args`, at the frame of the table) read at the encoding of values
-of another frame, over a row whose values do not read the frame
-(`frameFreeRow`): the precondition of the values (`requiresEntry_encode`),
-which are values of the entry's row as they are. -/
-simproc_decl requiresEntryFrameFree (∀ _ : _, _) := fun e => do
-  let .forallE name domain body info := e | return .continue
-  let_expr HList carriers row := domain | return .continue
-  let .forallE _ equation requires _ := body | return .continue
-  if requires.hasLooseBVar 0 then return .continue
-  let_expr Eq _ lhs rhs := equation | return .continue
-  let_expr HList.encode _ lhsRow argument := lhs | return .continue
-  let_expr HList.encode _ rhsRow values := rhs | return .continue
-  unless argument == .bvar 0 && !values.hasLooseBVars && lhsRow == row && rhsRow == row &&
-      frameFreeRow row do return .continue
-  let_expr Skolems.toCarriers unit frame := carriers.consumeMData | return .continue
-  let predicate := Lean.Expr.lam name domain (requires.lowerLooseBVars 1 1) info
-  let expr ← Core.betaReduce (mkApp predicate values)
-  let iff := mkAppN (mkConst ``VerexIR.Proofs.requiresEntry_encode) #[unit, frame, row, predicate, values]
-  let proof ← mkExpectedTypeHint (← mkPropExt (← mkExpectedTypeHint iff (mkIff e expr)))
-    (← mkEq e expr)
-  return .visit { expr, proof? := some proof }
-
-/-- `requires_of` of any closure where no target's entry in the table of
-declared preconditions states one (`requiresOf_of_table`); else of the
-closures whose target, weave, and captures a leaf's goal sees: the target's
-entry in the table, at the arguments woven by the closure's mask. -/
-macro "verex_behavior" : tactic => `(tactic| verex_focus (first
-  | (verex_requires_everywhere
-     intro _ _ _
-     verex_unfold_head
-     simp only [implies_true, ite_self]
-     done)
-  | simp (disch := first
+/-- `requires_of` of a function value the leaf knows at the base frame: the
+unit's requires meaning at the value (`requiresOf_runtime`), which reads a
+closure site's value as its target's declared precondition at the woven
+arguments (the generated `requires…` equations). A value no site encodes
+reads an uninterpreted precondition, which only a hypothesis states. -/
+macro "verex_behavior" : tactic => `(tactic| verex_focus (
+  simp (disch := first
       | (simp only [List.length_cons, List.length_nil, NRow.length] <;> fail)
       -- A discharger's last alternative fails in recovery mode, which logs
       -- its failure: the quiet failure leaves the goal unassigned.
       | skip) only
-    [requiresOf_closureOf, requiresEntry_encode, requiresEntryFrameFree, vir_denote_norm]))
+    [VerexIR.Proofs.requiresOf_runtime, vir_denote_norm]))
 
 /-- Whether a leaf's tactic closes a goal, leaving the goal list as it was. -/
 def closesBy (goal : MVarId) (tactic : TSyntax `tactic) : TacticM Bool := do

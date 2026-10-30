@@ -86,7 +86,7 @@ x_final_upper : x_final.val ≤ 18446744073709551615
             | VerexIR.Proofs.Denote.Flow.continue_ nest env => VerexIR.Proofs.Spec.bottom)
             (fun result final =>
               (∃ S S_x,
-                  VerexIR.Proofs.RequiresOf (requiresTable unit)
+                  functionRequires (VerexIR.Proofs.requiresForeign unit)
                       (VerexIR.Proofs.Denote.NRow.cons
                         (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
                             VerexIR.Proofs.Denote.NRow.nil

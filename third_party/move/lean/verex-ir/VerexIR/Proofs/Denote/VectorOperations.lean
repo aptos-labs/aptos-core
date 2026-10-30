@@ -25,7 +25,7 @@ theorem wp_dite_rule {σ ε α : Type} (condition : Prop) [Decidable condition]
 end VerexIR.Proofs
 
 namespace VerexIR.Proofs.Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Executable unsigned indices cannot take a negative-index branch. -/
 @[vir_denote_norm] theorem unsigned_val_not_negative {width : Nat}
@@ -92,7 +92,7 @@ def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
           if h : i.val < 0 ∨ values.values.size ≤ i.val.toNat then
             (abortAt site (Failure.ofInts .abort #[i.val]) :
               Comp unit (Flow ρ Γ (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))))
-          else Spec.pure (@Flow.value unit _ ρ Γ
+          else Spec.pure (@Flow.value unit _ _ ρ Γ
             (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
             ((values.values[i.val.toNat]'(Nat.lt_of_not_ge (fun outside => h (Or.inr outside))),
               (eraseBounded values i.val.toNat, ())) :

@@ -73,8 +73,8 @@ verex module 0x42::dispatch where
 
 run_cmd do
   let env ← getEnv
-  unless env.contains `«0x42».dispatch.requiresTable.eq_0 do
-    throwError "the closure's target has no entry in the table of declared preconditions"
+  unless env.contains `«0x42».dispatch.FunctionValue.requires0 do
+    throwError "the closure site has no equation of its declared precondition"
   unless env.contains (`VerexSL.Tests.Behavior ++ `«0x42».dispatch.use_apply.verified) do
     throwError "the caller did not verify through the target's precondition and theorem"
 

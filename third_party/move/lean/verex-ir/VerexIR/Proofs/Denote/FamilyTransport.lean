@@ -90,12 +90,12 @@ induced frame. -/
 def inducedCarriers? (family : Lean.Expr) : Option (Lean.Expr × Lean.Expr) :=
   if family.isAppOfArity ``VerexIR.Proofs.Denote.Carriers.instantiate 2 then
     some (family.getArg! 0, family.getArg! 1)
-  else if family.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 2 then
-    let frame := family.getArg! 1
-    if frame.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.instantiate 3 then
-      some (frame.getArg! 1,
-        mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) (frame.getArg! 0)
-          (frame.getArg! 2))
+  else if family.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 then
+    let frame := family.getArg! 2
+    if frame.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.instantiate 4 then
+      some (frame.getArg! 2,
+        mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) (frame.getArg! 0)
+          (frame.getArg! 1) (frame.getArg! 3))
     else none
   else none
 
@@ -219,15 +219,15 @@ partial def respellIndex? (env : Environment) (row e : Lean.Expr) : Option Lean.
   return mkAppN e.getAppFn args
 
 /-- The induced family an operation is at, from its arguments: the carriers
-it takes first, or the frame it takes after its unit. Its position, the type
-arguments, and the outer family. -/
+it takes first, or the frame it takes after its unit and function values.
+Its position, the type arguments, and the outer family. -/
 def operationFamily? (args : Array Lean.Expr) : Option (Nat × Lean.Expr × Lean.Expr) :=
   match args[0]?.bind (fun family => inducedCarriers? family.consumeMData) with
   | some (θ, outer) => some (0, θ, outer)
   | none => do
-      let frame := (← args[1]?).consumeMData
-      guard (frame.isAppOfArity ``Skolems.instantiate 3)
-      pure (1, frame.getArg! 1, frame.getArg! 2)
+      let frame := (← args[2]?).consumeMData
+      guard (frame.isAppOfArity ``Skolems.instantiate 4)
+      pure (2, frame.getArg! 2, frame.getArg! 3)
 
 /-- A native operation at an induced family whose type arguments are
 spelled, at the outer family with each type and index it takes substituted,

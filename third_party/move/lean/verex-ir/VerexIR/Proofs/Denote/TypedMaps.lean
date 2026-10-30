@@ -97,7 +97,8 @@ theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → 
 
 /-- A value of a two-variant enum named by its second variant is that
 variant's payload. -/
-theorem variantCarrier.second_of_name {unit : Validation.ValidatedUnit} [Skolems unit]
+theorem variantCarrier.second_of_name {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit]
     (first second : String) (distinct : first ≠ second)
     {leading trailing : NRow} {value : variantCarrier [first, second] (.cons leading (.cons trailing .nil))}
     (named : variantName [first, second] (.cons leading (.cons trailing .nil)) value = second) :

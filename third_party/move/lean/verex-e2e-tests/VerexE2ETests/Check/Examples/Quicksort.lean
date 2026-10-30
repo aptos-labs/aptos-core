@@ -371,7 +371,8 @@ verex module 0x42::quicksort where
     else count(values, needle, lo, hi - 1) + (if values[hi - 1] == needle then 1 else 0)
 
   /-- The generated definition of `count` counts over its vector's values. -/
-  theorem count_cnt {u : VerexIR.Validation.ValidatedUnit} [Θ : VerexIR.Proofs.Denote.Skolems u]
+  theorem count_cnt {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
+      [Θ : VerexIR.Proofs.Denote.Skolems u]
       (v : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier)
       (x : (VerexIR.Proofs.Denote.NTy.param 0).carrier) :
       ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k →
@@ -388,7 +389,8 @@ verex module 0x42::quicksort where
         rfl
 
   /-- The same, at any bundle: the form `simp` rewrites by. -/
-  theorem count_eq {u : VerexIR.Validation.ValidatedUnit} [Θ : VerexIR.Proofs.Denote.Skolems u]
+  theorem count_eq {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
+      [Θ : VerexIR.Proofs.Denote.Skolems u]
       (bundle : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier ×
         (VerexIR.Proofs.Denote.NTy.param 0).carrier × Int × Int × Unit) :
       count.at_T0.spec u Θ bundle =

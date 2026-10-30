@@ -610,11 +610,11 @@ private partial def resolvedType (carriers τ : Lean.Expr) : MetaM (Lean.Expr ×
   let instantiation? : Option (Lean.Expr × Lean.Expr) := do
     let carriers := carriers.consumeMData
     if let .app (.app (.const ``Carriers.instantiate _) θ) outer := carriers then return (θ, outer)
-    let .app (.app toCarriers unit) skolems := carriers | none
+    let .app (.app (.app toCarriers unit) functions) skolems := carriers | none
     guard (toCarriers.isConstOf ``Skolems.toCarriers)
-    let .app (.app (.app instantiate _) θ) outer := skolems.consumeMData | none
+    let .app (.app (.app (.app instantiate _) _) θ) outer := skolems.consumeMData | none
     guard (instantiate.isConstOf ``Skolems.instantiate)
-    return (θ, mkApp2 toCarriers unit outer)
+    return (θ, mkApp3 toCarriers unit functions outer)
   let some (θ, outer) := instantiation? | return (carriers, τ)
   resolvedType outer
     (mkApp2 (mkConst ``NTy.subst) (mkProj ``TypeArgs 0 θ) (mkApp (mkConst ``NTy.param) index))
@@ -706,11 +706,12 @@ simproc [vir_denote, vir_denote_norm] variantProjectionNone
     (@Eq _ _ (@Option.none _)) := fun e => do
   let_expr Eq _ lhs rhs := e | return .continue
   unless rhs.isAppOfArity ``Option.none 1 do return .continue
-  let_expr Which.project? unit skolems names rows σs choice value := lhs | return .continue
+  let_expr Which.project? unit functions skolems names rows σs choice value := lhs
+    | return .continue
   try
     let distinct ← mkDecideProof (← mkAppM ``List.Nodup #[names])
     let proof := mkAppN (mkConst ``Which.project?_eq_none_iff)
-      #[unit, skolems, names, rows, σs, choice, value, distinct]
+      #[unit, functions, skolems, names, rows, σs, choice, value, distinct]
     let some (_, rewritten) := (← inferType proof).iff? | return .continue
     return .visit { expr := rewritten, proof? := some (← mkPropExt proof) }
   catch _ => return .continue
@@ -847,7 +848,7 @@ does not see as the tuple the leaf spells. -/
 simproc [vir_denote, vir_denote_norm] variantProjectionSome
     (@Eq _ _ (@Option.some _ _)) := fun e => do
   let_expr Eq _ lhs _ := e | return .continue
-  unless lhs.isAppOfArity ``Which.project? 7 do return .continue
+  unless lhs.isAppOfArity ``Which.project? 8 do return .continue
   rewriteByAny e [``Which.project?_eq_some_iff]
 
 

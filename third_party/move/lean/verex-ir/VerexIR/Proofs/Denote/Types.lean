@@ -1335,10 +1335,38 @@ structure RuntimeFunction (unit : Validation.ValidatedUnit) (parameters : NRow)
     · cases decoded; rfl
     · cases decoded
 
+/-- A unit's function values: a carrier per function type and its interface
+(`TypedFunctions`). One instance per unit, declared where the unit is
+registered: the runtime family and storage hold these values. -/
+class FunctionCarriers (unit : Validation.ValidatedUnit) where
+  carrier : NRow → Sharing → NRow → Type
+  functions : (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    TypedFunctions (carrier parameters shared results)
+  /-- Every value's closure is one the unit types at its function type. -/
+  admits : ∀ parameters shared results (value : carrier parameters shared results),
+    NTy.admits unit (.function parameters shared results)
+      ((functions parameters shared results).closure value).encode = true
+  /-- Every closure the unit types at a function type decodes. -/
+  decodes : ∀ parameters shared results (closure : ClosureValue),
+    NTy.admits unit (.function parameters shared results) closure.encode = true →
+      ((functions parameters shared results).ofClosure? closure).isSome = true
+
+/-- The library's function values, the closures the unit types
+(`RuntimeFunction`): the instance of a unit without generated function
+values. A definition, not an instance: a unit's instance is declared with
+the unit. -/
+@[reducible] def FunctionCarriers.runtime (unit : Validation.ValidatedUnit) : FunctionCarriers unit where
+  carrier := RuntimeFunction unit
+  functions := RuntimeFunction.functions unit
+  admits := fun _ _ _ value => value.typed
+  decodes := fun _ _ _ _ typed => by
+    simp only [RuntimeFunction.functions, dif_pos typed, Option.isSome_some]
+
 open Classical in
 /-- The family of the public theorem: every type parameter carried as a
-loan-free runtime value. -/
-@[reducible] noncomputable def Carriers.runtime (unit : Validation.ValidatedUnit) : Carriers where
+loan-free runtime value, and the unit's function values. -/
+@[reducible] noncomputable def Carriers.runtime (unit : Validation.ValidatedUnit)
+    [FunctionCarriers unit] : Carriers where
   carrier := fun _ => { value : RuntimeValue // Plain value }
   codec := fun _ =>
     ⟨Subtype.val, fun raw => if plain : Plain raw then some ⟨raw, plain⟩ else none,
@@ -1350,8 +1378,8 @@ loan-free runtime value. -/
     subst decoded
     rfl
   plain := fun _ value => value.property
-  functionCarrier := RuntimeFunction unit
-  functions := RuntimeFunction.functions unit
+  functionCarrier := FunctionCarriers.carrier unit
+  functions := FunctionCarriers.functions
   reads := fun _ => PlainValue.reads
   orders := fun _ => PlainValue.orders
   erasures := fun _ => PlainValue.erasures
@@ -2968,7 +2996,7 @@ def initialEnv : (params rest : NRow) → HList params → HEnv (params ++ rest)
 end Carriers
 
 section Memory
-variable {unit : Validation.ValidatedUnit}
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
 /-! ## Native operations
 
@@ -3006,7 +3034,8 @@ structure ResourceType where
     arguments := NRow.subst types resource.arguments }
 
 /-- The values stored at a resource type. -/
-@[reducible] def ResourceType.carrier (unit : Validation.ValidatedUnit) (resource : ResourceType) :
+@[reducible] def ResourceType.carrier (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
+    (resource : ResourceType) :
     Type :=
   match resource.kind with
   | .value => @NTy.carrier (Carriers.runtime unit) resource.type
@@ -3033,7 +3062,7 @@ theorem ResourceType.encode_injective (resource : ResourceType) :
         @NTy.encode_injective (Carriers.runtime unit) type _ _).mp mapped
 
 /-- Global memory: per resource type, the value stored under each key. -/
-def Memory (unit : Validation.ValidatedUnit) : Type :=
+def Memory (unit : Validation.ValidatedUnit) [FunctionCarriers unit] : Type :=
   (resource : ResourceType) → StorageKey → Option (resource.carrier unit)
 
 /-- The memory with one slot replaced. -/
@@ -3166,7 +3195,8 @@ theorem lt_size_of_getElem?_eq_some {α : Type} {xs : Array α} {i : Nat} {value
 instance : Inhabited (Memory unit) := ⟨fun _ _ => none⟩
 
 /-- A `Spec` over global memory with VIR failures. -/
-abbrev Comp (unit : Validation.ValidatedUnit) (α : Type) := Spec (Memory unit) Failure α
+abbrev Comp (unit : Validation.ValidatedUnit) [FunctionCarriers unit] (α : Type) :=
+  Spec (Memory unit) Failure α
 
 end Memory
 
@@ -5577,7 +5607,8 @@ end
 end Plain
 
 /-- Both ordinary slots and native collection slots encode loan-free values. -/
-theorem ResourceType.encode_plain (resource : ResourceType) (value : resource.carrier unit) :
+theorem ResourceType.encode_plain {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
+    (resource : ResourceType) (value : resource.carrier unit) :
     Plain (resource.encode value) := by
   rcases resource with ⟨type, arguments, kind⟩
   cases kind with
@@ -5589,7 +5620,7 @@ theorem ResourceType.encode_plain (resource : ResourceType) (value : resource.ca
 
 section Admits
 
-variable (unit : Validation.ValidatedUnit)
+variable (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
 
 theorem NTy.admitsEach_of_forall {τ : NTy} : (values : List RuntimeValue) →
     (∀ value ∈ values, NTy.admits unit τ value = true) → NTy.admitsEach unit τ values = true
@@ -5650,7 +5681,7 @@ theorem NTy.admits_encode : (τ : NTy) → (value : @NTy.carrier (Carriers.runti
       simp only [NTy.codec, Codec.ghost, NTy.admits]
       exact (SemanticOperations.plain?_iff _).mpr (@NTy.encode_plain (Carriers.runtime unit) slot value)
   | .param _, _ => by simp [NTy.admits]
-  | .function _ _ _, value => value.typed
+  | .function _ _ _, value => FunctionCarriers.admits _ _ _ value
 
 /-- The runtime family's encoding of a row admits it. -/
 theorem NRow.admits_encode : (row : NRow) → (values : @HList (Carriers.runtime unit) row) →
@@ -7094,7 +7125,7 @@ end
 /-- The family of a frame: the carriers of its type parameters, each of its
 types as a runtime-family type, and its values carried to and from that
 family, inverse to each other and keeping their encodings. -/
-class Skolems (unit : outParam Validation.ValidatedUnit) extends Carriers where
+class Skolems (unit : outParam Validation.ValidatedUnit) [FunctionCarriers unit] extends Carriers where
   /-- A type of the frame at the runtime family. -/
   resolve : NTy → NTy
   /-- Resolution replaces each type parameter by its resolution. -/
@@ -7109,7 +7140,7 @@ class Skolems (unit : outParam Validation.ValidatedUnit) extends Carriers where
   type arguments of a resource are (`TypeArgs`). -/
   type_inhabitable : ∀ index, (resolve (.param index)).inhabitable = true
 
-variable {unit : Validation.ValidatedUnit}
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
 /-- The type parameter `index` of a frame at the runtime family.  It names
 the type arguments of an opaque specification function, which nothing else
@@ -7118,7 +7149,8 @@ identifies. -/
 
 /-- The frame of the public theorem and of every function without type
 parameters: the runtime family itself. -/
-@[reducible] noncomputable def Skolems.runtime (unit : Validation.ValidatedUnit) : Skolems unit where
+@[reducible] noncomputable def Skolems.runtime (unit : Validation.ValidatedUnit) [FunctionCarriers unit] :
+    Skolems unit where
   toCarriers := Carriers.runtime unit
   resolve := fun τ => τ
   resolve_eq := fun τ => (NTy.substWith_param τ).symm
@@ -7168,12 +7200,19 @@ theorem Skolems.ofClosure?_of_runtime [Θ : Skolems unit] {parameters results : 
   have resolved : NTy.function (parameters.substWith Θ.type) shared (results.substWith Θ.type) =
       Θ.resolve (.function parameters shared results) :=
     (Θ.resolve_eq (.function parameters shared results)).symm
+  -- The closure at the unit's function values, carried to the frame.
+  let functions := FunctionCarriers.functions (unit := unit) (parameters.substWith Θ.type) shared
+    (results.substWith Θ.type)
+  have decoded := FunctionCarriers.decodes _ _ _ closure typed
   let value := Θ.ofRuntime (.function parameters shared results)
-    (resolved ▸ (⟨closure, typed⟩ : RuntimeFunction unit (parameters.substWith Θ.type) shared
-      (results.substWith Θ.type)))
+    (resolved ▸ (functions.ofClosure? closure).get decoded)
   have encoded := Θ.encode_toRuntime (.function parameters shared results) value
   rw [Θ.toRuntime_ofRuntime, @NTy.encode_cast (Carriers.runtime unit) _ _ resolved] at encoded
   simp only [NTy.encode_function] at encoded
+  have back := functions.closure_of_ofClosure? closure _ (Option.some_get decoded).symm
+  have encoded : closure.encode =
+      ((Carriers.functions parameters shared results).closure value).encode := by
+    rw [← back]; exact encoded
   have same := ClosureValue.encode_injective encoded
   rw [show closure = (Carriers.functions parameters shared results).closure value from same,
     (Carriers.functions parameters shared results).ofClosure?_closure]
@@ -7246,7 +7285,7 @@ attribute [vir_denote] variantCarrier.toSkolem NTy.ofSkolem_unit NTy.ofSkolem_bo
 
 
 section Resolved
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- A row of a frame, as types of the runtime family. -/
 def NRow.resolved : NRow → NRow
@@ -7289,10 +7328,42 @@ theorem NRow.resolved_eq_substWith : (row : NRow) →
 /-- A row resolved at the frame type arguments induce is the row with them
 substituted, resolved at the outer frame. -/
 theorem NRow.resolved_instantiate (θ : TypeArgs) : (row : NRow) →
-    @NRow.resolved unit (Skolems.instantiate θ ‹_›) row = (NRow.subst θ.1 row).resolved
+    @NRow.resolved unit _ (Skolems.instantiate θ ‹_›) row = (NRow.subst θ.1 row).resolved
   | .nil => rfl
   | .cons τ rest => by
       simp only [NRow.resolved, Skolems.resolve_instantiate, NRow.resolved_instantiate θ rest]
+
+omit [Skolems unit] in
+private theorem heq_pair {α β γ : Type} (a : α) (same : β = γ) (x : β) (y : γ)
+    (sameValue : HEq x y) : HEq (a, x) (a, y) := by
+  subst same; cases sameValue; rfl
+
+omit [Skolems unit] in
+/-- An induced frame carries a row's values to the runtime family as the
+outer frame carries them read in its view. -/
+theorem HList.toRuntime_instantiate (θ : TypeArgs) (Θ : Skolems unit) : (row : NRow) →
+    (values : @HList (Skolems.instantiate θ Θ).toCarriers row) →
+    HEq (@HList.toRuntime unit _ (Skolems.instantiate θ Θ) row values)
+      (@HList.toRuntime unit _ Θ (NRow.subst θ.1 row) (HList.ofSkolem θ row values))
+  | .nil, _ => HEq.rfl
+  | .cons _ rest, values =>
+      heq_pair _ (congrArg (@HList (Carriers.runtime unit)) (@NRow.resolved_instantiate unit _ Θ θ rest))
+        _ _ (HList.toRuntime_instantiate θ Θ rest values.2)
+
+omit [Skolems unit] in
+/-- At the base frame a row resolves to itself. -/
+theorem NRow.resolved_runtime : (row : NRow) → @NRow.resolved unit _ (Skolems.runtime unit) row = row
+  | .nil => rfl
+  | .cons _ rest => congrArg (NRow.cons _) (NRow.resolved_runtime rest)
+
+omit [Skolems unit] in
+/-- The base frame carries a row's values to themselves. -/
+theorem HList.toRuntime_runtime : (row : NRow) → (values : @HList (Carriers.runtime unit) row) →
+    HEq (@HList.toRuntime unit _ (Skolems.runtime unit) row values) values
+  | .nil, _ => HEq.rfl
+  | .cons _ rest, values =>
+      heq_pair _ (congrArg (@HList (Carriers.runtime unit)) (@NRow.resolved_runtime unit _ rest))
+        _ _ (HList.toRuntime_runtime rest values.2)
 
 end Resolved
 

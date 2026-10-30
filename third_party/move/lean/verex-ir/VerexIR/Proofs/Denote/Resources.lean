@@ -79,19 +79,23 @@ theorem runtimeResourceOf_refFree {namespaceId : NamespaceId} {typeId : TypeId}
     resource.type.refFree = true :=
   (runtimeResourceOf_sound named).2.2
 
+variable [FunctionCarriers unit]
+
 /-- Runtime global memory holding exactly what a typed memory holds: under
 every key, the encoding of the value at the resource type its type
 identifier denotes, a table's entries included, and nothing under a key
 that denotes none.  Its entries are in key order, so the memory determines
 it. -/
-def Encodes (unit : ValidatedUnit) (memory : Memory unit) (globals : GlobalMap) : Prop :=
+def Encodes (unit : ValidatedUnit) [FunctionCarriers unit]
+    (memory : Memory unit) (globals : GlobalMap) : Prop :=
   globals.Sorted ∧ ∀ namespaceId typeId key, globals.lookup ⟨namespaceId, typeId, key⟩ =
     match runtimeResourceOf unit namespaceId typeId with
     | some resource => (memory resource key).map (resource.encode (unit := unit))
     | none => none
 
 /-- A memory's runtime encoding is unique. -/
-theorem Encodes.unique {unit : ValidatedUnit} {memory : Memory unit} {left right : GlobalMap}
+theorem Encodes.unique {unit : ValidatedUnit} [FunctionCarriers unit]
+    {memory : Memory unit} {left right : GlobalMap}
     (encodes : Encodes unit memory left) (encodes' : Encodes unit memory right) : left = right :=
   GlobalMap.ext encodes.1 encodes'.1 fun ⟨namespaceId, typeId, key⟩ => by
     rw [encodes.2, encodes'.2]
@@ -99,7 +103,7 @@ theorem Encodes.unique {unit : ValidatedUnit} {memory : Memory unit} {left right
 /-- The observable runtime stores encode one typed memory: the globals hold
 its values, and the handles allocated to tables are its allocation history,
 observable after a table's destruction. Loan registries remain separate. -/
-structure StorageEncodes (unit : ValidatedUnit) (memory : Memory unit)
+structure StorageEncodes (unit : ValidatedUnit) [FunctionCarriers unit] (memory : Memory unit)
     (state : RuntimeState) : Prop where
   globals : Encodes unit memory state.globals
   allocated : ∀ key, memory TableMemory.allocationResource key =
@@ -120,7 +124,7 @@ def Unnamed (unit : ValidatedUnit) (resource : ResourceType) : Prop :=
   resource ≠ TableMemory.allocationResource
 
 /-- Two memories that agree on every resource type no runtime key names. -/
-def AgreeUnnamed (unit : ValidatedUnit) (left right : Memory unit) : Prop :=
+def AgreeUnnamed (unit : ValidatedUnit) [FunctionCarriers unit] (left right : Memory unit) : Prop :=
   ∀ resource, Unnamed unit resource → left resource = right resource
 
 /-! ## Data invariants of stored resources -/
@@ -246,7 +250,7 @@ def StoredCase (σ : NTy) (arguments : NRow)
       @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers σ → Prop)
     (resource : ResourceType) (value : resource.carrier unit) : Prop :=
   ∀ (inhabitable : resource.arguments.inhabitable = true)
-    (same : resource = @Skolems.resource unit
+    (same : resource = @Skolems.resource unit _
       (Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)) σ arguments),
     holds ⟨resource.arguments, inhabitable⟩
       ((Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)).ofRuntime σ
@@ -259,7 +263,7 @@ theorem StoredCase.intro {σ : NTy} {arguments : NRow}
       @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers σ → Prop}
     {resource : ResourceType} {value : resource.carrier unit}
     (inhabitable : resource.arguments.inhabitable = true)
-    (same : resource = @Skolems.resource unit
+    (same : resource = @Skolems.resource unit _
       (Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)) σ arguments)
     (held : holds ⟨resource.arguments, inhabitable⟩
       ((Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)).ofRuntime σ
@@ -601,10 +605,10 @@ theorem StoredCase.atFrame (Θ : Skolems unit) {σ : NTy} {params : NRow}
     (own : params.isParamsFrom 0 = true)
     (bounded : σ.paramsAll (fun index => decide (index < params.length)) = true)
     (value : @NTy.carrier (Carriers.runtime unit) (Θ.resolve σ)) :
-    StoredCase σ params holds (@Skolems.resource unit Θ σ params) value ↔
+    StoredCase σ params holds (@Skolems.resource unit _ Θ σ params) value ↔
       holds (Θ.typeArgs params own) (Θ.reframe own bounded (Θ.ofRuntime σ value)) := by
-  have same : @Skolems.resource unit Θ σ params =
-      @Skolems.resource unit (Θ.instance params own) σ params := by
+  have same : @Skolems.resource unit _ Θ σ params =
+      @Skolems.resource unit _ (Θ.instance params own) σ params := by
     show ResourceType.mk (Θ.resolve σ) (params.map Θ.resolve) .value =
       ResourceType.mk (σ.subst (params.map Θ.resolve)) (params.map (Θ.instance params own).resolve) .value
     rw [Θ.map_resolve_instance own params (NRow.paramsAll_params params 0 params.length own (by omega)),
@@ -691,7 +695,8 @@ of it, as a native type and, for a resource type, with its arguments; and
 each of its type parameters, read at its node through the instantiation, is
 the frame's type for it.  The runtime instantiation maps only interned
 types, and static typing interns the required ones. -/
-structure Coherent (unit : ValidatedUnit) [Skolems unit] (handle : FunctionHandle)
+structure Coherent (unit : ValidatedUnit) [FunctionCarriers unit]
+    [Skolems unit] (handle : FunctionHandle)
     (typeInstantiation : Array (TypeId × TypeId)) : Prop where
   resources : ∀ typeId ∈ requiredAt unit handle, ∀ resource,
     resourceOf unit handle.namespaceId typeId = some resource →
@@ -711,7 +716,8 @@ structure Coherent (unit : ValidatedUnit) [Skolems unit] (handle : FunctionHandl
 
 /-- Whether a frame agrees with a runtime type instantiation on a function's
 required types and type parameters, decided by evaluation. -/
-def coherentCheck (unit : ValidatedUnit) [Skolems unit] (handle : FunctionHandle)
+def coherentCheck (unit : ValidatedUnit) [FunctionCarriers unit]
+    [Skolems unit] (handle : FunctionHandle)
     (typeInstantiation : Array (TypeId × TypeId)) : Bool :=
   (requiredAt unit handle).toList.all (fun typeId =>
     (match resourceOf unit handle.namespaceId typeId with
@@ -735,7 +741,8 @@ def coherentCheck (unit : ValidatedUnit) [Skolems unit] (handle : FunctionHandle
         decide (ntyOf unit handle.namespaceId (instantiatedTypeId typeInstantiation node) =
           some (Skolems.resolve (.param index)))
 
-theorem Coherent.ofCheck {unit : ValidatedUnit} [Skolems unit] {handle : FunctionHandle}
+theorem Coherent.ofCheck {unit : ValidatedUnit} [FunctionCarriers unit]
+    [Skolems unit] {handle : FunctionHandle}
     {typeInstantiation : Array (TypeId × TypeId)}
     (check : coherentCheck unit handle typeInstantiation = true) :
     Coherent unit handle typeInstantiation := by
@@ -785,9 +792,9 @@ theorem NRow.map_id : (row : NRow) → row.map (fun τ => τ) = row
 
 /-- At the runtime frame, the empty instantiation is coherent: every type
 identifier denotes its own type, and every parameter stays. -/
-theorem coherent_runtime (unit : ValidatedUnit) (handle : FunctionHandle) :
-    @Coherent unit (Skolems.runtime unit) handle #[] := by
-  refine @Coherent.mk unit (Skolems.runtime unit) handle #[]
+theorem coherent_runtime (unit : ValidatedUnit) [FunctionCarriers unit] (handle : FunctionHandle) :
+    @Coherent unit _ (Skolems.runtime unit) handle #[] := by
+  refine @Coherent.mk unit _ (Skolems.runtime unit) handle #[]
     (fun typeId _ resource named _ _ => ?_) (fun typeId _ τ named _ => ?_)
     (fun index _ node found => ?_)
   · rw [instantiatedTypeId_empty, named]

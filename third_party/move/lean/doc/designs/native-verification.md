@@ -62,7 +62,7 @@ denotation and the solver.
 | Binders | the carriers themselves; a binder carries its clause value and its native value |
 | Integers in carrier positions | the certified `SpecInt.val`, a certified literal `SpecInt.mk`, else the cut `SpecInt.ofInt`; a clause integer stored in a fixed-width field is defined only in range (`bindCuts`) |
 | Structs, tuples | rows (`HList`), `Var.select`, `Var.update`; a ghost slot is a row component of type `.ghost σ` |
-| Enums | injections, `variantName`, `Which.project?`, native `match`; ordering enums by `orderingChoice` |
+| Enums | injections, `variantName`, `Which.project?`, native `match`; ordering enums by `orderingChoice`; a variant field read totally takes the field type's inhabitant under another variant, and a field of a type without one (a function type) is bound by a match arm or a `let` of a Boolean clause to what `Choices.select?` holds, universally |
 | Vectors | `SpecVector` only: literals, `append`/`push` total under the length bound, `extract`, `set`, element quantifiers over `values` |
 | Maps | the owner is a row and the intrinsic roles act on its `SpecEntries` component wherever it sits; a table's typed map is `SpecMap.ofEntries keys values x`, and a map written back into a table reads back as itself where its length fits and its entries read back; `new` is the empty owner |
 | Equality and order | carrier equality after ghost erasure (`NTy.equal`, identity types by `holdsContents`); `NTy.order`, defined by recursion on the type and used by `Term.order` and the `.compare` primitive, with one theorem `NTy.order_encode` relating it to the order of encodings for the agreement |

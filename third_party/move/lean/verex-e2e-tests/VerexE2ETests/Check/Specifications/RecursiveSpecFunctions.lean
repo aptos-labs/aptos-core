@@ -35,6 +35,7 @@ verex module 0x42::recursive_spec where
 
   /-- A vector whose first element is the needle counts it at least once. -/
   theorem count_first {unit : VerexIR.Validation.ValidatedUnit}
+      [VerexIR.Proofs.Denote.FunctionCarriers unit]
       (frame : VerexIR.Proofs.Denote.Skolems unit)
       (values : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier) (needle : Int)
       (head : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier)

@@ -46,20 +46,29 @@ as the Prover's parameter and field variants are.
 **Invocation, equality, order.** `invoke v args` matches: a closure arm is
 the target's meaning at the woven arguments, handled by the call rule and
 the target's theorem as a direct call; `foreign k` is `invokeForeign k
-args`, a hypothesis stated as the model's `InvokeMeaning` is (definedness
-under the declared `requires_of`, coherence across frames, the declared
-predicates and frame). The weave and composition lemmas
+args`, a hypothesis stated as the model's `InvokeMeaning` is (definedness,
+coherence across frames, the declared predicates and frame). The weave and composition lemmas
 (`closureMeaning_closureOf_*`, `requiresOf_closureOf`) become unnecessary;
 the call rules and `KeepsMemoryAt` stay. Equality is structural up to
 ghosts, constructors of different sites differ; order is Move's
 lexicographic order (handle rank, handle, instantiation, mask, captures).
 A value is storable where its captured rows are reference-free.
 
-**The requires table**, per constructor over native rows:
-`RequiresOf (closure_{f,θ,m} c) args := requires_f θ (weave_m.compose c
-args)`; `RequiresOf (foreign k)` is the uninterpreted `requiresForeign k`
-of the `invokeForeign` hypothesis. Defining it as `True` would make every
-foreign closure invocable at every argument.
+**The requires meaning** (`functionRequires`, generated per link set),
+per constructor over native rows: `RequiresOf (closure_{f,θ,m} c) args :=
+requires_f θ (weave_m.compose c args)`; `RequiresOf (foreign k)` is the
+uninterpreted `requiresForeign`, which gives meaning to the `requires_of`
+predicate only. Calling a function value needs no `requires_of`, as in the
+Move Prover, which asserts none at a call of a function value (caller
+obligations are stated in the specification, not checked at the call): a
+model unit's invocation of a value is defined where its site's target's
+precondition holds and, of a `foreign` value, always (the definedness
+meaning `functionRequires (fun … => True)`); an executable unit's by
+typing. A link set none of whose sites' targets declares a precondition
+proves every invocation defined (`functionRequires_everywhere`). Off the
+base frame, `requires_of` of a construction is read at the base frame
+(`requiresOf_construct`); at rows without type parameters its arguments
+reach the target's precondition (`toRuntimeFree`).
 
 **Rust.** A closure type is a struct of its upvars (a by-reference upvar a
 `.ref` field) with a `self`-taking body, and a call through a known
@@ -102,7 +111,7 @@ them. 2b: the data, the per-instance datatypes implementing it, with
 `Carriers.runtime unit` taking the function carriers as a parameter so
 the library and the agreement stay one definition. Gates: Check/Closures,
 Check/Storage's stored closures, the prover's closure tests,
-`DenotePerformance`, the native inventory empty. 3: the requires table per
+`DenotePerformance`, the native inventory empty. 3 (done): the requires meaning per
 constructor (gates: the `requires_of` fixtures, `behavior_manual_facts`,
 `specialize_generic_caller`); the leaf's provenance records the
 constructor's target under the invocation site the proof language's L0
@@ -137,7 +146,7 @@ become derived data of the target.
   library's tests. The agreement holds for every unit and instance.
 - Generated per link set (the unit and the dependencies its theorems
   relocate), once, before the unit's first target theorem
-  (`ensureFunctionCarriers`, beside `ensureRequiresTable`): one indexed
+  (`ensureFunctionCarriers`): one indexed
   family `FV : NRow → Sharing → NRow → Type`, a constructor per closure site
   at its closed rows (a site inside a generic function once per
   instantiation the link set uses) and `foreign (key : ForeignClosure unit p
@@ -154,7 +163,7 @@ become derived data of the target.
   invocation at the woven arguments, of `foreign k` the hypothesis
   `invokeForeign k`. At an abstract frame nothing reduces.
 - Per function type one hypothesis bundle for `foreign` (`invokeForeign`:
-  definedness under the uninterpreted `requiresForeign`, coherence across
+  definedness without a precondition, coherence across
   frames, the declared predicates and frame) replaces `verexInvoke`, its
   definedness and coherence binders and the per-member routing; generic
   targets are constructors at their instantiation. `FunctionTyped`,
@@ -174,3 +183,47 @@ and `.closureGeneric` denoting constructors, the typing machinery deleted;
 `lean =>` updated; (v) equality, order and storage derived from the
 generated structure. Kept for step 3: `RequiresOf` through
 `ClosureMask.compose` and the requires table.
+
+Status: (i) to (iv) done; (v) done except where noted. The library
+holds the family interface (`SiteFamily`): the generator supplies the
+inductive with typed captures, the structural encoder and the site table,
+and the library derives the decoder (by closure size, over the codec
+parameterized by its function arm, `NTy.decodeWith`), the four laws and
+the instance. A closure whose captures do not decode at its site's row is
+`foreign`, so every admitted closure decodes. Construction is a frame
+operation, `Skolems.construct`, typed by its site (`SiteTyped`, what a
+closure node carries; a clause's literal by the unit's check,
+`SiteTyped.ofCheck`, whose proof the clause binds), irreducible; no
+`Carriers` field, so the ground family keeps no function values. The sites
+include the literal function values specifications write. Per site
+without type arguments the generator proves its constructor's closure, the
+unit's check, its invocation as its target's call at the woven arguments,
+and the typing of the value naming its target, and registers them
+(`SiteEquations`); the normalizer rewrites construction and invocation at
+the base frame by them (`constructSite`, `invokeSite`), and the solver's
+dispatch rules read a construction and a site's constructor alike
+(`LiteralValue`). `FunctionTyped`, `ClosureTypedAt`, the literal typing
+rule and the leaf-time evaluation of a literal's check are gone; the
+unseen-invocation rule takes its typing from the carrier
+(`FunctionCarriers.admits` through the frame's transport, where the
+readings agree), and a function value at a skolem frame invokes by it.
+Equality and order of known function values (a construction, a site's
+constructor) are read off the generated structure by the normalizer
+(`knownFunctionsEqual`, `knownFunctionsOrder`): at one key, the captures'
+equality without ghosts and the captures' order; at different keys,
+unequal, and ordered by the keys (`closureKeyOrder`); a value the leaf does
+not know keeps the interface's opaque key and order. Storage needs nothing
+further: a stored function value is encoded and decoded by the generated
+codec. Decided for (iv) (2026-10-29): definedness stays `verexInvokeDefined` under
+the requires table for every value (`requiresForeign` and the
+per-constructor table are step 3); executable units keep `closureMeaning`,
+`foreign k` opaque there; a model unit keeps `verexInvoke` with its
+definedness and coherence, its routing restated per closure site at the
+base frame. Open: the invocation equations of sites with type arguments
+(they keep `functionOfGeneric` and its invocation rule); function values
+under a vector or map in a capture. A carrier whose length certificate is a
+proof over its elements cannot nest the family in Lean, so (decided
+2026-10-29) the vector and map carriers drop their certificate; the bound
+becomes a leaf fact like an integer's (supplied where a value enters a
+leaf, required by the encoding). Postponed as an open gap; until it is done
+the generator rejects such captures.

@@ -7,7 +7,7 @@ import VerexIR.Proofs.Denote.Term
 
 namespace VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit}
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
 /-- The weakest precondition through a verified callee whose contract
 excuses its postcondition exactly where it must fail, as every generated

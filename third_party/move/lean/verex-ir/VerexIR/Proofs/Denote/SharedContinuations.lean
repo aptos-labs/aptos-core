@@ -34,9 +34,9 @@ private partial def normalExits (action : Lean.Expr) (flow : Bool) : MetaM Nat :
     let value := (action.getArg! 3).consumeMData.headBeta
     return if flow && (value.isAppOf ``Flow.return_ || value.isAppOf ``Flow.break_ ||
       value.isAppOf ``Flow.continue_) then 0 else 1
-  if action.isAppOfArity ``Flow.bind 8 then
-    return min 2 ((← normalExits (action.getArg! 6) true) *
-      (← normalExits (action.getArg! 7) flow))
+  if action.isAppOfArity ``Flow.bind 9 then
+    return min 2 ((← normalExits (action.getArg! 7) true) *
+      (← normalExits (action.getArg! 8) flow))
   if action.isAppOfArity ``Spec.bind 6 then
     return min 2 ((← normalExits (action.getArg! 4) false) *
       (← normalExits (action.getArg! 5) flow))
@@ -131,7 +131,7 @@ def fold? (goal : MVarId) : MetaM (Option (MVarId × Node)) := goal.withContext 
   let target := (← instantiateMVars (← goal.getType)).consumeMData
   unless target.isAppOfArity ``wp 7 do return none
   let resultType ← whnfR (target.getArg! 2)
-  unless resultType.isAppOfArity ``Flow 5 do return none
+  unless resultType.isAppOfArity ``Flow 6 do return none
   let ensures := target.getArg! 4
   if ensures.hasExprMVar then return none
   let allLocals ← orderedLocals
@@ -183,12 +183,12 @@ def arrival? (node : Node) (goal : MVarId) : MetaM (Option Arrival) := goal.with
   let arguments := target.getAppArgs
   unless arguments.size == node.captures + 2 do return none
   let flow := arguments[node.captures]!.consumeMData.headBeta
-  unless flow.isAppOfArity ``Flow.value 7 do return none
+  unless flow.isAppOfArity ``Flow.value 8 do return none
   let goal ← clearSavedComputations goal
   return some {
     goal
     arguments := arguments.extract 0 node.captures ++
-      #[flow.getArg! 5, flow.getArg! 6, arguments.back!]
+      #[flow.getArg! 6, flow.getArg! 7, arguments.back!]
     locals := ← goal.withContext orderedLocals }
 
 /-- Common context is independent of the body's capture telescope. Preserve
@@ -339,9 +339,9 @@ def sealNode (node : Node) : MetaM Node := do
     let rest ← whnfR rest
     let .forallE _ flowType _ _ := rest
       | throwError "a shared continuation does not accept its flow"
-    unless flowType.isAppOfArity ``Flow 5 do
+    unless flowType.isAppOfArity ``Flow 6 do
       throwError "a shared continuation lost its flow type"
-    withLocalDeclD `value (flowType.getArg! 4) fun value => do
+    withLocalDeclD `value (flowType.getArg! 5) fun value => do
     let constructor := mkAppN (mkConst ``Flow.value) (flowType.getAppArgs.push value)
     let .forallE _ envType _ _ ← whnfR (← inferType constructor)
       | throwError "a shared continuation value does not accept its locals"

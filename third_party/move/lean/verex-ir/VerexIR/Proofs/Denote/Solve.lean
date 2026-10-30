@@ -601,8 +601,8 @@ private partial def debugHead (goal : MVarId) : MetaM String := goal.withContext
       | .const name _ => pure (toString name)
       | .fvar id => do return s!"local {(← id.getDecl).userName}"
       | _ => pure "?"
-    let name := if e.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 7 then
-        s!"{name} {e.getArg! 3}" else name
+    let name := if e.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 8 then
+        s!"{name} {e.getArg! 4}" else name
     if depth == 0 then return name
     let inner := if e.isAppOfArity ``VerexIR.Proofs.wp 7 then some (e.getArg! 3)
       else if e.getAppNumArgs ≥ 1 && (e.getAppFn.isConstOf ``VerexIR.Proofs.Spec.bind ||
@@ -844,7 +844,7 @@ private def assumeStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
   let table? ← continues.withContext do
     let holds ← instantiateMVars (← assumed.getType)
     let entry := holds.getAppFn.constName? |>.bind fun name =>
-      if name == ``VerexIR.Proofs.Denote.assumptionOf then holds.getAppArgs[3]? else none
+      if name == ``VerexIR.Proofs.Denote.assumptionOf then holds.getAppArgs[4]? else none
     pure (entry.bind (·.getAppFn.constName?))
   if let some table := table? then
     unless table == ``VerexIR.Proofs.Denote.Meanings.assumption do
@@ -868,9 +868,9 @@ private def callAtStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
   let some (site, arguments) ← callAtGoal? goal | return false
   let rule ← match ctx.invariants.find? (·.1 == site) with
     | some (_, function, condition) => do
-        let owed ← atStart goal function (mkApp2 condition arguments[0]! arguments[1]!) site #[]
+        let owed ← atStart goal function (mkApp2 condition arguments[0]! arguments[2]!) site #[]
         pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_callAt_checked)
-          (arguments.extract 0 5 ++ #[owed] ++ arguments.extract 5 8))
+          (arguments.extract 0 6 ++ #[owed] ++ arguments.extract 6 9))
     | none => pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_callAt) arguments)
   let next ← goal.withContext (goal.apply rule)
   queue next provenance clauses (callSite := site)
@@ -897,6 +897,7 @@ private inductive PathMark where
   | branch (site : Nat) (taken : Bool)
   | arm (site : Nat) (variant : String)
   | after (site : Nat)
+  | dispatch (site : Nat) (target : String)
 
 /-- A goal's conclusion through branches and arms, at aborts and after
 operations (`Taken`, `Matched`, `AbortsAt`, `AfterAt`): its markers,
@@ -921,6 +922,11 @@ private partial def pathMarkers? (e : Lean.Expr) :
         pure ((← (evalNat (e.getArg! 0)).run).map (PathMark.arm · variant), e.getArg! 2)
       else if e.isAppOfArity ``AfterAt 2 then
         pure ((← (evalNat (e.getArg! 0)).run).map PathMark.after, e.getArg! 1)
+      else if e.isAppOfArity ``Dispatched 3 then
+        let target := match (e.getArg! 1).consumeMData with
+          | .lit (.strVal target) => target
+          | _ => "_"
+        pure ((← (evalNat (e.getArg! 0)).run).map (PathMark.dispatch · target), e.getArg! 2)
       else return none
     let some mark := mark | return none
     return match ← pathMarkers? inner with
@@ -1047,27 +1053,27 @@ private def unrollStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``loopUnroll 9 do return none
-    let some remaining ← (evalNat (action.getArg! 5)).run
+    unless action.isAppOfArity ``loopUnroll 10 do return none
+    let some remaining ← (evalNat (action.getArg! 6)).run
       | throwError "loop unrolling requires a concrete allowance"
     return some (action.getAppArgs, remaining,
       #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
   let some (arguments, remaining, conditions) := unrolling | return false
   let rule := if remaining == 0 then
       mkAppN (mkConst ``wp_loopUnroll_exhausted)
-        (arguments.extract 0 5 ++ arguments.extract 6 9 ++ conditions)
+        (arguments.extract 0 6 ++ arguments.extract 7 10 ++ conditions)
     else
       mkAppN (mkConst ``wp_loopUnroll_step)
-        (arguments.extract 0 5 ++ #[toExpr (remaining - 1)] ++
-          arguments.extract 6 9 ++ conditions)
+        (arguments.extract 0 6 ++ #[toExpr (remaining - 1)] ++
+          arguments.extract 7 10 ++ conditions)
   let next ← goal.withContext (goal.apply rule)
   setGoals next
   if remaining > 0 then
     evalTactic (← `(tactic| intro verexLoopFuel))
-    normalizeAround ctx.normalization (#[arguments[8]!] ++ conditions)
+    normalizeAround ctx.normalization (#[arguments[9]!] ++ conditions)
     queue (← getGoals) provenance clauses
   else
-    let site ← (evalNat arguments[4]!).run
+    let site ← (evalNat arguments[5]!).run
     let origin := match ctx.unrolls.find? (some ·.1 == site) with
       | some (_, bound) => some (Provenance.unrollBound bound)
       | none => provenance
@@ -1093,7 +1099,7 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       return true
   if let some (_, bound) := ctx.unrolls.find? (·.1 == site) then
     let rule := mkAppN (mkConst ``wp_loopAt_unroll)
-      (arguments.extract 0 5 ++ #[toExpr bound] ++ arguments.extract 5 10)
+      (arguments.extract 0 6 ++ #[toExpr bound] ++ arguments.extract 6 11)
     setGoals (← goal.withContext (goal.apply rule))
     evalTactic (← `(tactic| intro verexLoopFuel))
     queue (← getGoals) provenance clauses
@@ -1103,8 +1109,8 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
     | throwError m!"no invariant for the loop at site {site}"
   -- The invariant is stated over the loop's skolem instance: its frame's
   -- for an inlined generic callee.
-  let invariant ← atStart goal function (mkApp2 invariant arguments[0]! arguments[1]!) site
-    #[arguments[6]!, arguments[9]!]
+  let invariant ← atStart goal function (mkApp2 invariant arguments[0]! arguments[2]!) site
+    #[arguments[7]!, arguments[10]!]
   -- The invariant normalized once, as a predicate: the loop hypothesis
   -- states it at each back edge and the iteration assumes it, and the
   -- rule holds of any predicate.
@@ -1117,7 +1123,7 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   -- The loop's continuation is bound once, as a local definition the
   -- normalizer does not unfold: the loop hypothesis and every back edge
   -- carry it folded.
-  let ensures := arguments[7]!
+  let ensures := arguments[8]!
   let (continuation, goal) ← goal.withContext do
     let target ← instantiateMVars (← goal.getType)
     let defined ← goal.define continuationName (← inferType ensures) ensures
@@ -1125,11 +1131,11 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
     let abstracted := target.replace fun e =>
       if e == ensures then some (mkFVar continuation) else none
     pure (continuation, ← goal.replaceTargetDefEq abstracted)
-  let arguments := arguments.set! 7 (mkFVar continuation)
+  let arguments := arguments.set! 8 (mkFVar continuation)
   if ctx.profile then
     modify fun s => { s with continuations := s.continuations.folded continuation true }
   let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_loopAt)
-    (arguments.extract 0 7 ++ #[invariant] ++ arguments.extract 7 10)
+    (arguments.extract 0 8 ++ #[invariant] ++ arguments.extract 8 11)
   let subgoals ← goal.withContext (goal.apply rule)
   match subgoals with
   | [entryHolds, step] =>
@@ -1208,9 +1214,9 @@ private def assertionStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool 
   let some (_, function, condition) := ctx.invariants.find? (·.1 == site)
     | throwError m!"no condition for the assertion at site {site}"
   let condition ← resolveAnchors goal
-    (← atStart goal function (mkApp2 condition arguments[0]! arguments[1]!) site #[])
+    (← atStart goal function (mkApp2 condition arguments[0]! arguments[2]!) site #[])
   let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_assertAt)
-    (arguments.extract 0 6 ++ #[condition] ++ arguments.extract 6 9)
+    (arguments.extract 0 7 ++ #[condition] ++ arguments.extract 7 10)
   match ← goal.withContext (goal.apply rule) with
   | [holds, continues] =>
       setGoals [continues]
@@ -1232,7 +1238,7 @@ private def assertionStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool 
         -- The continuation is normalized where it is applied, as after
         -- a step; the row and state it is applied to are normal.
         let cut ← cutHypothesis? `assertionHolds
-        normalizeAround ctx.normalization #[arguments[5]!, arguments[8]!]
+        normalizeAround ctx.normalization #[arguments[6]!, arguments[9]!]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         renormalizeCut ctx.normalization cut
@@ -1268,19 +1274,19 @@ private def memoryWrittenStep (ctx : SolveContext) (step : SolveStep) : SolveM B
     | some (_, function, condition) =>
         if ← anchorRecorded goal site then
           resolveAnchors goal
-            (← atStart goal function (mkApp2 condition arguments[0]! arguments[1]!) site #[])
+            (← atStart goal function (mkApp2 condition arguments[0]! arguments[2]!) site #[])
         else goal.withContext do
-          withLocalDeclD `env (← inferType arguments[5]!) fun env =>
-          withLocalDeclD `state (mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) arguments[0]!)
+          withLocalDeclD `env (← inferType arguments[6]!) fun env =>
+          withLocalDeclD `state (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) arguments[0]! arguments[1]!)
             fun state =>
             mkLambdaFVars #[env, state] (mkConst ``True)
     | none => goal.withContext do
-        withLocalDeclD `env (← inferType arguments[5]!) fun env =>
-        withLocalDeclD `state (mkApp (mkConst ``VerexIR.Proofs.Denote.Memory) arguments[0]!)
+        withLocalDeclD `env (← inferType arguments[6]!) fun env =>
+        withLocalDeclD `state (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) arguments[0]! arguments[1]!)
           fun state =>
           mkLambdaFVars #[env, state] (mkConst ``True)
   let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_memoryWrittenAt)
-    (arguments.extract 0 6 ++ #[condition] ++ arguments.extract 6 9)
+    (arguments.extract 0 7 ++ #[condition] ++ arguments.extract 7 10)
   match ← goal.withContext (goal.apply rule) with
   | [holds, continues] =>
       setGoals [continues]
@@ -1289,7 +1295,7 @@ private def memoryWrittenStep (ctx : SolveContext) (step : SolveStep) : SolveM B
       evalTactic (← `(tactic| try verex_normalize at invariantHolds))
       unless (← getGoals).isEmpty do
         let cut ← cutHypothesis? `invariantHolds
-        normalizeAround ctx.normalization #[arguments[5]!, arguments[8]!]
+        normalizeAround ctx.normalization #[arguments[6]!, arguments[9]!]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         renormalizeCut ctx.normalization cut
@@ -1313,7 +1319,7 @@ private def ghostWriteStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
       evalTactic (← `(tactic| intro ghostValue ghostChosen))
       evalTactic (← `(tactic| try verex_normalize at ghostChosen))
       unless (← getGoals).isEmpty do
-        normalizeAround ctx.normalization #[arguments[7]!, arguments[10]!]
+        normalizeAround ctx.normalization #[arguments[8]!, arguments[11]!]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         queue (← getGoals) provenance clauses
@@ -1337,15 +1343,15 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
   let some (site, arguments, constructed) := check | return false
   let some (_, function, condition) := ctx.invariants.find? (·.1 == site)
     | throwError m!"no data invariant for the site {site}"
-  let condition ← atStart goal function (mkApp2 condition arguments[0]! arguments[1]!) site #[]
+  let condition ← atStart goal function (mkApp2 condition arguments[0]! arguments[2]!) site #[]
   let (rule, entry, initial, origin) := if constructed then
       (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_constructedAt)
-        (arguments.extract 0 8 ++ #[condition] ++ arguments.extract 8 11),
-        arguments[7]!, arguments[10]!, Provenance.construction)
+        (arguments.extract 0 9 ++ #[condition] ++ arguments.extract 9 12),
+        arguments[8]!, arguments[11]!, Provenance.construction)
     else
       (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_mutationEndAt)
-        (arguments.extract 0 6 ++ #[condition] ++ arguments.extract 6 9),
-        arguments[5]!, arguments[8]!, Provenance.mutationEnd)
+        (arguments.extract 0 7 ++ #[condition] ++ arguments.extract 7 10),
+        arguments[6]!, arguments[9]!, Provenance.mutationEnd)
   match ← goal.withContext (goal.apply rule) with
   | [holds, continues] =>
       setGoals [continues]
@@ -1371,15 +1377,15 @@ reading it. -/
 private def anchorStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
   let some (site, arguments) ← anchorGoal? goal | return false
-  let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_anchorAt) (arguments.extract 0 9)
+  let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_anchorAt) (arguments.extract 0 10)
   let [continues] ← goal.withContext (goal.apply rule)
     | throwError "the anchor rule did not produce its one obligation"
   let recorded ← continues.withContext do
-    let proof ← mkAppM ``AnchorSaved.intro #[Lean.toExpr site, arguments[5]!, arguments[8]!]
+    let proof ← mkAppM ``AnchorSaved.intro #[Lean.toExpr site, arguments[6]!, arguments[9]!]
     let (_, recorded) ← (← continues.assert `verexAnchor (← inferType proof) proof).intro1P
     pure recorded
   setGoals [recorded]
-  normalizeAround ctx.normalization #[arguments[5]!, arguments[8]!]
+  normalizeAround ctx.normalization #[arguments[6]!, arguments[9]!]
   queue (← getGoals) provenance clauses
   charge "anchor" stageStart
   return true
@@ -1397,9 +1403,6 @@ private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   let { goal, provenance, clauses, stageStart, .. } := step
   if ← scalarAt? (← contextFacts goal) goal then
     charge "scalar rows" stageStart
-    return true
-  if ← literalClosureTyped? goal then
-    charge "closure typing" stageStart
     return true
   if let some remaining ← routedClosureFrame? goal then
     queue remaining provenance (← withTargetClause goal clauses)
@@ -1471,7 +1474,7 @@ private def inlineRefinement (ctx : SolveContext) (step : SolveStep) (refinesPro
   setGoals [next]
   let compiled ← next.withContext do
     let body := ((← instantiateMVars (← next.getType)).getArg! 3)
-    pure (body.getArg! 4)
+    pure (body.getArg! 5)
   let lemmas ← compiledUnfoldLemmas compiled
   evalTactic (← `(tactic| try simp only [$lemmas,*, VerexIR.Proofs.Denote.Function.denoteWith,
     VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
@@ -1493,8 +1496,8 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
   -- checks — unifying the two here would unfold them in `isDefEq`.
   let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_propheticMeaning_of_compiled)
     #[action.getArg! 0, action.getArg! 1, action.getArg! 2, action.getArg! 3, action.getArg! 4,
-      compiled, theoremProof, action.getArg! 7, target.getArg! 4, target.getArg! 5,
-      target.getArg! 6]
+      action.getArg! 5, compiled, theoremProof, action.getArg! 8, target.getArg! 4,
+      target.getArg! 5, target.getArg! 6]
   let next ← goal.withContext do
     let .forallE _ premise _ _ := ← whnfR (← inferType rule)
       | throwError "the agreement rule does not take the callee's denotation"
@@ -1511,7 +1514,7 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
     let inlined ← getMainGoal
     let started ← inlined.withContext do
       let proof ← mkAppM ``FunctionStart.intro
-        #[action.getArg! 4, action.getArg! 7, target.getArg! 6]
+        #[action.getArg! 5, action.getArg! 8, target.getArg! 6]
       let (_, started) ← (← inlined.assert `verexStart (← inferType proof) proof).intro1P
       pure started
     replaceMainGoal [started]
@@ -1520,7 +1523,7 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
   if let some (_, condition) := precondition? then
     let started ← getMainGoal
     let owed ← atStart started handle
-      (mkApp2 condition (action.getArg! 0) (action.getArg! 2)) 0 #[]
+      (mkApp2 condition (action.getArg! 0) (action.getArg! 3)) 0 #[]
     let holds ← started.withContext (mkFreshExprSyntheticOpaqueMVar owed)
     let (_, continues) ← (← started.assert `calleeRequires owed holds).intro1P
     replaceMainGoal [continues]
@@ -1712,9 +1715,9 @@ private def inducedArguments? (proofType : Lean.Expr) :
     MetaM (Option (Lean.Expr × Lean.Expr)) := do
   let_expr VerexIR.Proofs.Satisfies args _ _ _ _ _ := ← whnfR proofType | return none
   let_expr VerexIR.Proofs.Denote.HList carriers _ := args.consumeMData | return none
-  let_expr VerexIR.Proofs.Denote.Skolems.toCarriers _ frame := carriers.consumeMData
+  let_expr VerexIR.Proofs.Denote.Skolems.toCarriers _ _ frame := carriers.consumeMData
     | return none
-  let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ θ outer := frame.consumeMData
+  let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := frame.consumeMData
     | return none
   return some (θ, outer)
 
@@ -1732,12 +1735,12 @@ private def specializedCall? (specializations : Array Lean.Expr) (theoremProof p
     let saved ← saveState
     let (arguments, _, statement) ← forallMetaTelescope (← inferType equivalence)
     let_expr VerexIR.Proofs.Contract.Equivalent _ _ _ _ _ read := statement | continue
-    let_expr VerexIR.Proofs.Contract.ofSkolem _ _ induced _ _ generic := read | continue
+    let_expr VerexIR.Proofs.Contract.ofSkolem _ _ _ induced _ _ generic := read | continue
     unless generic.getAppFn.constName? == some head do continue
     if (← isDefEq induced θ) && (← isDefEq generic contract) then
       let equivalent ← instantiateMVars (mkAppN equivalence arguments)
       let proof ← mkAppOptM ``VerexIR.Proofs.Denote.satisfies_specialized
-        #[none, some outer, some θ, none, none, none, none, none, some theoremProof,
+        #[none, none, some outer, some θ, none, none, none, none, none, some theoremProof,
           some equivalent]
       return some (θ, outer, proof)
     saved.restore
@@ -1775,7 +1778,7 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         let target ← instantiateMVars (← goal.getType)
         let action := (target.getArg! 3).consumeMData
         let rule ← mkAppOptM ``VerexIR.Proofs.Denote.wp_specialized
-          #[none, some outer, some θ, none, none, some action.appFn!, some action.appArg!,
+          #[none, none, some outer, some θ, none, none, some action.appFn!, some action.appArg!,
             some (target.getArg! 4), some (target.getArg! 5), some (target.getArg! 6)]
         let [next] ← goal.apply rule { newGoals := .nonDependentOnly }
           | throwError m!"the generic call of {calleeName} does not meet its specialized contract"
@@ -2022,7 +2025,7 @@ private def prepareAutomatic (ctx : SolveContext) (step : SolveStep) : SolveM Bo
   -- invariant must not exhaust the allowance of the other stored values.
   if (← writesStoredInvariants goal) ||
       (target.isArrow && target.bindingBody!.isAppOfArity
-        ``VerexIR.Proofs.Denote.MemoryInvariants 3) then return false
+        ``VerexIR.Proofs.Denote.MemoryInvariants 4) then return false
   if (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then return false
   let regions := (← get).regions
   if (target.find? fun term => regions.any (term.isAppOf ·.node.name)).isSome then return false
@@ -2395,6 +2398,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
           | .branch site taken => ctx.branchDecision site taken
           | .arm site variant => (ctx.siteNumber "match" site).map (.variant · variant)
           | .abort site => ctx.abortDecision site
+          | .dispatch site target => (ctx.siteNumber "invoke" site).map (.invoke · target)
           | .after _ => none
         modify fun s => { s with activeDecisions := s.activeDecisions ++ decisions }
         let after := marks.filterMap fun
@@ -3408,6 +3412,7 @@ syntax (name := decisionVariant) &"match" num ident : verexDecision
 syntax (name := decisionExits) &"loop" num &"exits" : verexDecision
 syntax (name := decisionContinues) &"loop" num &"continues" : verexDecision
 syntax (name := decisionAborts) &"aborts" &"at" verexSite : verexDecision
+syntax (name := decisionInvoke) &"invoke" num ident : verexDecision
 
 /-- The decision a selector's syntax states, a call without its callee
 counted among all calls. -/
@@ -3424,6 +3429,7 @@ def decisionPattern (stx : Syntax) : TacticM Decision :=
   | `(verexDecision| aborts at abort $k:num) => pure (.aborts (.abort k.getNat))
   | `(verexDecision| aborts at op $k:num) => pure (.aborts (.op k.getNat))
   | `(verexDecision| aborts at invoke $k:num) => pure (.aborts (.invoke k.getNat))
+  | `(verexDecision| invoke $k:num $target:ident) => pure (.invoke k.getNat target.getId.toString)
   | _ => throwErrorAt stx "unexpected decision"
 
 /-- An obligation an alternative of `verex_on` takes: by its key, or by its
