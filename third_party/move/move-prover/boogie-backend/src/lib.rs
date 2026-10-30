@@ -90,6 +90,11 @@ struct TypeInfo {
     name: String,
     suffix: String,
     has_native_equality: bool,
+    /// True iff a table key of this type may be encoded injectively through an
+    /// inverse function: raw equality is Move equality on every value. An
+    /// intrinsic map anywhere in the type rules this out even under native
+    /// equality, since its `Table` representation keeps values at removed keys.
+    key_inverse_encoding: bool,
     /// True iff the type transitively carries a ghost field. Templates
     /// comparing values of this type must use `$IsEqual'<suffix>'` instead of
     /// raw `==`: ghosts are constructor arguments, so raw equality would
@@ -627,12 +632,47 @@ pub fn add_prelude(
     Ok(())
 }
 
+/// Whether an intrinsic map occurs anywhere in `ty`: the type itself, a field of
+/// any variant, a vector element or a tuple component.
+fn contains_intrinsic_map(env: &GlobalEnv, ty: &Type) -> bool {
+    match ty {
+        Type::Struct(mid, sid, inst) => {
+            let struct_env = env.get_struct(mid.qualified(*sid));
+            if struct_env.is_intrinsic_of(move_model::pragmas::INTRINSIC_TYPE_MAP) {
+                return true;
+            }
+            let field_types: Vec<Type> = if struct_env.has_variants() {
+                struct_env
+                    .get_variants()
+                    .flat_map(|v| {
+                        struct_env
+                            .get_fields_of_variant(v)
+                            .map(|f| f.get_type().instantiate(inst))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect()
+            } else {
+                struct_env
+                    .get_fields()
+                    .map(|f| f.get_type().instantiate(inst))
+                    .collect()
+            };
+            field_types.iter().any(|t| contains_intrinsic_map(env, t))
+        },
+        Type::Vector(elem) => contains_intrinsic_map(env, elem),
+        Type::Tuple(elems) => elems.iter().any(|e| contains_intrinsic_map(env, e)),
+        _ => false,
+    }
+}
+
 impl TypeInfo {
     fn new(env: &GlobalEnv, options: &BoogieOptions, ty: &Type, bv_flag: bool) -> Self {
         Self {
             name: boogie_type(env, ty, bv_flag),
             suffix: boogie_type_suffix(env, ty, bv_flag),
             has_native_equality: has_native_equality(env, options, ty),
+            key_inverse_encoding: has_native_equality(env, options, ty)
+                && !contains_intrinsic_map(env, ty),
             has_ghost: crate::bytecode_translator::type_has_ghost_transitively(env, ty),
             is_bv: bv_flag && ty.is_number(),
             is_type_param: matches!(ty, Type::TypeParameter(_)),
