@@ -172,7 +172,7 @@ theorem frameInstantiation_of_faithful {unit : ValidatedUnit} {function : Functi
       exact interned index bounded
 
 /-- What `closureSignature?` reads: a function's parameter and result types,
-its results no reference, its types mentioning only its own type parameters
+its types mentioning only its own type parameters
 with nodes. -/
 theorem closureSignature?_eq_some {unit : ValidatedUnit} {function : FunctionHandle}
     {parameters results : List NTy}
@@ -190,17 +190,15 @@ theorem closureSignature?_eq_some {unit : ValidatedUnit} {function : FunctionHan
           (paramNodeIn? unit function.namespaceId index).isSome) = true := by
   simp only [closureSignature?, Option.bind_eq_bind, Option.bind_eq_some_iff, guard,
     Option.pure_def] at signature
-  obtain ⟨targetNs, namespace_eq, declaration, declaration_eq, read, readParameters, _,
-    plain, readResults, readResults_eq, _, bounded, final⟩ := signature
-  split at plain
-  · split at bounded
-    · next mentions =>
-        simp only [Option.some.injEq, Prod.mk.injEq] at final
-        obtain ⟨rfl, rfl⟩ := final
-        exact ⟨targetNs, declaration, namespace_eq, declaration_eq, readParameters,
-          readResults_eq, mentions⟩
-    · cases bounded
-  · cases plain
+  obtain ⟨targetNs, namespace_eq, declaration, declaration_eq, read, readParameters,
+    readResults, readResults_eq, _, bounded, final⟩ := signature
+  split at bounded
+  · next mentions =>
+      simp only [Option.some.injEq, Prod.mk.injEq] at final
+      obtain ⟨rfl, rfl⟩ := final
+      exact ⟨targetNs, declaration, namespace_eq, declaration_eq, readParameters,
+        readResults_eq, mentions⟩
+  · cases bounded
 
 mutual
 /-- A type substituted at its allowed parameters by closed types is closed. -/
@@ -567,7 +565,7 @@ the captured row's values are, and the function type's rows reading as the
 supplied parameters and the results. -/
 theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans : LoanTypes}
     {function : FunctionHandle} {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)}
-    {captures : Array RuntimeValue} {parameters : NRow} {shared : List Bool} {results : NRow}
+    {captures : Array RuntimeValue} {parameters : NRow} {shared : Sharing} {results : NRow}
     (admitted : NTy.admits unit (.function parameters shared results)
       (.closure function mask typeInstantiation captures) = true)
     (typedCaptures : ∀ (row : NRow) (types : List SemTy),
@@ -586,8 +584,9 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
       mask < 2 ^ declaration.signature.parameters.size ∧
       (∃ represented : Array RuntimeValue, represented.map (normalize unit) = captures ∧
         HasTypes unit loans represented.toList (ClosureMask.extract mask true allParameters)) ∧
-      parameters.ParametersTypedAs unit shared (ClosureMask.extract mask false allParameters) ∧
-      results.TypedAs unit targetResults := by
+      parameters.ParametersTypedAs unit shared.parameters
+        (ClosureMask.extract mask false allParameters) ∧
+      results.ParametersTypedAs unit shared.results targetResults := by
   unfold NTy.admits at admitted
   simp only [Bool.and_eq_true] at admitted
   obtain ⟨faithful, rowsAdmitted⟩ := admitted
@@ -607,7 +606,7 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
       · next genericParameters genericResults genericSignature =>
           simp only [Bool.and_eq_true] at agreesAt
           have parametersTyped := NRow.parametersTypedAs_of_check _ _ _ agreesAt.1
-          have resultsTyped := NRow.typedAs_of_check _ _ agreesAt.2
+          have resultsTyped := NRow.parametersTypedAs_of_check _ _ _ agreesAt.2
           let semArguments := frameSemArguments unit function typeInstantiation targetNs
             declaration.signature.generics
           have arguments := argumentsAgree_of_faithful agree namespace_eq declaration_eq faithful
@@ -617,14 +616,18 @@ theorem closureReading {unit : ValidatedUnit} (agree : TypesAgree unit) {loans :
           have resultsMentioned := ofList_paramsAll _ allMentioned.2
           have parametersAt := NRow.ParametersTypedAs.subst arguments parametersTyped
             parametersMentioned
-          have resultsAt := NRow.TypedAs.subst arguments resultsTyped resultsMentioned
+          have resultsAt := NRow.ParametersTypedAs.subst arguments resultsTyped resultsMentioned
           rw [NRow.ofList_substWith] at parametersAt resultsAt
           have suppliedTyped := ParametersTypedAs.extract mask false parametersAt
           rw [extract_map, ← NRow.ofList_substWith] at suppliedTyped
           have sharing : closureShared unit function mask =
-              ClosureMask.extract mask false (parameterSharing unit function declaration) := by
-            simp [closureShared, namespace_eq, declaration_eq, parameterSharing]
-          rw [suppliedEq, ← sharing, sharingEq] at suppliedTyped
+              { parameters := ClosureMask.extract mask false
+                  (parameterSharing unit function declaration)
+                results := resultSharing unit function declaration } := by
+            simp [closureShared, namespace_eq, declaration_eq, parameterSharing, resultSharing]
+          rw [sharingEq] at sharing
+          subst sharing
+          rw [suppliedEq] at suppliedTyped
           rw [← NRow.ofList_substWith, returnedEq] at resultsAt
           have closedArguments : ∀ index,
               targetParameter unit function declaration.signature.generics index = true →
@@ -746,7 +749,7 @@ theorem admits_enum {unit : ValidatedUnit} {source : StructHandle} {arguments : 
       | none => simp [NTy.admits] at admitted
   | _ => simp [NTy.admits] at admitted
 
-theorem admits_function {unit : ValidatedUnit} {parameters : NRow} {shared : List Bool}
+theorem admits_function {unit : ValidatedUnit} {parameters : NRow} {shared : Sharing}
     {results : NRow} {value : RuntimeValue}
     (admitted : NTy.admits unit (.function parameters shared results) value = true) :
     ∃ function mask typeInstantiation captures,
@@ -760,12 +763,12 @@ theorem admits_function {unit : ValidatedUnit} {parameters : NRow} {shared : Lis
 /-- A frame's function value is admitted at the frame's resolution of its
 function type: its transport to the runtime family keeps its encoding. -/
 theorem Skolems.admits_carrier {unit : ValidatedUnit} [Θ : Skolems unit]
-    {parameters results : NRow} {shared : List Bool}
-    (closure : (NTy.function parameters shared results).carrier) :
+    {parameters results : NRow} {shared : Sharing}
+    (function : (NTy.function parameters shared results).carrier) :
     NTy.admits unit (.function parameters.resolved shared results.resolved)
-      closure.val.encode = true := by
+      ((Carriers.functions parameters shared results).closure function).encode = true := by
   have admitted : NTy.admits unit (Θ.resolve (.function parameters shared results))
-      (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ closure)) = true :=
+      (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ function)) = true :=
     NTy.admits_encode unit _ _
   rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq] at admitted
   simpa only [NTy.substWith, NRow.resolved_eq_substWith, Skolems.type] using admitted
@@ -785,16 +788,17 @@ theorem Denote.NRow.TypedAs.scalarTypes_eq {unit : ValidatedUnit} :
 by its carrier where the unit's readings agree, as the rule for an unseen
 invocation takes it. -/
 theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : TypesAgree unit)
-    (representable : OwnersRepresentable unit) {parameters results : NRow} {shared : List Bool}
-    (closure : (NTy.function parameters shared results).carrier)
+    (representable : OwnersRepresentable unit) {parameters results : NRow} {shared : Sharing}
+    (function : (NTy.function parameters shared results).carrier)
     (resultsFree : results.refFree = true) (parametersScalar : ScalarAt unit parameters)
     (resultsScalar : ScalarAt unit results) :
-    ClosureTypedAt unit parameters results closure.val := by
+    ClosureTypedAt unit parameters shared results function := by
   intro _ _
   obtain ⟨parameterTypes, parametersScalar⟩ := Option.isSome_iff_exists.mp parametersScalar
   obtain ⟨resultTypes, resultsScalar⟩ := Option.isSome_iff_exists.mp resultsScalar
-  have admitted := Skolems.admits_carrier closure
-  obtain ⟨⟨function, mask, typeInstantiation, captures, plain⟩, typed⟩ := closure
+  have admitted := Skolems.admits_carrier function
+  generalize (Carriers.functions parameters shared results).closure function = closure at admitted ⊢
+  obtain ⟨function, mask, typeInstantiation, captures, plain⟩ := closure
   simp only [ClosureValue.encode] at admitted
   obtain ⟨targetNs, declaration, arguments, allParameters, targetResults, namespace_eq,
       declaration_eq, signature_eq, faithful, bound, capturesTyped, parametersTyped,
@@ -803,14 +807,14 @@ theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : 
       NRow.represented_of_admits representable agree captures.toList row capturesAdmitted rowTyped
         rowClosed rowPlain
   have observed := (ParametersTypedAs.observed parametersTyped).scalarTypes_eq parametersScalar
-  have results_eq := resultsTyped.scalarTypes_eq resultsScalar
+  have results_eq := (ParametersTypedAs.observed resultsTyped).scalarTypes_eq resultsScalar
   subst results_eq
   refine ⟨parameterTypes, targetResults, ClosureMask.extract mask false allParameters, observed,
     ⟨targetNs, declaration, arguments, allParameters, namespace_eq, declaration_eq, signature_eq,
       faithful, bound, capturesTyped, rfl⟩,
     RowTyped.ofResolved parametersScalar, fun shape row => ?_⟩
   subst row
-  exact RowDecodes.ofResolved shape resultsFree resultsScalar
+  exact RowDecodes.ofObserved (RowDecodes.ofResolved shape resultsFree resultsScalar)
 
 /-- Every runtime encoding of a memory has a typed representation, for a unit
 whose resource types correspond to their keys' types and whose typed values

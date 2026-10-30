@@ -23,20 +23,40 @@ namespace VerexIR.Proofs
 
 open VerexIR.Validation
 
-/-- An VIR failure outcome: the throw kind with its payload. -/
-abbrev Failure := ThrowKind × Array RuntimeValue
+/-- A runtime failure outcome: the throw kind with its payload. -/
+abbrev RuntimeFailure := ThrowKind × Array RuntimeValue
+
+/-- A failure outcome of the denotation: the throw kind with its integer
+payload, an abort's code or the failed operation's operands. -/
+abbrev Failure := ThrowKind × Array Int
+
+/-- A failure of a throw kind with integer arguments. -/
+def Failure.ofInts (kind : ThrowKind) (values : Array Int) : Failure := (kind, values)
+
+/-- The runtime failure a failure is: its integers as runtime integers. -/
+def Failure.encode (failure : Failure) : RuntimeFailure :=
+  (failure.1, failure.2.map RuntimeValue.integer)
+
+theorem Failure.encode_injective : Function.Injective Failure.encode := by
+  intro left right same
+  obtain ⟨kind, values⟩ := left
+  obtain ⟨kind', values'⟩ := right
+  simp only [Failure.encode, Prod.mk.injEq] at same
+  obtain ⟨rfl, same⟩ := same
+  refine Prod.ext rfl ?_
+  exact (Array.map_inj_right fun _ _ equal => RuntimeValue.integer.inj equal).mp same
 
 /-- The contract shape of an VIR function: runtime state, throw failures,
 argument and result value rows. -/
 abbrev FunctionContract :=
-  Contract RuntimeState Failure (Array RuntimeValue) (Array RuntimeValue)
+  Contract RuntimeState RuntimeFailure (Array RuntimeValue) (Array RuntimeValue)
 
 /-- A typed representation of a function's inputs at an instantiation: a
 typed start and arguments typed at the function's parameter types under
 every environment faithful to the instantiation, normalizing to the inputs
 (`SemanticOperations.normalize`). The runtime runs the Move representation
 of every value; the function meaning reads its runs at the abstract values
-the representation normalizes to (`designs/intrinsic-maps.md`, "Abstract
+the representation normalizes to (`doc/designs/intrinsic-maps.md`, "Abstract
 representation"). -/
 structure Represents (unit : ValidatedUnit) (function : FunctionHandle)
     (typeInstantiation : Array (TypeId × TypeId)) (start : RuntimeState)
@@ -73,7 +93,7 @@ the throwing ones as failures with the final state quantified away. -/
 def functionSpecAt {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     (function : FunctionHandle)
     (typeInstantiation : Array (TypeId × TypeId)) (arguments : Array RuntimeValue) :
-    Spec RuntimeState Failure (Array RuntimeValue) where
+    Spec RuntimeState RuntimeFailure (Array RuntimeValue) where
   ok := fun initial results final =>
     functionRuns executable function typeInstantiation initial arguments final (.returned results)
   aborts := fun initial failure =>
@@ -85,7 +105,7 @@ judgment. -/
 def functionSpec {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     (function : FunctionHandle)
     (arguments : Array RuntimeValue) :
-    Spec RuntimeState Failure (Array RuntimeValue) :=
+    Spec RuntimeState RuntimeFailure (Array RuntimeValue) :=
   functionSpecAt executable function #[] arguments
 
 /-- The M1 executable subset owes no unchecked proofs. -/
@@ -170,7 +190,7 @@ theorem run_of_functionSpec_ok {unit : ValidatedUnit} {executable : ExecutableUn
 from a typed representation of the start on one of the arguments. -/
 theorem run_of_functionSpec_aborts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {function : FunctionHandle} {inputs : Array RuntimeValue}
-    {initial : RuntimeState} {failure : Failure}
+    {initial : RuntimeState} {failure : RuntimeFailure}
     (h : (functionSpec executable function inputs).aborts initial failure) :
     ∃ start arguments payload fuel finalState outcome,
       Represents unit function #[] start arguments initial inputs ∧

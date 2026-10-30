@@ -110,8 +110,8 @@ A model holds beside what the native's specification states, as the
 prelude defines a native whatever its specification adds. The prelude's
 injectivity of the hashes is contradictory with their fixed length; a
 function assumes it of its parameters instead (`moveCollisionFreeHashes`).
-The prelude's injectivity and length axioms of `serialize`, and the
-concrete names the Prover computes for concrete types, are not mirrored. -/
+The concrete names the Prover computes for concrete types are not
+mirrored. -/
 def moveNativeModels : List (String × NativeModel) := [
   ("0x1::hash::sha2_256", .uninterpreted (some 32)),
   ("0x1::hash::sha3_256", .uninterpreted (some 32)),
@@ -120,6 +120,30 @@ def moveNativeModels : List (String × NativeModel) := [
   ("0x1::type_info::type_of",
     .uninterpreted (abortsUnless := some "0x1::type_info::spec_is_struct")),
   ("0x1::cmp::compare", .structuralOrder)]
+
+/-- The meaning the Move Prover's prelude gives a specification function
+beyond an uninterpreted one. -/
+inductive SpecificationModel where
+  /-- A byte vector of the value that is never empty, and nothing else
+  (`VerexIR.Proofs.serializedBytes`). The prelude also states the serialization
+  injective and every address of one length, which no function into
+  bounded byte vectors is of every value; a function assumes those of its
+  parameters instead (`Contract.serializeFacts`). -/
+  | serialization
+  deriving Repr, Inhabited
+
+/-- The Move Prover's meanings of specification functions, by qualified
+name: `bcs::serialize`, of which the prelude states every value's
+serialization not empty. -/
+def moveSpecificationModels : List (String × SpecificationModel) := [
+  ("0x1::bcs::serialize", .serialization)]
+
+/-- The prelude's meaning of a specification function of `profile`, if it
+gives one beyond an uninterpreted one. -/
+def specificationModel? (profile : Option Profile) (key : String) : Option SpecificationModel :=
+  match profile with
+  | some .move => (moveSpecificationModels.find? (·.1 == key)).map (·.2)
+  | _ => none
 
 /-- The hashes a Move function that applies them assumes collision-free on
 its byte-vector parameters (decided 2026-10-02). The Move Prover assumes

@@ -12,7 +12,7 @@ import VerexIR.Validation.TableRoles
 A table is a value: its owner's value holds its identity, a handle or the
 placeholder field of an owner declared without fields, its cached length
 where the owner declares one, and its entries in a hidden last field
-(`designs/intrinsic-maps.md`, "Tables in the runtime semantics"). A function
+(`doc/designs/intrinsic-maps.md`, "Tables in the runtime semantics"). A function
 bound to an executable role of a table owner (`tableRole?`) is provided by
 the runtime, not run from its body: the role's meaning on that value by the
 map model (`Maps`), the meaning the verifier reads the role by. Allocation

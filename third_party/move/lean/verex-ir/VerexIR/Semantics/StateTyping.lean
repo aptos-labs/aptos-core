@@ -7,7 +7,7 @@ import VerexIR.Semantics.ValueTyping
 # Typed frames and states
 
 The invariants preservation threads through evaluation
-(`designs/static-typing.md`, Phase 3), and the operations' lemmas over them.
+(`doc/historical/static-typing.md`, Phase 3), and the operations' lemmas over them.
 A frame types its initialized locals at their declared types under the
 frame's semantic arguments; a state types global memory at its keys' types
 and pending write-backs at their loans' referents, every loan below the

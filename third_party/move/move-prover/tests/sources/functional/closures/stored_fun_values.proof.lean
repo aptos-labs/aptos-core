@@ -11,7 +11,7 @@ open VerexIR.Proofs.Denote
 -- A frame can change a resource with a trivial invariant while preserving
 -- the invariants of every other resource.
 theorem stored_invariants_outside {unit : Validation.ValidatedUnit}
-    {invariant : ResourceType → RuntimeValue → Prop}
+    {invariant : (resource : ResourceType) → resource.carrier unit → Prop}
     {initial final : Memory unit}
     {modified : ResourceType}
     (frame : ∀ resource, resource ≠ modified → final resource = initial resource)

@@ -10,7 +10,7 @@ import VerexIR.Validation.MapOwners
 The runtime's values are read up to a normalization: every value of an
 intrinsic map owner is replaced by the canonical value of its abstract
 layout, its entries, ghost slots, and handle read off the concrete shape
-(`designs/intrinsic-maps.md`, "Abstract representation"). The agreement
+(`doc/designs/intrinsic-maps.md`, "Abstract representation"). The agreement
 relates runtime values to the denotation's through it.
 -/
 

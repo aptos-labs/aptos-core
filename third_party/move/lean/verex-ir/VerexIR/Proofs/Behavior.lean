@@ -8,775 +8,27 @@ import VerexIR.Proofs.Denote.Closures
 # Behavioral predicates
 
 The behavior of a function value as a specification states it
-(`designs/higher-order-functions.md`, "Behavioral predicates and state
-labels"): `aborts_of`, `ensures_of`, and `result_of` are defined from the
-invocation's big-step meaning on runtime values, from the starts a call
-runs from (`Denote.closureMeaning`), exactly and without axioms. Of a
-closure whose target, weave, and captures a proof sees, they are runs of
-the target's prophetic meaning, which its theorem speaks about.
+(`doc/designs/higher-order-functions.md`, "Behavioral predicates and state
+labels"): `aborts_of`, `ensures_of`, `result_of`, and `requires_of`, over an
+invocation meaning (`Denote.InvokeMeaning`) on native arguments and
+results. The executable meaning is `Denote.closureMeaning`, the big-step
+run of the value's closure from the starts a call runs from; a unit
+verified through its model invokes through the model's meaning. Of a
+function value whose target, weave, and captures a proof sees, the
+executable meaning is a run of the target's prophetic meaning
+(`Denote.closureRun_closureOf`), which its theorem speaks about.
+
+A mutable reference argument is its entry and final values, a returned one
+its value at return and its prophecy, as everywhere in the denotation.
 -/
 
 namespace VerexIR.Proofs
 
 open VerexIR.Validation (ExecutableUnit ValidatedUnit)
-
-/-- A literal callable's encoding with its specification type retained as
-an elaboration hint. This asserts no typing property: invocation rules
-still establish the closure's typing independently. -/
-abbrev Denote.ClosureValue.encodeFor (_type : Denote.NTy) (closure : Denote.ClosureValue) : RuntimeValue :=
-  closure.encode
-
-/-- An invocation of a function value on supplied arguments, as the big-step
-semantics runs it: the closure's target under the instantiation the closure
-fixed, on the captures and the arguments composed by its mask. A value that
-is not a closure, and arguments the mask does not compose with, have no
-execution. -/
-def invocationSpec {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (callable : RuntimeValue)
-    (arguments : List RuntimeValue) : Spec RuntimeState Failure (Array RuntimeValue) :=
-  match callable with
-  | .closure function mask typeInstantiation captures =>
-      match ClosureMask.compose mask captures.toList arguments with
-      | some composed => functionSpecAt executable function typeInstantiation composed.toArray
-      | none => Spec.bottom
-  | _ => Spec.bottom
-
-/-- A start an invocation runs from, as a call's does: globals and Table
-storage encoding the memory, with loan bookkeeping that lends nothing (`Denote.Admissible`). -/
-def StartsAt {unit : ValidatedUnit} (start : RuntimeState) (memory : Denote.Memory unit) : Prop :=
-  Denote.StorageEncodes unit memory start ∧ Denote.Admissible start []
-
-/-- `aborts_of<f>(x)`: the invocation aborts from a start at `memory`. -/
-def AbortsOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
-    (arguments : List RuntimeValue)
-    (memory : Denote.Memory unit) : Prop :=
-  ∃ start failure, StartsAt start memory ∧
-    (invocationSpec executable callable arguments).aborts start failure
-
-/-- `ensures_of<f>(x, r)`: the invocation returns `results` from a start at
-`pre` and leaves the memory `post`. -/
-def EnsuresOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
-    (arguments : List RuntimeValue)
-    (results : Array RuntimeValue) (pre post : Denote.Memory unit) : Prop :=
-  ∃ start exit, StartsAt start pre ∧ (invocationSpec executable callable arguments).ok start results exit ∧
-    Denote.StorageEncodesReturned unit post exit results ∧ Denote.AgreeUnnamed unit post pre
-
-open Classical in
-/-- `result_of<f>(x)`: results the invocation returns from a start at
-`memory`; unspecified when it returns none. -/
-noncomputable def ResultOf {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (callable : RuntimeValue)
-    (arguments : List RuntimeValue) (state : Denote.Memory unit) : Array RuntimeValue :=
-  if returns : ∃ results post, EnsuresOf executable callable arguments results state post
-  then returns.choose else #[]
-
-open Classical in
-/-- The post-state of a successful invocation, sharing `ResultOf`'s choice.
-On an invocation with no successful execution this defaults to its pre-state;
-using the label does not assume that the invocation succeeds. -/
-noncomputable def StateOf {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (callable : RuntimeValue) (arguments : List RuntimeValue)
-    (state : Denote.Memory unit) : Denote.Memory unit :=
-  if returns : ∃ results post, EnsuresOf executable callable arguments results state post
-  then returns.choose_spec.choose else state
-
-/-- Where the invocation returns, `result_of` names results it returns. -/
-theorem ensuresOf_resultOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    {callable : RuntimeValue}
-    {arguments : List RuntimeValue} {results : Array RuntimeValue} {pre post : Denote.Memory unit}
-    (ensures : EnsuresOf executable callable arguments results pre post) :
-    ∃ post, EnsuresOf executable callable arguments (ResultOf executable callable arguments pre) pre post := by
-  have returns : ∃ results post, EnsuresOf executable callable arguments results pre post :=
-    ⟨results, post, ensures⟩
-  unfold ResultOf
-  rw [dif_pos returns]
-  exact returns.choose_spec
-
-/-- Declared preconditions by target: a function's at its arguments. A
-unit's table names the targets its closures have whose contracts state no
-behavioral predicate, and holds `True` for every other function. -/
-abbrev RequiresTable (unit : Validation.ValidatedUnit) :=
-  FunctionHandle → Array RuntimeValue → Denote.Memory unit → Prop
-
-/-- `requires_of<f>(x)`: the declared precondition of the closure's target,
-read from a table, at the captures and the arguments composed by its mask;
-`True` where there is none to read. -/
-def RequiresOf {unit : Validation.ValidatedUnit} (table : RequiresTable unit)
-    (callable : RuntimeValue) (arguments : List RuntimeValue)
-    (state : Denote.Memory unit) : Prop :=
-  match callable with
-  | .closure function mask _ captures =>
-      match ClosureMask.compose mask captures.toList arguments with
-      | some composed => table function composed.toArray state
-      | none => True
-  | _ => True
-
-/-- `requires_of` holds of every function value where the table declares no
-precondition of any target. -/
-theorem requiresOf_of_table {unit : Validation.ValidatedUnit} (table : RequiresTable unit)
-    (everywhere : ∀ handle arguments state, table handle arguments state)
-    (callable : RuntimeValue) (arguments : List RuntimeValue) (state : Denote.Memory unit) :
-    RequiresOf table callable arguments state := by
-  unfold RequiresOf
-  split <;> (try trivial)
-  split
-  · exact everywhere _ _ _
-  · trivial
-
-/-! ## Invocations lending mutable references
-
-A function value whose parameters include mutable references is invoked as a
-call invokes its target: each `&mut` argument is lent under a loan of its
-own and passes its entry value; its final value is the one the run exports
-for that loan, the holes of the references the run returns filled
-(`Denote.argumentsResolve`). `mutable` marks the supplied arguments that are
-mutable references; the predicates read their entry values among the
-arguments and their final values in order, as the Move Prover lays out
-`ensures_of<f>(inputs, results, finals)`. `mutableResults` marks the results
-that are mutable references, which the predicates read as their referents'
-values at return (`readResults`). -/
-
-/-- The supplied arguments with each mutable one lent under the next loan,
-as a borrow of its entry value; and the loans left. -/
-def lendMutable : List Bool → List RuntimeValue → List Nat → Option (List RuntimeValue × List Nat)
-  | [], [], loans => some ([], loans)
-  | true :: mutable, entry :: arguments, loan :: loans =>
-      (lendMutable mutable arguments loans).map fun lent => (.borrow loan entry :: lent.1, lent.2)
-  | false :: mutable, argument :: arguments, loans =>
-      (lendMutable mutable arguments loans).map fun lent => (argument :: lent.1, lent.2)
-  | _, _, _ => none
-
-/-- The results a behavioral predicate reads of returned values: a mutable
-reference, where `mutable` marks one, as its referent's value at return
-(`RuntimeValue.observe`), as the Move Prover reads a reference result; any
-other result as returned. -/
-def readResults : List Bool → List RuntimeValue → List RuntimeValue
-  | true :: mutable, value :: values => value.observe :: readResults mutable values
-  | false :: mutable, value :: values => value :: readResults mutable values
-  | _, values => values
-
-/-- Results none of which is a mutable reference are read as returned. -/
-theorem readResults_of_all_false : {mutable : List Bool} → (∀ marked ∈ mutable, marked = false) →
-    (values : List RuntimeValue) → readResults mutable values = values
-  | [], _, values => by cases values <;> rfl
-  | marked :: mutable, unmarked, values => by
-      have plain : marked = false := unmarked marked (by simp)
-      subst plain
-      cases values with
-      | nil => rfl
-      | cons value values =>
-          simp only [readResults, List.cons.injEq, true_and]
-          exact readResults_of_all_false
-            (fun marked member => unmarked marked (by simp [member])) values
-
-/-- Lent loans resolve at final values, in order, as lent arguments do
-(`Denote.argumentsResolve`): the run exported each loan with a value that,
-the returned references' holes filled, is its final value, or returned the
-loan carrying it. -/
-def ResolvesAt (returned : Array RuntimeValue) (exports : List (Nat × RuntimeValue)) :
-    List Nat → List RuntimeValue → Prop
-  | _, [] => True
-  | [], _ :: _ => False
-  | loan :: loans, final :: finals =>
-      (match Denote.exportedRaw? loan exports with
-        | some exported => SemanticOperations.resolveReturnedBorrows returned exported = final
-        | none => ∃ entry ∈ returned.toList,
-            (loan, final) ∈ (SemanticOperations.outermostBorrows entry).toList) ∧
-      ResolvesAt returned exports loans finals
-
-/-- `aborts_of<f>(x)` of a function value taking mutable references: the
-invocation lending them aborts from a start at `memory`. -/
-def AbortsOfMut {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
-    (mutable : List Bool) (arguments : List RuntimeValue) (memory : Denote.Memory unit) : Prop :=
-  ∃ start loans lent failure,
-    Denote.StorageEncodes unit memory start ∧ Denote.Admissible start loans ∧
-    lendMutable mutable arguments loans = some (lent, []) ∧
-    (invocationSpec executable callable lent).aborts start failure
-
-/-- `ensures_of<f>(x, r, y)` of a function value taking or returning mutable
-references: the invocation lending them returns results read as `results`
-from a start at `pre`, leaves the memory `post`, and the references at
-`finals`. -/
-def EnsuresOfMut {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
-    (mutable mutableResults : List Bool) (arguments : List RuntimeValue)
-    (results : Array RuntimeValue) (finals : List RuntimeValue) (pre post : Denote.Memory unit) :
-    Prop :=
-  ∃ start loans lent returned exit,
-    Denote.StorageEncodes unit pre start ∧ Denote.Admissible start loans ∧
-    lendMutable mutable arguments loans = some (lent, []) ∧
-    (invocationSpec executable callable lent).ok start returned exit ∧
-    results = (readResults mutableResults returned.toList).toArray ∧
-    ResolvesAt returned (Denote.exportsAfter start.pending exit.pending) loans finals ∧
-    Denote.StorageEncodesReturned unit post exit returned ∧ Denote.AgreeUnnamed unit post pre
-
-open Classical in
-/-- `result_of<f>(x)` of a function value taking or returning mutable
-references: results the invocation returns from a start at `memory`, read
-as `EnsuresOfMut` reads them; unspecified when it returns none. -/
-noncomputable def ResultOfMut {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (callable : RuntimeValue) (mutable mutableResults : List Bool) (arguments : List RuntimeValue)
-    (state : Denote.Memory unit) : Array RuntimeValue :=
-  if returns : ∃ results finals post,
-      EnsuresOfMut executable callable mutable mutableResults arguments results finals state post
-  then returns.choose else #[]
-
-/-- Where the invocation returns, `result_of` names results it returns. -/
-theorem ensuresOfMut_resultOfMut {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    {callable : RuntimeValue} {mutable mutableResults : List Bool} {arguments : List RuntimeValue}
-    {results : Array RuntimeValue} {finals : List RuntimeValue} {pre post : Denote.Memory unit}
-    (ensures : EnsuresOfMut executable callable mutable mutableResults arguments results finals
-      pre post) :
-    ∃ finals post, EnsuresOfMut executable callable mutable mutableResults arguments
-      (ResultOfMut executable callable mutable mutableResults arguments pre) finals pre post := by
-  have returns : ∃ results finals post,
-      EnsuresOfMut executable callable mutable mutableResults arguments results finals pre post :=
-    ⟨results, finals, post, ensures⟩
-  unfold ResultOfMut
-  rw [dif_pos returns]
-  exact returns.choose_spec
-
-section
 open Denote
 
-/-- The positions of a parameter row that are mutable references. -/
-def Denote.NRow.mutable : NRow → List Bool
-  | .nil => []
-  | .cons (.ref _) rest => true :: rest.mutable
-  | .cons _ rest => false :: rest.mutable
-
-/-- A row without references marks none of its positions mutable. -/
-theorem Denote.NRow.mutable_refFree : (row : NRow) → row.refFree = true →
-    ∀ marked ∈ row.mutable, marked = false
-  | .nil, _, _, member => nomatch member
-  | .cons τ rest, free, marked, member => by
-      simp only [NRow.refFree, Bool.and_eq_true] at free
-      cases τ <;> simp only [NTy.refFree, Bool.false_eq_true, false_and] at free <;>
-        simp only [NRow.mutable, List.mem_cons] at member <;>
-        rcases member with rfl | member <;>
-        first | rfl | exact NRow.mutable_refFree rest free.2 marked member
-
-/-- A parameter row each element of which is a mutable reference or holds
-none, as a function's parameters are. -/
-def Denote.NRow.lentFlat : NRow → Bool
-  | .nil => true
-  | .cons (.ref _) rest => rest.lentFlat
-  | .cons τ rest => τ.refFree && rest.lentFlat
-
+section
 variable [Carriers]
-
-/-- The values a row of arguments passes: a mutable reference's entry value,
-any other argument's encoding. -/
-def Denote.HList.entries : {row : NRow} → HList row → List RuntimeValue
-  | .nil, _ => []
-  | .cons (.ref σ) _, values => σ.encode values.1.1 :: HList.entries values.2
-  | .cons τ _, values => τ.encode values.1 :: HList.entries values.2
-
-/-- The final values of a row's mutable references, in order. -/
-def Denote.HList.finals : {row : NRow} → HList row → List RuntimeValue
-  | .nil, _ => []
-  | .cons (.ref σ) _, values => σ.encode values.1.2 :: HList.finals values.2
-  | .cons _ _, values => HList.finals values.2
-
-end
-
-section
-open Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
-
-/-- A flat row lends as its entries, each mutable one under the next loan. -/
-theorem Denote.NRow.lend_lentFlat : (row : NRow) → row.lentFlat = true → (values : HList row) →
-    (loans : List Nat) →
-    NRow.lend row false values loans = lendMutable row.mutable (HList.entries values) loans
-  | .nil, _, _, _ => rfl
-  | .cons τ rest, flat, values, loans => by
-      cases τ with
-      | ref σ =>
-          simp only [NRow.lentFlat] at flat
-          cases loans with
-          | nil => rfl
-          | cons loan loans =>
-              simp only [NRow.lend, NTy.lend, Option.bind_some, NRow.mutable, HList.entries,
-                lendMutable, NRow.lend_lentFlat rest flat values.2 loans, ite_false,
-                Bool.false_eq_true]
-      | _ =>
-          simp only [NRow.lentFlat, Bool.and_eq_true] at flat
-          simp only [NRow.lend, NTy.lend_refFree _ flat.1, Option.bind_some, NRow.mutable,
-            HList.entries, lendMutable, NRow.lend_lentFlat rest flat.2 values.2 loans]
-
-/-- A row's references resolve as its final values do. -/
-theorem argumentsResolve_finals : (row : NRow) → (values : HList row) → (loans : List Nat) →
-    (returned : Array RuntimeValue) → (exports : List (Nat × RuntimeValue)) →
-    (argumentsResolve row values loans returned exports ↔
-      ResolvesAt returned exports loans (HList.finals values))
-  | .nil, _, _, _, _ => by simp [argumentsResolve, HList.finals, ResolvesAt]
-  | .cons τ rest, values, loans, returned, exports => by
-      have later := argumentsResolve_finals rest values.2
-      cases τ <;> cases loans <;>
-        simp only [argumentsResolve, HList.finals, ResolvesAt, later]
-      -- The two sides' matches on the export are separate but equal auxiliaries.
-      all_goals exact Iff.rfl
-end
-
-section
-open Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
-
-/-- The invocation of a closure whose target, weave, and captures a proof
-sees, on lent supplied arguments, runs the target on the woven row, which
-lends as the woven arguments. -/
-theorem invocationSpec_closureOf_lent {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (args : HList supplied) {loans : List Nat} {lent : List RuntimeValue}
-    (lends : lendMutable supplied.mutable (HList.entries args) loans = some (lent, [])) :
-    lendArguments full (weave.compose captures args) loans =
-        some (weave.composeList (HList.encode captures) lent).toArray ∧
-      invocationSpec executable (closureOf handle weave.mask typeInstantiation captures).encode lent =
-        functionSpecAt executable handle typeInstantiation
-          (weave.composeList (HList.encode captures) lent).toArray := by
-  rw [← NRow.lend_lentFlat supplied suppliedFlat args loans] at lends
-  refine ⟨?_, ?_⟩
-  · unfold lendArguments
-    rw [weave.lend_compose capturedFree captures args loans, lends]
-    rfl
-  · simp only [invocationSpec, ClosureValue.encode, closureOf]
-    rw [weave.compose_mask _ _ (HList.encode_length captured captures)
-      (NRow.lend_length supplied false args loans _ lends)]
-
-end
-
-section
-open Denote
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
-
-/-- `requires_of` of a closure whose target, weave, and captures a proof sees
-is the target's declared precondition at the captures and the arguments
-woven into its parameter row. -/
-theorem requiresOf_closureOf (table : RequiresTable unit) (handle : FunctionHandle)
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (arguments : List RuntimeValue) (state : Memory unit)
-    (lengths : arguments.length = supplied.length) :
-    RequiresOf table (closureOf handle weave.mask typeInstantiation captures).encode arguments
-        state =
-      table handle (weave.composeList (HList.encode captures) arguments).toArray state := by
-  simp only [RequiresOf, ClosureValue.encode, closureOf, List.toList_toArray]
-  rw [weave.compose_mask _ _ (HList.encode_length captured captures) lengths]
-
-/-- A woven row lent under no loans resolves every argument: none is a
-reference. -/
-private theorem argumentsResolve_refFree : (row : NRow) → row.refFree = true →
-    (values : HList row) → (returned : Array RuntimeValue) → (exports : List (Nat × RuntimeValue)) →
-    argumentsResolve row values [] returned exports
-  | .nil, _, _, _, _ => trivial
-  | .cons _ rest, free, values, returned, exports => by
-      simp only [NRow.refFree, Bool.and_eq_true] at free
-      exact (argumentsResolve_cons_refFree free.1 values [] returned exports).mpr
-        (argumentsResolve_refFree rest free.2 values.2 returned exports)
-
-/-- The woven row of reference-free captures and arguments lends as the
-woven encodings. -/
-theorem lendArguments_weave {full captured supplied : NRow}
-    (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
-    (suppliedFree : supplied.refFree = true) (captures : HList captured) (args : HList supplied) :
-    lendArguments full (weave.compose captures args) [] =
-      some (weave.composeList (HList.encode captures) (HList.encode args)).toArray := by
-  unfold lendArguments
-  rw [weave.lend_compose capturedFree, NRow.lend_refFree supplied suppliedFree]
-  rfl
-
-/-- The invocation of a closure whose target, weave, and captures a proof
-sees, on reference-free arguments, runs the target on the woven row. -/
-theorem invocationSpec_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (args : HList supplied) :
-    invocationSpec executable (closureOf handle weave.mask typeInstantiation captures).encode
-        (HList.encode args) =
-      functionSpecAt executable handle typeInstantiation
-        (weave.composeList (HList.encode captures) (HList.encode args)).toArray := by
-  simp only [invocationSpec, ClosureValue.encode, closureOf, List.toList_toArray]
-  rw [weave.compose_mask _ _ (HList.encode_length captured captures)
-    (HList.encode_length supplied args)]
-
-/-- The invocation of a literal closure is that of the function value
-naming its target, capturing nothing, at the woven arguments. -/
-theorem invocationSpec_closureOf_woven {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (arguments : List RuntimeValue) (lengths : arguments.length = supplied.length) :
-    invocationSpec executable (closureOf handle weave.mask typeInstantiation captures).encode
-        arguments =
-      invocationSpec executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-        (σs := .nil) ()).encode (weave.composeList (HList.encode captures) arguments) := by
-  have woven := weave.composeList_length (HList.encode captures) arguments
-    (HList.encode_length captured captures) lengths
-  simp only [invocationSpec, ClosureValue.encode, closureOf]
-  rw [weave.compose_mask _ _ (HList.encode_length captured captures) lengths,
-    (Weave.supplying full).compose_mask _ _ (HList.encode_length .nil ()) woven,
-    HList.encode_nil, Weave.composeList_supplying]
-
-/-- `aborts_of` of a literal closure, as of the function value naming its
-target at the woven arguments. -/
-theorem abortsOf_closureOf_woven {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (arguments : List RuntimeValue) (lengths : arguments.length = supplied.length)
-    (state : Denote.Memory unit) :
-    AbortsOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-        arguments state =
-      AbortsOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-        (σs := .nil) ()).encode (weave.composeList (HList.encode captures) arguments) state := by
-  simp only [AbortsOf, invocationSpec_closureOf_woven weave typeInstantiation captures arguments
-    lengths]
-
-/-- `ensures_of` of a literal closure, as of the function value naming its
-target at the woven arguments. -/
-theorem ensuresOf_closureOf_woven {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (arguments : List RuntimeValue) (lengths : arguments.length = supplied.length)
-    (results : Array RuntimeValue) (pre post : Denote.Memory unit) :
-    EnsuresOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-        arguments results pre post =
-      EnsuresOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-        (σs := .nil) ()).encode (weave.composeList (HList.encode captures) arguments) results
-        pre post := by
-  simp only [EnsuresOf, invocationSpec_closureOf_woven weave typeInstantiation captures arguments
-    lengths]
-
-/-- `aborts_of` of a literal closure capturing a value, as of the function
-value naming its target at the woven arguments. -/
-theorem abortsOf_closureOf_captured {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full : NRow} {τ : NTy} {captured supplied : NRow}
-    (weave : Weave full (.cons τ captured) supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList (.cons τ captured))
-    (arguments : List RuntimeValue) (lengths : arguments.length = supplied.length)
-    (state : Denote.Memory unit) :
-    AbortsOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-        arguments state =
-      AbortsOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-        (σs := .nil) ()).encode (weave.composeList (HList.encode captures) arguments) state :=
-  abortsOf_closureOf_woven weave typeInstantiation captures arguments lengths state
-
-/-- `ensures_of` of a literal closure capturing a value, as of the function
-value naming its target at the woven arguments. -/
-theorem ensuresOf_closureOf_captured {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full : NRow} {τ : NTy} {captured supplied : NRow}
-    (weave : Weave full (.cons τ captured) supplied)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList (.cons τ captured))
-    (arguments : List RuntimeValue) (lengths : arguments.length = supplied.length)
-    (results : Array RuntimeValue) (pre post : Denote.Memory unit) :
-    EnsuresOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-        arguments results pre post =
-      EnsuresOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-        (σs := .nil) ()).encode (weave.composeList (HList.encode captures) arguments) results
-        pre post :=
-  ensuresOf_closureOf_woven weave typeInstantiation captures arguments lengths results pre post
-
-/-- `ensures_of` of a closure whose target, weave, and captures a proof sees,
-at reference-free arguments and result, is a run of the target's prophetic
-meaning at a frame coherent with the closure's instantiation. -/
-theorem ensuresOf_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {τ : NTy} (resultFree : τ.refFree = true) (typeInstantiation : Array (TypeId × TypeId))
-    (coherent : Coherent unit handle typeInstantiation)
-    (captures : HList captured) (args : HList supplied) (result : τ.carrier)
-    {pre post : Memory unit}
-    (ensures : EnsuresOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-      (HList.encode args) #[τ.encode result] pre post) :
-    (propheticMeaning executable typeInstantiation handle full (.one τ)
-      (weave.compose captures args)).ok pre result post := by
-  obtain ⟨start, exit, ⟨globals, admissible⟩, runs, encoded, agree⟩ := ensures
-  rw [invocationSpec_closureOf] at runs
-  have lent : ResultShape.lend (.one τ) false result [] = some #[τ.encode result] := by
-    simp only [ResultShape.lend, NTy.lend_refFree τ resultFree]
-  have prophesied : ResultShape.lend (.one τ) true result [] = some #[τ.encode result] := by
-    simp only [ResultShape.lend, NTy.lend_refFree τ resultFree]
-  refine ⟨coherent, start, [], _, _, exit, [], _, globals, admissible,
-    lendArguments_weave weave capturedFree suppliedFree captures args, runs, lent, prophesied,
-    ?_, encoded, agree⟩
-  exact (weave.argumentsResolve_compose capturedFree captures args [] _ _).mpr
-    (argumentsResolve_refFree supplied suppliedFree args _ _)
-
-/-- `aborts_of` of a closure whose target, weave, and captures a proof sees,
-at reference-free arguments, is an abort of the target's prophetic meaning at
-a frame coherent with the closure's instantiation. -/
-theorem abortsOf_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    (shape : ResultShape) (typeInstantiation : Array (TypeId × TypeId))
-    (coherent : Coherent unit handle typeInstantiation)
-    (captures : HList captured) (args : HList supplied) {state : Memory unit}
-    (aborts : AbortsOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-      (HList.encode args) state) :
-    ∃ failure, (propheticMeaning executable typeInstantiation handle full shape
-      (weave.compose captures args)).aborts state failure := by
-  obtain ⟨start, failure, ⟨globals, admissible⟩, runs⟩ := aborts
-  rw [invocationSpec_closureOf] at runs
-  exact ⟨failure, coherent, start, [], _, globals, admissible,
-    lendArguments_weave weave capturedFree suppliedFree captures args, runs⟩
-
-/-- `ensures_of` of a closure whose target is verified: where what the
-target's theorem assumes and its precondition hold, what its contract
-ensures of the run, and that no condition under which it must abort held. -/
-theorem ensuresOf_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {τ : NTy} (resultFree : τ.refFree = true) (typeInstantiation : Array (TypeId × TypeId))
-    (coherent : Coherent unit handle typeInstantiation)
-    (captures : HList captured) (args : HList supplied) (result : τ.carrier)
-    {pre post : Memory unit} {contract : Contract (Memory unit) Failure (HList full) τ.carrier}
-    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full (.one τ)) contract)
-    (ensures : EnsuresOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-      (HList.encode args) #[τ.encode result] pre post)
-    (assumed : contract.assumes (weave.compose captures args) pre)
-    (permitted : contract.requires (weave.compose captures args) pre) :
-    (¬contract.mayAbort (weave.compose captures args) pre →
-        contract.ensures (weave.compose captures args) pre result post) ∧
-      contract.frame (weave.compose captures args) pre result post ∧
-      ¬contract.mustAbort (weave.compose captures args) pre :=
-  (verified _ pre assumed permitted).1 result post
-    (ensuresOf_closureOf weave capturedFree suppliedFree resultFree typeInstantiation coherent
-      captures args result ensures)
-
-/-- `aborts_of` of a closure whose target is verified: where what the
-target's theorem assumes and its precondition hold, a failure its contract
-permits. -/
-theorem abortsOf_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (capturedFree : captured.refFree = true) (suppliedFree : supplied.refFree = true)
-    {shape : ResultShape} (typeInstantiation : Array (TypeId × TypeId))
-    (coherent : Coherent unit handle typeInstantiation)
-    (captures : HList captured) (args : HList supplied) {state : Memory unit}
-    {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
-    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
-    (aborts : AbortsOf executable (closureOf handle weave.mask typeInstantiation captures).encode
-      (HList.encode args) state)
-    (assumed : contract.assumes (weave.compose captures args) state)
-    (permitted : contract.requires (weave.compose captures args) state) :
-    ∃ failure, contract.aborts (weave.compose captures args) state failure := by
-  obtain ⟨failure, runs⟩ := abortsOf_closureOf weave capturedFree suppliedFree shape
-    typeInstantiation coherent captures args aborts
-  exact ⟨failure, (verified _ state assumed permitted).2.1 failure runs⟩
-
-/-- The arguments of a row without references lend as their encodings, and
-only under no loans. -/
-private theorem lendArguments_refFree {row : NRow} (free : row.refFree = true)
-    {args : HList row} {loans : List Nat} {arguments : Array RuntimeValue}
-    (lent : lendArguments row args loans = some arguments) :
-    loans = [] ∧ arguments = (HList.encode args).toArray := by
-  unfold lendArguments at lent
-  rw [NRow.lend_refFree row free false args loans] at lent
-  cases loans with
-  | nil => exact ⟨rfl, (Option.some.inj lent).symm⟩
-  | cons _ _ => exact absurd lent (by simp)
-
-/-- A run of a target that takes and returns no reference is a run of the
-function value naming it: `ensures_of` of that value at the call's
-arguments. -/
-theorem ensuresOf_of_run {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
-    {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} (fullFree : full.refFree = true)
-    {shape : ResultShape} (shapeFree : shape.row.refFree = true) {args : HList full}
-    {result : shape.carrier} {pre final : Memory unit}
-    (runs : (propheticMeaning executable typeInstantiation handle full shape args).ok pre result final) :
-    EnsuresOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-      (σs := .nil) ()).encode (HList.encode args) ((resultCodec shape).encode result) pre final := by
-  obtain ⟨-, start, loans, arguments, results, exit, returnedLoans, prophecyRow, globals, admissible,
-    lent, ran, resultsLent, prophecyLent, -, encoded, agree⟩ := runs
-  obtain ⟨rfl, rfl⟩ := lendArguments_refFree fullFree lent
-  rw [ResultShape.lend_refFree_view shape shapeFree, resultsLent] at prophecyLent
-  have sameRow : prophecyRow = results := (Option.some.inj prophecyLent).symm
-  subst prophecyRow
-  have returned : results = (resultCodec shape).encode result := by
-    cases shape with
-    | none =>
-        cases returnedLoans with
-        | nil => exact (Option.some.inj resultsLent).symm
-        | cons _ _ => exact absurd resultsLent (by simp [ResultShape.lend])
-    | one τ =>
-        have resultFree : τ.refFree = true := by
-          simpa only [ResultShape.row, NRow.refFree, Bool.and_true] using shapeFree
-        simp only [ResultShape.lend, NTy.lend_refFree τ resultFree] at resultsLent
-        cases returnedLoans with
-        | nil => exact (Option.some.inj resultsLent).symm
-        | cons _ _ => exact absurd resultsLent (by simp)
-  subst returned
-  refine ⟨start, exit, ⟨globals, admissible⟩, ?_, encoded, agree⟩
-  rw [invocationSpec_closureOf (Weave.supplying full) typeInstantiation () args,
-    HList.encode_nil, Weave.composeList_supplying]
-  exact ran
-
-/-- An abort of a target that takes no reference is an abort of the function
-value naming it: `aborts_of` of that value at the call's arguments. -/
-theorem abortsOf_of_abort {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
-    {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} (fullFree : full.refFree = true)
-    {shape : ResultShape} {args : HList full} {pre : Memory unit} {failure : Failure}
-    (aborts : (propheticMeaning executable typeInstantiation handle full shape args).aborts pre failure) :
-    AbortsOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-      (σs := .nil) ()).encode (HList.encode args) pre := by
-  obtain ⟨-, start, loans, arguments, globals, admissible, lent, ran⟩ := aborts
-  obtain ⟨rfl, rfl⟩ := lendArguments_refFree fullFree lent
-  refine ⟨start, failure, ⟨globals, admissible⟩, ?_⟩
-  rw [invocationSpec_closureOf (Weave.supplying full) typeInstantiation () args,
-    HList.encode_nil, Weave.composeList_supplying]
-  exact ran
-
-/-- Where a target that takes and returns no reference is called, the run is
-one of the function value naming the target: the continuations may assume
-its `ensures_of` where the call returns and its `aborts_of` where it aborts. -/
-theorem wp_named {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
-    {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} {shape : ResultShape}
-    (fullFree : full.refFree = true) (shapeFree : shape.row.refFree = true) {args : HList full}
-    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
-    {initial : Memory unit}
-    (named : wp (propheticMeaning executable typeInstantiation handle full shape args)
-      (fun result final =>
-        EnsuresOf executable (ClosureValue.encode (closureOf handle
-          (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
-          (HList.encode args) ((resultCodec shape).encode result) initial final →
-        ensures result final)
-      (fun error =>
-        AbortsOf executable (ClosureValue.encode (closureOf handle
-          (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
-          (HList.encode args) initial → aborts error)
-      initial) :
-    wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts initial :=
-  ⟨fun result final execution =>
-      named.1 result final execution (ensuresOf_of_run fullFree shapeFree execution),
-    fun error execution => named.2.1 error execution (abortsOf_of_abort fullFree execution),
-    named.2.2⟩
-
-/-- A result's values as a behavioral predicate reads a run's
-(`readResults`): a returned mutable reference as its current value. -/
-def Denote.ResultShape.current : (shape : ResultShape) → shape.carrier → Array RuntimeValue
-  | .none, _ => #[]
-  | .one (.ref σ), value => #[σ.encode value.1]
-  | .one τ, value => #[τ.encode value]
-
-/-! ## Behavioral predicates over an invocation meaning
-
-In a unit verified through its model (`designs/ghost-fields.md`), an
-invocation means what the model's invocation meaning says, and the
-behavioral predicates are stated over it. Of a literal closure of a routed
-target they reduce to the target's meaning on the woven arguments
-(`Denote.invokeAt`). -/
-
-/-- A unit verified through its model (`designs/ghost-fields.md`): its
-executable, which its contracts read the unit from, and the meaning of
-invoking a function value at every family. A contract of such a unit that
-reads the unit takes a model where another takes the executable. -/
-structure ModelUnit (unit : ValidatedUnit) where
-  executable : ExecutableUnit unit
-  invoke : (Θ : Skolems unit) → @Denote.InvokeMeaning unit Θ
-
-section Model
-variable {unit : ValidatedUnit} [Skolems unit]
-
-/-- `ensures_of<f>(x, r)` over an invocation meaning: the value's invocation
-at the row and shape, on arguments encoding `x`, runs from `pre` to `post`
-returning a result encoding `r`. -/
-def EnsuresOfAt (invoke : Denote.InvokeMeaning) (σs : NRow) (shape : ResultShape)
-    (callable : RuntimeValue) (arguments : List RuntimeValue) (results : Array RuntimeValue)
-    (pre post : Denote.Memory unit) : Prop :=
-  ∃ (closure : ClosureValue) (args : HList σs) (result : shape.carrier),
-    closure.encode = callable ∧ HList.encode args = arguments ∧
-      (resultCodec shape).encode result = results ∧
-      (invoke closure σs shape args).ok pre result post
-
-/-- `aborts_of<f>(x)` over an invocation meaning: the value's invocation on
-arguments encoding `x` aborts from `state`. -/
-def AbortsOfAt (invoke : Denote.InvokeMeaning) (σs : NRow) (shape : ResultShape)
-    (callable : RuntimeValue) (arguments : List RuntimeValue) (state : Denote.Memory unit) : Prop :=
-  ∃ (closure : ClosureValue) (args : HList σs) (failure : Failure),
-    closure.encode = callable ∧ HList.encode args = arguments ∧
-      (invoke closure σs shape args).aborts state failure
-
-open Classical in
-/-- `result_of<f>(x)` over an invocation meaning: results the invocation
-returns from `state`; unspecified when it returns none. -/
-noncomputable def ResultOfAt (invoke : Denote.InvokeMeaning) (σs : NRow) (shape : ResultShape)
-    (callable : RuntimeValue) (arguments : List RuntimeValue) (state : Denote.Memory unit) :
-    Array RuntimeValue :=
-  if returns : ∃ results post, EnsuresOfAt invoke σs shape callable arguments results state post
-  then returns.choose else #[]
-
-open Classical in
-/-- The post-state of a successful invocation, sharing `ResultOfAt`'s choice. -/
-noncomputable def StateOfAt (invoke : Denote.InvokeMeaning) (σs : NRow) (shape : ResultShape)
-    (callable : RuntimeValue) (arguments : List RuntimeValue) (state : Denote.Memory unit) :
-    Denote.Memory unit :=
-  if returns : ∃ results post, EnsuresOfAt invoke σs shape callable arguments results state post
-  then returns.choose_spec.choose else state
-
-/-- `ensures_of` of a literal closure at native arguments and result is a
-run of its invocation. -/
-theorem ensuresOfAt_closureOf (invoke : Denote.InvokeMeaning) {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied) (ρ : ResultShape)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (args : HList supplied) (result : ρ.carrier) {pre post : Denote.Memory unit} :
-    EnsuresOfAt invoke supplied ρ (closureOf handle weave.mask typeInstantiation captures).encode
-        (HList.encode args) ((resultCodec ρ).encode result) pre post ↔
-      (invoke (closureOf handle weave.mask typeInstantiation captures) supplied ρ args).ok pre
-        result post := by
-  constructor
-  · rintro ⟨closure, args', result', encodes, argsEncode, resultEncodes, run⟩
-    cases ClosureValue.encode_injective encodes
-    cases (rowCodec supplied).encode_injective argsEncode
-    cases (resultCodec ρ).encode_injective resultEncodes
-    exact run
-  · intro run
-    exact ⟨_, _, _, rfl, rfl, rfl, run⟩
-
-/-- `aborts_of` of a literal closure at native arguments is an abort of its
-invocation. -/
-theorem abortsOfAt_closureOf (invoke : Denote.InvokeMeaning) {handle : FunctionHandle}
-    {full captured supplied : NRow} (weave : Weave full captured supplied) (ρ : ResultShape)
-    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
-    (args : HList supplied) {state : Denote.Memory unit} :
-    AbortsOfAt invoke supplied ρ (closureOf handle weave.mask typeInstantiation captures).encode
-        (HList.encode args) state ↔
-      ∃ failure, (invoke (closureOf handle weave.mask typeInstantiation captures) supplied ρ
-        args).aborts state failure := by
-  constructor
-  · rintro ⟨closure, args', failure, encodes, argsEncode, aborted⟩
-    cases ClosureValue.encode_injective encodes
-    cases (rowCodec supplied).encode_injective argsEncode
-    exact ⟨failure, aborted⟩
-  · rintro ⟨failure, aborted⟩
-    exact ⟨_, _, failure, rfl, rfl, aborted⟩
-
-/-- Where an invocation over a meaning returns, `result_of` names results it
-returns. -/
-theorem ensuresOfAt_resultOfAt {invoke : Denote.InvokeMeaning} {σs : NRow} {shape : ResultShape}
-    {callable : RuntimeValue} {arguments : List RuntimeValue} {results : Array RuntimeValue}
-    {pre post : Denote.Memory unit}
-    (ensures : EnsuresOfAt invoke σs shape callable arguments results pre post) :
-    ∃ post, EnsuresOfAt invoke σs shape callable arguments
-      (ResultOfAt invoke σs shape callable arguments pre) pre post := by
-  have returns : ∃ results post, EnsuresOfAt invoke σs shape callable arguments results pre post :=
-    ⟨results, post, ensures⟩
-  unfold ResultOfAt
-  rw [dif_pos returns]
-  exact returns.choose_spec
-
-end Model
 
 /-- A result whose returned mutable reference has its current value as its
 prophecy, as the reference's death leaves it (`Term.resolve`). -/
@@ -784,149 +36,720 @@ def Denote.ResultShape.Settled : (shape : ResultShape) → shape.carrier → Pro
   | .one (.ref _), value => value.1 = value.2
   | _, _ => True
 
--- The solver reads a lending call's named run at concrete rows and results.
-attribute [vir_denote_norm] Denote.NRow.mutable Denote.HList.entries Denote.HList.finals
-  Denote.ResultShape.current Denote.ResultShape.Settled
+/-- A value with a mutable reference's prophecy replaced by its entry value:
+an argument as `aborts_of` and `result_of` read it, which no final value
+names. -/
+def Denote.NTy.settle : (τ : NTy) → τ.carrier → τ.carrier
+  | .ref _, value => (value.1, value.1)
+  | .unit, value => value
+  | .bool, value => value
+  | .int _ _, value => value
+  | .num, value => value
+  | .address, value => value
+  | .signer, value => value
+  | .string, value => value
+  | .bytes, value => value
+  | .tuple _, value => value
+  | .struct _ _ _, value => value
+  | .enum _ _ _ _ _, value => value
+  | .vector _, value => value
+  | .table _ _, value => value
+  | .ghost _, value => value
+  | .param _, value => value
+  | .function _ _ _, value => value
 
-/-- A result read as values holds no loan. -/
-theorem Denote.ResultShape.current_plain : (shape : ResultShape) → (result : shape.carrier) →
-    ∀ value ∈ shape.current result, SemanticOperations.Plain value
-  | .none, _, _, member => by simp [ResultShape.current] at member
-  | .one τ, result, value, member => by
-      cases τ <;> simp only [ResultShape.current, List.mem_toArray, List.mem_singleton] at member <;>
-        subst member <;> exact NTy.encode_plain _ _
-
-/-- A settled result lends its prophecies as its current values. -/
-theorem Denote.ResultShape.lend_settled : (shape : ResultShape) → shape.row.lentFlat = true →
-    (result : shape.carrier) → shape.Settled result → (loans : List Nat) →
-    shape.lend true result loans = shape.lend false result loans
-  | .none, _, _, _, loans => by cases loans <;> rfl
-  | .one τ, flat, result, settled, loans => by
-      cases τ with
-      | ref σ =>
-          simp only [ResultShape.Settled] at settled
-          cases loans <;> simp [ResultShape.lend, NTy.lend, settled]
-      | _ =>
-          simp only [NRow.lentFlat, Bool.and_true] at flat
-          simp only [ResultShape.lend, NTy.lend_refFree _ flat]
-
-/-- A result lent at its current values reads as them. -/
-theorem Denote.ResultShape.readResults_lend : (shape : ResultShape) → shape.row.lentFlat = true →
-    (result : shape.carrier) → (loans : List Nat) → {results : Array RuntimeValue} →
-    shape.lend false result loans = some results →
-    readResults shape.row.mutable results.toList = (shape.current result).toList
-  | .none, _, _, loans, results, lent => by
-      cases loans <;> simp only [ResultShape.lend, Option.some.injEq, reduceCtorEq] at lent
-      subst lent
-      rfl
-  | .one τ, flat, result, loans, results, lent => by
-      cases τ with
-      | ref σ =>
-          match loans, lent with
-          | [], lent => simp [ResultShape.lend, NTy.lend] at lent
-          | loan :: rest, lent =>
-              cases rest <;> simp only [ResultShape.lend, NTy.lend, Option.some.injEq,
-                reduceCtorEq] at lent
-              subst lent
-              simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
-                RuntimeValue.observe, RuntimeValue.observe_of_plain (NTy.encode_plain σ result.1),
-                ResultShape.current, NTy.encode]
-      | _ =>
-          simp only [NRow.lentFlat, Bool.and_true] at flat
-          simp only [ResultShape.lend, NTy.lend_refFree _ flat] at lent
-          cases loans <;> simp only [Option.some.injEq, reduceCtorEq] at lent
-          subst lent
-          rfl
-
-/-- The arguments of a flat row lend as its entries, each mutable one under
-the next loan. -/
-theorem lendArguments_lentFlat {row : NRow} (flat : row.lentFlat = true) {args : HList row}
-    {loans : List Nat} {arguments : Array RuntimeValue}
-    (lent : lendArguments row args loans = some arguments) :
-    ∃ lentRow, lendMutable row.mutable (HList.entries args) loans = some (lentRow, []) ∧
-      arguments = lentRow.toArray := by
-  unfold lendArguments at lent
-  rw [NRow.lend_lentFlat row flat args loans] at lent
-  match lends : lendMutable row.mutable (HList.entries args) loans, lent with
-  | some (lentRow, []), lent => exact ⟨lentRow, rfl, (Option.some.inj lent).symm⟩
-  | some (_, _ :: _), lent => exact absurd lent (by simp)
-  | none, lent => exact absurd lent (by simp)
-
-/-- A run of a target taking and returning mutable references, or values
-holding none, whose returned references are settled, is a run of the
-function value naming it: `ensures_of` of that value at the call's entry
-values, its results' current values, and its references' final values. -/
-theorem ensuresOfMut_of_run {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
-    (fullFlat : full.lentFlat = true) {shape : ResultShape} (shapeFlat : shape.row.lentFlat = true)
-    {args : HList full} {result : shape.carrier} {pre final : Memory unit}
-    (runs : (propheticMeaning executable typeInstantiation handle full shape args).ok pre result final)
-    (settled : shape.Settled result) :
-    EnsuresOfMut executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-        (σs := .nil) ()).encode full.mutable shape.row.mutable (HList.entries args)
-      (shape.current result) (HList.finals args) pre final := by
-  obtain ⟨-, start, loans, arguments, results, exit, returnedLoans, prophecyRow, globals, admissible,
-    lent, ran, resultsLent, prophecyLent, resolves, encoded, agree⟩ := runs
-  rw [ResultShape.lend_settled shape shapeFlat result settled, resultsLent] at prophecyLent
-  have sameRow : prophecyRow = results := (Option.some.inj prophecyLent).symm
-  subst sameRow
-  obtain ⟨lentRow, lends, rfl⟩ := lendArguments_lentFlat fullFlat lent
-  obtain ⟨-, invocation⟩ := invocationSpec_closureOf_lent (Weave.supplying full) rfl fullFlat
-    typeInstantiation () args (executable := executable) (handle := handle) lends
-  refine ⟨start, loans, lentRow, prophecyRow, exit, globals, admissible, lends, ?_, ?_,
-    (argumentsResolve_finals full args loans _ _).mp resolves, encoded, agree⟩
-  · rw [invocation, HList.encode_nil, Weave.composeList_supplying]
-    exact ran
-  · rw [ResultShape.readResults_lend shape shapeFlat result returnedLoans resultsLent,
-      Array.toArray_toList]
-
-/-- An abort of a target taking mutable references, or values holding none,
-is an abort of the function value naming it: `aborts_of` of that value at
-the call's entry values. -/
-theorem abortsOfMut_of_abort {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)}
-    {full : NRow} (fullFlat : full.lentFlat = true) {shape : ResultShape} {args : HList full}
-    {pre : Memory unit} {failure : Failure}
-    (aborts : (propheticMeaning executable typeInstantiation handle full shape args).aborts pre failure) :
-    AbortsOfMut executable (closureOf handle (Weave.supplying full).mask typeInstantiation
-      (σs := .nil) ()).encode full.mutable (HList.entries args) pre := by
-  obtain ⟨-, start, loans, arguments, globals, admissible, lent, ran⟩ := aborts
-  obtain ⟨lentRow, lends, rfl⟩ := lendArguments_lentFlat fullFlat lent
-  obtain ⟨-, invocation⟩ := invocationSpec_closureOf_lent (Weave.supplying full) rfl fullFlat
-    typeInstantiation () args (executable := executable) (handle := handle) lends
-  refine ⟨start, loans, lentRow, failure, globals, admissible, lends, ?_⟩
-  rw [invocation, HList.encode_nil, Weave.composeList_supplying]
-  exact ran
-
-/-- Where a target taking mutable references, or values holding none, and
-returning one or a value holding none is called, the run is one of the
-function value naming the target: the continuations may assume its
-`ensures_of` where the call returns with its returned reference settled, and
-its `aborts_of` where it aborts. -/
-theorem wp_named_mut {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
-    {shape : ResultShape} (fullFlat : full.lentFlat = true) (shapeFlat : shape.row.lentFlat = true)
-    {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
-    {initial : Memory unit}
-    (named : wp (propheticMeaning executable typeInstantiation handle full shape args)
-      (fun result final =>
-        (shape.Settled result →
-          EnsuresOfMut executable (ClosureValue.encode (closureOf handle
-            (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
-            full.mutable shape.row.mutable (HList.entries args) (shape.current result)
-            (HList.finals args) initial final) →
-        ensures result final)
-      (fun error =>
-        AbortsOfMut executable (ClosureValue.encode (closureOf handle
-          (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
-          full.mutable (HList.entries args) initial → aborts error)
-      initial) :
-    wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts initial :=
-  ⟨fun result final execution =>
-      named.1 result final execution (ensuresOfMut_of_run fullFlat shapeFlat execution),
-    fun error execution => named.2.1 error execution (abortsOfMut_of_abort fullFlat execution),
-    named.2.2⟩
+/-- A row of arguments, each settled. -/
+def Denote.HList.settle : (row : NRow) → HList row → HList row
+  | .nil, values => values
+  | .cons τ rest, values => HList.cons (τ.settle values.1) (HList.settle rest values.2)
 
 end
+
+section
+variable {unit : ValidatedUnit} [Skolems unit]
+
+/-- `ensures_of<f>(x, r)`: the invocation of `function` on `args` runs from
+`pre` to `post`, returning `result`. -/
+def EnsuresOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function σs shared shape.row).carrier) (args : HList σs) (result : shape.carrier)
+    (pre post : Memory unit) : Prop :=
+  (invoke σs shared shape function args).ok pre result post
+
+/-- `aborts_of<f>(x)`: the invocation of `function` on `args` aborts from
+`state`. -/
+def AbortsOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function σs shared shape.row).carrier) (args : HList σs) (state : Memory unit) : Prop :=
+  ∃ error, (invoke σs shared shape function args).aborts state error
+
+/-- A run `result_of` and `state_of` read: from `state`, on arguments of the
+entry values of `args`, returning a settled result. -/
+def SettledRun (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function σs shared shape.row).carrier) (args : HList σs) (state : Memory unit)
+    (run : HList σs × shape.carrier × Memory unit) : Prop :=
+  HList.settle σs run.1 = HList.settle σs args ∧ shape.Settled run.2.1 ∧
+    EnsuresOf invoke σs shared shape function run.1 run.2.1 state run.2.2
+
+/-- A run's encodings: its arguments', its result's, and its final memory,
+which every view of a frame holds alike. -/
+def runEncoding (σs : NRow) (shape : ResultShape) (run : HList σs × shape.carrier × Memory unit) :
+    List RuntimeValue × Array RuntimeValue × Memory unit :=
+  (HList.encode run.1, (Denote.resultCodec shape).encode run.2.1, run.2.2)
+
+/-- The encodings of the settled runs `result_of` and `state_of` read. -/
+def SettledEncoding (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier) (args : HList σs)
+    (state : Memory unit) (encoded : List RuntimeValue × Array RuntimeValue × Memory unit) : Prop :=
+  ∃ run, SettledRun invoke σs shared shape function args state run ∧
+    runEncoding σs shape run = encoded
+
+open Classical in
+/-- `result_of<f>(x)`: the result of a settled run on the entry values of
+`args` from `state`, chosen among the runs' encodings, so that every view of
+a frame names the same run; `default` where there is none. -/
+noncomputable def ResultOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier) (args : HList σs)
+    (state : Memory unit) (default : shape.carrier) : shape.carrier :=
+  if returns : ∃ encoded, SettledEncoding invoke σs shared shape function args state encoded then
+    ((Denote.resultCodec shape).decode? returns.choose.2.1).getD default
+  else default
+
+open Classical in
+/-- The post-state of the run `result_of` reads; the pre-state where there is
+none, so that using the label does not assume that the invocation returns. -/
+noncomputable def StateOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier) (args : HList σs)
+    (state : Memory unit) : Memory unit :=
+  if returns : ∃ encoded, SettledEncoding invoke σs shared shape function args state encoded then
+    returns.choose.2.2
+  else state
+
+/-- The run `result_of` and `state_of` read, where a settled run returns:
+one whose encodings are the chosen ones. -/
+theorem settledEncoding_choose {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
+    {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier} {args : HList σs}
+    {state : Memory unit}
+    (returns : ∃ encoded, SettledEncoding invoke σs shared shape function args state encoded)
+    (default : shape.carrier) :
+    ∃ run, SettledRun invoke σs shared shape function args state run ∧
+      ResultOf invoke σs shared shape function args state default = run.2.1 ∧
+      StateOf invoke σs shared shape function args state = run.2.2 := by
+  obtain ⟨run, settled, encoded⟩ := returns.choose_spec
+  refine ⟨run, settled, ?_, ?_⟩
+  · unfold ResultOf
+    rw [dif_pos returns, ← encoded]
+    simp only [runEncoding, Codec.decode_encode, Option.getD_some]
+  · unfold StateOf
+    rw [dif_pos returns, ← encoded]
+    rfl
+
+/-- Where a settled run returns, `result_of` and `state_of` name one. -/
+theorem settledRun_resultOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
+    {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier} {args : HList σs}
+    {state : Memory unit} {run : HList σs × shape.carrier × Memory unit}
+    (returns : SettledRun invoke σs shared shape function args state run) (default : shape.carrier) :
+    ∃ args', SettledRun invoke σs shared shape function args state
+      (args', ResultOf invoke σs shared shape function args state default,
+        StateOf invoke σs shared shape function args state) := by
+  obtain ⟨chosen, settled, result, final⟩ :=
+    settledEncoding_choose ⟨runEncoding σs shape run, run, returns, rfl⟩ default
+  refine ⟨chosen.1, ?_⟩
+  rw [result, final]
+  exact settled
+
+end
+
+/-- Declared preconditions by target: a function's at its runtime
+arguments. A unit's table names the targets its closures have whose
+contracts state no behavioral predicate, and holds `True` for every other
+function. -/
+abbrev RequiresTable (unit : Validation.ValidatedUnit) :=
+  FunctionHandle → Array RuntimeValue → Memory unit → Prop
+
+section
+variable {unit : ValidatedUnit} [Skolems unit]
+
+/-- `requires_of<f>(x)`: the declared precondition of the target of the
+function value's closure, read from a table, at the captures and the
+arguments composed by its mask; `True` where there is none to read. -/
+def RequiresOf (table : RequiresTable unit) (σs : NRow) (shared : Sharing) (results : NRow)
+    (function : (NTy.function σs shared results).carrier) (args : HList σs) (state : Memory unit) : Prop :=
+  let closure := (Carriers.functions σs shared results).closure function
+  match ClosureMask.compose closure.mask closure.captures.toList (HList.encode args) with
+  | some composed => table closure.function composed.toArray state
+  | none => True
+
+/-- A table entry's precondition, stated of the rows of native values the
+runtime arguments encode, at one row's encoding: the precondition of that
+row, as encodings are injective. Stated at the list equation the normal
+form makes of the entry's array equation (`toArray_eq_iff`). -/
+theorem requiresEntry_encode {row : NRow} (requires : HList row → Prop) (values : HList row) :
+    (∀ args : HList row, HList.encode args = HList.encode values → requires args) ↔
+      requires values :=
+  ⟨fun held => held values rfl, fun held args equal => by
+    rw [(HList.encode_inj args values).mp equal]; exact held⟩
+
+/-- `requires_of` holds of every function value where the table declares no
+precondition of any target. -/
+theorem requiresOf_of_table (table : RequiresTable unit)
+    (everywhere : ∀ handle arguments state, table handle arguments state)
+    (σs : NRow) (shared : Sharing) (results : NRow) (function : (NTy.function σs shared results).carrier)
+    (args : HList σs) (state : Memory unit) :
+    RequiresOf table σs shared results function args state := by
+  dsimp only [RequiresOf]
+  split
+  · exact everywhere _ _ _
+  · trivial
+
+/-- `requires_of` of a function value whose target, weave, and captures a
+proof sees is the target's declared precondition at its woven arguments. -/
+theorem requiresOf_closureOf (table : RequiresTable unit) (handle : FunctionHandle)
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (shared : Sharing) (results : NRow)
+    (typed : FunctionTyped supplied shared results
+      handle weave.mask typeInstantiation captures)
+    (args : HList supplied) (state : Memory unit) :
+    RequiresOf table supplied shared results
+        (functionOf supplied shared results handle weave.mask typeInstantiation captures typed)
+        args state =
+      table handle (HList.encode (weave.compose captures args)).toArray state := by
+  simp only [RequiresOf, functionOf_closure, closureOf_captures, closureOf_mask, closureOf_function]
+  rw [weave.compose_mask _ _ (HList.encode_length captured captures)
+    (HList.encode_length supplied args), weave.encode_compose]
+
+end
+
+/-! ## Named targets
+
+A call of a target is an invocation of the function value naming it, which
+captures nothing (`Weave.supplying`): the continuations of a call may assume
+its behavioral predicates. -/
+
+section
+variable {unit : ValidatedUnit} [Skolems unit]
+
+/-- Invoking a function value whose target, weave, and captures a proof sees,
+at a frame coherent with its instantiation, is the target's prophetic meaning
+on the woven arguments. -/
+theorem closureMeaning_closureOf_coherent (executable : ExecutableUnit unit)
+    {handle : FunctionHandle} {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) {typeInstantiation : Array (TypeId × TypeId)}
+    (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
+    (shared : Sharing) (shape : ResultShape)
+    (typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures)
+    (args : HList supplied) :
+    closureMeaning executable supplied shared shape
+        (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+        args =
+      propheticMeaning executable typeInstantiation handle full shape (weave.compose captures args) := by
+  rw [closureMeaning_functionOf, closureRun_closureOf executable handle weave capturedFree
+    typeInstantiation captures shape args, propheticMeaning_of_coherent coherent]
+
+/-- `ensures_of` of a function value whose target, weave, and captures a proof
+sees is a run of the target's prophetic meaning on the woven arguments. -/
+theorem ensuresOf_closureOf {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) {typeInstantiation : Array (TypeId × TypeId)}
+    (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
+    {shared : Sharing} {shape : ResultShape}
+    {typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures}
+    (args : HList supplied) {result : shape.carrier} {pre post : Memory unit}
+    (ensures : EnsuresOf (closureMeaning executable) supplied shared shape
+      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+      args result pre post) :
+    (propheticMeaning executable typeInstantiation handle full shape
+      (weave.compose captures args)).ok pre result post := by
+  rw [← closureMeaning_closureOf_coherent executable weave capturedFree coherent captures shared
+    shape typed args]
+  exact ensures
+
+/-- `aborts_of` of a function value whose target, weave, and captures a proof
+sees is an abort of the target's prophetic meaning on the woven arguments. -/
+theorem abortsOf_closureOf {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) {typeInstantiation : Array (TypeId × TypeId)}
+    (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
+    {shared : Sharing} {shape : ResultShape}
+    {typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures}
+    (args : HList supplied) {state : Memory unit}
+    (aborts : AbortsOf (closureMeaning executable) supplied shared shape
+      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+      args state) :
+    ∃ failure, (propheticMeaning executable typeInstantiation handle full shape
+      (weave.compose captures args)).aborts state failure := by
+  rw [← closureMeaning_closureOf_coherent executable weave capturedFree coherent captures shared
+    shape typed args]
+  exact aborts
+
+/-- `ensures_of` of a function value whose target is verified: where what the
+target's theorem assumes and its precondition hold at the woven arguments,
+what its contract ensures of the run, its frame, and that no condition under
+which it must abort held. -/
+theorem ensuresOf_closureOf_verified {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) {typeInstantiation : Array (TypeId × TypeId)}
+    (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
+    {shared : Sharing} {shape : ResultShape}
+    {typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures}
+    (args : HList supplied) {result : shape.carrier} {pre post : Memory unit}
+    {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (ensures : EnsuresOf (closureMeaning executable) supplied shared shape
+      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+      args result pre post)
+    (assumed : contract.assumes (weave.compose captures args) pre)
+    (permitted : contract.requires (weave.compose captures args) pre) :
+    (¬contract.mayAbort (weave.compose captures args) pre →
+        contract.ensures (weave.compose captures args) pre result post) ∧
+      contract.frame (weave.compose captures args) pre result post ∧
+      ¬contract.mustAbort (weave.compose captures args) pre :=
+  (verified _ pre assumed permitted).1 result post
+    (ensuresOf_closureOf weave capturedFree coherent captures args ensures)
+
+/-- `aborts_of` of a function value whose target is verified: where what the
+target's theorem assumes and its precondition hold at the woven arguments,
+a failure its contract permits. -/
+theorem abortsOf_closureOf_verified {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) {typeInstantiation : Array (TypeId × TypeId)}
+    (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
+    {shared : Sharing} {shape : ResultShape}
+    {typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures}
+    (args : HList supplied) {state : Memory unit}
+    {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (aborts : AbortsOf (closureMeaning executable) supplied shared shape
+      (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+      args state)
+    (assumed : contract.assumes (weave.compose captures args) state)
+    (permitted : contract.requires (weave.compose captures args) state) :
+    ∃ failure, contract.aborts (weave.compose captures args) state failure := by
+  obtain ⟨failure, runs⟩ := abortsOf_closureOf weave capturedFree coherent captures args aborts
+  exact ⟨failure, (verified _ state assumed permitted).2.1 failure runs⟩
+
+/-- `aborts_of` of a function value capturing values, as of a function value
+naming its target (`named`), at the woven arguments. -/
+theorem abortsOf_closureOf_woven {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full : NRow} {τ : NTy} {captured supplied : NRow}
+    (weave : Weave full (.cons τ captured) supplied) (free : (NRow.cons τ captured).refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList (.cons τ captured))
+    (shared : Sharing) (shape : ResultShape)
+    (typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures)
+    {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
+    (naming : (Carriers.functions full named_shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (args : HList supplied) (state : Memory unit) :
+    AbortsOf (closureMeaning executable) supplied shared shape
+        (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+        args state =
+      AbortsOf (closureMeaning executable) full named_shared shape named
+        (weave.compose captures args) state := by
+  simp only [AbortsOf, closureMeaning, functionOf_closure, naming,
+    closureRun_closureOf_woven executable handle weave free typeInstantiation captures shape args]
+
+/-- `ensures_of` of a function value capturing values, as of a function value
+naming its target (`named`), at the woven arguments. -/
+theorem ensuresOf_closureOf_woven {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {full : NRow} {τ : NTy} {captured supplied : NRow}
+    (weave : Weave full (.cons τ captured) supplied) (free : (NRow.cons τ captured).refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList (.cons τ captured))
+    (shared : Sharing) (shape : ResultShape)
+    (typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures)
+    {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
+    (naming : (Carriers.functions full named_shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (args : HList supplied) (result : shape.carrier) (pre post : Memory unit) :
+    EnsuresOf (closureMeaning executable) supplied shared shape
+        (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+        args result pre post =
+      EnsuresOf (closureMeaning executable) full named_shared shape named
+        (weave.compose captures args) result pre post := by
+  simp only [EnsuresOf, closureMeaning, functionOf_closure, naming,
+    closureRun_closureOf_woven executable handle weave free typeInstantiation captures shape args]
+
+/-- Invoking a function value naming a target is running the target. -/
+theorem closureMeaning_named (executable : ExecutableUnit unit) {handle : FunctionHandle}
+    {typeInstantiation : Array (TypeId × TypeId)} (coherent : Coherent unit handle typeInstantiation)
+    (full : NRow) (shared : Sharing) (shape : ResultShape)
+    (named : (NTy.function full shared shape.row).carrier)
+    (naming : (Carriers.functions full shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    (args : HList full) :
+    closureMeaning executable full shared shape named args =
+      propheticMeaning executable typeInstantiation handle full shape args := by
+  simp only [closureMeaning, naming]
+  rw [closureRun_closureOf executable handle (Weave.supplying full) rfl typeInstantiation () shape
+    args, Weave.compose_supplying, propheticMeaning_of_coherent coherent]
+
+/-- Where a target is called, the run is one of a function value naming it
+(`named`): the continuations may assume its `ensures_of` where the call
+returns and its `aborts_of` where it aborts. -/
+theorem wp_named {executable : ExecutableUnit unit} {handle : FunctionHandle}
+    {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} {shape : ResultShape}
+    {shared : Sharing} {named : (NTy.function full shared shape.row).carrier}
+    (naming : (Carriers.functions full shared shape.row).closure named =
+      closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
+    {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    {initial : Memory unit}
+    (continued : wp (propheticMeaning executable typeInstantiation handle full shape args)
+      (fun result final =>
+        EnsuresOf (closureMeaning executable) full shared shape named args result initial final →
+        ensures result final)
+      (fun error =>
+        AbortsOf (closureMeaning executable) full shared shape named args initial → aborts error)
+      initial) :
+    wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts
+      initial :=
+  ⟨fun result final execution => continued.1 result final execution (by
+      unfold EnsuresOf
+      rw [closureMeaning_named executable execution.1 full shared shape named naming]
+      exact execution),
+    fun error execution => continued.2.1 error execution ⟨error, by
+      rw [closureMeaning_named executable execution.1 full shared shape named naming]
+      exact execution⟩,
+    continued.2.2⟩
+
+end
+
+/-! ## Units verified through their models
+
+In a unit verified through its model (`doc/designs/ghost-fields.md`), an
+invocation means what the model's invocation meaning says, and the
+behavioral predicates are stated over it. Of a literal closure of a routed
+target they are the target's meaning on the woven arguments
+(`Denote.invokeAt`). -/
+
+/-- A unit verified through its model (`doc/designs/ghost-fields.md`): its
+executable, which its contracts read the unit from, and the meaning of
+invoking a function value at every family, coherent across the families type
+arguments induce as the executable's is (`closureMeaning_coherent`). A
+contract of such a unit that reads the unit takes a model where another
+takes the executable. -/
+structure ModelUnit (unit : ValidatedUnit) where
+  executable : ExecutableUnit unit
+  invoke : (Θ : Skolems unit) → @Denote.InvokeMeaning unit Θ
+  coherent : Denote.InvokeMeaning.Coherent invoke
+
+/-! ## Behavioral predicates at induced frames
+
+A behavioral predicate a contract states at the frame a call's type
+arguments induce (`Skolems.instantiate`) is the predicate at the outer frame,
+of the arguments, results and runs read in its view, by the coherence of
+the invocation meaning (`InvokeMeaning.Coherent`); `result_of` and
+`state_of` choose among the runs' encodings, which both views hold alike. -/
+
+section Induced
+variable {unit : ValidatedUnit}
+
+/-- `ensures_of` at an induced frame is `ensures_of` at the outer frame, of
+the arguments and result read in its view. -/
+theorem ensuresOf_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning unit Θ}
+    (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
+    (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
+    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
+    (pre post : Memory unit) :
+    @EnsuresOf unit (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
+        function args result pre post =
+      @EnsuresOf unit Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args)
+        (ResultShape.ofSkolem θ shape result) pre post := by
+  apply propext
+  unfold EnsuresOf
+  rw [coherent Θ θ free]
+  simp only [Spec.bind_ok, Spec.pure_ok]
+  constructor
+  · rintro ⟨value, middle, ran, rfl, rfl⟩
+    rw [ResultShape.ofSkolem_toSkolem]
+    exact ran
+  · intro ran
+    exact ⟨_, post, ran, (@NTy.toSkolem_ofSkolem_shape unit Θ θ shape result).symm, rfl⟩
+
+/-- `aborts_of` at an induced frame, at the outer frame. -/
+theorem abortsOf_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning unit Θ}
+    (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
+    (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    @AbortsOf unit (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
+        function args state =
+      @AbortsOf unit Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args) state := by
+  apply propext
+  unfold AbortsOf
+  rw [coherent Θ θ free]
+  simp only [Spec.bind_aborts, Spec.pure_aborts, and_false, exists_false, or_false]
+
+/-- `requires_of` reads the arguments' encodings, which both views hold
+alike. -/
+theorem requiresOf_instantiate (Θ : Skolems unit) (θ : TypeArgs) (table : RequiresTable unit)
+    (σs : NRow) (shared : Sharing) (results : NRow)
+    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared results))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    @RequiresOf unit (Skolems.instantiate θ Θ) table σs shared results function args state =
+      @RequiresOf unit Θ table (NRow.subst θ.1 σs) shared (NRow.subst θ.1 results) function
+        (HList.ofSkolem θ σs args) state := by
+  dsimp only [RequiresOf]
+  rw [@HList.encode_ofSkolem Θ.toCarriers θ σs args]
+  rfl
+
+
+section Settle
+
+/-- Settling a value without a reference leaves it. -/
+theorem Denote.NTy.settle_self_of_refFree [Carriers] (τ : NTy) (free : τ.refFree = true)
+    (value : τ.carrier) : NTy.settle τ value = value := by
+  cases τ <;> first | rfl | simp [NTy.refFree] at free
+
+/-- Settling commutes with reading a value in the outer view, where the
+type arguments hold no reference. -/
+theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs) (free : θ.1.refFree = true) :
+    (τ : NTy) → (value : @NTy.carrier (Carriers.instantiate θ Θ) τ) →
+    NTy.settle (τ.subst θ.1) (NTy.ofSkolem θ τ value) =
+      NTy.ofSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ value)
+  | .param index, _ =>
+      NTy.settle_self_of_refFree _ (NRow.getD_refFree θ.1 free index _ rfl) _
+  | .ref _, _ | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
+  | .string, _ | .bytes, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .vector _, _
+  | .table _ _, _ | .ghost _, _ | .function _ _ _, _ => rfl
+
+theorem Denote.HList.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs) (free : θ.1.refFree = true) :
+    (row : NRow) → (values : @HList (Carriers.instantiate θ Θ) row) →
+    HList.settle (NRow.subst θ.1 row) (HList.ofSkolem θ row values) =
+      HList.ofSkolem θ row (@HList.settle (Carriers.instantiate θ Θ) row values)
+  | .nil, _ => rfl
+  | .cons τ rest, values => by
+      show (NTy.settle (τ.subst θ.1) (NTy.ofSkolem θ τ values.1),
+          HList.settle (NRow.subst θ.1 rest) (HList.ofSkolem θ rest values.2)) =
+        (NTy.ofSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ values.1),
+          HList.ofSkolem θ rest (@HList.settle (Carriers.instantiate θ Θ) rest values.2))
+      rw [NTy.settle_ofSkolem θ free τ, HList.settle_ofSkolem θ free rest]
+
+/-- A value without a reference is settled. -/
+theorem Denote.ResultShape.settled_one_of_refFree [Carriers] (τ : NTy) (free : τ.refFree = true)
+    (value : τ.carrier) : (ResultShape.one τ).Settled value := by
+  cases τ <;> first | trivial | simp [NTy.refFree] at free
+
+/-- A result is settled in either view alike. -/
+theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
+    (free : θ.1.refFree = true) : (shape : ResultShape) →
+    (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
+    ((shape.subst θ.1).Settled (ResultShape.ofSkolem θ shape value) ↔
+      @ResultShape.Settled (Carriers.instantiate θ Θ) shape value)
+  | .none, _ => Iff.rfl
+  | .one (.ref τ), value => by
+      show NTy.ofSkolem θ τ value.1 = NTy.ofSkolem θ τ value.2 ↔ value.1 = value.2
+      constructor
+      · intro same
+        have := congrArg (NTy.toSkolem θ τ) same
+        rwa [NTy.toSkolem_ofSkolem, NTy.toSkolem_ofSkolem] at this
+      · intro same; rw [same]
+  | .one (.param index), value => by
+      have settled := ResultShape.settled_one_of_refFree ((NTy.param index).subst θ.1)
+        (NRow.getD_refFree θ.1 free index _ rfl) (ResultShape.ofSkolem θ (.one (.param index)) value)
+      exact ⟨fun _ => trivial, fun _ => settled⟩
+  | .one .unit, _ | .one .bool, _ | .one (.int _ _), _ | .one .num, _ | .one .address, _
+  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one (.tuple _), _
+  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _
+  | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _ => Iff.rfl
+
+/-- A result encodes alike in either view. -/
+theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] (θ : TypeArgs) : (shape : ResultShape) →
+    (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
+    (resultCodec (shape.subst θ.1)).encode (ResultShape.ofSkolem θ shape value) =
+      (@resultCodec (Carriers.instantiate θ Θ) shape).encode value
+  | .none, _ => rfl
+  | .one τ, value => by
+      show #[NTy.encode (τ.subst θ.1) (NTy.ofSkolem θ τ value)] =
+        #[@NTy.encode (Carriers.instantiate θ Θ) τ value]
+      rw [NTy.encode_ofSkolem]
+
+end Settle
+
+section Runs
+variable {invoke : (Θ : Skolems unit) → @InvokeMeaning unit Θ}
+
+/-- The settled runs' encodings are the same at the induced frame as at the
+outer frame on the arguments read in its view. -/
+theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
+    (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    @SettledEncoding unit (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared
+        shape function args state =
+      @SettledEncoding unit Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args) state := by
+  funext encoded
+  apply propext
+  constructor
+  · rintro ⟨⟨values, result, final⟩, ⟨settles, settled, ran⟩, rfl⟩
+    refine ⟨(HList.ofSkolem θ σs values, ResultShape.ofSkolem θ shape result, final),
+      ⟨?_, ?_, ?_⟩, ?_⟩
+    · show HList.settle _ (HList.ofSkolem θ σs values) = HList.settle _ (HList.ofSkolem θ σs args)
+      rw [HList.settle_ofSkolem θ free, HList.settle_ofSkolem θ free]
+      exact congrArg (HList.ofSkolem θ σs) settles
+    · exact (ResultShape.settled_ofSkolem θ free shape result).mpr settled
+    · rw [← ensuresOf_instantiate coherent Θ θ free]; exact ran
+    · show (HList.encode (HList.ofSkolem θ σs values),
+          (resultCodec (shape.subst θ.1)).encode (ResultShape.ofSkolem θ shape result), final) = _
+      rw [HList.encode_ofSkolem, resultCodec_encode_ofSkolem]
+      rfl
+  · rintro ⟨⟨values, result, final⟩, ⟨settles, settled, ran⟩, rfl⟩
+    refine ⟨(HList.toSkolem θ σs values, ResultShape.toSkolem θ shape result, final),
+      ⟨?_, ?_, ?_⟩, ?_⟩
+    · have := congrArg (HList.toSkolem θ σs) settles
+      rw [← HList.ofSkolem_toSkolem θ σs values, HList.settle_ofSkolem θ free,
+        HList.settle_ofSkolem θ free, HList.toSkolem_ofSkolem, HList.toSkolem_ofSkolem] at this
+      exact this
+    · rw [← ResultShape.settled_ofSkolem θ free, ResultShape.ofSkolem_toSkolem]; exact settled
+    · rw [ensuresOf_instantiate coherent Θ θ free, HList.ofSkolem_toSkolem,
+        ResultShape.ofSkolem_toSkolem]
+      exact ran
+    · show (@HList.encode (Skolems.instantiate θ Θ).toCarriers σs (HList.toSkolem θ σs values),
+          (@resultCodec (Skolems.instantiate θ Θ).toCarriers shape).encode
+            (ResultShape.toSkolem θ shape result), final) = _
+      rw [← HList.encode_ofSkolem, ← resultCodec_encode_ofSkolem, HList.ofSkolem_toSkolem,
+        ResultShape.ofSkolem_toSkolem]
+      rfl
+
+/-- `state_of` at an induced frame is `state_of` at the outer frame. -/
+theorem stateOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
+    (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    @StateOf unit (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
+        function args state =
+      @StateOf unit Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args) state := by
+  unfold StateOf
+  rw [settledEncoding_instantiate coherent Θ θ free]
+
+/-- `result_of` at an induced frame is `result_of` at the outer frame, carried
+back. -/
+theorem resultOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
+    (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
+    (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
+    @ResultOf unit (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
+        function args state default =
+      ResultShape.toSkolem θ shape (@ResultOf unit Θ (invoke Θ) (NRow.subst θ.1 σs) shared
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args) state
+        (ResultShape.ofSkolem θ shape default)) := by
+  unfold ResultOf
+  rw [settledEncoding_instantiate coherent Θ θ free]
+  split
+  · rename_i returns
+    obtain ⟨⟨values, result, final⟩, _, chosen⟩ := returns.choose_spec
+    rw [← chosen]
+    show ((@resultCodec (Skolems.instantiate θ Θ).toCarriers shape).decode?
+        ((resultCodec (shape.subst θ.1)).encode result)).getD default =
+      ResultShape.toSkolem θ shape (((resultCodec (shape.subst θ.1)).decode?
+        ((resultCodec (shape.subst θ.1)).encode result)).getD (ResultShape.ofSkolem θ shape default))
+    rw [Codec.decode_encode, Option.getD_some, ← ResultShape.ofSkolem_toSkolem θ shape result,
+      resultCodec_encode_ofSkolem, Codec.decode_encode, Option.getD_some,
+      ResultShape.ofSkolem_toSkolem]
+  · exact (@NTy.toSkolem_ofSkolem_shape unit Θ θ shape default).symm
+
+end Runs
+
+
+/-! The behavioral predicates of the executable's invocations and of a
+model's at an induced frame, at the outer frame: the rewrite rules of the
+transport's normal form (`vir_transport`), which reads each coherence. -/
+
+section Instances
+variable (executable : ExecutableUnit unit) (model : ModelUnit unit) (Θ : Skolems unit)
+  (θ : TypeArgs) (σs : NRow) (shared : Sharing) (shape : ResultShape)
+  (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+  (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
+
+theorem closureMeaning_ensuresOf_instantiate (free : θ.1.refFree = true)
+    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) (post : Memory unit) :
+    @EnsuresOf unit (Skolems.instantiate θ Θ) (@closureMeaning unit executable (Skolems.instantiate θ Θ))
+        σs shared shape function args result state post =
+      @EnsuresOf unit Θ (@closureMeaning unit executable Θ) (NRow.subst θ.1 σs) shared
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args)
+        (ResultShape.ofSkolem θ shape result) state post :=
+  ensuresOf_instantiate (closureMeaning_coherent executable) Θ θ free σs shared shape function args
+    result state post
+
+theorem closureMeaning_abortsOf_instantiate (free : θ.1.refFree = true) :
+    @AbortsOf unit (Skolems.instantiate θ Θ) (@closureMeaning unit executable (Skolems.instantiate θ Θ))
+        σs shared shape function args state =
+      @AbortsOf unit Θ (@closureMeaning unit executable Θ) (NRow.subst θ.1 σs) shared
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args)
+        state :=
+  abortsOf_instantiate (closureMeaning_coherent executable) Θ θ free σs shared shape function args
+    state
+
+theorem closureMeaning_resultOf_instantiate (free : θ.1.refFree = true)
+    (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
+    @ResultOf unit (Skolems.instantiate θ Θ) (@closureMeaning unit executable (Skolems.instantiate θ Θ))
+        σs shared shape function args state default =
+      ResultShape.toSkolem θ shape (@ResultOf unit Θ (@closureMeaning unit executable Θ)
+        (NRow.subst θ.1 σs) shared (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function)
+        (HList.ofSkolem θ σs args) state (ResultShape.ofSkolem θ shape default)) :=
+  resultOf_instantiate (closureMeaning_coherent executable) Θ θ free σs shared shape function args
+    state default
+
+theorem closureMeaning_stateOf_instantiate (free : θ.1.refFree = true) :
+    @StateOf unit (Skolems.instantiate θ Θ) (@closureMeaning unit executable (Skolems.instantiate θ Θ))
+        σs shared shape function args state =
+      @StateOf unit Θ (@closureMeaning unit executable Θ) (NRow.subst θ.1 σs) shared
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args)
+        state :=
+  stateOf_instantiate (closureMeaning_coherent executable) Θ θ free σs shared shape function args
+    state
+
+theorem ModelUnit.ensuresOf_instantiate (free : θ.1.refFree = true)
+    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) (post : Memory unit) :
+    @EnsuresOf unit (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
+        σs shared shape function args result state post =
+      @EnsuresOf unit Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args)
+        (ResultShape.ofSkolem θ shape result) state post :=
+  VerexIR.Proofs.ensuresOf_instantiate model.coherent Θ θ free σs shared shape function args result
+    state post
+
+theorem ModelUnit.abortsOf_instantiate (free : θ.1.refFree = true) :
+    @AbortsOf unit (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
+        σs shared shape function args state =
+      @AbortsOf unit Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args) state :=
+  VerexIR.Proofs.abortsOf_instantiate model.coherent Θ θ free σs shared shape function args state
+
+theorem ModelUnit.resultOf_instantiate (free : θ.1.refFree = true)
+    (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
+    @ResultOf unit (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
+        σs shared shape function args state default =
+      ResultShape.toSkolem θ shape (@ResultOf unit Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared
+        (shape.subst θ.1) (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args)
+        state (ResultShape.ofSkolem θ shape default)) :=
+  VerexIR.Proofs.resultOf_instantiate model.coherent Θ θ free σs shared shape function args state
+    default
+
+theorem ModelUnit.stateOf_instantiate (free : θ.1.refFree = true) :
+    @StateOf unit (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
+        σs shared shape function args state =
+      @StateOf unit Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+        (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args) state :=
+  VerexIR.Proofs.stateOf_instantiate model.coherent Θ θ free σs shared shape function args state
+
+end Instances
+
+end Induced
+
+-- The solver reads behavioral predicates at concrete rows and results.
+attribute [vir_denote_norm] Denote.NTy.refFree Denote.NRow.refFree Denote.NRows.refFree
+attribute [vir_denote_norm] Denote.ResultShape.Settled Denote.NTy.settle Denote.HList.settle
 
 end VerexIR.Proofs

@@ -125,7 +125,6 @@ x✝² :
           VerexIR.Proofs.Denote.NRow.nil
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
         VerexIR.Proofs.Denote.NRow.nil))
-invariantHolds✝¹ : True
 fst✝¹ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 heq✝¹ :
   initialState✝
@@ -137,7 +136,8 @@ heq✝¹ :
         arguments := VerexIR.Proofs.Denote.NRow.nil }
       (VerexIR.StorageKey.address addr1) =
     some (fst✝¹, PUnit.unit)
-snd_eq✝¹ : (fst✝¹, PUnit.unit).snd = PUnit.unit
+invariantHolds✝¹ : True
+snd_eq✝¹ : () = PUnit.unit
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
       (VerexIR.Proofs.Denote.NRow.cons
@@ -194,7 +194,7 @@ verexAnchor :
             VerexIR.Proofs.Denote.NRow.nil
             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil),
         arguments := VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, PUnit.unit)))
+      (VerexIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, ())))
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
       (VerexIR.Proofs.Denote.NRow.cons
@@ -240,10 +240,9 @@ x✝¹ :
           VerexIR.Proofs.Denote.NRow.nil
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
         VerexIR.Proofs.Denote.NRow.nil))
-invariantHolds✝ : True
 fst✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 heq✝ :
-  (if addr2 = addr1 then some ({ val := 2, fits := ⋯ }, PUnit.unit)
+  (if addr2 = addr1 then some ({ val := 2, fits := ⋯ }, ())
     else
       initialState✝
         {
@@ -254,11 +253,12 @@ heq✝ :
           arguments := VerexIR.Proofs.Denote.NRow.nil }
         (VerexIR.StorageKey.address addr2)) =
     some (fst✝, PUnit.unit)
-snd_eq✝ : (fst✝, PUnit.unit).snd = PUnit.unit
+invariantHolds✝ : True
+snd_eq✝ : () = PUnit.unit
 key : VerexIR.StorageKey
 x✝ : ¬key = VerexIR.StorageKey.address addr1
 h✝ : key = VerexIR.StorageKey.address addr2
-⊢ some ({ val := 2, fits := ⋯ }, PUnit.unit) =
+⊢ some ({ val := 2, fits := ⋯ }, ()) =
     initialState✝
       {
         type :=

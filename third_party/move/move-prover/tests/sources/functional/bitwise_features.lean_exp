@@ -1,14 +1,12 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bitwise_features.move:81:9: error: the specification clause `ensures include == spec_contains(features, feature)` is not established
-tests/sources/functional/bitwise_features.move:62:17: error: the loop invariant `∀ (i in old_n .. n), features[i] == 0` is not preserved by an iteration
 tests/sources/functional/bitwise_features.move:61:17: error: the loop invariant `∀ (i in 0 .. old_n), features[i] == old_features[i]` is not preserved by an iteration
+tests/sources/functional/bitwise_features.move:81:9: error: the specification clause `ensures include == spec_contains(features, feature)` is not established
 tests/sources/functional/bitwise_features.move:76:5: error: verex verification failed: the automatic verification of `set` failed; provide a proof in `tests/sources/functional/bitwise_features.proof.lean`:
   verify set by
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
-    | invariant_6_step => verex_prepare; sorry
     | invariant_5_step => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/bitwise_features.move:141:17: error: the assertion `features.length > disable[i] / 8

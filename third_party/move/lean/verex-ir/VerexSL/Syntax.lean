@@ -830,7 +830,7 @@ syntax (name := verexAbortsWithClause)
 syntax (name := verexInvariantClause)
   kwInvariant (verexConditionProperties)? verexExpr (";")? : verexClause
 /-- A ghost field of every value of the struct or enum, with the value a pack
-gives it (`designs/ghost-fields.md`). -/
+gives it (`doc/designs/ghost-fields.md`). -/
 syntax (name := verexGhostClause)
   kwGhost verexIdentifier ":" verexType (":=" verexExpr)? (";")? : verexClause
 syntax (name := verexModifiesClause) kwModifies verexExpr (";")? : verexClause

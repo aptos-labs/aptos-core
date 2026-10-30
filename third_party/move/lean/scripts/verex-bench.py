@@ -2,7 +2,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-"""The verification benchmark (`designs/verification-benchmarks.md`).
+"""The verification benchmark (`doc/status/verification-benchmarks.md`).
 
     run      measure the problems of `bench/problems.toml`
     history  fetch the results of recent CI runs

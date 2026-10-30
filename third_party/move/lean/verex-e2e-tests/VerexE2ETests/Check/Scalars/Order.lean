@@ -9,7 +9,7 @@ import VerexE2ETests.CheckSupport
 `core.prim.compare` is `std::cmp::compare`: the structural order of two
 values of one type, `-1`, `0`, or `1`. On integers it is their natural order;
 at a type parameter it is an arbitrary total order, whose laws
-(`RuntimeValue.order_trans` and friends) an authored proof uses. A
+(`Std.TransCmp`, a typed order's) an authored proof uses. A
 `verify f by tactics` item runs the automatic solver first and hands the
 obligations it leaves to the tactics.
 -/

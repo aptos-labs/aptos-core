@@ -4,9 +4,11 @@
 import VerexSL
 
 -- Keep constructive state-label witnesses inside the ordinary verification
--- budget: searching every execution point first used to exceed it.
-set_option maxHeartbeats 25000
-set_option verex.verifyHeartbeats 25000
+-- budget: searching every execution point first used to exceed it. The
+-- budget is 8% above the cost of 2026-10-21 (`doc/designs/performance.md`,
+-- "Measurement debts").
+set_option maxHeartbeats 27000
+set_option verex.verifyHeartbeats 27000
 
 verex module 0x42::state_label_witnesses where
 

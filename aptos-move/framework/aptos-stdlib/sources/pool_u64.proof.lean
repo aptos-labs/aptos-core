@@ -39,14 +39,14 @@ verify buy_in by
   all_goals try simp (disch := verex_arithmetic_only) only [if_pos, Int.zero_mul, Int.zero_ediv] at *
   all_goals try verex_decide
   case aborts_if_1_8 =>
-    exact Or.inl (Or.inl (Or.inl (by verex_arithmetic_only)))
+    exact Or.inl (Or.inl (Or.inl (by omega)))
   case aborts_if_1_10 =>
     have positive : 0 < coins_amount.val := by omega
     rename_i aborted
     rcases aborted with ⟨present, overflow⟩ | ⟨missing, nonzero, full⟩
     · exact Or.inl (Or.inr ⟨positive, present, overflow⟩)
     · exact Or.inr ⟨positive, missing, nonzero, full⟩
-  case after_add_shares_1 =>
+  case after_call_1_of_add_shares_1 =>
     grind -ring only
 
 -- A successful deduction supplies nonnegative remaining totals. Separate
@@ -58,17 +58,7 @@ verify redeem_shares by
   all_goals verex_scalar_equalities
   all_goals try simp (disch := verex_arithmetic_only) only [if_pos, Int.zero_mul, Int.zero_ediv] at *
   all_goals try verex_decide
-  all_goals cases present : hasKey self_shares (RuntimeValue.address shareholder)
-  all_goals simp only [present, Bool.false_eq_true, Bool.true_eq_false, false_or] at *
+  all_goals split at shares_ensures_1
+  all_goals rename_i present
+  all_goals simp only [present, Bool.not_eq_true, Bool.false_eq_true, Bool.true_eq_false, false_or] at *
   all_goals omega
-
--- The ignored index_of flag leaves both search branches. Equal cardinality
--- and distinctness rule out a missing shareholder; a matching removal
--- preserves membership for every surviving shareholder. Use this argument
--- before general search on the quantified map facts.
-verify deduct_shares by
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals first
-  | verex_map_coverage_prepared
-  | verex_decide_prepared

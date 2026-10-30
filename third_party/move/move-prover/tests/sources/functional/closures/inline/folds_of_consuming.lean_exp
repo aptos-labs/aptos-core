@@ -1,5 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_consuming.move:48:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:42:5: error: the loop invariant `sum
         == «spec_fold_idx$lambda$1»(
           with_state_anchor!(18, old(sum)), n - remaining,
@@ -14,15 +13,15 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:42:5: error: th
           )
             + with_state_anchor!(14, old(v))[n - 1 - _j_19]
             > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_consuming.move:48:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:47:5: error: verex verification failed: the automatic verification of `sum_literal` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
   verify sum_literal by
     verex_obligations
     verex_on
-    | aborts_if_1 => verex_prepare; sorry
     | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of_consuming.move:58:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:52:5: error: the loop invariant `digits
         == «spec_fold_idx$lambda$0»(
           with_state_anchor!(4, old(digits)), n - remaining,
@@ -46,15 +45,15 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:52:5: error: th
               * 10
               + with_state_anchor!(3, old(v))[n - 1 - _j_8]
               > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_consuming.move:58:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:57:5: error: verex verification failed: the automatic verification of `digits_forward` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
   verify digits_forward by
     verex_obligations
     verex_on
-    | aborts_if_1 => verex_prepare; sorry
     | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of_consuming.move:71:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:62:5: error: the loop invariant `digits
         == «spec_fold_idx$lambda$0»(
           with_state_anchor!(12, old(digits)), n - remaining,
@@ -74,15 +73,15 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:62:5: error: th
               * 10
               + with_state_anchor!(9, old(v))[n - 1 - _j_13]
               > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_consuming.move:71:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:70:5: error: verex verification failed: the automatic verification of `digits_reverse` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
   verify digits_reverse by
     verex_obligations
     verex_on
-    | aborts_if_1 => verex_prepare; sorry
     | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of_consuming.move:84:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:75:5: error: the loop invariant `sum
         == «spec_fold_idx$lambda$2»(
           with_state_anchor!(24, old(sum)), n - remaining,
@@ -97,11 +96,12 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:75:5: error: th
           )
             + with_state_anchor!(20, old(v))[n - 1 - _j_25].value
             > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_consuming.move:84:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/closures/inline/folds_of_consuming.move:83:5: error: verex verification failed: the automatic verification of `sum_noncopy` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean`:
   verify sum_noncopy by
     verex_obligations
     verex_on
-    | aborts_if_1 => verex_prepare; sorry
     | invariant_5_step => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

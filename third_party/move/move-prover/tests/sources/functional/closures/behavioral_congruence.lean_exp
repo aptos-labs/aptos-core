@@ -1,30 +1,30 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/behavioral_congruence.move:42:5: error: the continuation after `same` is not established
+tests/sources/functional/closures/behavioral_congruence.move:42:5: error: the continuation after call 1 of `same` is not established
 tests/sources/functional/closures/behavioral_congruence.move:42:5: error: verex verification failed: the automatic verification of `field_equal` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify field_equal by
     verex_obligations
     verex_on
-    | after_same => verex_prepare; sorry
+    | after_call_1_of_same => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_congruence.move:49:5: error: the continuation after `rebuilt` is not established
+tests/sources/functional/closures/behavioral_congruence.move:49:5: error: the continuation after call 1 of `rebuilt` is not established
+tests/sources/functional/closures/behavioral_congruence.move:50:9: error: the specification clause `aborts_if aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:49:5: error: verex verification failed: the automatic verification of `field_fieldwise` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify field_fieldwise by
     verex_obligations
     verex_on
-    | after_rebuilt => verex_prepare; sorry
+    | after_call_1_of_rebuilt => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_congruence.move:58:5: error: the continuation after `same` is not established
+tests/sources/functional/closures/behavioral_congruence.move:58:5: error: the continuation after call 1 of `same` is not established
 tests/sources/functional/closures/behavioral_congruence.move:58:5: error: verex verification failed: the automatic verification of `param_equal` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify param_equal by
     verex_obligations
     verex_on
-    | after_same => verex_prepare; sorry
+    | after_call_1_of_same => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_congruence.move:67:9: error: the specification clause `aborts_if x.n + 1 > MAX_U64` is not established
-tests/sources/functional/closures/behavioral_congruence.move:68:9: error: the specification clause `aborts_if x.n + 1 <= MAX_U64 && aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:66:5: error: verification failed with a residual obligation:
 case left.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -59,7 +59,7 @@ cb_f :
                   VerexIR.Proofs.Denote.NRow.nil))
               VerexIR.Proofs.Denote.NRow.nil)))
         VerexIR.Proofs.Denote.NRow.nil)
-      [false] VerexIR.Proofs.Denote.NRow.nil).carrier
+      { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil).carrier
 x_n : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 x_id_vec :
   (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
@@ -92,36 +92,12 @@ permitted_1 :
                 VerexIR.Proofs.Denote.NRow.nil))
             VerexIR.Proofs.Denote.NRow.nil)))
       VerexIR.Proofs.Denote.NRow.nil)
-    cb_f.val
+    { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none cb_f
 permitted_2 : ↑x_id_vec.values.size ≤ 1
 verexResult : VerexIR.Proofs.Denote.ResultShape.none.carrier
 verexFinal : VerexIR.Proofs.Denote.Memory unit
-verexRun :
-  (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit) cb_f.val
-        (VerexIR.Proofs.Denote.NRow.cons
-          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            VerexIR.Proofs.Denote.NRow.nil
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-              (VerexIR.Proofs.Denote.NRow.cons
-                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                      VerexIR.Proofs.Denote.NRow.nil
-                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                        VerexIR.Proofs.Denote.NRow.nil))
-                    VerexIR.Proofs.Denote.NRow.nil)
-                  (VerexIR.Proofs.Denote.NRow.cons
-                    (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                        VerexIR.Proofs.Denote.NRow.nil
-                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                          VerexIR.Proofs.Denote.NRow.nil)).vector
-                    VerexIR.Proofs.Denote.NRow.nil))
-                VerexIR.Proofs.Denote.NRow.nil)))
-          VerexIR.Proofs.Denote.NRow.nil)
-        VerexIR.Proofs.Denote.ResultShape.none ((named, (x_id_vec, PUnit.unit), ()), ())).ok
-    verexFinal verexResult verexFinal
 verexEnsures :
-  VerexIR.Proofs.EnsuresOfAt (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
+  VerexIR.Proofs.EnsuresOf (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
     (VerexIR.Proofs.Denote.NRow.cons
       (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
@@ -141,13 +117,11 @@ verexEnsures :
                 VerexIR.Proofs.Denote.NRow.nil))
             VerexIR.Proofs.Denote.NRow.nil)))
       VerexIR.Proofs.Denote.NRow.nil)
-    VerexIR.Proofs.Denote.ResultShape.none cb_f.val.encode
-    (VerexIR.Proofs.Denote.HList.encode ((named, (x_id_vec, PUnit.unit), ()), ()))
-    ((VerexIR.Proofs.Denote.resultCodec VerexIR.Proofs.Denote.ResultShape.none).encode verexResult) verexFinal
-    verexFinal
+    { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none cb_f
+    ((named, (x_id_vec, PUnit.unit), ()), ()) verexResult verexFinal verexFinal
 ⊢ ¬(18446744073709551615 < x_n.val + 1 ∨
       x_n.val + 1 ≤ 18446744073709551615 ∧
-        VerexIR.Proofs.AbortsOfAt (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
+        VerexIR.Proofs.AbortsOf (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
           (VerexIR.Proofs.Denote.NRow.cons
             (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
               VerexIR.Proofs.Denote.NRow.nil
@@ -168,57 +142,26 @@ verexEnsures :
                       VerexIR.Proofs.Denote.NRow.nil))
                   VerexIR.Proofs.Denote.NRow.nil)))
             VerexIR.Proofs.Denote.NRow.nil)
-          VerexIR.Proofs.Denote.ResultShape.none
-          ((VerexIR.Proofs.Denote.NTy.function
-                (VerexIR.Proofs.Denote.NRow.cons
-                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                    VerexIR.Proofs.Denote.NRow.nil
-                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-                      (VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 2 }, structId := 0 }
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                              VerexIR.Proofs.Denote.NRow.nil
-                              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                VerexIR.Proofs.Denote.NRow.nil))
-                            VerexIR.Proofs.Denote.NRow.nil)
-                          (VerexIR.Proofs.Denote.NRow.cons
-                            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                                VerexIR.Proofs.Denote.NRow.nil
-                                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                  VerexIR.Proofs.Denote.NRow.nil)).vector
-                            VerexIR.Proofs.Denote.NRow.nil))
-                        VerexIR.Proofs.Denote.NRow.nil)))
-                  VerexIR.Proofs.Denote.NRow.nil)
-                [false] VerexIR.Proofs.Denote.NRow.nil).encode
-            cb_f)
-          [VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 0 } none
-              #[VerexIR.RuntimeValue.integer x_n.val,
-                VerexIR.RuntimeValue.nominal { namespaceId := { index := 2 }, structId := 0 } none
-                  #[VerexIR.RuntimeValue.vector
-                      (Array.map
-                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-                              VerexIR.Proofs.Denote.NRow.nil
-                              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-                                VerexIR.Proofs.Denote.NRow.nil)).codec.encode
-                        x_id_vec.values)]]]
-          verexFinal)
+          { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none cb_f
+          ((x_n, (x_id_vec, ()), ()), ()) verexFinal)
+tests/sources/functional/closures/behavioral_congruence.move:67:9: error: the specification clause `aborts_if x.n + 1 > MAX_U64` is not established
+tests/sources/functional/closures/behavioral_congruence.move:68:9: error: the specification clause `aborts_if x.n + 1 <= MAX_U64 && aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:66:5: error: verex verification failed: the automatic verification of `field_bumped` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify field_bumped by
     verex_obligations
     verex_on
-    | aborts_if_1 => verex_prepare; sorry
     | leaf => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/behavioral_congruence.move:75:5: error: the continuation after call 1 of `0x1::option::none` is not established
 tests/sources/functional/closures/behavioral_congruence.move:76:9: error: the specification clause `aborts_if aborts_of<cb.f>(x)` is not established
-tests/sources/functional/closures/behavioral_congruence.move:75:5: error: the continuation after `0x1::option::none` is not established
 tests/sources/functional/closures/behavioral_congruence.move:75:5: error: verex verification failed: the automatic verification of `field_dropped_id` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify field_dropped_id by
     verex_obligations
     verex_on
+    | after_call_1_of_none => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
-    | after_none => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_congruence.move:94:9: error: the specification clause `ensures _a == _b ==> (aborts_of<_cb.f>(_a) <==> aborts_of<_cb.f>(_b))` is not established

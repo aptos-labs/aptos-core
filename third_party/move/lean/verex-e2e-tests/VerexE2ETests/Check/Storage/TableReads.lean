@@ -132,7 +132,7 @@ error: verex verification failed: the automatic verification of `wrong_payload_b
 verify 0x42::table_reads::wrong_payload_bound
 
 -- The read roles run in the interpreter on the table's value, its entries in
--- the owner's last field (`designs/intrinsic-maps.md`, "Tables in the runtime
+-- the owner's last field (`doc/designs/intrinsic-maps.md`, "Tables in the runtime
 -- semantics").
 open Lean Elab Command VerexIR VerexIR.SemanticOperations VerexE2ETests.CheckSupport in
 run_cmd do

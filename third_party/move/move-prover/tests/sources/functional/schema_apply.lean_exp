@@ -1,9 +1,9 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/schema_apply.move:16:9: error: the precondition `requires [export] false` of `f` does not hold at this call
+tests/sources/functional/schema_apply.move:16:9: error: the precondition `requires [export] false` of `f` does not hold at call 1
 tests/sources/functional/schema_apply.move:2:5: error: verex verification failed: the automatic verification of `g` failed; provide a proof in `tests/sources/functional/schema_apply.proof.lean`:
   verify g by
     verex_obligations
     verex_on
-    | requires_of_f => verex_prepare; sorry
+    | requires_1_of_f_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

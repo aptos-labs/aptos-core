@@ -5,7 +5,7 @@ import VerexE2ETests.CheckSupport
 
 /-! The runtime provides a table's entry roles on its value: a mutable borrow
 of the entry an iterator names, by key or by position, and a conversion to a
-table of another owner (`designs/intrinsic-maps.md`, "Tables in the runtime
+table of another owner (`doc/designs/intrinsic-maps.md`, "Tables in the runtime
 semantics"). -/
 
 verex module 0x42::keyed_cursors where

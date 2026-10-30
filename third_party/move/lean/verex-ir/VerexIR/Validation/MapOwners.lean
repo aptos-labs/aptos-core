@@ -8,7 +8,7 @@ import VerexIR.Validation.TableRoles
 
 Every structure marked an intrinsic map has one abstract layout: its
 entries, its ghost slots, and its allocation handle where its Move type
-holds table storage (`designs/intrinsic-maps.md`, "Abstract
+holds table storage (`doc/designs/intrinsic-maps.md`, "Abstract
 representation"). Its concrete value holds them in one of a few shapes,
 which this module names (`ownerLayout?`); the runtime semantics reads the
 abstract value off the concrete one by the shape (`normalize`).
@@ -169,7 +169,7 @@ def ownerLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : 
 
 /-- The layout of an intrinsic map owner whose values the denotation holds
 abstractly, which the runtime's values are read through
-(`SemanticOperations.normalize`): every owner (`designs/intrinsic-maps.md`,
+(`SemanticOperations.normalize`): every owner (`doc/designs/intrinsic-maps.md`,
 "Abstract representation"). -/
 def abstractLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : Nat) :
     Option OwnerLayout :=

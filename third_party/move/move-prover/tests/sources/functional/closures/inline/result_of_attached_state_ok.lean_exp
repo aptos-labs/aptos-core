@@ -1,4 +1,5 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:44:13: error: the loop invariant `∀ (j in 0 .. i), result[j] == v[j] + old(global<R>(a).v)` is not preserved by an iteration
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: verification failed with a residual obligation:
 case step.some.some.some.some.right.right.right
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -44,8 +45,7 @@ invariant_4 :
       j < i.val →
         (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
           (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
-            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                    (initialState✝
+            ((initialState✝
                       {
                         type :=
                           VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
@@ -53,10 +53,10 @@ invariant_4 :
                             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                               VerexIR.Proofs.Denote.NRow.nil),
                         arguments := VerexIR.Proofs.Denote.NRow.nil }
-                      (VerexIR.StorageKey.address a))).getD
-                VerexIR.RuntimeValue.unit).asInt
+                      (VerexIR.StorageKey.address a)).getD
+                  ({ val := 0, fits := ⋯ }, ())).fst.val
 this✝ :
-  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 1 } } (v, a, PUnit.unit)
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 1 } } (v, a, ())
     initialState✝
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow
     (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false).vector)
@@ -143,8 +143,7 @@ loopHypothesis✝ :
                                       j < i.val →
                                         (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
                                           (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
-                                            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                                                    (initialState✝
+                                            ((initialState✝
                                                       {
                                                         type :=
                                                           VerexIR.Proofs.Denote.NTy.struct
@@ -154,8 +153,8 @@ loopHypothesis✝ :
                                                               (VerexIR.Proofs.Denote.NTy.int 64 false)
                                                               VerexIR.Proofs.Denote.NRow.nil),
                                                         arguments := VerexIR.Proofs.Denote.NRow.nil }
-                                                      (VerexIR.StorageKey.address a))).getD
-                                                VerexIR.RuntimeValue.unit).asInt)) →
+                                                      (VerexIR.StorageKey.address a)).getD
+                                                  ({ val := 0, fits := ⋯ }, ())).fst.val)) →
                   VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝ (fun failure => True) state
 invariant_1 : i.val ≤ ↑v.values.size
 invariant_2 : True
@@ -176,14 +175,13 @@ verexContinuation : VerexIR.Proofs.Denote.Flow
 a✝ : ↑v.values.size ≤ i.val
 ⊢ state✝ = initialState✝
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:55:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), result[i] == v[i] + global<R>(a).v` is not established
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:44:13: error: the loop invariant `∀ (j in 0 .. i), result[j] == v[j] + old(global<R>(a).v)` is not preserved by an iteration
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: verex verification failed: the automatic verification of `map_add_global` failed; provide a proof in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean`:
   verify map_add_global by
     verex_obligations
     verex_on
+    | invariant_4_step => verex_prepare; sorry
     | leaf => verex_prepare; sorry
     | ensures_2 => verex_prepare; sorry
-    | invariant_4_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: verification failed with a residual obligation:
@@ -231,8 +229,7 @@ invariant_4 :
       j < i.val →
         (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
           (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
-            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                    (state✝
+            ((state✝
                       {
                         type :=
                           VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
@@ -240,8 +237,8 @@ invariant_4 :
                             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                               VerexIR.Proofs.Denote.NRow.nil),
                         arguments := VerexIR.Proofs.Denote.NRow.nil }
-                      (VerexIR.StorageKey.address a))).getD
-                VerexIR.RuntimeValue.unit).asInt
+                      (VerexIR.StorageKey.address a)).getD
+                  ({ val := 0, fits := ⋯ }, ())).fst.val
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow
     (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false).vector)
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector
@@ -328,8 +325,7 @@ loopHypothesis✝ :
                                         j < i.val →
                                           (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
                                             (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
-                                              ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                                                      (state
+                                              ((state
                                                         {
                                                           type :=
                                                             VerexIR.Proofs.Denote.NTy.struct
@@ -339,8 +335,8 @@ loopHypothesis✝ :
                                                                 (VerexIR.Proofs.Denote.NTy.int 64 false)
                                                                 VerexIR.Proofs.Denote.NRow.nil),
                                                           arguments := VerexIR.Proofs.Denote.NRow.nil }
-                                                        (VerexIR.StorageKey.address a))).getD
-                                                  VerexIR.RuntimeValue.unit).asInt)) →
+                                                        (VerexIR.StorageKey.address a)).getD
+                                                    ({ val := 0, fits := ⋯ }, ())).fst.val)) →
                   VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝ (fun failure => True) state
 invariant_1 : i.val ≤ ↑v.values.size
 invariant_2 : True

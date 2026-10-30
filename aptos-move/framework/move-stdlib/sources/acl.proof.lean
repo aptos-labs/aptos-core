@@ -44,8 +44,8 @@ verify remove by
   all_goals try verex_decide
   case leaf_2 =>
     rename_i same
-    refine erase_unique self_list.values (fun x => ((x.map Codec.address.encode).getD .unit).asString)
-      _ ?_ permitted found index (by omega) (by omega) ?_ ?_ same
+    refine erase_unique self_list.values (fun x => x.getD "") _ ?_ permitted found index
+      (by omega) (by omega) ?_ ?_ same
     · omega
     · simp only [Array.size_eraseIdx]; omega
     · simp only [Array.size_eraseIdx]; omega

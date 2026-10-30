@@ -8,7 +8,7 @@ import VerexIR.Semantics.LoanRenaming
 
 Each runtime operation applied to a frame and state with their loans
 renamed injectively is the operation applied to the originals, renamed
-(`designs/static-typing.md`, "Loan independence").
+(`doc/historical/static-typing.md`, "Loan independence").
 -/
 
 namespace VerexIR

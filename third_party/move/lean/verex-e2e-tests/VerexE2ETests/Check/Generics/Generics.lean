@@ -239,14 +239,14 @@ example {registry : Validation.SemanticsRegistry}
     {executable : Validation.ExecutableUnit «0x42».language_generics.unit}
     (prepared :
       Validation.prepareExecution registry «0x42».language_generics.unit = .ok executable)
-    (preserved : GlobalsPreserved executable) :
+    (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable) :
     SatisfiesFunctionAt executable ⟨⟨0⟩, ⟨0⟩⟩
       (frameInstantiation «0x42».language_generics.unit ⟨⟨0⟩, ⟨0⟩⟩ #[]
         #[⟨⟨10⟩, ⟨0⟩⟩])
       («0x42».language_generics.identity.contract executable ⟨.cons (.int 64 false) .nil, rfl⟩
         (frameInstantiation «0x42».language_generics.unit ⟨⟨0⟩, ⟨0⟩⟩ #[]
           #[⟨⟨10⟩, ⟨0⟩⟩])) :=
-  «0x42».language_generics.identity.verified prepared preserved
+  «0x42».language_generics.identity.verified prepared preserved integral
     ⟨.cons (.int 64 false) .nil, rfl⟩ rfl _ (FrameOf.frame rfl)
     (@Coherent.ofCheck _ (Skolems.instantiate ⟨.cons (.int 64 false) .nil, rfl⟩
       (Skolems.runtime _)) _ _ (by decide +kernel))

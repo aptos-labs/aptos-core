@@ -1,11 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/address_serialization_constant_size.move:20:9: error: the specification clause `ensures result.length == spec.result[1].length` is not established
 tests/sources/functional/address_serialization_constant_size.move:19:9: error: the specification clause `ensures serialize(mv1).length == serialize(mv2).length` is not established
+tests/sources/functional/address_serialization_constant_size.move:20:9: error: the specification clause `ensures result.length == spec.result[1].length` is not established
 tests/sources/functional/address_serialization_constant_size.move:18:5: error: verex verification failed: the automatic verification of `serialized_move_values_diff_len_incorrect` failed; provide a proof in `tests/sources/functional/address_serialization_constant_size.proof.lean`:
   verify serialized_move_values_diff_len_incorrect by
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

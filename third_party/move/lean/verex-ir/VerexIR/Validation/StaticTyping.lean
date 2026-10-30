@@ -7,7 +7,7 @@ import VerexIR.Validation.SemanticTypes
 # Static typing
 
 A total checker over validated VIR whose acceptance a proof can use
-(`designs/static-typing.md`, Phase 1). Each node is checked by a total
+(`doc/historical/static-typing.md`, Phase 1). Each node is checked by a total
 `Bool` function over semantic types: the node's stored type and its
 children's, resolved under the body's generic environment, where each type
 binder is its rigid parameter. A function's body is walked from its root,
@@ -307,7 +307,7 @@ def fieldType? (targetNs : ValidatedNamespace) (declaration : StructDecl)
   resolveIn targetNs arguments.toArray field.type.typeId
 
 /-- The types of a declaration's ghost fields under arguments: a constructor
-takes their values after its fields (`designs/ghost-fields.md`). -/
+takes their values after its fields (`doc/designs/ghost-fields.md`). -/
 def ghostTypes? (targetNs : ValidatedNamespace) (declaration : StructDecl)
     (arguments : List SemArg) : Option (List SemTy) :=
   declaration.ghosts.toList.mapM fun ghost => resolveIn targetNs arguments.toArray ghost.type.typeId
@@ -461,7 +461,7 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
           let fieldName ← context.ns.tables.names[field.index]?
           let fieldType ← fieldTypeAt? targetNs declaration variant arguments fieldName.name
           some (fieldType, none)
-    -- A ghost field is the verification model's alone (`designs/ghost-fields.md`).
+    -- A ghost field is the verification model's alone (`doc/designs/ghost-fields.md`).
     | some (.ghostField ..) => none
     | some (.index base index) => do
         let (type, _) ← context.placeType fuel base
@@ -576,7 +576,7 @@ def consults (context : Context) (typeId : TypeId) : Bool :=
 
 /-- Whether a call creates a faithful frame: each type the target requires
 is interned at the call's arguments, read by the calling frame, and free of
-lifetime parameters (`designs/static-typing.md`, "Instantiation"). -/
+lifetime parameters (`doc/historical/static-typing.md`, "Instantiation"). -/
 def edgeClosed (context : Context) (reference : QualifiedRef)
     (instantiations : Array GenericArgument) : Bool :=
   (typeArguments instantiations).all context.consults &&
@@ -700,7 +700,7 @@ def checkData (context : Context) (result : SemTy) : DataOperation → Array Exp
               | none => false
           | none => false
       | _, _ => false
-  -- A ghost field is the verification model's alone (`designs/ghost-fields.md`).
+  -- A ghost field is the verification model's alone (`doc/designs/ghost-fields.md`).
   | .selectGhost _ _, _ => false
   | .selectVariants reference fields, operands =>
       match structTarget? context.unit context.ns reference, operands.toList with
@@ -949,7 +949,7 @@ instantiated type by searching the arena for its node, so a frame is
 faithful to its arguments where every type it requires is interned. A
 callee's required types, instantiated at a call's arguments, are required
 of the caller in turn: the callee's search then repeats the caller's
-(`designs/static-typing.md`, "Instantiation"). The table is computed by
+(`doc/historical/static-typing.md`, "Instantiation"). The table is computed by
 iteration here and checked at each node (`Context.consults`,
 `Context.edgeClosed`). -/
 

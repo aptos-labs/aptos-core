@@ -15,13 +15,13 @@ tests/sources/functional/macro_verification.move:54:5: error: verex verification
     | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/macro_verification.move:76:9: error: the specification clause `ensures result == x + y + y` is not established
 tests/sources/functional/macro_verification.move:75:9: error: the specification clause `ensures result == x + y + z` is not established
+tests/sources/functional/macro_verification.move:76:9: error: the specification clause `ensures result == x + y + y` is not established
 tests/sources/functional/macro_verification.move:74:5: error: verex verification failed: the automatic verification of `reduce_test` failed; provide a proof in `tests/sources/functional/macro_verification.proof.lean`:
   verify reduce_test by
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

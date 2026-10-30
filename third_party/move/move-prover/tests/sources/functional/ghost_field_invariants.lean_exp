@@ -15,8 +15,8 @@ tests/sources/functional/ghost_field_invariants.move:53:5: error: verex verifica
     | data_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_invariants.move:61:9: error: the specification clause `invariant total >= y` is not established
 tests/sources/functional/ghost_field_invariants.move:60:9: error: the specification clause `invariant total >= x` is not established
+tests/sources/functional/ghost_field_invariants.move:61:9: error: the specification clause `invariant total >= y` is not established
 tests/sources/functional/ghost_field_invariants.move:76:5: error: verex verification failed: the automatic verification of `sum_break` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
   verify sum_break by
     verex_obligations

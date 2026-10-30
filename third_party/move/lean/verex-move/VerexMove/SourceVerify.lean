@@ -137,7 +137,8 @@ a package directory in dev mode. -/
 def verifySource (environment : Lean.Environment) (source output : System.FilePath)
     (exported : Option System.FilePath := none) (filter : Option String := none)
     (renderOnly : Bool := false) (heartbeats : Option Nat := none)
-    (modules : Array String := #[]) (dev : Bool := false) (ignoreProofs : Bool := false) :
+    (modules : Array String := #[]) (dev : Bool := false) (ignoreProofs : Bool := false)
+    (jobs : Option Nat := none) :
     IO (Array Report) := do
   let prepared ← VerexSL.Perf.withPhase .frontend do
     let package ← match exported with
@@ -165,7 +166,8 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
         file := source.toString, line := 1, column := 1
         severity := .error, text := message }]
   | .ok (unit, companions, omitted) =>
-      let reports ← run environment { unit, companions, output, renderOnly, heartbeats, ignoreProofs }
+      let reports ← run environment
+        { unit, companions, output, renderOnly, heartbeats, ignoreProofs, jobs }
       return (if renderOnly then #[] else omitted) ++ reports
 
 end VerexMove.SourceVerify

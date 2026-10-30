@@ -427,16 +427,17 @@ private partial def liftProp (p : Lean.Expr) : LiftM (Lean.Expr × Lean.Expr × 
   return (lifted, ← mkExpectedTypeHint proof (← mkAppM ``Iff #[p, lifted]), true)
 
 /-- Restate a leaf over bit vectors: introduce a vector for each certified
-unsigned value it reads, restate the goal and every hypothesis whose terms
-lift, and leave the restated goal. -/
-def liftGoal (goal : MVarId) : MetaM MVarId := goal.withContext do
+unsigned value it reads. The target-only request leaves source hypotheses
+out of atom collection and lifting; the full request also restates them. -/
+def liftGoal (goal : MVarId) (hypotheses : Bool := true) : MetaM MVarId := goal.withContext do
   let mut atoms : Array (Lean.Expr × Nat) := #[]
-  for decl in ← getLCtx do
-    if decl.isImplementationDetail then continue
-    let type ← instantiateMVars decl.type
-    unless ← isProp type do continue
-    for atom in ← atomsOf type do
-      unless atoms.any (·.1 == atom.1) do atoms := atoms.push atom
+  if hypotheses then
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let type ← instantiateMVars decl.type
+      unless ← isProp type do continue
+      for atom in ← atomsOf type do
+        unless atoms.any (·.1 == atom.1) do atoms := atoms.push atom
   for atom in ← atomsOf (← instantiateMVars (← goal.getType)) do
     unless atoms.any (·.1 == atom.1) do atoms := atoms.push atom
   if atoms.isEmpty then throwError "the goal reads no certified unsigned integer"
@@ -463,6 +464,9 @@ def liftGoal (goal : MVarId) : MetaM MVarId := goal.withContext do
     let (restated, equivalence, targetLifted) ← (liftProp target).run lifting
     let mut goal ← if restated == target then pure goal
       else goal.replaceTargetEq restated (← mkPropExt equivalence)
+    unless hypotheses do
+      unless targetLifted do throwError "the leaf does not lift to bit vectors"
+      return goal
     let mut anyLifted := targetLifted
     let atomEquations := lifted.map (·.2.2)
     for decl in ← goal.withContext getLCtx do
@@ -490,6 +494,19 @@ register_option verex.bitVectors : Bool := {
 elab "verex_bv" : tactic => do
   unless verex.bitVectors.get (← getOptions) do throwError "bit-vector decisions are not selected"
   let goal ← liftGoal (← getMainGoal)
+  replaceMainGoal [goal]
+  evalTactic (← `(tactic| bv_decide))
+
+/-- Try the bit identity itself, without lifting unrelated context facts.
+Only hypotheses the restated goal and its local types do not need are cleared.
+The caller owns rollback, the fallback with hypotheses, and the shared cap. -/
+elab "verex_bv_target" : tactic => do
+  unless verex.bitVectors.get (← getOptions) do throwError "bit-vector decisions are not selected"
+  let mut goal ← liftGoal (← getMainGoal) (hypotheses := false)
+  for id in (← goal.withContext getLCtx).getFVarIds.reverse do
+    let proposition ← goal.withContext do isProp (← id.getType)
+    if proposition then
+      try goal ← goal.clear id catch _ => pure ()
   replaceMainGoal [goal]
   evalTactic (← `(tactic| bv_decide))
 

@@ -6,25 +6,20 @@ import VerexMove.Proofs
 verex proofs for "bitwise_table.move"
 verex proofs where
 
-open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
-
-private theorem different_literal_keys (owner : StructHandle) :
-    RuntimeValue.nominal owner none #[.vector #[.integer 1, .integer 2]] ≠
-      RuntimeValue.nominal owner none #[.vector #[.integer 2, .integer 3]] := by
-  intro same
-  have := congrArg (fun fields => fields.toList) (RuntimeValue.nominal.inj same).2.2
-  simp only [List.cons.injEq, RuntimeValue.vector.injEq, Array.mk.injEq,
-    RuntimeValue.integer.injEq] at this
-  omega
-
+-- The table holds 22 at the first key after both additions; the borrow
+-- reads it, and the write stores `22 & 1`.
 verify add_R by
   verex_obligations
   verex_on
+  | ensures_1 =>
+    verex_prepare only
+    subst old_value'' old_value' old_value
+    simp only [vir_denote_norm] at *
+    rfl
   | ensures_3 =>
     verex_prepare only
-    subst old_value'' old_value' old_value new_result
-    simp only [Maps.valueAt_update, Maps.valueAt_build, Maps.get, Maps.asInt_integer, ite_true] at *
-    simp only [if_neg (different_literal_keys _), RuntimeValue.integer.injEq] at consumed
-    rw [← consumed]
+    subst old_value'' old_value' old_value
+    simp only [VerexIR.SpecMap.valueAt_update, vir_denote_norm] at *
+    rw [← (‹22 = borrow_mut_result_0.val› : 22 = borrow_mut_result_0.val)]
     decide
   | _ => first | verex_decide | (verex_prepare only; all_goals verex_decide)

@@ -1248,7 +1248,7 @@ private structure SourceNominal where
   fields : Array FieldDecl := #[]
   variants : Array VariantDecl := #[]
   /-- The ghost fields of every value, which specifications read
-  (`designs/ghost-fields.md`). -/
+  (`doc/designs/ghost-fields.md`). -/
   ghosts : Array FieldDecl := #[]
   abilities : Array Ability := #[]
   /-- A nominal another compilation unit declares. This unit knows its
@@ -1482,7 +1482,7 @@ private def fieldSelection (declaration : SourceNominal) (reference : QualifiedR
     (field : String) : VerexIR.DataOperation :=
   let pairs := declaration.variants.filterMap fun variant =>
     if variant.fields.any (·.name == field) then some (variant.name, field) else none
-  -- A ghost field is in every variant (`designs/ghost-fields.md`).
+  -- A ghost field is in every variant (`doc/designs/ghost-fields.md`).
   if declaration.ghosts.any (·.name == field) then .selectGhost reference field
   else if pairs.isEmpty then .select reference field else .selectVariants reference pairs
 
@@ -1827,7 +1827,7 @@ private partial def lowerPlace (context : ExprContext) (source : Place) :
             pure (← pushPlace (.deref base), reference.referent)
         | _ => pure (base, baseType)
       let (owner, fieldName, typeId, declaration) ← resolveNominalField baseType field span variant
-      -- A ghost field is the verification model's (`designs/ghost-fields.md`).
+      -- A ghost field is the verification model's (`doc/designs/ghost-fields.md`).
       let place := if declaration.ghosts.any (·.name == field) then
           VerexIR.Place.ghostField base owner fieldName
         else .field base owner fieldName

@@ -1,23 +1,23 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/negated_definition.move:17:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/state_labels/negated_definition.move:16:9: error: the specification clause `ensures !((..S |~ update<R>(addr, new R { value := 1 })))
         && ((..S |~ exists<R>(addr)))` is not established
+tests/sources/functional/state_labels/negated_definition.move:17:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/state_labels/negated_definition.move:13:5: error: verex verification failed: the automatic verification of `write_negated` failed; provide a proof in `tests/sources/functional/state_labels/negated_definition.proof.lean`:
   verify write_negated by
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/state_labels/negated_definition.move:28:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/state_labels/negated_definition.move:26:9: error: the specification clause `ensures (((..S |~ update<R>(addr, new R { value := 1 }))) ==> false)
         && ((..S |~ exists<R>(addr)))` is not established
+tests/sources/functional/state_labels/negated_definition.move:28:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/state_labels/negated_definition.move:23:5: error: verex verification failed: the automatic verification of `write_in_antecedent` failed; provide a proof in `tests/sources/functional/state_labels/negated_definition.proof.lean`:
   verify write_in_antecedent by
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

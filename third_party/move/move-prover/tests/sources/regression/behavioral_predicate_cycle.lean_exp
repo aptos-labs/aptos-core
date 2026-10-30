@@ -30,12 +30,12 @@ tests/sources/regression/behavioral_predicate_cycle.move:26:5: error: verex veri
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavioral_predicate_cycle.move:92:1: error: a behavioral predicate reads the executable unit, which this contract does not take
 tests/sources/regression/behavioral_predicate_cycle.move:92:1: error: a behavioral predicate reads the executable unit, which this contract does not take
-tests/sources/regression/behavioral_predicate_cycle.move:130:5: error: the precondition of `g` is not established
+tests/sources/regression/behavioral_predicate_cycle.move:132:9: error: the precondition `requires !aborts_of<function[Fn(u64) -> u64](h)>(n) || n == 0` of `g` does not hold at call 1
 tests/sources/regression/behavioral_predicate_cycle.move:130:5: error: verex verification failed: the automatic verification of `g` failed; provide a proof in the module:
   verify g by
     verex_obligations
     verex_on
-    | requires_of_g => verex_prepare; sorry
+    | requires_1_of_g_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/behavioral_predicate_cycle.move:116:1: error: `requires_of` cannot read `g`: its precondition states a behavioral predicate

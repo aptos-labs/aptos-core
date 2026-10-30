@@ -1,105 +1,113 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/verify_iterator_validity.move:154:5: error: the precondition of `iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:154:5: error: verex verification failed: the automatic verification of `forward_stale_fails` failed; provide a proof in the module:
   verify forward_stale_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:180:5: error: the precondition of `box_use` is not established
+tests/sources/functional/verify_iterator_validity.move:128:9: error: the precondition `requires spec_iter_valid(_self.it, _t)` of `box_use` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:180:5: error: verex verification failed: the automatic verification of `implant_stale_fails` failed; provide a proof in the module:
   verify implant_stale_fails by
     verex_obligations
     verex_on
-    | requires_of_box_use => verex_prepare; sorry
+    | requires_1_of_box_use_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:272:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:314:9: error: the specification clause `ensures result == 3` is not established
+tests/sources/functional/verify_iterator_validity.move:313:5: error: verex verification failed: the automatic verification of `refind_after_invalidate` failed; provide a proof in the module:
+  verify refind_after_invalidate by
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:272:5: error: verex verification failed: the automatic verification of `stale_use_fails` failed; provide a proof in the module:
   verify stale_use_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:281:5: error: the precondition of `0x42::iter_table::iter_borrow_mut` is not established
+tests/sources/functional/verify_iterator_validity.move:60:9: error: the precondition `requires spec_iter_valid(self, t)` of `0x42::iter_table::iter_borrow_mut` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:281:5: error: verex verification failed: the automatic verification of `stale_borrow_mut_fails` failed; provide a proof in the module:
   verify stale_borrow_mut_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow_mut => verex_prepare; sorry
+    | requires_1_of_iter_borrow_mut_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:293:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:293:5: error: verex verification failed: the automatic verification of `use_after_invalidate_fails` failed; provide a proof in the module:
   verify use_after_invalidate_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:319:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:319:5: error: verex verification failed: the automatic verification of `generic_stale_fails` failed; provide a proof in the module:
   verify generic_stale_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:343:5: error: the precondition of `0x42::iter_table::node_next` is not established
+tests/sources/functional/verify_iterator_validity.move:223:9: error: the precondition `requires spec_node_valid(self, _t)` of `0x42::iter_table::node_next` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:343:5: error: verex verification failed: the automatic verification of `node_walk_stale_fails` failed; provide a proof in the module:
   verify node_walk_stale_fails by
     verex_obligations
     verex_on
-    | requires_of_node_next => verex_prepare; sorry
+    | requires_1_of_node_next_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:356:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:356:5: error: verex verification failed: the automatic verification of `revalidation_by_alias_fails` failed; provide a proof in the module:
   verify revalidation_by_alias_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:405:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:405:5: error: verex verification failed: the automatic verification of `cross_map_fails` failed; provide a proof in the module:
   verify cross_map_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:430:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:430:5: error: verex verification failed: the automatic verification of `vector_cross_element_fails` failed; provide a proof in the module:
   verify vector_cross_element_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:470:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:470:5: error: verex verification failed: the automatic verification of `copy_diverges_fails` failed; provide a proof in the module:
   verify copy_diverges_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:506:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:506:5: error: verex verification failed: the automatic verification of `opaque_mut_wrapper_fails` failed; provide a proof in the module:
   verify opaque_mut_wrapper_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:525:5: error: the precondition of `0x42::iter_table::iter_borrow` is not established
+tests/sources/functional/verify_iterator_validity.move:81:9: error: the precondition `requires spec_iter_valid(self, _t)` of `0x42::iter_table::iter_borrow` does not hold at call 1
 tests/sources/functional/verify_iterator_validity.move:525:5: error: verex verification failed: the automatic verification of `loop_mutation_fails` failed; provide a proof in the module:
   verify loop_mutation_fails by
     verex_obligations
     verex_on
-    | requires_of_iter_borrow => verex_prepare; sorry
+    | requires_1_of_iter_borrow_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -1,11 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/behavioral_derived_opaque.move:22:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](outer)>(1) == 1` is not established
 tests/sources/functional/closures/behavioral_derived_opaque.move:21:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](wrapper)>(1) == 1` is not established
+tests/sources/functional/closures/behavioral_derived_opaque.move:22:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](outer)>(1) == 1` is not established
 tests/sources/functional/closures/behavioral_derived_opaque.move:18:5: error: verex verification failed: the automatic verification of `check` failed; provide a proof in `tests/sources/functional/closures/behavioral_derived_opaque.proof.lean`:
   verify check by
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

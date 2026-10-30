@@ -37,9 +37,11 @@ verify verify_swap_remove by
       Array.getElem?_eq_getElem within]
     rfl
   case ensures_2 =>
-    simp only [last]
-    rw [swap_erase_last v.values i.val.toNat within, Array.map_extract,
-      Array.map_setIfInBounds, Array.getElem?_eq_getElem (by omega)]
+    apply VerexIR.SpecVector.ext
+    simp only [VerexIR.Proofs.Denote.eraseBounded_values, VerexIR.Proofs.Denote.swapBounded_values,
+      VerexIR.SpecVector.values_extract, VerexIR.SpecVector.values_set, Array.set!_eq_setIfInBounds,
+      last]
+    rw [swap_erase_last v.values i.val.toNat within, Array.getElem?_eq_getElem (by omega)]
     rfl
   case ensures_1 =>
     have bounded : ((v.values.size : Int) - 1).toNat < v.values.size := by omega
@@ -57,9 +59,11 @@ verify verify_model_swap_remove by
       Array.getElem?_eq_getElem within]
     rfl
   case ensures_2 =>
-    simp only [last]
-    rw [swap_erase_last v.values i.val.toNat within, Array.map_extract,
-      Array.map_setIfInBounds, Array.getElem?_eq_getElem (by omega)]
+    apply VerexIR.SpecVector.ext
+    simp only [VerexIR.Proofs.Denote.eraseBounded_values, VerexIR.Proofs.Denote.swapBounded_values,
+      VerexIR.SpecVector.values_extract, VerexIR.SpecVector.values_set, Array.set!_eq_setIfInBounds,
+      last]
+    rw [swap_erase_last v.values i.val.toNat within, Array.getElem?_eq_getElem (by omega)]
     rfl
   case ensures_1 =>
     have bounded : ((v.values.size : Int) - 1).toNat < v.values.size := by omega

@@ -7,14 +7,14 @@ tests/sources/functional/bug_15880.move:4:5: error: verex verification failed: t
     | invariant_1_entry => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/bug_15880.move:38:13: error: the assertion `global<R>(@0x1).v == 3` does not hold
 tests/sources/functional/bug_15880.move:37:13: error: the assertion `v == 4` does not hold
+tests/sources/functional/bug_15880.move:38:13: error: the assertion `global<R>(@0x1).v == 3` does not hold
 tests/sources/functional/bug_15880.move:27:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof in `tests/sources/functional/bug_15880.proof.lean`:
   verify test2 by
     verex_obligations
     verex_on
-    | assert_2 => verex_prepare; sorry
     | assert_1 => verex_prepare; sorry
+    | assert_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/bug_15880.move:54:18: error: the assertion `v == vector<u256>[1, 2, 3]` does not hold

@@ -52,7 +52,7 @@ carry their resolved qualified spelling so pattern matching remains stable
 across namespace-local `NameId` tables.
 
 References follow the prophetic ownership model
-(`designs/prophetic-references.md`): a mutable borrow owns the current value
+(`doc/designs/prophetic-references.md`): a mutable borrow owns the current value
 of its loan and leaves `loanHole` where the value was taken. `loan` is the
 dynamic loan instance minted at the borrow; the lexically recorded loan
 deaths reunite hole and current (`settleLoans`). A shared reference is not a
@@ -72,7 +72,7 @@ inductive RuntimeValue where
   | nominal (source : StructHandle) (variant : Option String)
       (fields : Array RuntimeValue)
   /-- A ghost field's slot in a nominal value, after its declared fields
-  (`designs/ghost-fields.md`). The runtime holds `.unit` in it; the
+  (`doc/designs/ghost-fields.md`). The runtime holds `.unit` in it; the
   denotation holds the ghost's value, and its equality reads none. -/
   | ghost (value : RuntimeValue)
   /-- A function value: its target, the mask of the parameters it
@@ -943,7 +943,7 @@ ancestor frame: a callee's dying borrow exports its current value here, and
 every caller applies what becomes visible at its call site.  A table is a
 value, its entries in its owner's last field; `tableHandles` are the handles
 allocated so far, which a destroyed table keeps, so that a table's identity,
-its handle, is never taken again (`designs/intrinsic-maps.md`, "Tables in
+its handle, is never taken again (`doc/designs/intrinsic-maps.md`, "Tables in
 the runtime semantics"). -/
 structure RuntimeState where
   globals : GlobalMap := {}

@@ -6,11 +6,12 @@ import VerexIR.Proofs.Denote.Term
 /-!
 # Closures of known targets
 
-An invocation denotes its closure's meaning (`closureMeaning`). For a closure
-whose target, weave, and captures a proof sees, that meaning is the target's
-prophetic meaning on the captures and the supplied arguments woven into its
-parameter row (`closureMeaning_closureOf`), so a proof invokes a known
-closure through its target's theorem, as it calls the target directly.
+An invocation denotes the run of its function value's closure
+(`closureMeaning`, `closureRun`). For a closure whose target, weave, and
+captures a proof sees, that run is the target's prophetic meaning on the
+captures and the supplied arguments woven into its parameter row
+(`closureRun_closureOf`), so a proof invokes a known function value through
+its target's theorem, as it calls the target directly.
 Captures hold no reference: lending the woven row lends the supplied
 arguments alone.
 -/
@@ -343,84 +344,112 @@ theorem closureOf_captures (handle : FunctionHandle) (mask : Nat)
 
 /-! ## Invoking a routed target
 
-In a unit verified through its model (`designs/ghost-fields.md`), a
+In a unit verified through its model (`doc/designs/ghost-fields.md`), a
 function value of a target the proof routes invokes the target's meaning:
-the captures decoded at the captured positions of the target's parameters,
-woven with the supplied arguments. -/
+the captures and the supplied arguments composed by the value's mask and
+decoded at the target's parameters, the target's result read back at the
+invocation's shape, by their encodings. -/
 
-omit [Skolems unit] in
-/-- The weave of a mask over a parameter row (`Weave.ofMask` over a list). -/
-def Weave.ofMaskRow : Nat → (full : NRow) → Σ captured supplied : NRow, Weave full captured supplied
-  | _, .nil => ⟨.nil, .nil, .nil⟩
-  | mask, .cons τ rest =>
-      let ⟨taken, given, weave⟩ := Weave.ofMaskRow (mask / 2) rest
-      if mask % 2 == 1 then ⟨.cons τ taken, given, .captured weave⟩
-      else ⟨taken, .cons τ given, .supplied weave⟩
-
-omit [Skolems unit] in
-/-- A weave is the one its mask reads off its row. -/
-theorem Weave.ofMaskRow_mask : {full captured supplied : NRow} →
-    (weave : Weave full captured supplied) →
-    Weave.ofMaskRow weave.mask full = ⟨captured, supplied, weave⟩
-  | _, _, _, .nil => rfl
-  | _, _, _, .captured rest => by
-      have half : (2 * rest.mask + 1) / 2 = rest.mask := by omega
-      have odd : (2 * rest.mask + 1) % 2 = 1 := by omega
-      show Weave.ofMaskRow (2 * rest.mask + 1) _ = _
-      unfold Weave.ofMaskRow
-      rw [half, odd, Weave.ofMaskRow_mask rest]
-      rfl
-  | _, _, _, .supplied rest => by
-      have half : 2 * rest.mask / 2 = rest.mask := by omega
-      have even : 2 * rest.mask % 2 = 0 := by omega
-      show Weave.ofMaskRow (2 * rest.mask) _ = _
-      unfold Weave.ofMaskRow
-      rw [half, even, Weave.ofMaskRow_mask rest]
-      rfl
+/-- Weaving native rows encodes as weaving their encodings. -/
+theorem Weave.encode_compose : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) → (captures : HList captured) → (args : HList supplied) →
+    HList.encode (weave.compose captures args) =
+      weave.composeList (HList.encode captures) (HList.encode args)
+  | _, _, _, .nil, _, _ => rfl
+  | _, _, _, .captured rest, captures, args => by
+      simp only [Weave.compose, HList.encode_cons, Weave.composeList, rest.encode_compose]
+  | _, _, _, .supplied rest, captures, args => by
+      simp only [Weave.compose, HList.encode_cons, Weave.composeList, rest.encode_compose]
 
 /-- Invoking a function value of a target without type parameters by the
-target's meaning: the captures decoded at the captured positions of the
-target's parameters, woven with the supplied arguments. A value not of the
-target, at other rows or another shape, or whose captures do not decode,
-has no outcome and is undefined. -/
+target's meaning, through the encodings: the captures and the supplied
+arguments composed by the value's mask, decoded at the target's parameters,
+and the target's result decoded at the invocation's shape. A value not of
+the target, or whose arguments or result do not decode, has no outcome and
+is undefined. -/
 def invokeAt (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
     (self : HList π → Comp unit ρ.carrier) : InvokeMeaning :=
-  fun closure σs shape args =>
-    if routed : closure.function = handle ∧ shape = ρ then
-      match Weave.ofMaskRow closure.mask π with
-      | ⟨captured, supplied, weave⟩ =>
-          if rows : σs = supplied then
-            match (rowCodec captured).decode? closure.captures.toList with
-            | some captures => routed.2 ▸ self (weave.compose captures (rows ▸ args))
-            | none => Spec.stuck
-          else Spec.stuck
+  fun σs shared shape function args =>
+    let closure := (Carriers.functions σs shared shape.row).closure function
+    if closure.function = handle then
+      match (ClosureMask.compose closure.mask closure.captures.toList (HList.encode args)).bind
+          (rowCodec π).decode? with
+      | some full => Spec.bind (self full) fun result =>
+          match (resultCodec shape).decode? ((resultCodec ρ).encode result) with
+          | some value => Spec.pure value
+          | none => Spec.stuck
+      | none => Spec.stuck
     else Spec.stuck
 
 /-- A literal closure of the routed target invokes it on the woven
-arguments. -/
-@[simp] theorem invokeAt_closureOf (handle : FunctionHandle) {π captured supplied : NRow}
+arguments, its result read back at the invocation's shape. -/
+theorem invokeAt_closureOf_read (handle : FunctionHandle) {π captured supplied : NRow}
     (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
     (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) (args : HList supplied) :
-    invokeAt handle π ρ self (closureOf handle weave.mask typeInstantiation captures) supplied ρ
+    (captures : HList captured) (shape : ResultShape) (shared : Sharing)
+    (typed : FunctionTyped supplied shared shape.row
+      handle weave.mask typeInstantiation captures)
+    (args : HList supplied) :
+    invokeAt handle π ρ self supplied shared shape
+        (functionOf supplied shared shape.row handle weave.mask typeInstantiation captures typed)
+        args =
+      Spec.bind (self (weave.compose captures args)) fun result =>
+        match (resultCodec shape).decode? ((resultCodec ρ).encode result) with
+        | some value => Spec.pure value
+        | none => Spec.stuck := by
+  unfold invokeAt
+  simp only [functionOf_closure]
+  rw [if_pos (closureOf_function handle weave.mask typeInstantiation captures), closureOf_captures,
+    closureOf_mask, weave.compose_mask _ _ (HList.encode_length captured captures)
+      (HList.encode_length supplied args), ← weave.encode_compose]
+  simp only [Option.bind_some, HList.encode, Codec.decode_encode]
+
+/-- A literal closure of the routed target invokes it on the woven
+arguments. -/
+theorem invokeAt_closureOf (handle : FunctionHandle) {π captured supplied : NRow}
+    (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
+    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
+    (captures : HList captured) (shared : Sharing)
+    (typed : FunctionTyped supplied shared ρ.row
+      handle weave.mask typeInstantiation captures)
+    (args : HList supplied) :
+    invokeAt handle π ρ self supplied shared ρ
+        (functionOf supplied shared ρ.row handle weave.mask typeInstantiation captures typed)
         args =
       self (weave.compose captures args) := by
-  have mask : (closureOf handle weave.mask typeInstantiation captures).mask = weave.mask := rfl
-  unfold invokeAt
-  rw [dif_pos (show (closureOf handle weave.mask typeInstantiation captures).function = handle ∧
-    ρ = ρ from ⟨rfl, rfl⟩), mask, Weave.ofMaskRow_mask weave]
-  simp only [closureOf_captures, HList.encode, Codec.decode_encode, dite_true]
+  rw [invokeAt_closureOf_read]
+  simp only [Codec.decode_encode]
+  exact Spec.bind_pure _
 
-/-- An invocation of a literal closure of the routed target at another shape
-is stuck. -/
-theorem invokeAt_closureOf_shape (handle : FunctionHandle) {π captured supplied : NRow}
-    (ρ : ResultShape) (self : HList π → Comp unit ρ.carrier)
+/-- `invokeAt_closureOf` at a target without a result, spelled at its row:
+the form a rewrite matches. -/
+@[simp] theorem invokeAt_closureOf_none (handle : FunctionHandle) {π captured supplied : NRow}
+    (self : HList π → Comp unit ResultShape.none.carrier)
     (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
-    (captures : HList captured) {σs : NRow} {shape : ResultShape} (args : HList σs)
-    (other : shape ≠ ρ) :
-    invokeAt handle π ρ self (closureOf handle weave.mask typeInstantiation captures) σs shape
-      args = Spec.stuck := by
-  simp [invokeAt, other]
+    (captures : HList captured) (shared : Sharing)
+    (typed : FunctionTyped supplied shared .nil
+      handle weave.mask typeInstantiation captures)
+    (args : HList supplied) :
+    invokeAt handle π .none self supplied shared .none
+        (functionOf supplied shared .nil handle weave.mask typeInstantiation captures typed)
+        args =
+      self (weave.compose captures args) :=
+  invokeAt_closureOf handle .none self weave typeInstantiation captures shared typed args
+
+/-- `invokeAt_closureOf` at a target with one result, spelled at its row. -/
+@[simp] theorem invokeAt_closureOf_one (handle : FunctionHandle) {π captured supplied : NRow}
+    (τ : NTy) (self : HList π → Comp unit (ResultShape.one τ).carrier)
+    (weave : Weave π captured supplied) (typeInstantiation : Array (TypeId × TypeId))
+    (captures : HList captured) (shared : Sharing)
+    (typed : FunctionTyped supplied shared (.cons τ .nil)
+      handle weave.mask typeInstantiation captures)
+    (args : HList supplied) :
+    invokeAt handle π (.one τ) self supplied shared (.one τ)
+        (functionOf supplied shared (.cons τ .nil) handle weave.mask typeInstantiation captures
+          typed)
+        args =
+      self (weave.compose captures args) :=
+  invokeAt_closureOf handle (.one τ) self weave typeInstantiation captures shared typed args
 
 /-- Lending a woven row is lending the supplied arguments and composing the
 captures' encodings among them by the weave's mask. -/
@@ -506,20 +535,20 @@ theorem Weave.lendArguments_compose_injective {full captured supplied : NRow}
     (Option.some.inj (composes.trans composes'.symm))
   exact ⟨HList.encode_injective sameCaptures, Array.toList_inj.mp sameLent⟩
 
-/-- Invoking a closure whose target, weave, and captures are known is running
+/-- Running a closure whose target, weave, and captures are known is running
 the target on the captures and the supplied arguments woven into its
 parameter row. -/
-theorem closureMeaning_closureOf {unit : VerexIR.Validation.ValidatedUnit}
+theorem closureRun_closureOf {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (handle : FunctionHandle) {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
     (shape : ResultShape) (args : HList supplied) :
-    closureMeaning executable (closureOf handle weave.mask typeInstantiation captures) supplied shape args =
+    closureRun executable (closureOf handle weave.mask typeInstantiation captures) supplied shape args =
       propheticRun executable typeInstantiation handle full shape (weave.compose captures args) := by
   have lend := weave.lendArguments_compose free
   have resolve := weave.argumentsResolve_compose free
-  simp only [closureMeaning, propheticRun, closureOf_captures]
+  simp only [closureRun, propheticRun, closureOf_captures]
   have mask : (closureOf handle weave.mask typeInstantiation captures).mask = weave.mask := rfl
   have function : (closureOf handle weave.mask typeInstantiation captures).function = handle := rfl
   have instantiation :
@@ -779,14 +808,33 @@ theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit}
         by rw [← result]; exact lendsResult, by rw [← result]; exact lendsProphecy,
         by rw [lend]; exact lendsValues, (resolve values loans _ _).mpr resolves⟩
 
-/-- An invocation of a function value at the family a call's type arguments
-induce is its invocation at the caller's types, read in the callee's view. -/
-theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
+/-- A function value of the frame type arguments induce, in the caller's
+view (`NTy.ofSkolem`), at the substituted result shape's row. -/
+def ResultShape.functionOfSkolem (θ : TypeArgs) (σs : NRow) (shared : Sharing) :
+    (shape : ResultShape) →
+    @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row) →
+    (NTy.function (NRow.subst θ.1 σs) shared (shape.subst θ.1).row).carrier
+  | .none, function => NTy.ofSkolem θ (.function σs shared .nil) function
+  | .one τ, function => NTy.ofSkolem θ (.function σs shared (.cons τ .nil)) function
+
+/-- A function value in the caller's view is the same closure. -/
+@[simp] theorem ResultShape.closure_functionOfSkolem (θ : TypeArgs) (σs : NRow)
+    (shared : Sharing) : (shape : ResultShape) →
+    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row)) →
+    (Carriers.functions (NRow.subst θ.1 σs) shared (shape.subst θ.1).row).closure
+        (shape.functionOfSkolem θ σs shared function) =
+      (@Carriers.functions (Skolems.instantiate θ Θ).toCarriers σs shared shape.row).closure function
+  | .none, _ => rfl
+  | .one _, _ => rfl
+
+/-- A run of a closure at the family a call's type arguments induce is its
+run at the caller's types, read in the callee's view. -/
+theorem closureRun_instantiate {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (closure : ClosureValue) (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow)
     (shape : ResultShape) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
-    @closureMeaning _ executable (Skolems.instantiate θ Θ) closure σs shape args =
-      Spec.bind (closureMeaning executable closure (NRow.subst θ.1 σs) (shape.subst θ.1)
+    @closureRun _ executable (Skolems.instantiate θ Θ) closure σs shape args =
+      Spec.bind (closureRun executable closure (NRow.subst θ.1 σs) (shape.subst θ.1)
           (HList.ofSkolem θ σs args))
         fun result => Spec.pure (ResultShape.toSkolem θ shape result) := by
   have lend (loans : List Nat) :
@@ -801,7 +849,7 @@ theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
       @ResultShape.lend _ (Skolems.instantiate θ Θ) shape prophecies value loans =
         (shape.subst θ.1).lend prophecies (ResultShape.ofSkolem θ shape value) loans :=
     (ResultShape.lend_ofSkolem θ free shape prophecies value loans).symm
-  simp only [closureMeaning, Spec.bind, Spec.pure]
+  simp only [closureRun, Spec.bind, Spec.pure]
   congr 1
   · funext initial value final
     apply propext
@@ -860,6 +908,43 @@ theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
       · rw [← lendAt, HList.toSkolem_ofSkolem]; exact lendsValues
       · rw [← resolve, HList.toSkolem_ofSkolem]; exact resolves
 
+/-- An invocation of a function value at the family a call's type arguments
+induce is its invocation at the caller's types, read in the callee's view. -/
+theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit}
+    (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
+    (shape : ResultShape)
+    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
+    @closureMeaning _ executable (Skolems.instantiate θ Θ) σs shared shape function args =
+      Spec.bind (closureMeaning executable (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+          (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args))
+        fun result => Spec.pure (ResultShape.toSkolem θ shape result) := by
+  simp only [closureMeaning, ResultShape.closure_functionOfSkolem]
+  exact closureRun_instantiate executable _ θ free σs shape args
+
+omit [Θ : Skolems unit] in
+/-- An invocation meaning given at every frame is coherent across the frames
+type arguments induce: invoking a function value at the induced frame is
+invoking it at the outer frame on the arguments read in the outer view, the
+result carried back, as both views hold the same runtime values. -/
+def InvokeMeaning.Coherent (invoke : (Θ : Skolems unit) → @InvokeMeaning unit Θ) : Prop :=
+  ∀ (Θ : Skolems unit) (θ : TypeArgs), θ.1.refFree = true → ∀ (σs : NRow) (shared : Sharing)
+    (shape : ResultShape)
+    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
+    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs),
+    invoke (Skolems.instantiate θ Θ) σs shared shape function args =
+      Spec.bind (invoke Θ (NRow.subst θ.1 σs) shared (shape.subst θ.1)
+          (@ResultShape.functionOfSkolem _ Θ θ σs shared shape function) (HList.ofSkolem θ σs args))
+        fun result => Spec.pure (ResultShape.toSkolem θ shape result)
+
+omit [Θ : Skolems unit] in
+/-- The executable's invocation meaning is coherent (`closureMeaning_instantiate`). -/
+theorem closureMeaning_coherent (executable : VerexIR.Validation.ExecutableUnit unit) :
+    InvokeMeaning.Coherent fun Θ => @closureMeaning _ executable Θ :=
+  fun Θ θ free σs shared shape function args =>
+    @closureMeaning_instantiate _ executable Θ θ free σs shared shape function args
+
 /-- A contract at the frame type arguments induce, read in the caller's
 view. -/
 def _root_.VerexIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
@@ -876,6 +961,65 @@ def _root_.VerexIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape 
   mustAbort := fun args => contract.mustAbort (HList.toSkolem θ σs args)
   frame := fun args initial result final =>
     contract.frame (HList.toSkolem θ σs args) initial (ResultShape.toSkolem θ shape result) final
+
+/-- A meaning at the frame type arguments induce, at the caller's types:
+its arguments carried into the callee's view, its result read back. -/
+def specializedMeaning (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
+    (meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
+      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)) :
+    HList (NRow.subst θ.1 σs) → Comp unit (shape.subst θ.1).carrier :=
+  fun args => Spec.bind (meaning (HList.toSkolem θ σs args))
+    fun result => Spec.pure (ResultShape.ofSkolem θ shape result)
+
+/-- A meaning satisfying a contract at the frame type arguments induce
+satisfies, at the caller's types, every contract equivalent to that one
+read in the caller's view (`doc/designs/native-verification.md`, "Specialized
+contracts"). -/
+theorem satisfies_specialized (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
+    {meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
+      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    {generic : Contract (Memory unit) Failure (@HList (Skolems.instantiate θ Θ).toCarriers σs)
+      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    {specialized : Contract (Memory unit) Failure (HList (NRow.subst θ.1 σs)) (shape.subst θ.1).carrier}
+    (verified : Satisfies meaning generic)
+    (equivalent : Contract.Equivalent specialized (generic.ofSkolem θ)) :
+    Satisfies (specializedMeaning θ meaning) specialized := by
+  intro args initial assumed required
+  obtain ⟨normal, failing, defined⟩ := verified (HList.toSkolem θ σs args) initial
+    ((equivalent.assumes args initial).mp assumed) ((equivalent.requires args initial).mp required)
+  refine ⟨fun result final ok => ?_, fun error aborted => ?_, fun undefined => ?_⟩
+  · simp only [specializedMeaning, Spec.bind_ok, Spec.pure_ok] at ok
+    obtain ⟨value, middle, run, rfl, rfl⟩ := ok
+    obtain ⟨established, kept, proper⟩ := normal value _ run
+    refine ⟨fun excused => (equivalent.ensures args initial _ _).mpr ?_,
+      (equivalent.frame args initial _ _).mpr ?_,
+      fun aborting => proper ((equivalent.mustAbort args initial).mp aborting)⟩
+    · simp only [Contract.ofSkolem, NTy.toSkolem_ofSkolem_shape]
+      exact established fun aborting => excused ((equivalent.mayAbort args initial).mpr aborting)
+    · simpa only [Contract.ofSkolem, NTy.toSkolem_ofSkolem_shape] using kept
+  · simp only [specializedMeaning, Spec.bind_aborts, Spec.pure_aborts, and_false, exists_false,
+      or_false] at aborted
+    exact (equivalent.aborts args initial error).mpr (failing error aborted)
+  · simp only [specializedMeaning] at undefined
+    rw [Spec.bind_undefined] at undefined
+    simp only [Spec.pure_undefined, and_false, exists_false, or_false] at undefined
+    exact defined undefined
+
+/-- A call at the frame type arguments induce, through the meaning at the
+caller's types (`specializedMeaning`): its arguments read in the caller's
+view, its result carried back into the callee's. -/
+theorem wp_specialized (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
+    {meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
+      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    {args : @HList (Skolems.instantiate θ Θ).toCarriers σs}
+    {ensures : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape → Memory unit → Prop}
+    {aborts : Failure → Prop} {initial : Memory unit}
+    (holds : wp (specializedMeaning θ meaning (HList.ofSkolem θ σs args))
+      (fun result => ensures (ResultShape.toSkolem θ shape result)) aborts initial) :
+    wp (meaning args) ensures aborts initial := by
+  simp only [specializedMeaning, HList.toSkolem_ofSkolem, wp_bind, wp_pure,
+    NTy.toSkolem_ofSkolem_shape] at holds
+  exact holds
 
 /-- A contract the run satisfies at the frame type arguments induce holds,
 read in the caller's view, of the run at the caller's types. -/
@@ -965,18 +1109,47 @@ theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit
     (typeArgs : Array TypeUse)
     (coherent : @Coherent unit (Skolems.instantiate θ Θ) handle
       (frameInstantiation unit handle outer typeArgs))
-    (captures : HList (NRow.subst θ.1 captured)) (args : HList (NRow.subst θ.1 supplied)) :
-    closureMeaning executable (closureOfGeneric unit outer typeArgs θ weave shape handle captures)
-      (NRow.subst θ.1 supplied) (shape.subst θ.1) args =
+    (captures : HList (NRow.subst θ.1 captured)) (shared : Sharing)
+    (typed : FunctionTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs)
+      captures)
+    (args : HList (NRow.subst θ.1 supplied)) :
+    closureMeaning executable (NRow.subst θ.1 supplied) shared (shape.subst θ.1)
+      (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed) args =
       Spec.bind (closedGeneric executable outer handle typeArgs θ full shape
           (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)))
         fun result => Spec.pure (ResultShape.ofSkolem θ shape result) := by
+  simp only [closureMeaning, functionOfGeneric_closure]
   rw [closureOfGeneric, ← weave.mask_subst θ.1,
-    closureMeaning_closureOf executable handle (weave.subst θ.1)
+    closureRun_closureOf executable handle (weave.subst θ.1)
       (NRow.refFree_subst θ.1 free captured capturedFree) _ captures,
     propheticRun_subst executable _ handle θ free full shape]
   simp only [closedGeneric]
   rw [@propheticMeaning_of_coherent _ _ (Skolems.instantiate θ Θ) _ _ coherent]
+
+/-- Supplying every parameter composes the arguments alone. -/
+theorem Weave.compose_supplying : (row : NRow) → (args : HList row) →
+    (Weave.supplying row).compose () args = args
+  | .nil, () => rfl
+  | .cons _ rest, (_, args) => by
+      simp only [Weave.supplying, Weave.compose, Weave.compose_supplying rest args]
+
+/-- A known closure run is the closure naming its target run at the woven
+arguments. -/
+theorem closureRun_closureOf_woven {unit : VerexIR.Validation.ValidatedUnit}
+    (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
+    (handle : FunctionHandle) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (shape : ResultShape) (args : HList supplied) :
+    closureRun executable (closureOf handle weave.mask typeInstantiation captures) supplied shape
+        args =
+      closureRun executable
+        (closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ()) full shape
+        (weave.compose captures args) := by
+  rw [closureRun_closureOf executable handle weave free typeInstantiation captures shape args,
+    closureRun_closureOf executable handle (Weave.supplying full) rfl typeInstantiation ()
+      shape (weave.compose captures args), Weave.compose_supplying]
 
 end Frames
 
@@ -987,23 +1160,85 @@ theorem closureMeaning_closureOf_nil {unit : VerexIR.Validation.ValidatedUnit}
     (executable : VerexIR.Validation.ExecutableUnit unit)
     (handle : FunctionHandle) {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
-    (captures : @HList (Carriers.runtime unit) captured) (shape : ResultShape)
+    (captures : @HList (Carriers.runtime unit) captured) (shared : Sharing) (shape : ResultShape)
+    (typed : @FunctionTyped unit (Skolems.runtime unit) supplied shared shape.row
+      handle weave.mask #[] captured captures)
     (args : @HList (Carriers.runtime unit) supplied) :
     letI : Skolems unit := Skolems.runtime unit
-    closureMeaning executable (closureOf handle weave.mask #[] captures) supplied shape args =
+    closureMeaning executable supplied shared shape
+        (functionOf supplied shared shape.row handle weave.mask #[] captures typed) args =
       propheticMeaning executable #[] handle full shape (weave.compose captures args) := by
   letI : Skolems unit := Skolems.runtime unit
-  rw [propheticMeaning_of_coherent (coherent_runtime unit handle)]
-  exact closureMeaning_closureOf executable handle weave free #[] captures shape args
+  rw [propheticMeaning_of_coherent (coherent_runtime unit handle), closureMeaning_functionOf]
+  exact closureRun_closureOf executable handle weave free #[] captures shape args
+
+/-- `closureMeaning_closureOf_nil` at a target without a result, spelled at
+its row: the form a rewrite matches. -/
+theorem closureMeaning_closureOf_nil_none {unit : VerexIR.Validation.ValidatedUnit}
+    (executable : VerexIR.Validation.ExecutableUnit unit)
+    (handle : FunctionHandle) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (captures : @HList (Carriers.runtime unit) captured) (shared : Sharing)
+    (typed : @FunctionTyped unit (Skolems.runtime unit) supplied shared .nil
+      handle weave.mask #[] captured captures)
+    (args : @HList (Carriers.runtime unit) supplied) :
+    letI : Skolems unit := Skolems.runtime unit
+    closureMeaning executable supplied shared .none
+        (functionOf supplied shared .nil handle weave.mask #[] captures typed) args =
+      propheticMeaning executable #[] handle full .none (weave.compose captures args) :=
+  closureMeaning_closureOf_nil executable handle weave free captures shared .none typed args
+
+/-- `closureMeaning_closureOf_nil` at a target with one result, spelled at
+its row. -/
+theorem closureMeaning_closureOf_nil_one {unit : VerexIR.Validation.ValidatedUnit}
+    (executable : VerexIR.Validation.ExecutableUnit unit)
+    (handle : FunctionHandle) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true)
+    (captures : @HList (Carriers.runtime unit) captured) (shared : Sharing) (τ : NTy)
+    (typed : @FunctionTyped unit (Skolems.runtime unit) supplied shared (.cons τ .nil)
+      handle weave.mask #[] captured captures)
+    (args : @HList (Carriers.runtime unit) supplied) :
+    letI : Skolems unit := Skolems.runtime unit
+    closureMeaning executable supplied shared (.one τ)
+        (functionOf supplied shared (.cons τ .nil) handle weave.mask #[] captures typed) args =
+      propheticMeaning executable #[] handle full (.one τ) (weave.compose captures args) :=
+  closureMeaning_closureOf_nil executable handle weave free captures shared (.one τ) typed args
 
 -- An invocation of a known closure is its target's call: the normalizer
 -- weaves the arguments and decides that the captures hold no reference.
-attribute [vir_denote] closureMeaning_closureOf_nil Weave.compose Weave.subst NTy.refFree
+attribute [vir_denote] closureMeaning_closureOf_nil_none closureMeaning_closureOf_nil_one
+  Weave.compose Weave.subst NTy.refFree
   NRow.refFree NRows.refFree
 
--- An invocation inside a callee inlined at type arguments is the
--- invocation at the caller's types.
-attribute [vir_denote] closureMeaning_instantiate ResultShape.toSkolem
+attribute [vir_denote] ResultShape.toSkolem ResultShape.functionOfSkolem
+
+open Lean Meta Simp in
+/-- Rewrite by an equation over a function value at the frame a call's type
+arguments induce (`closureMeaning_instantiate` and its kin): unified at
+default transparency, since the value a caller holds is one of the induced
+family (the transports of values between the views are identities), and its
+type-argument conditions decided. -/
+def rewriteInducedFrame (rule : Name) (e : Lean.Expr) : SimpM Step := do
+  let equation ← mkConstWithFreshMVarLevels rule
+  let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
+  let some (_, lhs, rhs) := statement.eq? | return .continue
+  unless ← withTransparency .default (isDefEq lhs e) do return .continue
+  for argument in arguments do
+    if (← instantiateMVars argument).isMVar then
+      let condition ← instantiateMVars (← inferType argument)
+      unless condition.isAppOfArity ``Eq 3 && !condition.hasMVar do return .continue
+      unless ← isDefEq argument (← mkDecideProof condition) do return .continue
+  let proof ← instantiateMVars (mkAppN equation arguments)
+  if proof.hasMVar then return .continue
+  return .visit { expr := ← instantiateMVars rhs, proof? := some proof }
+
+open Lean Meta Simp in
+/-- An invocation inside a callee inlined at type arguments is the
+invocation at the caller's types (`closureMeaning_instantiate`). -/
+simproc [vir_denote] invokeInducedFrame (@closureMeaning _ _ ?frame _ _ _ _ _) := fun e => do
+  unless e.getAppNumArgs == 8 && (e.getArg! 2).consumeMData.isAppOf ``Skolems.instantiate do
+    return .continue
+  rewriteInducedFrame ``closureMeaning_instantiate e
 
 open Lean Meta in
 /-- A proof of `Coherent unit handle typeInstantiation` by evaluation, of a
@@ -1062,13 +1297,19 @@ open Lean Meta Simp in
 /-- Rewrite the invocation of a known closure with type arguments by
 `closureMeaning_closureOfGeneric`. An invocation spells the rows the target's
 weave and type arguments substitute, which the equation's index cannot match,
-so the equation is instantiated by unification and its reference-freedom
-conditions are decided. -/
+so the equation is instantiated by unification, its function value first, and
+its reference-freedom conditions are decided. -/
 simproc [vir_denote] invokeGenericClosure
-    (@closureMeaning _ _ ?frame (@closureOfGeneric _ ?family _ _ _ _ _ _ _ _ _ _) _ _ _) := fun e => do
+    (@closureMeaning _ _ ?frame _ _ _ _ _) := fun e => do
+  -- The pattern leaves the function value open: spelled as a generic
+  -- closure, its type would fix the rows to their substitution.
+  unless e.getAppNumArgs == 8 && (e.getArg! 6).isAppOf ``functionOfGeneric do return .continue
   let equation ← mkConstWithFreshMVarLevels ``closureMeaning_closureOfGeneric
   let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
   let some (_, lhs, rhs) := statement.eq? | return .continue
+  -- The function value first: the rows the invocation spells substitute the
+  -- ones its weave and type arguments carry.
+  unless ← isDefEq (lhs.getArg! 6) (e.getArg! 6) do return .continue
   unless ← isDefEq lhs e do return .continue
   for argument in arguments do
     if (← instantiateMVars argument).isMVar then

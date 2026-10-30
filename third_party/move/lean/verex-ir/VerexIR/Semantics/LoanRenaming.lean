@@ -9,7 +9,7 @@ import VerexIR.Semantics.Focus
 Two runs from starts that differ only in their loan bookkeeping and in the
 loans their arguments are lent under mint the same loans in the same order,
 offset by their frontiers' difference, and lend the same arguments under
-loans of their own (`designs/static-typing.md`, "Loan independence").
+loans of their own (`doc/historical/static-typing.md`, "Loan independence").
 `rename` maps the loan identities of values, frames, and global memory by
 an injective renaming; `Within` states that every identity a value holds
 satisfies a predicate, such as having been minted at or beyond a frontier

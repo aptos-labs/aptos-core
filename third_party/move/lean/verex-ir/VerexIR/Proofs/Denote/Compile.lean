@@ -345,11 +345,16 @@ def Proj.mayMismatch : {τ σ : NTy} → Proj τ σ → Bool
       path.mayMismatch
   | _, _, .variant choices path => choices.partial || path.mayMismatch
 
+/-- The failure a pattern mismatch makes (`patternMismatch?`), its codes the
+throw's arguments, as the runtime throws it (`patternMismatchThrow?`). -/
+def mismatchFailure? (profile : Option Profile) : Option Failure :=
+  (patternMismatch? profile).map fun (kind, codes) => Failure.ofInts kind codes
+
 /-- The throw an access along a path makes where a variant lacks the field:
 the profile's mismatch throw, for a path that may meet one. -/
 def CompileNamespace.mismatchOn (ns : CompileNamespace) {τ σ : NTy} (path : Proj τ σ) :
     Option Failure :=
-  if path.mayMismatch then patternMismatchThrow? ns.source.profile else none
+  if path.mayMismatch then mismatchFailure? ns.source.profile else none
 
 /-- The slot of a named ghost field in each listed variant of a declaration. -/
 def ghostChoices? (unit : ValidatedUnit) (handle : StructHandle) (variants : List String)
@@ -547,14 +552,14 @@ def withDeaths (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (id :
   | none => .ok node
 
 /-- Whether a unit declares a ghost field or a spec variable's memory, which
-belong to the verification model (`designs/ghost-fields.md`). -/
+belong to the verification model (`doc/designs/ghost-fields.md`). -/
 def declaresGhosts (unit : ValidatedUnit) : Bool :=
   unit.namespaces.any fun ns => ns.structs.any fun declaration =>
     !declaration.ghosts.isEmpty || declaration.isGhostMemory
 
 /-- Whether `==` at a type compares the values' runtime encodings with
 ghost contents dropped: in a unit declaring ghosts, at a type mentioning a
-type parameter (`designs/ghost-fields.md`). -/
+type parameter (`doc/designs/ghost-fields.md`). -/
 def comparesErased (unit : ValidatedUnit) (τ : NTy) : Bool :=
   declaresGhosts unit && !τ.paramsAll (fun _ => false)
 
@@ -879,7 +884,7 @@ mutual
                 let fields ← compilePackArgs unit loanFacts ρ Γ ns namespaceId fuel
                   arguments.toList σs
                 -- Each initialized ghost slot takes its initializer's value
-                -- (`designs/ghost-fields.md`), before the invariants are owed.
+                -- (`doc/designs/ghost-fields.md`), before the invariants are owed.
                 let ghosts := nominalGhosts unit handle
                 let packed ← (List.range ghosts.size).foldlM
                     (init := Term.pack source nominalArguments fields) fun term k => do
@@ -955,14 +960,14 @@ mutual
               | .never _ => none
             match resultType? with
             | some τ => .ok (.at τ (.caseOf scrutinee
-                (← armsAt (patternMismatchThrow? ns.source.profile) τ arms)))
+                (← armsAt (mismatchFailure? ns.source.profile) τ arms)))
             | none =>
                 let some arms := arms.mapM fun (pattern, guard, body) => match body with
                     | .never body => some (pattern, guard, body)
                     | .at .. => none
                   | .error "internal: a match of type never has an arm with a type"
                 .ok (.never fun τ =>
-                  .caseOf scrutinee (neverArms (patternMismatchThrow? ns.source.profile) arms τ))
+                  .caseOf scrutinee (neverArms (mismatchFailure? ns.source.profile) arms τ))
         | .ifElse condition thenBranch elseBranch => do
             let condition ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel condition).at? .bool
             let thenBranch ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel thenBranch
@@ -988,8 +993,10 @@ mutual
             match arguments.toList with
             | [] => .ok (.never fun _ => .throw0 kind)
             | [code] => do
-                let ⟨_, code⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel code).some
-                .ok (.never fun _ => .throw1 kind code)
+                let ⟨σ, code⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel code).some
+                match σ, code with
+                | .int _ _, code => .ok (.never fun _ => .throw1 kind code)
+                | _, _ => notCarried "a throw of a value that is not an integer"
             | _ => notCarried "a throw with several arguments"
         | .return_ values =>
             match values.toList with
@@ -1052,7 +1059,7 @@ mutual
             let isAssertion := fun (condition : Condition) =>
               condition.kind matches .assertion | .apply | .split
             -- An update writes the ghost field it names the value the
-            -- meanings give its site (`designs/ghost-fields.md`), before or
+            -- meanings give its site (`doc/designs/ghost-fields.md`), before or
             -- after the block's other conditions.
             let isUpdate := fun (condition : Condition) => condition.kind == .update
             let all := block.conditions.toList
@@ -1144,7 +1151,7 @@ mutual
 
   /-- A constructor's fields, then each ghost slot of its row: any value of
   its type, the model's value for a ghost field the runtime does not hold
-  (`designs/ghost-fields.md`). -/
+  (`doc/designs/ghost-fields.md`). -/
   def compilePackArgs (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → List ExprId → (σs : NRow) → Except String (Args unit ρ Γ σs)
@@ -1174,7 +1181,7 @@ mutual
         let general : Except String (Compiled unit ρ Γ) := do
           let typed ← compilePattern Γ ns fuel patternId σ
           .ok (body.map fun _ body =>
-            .caseOf value (.cons typed body (.nil (patternMismatchThrow? ns.source.profile))))
+            .caseOf value (.cons typed body (.nil (mismatchFailure? ns.source.profile))))
         match pattern.kind with
         | .variable localId => do
             let x ← Var.at? Γ localId.index σ
@@ -1288,7 +1295,7 @@ mutual
             let x ← Var.at? σs index τ
             .ok (.at τ (.field x operand))
         | _, _ => notCarried "a field selection on a non-struct"
-    -- A ghost field reads as its slot's contents (`designs/ghost-fields.md`).
+    -- A ghost field reads as its slot's contents (`doc/designs/ghost-fields.md`).
     | fuel + 1, τ, .data (.selectGhost reference field), [operand] => do
         let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         let some handle := resolveStruct? unit namespaceId reference
@@ -1321,7 +1328,7 @@ mutual
             let some choices := variantFieldChoices? unit handle fields
               | .error "a variant field selection has no choices"
             let choices ← Choices.ofList names rows τ choices.toList
-            let mismatch := if choices.partial then patternMismatchThrow? ns.source.profile else none
+            let mismatch := if choices.partial then mismatchFailure? ns.source.profile else none
             .ok (.at τ (.payload mismatch choices operand))
         | _, _ => notCarried "a variant field selection on a non-enum"
     | _ + 1, _, operation, _ => notCarried (describeKind (.operation operation #[] #[] none))
@@ -1669,7 +1676,7 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
 /-- The compiled function a handle names, or the construct that stops it:
 its denotation, which agrees with its runtime meaning. A unit declaring
 ghost fields has none: its model holds ghost state the runtime does
-not, and is verified through the model (`designs/ghost-fields.md`). -/
+not, and is verified through the model (`doc/designs/ghost-fields.md`). -/
 def compileFunction (unit : ValidatedUnit)
     (handle : FunctionHandle) : Except String (Function unit) :=
   if declaresGhosts unit then .error "a unit declaring ghost fields is verified through its model"
@@ -1679,7 +1686,7 @@ def compileFunction (unit : ValidatedUnit)
 
 /-- A function's model in a unit declaring ghost fields: its denotation with
 the ghost state the runtime does not hold, which the unit's verification
-reads instead of its runtime meaning (`designs/ghost-fields.md`). -/
+reads instead of its runtime meaning (`doc/designs/ghost-fields.md`). -/
 def compileModelFunction (unit : ValidatedUnit)
     (handle : FunctionHandle) : Except String (Function unit) :=
   match compileNamespaceAt? unit handle.namespaceId with

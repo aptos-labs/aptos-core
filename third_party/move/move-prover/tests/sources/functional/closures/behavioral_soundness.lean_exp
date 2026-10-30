@@ -1,12 +1,10 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/behavioral_soundness.move:16:9: error: the specification clause `ensures false` is not established
-tests/sources/functional/closures/behavioral_soundness.move:14:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](always_aborts)>(0) >= 0` is not established
 tests/sources/functional/closures/behavioral_soundness.move:13:5: error: verex verification failed: the automatic verification of `always_aborts_context_is_consistent` failed; provide a proof in `tests/sources/functional/closures/behavioral_soundness.proof.lean`:
   verify always_aborts_context_is_consistent by
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_soundness.move:31:9: error: the specification clause `ensures !aborts_of<function[Fn(u64) -> Unit](partially_specified_abort)>(x)` is not established
@@ -18,13 +16,11 @@ tests/sources/functional/closures/behavioral_soundness.move:28:5: error: verex v
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_soundness.move:44:9: error: the specification clause `ensures false` is not established
-tests/sources/functional/closures/behavioral_soundness.move:42:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](requires_positive)>(0) >= 0` is not established
 tests/sources/functional/closures/behavioral_soundness.move:41:5: error: verex verification failed: the automatic verification of `result_of_outside_precondition_is_consistent` failed; provide a proof in `tests/sources/functional/closures/behavioral_soundness.proof.lean`:
   verify result_of_outside_precondition_is_consistent by
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_soundness.move:1:1: error: a function value with type arguments is not carried in generated contracts

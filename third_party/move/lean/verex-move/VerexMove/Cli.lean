@@ -20,7 +20,8 @@ open VerexSL.SourceVerify
 private def usage : String :=
   "usage: verex-move verify <source.move | package directory> [--output <generated.lean>] \
    [--export <xast directory>] [--filter <file name part>] [--modules <a::m>,...] \
-   [--heartbeats <thousands>] [--ignore-proofs] [--render-only] [--dev]"
+   [--heartbeats <thousands>] [--jobs <targets at once>] [--ignore-proofs] [--render-only] \
+   [--dev]"
 
 private def fail (message : String) : IO α := throw <| IO.userError s!"{message}\n{usage}"
 
@@ -45,6 +46,9 @@ private structure VerifyOptions where
   dev : Bool := false
   /-- Every function is verified automatically, its authored proof ignored. -/
   ignoreProofs : Bool := false
+  /-- How many targets of a module are proved at once; half the hardware
+  threads without. -/
+  jobs : Option Nat := none
 
 private partial def parseOptions : List String → VerifyOptions → IO VerifyOptions
   | [], options => pure options
@@ -63,6 +67,12 @@ private partial def parseOptions : List String → VerifyOptions → IO VerifyOp
   | "--modules" :: names :: rest, options =>
       if !options.modules.isEmpty then fail "--modules may be specified only once"
       else parseOptions rest { options with modules := (names.splitOn ",").toArray }
+  | "--jobs" :: value :: rest, options =>
+      if options.jobs.isSome then fail "--jobs may be specified only once"
+      else match value.toNat? with
+        | some jobs => if jobs == 0 then fail "--jobs expects a positive number"
+            else parseOptions rest { options with jobs := some jobs }
+        | none => fail s!"--jobs expects a number, not `{value}`"
   | "--heartbeats" :: value :: rest, options =>
       if options.heartbeats.isSome then fail "--heartbeats may be specified only once"
       else match value.toNat? with
@@ -83,7 +93,7 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
   let environment ← VerexSL.Perf.withPhase .load VerexMove.SourceVerify.importEnvironment
   let reports ← VerexMove.SourceVerify.verifySource environment source output
     options.exported options.filter options.renderOnly options.heartbeats options.modules
-    options.dev options.ignoreProofs
+    options.dev options.ignoreProofs options.jobs
   for report in reports do IO.println report.render
   -- The rendering and the wall time per phase are reports on the run, not
   -- its messages.

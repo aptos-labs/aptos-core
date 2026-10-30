@@ -4,7 +4,7 @@
 import VerexE2ETests.CheckSupport
 
 /-! An intrinsic map owner is its abstract map in verification
-(`designs/intrinsic-maps.md`, "Abstract representation"): a function of the
+(`doc/designs/intrinsic-maps.md`, "Abstract representation"): a function of the
 owner's module reading its representation has no denotation and is used
 through its specification; its own body is not verified. Only the owner's
 module can read its representation, by Move's visibility. -/
@@ -71,24 +71,19 @@ error: `count` reads the representation of the intrinsic map `Map`; a function o
 #guard_msgs in
 verify 0x42::abstract_owners::count
 
--- A leaf budget: past it a leaf is reported for the proof file.
+-- Stated contract facts close the invariant and call precondition even at
+-- this budget; the remaining clauses are reported for the proof file.
 /--
 error: the specification clause `aborts_if false` is not established
 ---
-error: the data invariant `intrinsic_map` does not hold where a mutation ends
----
 error: the specification clause `ensures result == 2` is not established
----
-error: the precondition of `add` is not established
 ---
 error: verex verification failed: the automatic verification of `two_budgeted` failed; provide a proof in the module:
   verify two_budgeted by
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
-    | data_invariant => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
-    | requires_of_add => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
@@ -97,10 +92,9 @@ verify 0x42::abstract_owners::two_budgeted
 
 -- The map laws under the module's specification function names.
 /--
-info: «0x42».abstract_owners.get_set (layout : VerexIR.Maps.Layout) (discipline : VerexIR.Maps.Discipline)
-  (map key value probe : VerexIR.RuntimeValue) :
-  VerexIR.Maps.valueAt (VerexIR.Maps.update layout discipline map key value) probe =
-    if probe = key then value else VerexIR.Maps.valueAt map probe
+info: «0x42».abstract_owners.get_set {K V : Type} [DecidableEq K] [Inhabited V] (discipline : VerexIR.SpecMap.Discipline K)
+  (map : VerexIR.SpecMap K V) (key : K) (value : V) (probe : K) :
+  (VerexIR.SpecMap.update discipline map key value).valueAt probe = if probe = key then value else map.valueAt probe
 -/
 #guard_msgs in
 #check «0x42».abstract_owners.get_set

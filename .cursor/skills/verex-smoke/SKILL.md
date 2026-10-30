@@ -13,13 +13,20 @@ checkpoint gate before a commit.
 ## Smoke suite
 
 ```bash
-third_party/move/lean/scripts/smoke.sh            # ≈ 90 s warm; the first run also builds the Move CLI (cargo, ≈ 2 min)
+third_party/move/lean/scripts/smoke.sh            # ≈ 65 s warm; after a restack the Move CLI rebuilds too (cargo, minutes)
 third_party/move/lean/scripts/smoke.sh --no-mvp   # without the Move Prover tests
+third_party/move/lean/scripts/smoke.sh --no-exe   # Lean fixtures only: no executable, no cargo
+third_party/move/lean/scripts/smoke.sh --jobs N   # Lean processes at once (or SMOKE_JOBS)
 third_party/move/lean/scripts/smoke.sh --list     # the fixtures
 ```
 
-It builds `verex-ir` and the e2e Check library in place, elaborates the
-fixtures and prints one line per fixture with pass/fail and seconds:
+It builds `verex-ir` and the e2e Check library in place, then elaborates the
+Lean fixtures as parallel processes (by default half the hardware threads, at
+most one per 3 GB of available memory), longest first by their times in the
+previous run, and prints one line per fixture with pass/fail and its own
+seconds, in the listed order. The `verex-move` executable (and the Move CLI,
+unless `APTOS_MOVE_CLI` is set) builds beside the fixtures; `verex-move verify`
+and the Move Prover tests run after them, beside each other. The fixtures:
 
 - Check fixtures (`verex-e2e-tests/VerexE2ETests/Check/`): `Storage/TableReads`,
   `TableAllocation`, `TableGlobalWrites`, `TableStoredInvariants`,
@@ -58,6 +65,15 @@ Rules it encodes:
 Run it after each edit batch, per the small-change validation rule. Green
 smoke is not a commit gate.
 
+Between smoke runs, build libraries, not executables: `lake build` in
+`verex-ir`, `lake build VerexMove` in `verex-move`, `lake build VerexE2ETests`
+in `verex-e2e-tests` (the default targets of the last two also compile and
+link the executables). To verify a Move package or some of its modules,
+`third_party/move/lean/scripts/verify-modules.py <package> [--filter <part>]`
+runs one `verex-move verify` process per module, several at a time, and
+prints the reports in module order; `verex-move verify <package>` runs the
+targets one after another.
+
 ## Checkpoint gate (before every commit)
 
 1. Full build and the four suites: `(cd verex-ir && lake build && lake test)`,
@@ -75,8 +91,11 @@ smoke is not a commit gate.
 
 ## Where the build time goes
 
-Measured 2026-10-18 after touching `Denote/Types.lean`: the `verex-move`
-rebuild takes 4m24s, dominated by the code generator compiling meta code
-(`Denote/Solve.lean` ≈ 140 s and `VerexSL/Verify.lean` ≈ 65 s of
-"compilation (LCNF base)" in standalone profiles). Stubbing the tactic
-proofs of the proof modules saved only 27 s and was not adopted.
+An edit rebuilds the edited module, every module importing it, and the C of
+the edited module only. The solver, `Contract` and `Verify` are split into
+parts so that most edits rebuild one part and its importers: an edit of the
+solver's walker costs about 30 s to libraries and 15 s more to the
+executable, against 90 s and 70 s before the split. Measurements and the
+parts: `third_party/move/lean/designs/performance.md`, "Modules split for
+edits", and `third_party/move/lean/CLAUDE.md`. After a restack, the first
+smoke also rebuilds the Move CLI with cargo (8 min on 2026-10-22).

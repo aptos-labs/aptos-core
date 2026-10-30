@@ -57,7 +57,7 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | Path | Contents |
 |---|---|
 | [`README.md`](README.md) | Tree-level overview, architecture, setup, and the main build/test path. Start here. |
-| [`designs/`](designs/) | The current cross-package design documents: unified VIR, VIR elaboration/verification, the VerexSL surface, the Rust MIR frontend, and the MonoVM differential-testing link. |
+| [`doc/`](doc/) | Designs, the plan, status, historical designs, and talks; see "Documentation". |
 | [`verex-ir/`](verex-ir/) | Shared typed VIR, versioned RawUnit JSON import, validation, structured semantics, interpreter, proofs, and unit tests. It owns the neutral IR boundary. |
 | [`verex-move/`](verex-move/) | Move semantic profile and intrinsic registry over `verex-ir`, the Move exchange frontend (`VerexMove/Frontend`): CLI invocation, XAST decoding, and VIR encoding, and the XIR backend (`VerexMove/Xir`) compiler-v2 compiles `.lean` sources through. |
 | [`verex-rust/`](verex-rust/) | Rust semantic profile, source backend, registry, Lean-owned import CLI, and Lean integration tests. |
@@ -66,7 +66,7 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Verex Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified VIR. |
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Verex printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and VIR adapter were ported to `verex-move`. |
 | [`verex-e2e-tests/`](verex-e2e-tests/) | Discoverable Move-to-VerexSL and Rust-to-VerexSL source/result baselines. Assertion-style legacy tests remain with their owning packages. |
-| [`scripts/`](scripts/) | The core smoke suite (`smoke.sh`, see "Between turns"), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. The verification benchmark driver (`verex-bench.py`); see `designs/verification-benchmarks.md`. |
+| [`scripts/`](scripts/) | The core smoke suite (`smoke.sh`, see "Between turns"), package verification with one process per module (`verify-modules.py`), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `doc/designs/performance.md`. The verification benchmark driver (`verex-bench.py`); see `doc/status/verification-benchmarks.md`. |
 | [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit, and a Move package of problems written for it (`package/`). |
 | [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
 
@@ -75,145 +75,48 @@ live under `Foo/`, and tests are either under `Foo/Tests/` or exposed through a
 test library listed in that package's `lakefile.toml`. `.lake/` contains local
 build output and is not source.
 
-## Design and architecture documents
+## Documentation (`doc/`)
 
-Read the document for the layer being changed; many contain explicit status,
-non-goals, deferred-work registers, and testing requirements.
+Read the design for the layer being changed. Designs hold the model and
+the decisions, not status; what is open is in the plan, and state that the
+source does not show is in the status directory.
 
-### Current designs (`designs/`)
+| Directory | Contents |
+|---|---|
+| [`doc/designs/`](doc/designs/) | The current designs (below). |
+| [`doc/plan/`](doc/plan/) | [`roadmap.md`](doc/plan/roadmap.md): what is open, by track, in priority order. Approved but unscheduled plans beside it ([`native-function-values.md`](doc/plan/native-function-values.md), [`unsafe-pointers.md`](doc/plan/unsafe-pointers.md)). |
+| [`doc/status/`](doc/status/) | [`prover-test-problems.md`](doc/status/prover-test-problems.md): what the Move Prover's tests show under Verex and why; [`assumptions.md`](doc/status/assumptions.md): the hypotheses of the public theorems nothing discharges; [`measurement-debts.md`](doc/status/measurement-debts.md); [`verification-benchmarks.md`](doc/status/verification-benchmarks.md): the nightly benchmark and its history. |
+| [`doc/historical/`](doc/historical/) | Executed or superseded designs, kept for their rationale, not updated. |
+| [`doc/talk/`](doc/talk/) | Talk sources and PDFs. |
 
-The current cross-package designs live in [`designs/`](designs/). The design
-documents kept inside `v0/` (`move/`, `move-model/`, `transpiler/`) describe the
-older source-specific work those packages own.
+Designs:
 
-- [`designs/roadmap.md`](designs/roadmap.md): the single status document —
-  what is open across the designs in priority order, and the test ledger
-  (gates, the Check fixtures under `verex-e2e-tests/VerexE2ETests/Check/`,
-  and their conventions).
-- [`designs/proof-strategy.md`](designs/proof-strategy.md): the thesis —
-  cheap, predictable automation for easy obligations, authored (AI-generated)
-  proofs for hard ones, no SMT — with its measurements and milestones P1–P4.
-- [`designs/vir-design.md`](designs/vir-design.md): the master design — unified
-  VIR ownership, stages, profiles, validation, serialization, frontend/backend
-  contracts, deferred-work register, and phase roadmap.
-- [`designs/elaboration-design.md`](designs/elaboration-design.md): VIR
-  elaboration, verification, execution, runtime semantics, and migration plan.
-- [`designs/denotation.md`](designs/denotation.md): the current
-  verification design — one `denote` of validated VIR into `Spec` and one
-  agreement theorem against `BigStep`, replacing per-target generated
-  agreement proofs; milestones D0–D6 with their fixture gates.
-- [`designs/perf-notes.md`](designs/perf-notes.md): how to measure
-  performance (stage logs, heartbeat stages, profiler categories, kernel
-  unfold diagnostics), what verification, elaboration, and the kernel pay
-  for, rejected experiments, and the open leads.
-- [`designs/verification-benchmarks.md`](designs/verification-benchmarks.md):
-  the nightly benchmark of standard problems, heartbeats per phase, history
-  from recent CI runs, curves, Slack reports, and local comparison.
-- [`designs/verex-sl.md`](designs/verex-sl.md): the profile-aware Verex
-  source language over the shared IR, generalizing the Move-profile surface.
-- [`designs/prophetic-references.md`](designs/prophetic-references.md):
-  prophecy-based ownership model for references in validated VIR — the
-  RustHorn encoding run by the interpreter, big-step relation, and
-  verifier alike, with loan elimination in validation and milestones.
-- [`designs/rust-mir-design.md`](designs/rust-mir-design.md): Rustc Public
-  frontend decision, Rust profile, structured VIR boundary, Rust source
-  backend, references, generics, unsafe boundary, and milestones.
-- [`designs/relocatable-namespaces.md`](designs/relocatable-namespaces.md):
-  validated namespaces as relocatable objects, linked into units by
-  relocation without re-validation, and verification across modules;
-  milestones R1–R4.
-- [`designs/source-verification.md`](designs/source-verification.md): the
-  `verex-move verify` / `verex-rust verify` commands, Rust `.spec.lean`
-  files, Move frames, and how messages map back to the original sources.
-- [`designs/proof-file-editing.md`](designs/proof-file-editing.md): Move
-  proof files as Lean files whose header (`verex proofs for`, `verex proofs
-  where`) loads their module's context from its rendering, so they open in
-  the editor with a working InfoView; options weighed, P1–P3 done, Rust
-  specification files and importable renderings open.
-- [`designs/lemmas.md`](designs/lemmas.md): Move `spec lemma`s and `proof`
-  blocks translated: VIR lemmas and proof steps (`apply`, `split`), lemma
-  theorems by well-founded recursion, and `apply` sites in the solver.
-- [`designs/prover-test-problems.md`](designs/prover-test-problems.md): the
-  registry of problems the Move Prover's unit tests show under Verex
-  (`MVP_TEST_FEATURE=lean`), each with its message and tests.
-- [`designs/static-memory.md`](designs/static-memory.md): the
-  denotation's global memory as one typed memory per resource type,
-  related to runtime globals once in the agreement; milestones S1–S5.
-- [`designs/static-typing.md`](designs/static-typing.md): semantic types,
-  a proved-sound static type checker run at preparation, and the phases
-  toward preservation of runtime typing for the big-step semantics.
-- [`designs/monovm-link-design.md`](designs/monovm-link-design.md): linking
-  MonoVM into Lean test executables for differential execution testing.
-- [`designs/higher-order-functions.md`](designs/higher-order-functions.md):
-  function values: closure masks and instantiations in VIR, closures as
-  runtime values in the denotation, behavioral predicates defined from a
-  closure's meaning, state labels, and milestones H1–H5.
-- [`designs/unsafe-pointers.md`](designs/unsafe-pointers.md): proposal for
-  the Rust unsafe profile over the prophetic model, scheduled as Rust M5.
-- [`designs/ghost-fields.md`](designs/ghost-fields.md): the Move Prover's
-  ghost fields carried in VIR values (`RuntimeValue.ghost`), filled by the
-  denotation and agreed up to ghost contents; the validity slots of
-  intrinsic maps; milestones G1–G5.
-- [`designs/state-labels.md`](designs/state-labels.md): state labels of
-  Move specifications (`..S |~ …`, `exists S in *`) as memory variables,
-  defined by state-change predicates or quantified; exchange, VIR,
-  VerexSL, contracts, solver witnesses; milestones S1–S4.
-- [`verex-rust/rust-exporter/README.md`](verex-rust/rust-exporter/README.md):
-  exact exporter scope, supported MIR fixtures, commands, and known boundaries.
+- [`vir-design.md`](doc/designs/vir-design.md): the unified VIR: ownership, stages, profiles, validation, serialization, frontend and backend contracts.
+- [`elaboration-design.md`](doc/designs/elaboration-design.md): runtime model, big-step semantics, interpreter, correctness obligations.
+- [`denotation.md`](doc/designs/denotation.md): one `denote` of validated VIR into `Spec` and one agreement theorem against `BigStep`.
+- [`native-verification.md`](doc/designs/native-verification.md): verification over native values only: constructs, enforcement, the solver's normal form and splits, specialized contracts.
+- [`proof-strategy.md`](doc/designs/proof-strategy.md): bounded automation, authored proofs, no SMT; the authored interface.
+- [`performance.md`](doc/designs/performance.md): how to measure, build cost, what was learned, open levers, rejected experiments.
+- [`source-verification.md`](doc/designs/source-verification.md): `verex-move verify` / `verex-rust verify` / `move prove --lean`, proof files, pragmas, message mapping.
+- [`verex-sl.md`](doc/designs/verex-sl.md): the profile-aware Verex source language.
+- [`prophetic-references.md`](doc/designs/prophetic-references.md): the prophecy ownership model of references.
+- [`static-memory.md`](doc/designs/static-memory.md): one typed memory per resource type.
+- [`intrinsic-maps.md`](doc/designs/intrinsic-maps.md): the abstract map value of intrinsic map types, roles, validity, typed map laws.
+- [`ghost-fields.md`](doc/designs/ghost-fields.md): ghost fields and validity slots.
+- [`state-labels.md`](doc/designs/state-labels.md): state labels as memory variables.
+- [`higher-order-functions.md`](doc/designs/higher-order-functions.md): closures in VIR, runtime, denotation, behavioral predicates, the typed carrier of function types.
+- [`lemmas.md`](doc/designs/lemmas.md): `spec lemma`s and `proof` blocks.
+- [`numeric-representation.md`](doc/designs/numeric-representation.md): integers as mathematical integers, not the Prover's bit vectors.
+- [`relocatable-namespaces.md`](doc/designs/relocatable-namespaces.md): namespaces linked by relocation; verification across modules.
+- [`rust-mir-design.md`](doc/designs/rust-mir-design.md): the Rustc Public frontend, Rust profile, source backend, milestones.
+- [`monovm-link-design.md`](doc/designs/monovm-link-design.md): MonoVM linked for differential execution.
+- [`verex-rust/rust-exporter/README.md`](verex-rust/rust-exporter/README.md): exporter scope and commands.
 
-Executed or superseded designs move to
-[`designs/historical/`](designs/historical/) (`verification-v2.md`,
-`certifying-execution.md`, `generic-route.md`, and
-`verification-perf-audit.md`, all replaced by `denotation.md`;
-`test-organization.md` and `test-organization-history.md`, the earlier
-check ledger, replaced by the roadmap's test ledger); they are reference
-only and are not updated. Session and handoff history belongs in version
-control, not in a separate documentation archive.
-
-### Verex Move source and verification (deprecated packages)
-
-- [`v0/move/Move/README.md`](v0/move/Move/README.md): example-driven architecture
-  and module tour.
-- [`v0/move/Move/verex-move.md`](v0/move/Move/verex-move.md): language reference,
-  grammar, types, expressions, functions, specifications, verification, and
-  compilation.
-- [`v0/move/Move/verification-design.md`](v0/move/Move/verification-design.md):
-  relational source semantics, effects, references, contracts, verification
-  interface, tests, and proof obligations.
-- [`v0/move/Move/design-plan.md`](v0/move/Move/design-plan.md): lowering from Verex
-  Move through VIR and MoveModel IR to XIR and bytecode.
-- [`v0/move/Move/project-plan.md`](v0/move/Move/project-plan.md): implemented source
-  features, unsupported language coverage, diagnostics, and roadmap.
-- [`v0/move/Move/loop-design.md`](v0/move/Move/loop-design.md): loop syntax, lowering,
-  fixed-point verification, and diagnostics.
-- [`v0/move/Move/invariant-design.md`](v0/move/Move/invariant-design.md): data and
-  global invariants and where proof obligations arise.
-- [`v0/move/Move/address-design.md`](v0/move/Move/address-design.md): address surface
-  model and compiler representation.
-- [`v0/move/Move/unified-int-design.md`](v0/move/Move/unified-int-design.md) and
-  [`v0/move/Move/int-widening-design.md`](v0/move/Move/int-widening-design.md): integer
-  representation, operations, and specification coercion policy.
-- [`v0/move/Move/structural-equality-design.md`](v0/move/Move/structural-equality-design.md):
-  runtime structural equality and the remaining verification-model gap.
-- [`v0/move/Move/performance-analysis.md`](v0/move/Move/performance-analysis.md) and
-  [`v0/move/Move/proof-simplification-plan.md`](v0/move/Move/proof-simplification-plan.md):
-  proof cost, simplifier behavior, benchmarks, and proof cleanup.
-- [`v0/move/Move/overview.md`](v0/move/Move/overview.md): short conceptual overview.
-
-### Move model and transpilation (deprecated packages)
-
-- [`v0/move-model/MoveModel/README.md`](v0/move-model/MoveModel/README.md): model
-  overview and links to the detailed
-  [`IR`](v0/move-model/MoveModel/IR/README.md),
-  [`Frontend`](v0/move-model/MoveModel/Frontend/README.md), and
-  [`Prover`](v0/move-model/MoveModel/Prover/README.md) guides.
-- [`v0/transpiler/transpile-design.md`](v0/transpiler/transpile-design.md): XAST
-  exchange format, export stage, decoding/printing, semantic mapping,
-  validation, baselines, and feature scoreboard.
-- [`v0/transpiler/intrinsic-design.md`](v0/transpiler/intrinsic-design.md): generic
-  intrinsic-map representation, lowering, diagnostics, and acceptance tests.
-- [`verex-e2e-tests/README.md`](verex-e2e-tests/README.md): source/result
-  baseline conventions for the two cross-language paths.
+The deprecated packages under `v0/` keep their own design documents
+(`v0/move/Move/*.md`, `v0/move-model/MoveModel/README.md`,
+`v0/transpiler/*.md`); they describe the old stack and are reference only.
+The e2e baseline conventions are in
+[`verex-e2e-tests/README.md`](verex-e2e-tests/README.md).
 
 ## Toolchains and setup
 
@@ -254,7 +157,7 @@ export APTOS_MOVE_CLI="$(git rev-parse --show-toplevel)/target/ci/move"
 The reverse direction verifies a Move package in place from the Move CLI:
 `move prove --lean --package-dir <package>` (or `aptos move prove --lean`)
 exports the package and runs the built `verex-move` executable through
-`lake env`; see `designs/source-verification.md` ("From the Move CLI").
+`lake env`; see `doc/designs/source-verification.md` ("From the Move CLI").
 A function the automatic verification does not establish within its budget
 is proved in the proof file beside its Move file (`foo.proof.lean`: its
 header, then `verify f by …` items and their lemmas), which the failure
@@ -316,16 +219,42 @@ suite described in [`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skil
 stack's regressions, read-only against their `.exp`, with one pass/fail line
 each; it refuses `UB=1`. Green smoke is not a commit gate.
 
+While iterating, build libraries, not executables: `lake build` in
+`verex-ir`, `lake build VerexMove` in `verex-move`, and `lake build
+VerexE2ETests` in `verex-e2e-tests`. The default targets of the last two
+also build the `verex-move` executable and the e2e driver, whose C
+compilation and linking the Lean fixtures do not need (10–30 s after an edit
+of one part of the solver; see `doc/designs/performance.md`, "Modules split for
+edits"). The smoke suite builds the executable beside its Lean fixtures,
+and `--no-exe` skips it with the two items that need it. To verify a Move
+package while iterating, `scripts/verify-modules.py <package> [--filter
+<part>]` runs one `verex-move verify` process per module, several at a time.
+
 Profile code generation as well as proofs when investigating build time.
 Splitting large metaprograms in `VerexIR/Proofs/Denote/Solve.lean` and
 `VerexSL/Verify.lean` into smaller functions reduces compiler work; see
-[`designs/perf-notes.md`](designs/perf-notes.md) for the measurements.
+[`doc/designs/performance.md`](doc/designs/performance.md) for the measurements.
+
+The solver, the contract generator and `verify` are split into modules for
+build time; the last part of each keeps the original module name, so
+importers are unchanged:
+
+| Module | Parts, in import order |
+|---|---|
+| `VerexIR.Proofs.Denote.Solve` | `Solve.Base` (options, accounting, leaf facts, caches); `Solve.Decide` (leaf deciders) and `Solve.Normal` (the normal form's simprocs and lemmas), which do not import each other; `Solve.Invoke` (splits, behaviors, invocations); `Solve` (walker, authored tactics) |
+| `VerexSL.Contract` | `Contract.Values` (native types, values, maps, owners); `Contract.Clauses` (the clause translator); `Contract` (invariants, contract assembly) |
+| `VerexSL.Verify` | `Verify.Contracts` (compiled functions, contracts, loop invariants; no solver import); `Verify.Members` (targets, cycles, lemmas); `Verify` (commands) |
+
+Put a new declaration in the part of its topic; one that another part uses
+cannot be `private`. Keep these import boundaries: `Solve.Normal` and
+`Solve.Decide` independent of each other, and `Verify.Contracts` free of the
+solver, so that an edit of one rebuilds neither the other nor that part.
 
 The Move Prover's lean gate (`MVP_TEST_FEATURE=lean cargo test -p move-prover
 --test testsuite`) builds `verex-move` itself and runs a private copy of it
 under `target/tmp`, so a concurrent Lake build cannot change what a test
 loads, and a harness failure of the verifier is never written as a
-baseline; see `designs/source-verification.md` ("From the Move Prover").
+baseline; see `doc/designs/source-verification.md` ("From the Move Prover").
 
 Do not add `sorry`, axioms, or other admissions to make a proof compile unless
 the design explicitly models an assumption and the change is requested.

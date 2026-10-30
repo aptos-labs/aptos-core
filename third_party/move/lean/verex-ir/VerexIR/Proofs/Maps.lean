@@ -7,7 +7,7 @@ import VerexIR.Proofs.Denote.Attr
 /-!
 # The intrinsic map model
 
-The model of an intrinsic map value (`designs/intrinsic-maps.md`): the list
+The model of an intrinsic map value (`doc/designs/intrinsic-maps.md`): the list
 of its `(key, value)` entries, under one of two disciplines. A sequence keeps
 insertion order: an update replaces the entry in place or appends one, and a
 removal moves the last entry into the removed position. An ordered map keeps
@@ -86,10 +86,10 @@ theorem containsB_iff (entries : Entries) (key : RuntimeValue) :
         · exact .inl rfl
         · exact .inr ⟨w, h⟩
 
-@[simp, vir_denote_norm] theorem containsB_nil (key : RuntimeValue) : containsB [] key = false :=
+@[simp] theorem containsB_nil (key : RuntimeValue) : containsB [] key = false :=
   rfl
 
-@[simp, vir_denote_norm] theorem containsB_cons (entry : RuntimeValue × RuntimeValue)
+@[simp] theorem containsB_cons (entry : RuntimeValue × RuntimeValue)
     (rest : Entries) (key : RuntimeValue) :
     containsB (entry :: rest) key = (decide (entry.1 = key) || containsB rest key) := rfl
 
@@ -623,7 +623,7 @@ or one variant of an enum) holds its entries in its last field, a vector of
 two-field entry values. An entries layout has that field alone, its entries
 values of the entry declaration. A table layout holds the handle of the
 table first, then its cached length if the owner caches one, then the
-hidden contents field of entry tuples (`designs/intrinsic-maps.md`,
+hidden contents field of entry tuples (`doc/designs/intrinsic-maps.md`,
 "Views"). -/
 structure Layout where
   owner : StructHandle
@@ -639,7 +639,7 @@ structure Layout where
   (`dummy_field`); the value keeps it as a table keeps its handle. -/
   dummy : Bool
   /-- The ghost slots of an owner declaring ghost fields, after its fields and
-  before its hidden contents (`designs/ghost-fields.md`). -/
+  before its hidden contents (`doc/designs/ghost-fields.md`). -/
   ghosts : Nat := 0
 
 /-- The fields before an owner's ghost slots: its handle or placeholder, and
@@ -758,7 +758,7 @@ theorem Layout.slotsOf_build (layout : Layout) (handle : RuntimeValue) (entries 
     exact layout.slot_build handle slots entries bound
 
 /-- A value built with fresh slots holds fresh slots. -/
-@[simp, vir_denote_norm] theorem Layout.slotsOf_build_fresh (layout : Layout) (handle : RuntimeValue)
+@[simp] theorem Layout.slotsOf_build_fresh (layout : Layout) (handle : RuntimeValue)
     (entries : Entries) : layout.slotsOf (layout.build handle entries) = layout.freshSlots :=
   layout.slotsOf_build handle entries _ (by simp [Layout.freshSlots])
 
@@ -864,7 +864,7 @@ theorem write_read_keyAt {α : Type} {read : RuntimeValue → α} {write : α �
 
 /-- The keys of entries encoded one by one, the key as their first field, are
 read back when every encoded first field is. -/
-@[vir_denote_norm, vir_denote_side] theorem keysRead_map {α β : Type} {read : RuntimeValue → α}
+theorem keysRead_map {α β : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
     (encode : β → RuntimeValue) (entries : Array β)
     (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
@@ -921,7 +921,7 @@ theorem order_keyAt_keyAt {map other : RuntimeValue} {index position : Int}
 def empty (layout : Layout) : RuntimeValue :=
   layout.build (if layout.dummy then .bool false else .unit) []
 
-@[simp, vir_denote_norm] theorem Layout.slotsOf_empty (layout : Layout) :
+@[simp] theorem Layout.slotsOf_empty (layout : Layout) :
     layout.slotsOf (empty layout) = layout.freshSlots := by
   unfold empty
   exact layout.slotsOf_build_fresh _ _
@@ -944,70 +944,70 @@ def remove (layout : Layout) (discipline : Discipline) (map key : RuntimeValue) 
 /-! The model operations keep a map's ghost slots; a map built afresh holds
 fresh ones. -/
 
-@[simp, vir_denote_norm] theorem Layout.slot_update (layout : Layout) (discipline : Discipline)
+@[simp] theorem Layout.slot_update (layout : Layout) (discipline : Discipline)
     (map key value : RuntimeValue) {k : Nat} (bound : k < layout.ghosts) :
     layout.slot (update layout discipline map key value) k = layout.slot map k :=
   layout.slot_build_slotsOf _ _ _ bound
 
-@[simp, vir_denote_norm] theorem Layout.slot_remove (layout : Layout) (discipline : Discipline)
+@[simp] theorem Layout.slot_remove (layout : Layout) (discipline : Discipline)
     (map key : RuntimeValue) {k : Nat} (bound : k < layout.ghosts) :
     layout.slot (remove layout discipline map key) k = layout.slot map k :=
   layout.slot_build_slotsOf _ _ _ bound
 
-@[simp, vir_denote_norm] theorem Layout.slot_empty (layout : Layout) {k : Nat}
+@[simp] theorem Layout.slot_empty (layout : Layout) {k : Nat}
     (bound : k < layout.ghosts) :
     layout.slot (empty layout) k = .ghost (.integer 0) := by
   unfold empty
   rw [Layout.slot_build layout _ _ _ (by simpa [Layout.freshSlots] using bound)]
   simp [Layout.freshSlots]
 
-@[simp, vir_denote_norm] theorem Layout.slot_restamp (layout : Layout) (map : RuntimeValue)
+@[simp] theorem Layout.slot_restamp (layout : Layout) (map : RuntimeValue)
     (stamp : Nat → RuntimeValue) {k : Nat} (bound : k < layout.ghosts) :
     layout.slot (layout.restamp map stamp) k = stamp k := by
   unfold Layout.restamp
   rw [Layout.slot_build layout _ _ _ (by simpa using bound)]
   simp
 
-@[simp, vir_denote_norm] theorem entriesOf_restamp (layout : Layout) (map : RuntimeValue)
+@[simp] theorem entriesOf_restamp (layout : Layout) (map : RuntimeValue)
     (stamp : Nat → RuntimeValue) : entriesOf (layout.restamp map stamp) = entriesOf map := by
   simp [Layout.restamp]
 
-@[simp, vir_denote_norm] theorem field_zero_restamp (layout : Layout) (map : RuntimeValue)
+@[simp] theorem field_zero_restamp (layout : Layout) (map : RuntimeValue)
     (stamp : Nat → RuntimeValue) (h : layout.handle = true) :
     (layout.restamp map stamp).field 0 = map.field 0 := by
   simp [Layout.restamp, Layout.handleOf, Layout.field_zero_build _ _ _ _ h, h]
 
 /-! Restamping keeps every observation of the entries. -/
 
-@[simp, vir_denote_norm, grind =] theorem size_restamp (layout : Layout) (map : RuntimeValue)
+@[simp, grind =] theorem size_restamp (layout : Layout) (map : RuntimeValue)
     (stamp : Nat → RuntimeValue) : size (layout.restamp map stamp) = size map := by
   simp only [size, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem hasKey_restamp (layout : Layout) (map key : RuntimeValue)
+@[simp, grind =] theorem hasKey_restamp (layout : Layout) (map key : RuntimeValue)
     (stamp : Nat → RuntimeValue) : hasKey (layout.restamp map stamp) key = hasKey map key := by
   simp only [hasKey, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem valueAt_restamp (layout : Layout) (map key : RuntimeValue)
+@[simp, grind =] theorem valueAt_restamp (layout : Layout) (map key : RuntimeValue)
     (stamp : Nat → RuntimeValue) : valueAt (layout.restamp map stamp) key = valueAt map key := by
   simp only [valueAt, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem keyAt_restamp (layout : Layout) (map : RuntimeValue)
+@[simp, grind =] theorem keyAt_restamp (layout : Layout) (map : RuntimeValue)
     (index : Int) (stamp : Nat → RuntimeValue) :
     keyAt (layout.restamp map stamp) index = keyAt map index := by
   simp only [keyAt, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem rank_restamp (layout : Layout) (map key : RuntimeValue)
+@[simp, grind =] theorem rank_restamp (layout : Layout) (map key : RuntimeValue)
     (stamp : Nat → RuntimeValue) : rank (layout.restamp map stamp) key = rank map key := by
   simp only [rank, entriesOf_restamp]
 
 /-! Updating and removing keep a table's handle. -/
 
-@[simp, vir_denote_norm] theorem field_zero_update (layout : Layout) (discipline : Discipline)
+@[simp] theorem field_zero_update (layout : Layout) (discipline : Discipline)
     (map key value : RuntimeValue) (h : layout.handle = true) :
     (update layout discipline map key value).field 0 = map.field 0 := by
   simp [update, Layout.handleOf, Layout.field_zero_build _ _ _ _ h, h]
 
-@[simp, vir_denote_norm] theorem field_zero_remove (layout : Layout) (discipline : Discipline)
+@[simp] theorem field_zero_remove (layout : Layout) (discipline : Discipline)
     (map key : RuntimeValue) (h : layout.handle = true) :
     (remove layout discipline map key).field 0 = map.field 0 := by
   simp [remove, Layout.handleOf, Layout.field_zero_build _ _ _ _ h, h]
@@ -1049,58 +1049,58 @@ def treeEntries (node : StructHandle) (root nodes children : Nat) (leaf : String
 def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
   discipline.Valid (entriesOf map)
 
-@[simp, vir_denote_norm, grind =] theorem size_empty (layout : Layout) : size (empty layout) = 0 := by
+@[simp, grind =] theorem size_empty (layout : Layout) : size (empty layout) = 0 := by
   simp [size, empty]
 
-@[simp, vir_denote_norm, grind =] theorem hasKey_empty (layout : Layout) (key : RuntimeValue) :
+@[simp, grind =] theorem hasKey_empty (layout : Layout) (key : RuntimeValue) :
     hasKey (empty layout) key = false := by
   simp [hasKey, empty]
 
-@[simp, vir_denote_norm, grind =] theorem valid_restamp (layout : Layout) (discipline : Discipline)
+@[simp, grind =] theorem valid_restamp (layout : Layout) (discipline : Discipline)
     (map : RuntimeValue) (stamp : Nat → RuntimeValue) :
     Valid discipline (layout.restamp map stamp) ↔ Valid discipline map := by
   simp only [Valid, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind .] theorem valid_empty (layout : Layout) (discipline : Discipline) : Valid discipline (empty layout) := by
+@[simp, grind .] theorem valid_empty (layout : Layout) (discipline : Discipline) : Valid discipline (empty layout) := by
   cases discipline <;> simp [Valid, empty, Distinct, Ascending]
 
 /-! A map built at a handle, as a table allocation yields it. -/
 
-@[simp, vir_denote_norm] theorem size_build (layout : Layout) (handle : RuntimeValue)
+@[simp] theorem size_build (layout : Layout) (handle : RuntimeValue)
     (slots : List RuntimeValue) (entries : Entries) :
     size (layout.build handle entries slots) = (entries.length : Int) := by
   simp [size]
 
-@[simp, vir_denote_norm] theorem hasKey_build (layout : Layout) (handle key : RuntimeValue)
+@[simp] theorem hasKey_build (layout : Layout) (handle key : RuntimeValue)
     (slots : List RuntimeValue) (entries : Entries) :
     hasKey (layout.build handle entries slots) key = containsB entries key := by
   simp [hasKey]
 
-@[simp, vir_denote_norm] theorem valueAt_build (layout : Layout) (handle key : RuntimeValue)
+@[simp] theorem valueAt_build (layout : Layout) (handle key : RuntimeValue)
     (slots : List RuntimeValue) (entries : Entries) :
     valueAt (layout.build handle entries slots) key = get entries key := by
   simp [valueAt]
 
-@[simp, vir_denote_norm] theorem valid_build_nil (layout : Layout) (handle : RuntimeValue)
+@[simp] theorem valid_build_nil (layout : Layout) (handle : RuntimeValue)
     (slots : List RuntimeValue) (discipline : Discipline) :
     Valid discipline (layout.build handle [] slots) := by
   cases discipline <;> simp [Valid, Distinct, Ascending]
 
 /-! Updates and removals, for either discipline. -/
 
-@[simp, vir_denote_norm, grind =] theorem hasKey_update (layout : Layout) (discipline : Discipline)
+@[simp, grind =] theorem hasKey_update (layout : Layout) (discipline : Discipline)
     (map key value probe : RuntimeValue) :
     hasKey (update layout discipline map key value) probe =
       (decide (key = probe) || hasKey map probe) := by
   cases discipline <;> simp [hasKey, update, containsB_ordSet]
 
-@[simp, vir_denote_norm, grind =] theorem valueAt_update (layout : Layout) (discipline : Discipline)
+@[simp, grind =] theorem valueAt_update (layout : Layout) (discipline : Discipline)
     (map key value probe : RuntimeValue) :
     valueAt (update layout discipline map key value) probe =
       if probe = key then value else valueAt map probe := by
   cases discipline <;> simp [valueAt, update, get_ordSet]
 
-@[vir_denote_norm, grind =] theorem size_update (layout : Layout) {discipline : Discipline}
+@[grind =] theorem size_update (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key value : RuntimeValue) :
     size (update layout discipline map key value) =
       if hasKey map key then size map else size map + 1 := by
@@ -1115,13 +1115,13 @@ def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
 
 /-- Under the sequence discipline the size law needs no validity: an update
 replaces the key's first entry or appends. A table's contents follow it. -/
-@[vir_denote_norm] theorem size_update_sequence (layout : Layout) (map key value : RuntimeValue) :
+theorem size_update_sequence (layout : Layout) (map key value : RuntimeValue) :
     size (update layout .sequence map key value) =
       if hasKey map key then size map else size map + 1 := by
   simp only [size, update, entriesOf_build, Discipline.set_sequence, length_seqSet, hasKey]
   split <;> simp
 
-@[vir_denote_norm, grind .] theorem valid_update (layout : Layout) {discipline : Discipline}
+@[grind .] theorem valid_update (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key value : RuntimeValue) :
     Valid discipline (update layout discipline map key value) := by
   cases discipline with
@@ -1134,7 +1134,7 @@ theorem distinct_of_valid {discipline : Discipline} {entries : Entries}
   | sequence => exact valid
   | ordered rank => exact distinct_of_ascending rank valid
 
-@[vir_denote_norm, grind =] theorem hasKey_remove (layout : Layout) {discipline : Discipline}
+@[grind =] theorem hasKey_remove (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key probe : RuntimeValue) :
     hasKey (remove layout discipline map key) probe = (!decide (key = probe) && hasKey map probe) := by
   have distinct := distinct_of_valid valid
@@ -1142,14 +1142,14 @@ theorem distinct_of_valid {discipline : Discipline} {entries : Entries}
   | sequence => simpa [hasKey, remove] using containsB_seqDel distinct key probe
   | ordered _ => simpa [hasKey, remove] using containsB_ordDel distinct key probe
 
-@[vir_denote_norm, grind =] theorem valueAt_remove (layout : Layout) {discipline : Discipline}
+@[grind =] theorem valueAt_remove (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key probe : RuntimeValue)
     (differs : probe ≠ key) : valueAt (remove layout discipline map key) probe = valueAt map probe := by
   cases discipline with
   | sequence => simpa [valueAt, remove] using get_seqDel valid key probe differs
   | ordered _ => simpa [valueAt, remove] using get_ordDel (entriesOf map) key probe differs
 
-@[simp, vir_denote_norm, grind =] theorem size_remove (layout : Layout) (discipline : Discipline)
+@[simp, grind =] theorem size_remove (layout : Layout) (discipline : Discipline)
     (map key : RuntimeValue) :
     size (remove layout discipline map key) = if hasKey map key then size map - 1 else size map := by
   have positive (present : containsB (entriesOf map) key = true) : 0 < (entriesOf map).length := by
@@ -1168,7 +1168,7 @@ theorem distinct_of_valid {discipline : Discipline} {entries : Entries}
       · have := positive ‹_›; omega
       · rfl
 
-@[vir_denote_norm, grind .] theorem valid_remove (layout : Layout) {discipline : Discipline}
+@[grind .] theorem valid_remove (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key : RuntimeValue) :
     Valid discipline (remove layout discipline map key) := by
   cases discipline with
@@ -1242,7 +1242,7 @@ theorem indexOf_eq_length {entries : Entries} {key : RuntimeValue}
       simp [indexOf, absent.1, ih absent.2]
 
 /-- A key's position is within the map exactly when the map has the key. -/
-@[vir_denote_norm] theorem rank_lt_size_iff (map key : RuntimeValue) :
+theorem rank_lt_size_iff (map key : RuntimeValue) :
     rank map key < size map ↔ hasKey map key = true := by
   constructor
   · intro within
@@ -1252,16 +1252,16 @@ theorem indexOf_eq_length {entries : Entries} {key : RuntimeValue}
     · rfl
   · exact rank_lt_size
 
-@[vir_denote_norm] theorem size_le_rank_iff (map key : RuntimeValue) :
+theorem size_le_rank_iff (map key : RuntimeValue) :
     size map ≤ rank map key ↔ hasKey map key = false := by
   rw [← Int.not_lt, rank_lt_size_iff, Bool.not_eq_true]
 
-@[vir_denote_norm] theorem rank_nonneg (map key : RuntimeValue) : 0 ≤ rank map key := by
+theorem rank_nonneg (map key : RuntimeValue) : 0 ≤ rank map key := by
   simp [rank]
 
 grind_pattern rank_nonneg => rank map key
 
-@[vir_denote_norm, grind →] theorem keyAt_rank {map key : RuntimeValue} (present : hasKey map key = true) :
+@[grind →] theorem keyAt_rank {map key : RuntimeValue} (present : hasKey map key = true) :
     keyAt map (rank map key) = key := by
   have bound := indexOf_lt_length present
   simp only [keyAt, rank, Int.natCast_nonneg, Int.not_lt.mpr, if_false, Int.toNat_natCast,
@@ -1332,7 +1332,7 @@ theorem keyAt_eq_keyAt_iff {discipline : Discipline} {map : RuntimeValue}
     rw [← rank_keyAt valid firstLow firstHigh, ← rank_keyAt valid secondLow secondHigh, same]
   · intro same; rw [same]
 
-@[vir_denote_norm] theorem keyAt_update_present (layout : Layout) {discipline : Discipline}
+theorem keyAt_update_present (layout : Layout) {discipline : Discipline}
     {map key : RuntimeValue} (valid : Valid discipline map) (present : hasKey map key = true)
     (value : RuntimeValue) (index : Int) :
     keyAt (update layout discipline map key value) index = keyAt map index := by
@@ -1353,7 +1353,7 @@ grind_pattern rank_keyAt => Valid discipline map, rank map (keyAt map index)
 
 /-- After an ordered removal, the positions from the removed key's on hold
 the keys one position further. -/
-@[vir_denote_norm, grind =] theorem keyAt_remove_ordered (layout : Layout) (order : ValueRanks)
+@[grind =] theorem keyAt_remove_ordered (layout : Layout) (order : ValueRanks)
     (map key : RuntimeValue) (index : Int) :
     keyAt (remove layout (.ordered order) map key) index =
       keyAt map (if index < rank map key then index else index + 1) := by
@@ -1372,7 +1372,7 @@ the keys one position further. -/
 
 /-! ## Enumeration and bulk operations
 
-The remaining roles of `designs/intrinsic-maps.md`, over the entries in the
+The remaining roles of `doc/designs/intrinsic-maps.md`, over the entries in the
 order the map holds them: ascending for an ordered map. -/
 
 /-- The elements of a vector value; none off a vector. -/
@@ -1395,20 +1395,20 @@ def prevKey? (rank : ValueRanks) (map key : RuntimeValue) : Option RuntimeValue 
 def nextKey? (rank : ValueRanks) (map key : RuntimeValue) : Option RuntimeValue :=
   ((entriesOf map).find? fun entry => RuntimeValue.order rank entry.1 key == .gt).map Prod.fst
 
-@[simp, vir_denote_norm, grind =] theorem keysOf_restamp (layout : Layout) (map : RuntimeValue)
+@[simp, grind =] theorem keysOf_restamp (layout : Layout) (map : RuntimeValue)
     (stamp : Nat → RuntimeValue) : keysOf (layout.restamp map stamp) = keysOf map := by
   simp only [keysOf, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem valuesOf_restamp (layout : Layout) (map : RuntimeValue)
+@[simp, grind =] theorem valuesOf_restamp (layout : Layout) (map : RuntimeValue)
     (stamp : Nat → RuntimeValue) : valuesOf (layout.restamp map stamp) = valuesOf map := by
   simp only [valuesOf, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem prevKey?_restamp (layout : Layout) (rank : ValueRanks)
+@[simp, grind =] theorem prevKey?_restamp (layout : Layout) (rank : ValueRanks)
     (map key : RuntimeValue) (stamp : Nat → RuntimeValue) :
     prevKey? rank (layout.restamp map stamp) key = prevKey? rank map key := by
   simp only [prevKey?, entriesOf_restamp]
 
-@[simp, vir_denote_norm, grind =] theorem nextKey?_restamp (layout : Layout) (rank : ValueRanks)
+@[simp, grind =] theorem nextKey?_restamp (layout : Layout) (rank : ValueRanks)
     (map key : RuntimeValue) (stamp : Nat → RuntimeValue) :
     nextKey? rank (layout.restamp map stamp) key = nextKey? rank map key := by
   simp only [nextKey?, entriesOf_restamp]
@@ -1437,32 +1437,32 @@ def replaceKey (layout : Layout) (map old new : RuntimeValue) : RuntimeValue :=
     ((entriesOf map).map fun entry => if entry.1 = old then (new, entry.2) else entry)
     (layout.slotsOf map)
 
-@[simp, vir_denote_norm] theorem Layout.slot_updateAll (layout : Layout) (discipline : Discipline)
+@[simp] theorem Layout.slot_updateAll (layout : Layout) (discipline : Discipline)
     (map keys values : RuntimeValue) {k : Nat} (bound : k < layout.ghosts) :
     layout.slot (updateAll layout discipline map keys values) k = layout.slot map k :=
   layout.slot_build_slotsOf _ _ _ bound
 
-@[simp, vir_denote_norm] theorem Layout.slot_takeEntries (layout : Layout) (map : RuntimeValue)
+@[simp] theorem Layout.slot_takeEntries (layout : Layout) (map : RuntimeValue)
     (count : Int) {k : Nat} (bound : k < layout.ghosts) :
     layout.slot (takeEntries layout map count) k = layout.slot map k :=
   layout.slot_build_slotsOf _ _ _ bound
 
-@[simp, vir_denote_norm] theorem Layout.slot_replaceKey (layout : Layout) (map old new : RuntimeValue)
+@[simp] theorem Layout.slot_replaceKey (layout : Layout) (map old new : RuntimeValue)
     {k : Nat} (bound : k < layout.ghosts) :
     layout.slot (replaceKey layout map old new) k = layout.slot map k :=
   layout.slot_build_slotsOf _ _ _ bound
 
-@[simp, vir_denote_norm] theorem field_zero_updateAll (layout : Layout) (discipline : Discipline)
+@[simp] theorem field_zero_updateAll (layout : Layout) (discipline : Discipline)
     (map keys values : RuntimeValue) (h : layout.handle = true) :
     (updateAll layout discipline map keys values).field 0 = map.field 0 := by
   simp [updateAll, Layout.handleOf, Layout.field_zero_build _ _ _ _ h, h]
 
-@[simp, vir_denote_norm] theorem field_zero_takeEntries (layout : Layout) (map : RuntimeValue)
+@[simp] theorem field_zero_takeEntries (layout : Layout) (map : RuntimeValue)
     (count : Int) (h : layout.handle = true) :
     (takeEntries layout map count).field 0 = map.field 0 := by
   simp [takeEntries, Layout.handleOf, Layout.field_zero_build _ _ _ _ h, h]
 
-@[simp, vir_denote_norm] theorem field_zero_replaceKey (layout : Layout) (map old new : RuntimeValue)
+@[simp] theorem field_zero_replaceKey (layout : Layout) (map old new : RuntimeValue)
     (h : layout.handle = true) : (replaceKey layout map old new).field 0 = map.field 0 := by
   simp [replaceKey, Layout.handleOf, Layout.field_zero_build _ _ _ _ h, h]
 
@@ -1490,7 +1490,7 @@ def AbortsReplaceKey (layout : Layout) (discipline : Discipline) (map old new : 
     Prop :=
   hasKey map old = false ∨ ¬Valid discipline (replaceKey layout map old new)
 
-@[simp, vir_denote_norm] theorem elementsOf_vector (elements : Array RuntimeValue) :
+@[simp] theorem elementsOf_vector (elements : Array RuntimeValue) :
     elementsOf (.vector elements) = elements.toList := rfl
 
 
@@ -1622,7 +1622,7 @@ theorem mem_fst_foldl_set (discipline : Discipline) (pairs : List (RuntimeValue 
 
 /-! ### `updateAll` -/
 
-@[vir_denote_norm, grind .] theorem valid_updateAll (layout : Layout) {discipline : Discipline}
+@[grind .] theorem valid_updateAll (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (keys values : RuntimeValue) :
     Valid discipline (updateAll layout discipline map keys values) := by
   simp only [Valid, updateAll, entriesOf_build]
@@ -1640,10 +1640,10 @@ theorem size_updateAll_bounds (layout : Layout) (discipline : Discipline)
   rw [List.length_zip] at this
   omega
 
-@[simp, vir_denote_norm] theorem elementsOf_keysOf (map : RuntimeValue) :
+@[simp] theorem elementsOf_keysOf (map : RuntimeValue) :
     elementsOf (keysOf map) = (entriesOf map).map Prod.fst := rfl
 
-@[simp, vir_denote_norm] theorem elementsOf_valuesOf (map : RuntimeValue) :
+@[simp] theorem elementsOf_valuesOf (map : RuntimeValue) :
     elementsOf (valuesOf map) = (entriesOf map).map Prod.snd := rfl
 
 /-- The same for an appended map, by its size. -/
@@ -1664,28 +1664,28 @@ theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
   simp only [hasKey, updateAll, entriesOf_build, Discipline.containsB_foldl_set,
     List.map_fst_zip fits]
 
-@[vir_denote_norm] theorem hasKey_updateAll_add_all (layout : Layout) (discipline : Discipline)
+theorem hasKey_updateAll_add_all (layout : Layout) (discipline : Discipline)
     (map keys values probe : RuntimeValue) (ok : ¬AbortsAddAll map keys values) :
     hasKey (updateAll layout discipline map keys values) probe =
       (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
   exact hasKey_updateAll_of_fits _ _ _ _ _ _
     (Nat.le_of_eq (Decidable.of_not_not fun h => ok (Or.inl h)))
 
-@[vir_denote_norm] theorem hasKey_updateAll_upsert_all (layout : Layout) (discipline : Discipline)
+theorem hasKey_updateAll_upsert_all (layout : Layout) (discipline : Discipline)
     (map keys values probe : RuntimeValue) (ok : ¬AbortsUpsertAll keys values) :
     hasKey (updateAll layout discipline map keys values) probe =
       (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
   unfold AbortsUpsertAll at ok
   exact hasKey_updateAll_of_fits _ _ _ _ _ _ (Nat.le_of_eq (Decidable.of_not_not ok))
 
-@[vir_denote_norm] theorem hasKey_updateAll_new_from (layout : Layout) (discipline : Discipline)
+theorem hasKey_updateAll_new_from (layout : Layout) (discipline : Discipline)
     (map keys values probe : RuntimeValue) (ok : ¬AbortsNewFrom keys values) :
     hasKey (updateAll layout discipline map keys values) probe =
       (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
   exact hasKey_updateAll_of_fits _ _ _ _ _ _
     (Nat.le_of_eq (Decidable.of_not_not fun h => ok (Or.inl h)))
 
-@[vir_denote_norm] theorem hasKey_updateAll_append (layout : Layout) (discipline : Discipline)
+theorem hasKey_updateAll_append (layout : Layout) (discipline : Discipline)
     (map other probe : RuntimeValue) :
     hasKey (updateAll layout discipline map (keysOf other) (valuesOf other)) probe =
       (hasKey other probe || hasKey map probe) := by
@@ -1694,7 +1694,7 @@ theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
   rfl
 
 /-- Adding entries at fresh keys adds one each. -/
-@[vir_denote_norm] theorem size_updateAll_add_all (layout : Layout) {discipline : Discipline}
+theorem size_updateAll_add_all (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (keys values : RuntimeValue)
     (ok : ¬AbortsAddAll map keys values) :
     size (updateAll layout discipline map keys values) = size map + ((elementsOf keys).length : Int) := by
@@ -1716,7 +1716,7 @@ theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
   omega
 
 /-- A map built from fresh vectors holds one entry per key. -/
-@[vir_denote_norm] theorem size_updateAll_new_from (layout : Layout) (discipline : Discipline)
+theorem size_updateAll_new_from (layout : Layout) (discipline : Discipline)
     (keys values : RuntimeValue) (ok : ¬AbortsNewFrom keys values) :
     size (updateAll layout discipline (empty layout) keys values) = ((elementsOf keys).length : Int) := by
   have ok' : ¬AbortsAddAll (empty layout) keys values := fun
@@ -1727,7 +1727,7 @@ theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
   omega
 
 /-- Appending a disjoint map adds its entries. -/
-@[vir_denote_norm] theorem size_updateAll_append_disjoint (layout : Layout) {discipline : Discipline}
+theorem size_updateAll_append_disjoint (layout : Layout) {discipline : Discipline}
     {map other : RuntimeValue} (valid : Valid discipline map) (validOther : Valid discipline other)
     (ok : ¬AbortsAppendDisjoint map other) :
     size (updateAll layout discipline map (keysOf other) (valuesOf other)) = size map + size other := by
@@ -1742,19 +1742,19 @@ theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
 
 /-! ### `takeEntries`, `dropEntries`, and `replaceKey` -/
 
-@[vir_denote_norm] theorem size_takeEntries (layout : Layout) (map : RuntimeValue) (count : Int) :
+theorem size_takeEntries (layout : Layout) (map : RuntimeValue) (count : Int) :
     size (takeEntries layout map count) = min (max count 0) (size map) := by
   simp only [size, takeEntries, entriesOf_build, List.length_take]; omega
 
-@[vir_denote_norm] theorem size_dropEntries (layout : Layout) (map : RuntimeValue) (count : Int) :
+theorem size_dropEntries (layout : Layout) (map : RuntimeValue) (count : Int) :
     size (dropEntries layout map count) = size map - min (max count 0) (size map) := by
   simp only [size, dropEntries, entriesOf_build, List.length_drop]; omega
 
-@[vir_denote_norm] theorem size_replaceKey (layout : Layout) (map old new : RuntimeValue) :
+theorem size_replaceKey (layout : Layout) (map old new : RuntimeValue) :
     size (replaceKey layout map old new) = size map := by
   simp only [size, replaceKey, entriesOf_build, List.length_map]
 
-@[vir_denote_norm, grind .] theorem valid_takeEntries (layout : Layout) {discipline : Discipline}
+@[grind .] theorem valid_takeEntries (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (count : Int) :
     Valid discipline (takeEntries layout map count) := by
   simp only [Valid, takeEntries, entriesOf_build]
@@ -1762,7 +1762,7 @@ theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
   | sequence => exact List.Nodup.sublist ((List.take_sublist _ _).map Prod.fst) valid
   | ordered rank => exact List.Pairwise.sublist (List.take_sublist _ _) valid
 
-@[vir_denote_norm, grind .] theorem valid_dropEntries (layout : Layout) {discipline : Discipline}
+@[grind .] theorem valid_dropEntries (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (count : Int) :
     Valid discipline (dropEntries layout map count) := by
   simp only [Valid, dropEntries, entriesOf_build]
@@ -1811,7 +1811,7 @@ theorem mem_fst_drop_iff {entries : Entries} (distinct : Distinct entries) (coun
     exact List.mem_drop_iff_getElem.mpr ⟨indexOf entries key - count, by simp; omega,
       by rw [List.getElem_map]; congr 2; omega⟩
 
-@[vir_denote_norm] theorem hasKey_takeEntries (layout : Layout) {discipline : Discipline}
+theorem hasKey_takeEntries (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (count : Int) (probe : RuntimeValue) :
     hasKey (takeEntries layout map count) probe = (hasKey map probe && decide (rank map probe < count)) := by
   simp only [hasKey, takeEntries, entriesOf_build, rank, containsB_eq_decide_mem (entriesOf map)]
@@ -1820,7 +1820,7 @@ theorem mem_fst_drop_iff {entries : Entries} (distinct : Distinct entries) (coun
   rw [mem_fst_take_iff (distinct_of_valid valid), containsB_eq_decide_mem, decide_eq_true_eq,
     Int.lt_toNat]
 
-@[vir_denote_norm] theorem hasKey_dropEntries (layout : Layout) {discipline : Discipline}
+theorem hasKey_dropEntries (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (count : Int) (probe : RuntimeValue) :
     hasKey (dropEntries layout map count) probe = (hasKey map probe && decide (count ≤ rank map probe)) := by
   simp only [hasKey, dropEntries, entriesOf_build, rank, containsB_eq_decide_mem (entriesOf map)]
@@ -1829,7 +1829,7 @@ theorem mem_fst_drop_iff {entries : Entries} (distinct : Distinct entries) (coun
   rw [mem_fst_drop_iff (distinct_of_valid valid), containsB_eq_decide_mem, decide_eq_true_eq,
     Int.toNat_le]
 
-@[vir_denote_norm] theorem hasKey_replaceKey (layout : Layout) (map old new probe : RuntimeValue) :
+theorem hasKey_replaceKey (layout : Layout) (map old new probe : RuntimeValue) :
     hasKey (replaceKey layout map old new) probe =
       if probe = new then (hasKey map old || hasKey map new)
       else (!decide (probe = old) && hasKey map probe) := by
@@ -1925,21 +1925,21 @@ theorem keysRead_list_map_at {α β : Type} {read : RuntimeValue → α} {write 
   obtain ⟨value, _, rfl⟩ := member
   exact roundTrip value
 
-@[vir_denote_norm, vir_denote_side] theorem keysRead_list_map {α β : Type} {read : RuntimeValue → α}
+theorem keysRead_list_map {α β : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
     (encode : β → RuntimeValue) (entries : List β)
     (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
     KeysRead read write (.nominal owner variant #[.vector (entries.map encode).toArray]) :=
   keysRead_list_map_at owner variant #[] encode entries roundTrip
 
-@[vir_denote_norm, vir_denote_side] theorem keysRead_list_map_one {α β : Type} {read : RuntimeValue → α}
+theorem keysRead_list_map_one {α β : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
     (first : RuntimeValue) (encode : β → RuntimeValue) (entries : List β)
     (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
     KeysRead read write (.nominal owner variant #[first, .vector (entries.map encode).toArray]) :=
   keysRead_list_map_at owner variant #[first] encode entries roundTrip
 
-@[vir_denote_norm, vir_denote_side] theorem keysRead_list_map_two {α β : Type} {read : RuntimeValue → α}
+theorem keysRead_list_map_two {α β : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
     (first second : RuntimeValue) (encode : β → RuntimeValue) (entries : List β)
     (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
@@ -1990,7 +1990,7 @@ theorem size_other_le_updateAll_append (layout : Layout) (discipline : Disciplin
   omega
 
 /-- The entries a replaced key leaves valid, where replacing does not abort. -/
-@[vir_denote_norm] theorem valid_replaceKey (layout : Layout) {discipline : Discipline}
+theorem valid_replaceKey (layout : Layout) {discipline : Discipline}
     {map old new : RuntimeValue} (ok : ¬AbortsReplaceKey layout discipline map old new) :
     Valid discipline (replaceKey layout map old new) :=
   Classical.byContradiction fun invalid => ok (Or.inr invalid)
@@ -1999,17 +1999,17 @@ theorem size_other_le_updateAll_append (layout : Layout) (discipline : Disciplin
 lists: evaluated where a specification states them of literals. A symbolic
 vector is a mapped array, which these leave as they are. -/
 
-@[vir_denote_norm] theorem AbortsNewFrom_toArray (keys values : List RuntimeValue) :
+theorem AbortsNewFrom_toArray (keys values : List RuntimeValue) :
     AbortsNewFrom (.vector keys.toArray) (.vector values.toArray) ↔
       keys.length ≠ values.length ∨ ¬keys.Nodup := by
   simp [AbortsNewFrom]
 
-@[vir_denote_norm] theorem AbortsUpsertAll_toArray (keys values : List RuntimeValue) :
+theorem AbortsUpsertAll_toArray (keys values : List RuntimeValue) :
     AbortsUpsertAll (.vector keys.toArray) (.vector values.toArray) ↔
       keys.length ≠ values.length := by
   simp [AbortsUpsertAll]
 
-@[vir_denote_norm] theorem AbortsAddAll_toArray (map : RuntimeValue) (keys values : List RuntimeValue) :
+theorem AbortsAddAll_toArray (map : RuntimeValue) (keys values : List RuntimeValue) :
     AbortsAddAll map (.vector keys.toArray) (.vector values.toArray) ↔
       keys.length ≠ values.length ∨ (∃ key ∈ keys, hasKey map key = true) ∨ ¬keys.Nodup := by
   simp [AbortsAddAll]
@@ -2029,15 +2029,15 @@ def setPairs (discipline : Discipline) (entries : Entries) :
   | key :: keys, value :: values => setPairs discipline (discipline.set entries key value) keys values
   | _, _ => entries
 
-@[vir_denote_norm] theorem setPairs_cons_cons (discipline : Discipline) (entries : Entries)
+theorem setPairs_cons_cons (discipline : Discipline) (entries : Entries)
     (key value : RuntimeValue) (keys values : List RuntimeValue) :
     setPairs discipline entries (key :: keys) (value :: values) =
       setPairs discipline (discipline.set entries key value) keys values := rfl
 
-@[vir_denote_norm] theorem setPairs_nil (discipline : Discipline) (entries : Entries)
+theorem setPairs_nil (discipline : Discipline) (entries : Entries)
     (values : List RuntimeValue) : setPairs discipline entries [] values = entries := rfl
 
-@[vir_denote_norm] theorem setPairs_cons_nil (discipline : Discipline) (entries : Entries)
+theorem setPairs_cons_nil (discipline : Discipline) (entries : Entries)
     (key : RuntimeValue) (keys : List RuntimeValue) :
     setPairs discipline entries (key :: keys) [] = entries := rfl
 
@@ -2063,63 +2063,63 @@ theorem updateAll_empty_vector (layout : Layout) (discipline : Discipline)
 
 attribute [vir_denote_norm] Discipline.set_ordered Discipline.set_sequence
 
-@[vir_denote_norm] theorem seqSet_of_absent {entries : Entries} {key : RuntimeValue}
+theorem seqSet_of_absent {entries : Entries} {key : RuntimeValue}
     (value : RuntimeValue) (absent : containsB entries key = false) :
     seqSet entries key value = entries ++ [(key, value)] := by
   simp [seqSet, absent]
 
-@[vir_denote_norm] theorem seqSet_of_present {entries : Entries} {key : RuntimeValue}
+theorem seqSet_of_present {entries : Entries} {key : RuntimeValue}
     (value : RuntimeValue) (present : containsB entries key = true) :
     seqSet entries key value = replaceFirst key value entries := by
   simp [seqSet, present]
 
-@[vir_denote_norm] theorem replaceFirst_nil (key value : RuntimeValue) :
+theorem replaceFirst_nil (key value : RuntimeValue) :
     replaceFirst key value [] = [] := rfl
 
-@[vir_denote_norm] theorem replaceFirst_cons_of_eq {other key : RuntimeValue}
+theorem replaceFirst_cons_of_eq {other key : RuntimeValue}
     (value otherValue : RuntimeValue) (rest : Entries) (same : other = key) :
     replaceFirst key value ((other, otherValue) :: rest) = (key, value) :: rest := by
   simp [replaceFirst, same]
 
-@[vir_denote_norm] theorem replaceFirst_cons_of_ne {other key : RuntimeValue}
+theorem replaceFirst_cons_of_ne {other key : RuntimeValue}
     (value otherValue : RuntimeValue) (rest : Entries) (differ : other ≠ key) :
     replaceFirst key value ((other, otherValue) :: rest) =
       (other, otherValue) :: replaceFirst key value rest := by
   simp [replaceFirst, differ]
 
-@[vir_denote_norm] theorem ordSet_nil (rank : ValueRanks) (key value : RuntimeValue) :
+theorem ordSet_nil (rank : ValueRanks) (key value : RuntimeValue) :
     ordSet rank key value [] = [(key, value)] := rfl
 
-@[vir_denote_norm] theorem ordSet_cons_lt (rank : ValueRanks) {key other : RuntimeValue}
+theorem ordSet_cons_lt (rank : ValueRanks) {key other : RuntimeValue}
     (value otherValue : RuntimeValue) (rest : Entries)
     (lt : RuntimeValue.order rank key other = .lt) :
     ordSet rank key value ((other, otherValue) :: rest) =
       (key, value) :: (other, otherValue) :: rest := by
   simp [ordSet, lt]
 
-@[vir_denote_norm] theorem ordSet_cons_eq (rank : ValueRanks) {key other : RuntimeValue}
+theorem ordSet_cons_eq (rank : ValueRanks) {key other : RuntimeValue}
     (value otherValue : RuntimeValue) (rest : Entries)
     (eq : RuntimeValue.order rank key other = .eq) :
     ordSet rank key value ((other, otherValue) :: rest) = (key, value) :: rest := by
   simp [ordSet, eq]
 
-@[vir_denote_norm] theorem ordSet_cons_gt (rank : ValueRanks) {key other : RuntimeValue}
+theorem ordSet_cons_gt (rank : ValueRanks) {key other : RuntimeValue}
     (value otherValue : RuntimeValue) (rest : Entries)
     (gt : RuntimeValue.order rank key other = .gt) :
     ordSet rank key value ((other, otherValue) :: rest) =
       (other, otherValue) :: ordSet rank key value rest := by
   simp [ordSet, gt]
 
-@[vir_denote_norm] theorem keyAt_build_nil (layout : Layout) (handle : RuntimeValue)
+theorem keyAt_build_nil (layout : Layout) (handle : RuntimeValue)
     (slots : List RuntimeValue) (index : Int) : keyAt (layout.build handle [] slots) index = .unit := by
   simp [keyAt]
 
-@[vir_denote_norm] theorem keyAt_build_cons_zero (layout : Layout) (handle key value : RuntimeValue)
+theorem keyAt_build_cons_zero (layout : Layout) (handle key value : RuntimeValue)
     (rest : Entries) (slots : List RuntimeValue) :
     keyAt (layout.build handle ((key, value) :: rest) slots) 0 = key := by
   simp [keyAt]
 
-@[vir_denote_norm] theorem keyAt_build_cons_of_pos (layout : Layout) (handle key value : RuntimeValue)
+theorem keyAt_build_cons_of_pos (layout : Layout) (handle key value : RuntimeValue)
     (rest : Entries) (slots : List RuntimeValue) {index : Int} (positive : 0 < index) :
     keyAt (layout.build handle ((key, value) :: rest) slots) index =
       keyAt (layout.build handle rest slots) (index - 1) := by
@@ -2127,30 +2127,30 @@ attribute [vir_denote_norm] Discipline.set_ordered Discipline.set_sequence
   have : ((n : Int) + 1).toNat = n + 1 := by omega
   simp [keyAt, show ¬((n : Int) + 1 < 0) by omega, show ¬((n : Int) < 0) by omega, this]
 
-@[vir_denote_norm] theorem rank_build_nil (layout : Layout) (handle key : RuntimeValue)
+theorem rank_build_nil (layout : Layout) (handle key : RuntimeValue)
     (slots : List RuntimeValue) : rank (layout.build handle [] slots) key = 0 := by
   simp [rank, indexOf]
 
-@[vir_denote_norm] theorem rank_build_cons_of_eq (layout : Layout) (handle : RuntimeValue)
+theorem rank_build_cons_of_eq (layout : Layout) (handle : RuntimeValue)
     {other key : RuntimeValue} (value : RuntimeValue) (rest : Entries) (slots : List RuntimeValue)
     (same : other = key) :
     rank (layout.build handle ((other, value) :: rest) slots) key = 0 := by
   simp [rank, indexOf, same]
 
-@[vir_denote_norm] theorem rank_build_cons_of_ne (layout : Layout) (handle : RuntimeValue)
+theorem rank_build_cons_of_ne (layout : Layout) (handle : RuntimeValue)
     {other key : RuntimeValue} (value : RuntimeValue) (rest : Entries) (slots : List RuntimeValue)
     (differ : other ≠ key) :
     rank (layout.build handle ((other, value) :: rest) slots) key =
       rank (layout.build handle rest slots) key + 1 := by
   simp [rank, indexOf, differ]
 
-@[vir_denote_norm] theorem get_nil (key : RuntimeValue) : get [] key = .unit := rfl
+theorem get_nil (key : RuntimeValue) : get [] key = .unit := rfl
 
-@[vir_denote_norm] theorem get_cons_of_eq {other key : RuntimeValue} (value : RuntimeValue)
+theorem get_cons_of_eq {other key : RuntimeValue} (value : RuntimeValue)
     (rest : Entries) (same : other = key) : get ((other, value) :: rest) key = value := by
   simp [get, same]
 
-@[vir_denote_norm] theorem get_cons_of_ne {other key : RuntimeValue} (value : RuntimeValue)
+theorem get_cons_of_ne {other key : RuntimeValue} (value : RuntimeValue)
     (rest : Entries) (differ : other ≠ key) : get ((other, value) :: rest) key = get rest key := by
   simp [get, differ]
 

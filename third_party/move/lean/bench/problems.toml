@@ -1,7 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 #
-# The problems of the verification benchmark (designs/verification-benchmarks.md),
+# The problems of the verification benchmark (doc/status/verification-benchmarks.md),
 # read from the tree at the benchmarked commit. Paths are relative to the
 # repository root. A problem is `move` (modules of an in-tree package),
 # `lean` (a VerexSL file), or `rust` (a Rust file with its specification).
@@ -186,15 +186,6 @@ inputs = ["aptos-move/framework/move-stdlib"]
 repeat = 3
 
 # ## Higher-order paper (move-prover/doc/higher-order-paper-26/examples)
-
-[[problem]]
-name = "amm"
-expected_rejections = ["«0x42».amm::create_noncompliant_fee_pool"]
-kind = "move"
-package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
-modules = ["0x42::amm"]
-dev = true
-inputs = ["third_party/move/move-stdlib"]
 
 [[problem]]
 name = "calculator"

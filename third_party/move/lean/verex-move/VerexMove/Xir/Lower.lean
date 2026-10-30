@@ -79,7 +79,7 @@ private def nominalDecl? (name : NameId) : M (Option StructDecl) := do
     else none
 
 /-- The structs a module compiles: a spec variable's memory, which only
-verification holds, has no bytecode form (`designs/ghost-fields.md`). -/
+verification holds, has no bytecode form (`doc/designs/ghost-fields.md`). -/
 private def compiledStructs (ns : ValidatedNamespace) : Array StructDecl :=
   ns.structs.filter (!·.isGhostMemory)
 

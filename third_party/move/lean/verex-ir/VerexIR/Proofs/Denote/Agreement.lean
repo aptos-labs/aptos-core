@@ -7,7 +7,7 @@ import VerexIR.Proofs.Denote.Compile
 /-!
 # Agreement of the denotation with the big-step semantics
 
-The one theorem of `designs/denotation.md`: for every function the compiler
+The one theorem of `doc/designs/denotation.md`: for every function the compiler
 accepts, the denotation of its term is exactly its prophetic big-step
 meaning, with references as `(current, prophecy)`.  It is stated over the compiler, so it holds for every
 unit at once; a verified function transports its native theorem through it
@@ -49,7 +49,7 @@ are the least fixed point of their bodies over all slots, with every call to
 a member routed to the argument at the slot it reaches (at the runtime
 family, calls with type arguments stay closed): every outcome is one of a finite unfolding, since a big-step
 derivation nests finitely many calls. A function calling itself is a cycle
-of one. Assumed with the agreement above (`designs/denotation.md`, D6). -/
+of one. Assumed with the agreement above (`doc/designs/denotation.md`, D6). -/
 axiom compileFunction_least_cycle {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit]
     (members : List (FunctionHandle × Function unit))
@@ -196,13 +196,24 @@ omit [Skolems unit] in
 /-- Runs of a unit keep global and Table storage encoding a typed memory: from
 stores encoding a memory, every successful run ends in stores encoding one that
 agrees with it where no runtime key reaches.  A property of the unit's
-semantics that static typing establishes (`designs/static-memory.md`); the
+semantics that static typing establishes (`doc/designs/static-memory.md`); the
 public theorem states it as a hypothesis. -/
 def GlobalsPreserved {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
   ∀ handle typeInstantiation start arguments results exit memory,
     StorageEncodes unit memory start →
     (functionSpecAt executable handle typeInstantiation arguments).ok start results exit →
     ∃ final, StorageEncodesReturned unit final exit results ∧ AgreeUnnamed unit final memory
+
+/-- Runs of a unit fail with integers: every failure of a run is a failure of
+the denotation encoded (`Failure.encode`), an abort code or the failed
+operation's operands. An assumption the public theorem states as a
+hypothesis, beside `GlobalsPreserved`; nothing establishes it yet, as
+validation does not constrain a throw's operands (`denotation.md`,
+"Assumption ledger"). -/
+def FailuresIntegral {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
+  ∀ handle typeInstantiation start arguments failure,
+    (functionSpecAt executable handle typeInstantiation arguments).aborts start failure →
+    ∃ error : Failure, error.encode = failure
 
 end Frames
 
@@ -236,8 +247,9 @@ def _root_.VerexIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [Skolems uni
       argumentsResolve σs args loans results (exportsAfter initial.pending final.pending) ∧
       contract.ensures args memory result memory'
   aborts := fun arguments initial error =>
-    ∃ memory loans args, StorageEncodes unit memory initial ∧
-      lendArguments σs args loans = some arguments ∧ contract.aborts args memory error
+    ∃ memory loans args failure, StorageEncodes unit memory initial ∧
+      lendArguments σs args loans = some arguments ∧ failure.encode = error ∧
+      contract.aborts args memory failure
   mayAbort := fun arguments initial =>
     ∃ memory loans args, StorageEncodes unit memory initial ∧
       lendArguments σs args loans = some arguments ∧ contract.mayAbort args memory
@@ -258,7 +270,7 @@ runs keep global memory typed.  Every runtime execution from an admissible
 start is a prophetic outcome at the value view from a memory its stores
 encode, whose existence the contract's definedness guarantees. -/
 theorem satisfies_run_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (preserved : GlobalsPreserved executable)
+    (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
     (shape : ResultShape)
     (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
@@ -301,14 +313,15 @@ theorem satisfies_run_at {unit : ValidatedUnit} (executable : ExecutableUnit uni
       lentCurrent, lentProphecy, resolves,
       ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩
   · intro error failed
-    exact ⟨memory, loans, args, encoded, lent,
-      established.2.1 error ⟨initial, loans, arguments, encoded, admissible, lent, failed⟩⟩
+    obtain ⟨failure, rfl⟩ := integral handle typeInstantiation initial arguments error failed
+    exact ⟨memory, loans, args, failure, encoded, lent, rfl,
+      established.2.1 failure ⟨initial, loans, arguments, encoded, admissible, lent, failed⟩⟩
 
 /-- A contract satisfied by the prophetic meaning at the runtime frame and
 the empty instantiation holds of the big-step meaning in its runtime form,
 for a unit whose runs keep global memory typed. -/
 theorem satisfies_prophetic {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (preserved : GlobalsPreserved executable)
+    (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
     (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
       (@ResultShape.carrier (Carriers.runtime unit) shape))
@@ -317,7 +330,7 @@ theorem satisfies_prophetic {unit : ValidatedUnit} (executable : ExecutableUnit 
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunction executable handle (contract.prophetic unit σs shape) := by
   letI : Skolems unit := Skolems.runtime unit
-  refine satisfies_run_at executable preserved handle #[] σs shape contract ?_
+  refine satisfies_run_at executable preserved integral handle #[] σs shape contract ?_
   have meaning : propheticMeaning executable #[] handle σs shape =
       propheticRun executable #[] handle σs shape :=
     funext (propheticMeaning_of_coherent (coherent_runtime unit handle) σs shape)
@@ -328,7 +341,8 @@ frame type arguments induce over the runtime family, holds, read at the
 arguments' types, of its big-step meaning at every runtime type
 instantiation coherent with that frame. -/
 theorem satisfies_generic_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    (preserved : GlobalsPreserved executable) (handle : FunctionHandle) (θ : TypeArgs)
+    (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
+    (handle : FunctionHandle) (θ : TypeArgs)
     (free : θ.1.refFree = true) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
     (shape : ResultShape)
     (contract : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
@@ -341,7 +355,7 @@ theorem satisfies_generic_at {unit : ValidatedUnit} (executable : ExecutableUnit
     SatisfiesFunctionAt executable handle typeInstantiation
       ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) := by
   letI : Skolems unit := Skolems.runtime unit
-  refine satisfies_run_at executable preserved handle typeInstantiation _ _ _ ?_
+  refine satisfies_run_at executable preserved integral handle typeInstantiation _ _ _ ?_
   have meaning : @propheticMeaning _ executable (Skolems.instantiate θ (Skolems.runtime unit))
         typeInstantiation handle σs shape =
       @propheticRun _ executable (Skolems.instantiate θ (Skolems.runtime unit)) typeInstantiation

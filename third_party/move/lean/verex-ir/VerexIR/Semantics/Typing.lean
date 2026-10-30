@@ -326,7 +326,7 @@ theorem initialFrame?_typed {tables : Tables}
 /-! ## Reference vocabulary
 
 Leaf lemmas of the prophetic ownership operations
-([`designs/prophetic-references.md`](../../../designs/prophetic-references.md)):
+([`doc/designs/prophetic-references.md`](../../../designs/prophetic-references.md)):
 dereference inversion, borrow introduction, freeze, and the hole writes.
 The walker-level preservation statements — write-back and mutation through
 a live borrow — need a loan-typing environment tying each hole's position

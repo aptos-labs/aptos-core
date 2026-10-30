@@ -7,7 +7,7 @@ import VerexMove.Frontend.Xast
 Specification arithmetic is mathematical. The Move Prover's bit-vector
 representation (`pragma bv`, `bv_ret`, `bv_internal`, and the classification
 bitwise operations induce) is a backend encoding and is not modeled; see G14 in
-`designs/prover-test-problems.md`. The explicit conversions are: `int2bv(e)`
+`doc/status/prover-test-problems.md`. The explicit conversions are: `int2bv(e)`
 wraps `e` into the fixed-width type of its result, two's complement for a signed
 type, and `bv2int(e)` reads the value back unchanged. The compiler types the
 conversion of an arithmetic operand at `num`, which has no width; that one wraps

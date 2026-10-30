@@ -15,13 +15,13 @@ tests/sources/functional/trace.move:25:5: error: verex verification failed: the 
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/trace.move:38:5: error: the module invariant `invariant ∀ (addr : Address), exists<R>(addr) ==> global<R>(addr).x < 5` does not hold after a write of memory it reads
 tests/sources/functional/trace.move:34:9: error: the specification clause `ensures exists<R>(addr) ==> global<R>(addr).x == x` is not established
+tests/sources/functional/trace.move:38:5: error: the module invariant `invariant ∀ (addr : Address), exists<R>(addr) ==> global<R>(addr).x < 5` does not hold after a write of memory it reads
 tests/sources/functional/trace.move:32:5: error: verex verification failed: the automatic verification of `publish_invalid` failed; provide a proof in `tests/sources/functional/trace.proof.lean`:
   verify publish_invalid by
     verex_obligations
     verex_on
-    | module_invariant => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | module_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

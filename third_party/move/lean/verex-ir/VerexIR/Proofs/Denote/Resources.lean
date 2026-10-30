@@ -9,7 +9,7 @@ import VerexIR.Semantics.ValueTyping
 
 The native types the unit's type tables denote, and the resource type each
 runtime storage key names: how typed global memory (`Memory`) relates to the
-runtime's (`designs/static-memory.md`).  A runtime key is the declaring
+runtime's (`doc/designs/static-memory.md`).  A runtime key is the declaring
 namespace with a type identifier of its table; the memory slot it names is
 the resource type that identifier denotes.
 -/
@@ -139,24 +139,22 @@ def NTy.handle? : NTy → Option StructHandle
     (NTy.enum source arguments names rows distinct).handle? = some source := rfl
 
 /-- Every value stored in memory satisfies the data invariant of its
-resource type, read over its encoding, as the Move Prover assumes of the
-memory a function accesses (`designs/static-memory.md`, "Contracts"). The
-invariants read no memory, so a write keeps those of the values it leaves
-alone. -/
-def MemoryInvariants (invariant : ResourceType → RuntimeValue → Prop)
+resource type, as the Move Prover assumes of the memory a function accesses
+(`doc/designs/static-memory.md`, "Contracts"). The invariants read no memory,
+so a write keeps those of the values it leaves alone. -/
+def MemoryInvariants (invariant : (resource : ResourceType) → resource.carrier unit → Prop)
     (memory : Memory unit) : Prop :=
-  ∀ resource key value, memory resource key = some value →
-    invariant resource (resource.encode (unit := unit) value)
+  ∀ resource key value, memory resource key = some value → invariant resource value
 
 namespace MemoryInvariants
 
-variable {invariant : ResourceType → RuntimeValue → Prop} {memory : Memory unit}
+variable {invariant : (resource : ResourceType) → resource.carrier unit → Prop}
+  {memory : Memory unit}
 
 /-- A write keeps the invariants when the value written satisfies its own. -/
 theorem set (holds : MemoryInvariants invariant memory) {resource : ResourceType}
     {key : StorageKey} {value : Option (resource.carrier unit)}
-    (stored : ∀ written, value = some written →
-      invariant resource (resource.encode (unit := unit) written)) :
+    (stored : ∀ written, value = some written → invariant resource written) :
     MemoryInvariants invariant (memory.set resource key value) := by
   intro other otherKey held read
   by_cases same : other = resource
@@ -171,8 +169,7 @@ theorem set (holds : MemoryInvariants invariant memory) {resource : ResourceType
 /-- Publishing or writing a value keeps the invariants when it satisfies
 its own. -/
 theorem set_some (holds : MemoryInvariants invariant memory) {resource : ResourceType}
-    {key : StorageKey} {value : resource.carrier unit}
-    (stored : invariant resource (resource.encode (unit := unit) value)) :
+    {key : StorageKey} {value : resource.carrier unit} (stored : invariant resource value) :
     MemoryInvariants invariant (memory.set resource key (some value)) :=
   holds.set fun _ written => by cases written; exact stored
 
@@ -184,7 +181,7 @@ theorem set_none (holds : MemoryInvariants invariant memory) {resource : Resourc
 /-- A value read from memory satisfies the invariant of its resource type. -/
 theorem read (holds : MemoryInvariants invariant memory) {resource : ResourceType}
     {key : StorageKey} {value : resource.carrier unit} (read : memory resource key = some value) :
-    invariant resource (resource.encode (unit := unit) value) :=
+    invariant resource value :=
   holds resource key value read
 
 end MemoryInvariants
@@ -236,6 +233,456 @@ variable [Θ : Skolems unit]
 @[reducible] def Skolems.resource (type : NTy) (arguments : NRow) : ResourceType :=
   ⟨Θ.resolve type, arguments.map Θ.resolve, .value⟩
 
+
+end Frames
+
+/-- The data invariant of the stored values of a declaration of native type
+`σ` and arguments `arguments`, its type parameters: of a value of the
+resource of an instance, `holds` at the instance's type arguments of the
+value read at the frame they induce over the runtime frame, as a generic
+contract spells its frame; nothing of a value of another resource. -/
+def StoredCase (σ : NTy) (arguments : NRow)
+    (holds : (θ : TypeArgs) →
+      @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers σ → Prop)
+    (resource : ResourceType) (value : resource.carrier unit) : Prop :=
+  ∀ (inhabitable : resource.arguments.inhabitable = true)
+    (same : resource = @Skolems.resource unit
+      (Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)) σ arguments),
+    holds ⟨resource.arguments, inhabitable⟩
+      ((Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)).ofRuntime σ
+        (cast (congrArg (ResourceType.carrier unit) same) value))
+
+/-- A stored value satisfies its declaration's invariant where it does at
+its resource's own type arguments: the premises' proofs are any. -/
+theorem StoredCase.intro {σ : NTy} {arguments : NRow}
+    {holds : (θ : TypeArgs) →
+      @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers σ → Prop}
+    {resource : ResourceType} {value : resource.carrier unit}
+    (inhabitable : resource.arguments.inhabitable = true)
+    (same : resource = @Skolems.resource unit
+      (Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)) σ arguments)
+    (held : holds ⟨resource.arguments, inhabitable⟩
+      ((Skolems.instantiate ⟨resource.arguments, inhabitable⟩ (Skolems.runtime unit)).ofRuntime σ
+        (cast (congrArg (ResourceType.carrier unit) same) value))) :
+    StoredCase σ arguments holds resource value :=
+  fun _ _ => held
+
+/-! ## The frame of a resource's type arguments
+
+A declaration's invariant is stated of a stored value at its resource's own
+type arguments, at the frame they induce over the runtime frame
+(`StoredCase`): one statement per row of type values. A frame reading or
+writing the value moves its own view of it there (`Skolems.reframe`), which
+keeps its encoding (`Skolems.encode_reframe`). -/
+
+/-- Whether a row is the parameters of a declaration, from `start` on. -/
+def NRow.isParamsFrom (start : Nat) : NRow → Bool
+  | .nil => true
+  | .cons τ rest => τ == .param start && rest.isParamsFrom (start + 1)
+
+/-- A row's entries with each replaced. -/
+theorem NRow.getD_map_params (g : NTy → NTy) :
+    (params : NRow) → (start : Nat) → params.isParamsFrom start = true → (index : Nat) →
+      index < params.length → (default : NTy) →
+      (params.map g).getD index default = g (.param (start + index))
+  | .nil, _, _, _, below, _ => absurd below (Nat.not_lt_zero _)
+  | .cons τ rest, start, own, 0, _, _ => by
+      simp only [NRow.isParamsFrom, Bool.and_eq_true, beq_iff_eq] at own
+      simp only [NRow.map, NRow.getD, own.1, Nat.add_zero]
+  | .cons _ rest, start, own, index + 1, below, default => by
+      simp only [NRow.isParamsFrom, Bool.and_eq_true] at own
+      simp only [NRow.map, NRow.getD]
+      rw [NRow.getD_map_params g rest (start + 1) own.2 index
+        (by simp only [NRow.length] at below; omega) default]
+      congr 2
+      omega
+
+/-- A declaration's parameters are below their number. -/
+theorem NRow.paramsAll_params : (params : NRow) → (start bound : Nat) →
+    params.isParamsFrom start = true → start + params.length ≤ bound →
+    params.paramsAll (fun index => decide (index < bound)) = true
+  | .nil, _, _, _, _ => rfl
+  | .cons τ rest, start, bound, own, below => by
+      simp only [NRow.isParamsFrom, Bool.and_eq_true, beq_iff_eq] at own
+      simp only [NRow.length] at below
+      simp only [NRow.paramsAll, own.1, NTy.paramsAll, Bool.and_eq_true, decide_eq_true_eq]
+      exact ⟨by omega, NRow.paramsAll_params rest (start + 1) bound own.2 (by omega)⟩
+
+mutual
+/-- Substituting a row agreeing with a family on the parameters a type
+mentions is resolving it by the family. -/
+theorem NTy.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
+    (agree : ∀ index, index < bound → θ.getD index (.param index) = f index) :
+    (τ : NTy) → τ.paramsAll (fun index => decide (index < bound)) = true →
+      τ.subst θ = τ.substWith f
+  | .param index, bounded => by
+      simp only [NTy.paramsAll, decide_eq_true_eq] at bounded
+      simp only [NTy.subst, NTy.substWith]
+      exact agree index bounded
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
+  | .bytes, _ => rfl
+  | .tuple elements, bounded => by
+      simp only [NTy.paramsAll] at bounded
+      simp only [NTy.subst, NTy.substWith, NRow.subst_eq_substWith θ f bound agree elements bounded]
+  | .struct _ arguments fields, bounded => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at bounded
+      simp only [NTy.subst, NTy.substWith, NRow.subst_eq_substWith θ f bound agree arguments bounded.1,
+        NRow.subst_eq_substWith θ f bound agree fields bounded.2]
+  | .enum _ arguments _ rows _, bounded => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at bounded
+      simp only [NTy.subst, NTy.substWith, NRow.subst_eq_substWith θ f bound agree arguments bounded.1,
+        NRows.subst_eq_substWith θ f bound agree rows bounded.2]
+  | .vector element, bounded => by
+      simp only [NTy.paramsAll] at bounded
+      simp only [NTy.subst, NTy.substWith, NTy.subst_eq_substWith θ f bound agree element bounded]
+  | .table key value, bounded => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at bounded
+      simp only [NTy.subst, NTy.substWith, NTy.subst_eq_substWith θ f bound agree key bounded.1,
+        NTy.subst_eq_substWith θ f bound agree value bounded.2]
+  | .ghost slot, bounded => by
+      simp only [NTy.paramsAll] at bounded
+      simp only [NTy.subst, NTy.substWith, NTy.subst_eq_substWith θ f bound agree slot bounded]
+  | .ref referent, bounded => by
+      simp only [NTy.paramsAll] at bounded
+      simp only [NTy.subst, NTy.substWith, NTy.subst_eq_substWith θ f bound agree referent bounded]
+  | .function parameters _ results, bounded => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at bounded
+      simp only [NTy.subst, NTy.substWith,
+        NRow.subst_eq_substWith θ f bound agree parameters bounded.1,
+        NRow.subst_eq_substWith θ f bound agree results bounded.2]
+
+theorem NRow.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
+    (agree : ∀ index, index < bound → θ.getD index (.param index) = f index) :
+    (row : NRow) → row.paramsAll (fun index => decide (index < bound)) = true →
+      NRow.subst θ row = NRow.substWith f row
+  | .nil, _ => rfl
+  | .cons τ rest, bounded => by
+      simp only [NRow.paramsAll, Bool.and_eq_true] at bounded
+      simp only [NRow.subst, NRow.substWith, NTy.subst_eq_substWith θ f bound agree τ bounded.1,
+        NRow.subst_eq_substWith θ f bound agree rest bounded.2]
+
+theorem NRows.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
+    (agree : ∀ index, index < bound → θ.getD index (.param index) = f index) :
+    (rows : NRows) → rows.paramsAll (fun index => decide (index < bound)) = true →
+      NRows.subst θ rows = NRows.substWith f rows
+  | .nil, _ => rfl
+  | .cons fields rest, bounded => by
+      simp only [NRows.paramsAll, Bool.and_eq_true] at bounded
+      simp only [NRows.subst, NRows.substWith, NRow.subst_eq_substWith θ f bound agree fields bounded.1,
+        NRows.subst_eq_substWith θ f bound agree rest bounded.2]
+end
+
+/-- A frame's resolutions of a declaration's parameters are inhabitable. -/
+theorem NRow.inhabitable_map_resolve (Θ : Skolems unit) :
+    (params : NRow) → (start : Nat) → params.isParamsFrom start = true →
+      (params.map Θ.resolve).inhabitable = true
+  | .nil, _, _ => rfl
+  | .cons _ rest, start, own => by
+      simp only [NRow.isParamsFrom, Bool.and_eq_true, beq_iff_eq] at own
+      simp only [NRow.map, NRow.inhabitable, own.1, Θ.type_inhabitable,
+        NRow.inhabitable_map_resolve Θ rest (start + 1) own.2, Bool.and_self]
+
+/-- The type arguments a frame gives a declaration's parameters. -/
+@[reducible] def Skolems.typeArgs (Θ : Skolems unit) (params : NRow)
+    (own : params.isParamsFrom 0 = true) : TypeArgs :=
+  ⟨params.map Θ.resolve, NRow.inhabitable_map_resolve Θ params 0 own⟩
+
+/-- The frame those type arguments induce over the runtime frame. -/
+@[reducible] noncomputable def Skolems.instance (Θ : Skolems unit) (params : NRow)
+    (own : params.isParamsFrom 0 = true) : Skolems unit :=
+  Skolems.instantiate (Θ.typeArgs params own) (Skolems.runtime unit)
+
+/-- A type over a declaration's parameters resolves alike at a frame and at
+the frame of its type arguments. -/
+theorem Skolems.resolve_instance (Θ : Skolems unit) {params : NRow}
+    (own : params.isParamsFrom 0 = true) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
+    τ.subst (params.map Θ.resolve) = Θ.resolve τ := by
+  rw [Θ.resolve_eq τ]
+  refine NTy.subst_eq_substWith _ _ params.length (fun index below => ?_) τ bounded
+  simpa only [Nat.zero_add] using
+    NRow.getD_map_params Θ.resolve params 0 own index below (.param index)
+
+/-- A frame's value of a type over a declaration's parameters, at the frame
+of its type arguments: the same runtime value. -/
+noncomputable def Skolems.reframe (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true)
+    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
+    (value : @NTy.carrier Θ.toCarriers τ) : @NTy.carrier (Θ.instance params own).toCarriers τ :=
+  (Θ.instance params own).ofRuntime τ
+    (cast (congrArg (@NTy.carrier (Carriers.runtime unit)) (Θ.resolve_instance own bounded).symm)
+      (Θ.toRuntime τ value))
+
+/-- An encoding does not see a cast between the carriers of equal types. -/
+theorem NTy.encode_castCarrier {Φ : Carriers} {ρ ρ' : NTy} (same : ρ = ρ')
+    (carriers : @NTy.carrier Φ ρ = @NTy.carrier Φ ρ') (value : @NTy.carrier Φ ρ) :
+    @NTy.encode Φ ρ' (cast carriers value) = @NTy.encode Φ ρ value := by
+  subst same
+  rfl
+
+/-- Moving a value to the frame of its type arguments keeps its encoding. -/
+theorem Skolems.encode_reframe (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
+    (value : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.encode (Θ.instance params own).toCarriers τ (Θ.reframe own bounded value) =
+      @NTy.encode Θ.toCarriers τ value := by
+  unfold Skolems.reframe
+  rw [← (Θ.instance params own).encode_toRuntime, (Θ.instance params own).toRuntime_ofRuntime]
+  exact (NTy.encode_castCarrier (Θ.resolve_instance own bounded).symm _ _).trans
+    (Θ.encode_toRuntime τ value)
+
+/-- Moving values to the frame of their type arguments is injective. -/
+@[vir_denote_norm] theorem Skolems.reframe_inj (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) (left right : @NTy.carrier Θ.toCarriers τ) :
+    Θ.reframe own bounded left = Θ.reframe own bounded right ↔ left = right := by
+  constructor
+  · intro same
+    apply @NTy.encode_injective Θ.toCarriers τ
+    rw [← Θ.encode_reframe own bounded left, ← Θ.encode_reframe own bounded right, same]
+  · intro same
+    rw [same]
+
+/-- Equality without handle identity does not see the frame (`NTy.equal_codec`). -/
+@[vir_denote_norm] theorem Skolems.equal_reframe (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true)
+    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) (left right : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.equal (Θ.instance params own).toCarriers false τ (Θ.reframe own bounded left)
+        (Θ.reframe own bounded right) = @NTy.equal Θ.toCarriers false τ left right := by
+  rw [@NTy.equal_codec (Θ.instance params own).toCarriers, @NTy.equal_codec Θ.toCarriers]
+  simp only [NTy.codec_encode, Skolems.encode_reframe]
+  rfl
+
+/-- Nor does the order (`NTy.order_codec`). -/
+@[vir_denote_norm] theorem Skolems.order_reframe (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true)
+    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) (rank : ValueRanks) (left right : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.order (Θ.instance params own).toCarriers rank τ (Θ.reframe own bounded left)
+        (Θ.reframe own bounded right) = @NTy.order Θ.toCarriers rank τ left right := by
+  rw [← @NTy.order_codec (Θ.instance params own).toCarriers, ← @NTy.order_codec Θ.toCarriers]
+  simp only [NTy.codec_encode, Skolems.encode_reframe]
+
+section Reframe
+variable (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true)
+
+/-- A scalar is the same value at every frame. -/
+private theorem Skolems.reframe_scalar {τ : NTy} (bounded) (value : @NTy.carrier Θ.toCarriers τ)
+    (carriers : @NTy.carrier Θ.toCarriers τ = @NTy.carrier (Θ.instance params own).toCarriers τ)
+    (encoded : ∀ value, @NTy.encode (Θ.instance params own).toCarriers τ (cast carriers value) =
+      @NTy.encode Θ.toCarriers τ value) :
+    Θ.reframe own bounded value = cast carriers value := by
+  apply @NTy.encode_injective (Θ.instance params own).toCarriers τ
+  rw [Θ.encode_reframe, encoded]
+
+@[vir_denote_norm] theorem Skolems.reframe_unit (bounded) (value : Unit) :
+    Θ.reframe own (τ := .unit) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_bool (bounded) (value : Bool) :
+    Θ.reframe own (τ := .bool) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_int {width : Nat} {signed : Bool} (bounded)
+    (value : SpecInt (.bits width) signed) :
+    Θ.reframe own (τ := .int width signed) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_num (bounded) (value : SpecInt .unbounded true) :
+    Θ.reframe own (τ := .num) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_address (bounded) (value : String) :
+    Θ.reframe own (τ := .address) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_signer (bounded) (value : String) :
+    Θ.reframe own (τ := .signer) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_string (bounded) (value : String) :
+    Θ.reframe own (τ := .string) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+@[vir_denote_norm] theorem Skolems.reframe_bytes (bounded) (value : Array UInt8) :
+    Θ.reframe own (τ := .bytes) bounded value = value :=
+  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+
+private theorem paramsAll_head {f : Nat → Bool} {τ : NTy} {rest : NRow}
+    (bounded : NRow.paramsAll f (.cons τ rest) = true) : τ.paramsAll f = true := by
+  simp only [NRow.paramsAll, Bool.and_eq_true] at bounded
+  exact bounded.1
+
+private theorem paramsAll_tail {f : Nat → Bool} {τ : NTy} {rest : NRow}
+    (bounded : NRow.paramsAll f (.cons τ rest) = true) : rest.paramsAll f = true := by
+  simp only [NRow.paramsAll, Bool.and_eq_true] at bounded
+  exact bounded.2
+
+private theorem paramsAll_fields {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
+    (bounded : (NTy.struct source arguments fields).paramsAll f = true) :
+    fields.paramsAll f = true := by
+  simp only [NTy.paramsAll, Bool.and_eq_true] at bounded
+  exact bounded.2
+
+private theorem paramsAll_struct {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
+    (arguments' : arguments.paramsAll f = true) (fields' : fields.paramsAll f = true) :
+    (NTy.struct source arguments fields).paramsAll f = true := by
+  simp only [NTy.paramsAll, Bool.and_eq_true]
+  exact ⟨arguments', fields'⟩
+
+/-- The encodings of a struct value's fields, from the value's. -/
+private theorem encode_fields {Φ Ψ : Carriers} {source : StructHandle} {arguments : NRow}
+    {τ : NTy} {rest : NRow} (left : @NTy.carrier Φ (.struct source arguments (.cons τ rest)))
+    (right : @NTy.carrier Ψ (.struct source arguments (.cons τ rest)))
+    (same : @NTy.encode Φ (.struct source arguments (.cons τ rest)) left =
+      @NTy.encode Ψ (.struct source arguments (.cons τ rest)) right) :
+    @NTy.encode Φ τ left.1 = @NTy.encode Ψ τ right.1 ∧
+      @NTy.encode Φ (.struct source arguments rest) left.2 =
+        @NTy.encode Ψ (.struct source arguments rest) right.2 := by
+  rw [@NTy.encode_struct Φ, @NTy.encode_struct Ψ, @HList.encode_cons Φ, @HList.encode_cons Ψ] at same
+  simp only [RuntimeValue.nominal.injEq, true_and] at same
+  have fields := List.toArray_inj same
+  simp only [List.cons.injEq] at fields
+  refine ⟨fields.1, ?_⟩
+  rw [@NTy.encode_struct Φ, @NTy.encode_struct Ψ, fields.2]
+
+/-- A struct value's fields move with it. -/
+@[vir_denote_norm] theorem Skolems.reframe_struct_fst {source : StructHandle} {arguments : NRow}
+    {τ : NTy} {rest : NRow} (bounded)
+    (value : @NTy.carrier Θ.toCarriers (.struct source arguments (.cons τ rest))) :
+    (Θ.reframe own bounded value).1 =
+      Θ.reframe own (paramsAll_head (paramsAll_fields bounded)) value.1 := by
+  apply @NTy.encode_injective (Θ.instance params own).toCarriers τ
+  rw [(encode_fields _ _ (Θ.encode_reframe own bounded value)).1, Θ.encode_reframe]
+
+@[vir_denote_norm] theorem Skolems.reframe_struct_snd {source : StructHandle} {arguments : NRow}
+    {τ : NTy} {rest : NRow} (bounded)
+    (value : @NTy.carrier Θ.toCarriers (.struct source arguments (.cons τ rest))) :
+    (Θ.reframe own bounded value).2 =
+      Θ.reframe own (τ := .struct source arguments rest)
+        (paramsAll_struct (by simp only [NTy.paramsAll, Bool.and_eq_true] at bounded; exact bounded.1)
+          (paramsAll_tail (paramsAll_fields bounded))) value.2 := by
+  apply @NTy.encode_injective (Θ.instance params own).toCarriers (.struct source arguments rest)
+  rw [(encode_fields _ _ (Θ.encode_reframe own bounded value)).2, Θ.encode_reframe]
+
+/-- A vector's elements move with it. -/
+@[vir_denote_norm] theorem Skolems.reframe_vector_values {element : NTy} (bounded)
+    (vector : @NTy.carrier Θ.toCarriers (.vector element)) :
+    (Θ.reframe own (τ := .vector element) bounded vector).values =
+      vector.values.map (Θ.reframe own (τ := element) (by simpa only [NTy.paramsAll] using bounded)) := by
+  have encoded := Θ.encode_reframe own bounded vector
+  rw [@NTy.encode_vector (Θ.instance params own).toCarriers, @NTy.encode_vector Θ.toCarriers] at encoded
+  simp only [RuntimeValue.vector.injEq] at encoded
+  apply Array.map_inj_right (f := @NTy.encode (Θ.instance params own).toCarriers element)
+    (fun _ _ same => @NTy.encode_injective (Θ.instance params own).toCarriers element _ _ same) |>.mp
+  rw [Array.map_map]
+  refine encoded.trans ?_
+  apply Array.map_congr_left
+  intro value _
+  exact (Θ.encode_reframe own _ value).symm
+
+/-- A ghost slot moves with its value. -/
+@[vir_denote_norm] theorem Skolems.reframe_ghost {slot : NTy} (bounded)
+    (value : @NTy.carrier Θ.toCarriers (.ghost slot)) :
+    Θ.reframe own (τ := .ghost slot) bounded value =
+      Θ.reframe own (τ := slot) (by simpa only [NTy.paramsAll] using bounded) value := by
+  apply @NTy.encode_injective (Θ.instance params own).toCarriers (.ghost slot)
+  rw [Θ.encode_reframe, @NTy.encode_ghost (Θ.instance params own).toCarriers,
+    Θ.encode_reframe, @NTy.encode_ghost Θ.toCarriers]
+
+end Reframe
+
+/-- A row over a declaration's parameters resolves alike at a frame and at
+the frame of its type arguments. -/
+theorem Skolems.map_resolve_instance (Θ : Skolems unit) {params : NRow}
+    (own : params.isParamsFrom 0 = true) :
+    (row : NRow) → row.paramsAll (fun index => decide (index < params.length)) = true →
+      row.map (Θ.instance params own).resolve = row.map Θ.resolve
+  | .nil, _ => rfl
+  | .cons τ rest, bounded => by
+      simp only [NRow.paramsAll, Bool.and_eq_true] at bounded
+      show NRow.cons (τ.subst (params.map Θ.resolve)) (rest.map (Θ.instance params own).resolve) =
+        .cons (Θ.resolve τ) (rest.map Θ.resolve)
+      rw [Θ.map_resolve_instance own rest bounded.2, Θ.resolve_instance own bounded.1]
+
+/-- A declaration's invariant at a frame: of the value the frame reads at its
+resource, the invariant at the resource's type arguments of the value moved
+to the frame they induce (`Skolems.reframe`). -/
+theorem StoredCase.atFrame (Θ : Skolems unit) {σ : NTy} {params : NRow}
+    {holds : (θ : TypeArgs) →
+      @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers σ → Prop}
+    (own : params.isParamsFrom 0 = true)
+    (bounded : σ.paramsAll (fun index => decide (index < params.length)) = true)
+    (value : @NTy.carrier (Carriers.runtime unit) (Θ.resolve σ)) :
+    StoredCase σ params holds (@Skolems.resource unit Θ σ params) value ↔
+      holds (Θ.typeArgs params own) (Θ.reframe own bounded (Θ.ofRuntime σ value)) := by
+  have same : @Skolems.resource unit Θ σ params =
+      @Skolems.resource unit (Θ.instance params own) σ params := by
+    show ResourceType.mk (Θ.resolve σ) (params.map Θ.resolve) .value =
+      ResourceType.mk (σ.subst (params.map Θ.resolve)) (params.map (Θ.instance params own).resolve) .value
+    rw [Θ.map_resolve_instance own params (NRow.paramsAll_params params 0 params.length own (by omega)),
+      Θ.resolve_instance own bounded]
+  constructor
+  · intro stored
+    have held := stored (Θ.typeArgs params own).2 same
+    unfold Skolems.reframe
+    rw [Θ.toRuntime_ofRuntime]
+    exact held
+  · intro held _ _
+    unfold Skolems.reframe at held
+    rw [Θ.toRuntime_ofRuntime] at held
+    exact held
+
+mutual
+/-- A substitution by inhabitable types keeps a type inhabitable. -/
+theorem NTy.inhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
+    (τ : NTy) → τ.inhabitable = true → (τ.subst θ).inhabitable = true
+  | .tuple elements, held => by
+      simp only [NTy.subst, NTy.inhabitable] at held ⊢
+      exact NRow.inhabitable_subst θ fits elements held
+  | .struct _ _ fields, held => by
+      simp only [NTy.subst, NTy.inhabitable] at held ⊢
+      exact NRow.inhabitable_subst θ fits fields held
+  | .enum _ _ names rows _, held => by
+      simp only [NTy.subst, NTy.inhabitable] at held ⊢
+      exact NRows.firstInhabitable_subst θ fits names rows held
+  | .ref referent, held => by
+      simp only [NTy.subst, NTy.inhabitable] at held ⊢
+      exact NTy.inhabitable_subst θ fits referent held
+  | .ghost slot, held => by
+      simp only [NTy.subst, NTy.inhabitable] at held ⊢
+      exact NTy.inhabitable_subst θ fits slot held
+  | .param index, _ => by
+      simp only [NTy.subst]
+      exact NRow.getD_inhabitable θ fits index (.param index) rfl
+  | .function _ _ _, held => by simp [NTy.inhabitable] at held
+  | .vector _, _ => rfl
+  | .table _ _, _ => rfl
+  | .unit, _ => rfl
+  | .bool, _ => rfl
+  | .int _ _, held => held
+  | .num, _ => rfl
+  | .address, _ => rfl
+  | .signer, _ => rfl
+  | .string, _ => rfl
+  | .bytes, _ => rfl
+
+theorem NRow.inhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
+    (row : NRow) → row.inhabitable = true → (NRow.subst θ row).inhabitable = true
+  | .nil, _ => rfl
+  | .cons τ rest, held => by
+      simp only [NRow.subst, NRow.inhabitable, Bool.and_eq_true] at held ⊢
+      exact ⟨NTy.inhabitable_subst θ fits τ held.1, NRow.inhabitable_subst θ fits rest held.2⟩
+
+theorem NRows.firstInhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
+    (names : List String) → (rows : NRows) → NRows.firstInhabitable names rows = true →
+      NRows.firstInhabitable names (rows.subst θ) = true
+  | _ :: _, .cons fields _, held => by
+      simp only [NRows.subst, NRows.firstInhabitable] at held ⊢
+      exact NRow.inhabitable_subst θ fits fields held
+  | [], _, held => by simp [NRows.firstInhabitable] at held
+  | _ :: _, .nil, held => by simp [NRows.firstInhabitable] at held
+end
+
+/-- The entries and substitutions of type arguments are inhabitable: what a
+stored value's resource arguments are, spelled as normalization leaves them. -/
+@[simp] theorem TypeArgs.getD_inhabitable (θ : TypeArgs) (index : Nat) (default : NTy)
+    (held : default.inhabitable = true) : (θ.1.getD index default).inhabitable = true :=
+  NRow.getD_inhabitable θ.1 θ.2 index default held
+
+@[simp] theorem TypeArgs.subst_inhabitable (θ : TypeArgs) (τ : NTy) (held : τ.inhabitable = true) :
+    (τ.subst θ.1).inhabitable = true :=
+  NTy.inhabitable_subst θ.1 θ.2 τ held
+
+section Frames
+variable [Θ : Skolems unit]
 
 /-- A function's frame agrees with its runtime type instantiation on the
 types it reads, as the runtime reads them: each type it requires
@@ -351,64 +798,5 @@ theorem coherent_runtime (unit : ValidatedUnit) (handle : FunctionHandle) :
     rfl
   · rw [instantiatedTypeId_empty, ntyOf_paramNode found]
     rfl
-
-/-! ## Data invariants of stored values
-
-The declaration predicate states the authored invariant of a nominal value at
-its resolved type arguments. The arguments matter even for phantom
-parameters: two values with identical physical encodings can have different
-invariants. Traversal follows the native type: fields, variants' payloads,
-vector elements, and the entries of a map's contents. The predicate reads no
-memory. -/
-
-namespace DataInvariant
-
-def elements : RuntimeValue → List RuntimeValue
-  | .vector values => values.toList
-  | _ => []
-
-mutual
-def value (declared : StructHandle → NRow → RuntimeValue → Prop) : NTy → RuntimeValue → Prop
-  | .struct source arguments fields, raw =>
-      declared source arguments raw ∧ row declared fields raw 0
-  | .enum source arguments names rows _, raw =>
-      declared source arguments raw ∧ variant declared names rows raw
-  | .tuple fields, raw => row declared fields raw 0
-  | .vector element, raw => ∀ held ∈ elements raw, value declared element held
-  -- A map's contents: each entry's key and value.
-  | .table key element, raw => ∀ entry ∈ elements raw,
-      value declared key (entry.field 0) ∧ value declared element (entry.field 1)
-  | .ref element, raw => value declared element (raw.field 0) ∧ value declared element (raw.field 1)
-  | _, _ => True
-
-def row (declared : StructHandle → NRow → RuntimeValue → Prop) : NRow → RuntimeValue → Nat → Prop
-  | .nil, _, _ => True
-  | .cons type rest, raw, index =>
-      value declared type (raw.field index) ∧ row declared rest raw (index + 1)
-
-def variant (declared : StructHandle → NRow → RuntimeValue → Prop) :
-    List String → NRows → RuntimeValue → Prop
-  | name :: names, .cons fields rest, raw =>
-      (raw.variant? = some name → row declared fields raw 0) ∧
-        variant declared names rest raw
-  | _, _, _ => True
-end
-
-/-- Primitive integer elements carry no declared nominal invariant. Resolve
-this before traversing a potentially large stored vector expression. -/
-@[vir_denote_norm↓] theorem integer_vector
-    (declared : StructHandle → NRow → RuntimeValue → Prop) (width : Nat) (signed : Bool)
-    (raw : RuntimeValue) : value declared (.vector (.int width signed)) raw := by
-  intro held member
-  trivial
-
-/-- Nested primitive vectors likewise need no nominal-invariant traversal. -/
-@[vir_denote_norm↓] theorem integer_vector_vector
-    (declared : StructHandle → NRow → RuntimeValue → Prop) (width : Nat) (signed : Bool)
-    (raw : RuntimeValue) : value declared (.vector (.vector (.int width signed))) raw := by
-  intro held member
-  exact integer_vector declared width signed held
-
-end DataInvariant
 
 end VerexIR.Proofs.Denote

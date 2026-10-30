@@ -6,7 +6,7 @@ import VerexSL
 /-!
 # End-to-end verification over the prophetic reference model
 
-The gate demos of [`designs/prophetic-references.md`](../../../designs/prophetic-references.md):
+The gate demos of [`doc/designs/prophetic-references.md`](../../../designs/prophetic-references.md):
 reference-taking functions authored in VerexSL verify through
 `verex_wp` against contracts phrased in the prophetic vocabulary.
 

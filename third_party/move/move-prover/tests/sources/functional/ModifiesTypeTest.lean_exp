@@ -1,10 +1,10 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ModifiesTypeTest.move:32:5: error: the continuation after `0x0::A::mutate_at` is not established
-tests/sources/functional/ModifiesTypeTest.move:32:5: error: the continuation after `0x0::A::mutate_at` is not established
+tests/sources/functional/ModifiesTypeTest.move:32:5: error: the continuation after call 1 of `0x0::A::mutate_at` is not established
+tests/sources/functional/ModifiesTypeTest.move:32:5: error: the continuation after call 1 of `0x0::A::mutate_at` is not established
 tests/sources/functional/ModifiesTypeTest.move:32:5: error: verex verification failed: the automatic verification of `mutate_S_test1_incorrect` failed; provide a proof in the module:
   verify mutate_S_test1_incorrect by
     verex_obligations
     verex_on
-    | after_mutate_at => verex_prepare; sorry
+    | after_call_1_of_mutate_at => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

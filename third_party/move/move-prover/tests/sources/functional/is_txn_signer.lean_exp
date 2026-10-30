@@ -23,12 +23,12 @@ tests/sources/functional/is_txn_signer.move:29:5: error: verex verification fail
     | assert_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/is_txn_signer.move:38:9: error: the precondition `requires is_txn_signer_addr(@0x7)` of `f5` does not hold at this call
+tests/sources/functional/is_txn_signer.move:38:9: error: the precondition `requires is_txn_signer_addr(@0x7)` of `f5` does not hold at call 1
 tests/sources/functional/is_txn_signer.move:46:5: error: verex verification failed: the automatic verification of `f7_incorrect` failed; provide a proof in `tests/sources/functional/is_txn_signer.proof.lean`:
   verify f7_incorrect by
     verex_obligations
     verex_on
-    | requires_of_f5 => verex_prepare; sorry
+    | requires_1_of_f5_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/is_txn_signer.move:90:9: error: the module invariant `invariant [update] old(exists<Counter>(ADMIN_ADDRESS()))

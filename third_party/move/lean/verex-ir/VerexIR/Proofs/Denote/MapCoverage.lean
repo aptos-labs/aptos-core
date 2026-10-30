@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import VerexIR.Proofs.Maps
+import VerexIR.Proofs.Maps.Model
 import VerexIR.Proofs.Denote.Types
 open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
 namespace VerexIR.Proofs.Denote
@@ -38,75 +38,75 @@ private theorem mem_of_subset_of_length {α : Type} [BEq α] [LawfulBEq α]
   have nonempty : 0 < right.length := List.length_pos_of_mem present
   omega
 
-/-- A distinct vector covering a map of the same size contains every map key. -/
-theorem map_key_mem_of_coverage (map : RuntimeValue) (keys : Array String)
+variable {K V : Type} [DecidableEq K]
+
+/-- A distinct vector covering a map of the same size contains every map
+key. A vector's element is read as a clause reads it, its fallback outside
+the vector. -/
+theorem map_key_mem_of_coverage (map : SpecMap K V) (keys : Array K) (fallback : K)
     (covered : ∀ i : Int, 0 ≤ i → i < keys.size →
-      Maps.hasKey map (.address ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString) = true)
-    (cardinality : Maps.size map = keys.size)
+      SpecMap.hasKey map (keys[i.toNat]?.getD fallback) = true)
+    (cardinality : SpecMap.size map = keys.size)
     (distinct : ∀ i : Int, 0 ≤ i → i < keys.size → ∀ j : Int, 0 ≤ j → j < keys.size →
-      ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString =
-      ((Option.map Codec.address.encode keys[j.toNat]?).getD .unit).asString → i = j)
-    (key : String) (present : Maps.hasKey map (.address key) = true) : key ∈ keys := by
+      keys[i.toNat]?.getD fallback = keys[j.toNat]?.getD fallback → i = j)
+    (key : K) (present : SpecMap.hasKey map key = true) : key ∈ keys := by
   have simple (i : Nat) (within : i < keys.size) :
-      ((Option.map Codec.address.encode keys[(i : Int).toNat]?).getD .unit).asString = keys[i] := by
-    simp [Array.getElem?_eq_getElem within, Codec.address, RuntimeValue.asString]
-  have nodup : (keys.toList.map RuntimeValue.address).Nodup := by
+      keys[(i : Int).toNat]?.getD fallback = keys[i] := by
+    simp [Array.getElem?_eq_getElem within]
+  have nodup : keys.toList.Nodup := by
     apply List.pairwise_iff_getElem.mpr
     intro i j hi hj lt eq
-    simp only [List.length_map, Array.length_toList] at hi hj
+    simp only [Array.length_toList] at hi hj
     have eq' : keys[i] = keys[j] := by simpa using eq
     have := distinct i (by omega) (by omega) j (by omega) (by omega)
       (by simpa only [simple i hi, simple j hj] using eq')
     omega
-  have subset : keys.toList.map RuntimeValue.address ⊆ (Maps.entriesOf map).map Prod.fst := by
+  have subset : keys.toList ⊆ map.map Prod.fst := by
     intro item mem
-    obtain ⟨value, mem, rfl⟩ := List.mem_map.mp mem
-    have mem : value ∈ keys := by simpa using mem
+    have mem : item ∈ keys := by simpa using mem
     obtain ⟨i, hi, rfl⟩ := Array.getElem_of_mem mem
     have found := covered i (by omega) (by omega)
     rw [simple i hi] at found
-    obtain ⟨value, mem⟩ := (Maps.containsB_iff _ _).mp found
+    obtain ⟨value, mem⟩ := (SpecMap.containsB_iff _ _).mp found
     exact List.mem_map.mpr ⟨(_, value), mem, rfl⟩
-  have mem : RuntimeValue.address key ∈ (Maps.entriesOf map).map Prod.fst := by
-    obtain ⟨value, mem⟩ := (Maps.containsB_iff _ _).mp present
+  have mem : key ∈ map.map Prod.fst := by
+    obtain ⟨value, mem⟩ := (SpecMap.containsB_iff _ _).mp present
     exact List.mem_map.mpr ⟨(_, value), mem, rfl⟩
-  have card : (keys.toList.map RuntimeValue.address).length = ((Maps.entriesOf map).map Prod.fst).length := by
+  have card : keys.toList.length = (map.map Prod.fst).length := by
     simp only [List.length_map, Array.length_toList]
-    simp only [Maps.size] at cardinality
+    simp only [SpecMap.size] at cardinality
     omega
   have := mem_of_subset_of_length nodup subset card mem
   simpa using this
 
 /-- A present key cannot be absent from a complete distinct enumeration. -/
-theorem map_key_search_absurd (map : RuntimeValue) (keys : Array String)
+theorem map_key_search_absurd (map : SpecMap K V) (keys : Array K) (fallback : K)
     (covered : ∀ i : Int, 0 ≤ i → i < keys.size →
-      Maps.hasKey map (.address ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString) = true)
-    (cardinality : Maps.size map = keys.size)
+      SpecMap.hasKey map (keys[i.toNat]?.getD fallback) = true)
+    (cardinality : SpecMap.size map = keys.size)
     (distinct : ∀ i : Int, 0 ≤ i → i < keys.size → ∀ j : Int, 0 ≤ j → j < keys.size →
-      ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString =
-      ((Option.map Codec.address.encode keys[j.toNat]?).getD .unit).asString → i = j)
-    (key : String) (present : Maps.hasKey map (.address key) = true)
+      keys[i.toNat]?.getD fallback = keys[j.toNat]?.getD fallback → i = j)
+    (key : K) (present : SpecMap.hasKey map key = true)
     (missing : ∀ i : Int, 0 ≤ i → i < keys.size → ¬keys[i.toNat]? = some key) : False := by
-  have mem := map_key_mem_of_coverage map keys covered cardinality distinct key present
+  have mem := map_key_mem_of_coverage map keys fallback covered cardinality distinct key present
   obtain ⟨i, hi, eq⟩ := Array.getElem_of_mem mem
   apply missing i (by omega) (by omega)
   simp [Array.getElem?_eq_getElem hi, eq]
 
 /-- Removing a matching vector element and map key preserves coverage. The
 intermediate update models a mutable borrow ending before the map removal. -/
-theorem map_keys_after_remove (map : RuntimeValue) (keys : Array String)
+theorem map_keys_after_remove (map : SpecMap K V) (keys : Array K) (fallback : K)
     (covered : ∀ i : Int, 0 ≤ i → i < keys.size →
-      Maps.hasKey map (.address ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString) = true)
+      SpecMap.hasKey map (keys[i.toNat]?.getD fallback) = true)
     (distinct : ∀ i : Int, 0 ≤ i → i < keys.size → ∀ j : Int, 0 ≤ j → j < keys.size →
-      ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString =
-      ((Option.map Codec.address.encode keys[j.toNat]?).getD .unit).asString → i = j)
-    (valid : Maps.Valid .sequence map)
-    (index : Nat) (within : index < keys.size) (key : String) (atIndex : keys[index]? = some key)
-    (layout : Maps.Layout) (value middle next : RuntimeValue)
-    (updated : middle = Maps.update layout .sequence map (.address key) value)
-    (removed : next = Maps.remove layout .sequence middle (.address key)) :
+      keys[i.toNat]?.getD fallback = keys[j.toNat]?.getD fallback → i = j)
+    (valid : SpecMap.Valid .sequence map)
+    (index : Nat) (within : index < keys.size) (key : K) (atIndex : keys[index]? = some key)
+    (value : V) (middle next : SpecMap K V)
+    (updated : middle = SpecMap.update .sequence map key value)
+    (removed : next = SpecMap.remove .sequence middle key) :
     ∀ i : Int, 0 ≤ i → i < (keys.size - 1 : Nat) →
-      Maps.hasKey next (.address ((Option.map Codec.address.encode (keys.eraseIdx index within)[i.toNat]?).getD .unit).asString) = true := by
+      SpecMap.hasKey next ((keys.eraseIdx index within)[i.toNat]?.getD fallback) = true := by
   intro i low high
   let previousIndex := if i.toNat < index then i.toNat else i.toNat + 1
   have bound : previousIndex < keys.size := by dsimp [previousIndex]; split <;> omega
@@ -114,15 +114,14 @@ theorem map_keys_after_remove (map : RuntimeValue) (keys : Array String)
   have read : (keys.eraseIdx index within)[i.toNat]? = keys[previousIndex]? := by
     rw [Array.getElem?_eraseIdx within]
     split <;> rename_i h <;> simp [previousIndex, h]
-  have keyRead : ((Option.map Codec.address.encode keys[index]?).getD .unit).asString = key := by
-    simp [atIndex, Codec.address, RuntimeValue.asString]
-  have differs : key ≠ ((Option.map Codec.address.encode keys[previousIndex]?).getD .unit).asString := by
+  have keyRead : keys[index]?.getD fallback = key := by simp [atIndex]
+  have differs : key ≠ keys[previousIndex]?.getD fallback := by
     intro eq
     have equal := distinct index (by omega) (by omega) previousIndex (by omega) (by omega)
       (by simpa only [Int.toNat_natCast, keyRead] using eq)
     omega
   have present := covered previousIndex (by omega) (by omega)
   simp only [Int.toNat_natCast] at present
-  rw [read, removed, updated, Maps.hasKey_remove layout (Maps.valid_update layout valid _ _)]
-  simp [Maps.hasKey_update, differs, present]
+  rw [read, removed, updated, SpecMap.hasKey_remove (SpecMap.valid_update valid _ _)]
+  simp [SpecMap.hasKey_update, differs, present]
 end VerexIR.Proofs.Denote

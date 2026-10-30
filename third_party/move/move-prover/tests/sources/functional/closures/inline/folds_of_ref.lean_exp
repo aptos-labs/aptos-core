@@ -1,4 +1,8 @@
 Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/folds_of_ref.move:77:9: error: the specification clause `ensures «spec_fold$lambda$0»(v, new Acc { total := 0, count := 0 }, n)
+        == new Acc { total := spec_idx_sum(v, n), count := n }` is not established
+tests/sources/functional/closures/inline/folds_of_ref.move:75:10: error: verex verification failed: the lemma `ref_fold_is_weighted` is not established
+tests/sources/functional/closures/inline/folds_of_ref.move:59:9: error: the assertion `∀ (n : u64), ref_fold_is_weighted(v, n)` does not hold
 tests/sources/functional/closures/inline/folds_of_ref.move:41:55: error: the loop invariant `r == «spec_fold$lambda$0»(v, with_state_anchor!(3, old(r)), i)
         && (∀ (_j_4 in 0 .. i),
           !(«spec_fold$lambda$0»(v, with_state_anchor!(3, old(r)), _j_4).total
@@ -20,10 +24,10 @@ tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: verex ve
   verify weighted_via_ref by
     verex_obligations
     verex_on
+    | apply_2 => verex_prepare; sorry
     | invariant_3_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/inline/folds_of_ref.move:100:9: error: the specification clause `ensures v.length == 1 ==> result == 2` is not established
 tests/sources/functional/closures/inline/folds_of_ref.move:89:5: error: the loop invariant `r == «spec_fold$lambda$0»(v, with_state_anchor!(7, old(r)), i)
         && (∀ (_j_8 in 0 .. i),
           !(«spec_fold$lambda$0»(v, with_state_anchor!(7, old(r)), _j_8).total
@@ -41,11 +45,12 @@ tests/sources/functional/closures/inline/folds_of_ref.move:89:5: error: the loop
               v, with_state_anchor!(7, old(r)), _j_8
             ).count
               > 18446744073709551614))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_ref.move:100:9: error: the specification clause `ensures v.length == 1 ==> result == 2` is not established
 tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: verex verification failed: the automatic verification of `weighted_via_ref_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean`:
   verify weighted_via_ref_wrong by
     verex_obligations
     verex_on
-    | ensures_1 => verex_prepare; sorry
     | invariant_3_step => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

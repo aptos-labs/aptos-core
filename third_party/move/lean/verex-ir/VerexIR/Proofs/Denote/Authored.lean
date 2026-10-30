@@ -1,0 +1,133 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import VerexIR.Proofs.Denote.TypedMaps
+import VerexIR.Proofs.Denote.NativeMaps
+
+/-! Structured authored proofs. Preparation acts on shared program contexts;
+clause alternatives contain ordinary Lean proofs in source order. -/
+
+namespace VerexIR.Proofs.Denote
+
+open Lean Meta Elab Tactic
+
+/-- Apply each top-level preparation step to every surviving case. Nested
+blocks retain Lean's ordinary tactic semantics. -/
+elab "verex_each" steps:tacticSeq : tactic => do
+  let sequence := steps.raw[0]
+  let items := if sequence.isOfKind ``Lean.Parser.Tactic.tacticSeqBracketed then
+      sequence[1].getSepArgs else sequence[0].getSepArgs
+  for step in items do
+    evalTactic (← `(tactic| all_goals $(⟨step⟩):tactic))
+
+/-- Prepare selected source values as they become available. Normalize after
+one case split before considering the next, so contradictory tags do not
+multiply the remaining cases. Nested variant payloads stay intact. -/
+elab "verex_prepare" &"cases" " [" values:ident,* "]" : tactic => focusGoal do
+  for value in values.getElems do
+    let mut remaining := []
+    for goal in ← getGoals do
+      if ← goal.isAssigned then continue
+      setGoals [goal]
+      let present ← goal.withContext do
+        return ((← getLCtx).findFromUserName? value.getId).isSome
+      if present then
+        evalTactic (← `(tactic| verex_cases $value:ident))
+        evalTactic (← `(tactic| all_goals verex_canonical_families))
+        evalTactic (← `(tactic| all_goals verex_normalize_context))
+      remaining := remaining ++ (← getUnsolvedGoals)
+    setGoals remaining
+
+macro "verex_prepare" &"values" &"splitting" " [" values:ident,* "]" : tactic =>
+  `(tactic| (
+    verex_prepare values
+    all_goals verex_prepare cases [$values,*]
+    all_goals verex_normalize_dependent
+    all_goals verex_normalize_families))
+
+macro "verex_prepare" &"typed" &"splitting" " [" values:ident,* "]" : tactic =>
+  `(tactic| (verex_prepare values splitting [$values,*]; all_goals verex_name_maps))
+
+/-- Reduce closed map observations directly, avoiding a rewrite proof for
+every list cell. Leave symbolic observations available to mathematical laws.
+These procedures are opt-in: they are not in the global simp inventory. -/
+private def evaluateClosedMap : Simp.DSimproc := fun expression => do
+  if expression.hasFVar || expression.hasExprMVar || expression.hasLooseBVars then
+    return .continue
+  let result ← withTransparency .all (whnf expression)
+  if result == expression then return .continue
+  return .done result
+
+dsimproc_decl evaluateMapSize (SpecMap.size _) := evaluateClosedMap
+dsimproc_decl evaluateMapHasKey (SpecMap.hasKey _ _) := evaluateClosedMap
+dsimproc_decl evaluateMapContains (SpecMap.containsB _ _) := evaluateClosedMap
+dsimproc_decl evaluateMapValueAt (SpecMap.valueAt _ _) := evaluateClosedMap
+dsimproc_decl evaluateMapGet (SpecMap.get _ _) := evaluateClosedMap
+
+/-- Simplify finite maps in the goal and its assumptions. Evaluate closed
+observations before unfolding map construction and again after substitutions
+expose literal arguments. Symbolic observations keep their `SpecMap` form. -/
+macro "verex_map_simp" : tactic => `(tactic| simp_all
+  [↓evaluateMapSize, evaluateMapSize, ↓evaluateMapHasKey, evaluateMapHasKey,
+    ↓evaluateMapContains, evaluateMapContains, ↓evaluateMapValueAt, evaluateMapValueAt,
+    ↓evaluateMapGet, evaluateMapGet,
+    SpecMap.update, SpecMap.Discipline.set, SpecMap.ordSet, SpecMap.remove,
+    SpecMap.Discipline.del, SpecMap.ordDel, SpecMap.Valid, SpecMap.Ascending,
+    SpecMap.intOrder, compare, compareOfLessAndEq])
+
+/-- The preparation a path of typed map facts needs:
+projections of returned rows reduced, family spellings made canonical, and
+clause markers unwrapped. -/
+macro "verex_typed_prepare" : tactic => `(tactic| (
+  verex_reduce_projections
+  all_goals verex_canonical_families
+  all_goals verex_reduce_projections
+  all_goals try simp only [VerexIR.Proofs.Obligation_eq] at *))
+
+/-- Close a leaf stated over typed maps: the variables equations identify
+substituted; then substitute the equations that give maps their values,
+evaluate the closed observations, and decide; a literal vector's membership
+at its positions; the cheap automatic decision next; a general
+simplification by the hypotheses last. -/
+macro "verex_typed_close" : tactic => `(tactic| (
+  (try verex_subst_vars)
+  first
+  | (simp only [*, ↓evaluateMapSize, evaluateMapSize, ↓evaluateMapHasKey, evaluateMapHasKey,
+      ↓evaluateMapValueAt, evaluateMapValueAt]; done)
+  | (simp only [*]; decide)
+  | (verex_goal_witnesses; done)
+  | (verex_decide; done)
+  | (simp [*, ↓evaluateMapHasKey, evaluateMapHasKey, ↓evaluateMapValueAt, evaluateMapValueAt,
+      VerexIR.Proofs.Denote.NativeMaps.get_integers_asInt]; done)))
+
+/-- Generate a function's obligations, prepare shared contexts, and route
+source clauses to ordinary Lean proofs. Every top-level preparation step
+runs on all surviving cases. Omitted clauses use only `verex_decide`.
+No automatic solver runs before an explicitly selected clause argument. -/
+syntax (name := verexProof) "verex_proof" (obligationArguments)?
+  (&"preparing" tacticSeq)?
+  withPosition((ppDedent(ppLine) colGe verexOnAlternative)*) : tactic
+
+elab_rules : tactic
+  | `(tactic| verex_proof $[$arguments]? $[preparing $preparation:tacticSeq]?
+      $alternatives:verexOnAlternative*) => do
+    match preparation with
+    | some steps =>
+      evalTactic (← `(tactic| verex_obligations $[$arguments]? preparing
+        verex_paths
+        all_goals verex_clear_computations
+        all_goals try verex_trivial
+        verex_each $steps:tacticSeq))
+    | none => evalTactic (← `(tactic| verex_obligations $[$arguments]?))
+    if alternatives.isEmpty then
+      evalTactic (← `(tactic| all_goals (verex_paths; all_goals (verex_finish_prepare; verex_decide))))
+    else
+      let routed ← alternatives.mapM fun alternative => do
+        let pattern : TSyntax `verexOnPattern := ⟨alternative.raw[1]⟩
+        let steps : TSyntax ``Lean.Parser.Tactic.tacticSeq := ⟨alternative.raw[3]⟩
+        `(verexOnAlternative| | $pattern:verexOnPattern =>
+          verex_paths
+          all_goals (verex_finish_prepare; ($steps:tacticSeq)))
+      evalTactic (← `(tactic| verex_on $routed:verexOnAlternative*))
+
+end VerexIR.Proofs.Denote

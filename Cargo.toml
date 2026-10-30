@@ -1008,6 +1008,12 @@ debug-assertions = true
 [profile.bench]
 debug = true
 
+# The Move Prover's Lean tests digest the Verex verifier's build artifacts,
+# about 1 GB, twice per run (third_party/move/move-prover/src/verex.rs).
+# Unoptimized, `sha2` takes over a minute for it; optimized, about ten seconds.
+[profile.dev.package.sha2]
+opt-level = 3
+
 [patch.crates-io]
 # version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
 dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }

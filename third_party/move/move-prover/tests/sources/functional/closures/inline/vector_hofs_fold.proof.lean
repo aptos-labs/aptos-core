@@ -10,8 +10,10 @@ open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
 
 verify count_even_concrete by
   have even_prefix (i : Int) (low : 0 ≤ i) (high : i ≤ 6) :
-      «spec_fold$lambda$0».spec
-        (.vector #[.integer 1, .integer 2, .integer 3, .integer 4, .integer 5, .integer 6], 0, i, ()) = i / 2 := by
+      «spec_fold$lambda$0».spec unit (Skolems.runtime unit)
+        (({ values := #[⟨1, by decide⟩, ⟨2, by decide⟩, ⟨3, by decide⟩, ⟨4, by decide⟩,
+            ⟨5, by decide⟩, ⟨6, by decide⟩], bounded := by decide } :
+          SpecVector (SpecInt (.bits 64) false)), 0, i, ()) = i / 2 := by
     have cases_i : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 := by omega
     rcases cases_i with rfl | rfl | rfl | rfl | rfl | rfl | rfl
     all_goals simp [«spec_fold$lambda$0».spec.unfold, vir_denote_norm]

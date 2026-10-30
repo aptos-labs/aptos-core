@@ -7,7 +7,7 @@ import VerexE2ETests.CheckSupport
 is, in verification, its abstract map at the table's handle: its
 specification roles and the contracts of its roles are the map model, and
 the runtime runs its role bodies, which call the table's roles
-(`designs/intrinsic-maps.md`, "Abstract representation"). -/
+(`doc/designs/intrinsic-maps.md`, "Abstract representation"). -/
 
 verex module 0x42::wrapped_tables where
   @[intrinsic_map]

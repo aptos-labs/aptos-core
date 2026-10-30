@@ -34,13 +34,16 @@ verex module 0x42::recursive_spec where
     else count(values, needle, n - 1) + (if values[n - 1] == needle then 1 else 0)
 
   /-- A vector whose first element is the needle counts it at least once. -/
-  theorem count_first (values : RuntimeValue) (needle : Int) :
-      ∀ (k : Nat) (n : Int), n.toNat = k → 1 ≤ n → (values.field 0).asInt = needle →
-        1 ≤ count.spec (values, needle, n, ()) := by
+  theorem count_first {unit : VerexIR.Validation.ValidatedUnit}
+      (frame : VerexIR.Proofs.Denote.Skolems unit)
+      (values : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier) (needle : Int)
+      (head : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier)
+      (first : values.values[0]? = some head) (equal : head.val = needle) :
+      ∀ (k : Nat) (n : Int), n.toNat = k → 1 ≤ n → 1 ≤ count.spec unit frame (values, needle, n, ()) := by
     intro k
     induction k using Nat.strongRecOn with
     | _ k ih =>
-      intro n hk hn hfirst
+      intro n hk hn
       rw [count.spec.unfold]
       simp only
       split
@@ -48,16 +51,15 @@ verex module 0x42::recursive_spec where
       · by_cases one : n = 1
         · subst one
           rw [count.spec.unfold]
-          simp [hfirst]
-        · have := ih (n - 1).toNat (by omega) (n - 1) rfl (by omega) hfirst
+          simp [first, equal]
+        · have := ih (n - 1).toNat (by omega) (n - 1) rfl (by omega)
           split <;> omega
 
   verify first_is by
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     intro first
-    refine count_first _ _ _ _ rfl (by omega) ?_
-    simp [RuntimeValue.field, ‹values.values[0]? = some _›, first]
+    exact count_first _ values _ _ ‹values.values[0]? = some _› first _ _ rfl (by omega)
 
 verex module 0x42::sum_probe where
   spec fun sum_upto(v : Vector<u64>, n : Int) : Int :=

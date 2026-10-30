@@ -9,7 +9,7 @@ import VerexE2ETests.CheckSupport
 # `verex-bench`
 
 Runs one problem of the verification benchmark natively and writes what it
-cost as JSON (`designs/verification-benchmarks.md`): wall time and
+cost as JSON (`doc/status/verification-benchmarks.md`): wall time and
 heartbeats per phase, the verified targets with their wall time and
 heartbeats, and the errors reported.
 

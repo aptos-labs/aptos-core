@@ -62,7 +62,7 @@ def SemTy.unshared : SemTy → SemTy
 
 /-- The semantic types of the fields a nominal value holds beyond its declared
 ones: a table owner's entries, pairs of its key and value type arguments
-(`designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
+(`doc/designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
 def contentsTypes (unit : Validation.ValidatedUnit) (source : StructHandle)
     (variant : Option String) (arguments : List SemArg) : List SemTy :=
   match variant, Validation.tableLayout? unit source.namespaceId source.structId, arguments with
@@ -90,7 +90,7 @@ theorem contentsTypes_substList (unit : Validation.ValidatedUnit) (source : Stru
           · cases first <;> cases second <;> rfl
 
 /-- The declared types of a nominal value's ghost fields, whose slots follow
-its declared fields (`designs/ghost-fields.md`). -/
+its declared fields (`doc/designs/ghost-fields.md`). -/
 def ghostTypeIds (unit : Validation.ValidatedUnit) (source : StructHandle) : List TypeId :=
   (SemanticOperations.nominalGhosts unit source).toList.map (·.type.typeId)
 
@@ -137,7 +137,7 @@ mutual
           (fieldTypes ++ (ghostTypes.map .ghost ++ contentsTypes unit source variant arguments))) :
         HasType unit loans (.nominal source variant fields) (.nominal name arguments)
     /-- A ghost field's slot, whose contents the runtime ignores: the
-    verification model alone gives them meaning (`designs/ghost-fields.md`);
+    verification model alone gives them meaning (`doc/designs/ghost-fields.md`);
     they hold no loan. -/
     | ghost (contents : RuntimeValue) (slot : SemTy) (plain : SemanticOperations.Plain contents) :
         HasType unit loans (.ghost contents) (.ghost slot)
