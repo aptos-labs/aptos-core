@@ -5,4 +5,3 @@ error: failed to parse manifest
 3 | version = "0.1.2"
 4 | authors = ["alice", "bob", "alice"]
   |           ^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate entry: alice
-  |
