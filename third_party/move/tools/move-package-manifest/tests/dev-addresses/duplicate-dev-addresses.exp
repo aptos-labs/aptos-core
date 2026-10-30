@@ -8,4 +8,3 @@ error: failed to parse manifest
 6 | addr1 = "0x1"
 7 | addr1 = "0x2"
   | ^ duplicate key `addr1` in table `dev-addresses`
-  |
