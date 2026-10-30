@@ -35,17 +35,17 @@ private theorem erase_unique {α β : Type} (xs : Array α) (read : Option α �
     have := unique (i + 1) (by omega) (by omega) (j + 1) (by omega) (by omega) same
     omega
 
-verify remove by
+verify remove by lean =>
   verex_obligations
   all_goals verex_prepare only
   all_goals try verex_decide
   all_goals verex_clear_computations
   all_goals verex_lookups_after_writes
   all_goals try verex_decide
-  case leaf_2 =>
+  case data_invariant_1 =>
     rename_i same
-    refine erase_unique self_list.values (fun x => ((x.map Codec.address.encode).getD .unit).asString)
-      _ ?_ permitted found index (by omega) (by omega) ?_ ?_ same
+    refine erase_unique self_list.values (fun x => x.getD "") _ ?_ permitted i j
+      (by omega) (by omega) ?_ ?_ same
     · omega
     · simp only [Array.size_eraseIdx]; omega
     · simp only [Array.size_eraseIdx]; omega

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/math8.move:74:5: error: the bound `pragma unroll = 3` of a loop is not established
 tests/sources/functional/math8.move:74:5: error: verex verification failed: the automatic verification of `pow` failed; provide a proof in `tests/sources/functional/math8.proof.lean`:
-  verify pow by
+  verify pow by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
@@ -9,21 +9,21 @@ tests/sources/functional/math8.move:74:5: error: verex verification failed: the 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/math8.move:96:5: error: the bound `pragma unroll = 2` of a loop is not established
 tests/sources/functional/math8.move:96:5: error: verex verification failed: the automatic verification of `floor_log2` failed; provide a proof in `tests/sources/functional/math8.proof.lean`:
-  verify floor_log2 by
+  verify floor_log2 by lean =>
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/math8.move:123:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/math8.move:127:9: error: the specification clause `ensures x > 0 ==> x < (result + 1) * (result + 1)` is not established
 tests/sources/functional/math8.move:126:9: error: the specification clause `ensures x > 0 ==> result * result <= x` is not established
+tests/sources/functional/math8.move:127:9: error: the specification clause `ensures x > 0 ==> x < (result + 1) * (result + 1)` is not established
 tests/sources/functional/math8.move:122:5: error: verex verification failed: the automatic verification of `sqrt` failed; provide a proof in `tests/sources/functional/math8.proof.lean`:
-  verify sqrt by
+  verify sqrt by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -3,7 +3,6 @@
 
 import VerexSL.Registry
 import VerexIR.Proofs.Typed
-import VerexIR.Proofs.SimpAttrs
 import VerexIR.Proofs.Denote.Attr
 
 /-!
@@ -44,9 +43,9 @@ inductive FieldRep where
   /-- A nested twin, by its generated Lean name. -/
   | nominal (twin : Name) (arguments : Array FieldRep)
   /-- The hidden contents field of a table owner: its entries, each a key and
-  a value (`designs/intrinsic-maps.md`, "Owned Table values"). -/
+  a value (`doc/designs/intrinsic-maps.md`, "Owned Table values"). -/
   | table (key value : FieldRep)
-  /-- A ghost field's slot: a value of its type (`designs/ghost-fields.md`). -/
+  /-- A ghost field's slot: a value of its type (`doc/designs/ghost-fields.md`). -/
   | ghost (slot : FieldRep)
   deriving Repr, BEq, Inhabited
 
@@ -182,7 +181,7 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
         -- An intrinsic map owner's twin is its abstract value's, as its
         -- native type is (`structNTy`): its leading fields, its ghost slots,
         -- and its hidden contents field; its declaration's fields and
-        -- variants are no part of it (`designs/intrinsic-maps.md`,
+        -- variants are no part of it (`doc/designs/intrinsic-maps.md`,
         -- "Abstract representation").
         let abstractLayout := VerexIR.Validation.abstractLayout? unit ⟨namespaceIndex⟩ structIndex
         -- After the declared fields of a struct or variant, a slot per ghost
@@ -488,7 +487,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let twinType ← `(term| $twin:ident $typeParameters*)
   let fieldIds := info.fields.map fun (name, _) => mkIdent (Name.mkSimple name)
   let fieldTypes ← info.fields.mapM fun (_, rep) => rep.typeSyntax typeParameters
-  elabSync (← `(@[verex_twin] structure $twin:ident $typeBinders* where
+  elabSync (← `(structure $twin:ident $typeBinders* where
     $[( $fieldIds:ident : $fieldTypes:term)]*))
 
   let value := mkIdent `value
@@ -591,7 +590,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let twin := rootIdent info.twin
   let fieldIds := info.fields.map fun (name, _) => mkIdent (Name.mkSimple name)
   let fieldTypes ← info.fields.mapM fun (_, rep) => rep.typeSyntax
-  elabSync (← `(@[verex_twin] structure $twin:ident where
+  elabSync (← `(structure $twin:ident where
     $[($fieldIds:ident : $fieldTypes:term)]*))
   -- erase
   let eraseName := rootIdent (info.twin ++ `erase)
@@ -641,8 +640,6 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
       ($value:ident : $twin) :
       $decodeName $literal = some $value :=
     $roundtripName $value))
-  elabSync (← `(attribute [vir_denote_norm] $roundtripName:ident
-    $literalRoundtripName:ident))
   /- The decoder belongs to the simp phase, not to reduction.  Symbolic
   execution that unfolds it splits the range test of every certified
   integer it reaches, and the branch that assumes the test failed cannot be
@@ -709,7 +706,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       `(bracketedBinder| ($(mkIdent (Name.mkSimple field)):ident : $(← rep.typeSyntax typeParameters)))
     constructors := constructors.push
       (← `(Lean.Parser.Command.ctor| | $constructor:ident $[$binders]*))
-  elabSync (← `(@[verex_twin] inductive $twin:ident $typeBinders* where
+  elabSync (← `(inductive $twin:ident $typeBinders* where
     $[$constructors:ctor]*))
 
   let value := mkIdent `value

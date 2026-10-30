@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/mono_after_global_invariant.move:44:9: error: the module invariant `invariant {T} [update] has_b() ==> (has_r::<T>() ==> old(has_r::<T>()))` does not hold after a write of memory it reads
 tests/sources/regression/mono_after_global_invariant.move:30:5: error: verex verification failed: the automatic verification of `put_r` failed; provide a proof in the module:
-  verify put_r by
+  verify put_r by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry

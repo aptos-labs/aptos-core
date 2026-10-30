@@ -25,7 +25,7 @@ warning: cannot derive `requires_of` exactly for this lambda argument: per-appli
 
 tests/sources/functional/closures/inline/requires_of_state.move:28:13: error: the assertion `with_state_anchor!(0, old(global<R>(a)).v > 0)` does not hold
 tests/sources/functional/closures/inline/requires_of_state.move:49:5: error: verex verification failed: the automatic verification of `false_at_application` failed; provide a proof in `tests/sources/functional/closures/inline/requires_of_state.proof.lean`:
-  verify false_at_application by
+  verify false_at_application by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -35,7 +35,7 @@ tests/sources/functional/closures/inline/requires_of_state.move:28:13: error: th
       1, old(result_of<function[Fn(Address) -> u64](read_r)>(a)) > 0
     )` does not hold
 tests/sources/functional/closures/inline/requires_of_state.move:67:5: error: verex verification failed: the automatic verification of `nested_false_at_application` failed; provide a proof in `tests/sources/functional/closures/inline/requires_of_state.proof.lean`:
-  verify nested_false_at_application by
+  verify nested_false_at_application by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

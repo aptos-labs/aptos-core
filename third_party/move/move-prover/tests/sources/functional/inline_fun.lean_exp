@@ -1,11 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/inline_fun.move:21:5: error: the loop invariant `∀ (k in 0 .. i), !(v'[k] > 1)` is not preserved by an iteration
 tests/sources/functional/inline_fun.move:21:5: error: the loop invariant `v'.length >= i` is not preserved by an iteration
+tests/sources/functional/inline_fun.move:21:5: error: the loop invariant `∀ (k in 0 .. i), !(v'[k] > 1)` is not preserved by an iteration
 tests/sources/functional/inline_fun.move:26:5: error: verex verification failed: the automatic verification of `test_filter` failed; provide a proof in `tests/sources/functional/inline_fun.proof.lean`:
-  verify test_filter by
+  verify test_filter by lean =>
     verex_obligations
     verex_on
-    | invariant_2_step => verex_prepare; sorry
     | invariant_1_step => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

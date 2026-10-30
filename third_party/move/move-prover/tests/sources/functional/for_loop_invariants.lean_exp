@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/for_loop_invariants.move:234:5: error: the loop invariant `sum == i` is not preserved by an iteration
 tests/sources/functional/for_loop_invariants.move:243:5: error: verex verification failed: the automatic verification of `sum_range_incorrect` failed; provide a proof in `tests/sources/functional/for_loop_invariants.proof.lean`:
-  verify sum_range_incorrect by
+  verify sum_range_incorrect by lean =>
     verex_obligations
     verex_on
     | invariant_1_step => verex_prepare; sorry
@@ -10,7 +10,7 @@ tests/sources/functional/for_loop_invariants.move:243:5: error: verex verificati
 tests/sources/functional/for_loop_invariants.move:249:5: error: the loop invariant `sum == i + 1` is not established at entry
 tests/sources/functional/for_loop_invariants.move:249:5: error: the loop invariant `sum == i + 1` is not preserved by an iteration
 tests/sources/functional/for_loop_invariants.move:258:5: error: verex verification failed: the automatic verification of `base_case_incorrect` failed; provide a proof in `tests/sources/functional/for_loop_invariants.proof.lean`:
-  verify base_case_incorrect by
+  verify base_case_incorrect by lean =>
     verex_obligations
     verex_on
     | invariant_1_entry => verex_prepare; sorry

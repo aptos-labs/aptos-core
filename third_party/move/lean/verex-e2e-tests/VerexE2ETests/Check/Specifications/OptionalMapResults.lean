@@ -91,20 +91,7 @@ verex module 0x42::optional_vector_map where
   spec replaced where
     aborts_if false
     ensures len(result.values) == 1 && result.values[0] == 11
-  verify replaced by
-    verex_obligations
-    all_goals verex_prepare
-    all_goals try simp_all only [vir_denote_norm]
-    all_goals
-      have encoded : [RuntimeValue.integer 11] =
-          List.map (VerexIR.Proofs.Codec.specInt (.bits 64) false).encode
-            upsert_result.values.toList := by assumption
-      have length := congrArg List.length encoded
-      have read := congrArg (fun xs : List RuntimeValue => RuntimeValue.asInt ((xs[0]?).getD RuntimeValue.unit)) encoded
-      simp only [List.length_cons, List.length_nil, List.length_map, Array.length_toList] at length
-      simp only [List.getElem?_cons_zero, Option.getD_some, VerexIR.Maps.asInt_integer,
-        List.getElem?_map, Array.getElem?_toList, asInt_getD_map_specInt 64 false (by decide)] at read
-      exact ⟨by omega, read.symm⟩
+  verify replaced
 
 open VerexE2ETests.CheckSupport in
 run_cmd assertRuns `«0x42».optional_vector_map #[

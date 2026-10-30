@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/map_destruction.move:57:9: error: the specification clause `ensures result == 8` is not established
 tests/sources/functional/map_destruction.move:55:5: error: verex verification failed: the automatic verification of `unchecked_incorrect` failed; provide a proof in `tests/sources/functional/map_destruction.proof.lean`:
-  verify unchecked_incorrect by
+  verify unchecked_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

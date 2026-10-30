@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/shift.move:38:9: error: the specification clause `ensures result == x * 128 + 1` is not established
 tests/sources/functional/shift.move:37:5: error: verex verification failed: the automatic verification of `shiftl_7_incorrect` failed; provide a proof in `tests/sources/functional/shift.proof.lean`:
-  verify shiftl_7_incorrect by
+  verify shiftl_7_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/shift.move:37:5: error: verex verification failed: the 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/shift.move:54:9: error: the specification clause `ensures result == x / 128 + 1` is not established
 tests/sources/functional/shift.move:53:5: error: verex verification failed: the automatic verification of `shiftr_7_incorrect` failed; provide a proof in `tests/sources/functional/shift.proof.lean`:
-  verify shiftr_7_incorrect by
+  verify shiftr_7_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/shift.move:53:5: error: verex verification failed: the 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/shift.move:95:9: error: the specification clause `ensures result == (x << 10) % 18446744073709551616` is not established
 tests/sources/functional/shift.move:94:5: error: verex verification failed: the automatic verification of `shift_l_11_incorrect` failed; provide a proof in `tests/sources/functional/shift.proof.lean`:
-  verify shift_l_11_incorrect by
+  verify shift_l_11_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

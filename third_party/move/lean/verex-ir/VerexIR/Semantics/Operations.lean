@@ -186,7 +186,7 @@ def structName? (unit : ValidatedUnit) (handle : StructHandle) : Option Qualifie
 
 /-- Ordered fields selected by a structure or enum constructor. A table
 owner has none: its value holds its entries beside its declared fields, and
-only its roles make one (`designs/intrinsic-maps.md`, "Tables in the runtime
+only its roles make one (`doc/designs/intrinsic-maps.md`, "Tables in the runtime
 semantics"). -/
 def constructorFields? (unit : ValidatedUnit) (handle : StructHandle)
     (variant : Option String) : Option (Array FieldDecl) := do
@@ -235,14 +235,14 @@ def RuntimeValue.toConst? : RuntimeValue → Option ConstValue
   | .signer .. | .nominal .. | .ghost .. | .closure .. | .borrow .. | .loanHole .. => none
 
 /-- The ghost fields of a nominal declaration, whose slots follow its
-declared fields in its values (`designs/ghost-fields.md`). -/
+declared fields in its values (`doc/designs/ghost-fields.md`). -/
 def nominalGhosts (unit : ValidatedUnit) (handle : StructHandle) : Array GhostFieldDecl :=
   (((unit.namespaces[handle.namespaceId.index]?).bind (·.structs[handle.structId]?)).map
     (·.ghosts)).getD #[]
 
 /-- Construct a resolved nominal runtime value with exact constructor arity,
 its ghost slots holding unit: the runtime ignores ghost contents
-(`designs/ghost-fields.md`). -/
+(`doc/designs/ghost-fields.md`). -/
 def constructNominal? (unit : ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) (variant : Option String) (fields : Array RuntimeValue) :
     Option RuntimeValue := do
@@ -973,7 +973,7 @@ def handleFieldIndex? (unit : ValidatedUnit) (handle : StructHandle)
   fieldIndexIn targetNs fieldName fields.toList 0
 
 /-- Position of a named ghost field's slot in a handle-identified payload:
-after the payload's declared fields (`designs/ghost-fields.md`). -/
+after the payload's declared fields (`doc/designs/ghost-fields.md`). -/
 def handleGhostIndex? (unit : ValidatedUnit) (handle : StructHandle)
     (variant : Option String) (fieldName : String) : Option Nat := do
   let (targetNs, fields) ← handleFields? unit handle variant
@@ -1731,7 +1731,7 @@ theorem removeGlobalLoan_of_free (loans : List (Nat × GlobalKey)) (loan : Nat)
         simp only [removeGlobalLoan, h, Bool.false_eq_true, if_false, ih restFree]
 
 /-- Retirement changes only the selected identity's lookup. No registry
-shape or resource payload is exposed to consumers of this law. -/
+shape or resource payload is exposed to consumers of this lemma. -/
 theorem globalLoanKeyIn?_remove_other (loans : List (Nat × GlobalKey))
     (retired loan : Nat) (different : retired ≠ loan) :
     globalLoanKeyIn? (removeGlobalLoan loans retired) loan =

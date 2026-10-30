@@ -12,7 +12,7 @@ import VerexIR.Semantics.LoanRenamingPrimitives
 A run mirrors from any start whose loan bookkeeping differs, with its
 loans renamed injectively: the loans it mints raised by the difference of
 the frontiers, and the loans it is lent mapped to the other start's
-(`designs/static-typing.md`, "Loan independence"). Each relation of the
+(`doc/historical/static-typing.md`, "Loan independence"). Each relation of the
 big-step semantics is simulated from a state `StateRenamed` from the
 first run's, by a forward induction over the first run's derivation.
 -/

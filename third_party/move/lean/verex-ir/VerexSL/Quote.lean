@@ -121,6 +121,7 @@ deriving instance ToExpr for Condition
 deriving instance ToExpr for Frame
 deriving instance ToExpr for SpecBlock
 deriving instance ToExpr for ExprKind
+deriving instance ToExpr for ExprOrigin
 deriving instance ToExpr for VerexIR.Expr
 deriving instance ToExpr for PatternKind
 deriving instance ToExpr for Pattern
@@ -204,5 +205,37 @@ def quoteUnit [Monad m] [MonadEnv m] (unit : ValidatedUnit) : m Lean.Expr := do
     toExpr unit.structurizationWitnesses, toExpr unit.resolution,
     toExpr unit.initializationCertificates, toExpr unit.borrowCertificates,
     toExpr unit.borrowRejections]
+
+/-- The definitions holding quoted value orders, by the hash of their
+literal. -/
+private initialize valueOrderDefinitions :
+    SimplePersistentEnvExtension (UInt64 × Name) (Std.HashMap UInt64 (Array Name)) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun map (key, name) => map.insert key ((map.getD key #[]).push name)
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries (fun map (key, name) =>
+        map.insert key ((map.getD key #[]).push name)) {} entries }
+
+/-- Value orders as the definition holding their literal, defined at the
+first use. A unit's table of variant names and function positions would
+otherwise be repeated in every comparison and map discipline a generated
+statement states; equal tables share one definition. -/
+def quoteValueOrders (orders : ValueOrders) : Lean.Meta.MetaM Lean.Expr := do
+  let literal := toExpr orders
+  let key := literal.hash
+  let env ← getEnv
+  for name in (valueOrderDefinitions.getState env).getD key #[] do
+    if ((env.find? name).bind (·.value?)) == some literal then return mkConst name
+  let base := (← getMainModule) ++ `verexValueOrders
+  let mut index := (valueOrderDefinitions.getEntries env).length
+  while env.contains (base ++ Name.mkSimple s!"table{index}") do index := index + 1
+  let name := base ++ Name.mkSimple s!"table{index}"
+  addDecl (.defnDecl {
+    name, levelParams := []
+    type := mkConst ``ValueOrders
+    value := literal
+    hints := .abbrev, safety := .safe })
+  modifyEnv (valueOrderDefinitions.addEntry · (key, name))
+  return mkConst name
 
 end VerexSL.Quote

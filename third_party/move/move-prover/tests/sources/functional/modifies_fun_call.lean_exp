@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/modifies_fun_call.move:12:9: error: the specification clause `aborts_if !exists<Data>(a)` is not established
 tests/sources/functional/modifies_fun_call.move:10:5: error: verex verification failed: the automatic verification of `mutate` failed; provide a proof in `tests/sources/functional/modifies_fun_call.proof.lean`:
-  verify mutate by
+  verify mutate by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

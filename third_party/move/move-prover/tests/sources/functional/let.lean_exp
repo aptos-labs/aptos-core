@@ -23,7 +23,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       (fun result final =>
         (¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val) →
             VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 2016 2034
-              (a_final.val = a.val.tdiv (a.val + b.val))) ∧
+              (a_final.val = a.val / (a.val + b.val))) ∧
           (¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val) →
               VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 2039 2059
                 (b_final.val = a.val * b.val)) ∧
@@ -42,9 +42,9 @@ a✝⁸ : 0 ≤ a.val + b.val
 a✝⁷ : a.val + b.val ≤ 18446744073709551615
 x✝ : ¬named✝¹.val = 0
 named✝ : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
-a✝⁶ : named✝.val = a.val.tdiv named✝¹.val
-a✝⁵ : 0 ≤ a.val.tdiv named✝¹.val
-a✝⁴ : a.val.tdiv named✝¹.val ≤ 18446744073709551615
+a✝⁶ : named✝.val = a.val / named✝¹.val
+a✝⁵ : 0 ≤ a.val / named✝¹.val
+a✝⁴ : a.val / named✝¹.val ≤ 18446744073709551615
 named : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
 a✝³ : named.val = a.val * b.val
 a✝² : 0 ≤ a.val * b.val
@@ -56,7 +56,7 @@ tests/sources/functional/let.move:77:9: error: the specification clause `aborts_
 tests/sources/functional/let.move:78:9: error: the specification clause `aborts_if sum >= MAX_U64` is not established
 tests/sources/functional/let.move:79:9: error: the specification clause `aborts_if product >= MAX_U64` is not established
 tests/sources/functional/let.move:74:5: error: verex verification failed: the automatic verification of `spec_let_with_abort_incorrect` failed; provide a proof in `tests/sources/functional/let.proof.lean`:
-  verify spec_let_with_abort_incorrect by
+  verify spec_let_with_abort_incorrect by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry

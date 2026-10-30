@@ -7,7 +7,7 @@ import VerexIR.Proofs.Invocation
 # Typed memory is typed at run time
 
 An invocation of a function value a proof does not see runs from global
-memory whose every slot is typed at its key's type (`designs/static-typing.md`,
+memory whose every slot is typed at its key's type (`doc/historical/static-typing.md`,
 Phase 5). Typed memory (`Denote.Memory`) holds a native value per resource
 type, so every runtime encoding of every memory is typed once the unit's
 resource types correspond to their keys' types (`ResourcesTyped`), which is
@@ -65,7 +65,7 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
       Denote.NTy.TypedAs unit (.struct source nativeArguments fields) (.nominal name arguments)
   /-- An intrinsic map owner at its key and value arguments: the fields of
   its abstract value, its leading fields, its ghost slots, and its entries
-  (`OwnerLayout.canonicalTypes`; `designs/intrinsic-maps.md`, "Abstract
+  (`OwnerLayout.canonicalTypes`; `doc/designs/intrinsic-maps.md`, "Abstract
   representation"). -/
   | abstract {source : StructHandle} {nativeArguments fields : NRow} {name : QualifiedName}
       {key value : SemTy} {layout : OwnerLayout} {declaringNs : ValidatedNamespace}
@@ -94,16 +94,18 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
         (.nominal name arguments)
   | ref {referent : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit referent type) :
       Denote.NTy.TypedAs unit (.ref referent) (.reference .mutable type)
-  /-- A ghost field's slot reads as a slot of its type (`designs/ghost-fields.md`). -/
+  /-- A ghost field's slot reads as a slot of its type (`doc/designs/ghost-fields.md`). -/
   | ghost {slot : NTy} {type : SemTy} (typed : Denote.NTy.TypedAs unit slot type) :
       Denote.NTy.TypedAs unit (.ghost slot) (.ghost type)
   | param (index : Nat) : Denote.NTy.TypedAs unit (.param index) (.param index)
-  /-- A function type at its rows, each parameter a shared reference where it
-  is marked so, the results packed as the checker packs them. -/
-  | function {parameters returned : NRow} {shared : List Bool} {parameterTypes results : List SemTy}
-      {result : SemTy}
-      (typedParameters : Denote.NRow.ParametersTypedAs unit parameters shared parameterTypes)
-      (typedResults : Denote.NRow.TypedAs unit returned results)
+  /-- A function type at its rows, each parameter and each result a shared
+  reference where it is marked so, the results packed as the checker packs
+  them. -/
+  | function {parameters returned : NRow} {shared : Denote.Sharing}
+      {parameterTypes results : List SemTy} {result : SemTy}
+      (typedParameters : Denote.NRow.ParametersTypedAs unit parameters shared.parameters
+        parameterTypes)
+      (typedResults : Denote.NRow.ParametersTypedAs unit returned shared.results results)
       (packed : result = SemTy.pack results) :
       Denote.NTy.TypedAs unit (.function parameters shared returned)
         (.function parameterTypes result)
@@ -294,9 +296,10 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
       | function parameterTypes result =>
           simp only [NTy.typedAsCore, Bool.and_eq_true, beq_iff_eq] at checked
           obtain ⟨⟨typedParameters, packed⟩, typedResults⟩ := checked
-          exact .function (NRow.parametersTypedAs_of_check parameters shared parameterTypes
-              typedParameters)
-            (NRow.typedAs_of_check returned result.resultRow typedResults) packed.symm
+          exact .function (NRow.parametersTypedAs_of_check parameters shared.parameters
+              parameterTypes typedParameters)
+            (NRow.parametersTypedAs_of_check returned shared.results result.resultRow typedResults)
+            packed.symm
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
 
 theorem Denote.NRow.typedAs_of_check {unit : ValidatedUnit} :
@@ -549,7 +552,7 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
       subst packed
       simp only [NTy.substWith, SemTy.subst, SemTy.substList_eq_map]
       exact .function (NRow.ParametersTypedAs.subst agree typedParameters mentioned.1)
-        (NRow.TypedAs.subst agree typedResults mentioned.2) (SemTy.subst_pack arguments _)
+        (NRow.ParametersTypedAs.subst agree typedResults mentioned.2) (SemTy.subst_pack arguments _)
 
 theorem Denote.NRow.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
     {types : Nat → NTy} {arguments : Array SemArg}
@@ -676,7 +679,7 @@ theorem Denote.NTy.readsUnique {unit : ValidatedUnit} :
         | scalar scalar => simp [NTy.scalarType?] at scalar
         | function rightParameters rightResults rightPacked =>
             rw [NRow.parametersUnique parameters leftParameters rightParameters, leftPacked,
-              rightPacked, NRow.readsUnique returned leftResults rightResults]
+              rightPacked, NRow.parametersUnique returned leftResults rightResults]
   | .struct _ nativeArguments _, _, _, leftTyped, rightTyped => by
       cases leftTyped with
       | scalar scalar => simp [NTy.scalarType?] at scalar
@@ -743,6 +746,13 @@ def parameterSharing (unit : ValidatedUnit) (function : FunctionHandle)
   declaration.signature.parameters.toList.map fun parameter =>
     sharedReference (unitTypes unit) function.namespaceId parameter.typeUse.typeId
 
+/-- The sharing a function's declared results have, as a function type marks
+it. -/
+def resultSharing (unit : ValidatedUnit) (function : FunctionHandle)
+    (declaration : FunctionDecl Validation.FunctionBody) : List Bool :=
+  declaration.signature.results.toList.map fun result =>
+    sharedReference (unitTypes unit) function.namespaceId result.typeId
+
 /-- Whether a closure target's signature reads alike natively and
 semantically, over its own environment. -/
 def signatureAgrees (unit : ValidatedUnit) (function : FunctionHandle) : Bool :=
@@ -758,7 +768,8 @@ def signatureAgrees (unit : ValidatedUnit) (function : FunctionHandle) : Bool :=
           | some (parameterTypes, resultTypes) =>
               NRow.parametersCheck unit (NRow.ofList parameters)
                   (parameterSharing unit function declaration) parameterTypes &&
-                NRow.typedAsCheck unit (NRow.ofList results) resultTypes
+                NRow.parametersCheck unit (NRow.ofList results)
+                  (resultSharing unit function declaration) resultTypes
           | none => false
 
 /-- Whether a unit's native and semantic readings agree: every closed type
@@ -939,7 +950,7 @@ theorem holdsAt_val (pointerWidth : Option Nat) {width : Nat} {signed : Bool}
   simp [StaticTyping.holdsAt, StaticTyping.targetWidth, fits]
 
 section
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- Every runtime value a closed native type holding no reference admits
 (`NTy.admits`) has a typed runtime representation: a runtime value
@@ -948,7 +959,7 @@ type the native type reads as, a function type only in a unit whose readings
 agree. A value of an intrinsic map owner is abstract, and its representation
 is a value of the owner's Move type holding its entries, slots, and handle;
 this is assumed of a unit as its natives' contracts are
-(`designs/intrinsic-maps.md`, "Abstract representation"). -/
+(`doc/designs/intrinsic-maps.md`, "Abstract representation"). -/
 def OwnersRepresentable (unit : ValidatedUnit) : Prop :=
   ∀ (τ : NTy) (type : SemTy) (value : RuntimeValue), τ.TypedAs unit type → τ.paramFree = true →
     τ.refFree = true → (τ.closureFree = true ∨ TypesAgree unit) → NTy.admits unit τ value = true →

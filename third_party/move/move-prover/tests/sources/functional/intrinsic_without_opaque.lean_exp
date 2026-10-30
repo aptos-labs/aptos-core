@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/intrinsic_without_opaque.move:12:9: error: the specification clause `ensures result == x` is not established
 tests/sources/functional/intrinsic_without_opaque.move:10:5: error: verex verification failed: the automatic verification of `bounded` failed; provide a proof in `tests/sources/functional/intrinsic_without_opaque.proof.lean`:
-  verify bounded by
+  verify bounded by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/intrinsic_without_opaque.move:10:5: error: verex verifi
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/intrinsic_without_opaque.move:20:9: error: the specification clause `ensures result == x` is not established
 tests/sources/functional/intrinsic_without_opaque.move:19:5: error: verex verification failed: the automatic verification of `caller` failed; provide a proof in `tests/sources/functional/intrinsic_without_opaque.proof.lean`:
-  verify caller by
+  verify caller by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/intrinsic_without_opaque.move:19:5: error: verex verifi
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/intrinsic_without_opaque.move:28:9: error: the specification clause `ensures result == x` is not established
 tests/sources/functional/intrinsic_without_opaque.move:27:5: error: verex verification failed: the automatic verification of `caller_expecting_the_body` failed; provide a proof in `tests/sources/functional/intrinsic_without_opaque.proof.lean`:
-  verify caller_expecting_the_body by
+  verify caller_expecting_the_body by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -88,10 +88,21 @@ run_cmd do
       ("carry_bool", "carry"), ("carry_address", "carry"), ("carry_string", "carry"),
       ("carry_signer", "carry"), ("carry_bytes", "carry"), ("carry_u64_strict", "carry_strict")] do
     let name := base ++ Name.mkSimple caller ++ `typedVerified
-    let some proof := (← getEnv).find? name |>.bind (·.value? (allowOpaque := true))
-      | throwError "missing native scalar caller theorem {name}"
-    unless proof.getUsedConstants.contains
-        (base ++ Name.mkSimple callee ++ `typedSemanticsVerified) do
+    -- The theorem is declared as the proof attempt that proved it: the
+    -- constants the proof uses are those of the caller's own theorems.
+    let mut pending := [name]
+    let mut visited : NameSet := {}
+    let mut used : NameSet := {}
+    while let next :: rest := pending do
+      pending := rest
+      if visited.contains next then continue
+      visited := visited.insert next
+      let some proof := (← getEnv).find? next |>.bind (·.value? (allowOpaque := true))
+        | throwError "missing native scalar caller theorem {next}"
+      for constant in proof.getUsedConstants do
+        used := used.insert constant
+        if (base ++ Name.mkSimple caller).isPrefixOf constant then pending := constant :: pending
+    unless used.contains (base ++ Name.mkSimple callee ++ `typedSemanticsVerified) do
       throwError "native scalar caller {caller} does not reuse its generic callee theorem"
 
 end VerexSL.Tests.Check.Generics.GenericScalarCalls

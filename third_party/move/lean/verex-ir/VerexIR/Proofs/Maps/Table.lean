@@ -7,10 +7,10 @@ import VerexIR.Proofs.Maps
 # Table identity and owned contents
 
 The logical snapshot of a Table separates its allocation identity from its
-contents (`designs/intrinsic-maps.md`). Identity equality is deliberately not
+contents (`doc/designs/intrinsic-maps.md`). Identity equality is deliberately not
 Lean equality of snapshots: two states can contain different entries for the
 same Table. Contents use the existing intrinsic-map operations and their
-proved laws, independently of the physical handle's representation.
+proved lemmas, independently of the physical handle's representation.
 
 This library does not change a physical Table declaration or assert agreement
 with native storage. That agreement, the carrier used by the denotation, and

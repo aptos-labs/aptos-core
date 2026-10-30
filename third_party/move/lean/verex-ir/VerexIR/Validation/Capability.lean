@@ -926,7 +926,7 @@ private def sourceName? (ns : ValidatedNamespace) (name : NameId) : Option Strin
   (ns.tables.names[name.index]?).map (·.name)
 
 
-/-- A declaration's ghost field of a name (`designs/ghost-fields.md`). -/
+/-- A declaration's ghost field of a name (`doc/designs/ghost-fields.md`). -/
 private def ghostFieldNamed? (targetNs : ValidatedNamespace) (declaration : StructDecl)
     (name : String) : Option GhostFieldDecl :=
   declaration.ghosts.find? fun ghost => sourceName? targetNs ghost.name == some name
@@ -4662,7 +4662,7 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
     ns.invariants.foldl (fun ds declaration =>
       ds ++ scanNamespaceInvariant registry unit mode ns declaration) ds
   -- A map's roles run by their bodies, or, at a table owner, as the runtime
-  -- provides them (`designs/intrinsic-maps.md`, "Tables in the runtime
+  -- provides them (`doc/designs/intrinsic-maps.md`, "Tables in the runtime
   -- semantics").
   let intrinsicErrors := if ns.intrinsics.isEmpty || (mode matches .typing) then #[] else
     ns.intrinsics.foldl (fun ds declaration =>
@@ -4694,7 +4694,7 @@ def typingDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
 /-! ## Shared references
 
 Certified exclusivity makes a shared reference the observed value itself
-([`designs/prophetic-references.md`](../../../designs/prophetic-references.md)
+([`doc/designs/prophetic-references.md`](../../../designs/prophetic-references.md)
 §2.1): a dereference or freeze whose operand is a shared reference reads
 the operand, and a place dereferencing a shared-typed base is that base.
 Mutable loans keep the full prophetic treatment. The semantics decides the

@@ -4,11 +4,10 @@ tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the modul
 tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the specification clause `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
         && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` is not established
 tests/sources/regression/generic_aliasing_ghost_pair.move:25:5: error: verex verification failed: the automatic verification of `concrete` failed; provide a proof in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean`:
-  verify concrete by
+  verify concrete by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
-    | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
@@ -16,10 +15,9 @@ tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the modul
 tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the specification clause `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
         && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` is not established
 tests/sources/regression/generic_aliasing_ghost_pair.move:36:5: error: verex verification failed: the automatic verification of `declared` failed; provide a proof in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean`:
-  verify declared by
+  verify declared by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
-    | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

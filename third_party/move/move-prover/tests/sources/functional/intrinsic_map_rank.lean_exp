@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/intrinsic_map_rank.move:77:9: error: the specification clause `ensures spec_rank(_m, _k) > 0` is not established
 tests/sources/functional/intrinsic_map_rank.move:74:5: error: verex verification failed: the automatic verification of `rank_wrong` failed; provide a proof in `tests/sources/functional/intrinsic_map_rank.proof.lean`:
-  verify rank_wrong by
+  verify rank_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

@@ -12,7 +12,7 @@ Evaluation of a checked body from a typed frame and state ends in a typed
 frame and state, under loans extending the starting ones, with a control of
 the type the checker assigns: a value of the node's type, a `break` value
 of its loop's type, returned values of the function's result types
-(`designs/static-typing.md`, Phase 4). Natives are assumed to preserve
+(`doc/historical/static-typing.md`, Phase 4). Natives are assumed to preserve
 typing (`NativesTyped`): the runtime provides them and `nativeCall` is
 opaque.
 -/

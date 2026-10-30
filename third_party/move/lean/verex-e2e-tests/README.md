@@ -50,7 +50,8 @@ accepted aliases. Review the resulting source diff before committing it.
 at any depth, is a VerexSL source — modules with specifications, `verify`
 commands, proof scripts where real mathematics lives — that the driver
 elaborates in its own `lean` process under a heartbeat cap, several at once
-(`VEREX_E2E_JOBS`, by default half the hardware threads). What `lean`
+(`VEREX_E2E_JOBS`, by default half the hardware threads; the processes
+share those threads for the targets each proves at once, `verex.jobs`). What `lean`
 prints is the baseline, verbatim, beside the source as `<name>.exp`,
 following compiler-v2's baseline convention: a clean check has no
 expectation file, a check that prints anything has exactly that output as
@@ -65,7 +66,7 @@ under `Check/` is VerexSL; the frontend paths keep their own directories.
 
 `VerexE2ETests/SourceVerify/` verifies Move and Rust sources as
 `verex-move verify` and `verex-rust verify` do
-([`designs/source-verification.md`](../designs/source-verification.md)): every
+([`doc/designs/source-verification.md`](../designs/source-verification.md)): every
 `.move` and `.rs` file there, a Rust file with the `.spec.lean` items beside
 it and a Move file with its proof file, is rendered as VerexSL and
 elaborated, and its messages, in the coordinates of the Move, Rust,
@@ -114,7 +115,7 @@ records nothing extra, but a divergence adds an explicit line naming it:
 Exhaustion never produces one — an `inconclusive` line means an engine ran out
 of its own budget, which proves nothing about the others. A recorded `ERROR:`
 line is an open finding, tracked in the findings register of
-`designs/monovm-link-design.md`, not an accepted expectation.
+`doc/designs/monovm-link-design.md`, not an accepted expectation.
 
 Only normalized content is recorded, so the file is deterministic: gas usage,
 collection counts, abort locations, and the adapter's build identity are

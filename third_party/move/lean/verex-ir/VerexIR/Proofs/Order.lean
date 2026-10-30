@@ -400,6 +400,73 @@ ordering itself, and on primitive values the order is the natural one. -/
       (RuntimeValue.order rank left right).then (RuntimeValue.orderList rank lefts rights) := by
   simp [RuntimeValue.orderList]
 
+@[simp] theorem RuntimeValue.order_unit (rank : ValueRanks) :
+    RuntimeValue.order rank .unit .unit = .eq := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_address (rank : ValueRanks) (a b : String) :
+    RuntimeValue.order rank (.address a) (.address b) = compareAddress a b := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_signer (rank : ValueRanks) (a b : String) :
+    RuntimeValue.order rank (.signer a) (.signer b) = compareAddress a b := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_string (rank : ValueRanks) (a b : String) :
+    RuntimeValue.order rank (.string a) (.string b) = compare a b := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_bytes (rank : ValueRanks) (a b : Array UInt8) :
+    RuntimeValue.order rank (.bytes a) (.bytes b) = List.compareLex compare a.toList b.toList := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_tuple (rank : ValueRanks) (a b : Array RuntimeValue) :
+    RuntimeValue.order rank (.tuple a) (.tuple b) =
+      RuntimeValue.orderList rank a.toList b.toList := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_ghost (rank : ValueRanks) (a b : RuntimeValue) :
+    RuntimeValue.order rank (.ghost a) (.ghost b) = RuntimeValue.order rank a b := by
+  rw [RuntimeValue.order, RuntimeValue.orderPayload]
+  simp [RuntimeValue.kindRank]
+
+theorem RuntimeValue.order_closure (rank : ValueRanks) (leftFunction rightFunction : FunctionHandle)
+    (leftMask rightMask : Nat) (leftInstantiation rightInstantiation : Array (TypeId × TypeId))
+    (leftCaptures rightCaptures : Array RuntimeValue) :
+    RuntimeValue.order rank (.closure leftFunction leftMask leftInstantiation leftCaptures)
+        (.closure rightFunction rightMask rightInstantiation rightCaptures) =
+      ((compare (rank.function leftFunction) (rank.function rightFunction)).then
+        ((compare leftFunction.namespaceId.index rightFunction.namespaceId.index).then
+          (compare leftFunction.functionId.index rightFunction.functionId.index))).then
+      ((compareInstantiation leftInstantiation rightInstantiation).then
+        ((compare leftMask rightMask).then
+          (RuntimeValue.orderList rank leftCaptures.toList rightCaptures.toList))) := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+/-- The order of two lists of encodings is the lexicographic order of what
+they encode under the order of encodings. -/
+theorem RuntimeValue.orderList_map {α : Type} (rank : ValueRanks) (encode : α → RuntimeValue) :
+    (left right : List α) →
+    RuntimeValue.orderList rank (left.map encode) (right.map encode) =
+      List.compareLex (fun a b => RuntimeValue.order rank (encode a) (encode b)) left right
+  | [], [] => by simp [List.compareLex_nil_nil]
+  | [], _ :: _ => by simp [List.compareLex_nil_cons]
+  | _ :: _, [] => by simp [List.compareLex_cons_nil]
+  | a :: as, b :: bs => by
+      rw [List.map_cons, List.map_cons, RuntimeValue.orderList_cons_cons,
+        RuntimeValue.orderList_map rank encode as bs, List.compareLex_cons_cons]
+
+/-- Two variants of one declaration of different names never compare
+equal, whatever follows. -/
+theorem compareVariant_then_of_ne (rank : ValueRanks) (source : StructHandle) {left right : String}
+    (distinct : left ≠ right) (after : Ordering) :
+    (compareVariant rank source source (some left) (some right)).then after =
+      compareVariant rank source source (some left) (some right) := by
+  have different : compare left right ≠ .eq := fun same => distinct (Std.LawfulEqOrd.eq_of_compare same)
+  simp only [compareVariant]
+  cases h : compare (rank.variant source left) (rank.variant source right) <;>
+    cases h' : compare left right <;> simp_all [Ordering.then]
+
 /-! ## Instances -/
 
 instance RuntimeValue.order_oriented (rank : ValueRanks) :

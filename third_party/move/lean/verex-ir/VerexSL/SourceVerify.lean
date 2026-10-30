@@ -71,6 +71,9 @@ structure Request where
   /-- Verify every function automatically, its authored proof ignored
   (`verex.ignoreProofs`). -/
   ignoreProofs : Bool := false
+  /-- How many targets of a module are proved at once (`verex.jobs`); the
+  option's default without one. -/
+  jobs : Option Nat := none
 
 /-- A message in the coordinates of the file it is attributed to; lines and
 columns count from one. -/
@@ -527,6 +530,9 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
     | some heartbeats => verex.verifyHeartbeats.set {} (heartbeats * 1000)
     | none => {}
   let options := if request.ignoreProofs then verex.ignoreProofs.set options true else options
+  let options := match request.jobs with
+    | some jobs => verex.jobs.set options jobs
+    | none => options
   let options ← environmentOptions options
   -- A namespace with a proof file is verified by it.
   let proofFiles := request.companions.filter fun companion =>

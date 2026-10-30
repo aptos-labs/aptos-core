@@ -5,7 +5,7 @@ import VerexIR.Proofs.Denote.Term
 
 namespace VerexIR.Proofs.Denote
 
-variable {unit : Validation.ValidatedUnit} [Skolems unit]
+variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- A finite semantic approximant with a separate proof-unrolling allowance.
 The allowance never truncates executions: exhaustion must be proved unreachable.

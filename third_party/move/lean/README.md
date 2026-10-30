@@ -30,7 +30,7 @@ Three claims stay separate:
 
 1. **Source verification.** `verify f` proves a theorem about the big-step
    semantics of the validated VIR of `f`
-   ([`designs/denotation.md`](designs/denotation.md)).
+   ([`doc/designs/denotation.md`](doc/designs/denotation.md)).
 2. **Compilation.** Supported declarations lower to XIR and production Move
    bytecode.
 3. A compiler-correctness theorem connecting the two is future work.
@@ -38,7 +38,7 @@ Three claims stay separate:
 A Move file, or a Rust file with its specifications in a VerexSL file
 beside it, is verified by rendering it as VerexSL, with every message
 reported at its position in the original files
-([`designs/source-verification.md`](designs/source-verification.md)):
+([`doc/designs/source-verification.md`](doc/designs/source-verification.md)):
 
 ```bash
 verex-move verify vault.move
@@ -52,12 +52,12 @@ verex-rust verify bounds.rs      # specifications in bounds.spec.lean
 | [`verex-ir`](verex-ir/) | The shared typed VIR: RawUnit JSON import, validation, semantics, interpreter, proofs, the denotation-based verifier, and VerexSL. |
 | [`verex-move`](verex-move/) | The Move semantic profile and intrinsic registry, the Move exchange frontend (`VerexMove/Frontend`), and the XIR backend (`VerexMove/Xir`) through which compiler-v2 compiles `.lean` sources to Move bytecode. |
 | [`verex-rust`](verex-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](verex-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. |
-| [`verex-e2e-tests`](verex-e2e-tests/) | Move-to-VerexSL and Rust-to-VerexSL baselines, verification of Move and Rust sources, and the verification check fixtures (ledger in [`designs/roadmap.md`](designs/roadmap.md#tests)). |
+| [`verex-e2e-tests`](verex-e2e-tests/) | Move-to-VerexSL and Rust-to-VerexSL baselines, verification of Move and Rust sources, and the verification check fixtures under `VerexE2ETests/Check/`. |
 
 [`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
-and `transpiler`; nothing links them. Designs live in [`designs/`](designs/), with
-executed or superseded ones under [`designs/historical/`](designs/historical/);
-[`designs/roadmap.md`](designs/roadmap.md) holds the status: what is open and the test ledger.
+and `transpiler`; nothing links them. Documentation is under [`doc/`](doc/): designs, the plan
+([`doc/plan/roadmap.md`](doc/plan/roadmap.md) is what is open), status, and
+historical designs.
 
 ## Build and test
 
@@ -96,9 +96,15 @@ cd verex-move
 lake exe verex-move verify <file.move | package>         # every specified function
 lake exe verex-move verify <package> --filter vector     # modules whose file names contain it
 lake exe verex-move verify <file.move> --heartbeats 400 # default budget, thousands
+lake exe verex-move verify <package> --jobs 4            # targets proved at once per module
 cd ../verex-rust
 lake exe verex-rust verify <file.rs>                    # specifications in <file>.spec.lean
 ```
+
+`verex-move verify` elaborates a package's targets one after another in one
+process. `scripts/verify-modules.py <package> [--filter <part>] [--jobs N]`
+runs one process per module with specifications, several at a time, and
+prints the modules' reports in module order.
 
 From the Move CLI, a package is verified in place; the Move Prover's unit
 tests run with it on request:
@@ -130,7 +136,7 @@ import VerexMove.Proofs
 verex proofs for "proofs.move"
 verex proofs where
 
-verify square_of_sum by
+verify square_of_sum by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case ensures_1 => …
@@ -142,4 +148,4 @@ default in the language server only); `verify! f`, marked by the code action "Ve
 runs. A proof file opens with its goals in the InfoView once its Move file
 has been verified: the header loads the rendering that verification wrote
 (`.verex/` beside the file, `build/` of a package).
-Details: [`designs/source-verification.md`](designs/source-verification.md).
+Details: [`doc/designs/source-verification.md`](doc/designs/source-verification.md).

@@ -649,7 +649,7 @@ private def typeHoldsReference (tables : Tables) : Nat → TypeId → Bool
     | some .stateDomain | some (.function ..) | some (.typeParameter _) | some (.profile _)
     | none => false
 
-/-- A ghost field's declaration (`designs/ghost-fields.md`): its type holds
+/-- A ghost field's declaration (`doc/designs/ghost-fields.md`): its type holds
 no reference, so that its slot holds no loan; an initializer is an
 expression of an owned namespace. -/
 private def checkGhostField (registry : ProfileRegistry) (unit : RawUnit)

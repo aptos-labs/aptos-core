@@ -245,8 +245,8 @@ private def boolRow : NRow := .cons .bool .nil
         | .closure target mask instantiation _ =>
             closureRows? unit target mask == some (paramRow, paramRow, paramRow) &&
               closureRowsIn? unit target mask instantiation == some (boolRow, boolRow, boolRow) &&
-              NTy.admits unit (.function boolRow [false] boolRow) closure &&
-              !NTy.admits unit (.function paramRow [false] paramRow) closure
+              NTy.admits unit (.function boolRow ⟨[false], [false]⟩ boolRow) closure &&
+              !NTy.admits unit (.function paramRow ⟨[false], [false]⟩ paramRow) closure
         | _ => false
       | _ => false
   | none => false

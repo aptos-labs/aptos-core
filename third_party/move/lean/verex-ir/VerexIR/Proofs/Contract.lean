@@ -25,7 +25,7 @@ structure Contract (σ ε Args Result : Type) where
   requires : Args → σ → Prop
   /-- What the theorem assumes of an invocation beyond the precondition:
   the typing of inputs a run of a closure the proof cannot see needs
-  (`designs/static-typing.md`, Phase 5). Generated, never written by hand;
+  (`doc/historical/static-typing.md`, Phase 5). Generated, never written by hand;
   callers establish it at each call. -/
   assumes : Args → σ → Prop := fun _ _ => True
   /-- Relation established by a successful execution. -/
@@ -66,6 +66,20 @@ def Satisfies (function : Args → Spec σ ε Result)
       (∀ error, (function args).aborts initial error →
         contract.aborts args initial error) ∧
       ¬(function args).undefined initial
+
+/-- Two contracts stating the same conditions, each in its own spelling, as
+a generic callee's contract read in a caller's view (`Contract.ofSkolem`)
+and stated at the caller's types (a specialized contract). -/
+structure Contract.Equivalent (left right : Contract σ ε Args Result) : Prop where
+  requires : ∀ args initial, left.requires args initial ↔ right.requires args initial
+  assumes : ∀ args initial, left.assumes args initial ↔ right.assumes args initial
+  ensures : ∀ args initial result final,
+    left.ensures args initial result final ↔ right.ensures args initial result final
+  aborts : ∀ args initial error, left.aborts args initial error ↔ right.aborts args initial error
+  mayAbort : ∀ args initial, left.mayAbort args initial ↔ right.mayAbort args initial
+  mustAbort : ∀ args initial, left.mustAbort args initial ↔ right.mustAbort args initial
+  frame : ∀ args initial result final,
+    left.frame args initial result final ↔ right.frame args initial result final
 
 /-- Contract satisfaction depends only on the three relations of `Spec`.
 This is the transport used by a generated denotation's exact agreement

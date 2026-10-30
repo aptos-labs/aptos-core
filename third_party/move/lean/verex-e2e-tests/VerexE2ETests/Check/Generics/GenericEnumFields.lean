@@ -83,7 +83,7 @@ verex module 0x42::generic_enum_fields where
 error: the specification clause `ensures result == 0` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_fixed` failed; provide a proof in the module:
-  verify wrong_fixed by
+  verify wrong_fixed by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

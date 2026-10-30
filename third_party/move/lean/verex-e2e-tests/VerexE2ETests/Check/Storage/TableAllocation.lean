@@ -6,7 +6,7 @@ import VerexE2ETests.CheckSupport
 /-! A table is allocated at a fresh handle and filled through its roles: the
 caller reads the contents it built, and its frame leaves the allocation
 history open while keeping every other resource
-(`designs/intrinsic-maps.md`, "Owned Table values"). -/
+(`doc/designs/intrinsic-maps.md`, "Owned Table values"). -/
 
 verex module 0x42::table_allocation where
   pragma verify = false
@@ -94,7 +94,7 @@ verex module 0x42::table_allocation where
 error: the specification clause `ensures get(result, 1u8) == 4` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_value` failed; provide a proof in the module:
-  verify wrong_value by
+  verify wrong_value by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -106,7 +106,7 @@ verify 0x42::table_allocation::wrong_value
 
 -- The roles run in the interpreter: the runtime provides them on the table's
 -- value, allocating at a fresh handle and keeping the entries in the owner's
--- last field (`designs/intrinsic-maps.md`, "Tables in the runtime
+-- last field (`doc/designs/intrinsic-maps.md`, "Tables in the runtime
 -- semantics").
 open Lean Elab Command VerexIR VerexE2ETests.CheckSupport in
 run_cmd do

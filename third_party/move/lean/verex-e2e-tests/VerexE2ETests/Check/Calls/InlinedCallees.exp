@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Calls/InlinedCallees.lean:90:4: error: the specification clause `ensures result == 2` is not established
 VerexE2ETests/Check/Calls/InlinedCallees.lean:89:7: error: verex verification failed: the automatic verification of `twice_of_one` failed; provide a proof in the module:
-  verify twice_of_one by
+  verify twice_of_one by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

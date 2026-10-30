@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/proof/monotonicity.move:88:9: error: the requirement of the lemma applied at `add_mono(x, y, offset)` does not hold
 tests/sources/functional/proof/monotonicity.move:82:5: error: verex verification failed: the automatic verification of `add_unchecked` failed; provide a proof in `tests/sources/functional/proof/monotonicity.proof.lean`:
-  verify add_unchecked by
+  verify add_unchecked by lean =>
     verex_obligations
     verex_on
     | apply_1 => verex_prepare; sorry

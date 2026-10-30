@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:106:9: error: the specification clause `ensures ∀ (i in 0 .. s.v.length), s.v[i] == old(s.v)[i] + 2` is not established
 tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103:5: error: verex verification failed: the automatic verification of `bump_field_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean`:
-  verify bump_field_wrong by
+  verify bump_field_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

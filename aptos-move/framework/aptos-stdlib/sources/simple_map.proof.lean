@@ -10,7 +10,7 @@ open VerexIR VerexIR.Maps VerexIR.Proofs VerexIR.Proofs.Denote
 
 -- Both vectors lose only their last item. Their earlier entries still
 -- satisfy the reversed-prefix invariants, including generic encoded values.
-verify add_all by
+verify add_all by lean =>
   verex_obligations
   verex_on
   | invariant_6_step, invariant_5_step =>

@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:20:16: error: the assertion `x == y` does not hold
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:21:7: error: verex verification failed: the automatic verification of `specified` failed; provide a proof in the module:
-  verify specified by
+  verify specified by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/Check/Specifications/AssertionErrors.lean:21:7: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:27:18: error: the assertion `i + 1 < n` does not hold
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:32:7: error: verex verification failed: the automatic verification of `count` failed; provide a proof in the module:
-  verify count by
+  verify count by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -16,7 +16,7 @@ VerexE2ETests/Check/Specifications/AssertionErrors.lean:32:7: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:36:16: error: the assertion `x > 0` does not hold
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:42:7: error: verex verification failed: the automatic verification of `calls_positive` failed; provide a proof in the module:
-  verify calls_positive by
+  verify calls_positive by lean =>
     verex_obligations
     verex_on
     | positive_assert_1 => verex_prepare; sorry
@@ -24,7 +24,7 @@ VerexE2ETests/Check/Specifications/AssertionErrors.lean:42:7: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:46:16: error: the assertion `value == other` does not hold
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:48:7: error: verex verification failed: the automatic verification of `same` failed; provide a proof in the module:
-  verify same by
+  verify same by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -32,7 +32,7 @@ VerexE2ETests/Check/Specifications/AssertionErrors.lean:48:7: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:54:16: error: the assertion `with_state_anchor!(0, global<Counter>(a).value == old(global<Counter>(a).value) + 1)` does not hold
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:55:7: error: verex verification failed: the automatic verification of `bump_once` failed; provide a proof in the module:
-  verify bump_once by
+  verify bump_once by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
@@ -40,7 +40,7 @@ VerexE2ETests/Check/Specifications/AssertionErrors.lean:55:7: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:16:16: error: the assertion `x == y` does not hold
 VerexE2ETests/Check/Specifications/AssertionErrors.lean:14:6: error: verex verification failed: the automatic verification of `unspecified` failed; provide a proof in the module:
-  verify unspecified by
+  verify unspecified by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

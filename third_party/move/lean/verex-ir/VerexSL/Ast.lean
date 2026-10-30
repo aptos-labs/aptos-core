@@ -191,7 +191,7 @@ inductive SpecificationConditionKind where
   /-- Splits cases on a Boolean or an enum's variant. -/
   | split
   /-- Updates a ghost field: the condition's expression assigns the field
-  (`designs/ghost-fields.md`). -/
+  (`doc/designs/ghost-fields.md`). -/
   | update
   deriving Repr, BEq, DecidableEq, Inhabited
 
@@ -516,7 +516,7 @@ inductive ContractClause where
   /-- `modifies_of<f> *`: an invocation of `f` may change any global memory. -/
   | modifiesOfAll (parameter : String) (span : Span := {})
   /-- A ghost field of every value of a struct or enum, with the value a pack
-  gives it over the fields (`designs/ghost-fields.md`). -/
+  gives it over the fields (`doc/designs/ghost-fields.md`). -/
   | ghost (name : String) (type : Located Ty) (initializer : Option Expr) (span : Span := {})
   deriving Repr, BEq, Inhabited
 
@@ -569,7 +569,9 @@ structure SpecFunctionDecl where
   isOpaque : Bool := false
   generics : Array GenericBinder := #[]
   parameters : Array Parameter := #[]
-  result : Located Ty := { value := .unit }
+  /-- The declared result type; without one the body's type is the result
+  and the function cannot be called. -/
+  result : Option (Located Ty) := none
   /-- The measure a recursive definition decreases. -/
   decreases : Option Expr := none
   body : Option Expr := none
@@ -687,10 +689,19 @@ structure Namespace where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
-/-- A source file may own multiple namespaces but uses one provenance file. -/
+/-- The width of a source's band of positions: the positions of the unit's
+own file lie in the first band, those of its further sources each in the
+next (`CompilationUnit.sources`). -/
+def sourceBand : Nat := 1000000000
+
+/-- A source file may own multiple namespaces. Its syntax may hold items of
+further sources, spliced in at positions shifted to their bands
+(`sourceBand`): the proof file whose step expressions a copy of the unit
+lowers. -/
 structure CompilationUnit where
   sourceName : String
   namespaces : Array Namespace
+  sources : Array String := #[]
   deriving Repr, BEq, Inhabited
 
 end VerexSL

@@ -1042,13 +1042,12 @@ mutual
   private partial def statementDocs (statements : Array Statement) : Except String (Array Doc) := do
     let rec go (remaining : List Statement) (rendered : Array Doc) := do
       match remaining with
-      | .expression specExpr@(.specBlock conditions _ false) ::
-          .expression loopExpr@(.loop ..) :: rest
       | .expression loopExpr@(.loop ..) ::
           .expression specExpr@(.specBlock conditions _ false) :: rest =>
           if isLoopSpecification conditions then
-            -- Only a `while` takes a `where` region; any other loop is
-            -- followed by its specification, which lowering attaches.
+            -- A specification after a loop is the loop's. Only a `while`
+            -- takes a `where` region; any other loop is followed by its
+            -- specification, which lowering attaches to the loop.
             let attachment ← match loopExpr with
               | .loop (.ifElse _ _ (some (.break_ none _ none)) _) _ none =>
                   pure (block (text "where") (← specificationMemberDocs conditions))
@@ -1346,14 +1345,17 @@ private def itemDocs : Item → Except String (Array Doc)
         {bindersText declaration.generics}"
       let signature := hangingDelimited (text signatureHead) "(" ")"
         (declaration.parameters.map parameterDoc)
-        (text s!" : {typeText declaration.result.value}")
+        (match declaration.result with
+          | some result => text s!" : {typeText result.value}"
+          | none => .nil)
       let signature ← match declaration.decreases with
         | some measure => pure (signature ++ text " decreases " ++ (← expressionDoc measure))
         | none => pure signature
       let declarationDoc ← match declaration.body with
         | none => pure signature
         | some body =>
-            let body := normalizeFunctionBody (declaration.result.value == .unit)
+            let body := normalizeFunctionBody
+              (declaration.result.any (·.value == .unit))
               (normalizeResultPosition body)
             let bodyDoc ← expressionDoc body
             if body matches .match_ .. | .ifElse .. then

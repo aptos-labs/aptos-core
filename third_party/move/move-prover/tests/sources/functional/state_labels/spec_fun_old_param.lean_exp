@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/spec_fun_old_param.move:31:9: error: the specification clause `ensures counter_increased(old(_c), _c)` is not established
 tests/sources/functional/state_labels/spec_fun_old_param.move:30:5: error: verex verification failed: the automatic verification of `noop` failed; provide a proof in `tests/sources/functional/state_labels/spec_fun_old_param.proof.lean`:
-  verify noop by
+  verify noop by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

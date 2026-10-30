@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:100:9: error: the specification clause `ensures spec_preserved(m, old(m))` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:98:5: error: verex verification failed: the automatic verification of `add_preserved_bad` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
-  verify add_preserved_bad by
+  verify add_preserved_bad by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,45 +9,39 @@ tests/sources/functional/ghost_field_intrinsic_map_ops.move:98:5: error: verex v
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:128:9: error: the specification clause `ensures spec_preserved(m, old(m))` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:127:5: error: verex verification failed: the automatic verification of `addall_preserved_bad` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
-  verify addall_preserved_bad by
+  verify addall_preserved_bad by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:155:5: error: the continuation after call 1 of `append_disjoint` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:156:9: error: the specification clause `aborts_if ∃ (k : u64), spec_contains(m, k) && spec_contains(other, k)` is not established
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:155:5: error: the continuation after `append_disjoint` is not established
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:158:9: error: the specification clause `ensures ∀ (k : u64),
-        spec_contains(m, k)
-          <==> spec_contains(old(m), k) || spec_contains(other, k)` is not established
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:157:9: error: the specification clause `ensures spec_len(m) == spec_len(old(m)) + spec_len(other)` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:155:5: error: verex verification failed: the automatic verification of `app_disjoint` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
-  verify app_disjoint by
+  verify app_disjoint by lean =>
     verex_obligations
     verex_on
+    | after_call_1_of_append_disjoint => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
-    | after_append_disjoint => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:171:9: error: the specification clause `ensures ∀ (k : u64), !(spec_contains(m, k) && spec_contains(result, k))` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:169:9: error: the specification clause `ensures ∀ (k : u64),
         spec_contains(old(m), k)
           <==> spec_contains(m, k) || spec_contains(result, k)` is not established
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:171:9: error: the specification clause `ensures ∀ (k : u64), !(spec_contains(m, k) && spec_contains(result, k))` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:165:5: error: verex verification failed: the automatic verification of `tr` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
-  verify tr by
+  verify tr by lean =>
     verex_obligations
     verex_on
-    | ensures_4 => verex_prepare; sorry
     | ensures_3 => verex_prepare; sorry
+    | ensures_4 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:179:5: error: the continuation after `replace_key_inplace` is not established
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:179:5: error: the continuation after call 1 of `replace_key_inplace` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:179:5: error: verex verification failed: the automatic verification of `rk` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
-  verify rk by
+  verify rk by lean =>
     verex_obligations
     verex_on
-    | after_replace_key_inplace => verex_prepare; sorry
+    | after_call_1_of_replace_key_inplace => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

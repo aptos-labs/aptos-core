@@ -13,7 +13,7 @@ warning: proof uses trusted assumption
 
 tests/sources/functional/proof/if_else.move:159:18: error: the assertion `!(a <= b) ==> _result == a` does not hold
 tests/sources/functional/proof/if_else.move:152:5: error: verex verification failed: the automatic verification of `min` failed; provide a proof in `tests/sources/functional/proof/if_else.proof.lean`:
-  verify min by
+  verify min by lean =>
     verex_obligations
     verex_on
     | assert_2 => verex_prepare; sorry

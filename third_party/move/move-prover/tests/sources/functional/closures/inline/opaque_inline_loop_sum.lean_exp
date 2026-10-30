@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:80:9: error: the specification clause `ensures result == n * (n + 1)` is not established
 tests/sources/functional/closures/inline/opaque_inline_loop_sum.move:78:5: error: verex verification failed: the automatic verification of `test_sum_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/opaque_inline_loop_sum.proof.lean`:
-  verify test_sum_wrong by
+  verify test_sum_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

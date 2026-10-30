@@ -10,19 +10,310 @@ A generic in-place quicksort: a Lomuto `partition` over a
 type parameter, the recursive `quick_sort_range` calling itself at its own
 type parameter, and `quick_sort`. Sortedness is stated by the structural
 order and the permutation of each range by counts, a recursive
-specification function. The solver leaves the effect of a swap on each
-partition invariant and the composition of the two recursive sorts with
-the partition; authored proofs discharge them with count lemmas proved
-through the generated definition's unfolding theorem. `quick_sort` closes
-automatically.
+specification function, defined at the type parameter (`count.at_T0.spec`).
+The solver leaves the effect of a swap on each partition invariant and the
+composition of the two recursive sorts with the partition; authored proofs
+discharge them with count lemmas over arrays (`Arrays.cnt`), which the
+definition's unfolding theorem equates with the generated definition.
+`quick_sort` and its concrete callers close automatically, through
+`quick_sort_range`'s contract specialized at their type arguments.
 -/
 
 namespace VerexSL.Tests.Check.Examples.Quicksort
 
 set_option verex.verifyHeartbeats 400000
 
+namespace Arrays
+
+/-! ## Counts over arrays
+
+The generated `count` reads a vector's values only; its facts are proved
+over arrays (`cnt`), a missing position reading as `d`. -/
+
+/-- Occurrences of `x` among the positions `[lo, hi)` of an array. -/
+def cnt {α : Type} [DecidableEq α] (d : α) (a : Array α) (x : α) (lo hi : Int) : Int :=
+  if hi ≤ lo then 0 else cnt d a x lo (hi - 1) + if a[(hi - 1).toNat]?.getD d = x then 1 else 0
+termination_by (hi - lo).toNat
+decreasing_by omega
+
+theorem cnt_unfold {α : Type} [DecidableEq α] (d : α) (a : Array α) (x : α) (lo hi : Int) :
+    cnt d a x lo hi =
+      if hi ≤ lo then 0 else cnt d a x lo (hi - 1) + if a[(hi - 1).toNat]?.getD d = x then 1 else 0 := by
+  rw [cnt]
+
+/-- An update outside `[lo, hi)` leaves the count over it unchanged. -/
+theorem cnt_set_outside {α : Type} [DecidableEq α] (d : α) (a : Array α) (x y : α) (i : Nat) :
+    ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k → 0 ≤ lo → ((i : Int) < lo ∨ hi ≤ i) →
+      cnt d (a.setIfInBounds i y) x lo hi = cnt d a x lo hi := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro lo hi hk hlo hout
+    rw [cnt_unfold d (a.setIfInBounds i y), cnt_unfold d a]
+    by_cases hle : hi ≤ lo
+    · rw [if_pos hle, if_pos hle]
+    · rw [if_neg hle, if_neg hle,
+        ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl hlo (by omega),
+        Array.getElem?_setIfInBounds_ne (by omega)]
+
+/-- An update inside `[lo, hi)` trades the old element's count for the new one's. -/
+theorem cnt_set_inside {α : Type} [DecidableEq α] (d : α) (a : Array α) (x y : α) (i : Nat)
+    (bound : i < a.size) :
+    ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k → 0 ≤ lo → lo ≤ i → (i : Int) < hi →
+      cnt d (a.setIfInBounds i y) x lo hi =
+        cnt d a x lo hi - (if a[i] = x then 1 else 0) + (if y = x then 1 else 0) := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro lo hi hk hlo hlow hhigh
+    rw [cnt_unfold d (a.setIfInBounds i y), cnt_unfold d a]
+    have hlt : ¬hi ≤ lo := by omega
+    rw [if_neg hlt, if_neg hlt]
+    by_cases hlast : (hi - 1).toNat = i
+    · rw [cnt_set_outside d a x y i (hi - 1 - lo).toNat lo (hi - 1) rfl hlo (by omega), hlast,
+        Array.getElem?_setIfInBounds_self, if_pos bound, Option.getD_some,
+        Array.getElem?_eq_getElem bound, Option.getD_some]
+      omega
+    · rw [ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl hlo hlow (by omega),
+        Array.getElem?_setIfInBounds_ne (fun h => hlast h.symm)]
+      omega
+
+/-- Swapping two positions inside `[lo, hi)` preserves every count over it. -/
+theorem cnt_swap {α : Type} [DecidableEq α] (d : α) (a : Array α) (x : α) (i j : Nat)
+    (hi : i < a.size) (hj : j < a.size) (lo high : Int) (hlo : 0 ≤ lo) (hi1 : lo ≤ i)
+    (hi2 : (i : Int) < high) (hj1 : lo ≤ j) (hj2 : (j : Int) < high) :
+    cnt d ((a.setIfInBounds i a[j]).setIfInBounds j a[i]) x lo high = cnt d a x lo high := by
+  rw [cnt_set_inside d (a.setIfInBounds i a[j]) x a[i] j (by simpa using hj) _ lo high rfl hlo hj1
+      hj2,
+    cnt_set_inside d a x a[j] i hi _ lo high rfl hlo hi1 hi2]
+  rw [Array.getElem_setIfInBounds (by simpa using hj), ite_self]
+  omega
+
+/-- A certified swap inside the range preserves counts. -/
+theorem cnt_swapIfInBounds {α : Type} [DecidableEq α] (d : α) (xs : Array α) (x : α)
+    (i j : Int) (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
+    (lo high : Int) (hlo : 0 ≤ lo) (hi1 : lo ≤ i) (hi2 : i < high) (hj1 : lo ≤ j) (hj2 : j < high) :
+    cnt d (xs.swapIfInBounds i.toNat j.toNat) x lo high = cnt d xs x lo high := by
+  rw [Array.swapIfInBounds_def, dif_pos ib, dif_pos jb, Array.swap_def]
+  simpa only [Array.setIfInBounds, dif_pos ib, Array.size_set, dif_pos jb] using
+    (cnt_swap d xs x i.toNat j.toNat ib jb lo high hlo (by omega) (by omega) (by omega)
+      (by omega))
+
+/-- An element found at a position is the lookup there. -/
+theorem lookup_of_found {α : Type} (d : α) (xs : Array α) (k : Int) (a : α)
+    (found : xs[k.toNat]? = some a) : xs[k.toNat]?.getD d = a := by
+  rw [found]; rfl
+
+/-- A lookup in a vector after a certified swap of two of its positions. -/
+theorem swap_lookup {α : Type} (d : α) (xs : Array α) (i j k : Int)
+    (ib : i.toNat < xs.size) (jb : j.toNat < xs.size) (hi : 0 ≤ i) (hj : 0 ≤ j) (hk : 0 ≤ k) :
+    (xs.swapIfInBounds i.toNat j.toNat)[k.toNat]?.getD d =
+      if j = k then xs[i.toNat]?.getD d
+      else if i = k then xs[j.toNat]?.getD d
+      else xs[k.toNat]?.getD d := by
+  rw [Array.swapIfInBounds_def, dif_pos ib, dif_pos jb, Array.swap_def]
+  simp only [Array.getElem?_set]
+  by_cases e1 : j = k
+  · simp [e1, Array.getElem?_eq_getElem ib]
+  · have : ¬j.toNat = k.toNat := by omega
+    simp only [this, e1, if_false]
+    by_cases e2 : i = k
+    · simp [e2, Array.getElem?_eq_getElem jb]
+    · have : ¬i.toNat = k.toNat := by omega
+      simp [this, e2]
+
+/-- A count splits at any point of its range. -/
+theorem cnt_split {α : Type} [DecidableEq α] (d : α) (xs : Array α) (x : α) (lo mid : Int) :
+    ∀ (k : Nat) (hi : Int), (hi - mid).toNat = k → lo ≤ mid → mid ≤ hi →
+      cnt d xs x lo hi = cnt d xs x lo mid + cnt d xs x mid hi := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro hi hk hlm hmh
+    by_cases same : hi = mid
+    · subst same
+      rw [cnt_unfold d xs x hi hi, if_pos (Int.le_refl _)]
+      omega
+    · have outer : ¬hi ≤ lo := by omega
+      have inner : ¬hi ≤ mid := by omega
+      rw [cnt_unfold d xs x lo hi, cnt_unfold d xs x mid hi, if_neg outer, if_neg inner,
+        ih (hi - 1 - mid).toNat (by omega) (hi - 1) rfl hlm (by omega)]
+      omega
+
+/-- Arrays agreeing on a range count alike over it. -/
+theorem cnt_congr {α : Type} [DecidableEq α] (d : α) (xs ys : Array α) (x : α) (lo : Int) :
+    ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
+      (∀ i : Int, lo ≤ i → i < hi → xs[i.toNat]?.getD d = ys[i.toNat]?.getD d) →
+      cnt d xs x lo hi = cnt d ys x lo hi := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro hi hk agree
+    rw [cnt_unfold d xs x lo hi, cnt_unfold d ys x lo hi]
+    by_cases hle : hi ≤ lo
+    · rw [if_pos hle, if_pos hle]
+    · rw [if_neg hle, if_neg hle, ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl
+        (fun i h1 h2 => agree i h1 (by omega)), agree (hi - 1) (by omega) (by omega)]
+
+theorem cnt_nonneg {α : Type} [DecidableEq α] (d : α) (xs : Array α) (x : α) (lo : Int) :
+    ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k → 0 ≤ cnt d xs x lo hi := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro hi hk
+    rw [cnt_unfold d xs x lo hi]
+    by_cases hle : hi ≤ lo
+    · rw [if_pos hle]; omega
+    · rw [if_neg hle]
+      have := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl
+      split <;> omega
+
+/-- An element of a range is counted there. -/
+theorem cnt_pos {α : Type} [DecidableEq α] (d : α) (xs : Array α) (lo i : Int) :
+    ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k → lo ≤ i → i < hi →
+      1 ≤ cnt d xs (xs[i.toNat]?.getD d) lo hi := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro hi hk h1 h2
+    rw [cnt_unfold d xs _ lo hi, if_neg (by omega)]
+    have := cnt_nonneg d xs (xs[i.toNat]?.getD d) lo _ (hi - 1) rfl
+    by_cases last : hi - 1 = i
+    · subst last
+      rw [if_pos rfl]
+      omega
+    · have := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl h1 (by omega)
+      split <;> omega
+
+/-- What is counted in a range is an element of it. -/
+theorem exists_of_cnt_pos {α : Type} [DecidableEq α] (d : α) (xs : Array α) (x : α) (lo : Int) :
+    ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k → 1 ≤ cnt d xs x lo hi →
+      ∃ i : Int, lo ≤ i ∧ i < hi ∧ xs[i.toNat]?.getD d = x := by
+  intro k
+  induction k using Nat.strongRecOn with
+  | _ k ih =>
+    intro hi hk pos
+    rw [cnt_unfold d xs x lo hi] at pos
+    by_cases hle : hi ≤ lo
+    · rw [if_pos hle] at pos; omega
+    · rw [if_neg hle] at pos
+      by_cases hit : xs[(hi - 1).toNat]?.getD d = x
+      · exact ⟨hi - 1, by omega, by omega, hit⟩
+      · rw [if_neg hit] at pos
+        obtain ⟨i, h1, h2, h3⟩ := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl (by omega)
+        exact ⟨i, h1, by omega, h3⟩
+
+/-- The frame of a sorted range: partition, then the two recursive sorts. -/
+theorem sort_frame {α : Type} (d : α) (v P L R : Array α) (low high p : Int)
+    (hvP : ∀ i : Int, 0 ≤ i → i < v.size → i < low ∨ high ≤ i →
+      P[i.toNat]?.getD d = v[i.toNat]?.getD d)
+    (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
+      L[i.toNat]?.getD d = P[i.toNat]?.getD d)
+    (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
+      R[i.toNat]?.getD d = L[i.toNat]?.getD d)
+    (sP : (P.size : Int) = v.size) (sL : (L.size : Int) = P.size) (hp : low ≤ p)
+    (hp2 : p ≤ high - 1) :
+    ∀ i : Int, 0 ≤ i → i < v.size → i < low ∨ high ≤ i →
+      R[i.toNat]?.getD d = v[i.toNat]?.getD d := by
+  intro i h0 h1 hout
+  rw [hLR i h0 (by omega) (by omega), hPL i h0 (by omega) (by omega), hvP i h0 h1 hout]
+
+/-- The counts of a sorted range: partition, then the two recursive sorts. -/
+theorem sort_counts {α : Type} [DecidableEq α] (d : α) (v P L R : Array α) (low high p : Int)
+    (cvP : ∀ x, cnt d v x low high = cnt d P x low high)
+    (cPL : ∀ x, cnt d P x low p = cnt d L x low p)
+    (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
+      L[i.toNat]?.getD d = P[i.toNat]?.getD d)
+    (cLR : ∀ x, cnt d L x (p + 1) high = cnt d R x (p + 1) high)
+    (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
+      R[i.toNat]?.getD d = L[i.toNat]?.getD d)
+    (sP : (P.size : Int) = v.size) (sL : (L.size : Int) = P.size) (hhigh : high ≤ v.size)
+    (hlow : 0 ≤ low) (hp : low ≤ p) (hp2 : p ≤ high - 1) :
+    ∀ x, cnt d v x low high = cnt d R x low high := by
+  intro x
+  have upper : cnt d P x p high = cnt d L x p high :=
+    cnt_congr d _ _ x p _ high rfl fun i h1 h2 =>
+      (hPL i (by omega) (by omega) (Or.inr h1)).symm
+  have lower : cnt d R x low (p + 1) = cnt d L x low (p + 1) :=
+    cnt_congr d _ _ x low _ (p + 1) rfl fun i h1 h2 =>
+      hLR i (by omega) (by omega) (Or.inl h2)
+  rw [cvP x, cnt_split d _ x low p _ high rfl hp (by omega),
+    cnt_split d R x low (p + 1) _ high rfl (by omega) (by omega), cPL x, upper,
+    lower, ← cLR x, ← cnt_split d _ x low p _ high rfl hp (by omega),
+    ← cnt_split d _ x low (p + 1) _ high rfl (by omega) (by omega)]
+
+/-- An element of a range whose counts are those of another range is an
+element of that one. -/
+theorem element_of_counts {α : Type} [DecidableEq α] (d : α) (xs ys : Array α) (lo hi i : Int)
+    (counts : ∀ x, cnt d xs x lo hi = cnt d ys x lo hi)
+    (h1 : lo ≤ i) (h2 : i < hi) :
+    ∃ k : Int, lo ≤ k ∧ k < hi ∧ xs[k.toNat]?.getD d = ys[i.toNat]?.getD d := by
+  have pos := cnt_pos d ys lo i _ hi rfl h1 h2
+  rw [← counts] at pos
+  exact exists_of_cnt_pos d _ _ lo _ hi rfl pos
+
+/-- The order of a sorted range: partition, then the two recursive sorts. -/
+theorem sort_order {α : Type} [DecidableEq α] (d : α) (order : α → α → Ordering) [Std.TransCmp order]
+    (P L R : Array α) (low high p : Int) (pivot : α)
+    (hpivot : P[p.toNat]?.getD d = pivot)
+    (below : ∀ i : Int, low ≤ i → i < p → order (P[i.toNat]?.getD d) pivot = .lt)
+    (above : ∀ i : Int, p < i → i ≤ high - 1 → ¬order (P[i.toNat]?.getD d) pivot = .lt)
+    (cPL : ∀ x, cnt d P x low p = cnt d L x low p)
+    (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
+      L[i.toNat]?.getD d = P[i.toNat]?.getD d)
+    (cLR : ∀ x, cnt d L x (p + 1) high = cnt d R x (p + 1) high)
+    (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
+      R[i.toNat]?.getD d = L[i.toNat]?.getD d)
+    (sortedL : ∀ i j : Int, low ≤ i → i < j → j < p →
+      ¬order (L[i.toNat]?.getD d) (L[j.toNat]?.getD d) = .gt)
+    (sortedR : ∀ i j : Int, p + 1 ≤ i → i < j → j < high →
+      ¬order (R[i.toNat]?.getD d) (R[j.toNat]?.getD d) = .gt)
+    (sL : (L.size : Int) = P.size) (sR : (R.size : Int) = L.size) (sP : high ≤ P.size)
+    (hlow : 0 ≤ low) (hp : low ≤ p) (hp2 : p ≤ high - 1) :
+    ∀ i j : Int, low ≤ i → i < j → j < high →
+      ¬order (R[i.toNat]?.getD d) (R[j.toNat]?.getD d) = .gt := by
+  -- The lower part lies below the pivot, the pivot stays, the upper part
+  -- lies above it.
+  have lowerPart : ∀ k : Int, low ≤ k → k < p → order (R[k.toNat]?.getD d) pivot = .lt := by
+    intro k h1 h2
+    rw [hLR k (by omega) (by omega) (Or.inl (by omega))]
+    obtain ⟨k', k1, k2, k3⟩ := element_of_counts d P L low p k cPL h1 h2
+    rw [← k3]
+    exact below k' k1 k2
+  have atPivot : R[p.toNat]?.getD d = pivot := by
+    rw [hLR p (by omega) (by omega) (Or.inl (by omega)),
+      hPL p (by omega) (by omega) (Or.inr (Int.le_refl _)), hpivot]
+  have upperPart : ∀ k : Int, p + 1 ≤ k → k < high → ¬order pivot (R[k.toNat]?.getD d) = .gt := by
+    intro k h1 h2
+    obtain ⟨k', k1, k2, k3⟩ := element_of_counts d L R (p + 1) high k cLR h1 h2
+    rw [← k3, hPL k' (by omega) (by omega) (Or.inr (by omega)), Std.OrientedCmp.gt_iff_lt]
+    exact above k' (by omega) (by omega)
+  intro i j hi hij hj
+  by_cases jl : j < p
+  · rw [hLR i (by omega) (by omega) (Or.inl (by omega)),
+      hLR j (by omega) (by omega) (Or.inl (by omega))]
+    exact sortedL i j hi hij jl
+  by_cases ih : p + 1 ≤ i
+  · exact sortedR i j ih hij hj
+  have leIsLE : ∀ {a b : α}, ¬order a b = .gt → (order a b).isLE = true := by
+    intro a b h
+    cases e : order a b <;> simp_all
+  by_cases ip : i = p
+  · subst ip
+    rw [atPivot]
+    exact upperPart j (by omega) hj
+  · have below' := lowerPart i hi (by omega)
+    by_cases jp : j = p
+    · subst jp
+      rw [atPivot, below']
+      simp
+    · rw [Std.TransCmp.lt_of_lt_of_isLE below' (leIsLE (upperPart j (by omega) hj))]
+      simp
+
+end Arrays
+
 verex module 0x42::quicksort where
-  open Classical
+  open Classical Arrays
   -- ## Partition
 
   struct PartitionResult {T has Copy, Drop, Store} has Copy, Drop, Store where
@@ -79,162 +370,56 @@ verex module 0x42::quicksort where
     if hi <= lo then 0
     else count(values, needle, lo, hi - 1) + (if values[hi - 1] == needle then 1 else 0)
 
-  /-- The generated definition of `count`, at a vector of elements. -/
-  theorem count_unfold (a : Array RuntimeValue) (x : RuntimeValue) (lo hi : Int) :
-      count.spec (.vector a, x, lo, hi, ()) =
-        if hi ≤ lo then 0 else
-          count.spec (.vector a, x, lo, hi - 1, ()) +
-            if a[(hi - 1).toNat]?.getD .unit = x then 1 else 0 := by
-    rw [count.spec.unfold]
-    simp only [RuntimeValue.field, dite_eq_ite]
-    congr
-
-  /-- An update outside `[lo, hi)` leaves the count over it unchanged. -/
-  theorem count_set_outside (a : Array RuntimeValue) (x y : RuntimeValue) (i : Nat) :
-      ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k → 0 ≤ lo → ((i : Int) < lo ∨ hi ≤ i) →
-        count.spec (.vector (a.setIfInBounds i y), x, lo, hi, ()) =
-          count.spec (.vector a, x, lo, hi, ()) := by
+  /-- The generated definition of `count` counts over its vector's values. -/
+  theorem count_cnt {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
+      [Θ : VerexIR.Proofs.Denote.Skolems u]
+      (v : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier)
+      (x : (VerexIR.Proofs.Denote.NTy.param 0).carrier) :
+      ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k →
+        count.at_T0.spec u Θ (v, x, lo, hi, ()) = cnt default v.values x lo hi := by
     intro k
     induction k using Nat.strongRecOn with
     | _ k ih =>
-      intro lo hi hk hlo hout
-      rw [count_unfold (a.setIfInBounds i y), count_unfold a]
+      intro lo hi hk
+      rw [count.at_T0.spec.unfold, cnt_unfold]
       by_cases hle : hi ≤ lo
-      · rw [if_pos hle, if_pos hle]
-      · rw [if_neg hle, if_neg hle,
-          ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl hlo (by omega),
-          Array.getElem?_setIfInBounds_ne (by omega)]
+      · simp [hle]
+      · simp only [hle, if_false, dite_eq_ite]
+        rw [ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl]
+        rfl
 
-  /-- An update inside `[lo, hi)` trades the old element's count for the new one's. -/
-  theorem count_set_inside (a : Array RuntimeValue) (x y : RuntimeValue) (i : Nat)
-      (bound : i < a.size) :
-      ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k → 0 ≤ lo → lo ≤ i → (i : Int) < hi →
-        count.spec (.vector (a.setIfInBounds i y), x, lo, hi, ()) =
-          count.spec (.vector a, x, lo, hi, ()) -
-            (if a[i] = x then 1 else 0) + (if y = x then 1 else 0) := by
-    intro k
-    induction k using Nat.strongRecOn with
-    | _ k ih =>
-      intro lo hi hk hlo hlow hhigh
-      rw [count_unfold (a.setIfInBounds i y), count_unfold a]
-      have hlt : ¬hi ≤ lo := by omega
-      rw [if_neg hlt]
-      by_cases hlast : (hi - 1).toNat = i
-      · rw [count_set_outside a x y i (hi - 1 - lo).toNat lo (hi - 1) rfl hlo (by omega), hlast,
-          Array.getElem?_setIfInBounds_self, if_pos bound, Option.getD_some,
-          Array.getElem?_eq_getElem bound, Option.getD_some]
-        omega
-      · rw [ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl hlo hlow (by omega),
-          Array.getElem?_setIfInBounds_ne (fun h => hlast h.symm)]
-        omega
+  /-- The same, at any bundle: the form `simp` rewrites by. -/
+  theorem count_eq {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
+      [Θ : VerexIR.Proofs.Denote.Skolems u]
+      (bundle : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier ×
+        (VerexIR.Proofs.Denote.NTy.param 0).carrier × Int × Int × Unit) :
+      count.at_T0.spec u Θ bundle =
+        cnt default bundle.1.values bundle.2.1 bundle.2.2.1 bundle.2.2.2.1 := by
+    obtain ⟨v, x, lo, hi, ⟨⟩⟩ := bundle
+    exact count_cnt v x _ lo hi rfl
 
-  /-- Swapping two positions inside `[lo, hi)` preserves every count over it. -/
-  theorem count_swap (a : Array RuntimeValue) (x : RuntimeValue) (i j : Nat) (hi : i < a.size)
-      (hj : j < a.size) (lo high : Int) (hlo : 0 ≤ lo) (hi1 : lo ≤ i) (hi2 : (i : Int) < high)
-      (hj1 : lo ≤ j) (hj2 : (j : Int) < high) :
-      count.spec (.vector ((a.setIfInBounds i a[j]).setIfInBounds j a[i]), x, lo,
-          high, ()) =
-        count.spec (.vector a, x, lo, high, ()) := by
-    rw [count_set_inside (a.setIfInBounds i a[j]) x a[i] j (by simpa using hj) _ lo high rfl hlo hj1
-        hj2,
-      count_set_inside a x a[j] i hi _ lo high rfl hlo hi1 hi2]
-    rw [Array.getElem_setIfInBounds (by simpa using hj), ite_self]
-    omega
-
-  /-- The same, for a vector of encoded elements. -/
-  theorem count_swap_map {α : Type} (f : α → RuntimeValue) (a : Array α) (x : RuntimeValue)
-      (i j : Nat) (hi : i < a.size) (hj : j < a.size) (lo high : Int) (hlo : 0 ≤ lo)
-      (hi1 : lo ≤ i) (hi2 : (i : Int) < high) (hj1 : lo ≤ j) (hj2 : (j : Int) < high) :
-      count.spec
-          (.vector (Array.map f ((a.setIfInBounds i a[j]).setIfInBounds j a[i])), x, lo, high, ()) =
-        count.spec (.vector (Array.map f a), x, lo, high, ()) := by
-    rw [Array.map_setIfInBounds, Array.map_setIfInBounds]
-    have e1 : f a[j] = (Array.map f a)[j]'(by simpa using hj) := by simp
-    have e2 : f a[i] = (Array.map f a)[i]'(by simpa using hi) := by simp
-    rw [e1, e2]
-    exact count_swap (Array.map f a) x i j (by simpa using hi) (by simpa using hj) lo high hlo hi1 hi2
-      hj1 hj2
-
-  /-- An element found at a position is the lookup there. -/
-  theorem lookup_eq {α : Type} (f : α → RuntimeValue) (xs : Array α) (k : Int) (a : α)
-      (found : xs[k.toNat]? = some a) : f a = (Option.map f xs[k.toNat]?).getD .unit := by
-    rw [found]; rfl
-
-  /-- A lookup in a vector after swapping two of its positions. -/
-  theorem swap_lookup_found {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j : Int) (a b : α)
-      (ha : xs[i.toNat]? = some a) (hb : xs[j.toNat]? = some b) (k : Int) (hi : 0 ≤ i)
-      (hj : 0 ≤ j) (hk : 0 ≤ k) :
-      (Option.map f ((xs.setIfInBounds i.toNat b).setIfInBounds j.toNat a)[k.toNat]?).getD .unit =
-        if j = k then (Option.map f xs[i.toNat]?).getD .unit
-        else if i = k then (Option.map f xs[j.toNat]?).getD .unit
-        else (Option.map f xs[k.toNat]?).getD .unit := by
-    have ib := (Array.getElem?_eq_some_iff.mp ha).1
-    have jb := (Array.getElem?_eq_some_iff.mp hb).1
-    simp only [Array.getElem?_setIfInBounds, Array.size_setIfInBounds, ib, jb, if_true, ha, hb]
-    by_cases e1 : j = k
-    · have : j.toNat = k.toNat := by omega
-      simp [e1]
-    · have : ¬j.toNat = k.toNat := by omega
-      simp only [this, e1, if_false]
-      by_cases e2 : i = k
-      · have : i.toNat = k.toNat := by omega
-        simp [e2]
-      · have : ¬i.toNat = k.toNat := by omega
-        simp [this, e2]
-
-  /-- Lookup through the certified swap used by the denotation. -/
-  theorem swap_lookup {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j k : Int)
-      (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
-      (hi : 0 ≤ i) (hj : 0 ≤ j) (hk : 0 ≤ k) :
-      (Option.map f (xs.swapIfInBounds i.toNat j.toNat)[k.toNat]?).getD .unit =
-        if j = k then (Option.map f xs[i.toNat]?).getD .unit
-        else if i = k then (Option.map f xs[j.toNat]?).getD .unit
-        else (Option.map f xs[k.toNat]?).getD .unit := by
-    rw [Array.swapIfInBounds_def, dif_pos ib, dif_pos jb, Array.swap_def]
-    simpa only [Array.setIfInBounds, dif_pos ib, Array.size_set, dif_pos jb] using
-      (swap_lookup_found f xs i j xs[i.toNat] xs[j.toNat]
-        (Array.getElem?_eq_getElem ib) (Array.getElem?_eq_getElem jb) k hi hj hk)
-
-  /-- A certified swap inside the range preserves counts. -/
-  theorem count_swap_bounded {α : Type} (f : α → RuntimeValue) (xs : Array α) (x : RuntimeValue)
-      (i j : Int) (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
-      (lo high : Int) (hlo : 0 ≤ lo) (hi1 : lo ≤ i) (hi2 : i < high) (hj1 : lo ≤ j) (hj2 : j < high) :
-      count.spec (.vector (Array.map f (xs.swapIfInBounds i.toNat j.toNat)), x, lo, high, ()) =
-        count.spec (.vector (Array.map f xs), x, lo, high, ()) := by
-    rw [Array.swapIfInBounds_def, dif_pos ib, dif_pos jb, Array.swap_def]
-    simpa only [Array.setIfInBounds, dif_pos ib, Array.size_set, dif_pos jb] using
-      (count_swap_map f xs x i.toNat j.toNat ib jb lo high hlo (by omega) (by omega) (by omega)
-        (by omega))
-
-  verify partition by
+  verify partition by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    all_goals (try simp only [count_eq, VerexIR.Proofs.Denote.swapBounded] at *)
+    all_goals (try intros)
+    -- A count across a swap inside its range is the count before it.
+    all_goals (try (rw [cnt_swapIfInBounds] <;> first | omega | skip))
     -- A lookup in a swapped vector is a lookup in the vector.
-    all_goals (intros; try (rw [swap_lookup (ib := ?_) (jb := ?_) (hi := ?_) (hj := ?_) (hk := ?_)] <;>
-      first | assumption | omega | skip))
-    -- A lookup of an element found before is that element's lookup, and an
-    -- invariant instance closes the rest.
-    all_goals repeat' split
-    all_goals try first
-      | omega
-      | assumption
-      | verex_instance
-      | (rw [‹∀ x : (Proofs.Denote.NTy.param 0).carrier, count.spec
-            (RuntimeValue.vector (Array.map _ _), _, _, _, ()) = _›]
-         symm
-         apply count_swap_bounded <;> first | assumption | omega)
-    -- The pivot is the original vector's element at the pivot position.
-    all_goals (try rw [← lookup_eq (found := ‹original.values[_]? = some _›)])
-    all_goals (try first | assumption | verex_instance)
+    all_goals (try (rw [swap_lookup] <;> first | omega | skip))
+    all_goals (repeat' split)
+    -- The pivot is the original vector's element at its position, and the
+    -- element compared at the scan is the one found there.
+    all_goals (try rw [lookup_of_found (found := ‹original.values[_]? = some _›)])
+    all_goals (try first | rfl | omega | assumption | verex_instance)
     case ensures_3.isTrue =>
       rw [show lo.val = pivot_index.val by omega]
-      assumption
     case invariant_3_step_2.isTrue =>
       rw [show lo.val = scan.val by omega,
-        ← lookup_eq (found := ‹values.values[scan.val.toNat]? = some _›)]
+        lookup_of_found (found := ‹values.values[scan.val.toNat]? = some _›)]
       assumption
     case invariant_3_step_2.isFalse.isTrue =>
-      rw [← lookup_eq (found := ‹values.values[scan.val.toNat]? = some _›)]
+      rw [lookup_of_found (found := ‹values.values[scan.val.toNat]? = some _›)]
       assumption
 
   -- ## Sorting
@@ -258,231 +443,10 @@ verex module 0x42::quicksort where
     forall (i : Int), forall (j : Int),
       lo <= i && i < j && j < hi ==> core.prim.compare(values[i], values[j]) <= 0
 
-  /-- A count splits at any point of its range. -/
-  theorem count_split (xs : Array RuntimeValue) (x : RuntimeValue) (lo mid : Int) :
-      ∀ (k : Nat) (hi : Int), (hi - mid).toNat = k → lo ≤ mid → mid ≤ hi →
-        count.spec (.vector xs, x, lo, hi, ()) =
-          count.spec (.vector xs, x, lo, mid, ()) +
-            count.spec (.vector xs, x, mid, hi, ()) := by
-    intro k
-    induction k using Nat.strongRecOn with
-    | _ k ih =>
-      intro hi hk hlm hmh
-      by_cases same : hi = mid
-      · subst same
-        rw [count_unfold xs x hi hi, if_pos (Int.le_refl _)]
-        omega
-      · have outer : ¬hi ≤ lo := by omega
-        have inner : ¬hi ≤ mid := by omega
-        rw [count_unfold xs x lo hi, count_unfold xs x mid hi, if_neg outer, if_neg inner,
-          ih (hi - 1 - mid).toNat (by omega) (hi - 1) rfl hlm (by omega)]
-        omega
-
-  /-- Arrays agreeing on a range count alike over it. -/
-  theorem count_congr (xs ys : Array RuntimeValue) (x : RuntimeValue) (lo : Int) :
-      ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
-        (∀ i : Int, lo ≤ i → i < hi → xs[i.toNat]?.getD .unit = ys[i.toNat]?.getD .unit) →
-        count.spec (.vector xs, x, lo, hi, ()) =
-          count.spec (.vector ys, x, lo, hi, ()) := by
-    intro k
-    induction k using Nat.strongRecOn with
-    | _ k ih =>
-      intro hi hk agree
-      rw [count_unfold xs x lo hi, count_unfold ys x lo hi]
-      by_cases hle : hi ≤ lo
-      · rw [if_pos hle, if_pos hle]
-      · rw [if_neg hle, if_neg hle, ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl
-          (fun i h1 h2 => agree i h1 (by omega)), agree (hi - 1) (by omega) (by omega)]
-
-  theorem count_nonneg (xs : Array RuntimeValue) (x : RuntimeValue) (lo : Int) :
-      ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
-        0 ≤ count.spec (.vector xs, x, lo, hi, ()) := by
-    intro k
-    induction k using Nat.strongRecOn with
-    | _ k ih =>
-      intro hi hk
-      rw [count_unfold xs x lo hi]
-      by_cases hle : hi ≤ lo
-      · rw [if_pos hle]; omega
-      · rw [if_neg hle]
-        have := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl
-        split <;> omega
-
-  /-- An element of a range is counted there. -/
-  theorem count_pos (xs : Array RuntimeValue) (lo i : Int) :
-      ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k → lo ≤ i → i < hi →
-        1 ≤ count.spec (.vector xs, xs[i.toNat]?.getD .unit, lo, hi, ()) := by
-    intro k
-    induction k using Nat.strongRecOn with
-    | _ k ih =>
-      intro hi hk h1 h2
-      rw [count_unfold xs _ lo hi, if_neg (by omega)]
-      have := count_nonneg xs (xs[i.toNat]?.getD .unit) lo _ (hi - 1) rfl
-      by_cases last : hi - 1 = i
-      · subst last
-        rw [if_pos rfl]
-        omega
-      · have := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl h1 (by omega)
-        split <;> omega
-
-  /-- What is counted in a range is an element of it. -/
-  theorem exists_of_count_pos (xs : Array RuntimeValue) (x : RuntimeValue) (lo : Int) :
-      ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
-        1 ≤ count.spec (.vector xs, x, lo, hi, ()) →
-        ∃ i : Int, lo ≤ i ∧ i < hi ∧ xs[i.toNat]?.getD .unit = x := by
-    intro k
-    induction k using Nat.strongRecOn with
-    | _ k ih =>
-      intro hi hk pos
-      rw [count_unfold xs x lo hi] at pos
-      by_cases hle : hi ≤ lo
-      · rw [if_pos hle] at pos; omega
-      · rw [if_neg hle] at pos
-        by_cases hit : xs[(hi - 1).toNat]?.getD .unit = x
-        · exact ⟨hi - 1, by omega, by omega, hit⟩
-        · rw [if_neg hit] at pos
-          obtain ⟨i, h1, h2, h3⟩ := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl (by omega)
-          exact ⟨i, h1, by omega, h3⟩
-
-  /-- The frame of a sorted range: partition, then the two recursive sorts. -/
-  theorem sort_frame {α : Type} (f : α → RuntimeValue) (v P L R : Array α) (low high p : Int)
-      (hvP : ∀ i : Int, 0 ≤ i → i < v.size → i < low ∨ high ≤ i →
-        (Option.map f P[i.toNat]?).getD .unit = (Option.map f v[i.toNat]?).getD .unit)
-      (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
-        (Option.map f L[i.toNat]?).getD .unit = (Option.map f P[i.toNat]?).getD .unit)
-      (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
-        (Option.map f R[i.toNat]?).getD .unit = (Option.map f L[i.toNat]?).getD .unit)
-      (sP : (P.size : Int) = v.size) (sL : (L.size : Int) = P.size) (hp : low ≤ p)
-      (hp2 : p ≤ high - 1) :
-      ∀ i : Int, 0 ≤ i → i < v.size → i < low ∨ high ≤ i →
-        (Option.map f R[i.toNat]?).getD .unit = (Option.map f v[i.toNat]?).getD .unit := by
-    intro i h0 h1 hout
-    rw [hLR i h0 (by omega) (by omega), hPL i h0 (by omega) (by omega), hvP i h0 h1 hout]
-
-  /-- The counts of a sorted range: partition, then the two recursive sorts. -/
-  theorem sort_counts {α : Type} (f : α → RuntimeValue) (v P L R : Array α) (low high p : Int)
-      (cvP : ∀ a, count.spec (.vector (Array.map f v), f a, low, high, ()) =
-        count.spec (.vector (Array.map f P), f a, low, high, ()))
-      (cPL : ∀ a, count.spec (.vector (Array.map f P), f a, low, p, ()) =
-        count.spec (.vector (Array.map f L), f a, low, p, ()))
-      (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
-        (Option.map f L[i.toNat]?).getD .unit = (Option.map f P[i.toNat]?).getD .unit)
-      (cLR : ∀ a, count.spec (.vector (Array.map f L), f a, p + 1, high, ()) =
-        count.spec (.vector (Array.map f R), f a, p + 1, high, ()))
-      (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
-        (Option.map f R[i.toNat]?).getD .unit = (Option.map f L[i.toNat]?).getD .unit)
-      (sP : (P.size : Int) = v.size) (sL : (L.size : Int) = P.size) (hhigh : high ≤ v.size)
-      (hlow : 0 ≤ low) (hp : low ≤ p) (hp2 : p ≤ high - 1) :
-      ∀ a, count.spec (.vector (Array.map f v), f a, low, high, ()) =
-        count.spec (.vector (Array.map f R), f a, low, high, ()) := by
-    intro a
-    have cvP := cvP a
-    have cPL := cPL a
-    have cLR := cLR a
-    generalize f a = x at cvP cPL cLR ⊢
-    have upper : count.spec (.vector (Array.map f P), x, p, high, ()) =
-        count.spec (.vector (Array.map f L), x, p, high, ()) :=
-      count_congr _ _ x p _ high rfl fun i h1 h2 => by
-        simp only [Array.getElem?_map]
-        exact (hPL i (by omega) (by omega) (Or.inr h1)).symm
-    have lower : count.spec (.vector (Array.map f R), x, low, p + 1, ()) =
-        count.spec (.vector (Array.map f L), x, low, p + 1, ()) :=
-      count_congr _ _ x low _ (p + 1) rfl fun i h1 h2 => by
-        simp only [Array.getElem?_map]
-        exact hLR i (by omega) (by omega) (Or.inl h2)
-    rw [cvP, count_split _ x low p _ high rfl hp (by omega),
-      count_split (Array.map f R) x low (p + 1) _ high rfl (by omega) (by omega), cPL, upper,
-      lower, ← cLR, ← count_split _ x low p _ high rfl hp (by omega),
-      ← count_split _ x low (p + 1) _ high rfl (by omega) (by omega)]
-
-  /-- An element of a range whose counts are those of another range is an
-  element of that one. -/
-  theorem element_of_counts {α : Type} (f : α → RuntimeValue) (xs ys : Array α) (lo hi i : Int)
-      (counts : ∀ a, count.spec (.vector (Array.map f xs), f a, lo, hi, ()) =
-        count.spec (.vector (Array.map f ys), f a, lo, hi, ()))
-      (h0 : 0 ≤ lo) (h1 : lo ≤ i) (h2 : i < hi) (hsize : hi ≤ ys.size) :
-      ∃ k : Int, lo ≤ k ∧ k < hi ∧
-        (Option.map f xs[k.toNat]?).getD .unit = (Option.map f ys[i.toNat]?).getD .unit := by
-    have pos := count_pos (Array.map f ys) lo i _ hi rfl h1 h2
-    -- The element is in range, so it is a value of the element type.
-    have inRange : i.toNat < ys.size := by omega
-    have element : (Array.map f ys)[i.toNat]?.getD .unit = f ys[i.toNat] := by
-      simp [Array.getElem?_eq_getElem inRange]
-    rw [element, ← counts] at pos
-    obtain ⟨k, k1, k2, k3⟩ := exists_of_count_pos _ _ lo _ hi rfl pos
-    simp only [Array.getElem?_map] at k3
-    exact ⟨k, k1, k2, k3.trans (by simp [Array.getElem?_eq_getElem inRange])⟩
-
-  /-- The order of a sorted range: partition, then the two recursive sorts. -/
-  theorem sort_order {α : Type} (f : α → RuntimeValue) (order : RuntimeValue → RuntimeValue → Ordering) [Std.TransCmp order]
-      (P L R : Array α) (low high p : Int) (pivot : RuntimeValue)
-      (hpivot : (Option.map f P[p.toNat]?).getD .unit = pivot)
-      (below : ∀ i : Int, low ≤ i → i < p →
-        order ((Option.map f P[i.toNat]?).getD .unit) pivot = .lt)
-      (above : ∀ i : Int, p < i → i ≤ high - 1 →
-        ¬order ((Option.map f P[i.toNat]?).getD .unit) pivot = .lt)
-      (cPL : ∀ a, count.spec (.vector (Array.map f P), f a, low, p, ()) =
-        count.spec (.vector (Array.map f L), f a, low, p, ()))
-      (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
-        (Option.map f L[i.toNat]?).getD .unit = (Option.map f P[i.toNat]?).getD .unit)
-      (cLR : ∀ a, count.spec (.vector (Array.map f L), f a, p + 1, high, ()) =
-        count.spec (.vector (Array.map f R), f a, p + 1, high, ()))
-      (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
-        (Option.map f R[i.toNat]?).getD .unit = (Option.map f L[i.toNat]?).getD .unit)
-      (sortedL : ∀ i j : Int, low ≤ i → i < j → j < p →
-        ¬order ((Option.map f L[i.toNat]?).getD .unit) ((Option.map f L[j.toNat]?).getD .unit) =
-          .gt)
-      (sortedR : ∀ i j : Int, p + 1 ≤ i → i < j → j < high →
-        ¬order ((Option.map f R[i.toNat]?).getD .unit) ((Option.map f R[j.toNat]?).getD .unit) =
-          .gt)
-      (sL : (L.size : Int) = P.size) (sR : (R.size : Int) = L.size) (sP : high ≤ P.size)
-      (hlow : 0 ≤ low) (hp : low ≤ p) (hp2 : p ≤ high - 1) :
-      ∀ i j : Int, low ≤ i → i < j → j < high →
-        ¬order ((Option.map f R[i.toNat]?).getD .unit) ((Option.map f R[j.toNat]?).getD .unit) =
-          .gt := by
-    -- The lower part lies below the pivot, the pivot stays, the upper part
-    -- lies above it.
-    have lowerPart : ∀ k : Int, low ≤ k → k < p →
-        order ((Option.map f R[k.toNat]?).getD .unit) pivot = .lt := by
-      intro k h1 h2
-      rw [hLR k (by omega) (by omega) (Or.inl (by omega))]
-      obtain ⟨k', k1, k2, k3⟩ := element_of_counts f P L low p k cPL hlow h1 h2 (by omega)
-      rw [← k3]
-      exact below k' k1 k2
-    have atPivot : (Option.map f R[p.toNat]?).getD .unit = pivot := by
-      rw [hLR p (by omega) (by omega) (Or.inl (by omega)),
-        hPL p (by omega) (by omega) (Or.inr (Int.le_refl _)), hpivot]
-    have upperPart : ∀ k : Int, p + 1 ≤ k → k < high →
-        ¬order pivot ((Option.map f R[k.toNat]?).getD .unit) = .gt := by
-      intro k h1 h2
-      obtain ⟨k', k1, k2, k3⟩ := element_of_counts f L R (p + 1) high k cLR (by omega) h1 h2 (by omega)
-      rw [← k3, hPL k' (by omega) (by omega) (Or.inr (by omega)), Std.OrientedCmp.gt_iff_lt]
-      exact above k' (by omega) (by omega)
-    intro i j hi hij hj
-    by_cases jl : j < p
-    · rw [hLR i (by omega) (by omega) (Or.inl (by omega)),
-        hLR j (by omega) (by omega) (Or.inl (by omega))]
-      exact sortedL i j hi hij jl
-    by_cases ih : p + 1 ≤ i
-    · exact sortedR i j ih hij hj
-    have leIsLE : ∀ {xs ys : RuntimeValue}, ¬order xs ys = .gt → (order xs ys).isLE = true := by
-      intro xs ys h
-      cases e : order xs ys <;> simp_all
-    by_cases ip : i = p
-    · subst ip
-      rw [atPivot]
-      exact upperPart j (by omega) hj
-    · have below' := lowerPart i hi (by omega)
-      by_cases jp : j = p
-      · subst jp
-        rw [atPivot, below']
-        simp
-      · rw [Std.TransCmp.lt_of_lt_of_isLE below' (leIsLE (upperPart j (by omega) hj))]
-        simp
-
-  verify quick_sort_range by
+  verify quick_sort_range by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    all_goals (try simp only [count_eq] at *)
     case ensures_4_3 => apply sort_counts <;> assumption
     case ensures_3_3 => apply sort_frame <;> assumption
     case ensures_2_3 => apply sort_order <;> first | assumption | omega

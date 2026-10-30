@@ -18,4 +18,5 @@ import VerexSL.Quote
 import VerexSL.Contract
 import VerexSL.Verify
 import VerexSL.Proofs
+import VerexIR.Proofs.Denote.Join
 import VerexIR.Proofs.Denote.TypedMaps

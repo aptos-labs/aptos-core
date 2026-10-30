@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/folds_of.move:75:9: error: the specification clause `aborts_if spec_sum(v, v.length) > MAX_U64` is not established
 tests/sources/functional/closures/inline/folds_of.move:74:5: error: verex verification failed: the automatic verification of `sum` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of.proof.lean`:
-  verify sum by
+  verify sum by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -16,7 +16,7 @@ tests/sources/functional/closures/inline/folds_of.move:103:5: error: the loop in
             + v[_j_20]
             > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of.move:109:5: error: verex verification failed: the automatic verification of `sum_without_abilities` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of.proof.lean`:
-  verify sum_without_abilities by
+  verify sum_without_abilities by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry
@@ -29,7 +29,7 @@ tests/sources/functional/closures/inline/folds_of.move:27:13: error: the loop in
             + v[_j_4]
             > MAX_U64))` is not preserved by an iteration
 tests/sources/functional/closures/inline/folds_of.move:123:5: error: verex verification failed: the automatic verification of `accumulate_into_parameter` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of.proof.lean`:
-  verify accumulate_into_parameter by
+  verify accumulate_into_parameter by lean =>
     verex_obligations
     verex_on
     | invariant_3_step => verex_prepare; sorry
@@ -37,7 +37,7 @@ tests/sources/functional/closures/inline/folds_of.move:123:5: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/folds_of.move:181:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established
 tests/sources/functional/closures/inline/folds_of.move:179:5: error: verex verification failed: the automatic verification of `sum_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of.proof.lean`:
-  verify sum_wrong by
+  verify sum_wrong by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

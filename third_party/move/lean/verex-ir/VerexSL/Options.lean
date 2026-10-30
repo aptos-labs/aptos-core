@@ -53,6 +53,12 @@ register_option verex.relocateMessages : Bool := {
     position in the text"
 }
 
+register_option verex.jobs : Nat := {
+  defValue := 0
+  descr := "how many targets of a module are proved at once, each in a task of its own; \
+    0 for half the hardware threads"
+}
+
 register_option verex.stageLog : String := {
   defValue := ""
   descr := "path of a file the verifier appends a timestamped line to at every stage of a \

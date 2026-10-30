@@ -1,19 +1,19 @@
 VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:53:4: error: the specification clause `ensures result == bump(coin)` is not established
 VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:51:7: error: verex verification failed: the automatic verification of `use_bump_exit` failed; provide a proof in the module:
-  verify use_bump_exit by
+  verify use_bump_exit by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:67:4: error: the specification clause `aborts_if false` is not established
 VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:66:4: error: the specification clause `ensures result == host_value(coin)` is not established
+VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:67:4: error: the specification clause `aborts_if false` is not established
 VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:65:7: error: verex verification failed: the automatic verification of `use_host` failed; provide a proof in the module:
-  verify use_host by
+  verify use_host by lean =>
     verex_obligations
     verex_on
-    | aborts_if_1 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/SpecFunctionErrors.lean:75:2: error: VIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `is_empty`

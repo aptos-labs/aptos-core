@@ -727,7 +727,7 @@ inductive ReferenceOperation where
 are strong references rather than profile payload strings. -/
 inductive DataOperation where
   | select (type : QualifiedRef) (field : String)
-  /-- A ghost field's value: the contents of its slot (`designs/ghost-fields.md`). -/
+  /-- A ghost field's value: the contents of its slot (`doc/designs/ghost-fields.md`). -/
   | selectGhost (type : QualifiedRef) (field : String)
   /-- The field of whichever listed variant the operand holds, as
   `(variant, field)` pairs. -/
@@ -858,7 +858,7 @@ inductive Place where
   question about the value that happens to be at the base. -/
   | field (base : PlaceId) (owner : QualifiedRef) (field : NameId)
   /-- A ghost field's slot contents, a place of the field's type
-  (`designs/ghost-fields.md`); the owner is named as for a field. -/
+  (`doc/designs/ghost-fields.md`); the owner is named as for a field. -/
   | ghostField (base : PlaceId) (owner : QualifiedRef) (field : NameId)
   | index (base : PlaceId) (index : ExprId)
   /-- Select `from..to` when `fromEnd` is false, or
@@ -993,12 +993,26 @@ inductive ExprKind where
   | spec (block : SpecBlock)
   deriving Repr, BEq, Inhabited
 
+/-- The source construct an expression stands for, where a frontend or an
+import pass introduced it for one of another kind. Provenance only: it does
+not alter the expression's semantics. -/
+inductive ExprOrigin where
+  /-- The test of an arm of a `match` lowered to conditionals: the match's
+  location, the arm's variant (`_` for another pattern), and, where the
+  conditional's other branch is the match's last arm taken untested, that
+  arm's variant. -/
+  | matchArm (site : LocId) (variant : String) (last : Option String)
+  /-- The throw of a lowered `match` none of whose arms matches. -/
+  | matchMismatch (site : LocId)
+  deriving Repr, BEq, Inhabited
+
 /-- Located, typed expression arena node. The checker validates `typeId` and
 all child IDs before a backend can receive the enclosing `ValidatedUnit`. -/
 structure Expr where
   loc : LocId
   typeId : TypeId
   kind : ExprKind
+  origin : Option ExprOrigin := none
   deriving Repr, BEq, Inhabited
 
 /-- Binding and matching pattern language shared by declarations, `let`,
@@ -1134,7 +1148,7 @@ structure VariantDecl where
   discriminant : Option Int := none
   deriving Repr, BEq, Inhabited
 
-/-- A ghost field (`designs/ghost-fields.md`): a model-only field of every
+/-- A ghost field (`doc/designs/ghost-fields.md`): a model-only field of every
 value of its declaration, of every variant of an enum, held in a slot after
 the declared fields. Its initializer, an expression over the declaration's
 locals (a struct's fields), gives its value at a pack; without one a pack
@@ -1167,7 +1181,7 @@ structure StructDecl where
 
 /-- Whether a struct is a spec variable's memory (`pragma ghost_memory`): a
 resource only verification holds, never the runtime
-(`designs/ghost-fields.md`). -/
+(`doc/designs/ghost-fields.md`). -/
 def StructDecl.isGhostMemory (declaration : StructDecl) : Bool :=
   declaration.contract.pragmas.any fun
     | .assign "ghost_memory" (.constant (.bool true)) _ => true

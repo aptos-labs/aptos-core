@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/signed_int/negate.move:12:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/negate.move:11:5: error: verex verification failed: the automatic verification of `negate_i8_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/negate.proof.lean`:
-  verify negate_i8_incorrect by
+  verify negate_i8_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/signed_int/negate.move:11:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/negate.move:27:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/negate.move:26:5: error: verex verification failed: the automatic verification of `negate_i16_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/negate.proof.lean`:
-  verify negate_i16_incorrect by
+  verify negate_i16_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/signed_int/negate.move:26:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/negate.move:43:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/negate.move:42:5: error: verex verification failed: the automatic verification of `negate_i32_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/negate.proof.lean`:
-  verify negate_i32_incorrect by
+  verify negate_i32_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -25,7 +25,7 @@ tests/sources/functional/signed_int/negate.move:42:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/negate.move:59:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/negate.move:58:5: error: verex verification failed: the automatic verification of `negate_i64_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/negate.proof.lean`:
-  verify negate_i64_incorrect by
+  verify negate_i64_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -33,7 +33,7 @@ tests/sources/functional/signed_int/negate.move:58:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/negate.move:75:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/negate.move:74:5: error: verex verification failed: the automatic verification of `negate_i128_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/negate.proof.lean`:
-  verify negate_i128_incorrect by
+  verify negate_i128_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -41,7 +41,7 @@ tests/sources/functional/signed_int/negate.move:74:5: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/negate.move:91:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/negate.move:90:5: error: verex verification failed: the automatic verification of `negate_i256_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/negate.proof.lean`:
-  verify negate_i256_incorrect by
+  verify negate_i256_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

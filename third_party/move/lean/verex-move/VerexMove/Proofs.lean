@@ -14,7 +14,7 @@ import VerexMove.Proofs
 verex proofs for "foo.move"
 verex proofs where
 
-verify f by
+verify f by lean =>
   …
 ```
 

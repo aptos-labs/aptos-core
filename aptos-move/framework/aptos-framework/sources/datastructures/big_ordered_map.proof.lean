@@ -8,322 +8,102 @@ verex proofs where
 
 open VerexIR VerexIR.Maps VerexIR.Proofs VerexIR.Proofs.Denote
 
-verify test_verify_borrow_front_key by
-  verex_obligations
-  verex_on
-  | assert_5 =>
-    verex_prepare only
-    have read := congrArg RuntimeValue.asInt (show RuntimeValue.integer borrow_front_result_0.val = keyAt new_from_result 0 from by assumption)
-    simpa [new_from_result_eq, keyAt, entriesOf_restamp, entriesOf_build] using read
-  | assert_4 =>
-    verex_prepare only
-    rw [show RuntimeValue.integer borrow_front_result_0.val = keyAt new_from_result 0 from by assumption]
-    exact congrArg RuntimeValue.asInt (show RuntimeValue.integer borrow_front_result_1.val = valueAt new_from_result (keyAt new_from_result 0) from by assumption) |>.symm
-  | assert_2 =>
-    verex_prepare only
-    exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare only; all_goals (first | assumption | verex_residual_budgeted omega | skip))
-
-verify test_verify_borrow_back_key by
-  verex_obligations
-  verex_on
-  | assert_2 =>
-    verex_prepare only
-    exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare only; all_goals simp_all [vir_denote_norm])
-
-verify test_verify_remove by
-  verex_obligations
-  verex_on
-  | assert_2 =>
-    verex_prepare only
-    exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare only; all_goals simp_all [vir_denote_norm])
-
 -- Append the current key, then advance the iterator rank by one.
+
 verify test_verify_iter_collect_symbolic by
-  verex_obligations
-  verex_on
-  | invariant_5_step, invariant_4_step, invariant_4_step_1, invariant_4_step_2, invariant_2_step, invariant_1_step, ensures_2 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals try verex_cases iter_next_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals first
-    | omega
-    | assumption
-    | (have step := iter_next_ensures_7 (by assumption); omega)
-    | (have step := iter_next_ensures_6 (by assumption); omega)
-    | (apply iter_next_ensures_3; assumption)
-    | (apply iter_next_ensures_1; assumption)
-    | (have below := rank_lt_size (show hasKey m (.integer it_Some_2.val) = true from by assumption); omega)
-    | (apply invariant_3; omega; omega)
-    | skip
-  | invariant_1_entry, invariant_4_entry, invariant_4_entry_1, invariant_4_entry_2, invariant_5_entry =>
-    verex_prepare only
-    all_goals verex_cases internal_new_begin_iter_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals first
-    | assumption
-    | omega
-    | exact (internal_new_begin_iter_ensures_5 internal_new_begin_iter_ensures_2).symm
-    | exact internal_new_begin_iter_ensures_3 internal_new_begin_iter_ensures_2
-    | (apply internal_new_begin_iter_ensures_3; split; verex_normalize_context; omega)
-  | ensures_1 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_normalize_context
-    all_goals try omega
-  | aborts_if_1 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-    verex_prepare only
-    all_goals try verex_cases it
-    all_goals verex_normalize_context
-    all_goals try omega
-  | invariant_3_step =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_normalize_context
-    all_goals
-      have located := keyAt_rank (show hasKey m (.integer it_Some_2.val) = true from by assumption)
-      have position : (out.values.size : Int) = rank m (.integer it_Some_2.val) := by assumption
-      have read : iter_borrow_key_result.val = it_Some_2.val := by assumption
-      have upper : i ≤ (out.values.size : Int) := by omega
-      rcases Decidable.em (i = out.values.size) with last | last
-      all_goals first
-      | (subst i
-         simp only [Int.toNat_natCast, Array.getElem?_push_size, Option.getD_some]
-         rw [position]
-         simpa only [asInt_integer, read] using congrArg RuntimeValue.asInt located.symm)
-      | (simpa only [Array.getElem?_push, if_neg (show i.toNat ≠ out.values.size by omega)] using
-          invariant_3 i (by omega) (by omega))
-  | _ => try verex_decide
+  on invariant 2 step {
+    split it
+    apply lemma_rank_lt_len(m, it.key)
+  }
+  on invariant 4 step, invariant 5 step {
+    split it
+  }
+  on invariant 3 step {
+    split it
+    assert len(out) == spec_rank(m, it.key)
+    apply lemma_key_at_rank(m, it.key)
+    split i == len(out)
+    lean =>
+      first
+      | (rw [Array.getElem?_push, if_pos (by omega), Option.getD_some])
+      | (rw [Array.getElem?_push, if_neg (by omega)])
+  }
+  on invariant 1 step {
+    split iter_next_result
+    split internal_new_begin_iter_result
+  }
+  on requires 1 of iter_next {
+    split it
+    split internal_new_begin_iter_result
+  }
+  on invariant 1 entry {
+    split internal_new_begin_iter_result
+  }
+  on invariant 2 entry, invariant 3 entry, invariant 4 entry, invariant 5 entry, ensures 1, ensures 2, aborts_if 1,
+    requires of internal_new_begin_iter { }
 
 verify test_aborts_if_new_from_1 by
-  verex_obligations
-  all_goals verex_decide
+  on _ { }
 
 verify test_aborts_if_remove by
-  verex_obligations
-  all_goals try verex_decide
-  all_goals verex_prepare only
-  all_goals simp_all only [vir_denote_norm]
+  on _ { }
 
 verify test_aborts_if_new_from_2 by
-  verex_obligations
-  all_goals verex_prepare only
-  all_goals have duplicateLaw := integer_duplicate_indices 64 false keys
-  all_goals simp only [asInt_getD_map_specInt 64 false (by decide)] at duplicateLaw
-  all_goals simp only [Maps.AbortsNewFrom, Maps.elementsOf,
-    Array.toList_map, List.length_map, Array.length_toList] at *
-  all_goals grind only
+  on _ { }
 
 verify test_verify_prev_key by
-  verex_obligations
-  verex_group predecessor := assert_2, assert_3, assert_4, assert_5, assert_6
-  all_goals verex_prepare values
-  all_goals try verex_cases prev_key_result
-  all_goals try verex_cases old_prev_key_result
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_lift_maps
-  all_goals simp_all [SpecMap.nextKey?, SpecMap.prevKey?, SpecMap.intOrder,
-    SpecMap.hasKey, SpecMap.containsB, SpecMap.keyAt, SpecMap.rank, SpecMap.indexOf,
-    variantName, variantPayload, variantCarrier.ofSkolem, HList.ofSkolem, NTy.ofSkolem,
-    NTy.encode_enum_payload, compare, compareOfLessAndEq, vir_denote_norm]
+  on assert 1 {
+    assert is_none(prev_key_result) by eval
+  }
+  on assert 3 {
+    assert spec_contains_key(new_from_result, 1) by eval
+  }
+  on assert 5 {
+    assert spec_contains_key(new_from_result, 2) by eval
+  }
+  on assert 6 {
+    assert is_some(prev_key_result) by eval
+  }
+  on data invariant, requires of remove at call 1, requires of prev_key at call 1, requires of prev_key at call 2 { }
 
 verify test_verify_next_key by
-  verex_obligations
-  verex_group successor := assert_2, assert_3, assert_4, assert_5, assert_6, assert_7
-  all_goals verex_prepare values
-  all_goals try verex_cases next_key_result
-  all_goals try verex_cases old_next_key_result
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_lift_maps
-  all_goals simp_all [SpecMap.nextKey?, SpecMap.prevKey?, SpecMap.intOrder,
-    SpecMap.hasKey, SpecMap.containsB, SpecMap.keyAt, SpecMap.rank, SpecMap.indexOf,
-    variantName, variantPayload, variantCarrier.ofSkolem, HList.ofSkolem, NTy.ofSkolem,
-    NTy.encode_enum_payload, compare, compareOfLessAndEq, vir_denote_norm]
-
-verify test_verify_enumeration_view by
-  verex_obligations
-  verex_group initial := assert_1, assert_2, assert_3, assert_7, assert_8, assert_9, assert_10
-  verex_group observations := assert_11, assert_12, assert_13
-  all_goals verex_prepare only
-  all_goals first
-    | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | simp_all [vir_denote_norm, Maps.Valid, Maps.Ascending,
-        compare, compareOfLessAndEq]
-  all_goals verex_canonical_families
-  all_goals simp_all [vir_denote_norm]
-
-verify test_verify_pop_rank by
-  verex_obligations
-  verex_group initial := assert_1, assert_2, assert_3, assert_7, assert_8, assert_9, assert_10
-  verex_group front := assert_11, assert_12, assert_13, assert_14, assert_15, assert_16, assert_17
-  verex_group back := assert_18, assert_19, assert_20, assert_21, assert_22
-  all_goals verex_prepare only
-  all_goals first
-    | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | (try simp_all [vir_denote_norm, Maps.Valid, Maps.Ascending,
-        compare, compareOfLessAndEq])
-  all_goals verex_canonical_families
-  all_goals try simp_all [vir_denote_norm]
-  all_goals simp [Maps.rank, Maps.remove, Maps.ordDel, Maps.indexOf]
+  on assert 1 {
+    assert is_none(next_key_result) by eval
+  }
+  on assert 3 {
+    assert spec_contains_key(new_from_result, 1) by eval
+  }
+  on assert 5 {
+    assert spec_contains_key(new_from_result, 2) by eval
+  }
+  on assert 6, assert 7 {
+    assert is_some(next_key_result) by eval
+    assert 2 == std::option::borrow(next_key_result) by eval
+    split next_key_result
+  }
+  on data invariant, requires of remove at call 1, requires of next_key at call 1, requires of next_key at call 2 { }
 
 verify test_verify_iter_rank_loop by
-  verex_obligations
-  -- The loop invariants describe the current iterator; discard the initial facts.
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step,
-    invariant_5_step, ensures_1, ensures_2, assert_1, assert_2, aborts_if_1 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-  | _ => skip
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step =>
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_cases iter_next_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals first
-    | assumption
-    | omega
-    | (have step := iter_next_ensures_7 (by assumption); omega)
-    | (have step := iter_next_ensures_6 (by assumption); omega)
-    | (apply iter_next_ensures_3; assumption)
-    | (apply iter_next_ensures_1; assumption)
-    | skip
-  | invariant_1_entry, invariant_2_entry, invariant_3_entry =>
-    verex_prepare only
-    all_goals verex_cases internal_new_begin_iter_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals first
-    | assumption
-    | omega
-    | (apply internal_new_begin_iter_ensures_3; rfl)
-    | (have first := internal_new_begin_iter_ensures_5 (by rfl); omega)
-    | skip
-  | assert_1, assert_2 =>
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_normalize_context
-    all_goals first
-    | omega
-    | (simp_all only [vir_denote_norm]; omega)
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare only
-       all_goals first | assumption | omega | simp_all only [vir_denote_norm])
+  on invariant 2 step, invariant 3 step {
+    assert spec_contains_key(map, it.key)
+  }
+  on assert 2 {
+    assert spec_len(map) == 3 by eval
+  }
+  on invariant 1 step {
+    split iter_next_result
+    split internal_new_begin_iter_result
+  }
+  on requires 1 of iter_next {
+    split it
+    split internal_new_begin_iter_result
+  }
+  on invariant 1 entry {
+    split internal_new_begin_iter_result
+  }
+  on invariant 2 entry, invariant 3 entry, assert 1, data invariant, requires of internal_new_begin_iter { }
 
-verify test_verify_iter_sum_symbolic by
-  verex_obligations
-  -- The loop invariants describe the current iterator; discard the initial facts.
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step,
-    invariant_5_step, ensures_1, ensures_2, assert_1, assert_2, aborts_if_1 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-  | _ => skip
-  verex_group_contexts
-  all_goals verex_prepare only
-  all_goals first | verex_cases it | verex_cases internal_new_begin_iter_result | verex_cases internal_new_end_iter_result | skip
-  all_goals try verex_cases iter_next_result
-  all_goals try verex_cases iter_prev_result
-  all_goals verex_normalize_context
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals repeat' apply And.intro
-  all_goals verex_intro_any
-  all_goals first
-  | assumption
-  | omega
-  | (have step := iter_next_ensures_7 (by assumption); omega)
-  | (have step := iter_next_ensures_6 (by assumption); omega)
-  | (apply iter_next_ensures_3; assumption)
-  | (apply iter_prev_ensures_3; assumption)
-  | (apply iter_next_ensures_1; assumption)
-  | (apply iter_prev_ensures_1; assumption)
-  | (have step := iter_prev_ensures_7 (by assumption); omega)
-  | (have step := iter_prev_ensures_6 (by assumption); omega)
-  | (try simp_all only [vir_denote_norm])
-  all_goals first
-  | (rw [spec_test_sum_upto.spec.unfold]; simp; done)
-  | (have low := rank_nonneg m (.integer it_Some_2.val)
-     have located := keyAt_rank invariant_2_1
-     have read := congrArg RuntimeValue.asInt iter_borrow_ensures_1
-     conv => rhs; rw [spec_test_sum_upto.spec.unfold]
-     dsimp only
-     split
-     all_goals first
-     | omega
-     | (try rw [← iter_next_ensures_7]
-        simp only [Int.add_sub_cancel, located, asInt_integer]
-        have value_eq : iter_borrow_result.val = (valueAt m (.integer it_Some_2.val)).asInt := by
-          simpa only [asInt_integer, asInt_eraseGhosts] using read
-        rw [value_eq]))
-
-verify test_verify_iter_prev_loop_symbolic by
+verify test_verify_iter_prev_loop_symbolic by lean =>
   verex_obligations preparing
     verex_prepare values
     all_goals first | verex_cases it | verex_cases internal_new_begin_iter_result | verex_cases internal_new_end_iter_result | skip
@@ -333,7 +113,7 @@ verify test_verify_iter_prev_loop_symbolic by
     all_goals verex_canonical_families
     all_goals verex_normalize_context
     all_goals verex_type_bounds
-    all_goals verex_lift_maps
+    all_goals verex_name_maps
   all_goals verex_paths
   all_goals repeat' apply And.intro
   all_goals verex_intro_any
@@ -355,24 +135,24 @@ verify test_verify_iter_prev_loop_symbolic by
     omega
 
 verify test_verify_insert_shift_symbolic by
-  verex_obligations
-  verex_on
-  | ensures_1, ensures_2, ensures_3, ensures_4, ensures_5 =>
-    verex_prepare typed
-    have missing : SpecMap.hasKey m k.val = false := by assumption
-    have valid : SpecMap.Valid (.ordered SpecMap.intOrder) m := by assumption
-    have equal : value = SpecMap.update (.ordered SpecMap.intOrder) m k.val v.val :=
-      (show SpecMap.hasKey m k.val = false → _ from by assumption) missing
-    simp only [equal] at *
-    solve
-    | simp only [SpecMap.hasKey_update, decide_true, Bool.true_or]
-    | simp only [SpecMap.size_update valid, missing, Bool.false_eq_true, if_false]
-    | rw [SpecMap.valueAt_update, if_pos rfl]
-    | exact SpecMap.keyAt_update_before _ _ _ _ _ missing (by omega) (by omega)
-    | exact SpecMap.keyAt_update_after _ _ _ _ _ missing (by omega)
-  | _ => first | verex_decide | (verex_prepare only; all_goals first | assumption | verex_decide | grind only)
+  on ensures 1 {
+    apply lemma_contains_key_set(m, k, v, k)
+  }
+  on ensures 2 {
+    apply lemma_len_set(m, k, v)
+  }
+  on ensures 3 {
+    apply lemma_get_set(m, k, v, k)
+  }
+  on ensures 4 {
+    apply lemma_key_at_set_before(m, k, v, i)
+  }
+  on ensures 5 {
+    apply lemma_key_at_set_after(m, k, v, i)
+  }
+  on _ { }
 
-verify test_verify_keys_for_loop_symbolic by
+verify test_verify_keys_for_loop_symbolic by lean =>
   verex_obligations
   verex_on
   | invariant_3_entry =>
@@ -381,651 +161,555 @@ verify test_verify_keys_for_loop_symbolic by
     simp
   | invariant_1_entry =>
     verex_prepare typed
-    have keys : keys_result.values.toList.map SpecInt.val = m.map Prod.fst := by assumption
-    simpa only [List.length_map, Array.length_toList] using SpecMap.size_of_keys keys
+    rfl
   | ensures_1 =>
-    verex_prepare only
-    have last : i.val = size m := by omega
+    verex_prepare typed
+    have last : i.val = SpecMap.size m := by omega
     simpa only [last] using invariant_3
   | invariant_3_step =>
-    verex_prepare values
+    verex_prepare typed
     conv => rhs; rw [spec_test_sum_upto.spec.unfold]
     dsimp only
+    try verex_name_maps
     rw [dif_neg (by omega)]
-    verex_lift_maps
-    obtain ⟨entry, readSlot, readValue⟩ : ∃ entry : SpecInt (.bits 64) false,
-        keys_result.values[i.val.toNat]? = some entry ∧
-          SpecMap.valueAt m entry.val = borrow_result.val := ⟨_, by assumption, consumed⟩
-    have keys : keys_result.values.toList.map SpecInt.val = m.map Prod.fst := by assumption
-    have located := SpecMap.keyAt_of_keys keys i.val (by omega)
-    simp only [List.getElem?_map, Array.getElem?_toList, readSlot,
-      Option.map_some, Option.getD_some] at located
-    simpa only [Int.add_sub_cancel, ← invariant_3, located, readValue]
+    simp only [Int.add_sub_cancel] at *
+    first | (simp only [*]; done) | omega
   | _ => first | verex_decide | (verex_prepare only; all_goals first | assumption | omega)
 
 verify test_verify_iter_valid_after_insert_symbolic by
-  verex_obligations
-  verex_on
-  | assert_1, assert_2, assert_3 =>
-    verex_prepare only
-    all_goals
-      have missing : hasKey m (.integer k.val) = false := by assumption
-      have length : size value = size m + 1 := by
-        rw [value_eq, size_restamp, size_update _ m_valid, if_neg (by simp only [missing, Bool.false_eq_true, not_false_eq_true])]
-      verex_cases internal_new_begin_iter_result
-      all_goals first
-      | omega
-      | (simp only [vir_denote_norm] at *
-         all_goals verex_canonical_families
-         all_goals simp only [vir_denote_norm] at *
-         all_goals first | assumption | omega)
-  | ensures_1, ensures_2 =>
-    verex_prepare only
-    all_goals
-      have missing : hasKey m (.integer k.val) = false := by assumption
-      rw [value_eq]
-      solve
-      | simp only [hasKey_restamp, hasKey_update, decide_true, Bool.true_or]
-      | simp only [size_restamp, size_update _ m_valid, missing, Bool.false_eq_true, if_false]
-  | _ => first | verex_decide | (verex_prepare only; all_goals first | assumption | omega | grind only)
+  on assert 1, assert 2, assert 3 {
+    apply lemma_len_set(m, k, v)
+    split internal_new_begin_iter_result
+  }
+  on ensures 1 {
+    apply lemma_contains_key_set(m, k, v, k)
+  }
+  on ensures 2 {
+    apply lemma_len_set(m, k, v)
+  }
+  on _ { }
 
 verify test_verify_keys_sorted by
-  verex_obligations
-  verex_group observations := assert_1, assert_2, assert_3, assert_4, assert_5, assert_6
-  all_goals verex_prepare typed
-  all_goals try verex_decide
-  all_goals
-    have keys : keys_result.values.toList.map SpecInt.val = new_from_result.map Prod.fst := by assumption
-    have length := SpecMap.size_of_keys keys
-    have first := SpecMap.keyAt_of_keys keys 0 (by decide)
-    have second := SpecMap.keyAt_of_keys keys 1 (by decide)
-    have third := SpecMap.keyAt_of_keys keys 2 (by decide)
-    simp [new_from_result_eq, SpecMap.keyAt, SpecMap.size] at length first second third
-    try simp only [List.getElem?_map, Array.getElem?_toList] at first second third
-    simp only [List.getElem?_map, Array.getElem?_toList,
-      Option.getD_map SpecInt.val (⟨0, by decide⟩ : SpecInt (.bits 64) false)] at first second third
-    simp [length, ← first, ← second, ← third, new_from_result_eq, SpecMap.hasKey, SpecMap.containsB]
+  on assert 1 {
+    assert len(keys_result) == 3 by eval
+  }
+  on assert 2 {
+    assert keys_result[0] < keys_result[1] by eval
+  }
+  on assert 3 {
+    assert keys_result[1] < keys_result[2] by eval
+  }
+  on assert 4, assert 5, assert 6 {
+    lean => (try subst new_from_result_eq); (try simp only [vir_denote_norm, vir_denote_eval] at *); (try subst_vars); all_goals first | decide | (simp only [vir_denote_norm, vir_denote_eval]; done)
+  }
+  on data invariant, requires of remove at call 1, requires of keys at call 1 { }
 
 verify test_verify_iter_across_upsert by
-  verex_obligations
-  all_goals verex_prepare only
-  all_goals try
-    have present : hasKey new_from_result (.integer 2) = true := by
-      simp [new_from_result_eq, hasKey, containsB]
-    obtain ⟨_, changed⟩ := (show _ ∨ _ from by assumption).resolve_right
-      (by rintro ⟨missing, _⟩; simp only [present, Bool.true_eq_false] at missing)
-    subst value
-  all_goals try verex_cases internal_find_result
-  all_goals try verex_cases upsert_result
-  all_goals verex_normalize_context
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals try simp_all only [new_from_result_eq, vir_denote_norm, asInt_eraseGhosts]
-  all_goals try omega
+  on assert 1 {
+    assert spec_contains_key(new_from_result, 2) by eval
+    split upsert_result
+  }
+  on assert 2 {
+    split internal_find_result
+    split upsert_result
+    assert spec_iter_valid(internal_find_result, map') by solve
+  }
+  on requires 1 of iter_borrow at call 1 {
+    assert spec_contains_key(new_from_result, 2) by eval
+    split internal_find_result
+    split upsert_result
+  }
+  on assert 3 {
+    assert spec_contains_key(new_from_result, 1) by eval
+    assert spec_contains_key(new_from_result, 2) by eval
+    assert spec_get(new_from_result, 1) == 10 by eval
+    apply lemma_get_set(new_from_result, 2, 21, 1)
+    split internal_find_result
+    split upsert_result
+    assert iter_borrow_result == 10 by congr
+  }
+  on data invariant, requires of upsert at call 1, requires of internal_find at call 1 { }
 
 verify test_verify_iter_remove_shift_symbolic by
-  verex_obligations
-  all_goals verex_prepare values
-  all_goals try verex_cases internal_find_with_path_result_0
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_lift_maps
-  all_goals try simp_all only [vir_denote_norm]
-  all_goals first
-  | assumption
-  | omega
-  | exact iter_remove_ensures_1
-  | (exact iter_remove_ensures_5 i (by omega) (by omega))
-  | (exact iter_remove_ensures_6 i (by omega) (by omega))
-  | (exact iter_remove_ensures_4_1 ⟨other, by constructor <;> omega⟩ (by assumption))
-  | (have read := iter_remove_ensures_4_2 k ⟨other, by constructor <;> omega⟩ (by assumption) (by assumption)
-      exact read)
-  | skip
+  on ensures 1, ensures 2, ensures 4, ensures 5 {
+    assert internal_find_with_path_result.iterator.key == k
+  }
+  on aborts_if 1, requires 1 of iter_remove at call 1 {
+    split internal_find_with_path_result.iterator
+  }
+  on _ { }
 
 verify test_verify_iter_remove_symbolic by
-  verex_obligations
-  all_goals verex_prepare values
-  all_goals try verex_cases internal_find_with_path_result_0
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_lift_maps
-  all_goals try simp_all only [vir_denote_norm]
-  all_goals first
-  | assumption
-  | omega
-  | exact iter_remove_ensures_1
-  | (exact iter_remove_ensures_5 i (by omega) (by omega))
-  | (exact iter_remove_ensures_6 i (by omega) (by omega))
-  | (exact iter_remove_ensures_4_1 ⟨other, by simp only [IntegerValueFits_unsigned_succ]; omega⟩ (by assumption))
-  | (have read := iter_remove_ensures_4_2 k ⟨other, by simp only [IntegerValueFits_unsigned_succ]; omega⟩ (by assumption) (by assumption)
-      exact read)
-  | skip
-  all_goals
-    let otherValue : SpecInt (.bits 64) false := ⟨other, by simp only [IntegerValueFits_unsigned_succ]; omega⟩
-    have read := iter_remove_ensures_4_2 k otherValue (by simpa only [otherValue] using (show other ≠ k.val from by assumption)) (by simpa only [otherValue] using (show SpecMap.hasKey m other = true from by assumption))
-    exact read
+  on ensures 3, ensures 4, ensures 5 {
+    assert internal_find_with_path_result.iterator.key == k
+  }
+  on ensures 2 { }
+  on aborts_if 1, requires 1 of iter_remove at call 1 { }
 
-verify test_verify_lower_bound_scan_start_symbolic by
+verify test_verify_lower_bound_scan_start_symbolic by lean =>
   verex_obligations
-  all_goals try verex_decide
-  all_goals verex_prepare only
-  all_goals try verex_split_variants
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals first
-  | (constructor
-     all_goals intro present
-     all_goals have impossible := internal_lower_bound_ensures_2 k present
-     all_goals omega)
-  | (intro present
-     have least := internal_lower_bound_ensures_5 k present (by omega)
-     omega)
-  | (have bound := rank_lt_size internal_lower_bound_ensures_3
-     obtain ⟨key, encoded⟩ := encoded_keyAt m_keys_encoded (index := i) (by omega) (by omega)
-     have present : hasKey m (.integer key.val) = true := by
-       rw [show RuntimeValue.integer key.val = keyAt m i from encoded]
-       exact hasKey_keyAt (by omega) (by omega)
-     have ordered := order_keyAt_lt permitted (show 0 ≤ i from by omega)
-       (show i < rank m (.integer x_Some_2.val) from by omega) bound
-     rw [keyAt_rank internal_lower_bound_ensures_3, ← encoded, NTy.encode_int,
-       RuntimeValue.order_integer] at ordered
-     have earlier := Int.compare_eq_lt.mp ordered
-     have keyRead := congrArg RuntimeValue.asInt encoded
-     simp only [NTy.encode_int, asInt_integer] at keyRead
-     apply Classical.byContradiction
-     intro wrong
-     have least := internal_lower_bound_ensures_5 key present (by omega)
-     omega)
+  verex_on
+  | ensures_1, ensures_2 =>
+    verex_prepare typed
+    all_goals try verex_split_variants
+    all_goals simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at *
+    all_goals first
+    | omega
+    | (constructor
+       all_goals intro present
+       all_goals have impossible := internal_lower_bound_ensures_2 k.val (by omega) (by omega) present
+       all_goals omega)
+    | (intro present
+       have least := internal_lower_bound_ensures_5 k.val (by omega) (by omega) present (by omega)
+       omega)
+    | skip
+    all_goals
+      have bound := SpecMap.rank_lt_size internal_lower_bound_ensures_3
+      have valid : SpecMap.Valid (.ordered SpecMap.intOrder) m := by assumption
+      have present : SpecMap.hasKey m (SpecMap.keyAt m i) = true :=
+        SpecMap.hasKey_keyAt (by omega) (by omega)
+      have ordered := SpecMap.keyAt_lt_of_lt valid i (SpecMap.rank m x_Some_2.val)
+        (by omega) (by omega) bound
+      rw [SpecMap.keyAt_rank internal_lower_bound_ensures_3] at ordered
+      apply Classical.byContradiction
+      intro wrong
+      have least := internal_lower_bound_ensures_5 (SpecMap.keyAt m i) (by omega) (by omega) present
+        (show k.val ≤ SpecMap.keyAt m i by omega)
+      omega
+  | _ => first | verex_decide | (verex_prepare typed; all_goals first | verex_decide)
 
-verify test_verify_bounded_walk_symbolic by
-  verex_obligations
-  -- The loop invariants describe the current iterator; discard the initial facts.
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step,
-    invariant_5_step, ensures_1, ensures_2, assert_1, assert_2, aborts_if_1 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_new_begin_iter_ensures_1
-    all_goals try clear internal_new_begin_iter_ensures_2
-    all_goals try clear internal_new_begin_iter_ensures_3
-    all_goals try clear internal_new_begin_iter_ensures_4
-    all_goals try clear internal_new_begin_iter_ensures_5
-  | _ => skip
-  verex_on
-  | invariant_5_step, invariant_4_step, invariant_4_step_1, invariant_4_step_2, invariant_2_step, invariant_1_step, ensures_2 =>
+verify test_verify_bounded_walk_symbolic by lean =>
+  verex_obligations preparing
     verex_prepare only
-    all_goals verex_cases it
+    all_goals first
+    | (verex_cases it
+       all_goals try clear internal_new_begin_iter_ensures_1
+       all_goals try clear internal_new_begin_iter_ensures_2
+       all_goals try clear internal_new_begin_iter_ensures_3
+       all_goals try clear internal_new_begin_iter_ensures_4
+       all_goals try clear internal_new_begin_iter_ensures_5)
+    | verex_cases internal_new_begin_iter_result
     all_goals try verex_cases iter_next_result
     all_goals verex_normalize_context
     all_goals verex_canonical_families
     all_goals verex_normalize_context
+    all_goals verex_type_bounds
+  all_goals verex_paths
+  all_goals verex_intro_any
+  all_goals verex_normalize_context
+  all_goals verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals verex_reduce_projections
+  all_goals verex_finish_prepare
+  all_goals try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at *
+  verex_on
+  | invariant_5_step, invariant_4_step, invariant_4_step_1, invariant_4_step_2, invariant_2_step, invariant_1_step, ensures_2 =>
     all_goals first
     | omega
-    | assumption
-    | (have step := iter_next_ensures_7 (by assumption); omega)
-    | (have step := iter_next_ensures_6 (by assumption); omega)
-    | (apply iter_next_ensures_3; assumption)
-    | (apply iter_next_ensures_1; assumption)
-    | (have below := rank_lt_size (show hasKey m (.integer it_Some_2.val) = true from by assumption); omega)
+    | verex_assumption
+    | (have step := iter_next_ensures_7 (by verex_assumption); omega)
+    | (have step := iter_next_ensures_6 (by verex_assumption); omega)
+    | (apply iter_next_ensures_3; verex_assumption)
+    | (apply iter_next_ensures_1; verex_assumption)
+    | (have below := SpecMap.rank_lt_size (show SpecMap.hasKey m it_Some_2.val = true from by verex_assumption); omega)
     | (apply invariant_3; omega; omega)
-    | skip
   | invariant_1_entry, invariant_4_entry, invariant_4_entry_1, invariant_4_entry_2, invariant_5_entry =>
-    verex_prepare only
-    all_goals verex_cases internal_new_begin_iter_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
     all_goals first
-    | assumption
+    | verex_assumption
     | omega
     | exact (internal_new_begin_iter_ensures_5 internal_new_begin_iter_ensures_2).symm
     | exact internal_new_begin_iter_ensures_3 internal_new_begin_iter_ensures_2
     | (apply internal_new_begin_iter_ensures_3; split; verex_normalize_context; omega)
   | ensures_1 =>
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_normalize_context
     all_goals try omega
   | aborts_if_1 =>
-    verex_prepare only
-    all_goals try verex_cases it
-    all_goals verex_normalize_context
     all_goals try omega
   | invariant_3_step =>
-    verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_normalize_context
     all_goals
-      have located := keyAt_rank (show hasKey m (.integer it_Some_2.val) = true from by assumption)
-      have position : (out.values.size : Int) = rank m (.integer it_Some_2.val) := by omega
-      have read : iter_borrow_key_result.val = it_Some_2.val := by assumption
+      have located := SpecMap.keyAt_rank (show SpecMap.hasKey m it_Some_2.val = true from by verex_assumption)
+      have position : (out.values.size : Int) = SpecMap.rank m it_Some_2.val := by
+        first | verex_assumption | (symm; verex_assumption) | omega
+      have read : iter_borrow_key_result.val = it_Some_2.val := by verex_assumption
       have upper : i ≤ (out.values.size : Int) := by omega
       rcases Decidable.em (i = out.values.size) with last | last
       all_goals first
       | (subst i
          simp only [Int.toNat_natCast, Array.getElem?_push_size, Option.getD_some]
-         rw [position]
-         simpa only [asInt_integer, read] using congrArg RuntimeValue.asInt located.symm)
+         rw [position, located, read])
       | (simpa only [Array.getElem?_push, if_neg (show i.toNat ≠ out.values.size by omega)] using
           invariant_3 i (by omega) (by omega))
   | _ => try verex_decide
 
-verify test_verify_find_started_walk_symbolic by
-  verex_obligations
-  -- The loop invariants describe the current iterator; discard the initial facts.
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step,
-    invariant_5_step, ensures_1, ensures_2, assert_1, assert_2, aborts_if_1 =>
-    verex_paths
-    all_goals verex_split_hypotheses
-    all_goals try clear internal_find_ensures_1
-    all_goals try clear internal_find_ensures_2
-    all_goals try clear internal_find_ensures_3
-    all_goals try clear internal_find_ensures_4
-    all_goals try clear internal_find_ensures_5
-  | _ => skip
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step =>
+verify test_verify_find_started_walk_symbolic by lean =>
+  verex_obligations preparing
     verex_prepare only
-    all_goals verex_cases it
-    all_goals verex_cases iter_next_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
     all_goals first
-    | assumption
-    | omega
-    | (have step := iter_next_ensures_7 (by assumption); omega)
-    | (have step := iter_next_ensures_6 (by assumption); omega)
-    | (apply iter_next_ensures_3; assumption)
-    | (apply iter_next_ensures_1; assumption)
-    | (have bound := rank_lt_size (show hasKey m (.integer it_Some_2.val) = true from by assumption); omega)
-    | (constructor <;> first | assumption | omega | (have step := iter_next_ensures_6 (by assumption); omega))
-    | skip
-  | invariant_1_entry, invariant_2_entry, invariant_3_entry, invariant_4_entry =>
-    verex_prepare only
-    all_goals verex_cases internal_find_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals first
-    | assumption
-    | omega
-    | (solve | rw [internal_find_ensures_3])
-    | (rw [internal_find_ensures_3]; assumption)
-    | (have present : hasKey m (.integer k.val) = true := by assumption
-       exact False.elim (Bool.false_ne_true (internal_find_ensures_2.symm.trans present)))
-    | (have bound := rank_lt_size (show hasKey m (.integer k.val) = true from by assumption); omega)
-    | skip
-  | ensures_1, aborts_if_1 =>
-    verex_prepare only
-    all_goals try verex_cases it
-    all_goals verex_normalize_context
-    all_goals first
-    | omega
-    | (have bound := rank_lt_size (show hasKey m (.integer it_Some_2.val) = true from by assumption)
-       have low := rank_nonneg m (.integer k.val)
-       omega)
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare only; all_goals first | assumption | omega)
-
-verify test_verify_early_exit_walk_symbolic by
-  verex_obligations
-  verex_on
-  | invariant_4_entry, invariant_3_entry, invariant_1_entry =>
-    verex_prepare only
-    all_goals verex_cases internal_new_begin_iter_result
-    all_goals verex_normalize_context
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals first | assumption | omega
-  | invariant_4_step, invariant_3_step, invariant_2_step, invariant_1_step =>
-    verex_prepare only
-    all_goals clear internal_new_begin_iter_ensures_1 internal_new_begin_iter_ensures_2 internal_new_begin_iter_ensures_3 internal_new_begin_iter_ensures_4 internal_new_begin_iter_ensures_5
-    all_goals verex_cases it
+    | (verex_cases it
+       all_goals try clear internal_find_ensures_1
+       all_goals try clear internal_find_ensures_2
+       all_goals try clear internal_find_ensures_3
+       all_goals try clear internal_find_ensures_4
+       all_goals try clear internal_find_ensures_5)
+    | verex_cases internal_find_result
     all_goals try verex_cases iter_next_result
     all_goals verex_normalize_context
     all_goals verex_canonical_families
     all_goals verex_normalize_context
+    all_goals verex_type_bounds
+  all_goals verex_paths
+  all_goals verex_intro_any
+  all_goals verex_normalize_context
+  all_goals verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals verex_reduce_projections
+  all_goals verex_finish_prepare
+  all_goals try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at *
+  verex_on
+  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step =>
+    all_goals first
+    | verex_assumption
+    | omega
+    | (have step := iter_next_ensures_7 (by verex_assumption); omega)
+    | (have step := iter_next_ensures_6 (by verex_assumption); omega)
+    | (apply iter_next_ensures_3; verex_assumption)
+    | (apply iter_next_ensures_1; verex_assumption)
+    | (have bound := SpecMap.rank_lt_size (show SpecMap.hasKey m it_Some_2.val = true from by verex_assumption); omega)
+    | (constructor <;> first | verex_assumption | omega | (have step := iter_next_ensures_6 (by verex_assumption); omega))
+  | invariant_1_entry, invariant_2_entry, invariant_3_entry, invariant_4_entry =>
+    all_goals first
+    | verex_assumption
+    | omega
+    | (solve | rw [internal_find_ensures_3])
+    | (rw [internal_find_ensures_3]; verex_assumption)
+    | (have present : SpecMap.hasKey m k.val = true := by verex_assumption
+       exact False.elim (Bool.false_ne_true (internal_find_ensures_2.symm.trans present)))
+    | (have bound := SpecMap.rank_lt_size (show SpecMap.hasKey m k.val = true from by verex_assumption); omega)
+  | ensures_1, aborts_if_1 =>
     all_goals first
     | omega
-    | assumption
-    | (have step := iter_next_ensures_7 (by assumption); omega)
-    | (have step := iter_next_ensures_6 (by assumption); omega)
-    | (apply iter_next_ensures_3; assumption)
-    | (apply iter_next_ensures_1; assumption)
-    | (have below := rank_lt_size (show hasKey m (.integer it_Some_2.val) = true from by assumption); omega)
-  | invariant_5_step =>
+    | (have bound := SpecMap.rank_lt_size (show SpecMap.hasKey m it_Some_2.val = true from by verex_assumption)
+       have low := SpecMap.rank_nonneg m k.val
+       omega)
+  | _ =>
+    first
+    | verex_decide
+    | (verex_prepare only; all_goals first | verex_assumption | omega)
+
+verify test_verify_early_exit_walk_symbolic by lean =>
+  verex_obligations preparing
     verex_prepare only
-    all_goals clear internal_new_begin_iter_ensures_1 internal_new_begin_iter_ensures_2 internal_new_begin_iter_ensures_3 internal_new_begin_iter_ensures_4 internal_new_begin_iter_ensures_5
-    all_goals verex_cases it
+    all_goals first
+    | (verex_cases it
+       all_goals try clear internal_new_begin_iter_ensures_1
+       all_goals try clear internal_new_begin_iter_ensures_2
+       all_goals try clear internal_new_begin_iter_ensures_3
+       all_goals try clear internal_new_begin_iter_ensures_4
+       all_goals try clear internal_new_begin_iter_ensures_5)
+    | verex_cases internal_new_begin_iter_result
+    all_goals try verex_cases iter_next_result
     all_goals verex_normalize_context
     all_goals verex_canonical_families
     all_goals verex_normalize_context
-    all_goals
-      have located := keyAt_rank invariant_3_1
-      rw [invariant_3_2] at located
-      by_cases last : i = seen.val
-      · rw [last, located]
-        simp only [asInt_integer]
-        have read := congrArg RuntimeValue.asInt iter_borrow_ensures_1
-        simp only [asInt_integer, asInt_eraseGhosts] at read
-        rw [← read]
-        assumption
-      · exact invariant_5 i (by omega) (by omega)
-  | ensures_1 =>
-    verex_prepare only
-    all_goals clear internal_new_begin_iter_ensures_1 internal_new_begin_iter_ensures_2 internal_new_begin_iter_ensures_3 internal_new_begin_iter_ensures_4 internal_new_begin_iter_ensures_5
-    all_goals verex_cases it
-    all_goals verex_normalize_context
-    all_goals
-      have checked :=  invariant_5 i (by omega) (by omega)
-      simpa only [integer_asInt_keyAt m_keys (by omega) (by omega)] using checked
-  | aborts_if_1 =>
-    verex_prepare only
-    all_goals try verex_cases it
-    all_goals verex_normalize_context
+    all_goals verex_type_bounds
+  all_goals verex_paths
+  all_goals verex_intro_any
+  all_goals verex_normalize_context
+  all_goals verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals verex_reduce_projections
+  all_goals verex_finish_prepare
+  all_goals try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at *
+  verex_on
+  | invariant_4_entry, invariant_3_entry, invariant_1_entry =>
+    all_goals first | verex_assumption | omega
+  | invariant_4_step, invariant_3_step, invariant_2_step, invariant_1_step =>
     all_goals first
     | omega
-    | (have below := rank_lt_size (show hasKey m (.integer it_Some_2.val) = true from by assumption); omega)
+    | verex_assumption
+    | (have step := iter_next_ensures_7 (by verex_assumption); omega)
+    | (have step := iter_next_ensures_6 (by verex_assumption); omega)
+    | (apply iter_next_ensures_3; verex_assumption)
+    | (apply iter_next_ensures_1; verex_assumption)
+    | (have below := SpecMap.rank_lt_size (show SpecMap.hasKey m it_Some_2.val = true from by verex_assumption); omega)
+  | invariant_5_step =>
+    all_goals
+      have located := SpecMap.keyAt_rank invariant_3_1
+      rw [invariant_3_2] at located
+      by_cases last : i = seen.val
+      · first
+        | (rw [last, located]
+           have read : iter_borrow_result.val = SpecMap.valueAt m it_Some_2.val := by verex_assumption
+           rw [← read]
+           verex_assumption)
+      · first
+        | exact invariant_5 i (by omega) (by omega)
+  | ensures_1 =>
+    all_goals
+      exact invariant_5 i (by omega) (by omega)
+  | aborts_if_1 =>
+    all_goals first
+    | omega
+    | (have below := SpecMap.rank_lt_size (show SpecMap.hasKey m it_Some_2.val = true from by verex_assumption); omega)
   | _ => verex_decide
 
 verify test_verify_next_key_scan_symbolic by
-  verex_obligations
-  all_goals verex_prepare values
-  all_goals try verex_cases nxt
-  all_goals try verex_cases next_key_result
-  all_goals verex_normalize_context
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_type_bounds
-  all_goals verex_lift_maps
-  all_goals try omega
-  all_goals try assumption
-  all_goals try
-    have front_present : SpecMap.hasKey m front_key_result.val = true := by
-      rw [← consumed]
-      exact SpecMap.hasKey_keyAt (by omega) (by omega)
-    have front_position : SpecMap.rank m front_key_result.val = 0 := by
-      rw [← consumed]
-      exact SpecMap.rank_keyAt m_valid (by omega) (by omega)
-  all_goals try
-    have step_present : SpecMap.hasKey m borrow_result.val = true := by
-      rw [borrow_ensures_1]
-      exact invariant_4_1
-    have step_position : SpecMap.rank m borrow_result.val = count.val := by
-      rw [borrow_ensures_1]
-      exact invariant_4_2
-    have step_high := SpecMap.rank_lt_size step_present
-    first
-    | omega
-    | assumption
-    | (have last := SpecMap.nextKey_none m_valid step_present (by assumption); omega)
-    | (have next := SpecMap.nextKey_some (next := next_key_result_Some.val)
-          m_valid step_present (by assumption)
-       first | exact next.1 | omega)
-  all_goals first
-  | omega
-  | assumption
-  | (have last := SpecMap.nextKey_none m_valid front_present (by assumption); omega)
-  | (have next := SpecMap.nextKey_some (next := next_key_result_Some.val)
-        m_valid front_present (by assumption)
-     first | exact next.1 | omega)
+  after call 1 of front_key {
+    assert spec_contains_key(m, front_key_result) by apply lemma_contains_key_key_at(m, 0)
+    assert spec_rank(m, front_key_result) == 0 by apply lemma_rank_key_at(m, 0)
+  }
+  on invariant 4 entry, invariant 5 entry {
+    split next_key_result
+  }
+  on invariant 1 step, invariant 2 step, invariant 3 step, invariant 4 step, invariant 5 step {
+    split nxt
+    assert spec_contains_key(m, borrow_result)
+    assert spec_rank(m, borrow_result) == count
+    split next_key_result
+  }
+  on ensures 1 {
+    split nxt
+  }
+  on aborts_if 1 when loop 1 continues {
+    split nxt
+    apply lemma_rank_lt_len(m, borrow_result)
+  }
 
 verify test_verify_iter_prev by
-  verex_obligations
-  verex_group assertions := assert_1, assert_2, assert_3, assert_4, assert_5, assert_6, assert_7, assert_8
-  case assertions =>
-    verex_prepare only
-    verex_cases internal_new_end_iter_result
-    all_goals verex_cases old_iter_prev_result
-    all_goals verex_cases iter_prev_result
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals
-      have present : hasKey new_from_result (.integer old_iter_prev_result_Some_2.val) = true := by assumption
-      have position : rank new_from_result (.integer old_iter_prev_result_Some_2.val) = size new_from_result - 1 := by assumption
-      have located := keyAt_rank present
-      rw [position] at located
-      have size3 : size new_from_result = 3 := by simp [new_from_result_eq, vir_denote_norm]
-      rw [size3] at located
-      have key3 : keyAt new_from_result (3 - 1) = .integer 3 := by simp [new_from_result_eq, vir_denote_norm]
-      rw [key3] at located
-      have : old_iter_prev_result_Some_2.val = 3 := (RuntimeValue.integer.inj located).symm
-      have present2 : hasKey new_from_result (.integer iter_prev_result_Some_2.val) = true := by assumption
-      have shift : rank new_from_result (.integer iter_prev_result_Some_2.val) =
-          rank new_from_result (.integer old_iter_prev_result_Some_2.val) - 1 :=
-        (show hasKey new_from_result (.integer old_iter_prev_result_Some_2.val) = true → _ from by assumption) present
-      have located2 := keyAt_rank present2
-      rw [shift, position, size3] at located2
-      have key2 : keyAt new_from_result (3 - 1 - 1) = .integer 2 := by simp [new_from_result_eq, vir_denote_norm]
-      rw [key2] at located2
-      have second : iter_prev_result_Some_2.val = 2 := (RuntimeValue.integer.inj located2).symm
-      have read1 : old_iter_borrow_key_result.val = old_iter_prev_result_Some_2.val := by assumption
-      have read2 : iter_borrow_key_result.val = iter_prev_result_Some_2.val := by assumption
-      simp [read1, read2, this, second, new_from_result_eq, vir_denote_norm]
-      exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, rfl⟩, rfl⟩
-  all_goals first | verex_decide | (verex_prepare only; all_goals try verex_decide)
+  on assert 1, assert 4, assert 5, assert 6, assert 7, assert 8 {
+    assert spec_key_at(new_from_result, 2) == 3 by eval
+    assert spec_key_at(new_from_result, 1) == 2 by eval
+    assert spec_len(new_from_result) == 3 by eval
+    assert spec_contains_key(new_from_result, 2) by eval
+    split old_iter_prev_result
+    split iter_prev_result
+    assert spec_rank(new_from_result, old_iter_borrow_key_result) == 2
+    assert spec_rank(new_from_result, iter_borrow_key_result) == 1
+    apply lemma_key_at_rank(new_from_result, old_iter_borrow_key_result)
+    apply lemma_key_at_rank(new_from_result, iter_borrow_key_result)
+  }
+  on assert 3 {
+    lean => verex_goal_witnesses
+  }
+  on requires 1 of iter_prev at call 1, requires 1 of iter_prev at call 2 { }
+  on data invariant, requires of remove at call 1, requires of iter_prev at call 1, requires of iter_prev at call 2,
+    requires of internal_new_end_iter at call 1 { }
 
 verify test_verify_iter_next by
-  verex_obligations
-  verex_group initial := assert_1, assert_2, assert_3, assert_4, assert_5, assert_6, assert_7, assert_8, assert_9, assert_10
-  verex_group assertions := assert_11, assert_12, assert_13, assert_14, assert_15, assert_16, assert_17
-  case assertions =>
-    verex_prepare only
-    verex_cases internal_find_result
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals verex_cases old_iter_next_result
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals verex_cases iter_next_result_1
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals verex_cases iter_next_result
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals try simp_all only [vir_denote_norm]
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals try omega
-    all_goals simp only [variantName, Int.reduceAdd, true_and]
-    all_goals simp only [beq_self_eq_true, true_and]
-    all_goals omega
-  case initial =>
-    verex_prepare only
-    simp [new_from_result_eq, vir_denote_norm]
-    exact ⟨⟨⟨3, by decide⟩, ⟨2, by decide, by decide, rfl⟩, rfl⟩,
-      ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, rfl⟩, rfl⟩,
-      ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, rfl⟩, rfl⟩⟩
-  -- These clauses need normalization; skip the decider that fails beforehand.
-  verex_on
-  | data_invariant, requires_of_iter_next, requires_of_internal_find,
-    requires_of_remove_3, requires_of_ground_enum_123_1 =>
-    verex_prepare only
-    all_goals verex_decide
-  | _ => verex_decide
+  on assert 7 { assert spec_contains_key(new_from_result, 1) by eval }
+  on assert 8 { assert spec_contains_key(new_from_result, 2) by eval }
+  on assert 9 { assert spec_contains_key(new_from_result, 3) by eval }
+  on assert 10 { assert spec_len(new_from_result) == 3 by eval }
+  on assert 4, assert 5, assert 6 {
+    lean => verex_goal_witnesses
+  }
+  on assert 11, assert 12, assert 13, assert 14, assert 15, assert 16, assert 17 {
+    split internal_find_result
+    split old_iter_next_result
+    split old_iter_next_result_1
+    assert old_iter_borrow_key_result == 1
+    assert spec_rank(new_from_result, old_iter_borrow_key_result_1) == 1
+    apply lemma_key_at_rank(new_from_result, old_iter_borrow_key_result_1)
+    assert old_iter_borrow_key_result_1 == 2
+    assert spec_rank(new_from_result, iter_borrow_key_result) == 2
+    apply lemma_key_at_rank(new_from_result, iter_borrow_key_result)
+    assert iter_borrow_key_result == 3
+    split iter_next_result
+    apply !(iter_next_result is End) ==> lemma_rank_lt_len(new_from_result, iter_next_result.key)
+  }
+  on requires 1 of iter_next at call 1 {
+    split internal_find_result
+  }
+  on requires 1 of iter_next at call 2, requires 1 of iter_next at call 3, data invariant,
+    requires of iter_next at call 1, requires of iter_next at call 2, requires of iter_next at call 3,
+    requires of internal_find at call 1, requires of remove at call 1, requires of ground_enum_123 at call 1 { }
 
-verify test_verify_leaf_walk_sum_symbolic by
+verify test_verify_leaf_walk_sum_symbolic by lean =>
   verex_obligations
-  -- Iterator preconditions need only the leaf's ordered slice of the parent.
-  -- Prove them before splitting iterator results irrelevant to that argument.
   verex_on
-  | requires_of_iter_next, requires_of_iter_borrow, requires_of_iter_is_end, requires_of_internal_new_begin_iter =>
-    verex_prepare values
+  | requires of iter_next, requires of iter_borrow, requires of iter_is_end,
+    requires of internal_new_begin_iter =>
+    verex_prepare typed
+    all_goals first
+    | (refine SpecMap.valid_slice permitted ?low
+        internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5 ?same
+       case same =>
+         intro j low high
+         exact (internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6 j low high).symm
+       case low =>
+         first
+         | omega
+         | (rw [internal_leaf_new_begin_iter_ensures_3]; omega)
+         | (simp only [internal_leaf_new_begin_iter_ensures_3]; omega))
+  | invariant_2_step =>
+    verex_prepare typed
+    all_goals try verex_cases it
+    all_goals try verex_cases internal_leaf_new_begin_iter_result
+    all_goals try verex_cases internal_leaf_iter_borrow_entries_and_next_leaf_index_result_1
+    all_goals try verex_cases oit
+    all_goals try verex_cases internal_new_begin_iter_result
+    all_goals try verex_cases iter_next_result
+    all_goals try verex_cases iter_borrow_result
+    all_goals verex_canonical_families
+    all_goals try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at *
+    all_goals try simp only [internal_leaf_new_begin_iter_ensures_3] at *
+    all_goals try omega
+    all_goals (first | (exfalso; omega) | skip)
     all_goals
-      have sliceSize := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5 (by assumption)
-      have sliceKeys := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6 (by assumption)
-      verex_lift_maps only [permitted, invariant_4_1, sliceSize, sliceKeys]
-      apply SpecMap.valid_slice permitted invariant_4_1 sliceSize
-      intro i low high
-      exact (sliceKeys i low high).symm
-  | _ => skip
-  verex_group_contexts
-  all_goals verex_paths
-  all_goals try verex_cases it
-  all_goals try verex_cases internal_leaf_new_begin_iter_result
-  all_goals verex_prepare only
-  all_goals try verex_cases internal_leaf_iter_borrow_entries_and_next_leaf_index_result_1
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals try verex_cases oit
-  all_goals try verex_cases internal_new_begin_iter_result
-  all_goals try verex_cases iter_next_result
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_normalize_dependent
-  all_goals try simp_all only [variantCarrier.ofSkolem, HList.ofSkolem,
-    NTy.ofSkolem, variantName, variantPayload, vir_denote_norm]
-  all_goals repeat' apply And.intro
-  all_goals verex_intro_any
-  all_goals try assumption
-  all_goals try omega
-  all_goals try (rw [spec_test_sum_upto.spec.unfold]; simp; done)
-  all_goals try
-    verex_lift_maps only [permitted, invariant_4_1,
-      internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5,
-      internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6]
-    apply SpecMap.valid_slice permitted invariant_4_1
-      internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5
-    intro i low high
-    exact (internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6 i low high).symm
-  all_goals try
-    verex_lift_maps only [internal_new_begin_iter_ensures_1]
-    apply SpecMap.valid_of_keyAt_lt
-    intro i j low before high
-    simp only [internal_new_begin_iter_ensures_1] at high
-    omega
-  all_goals try simp only [Int.add_zero]
-  all_goals try verex_cases iter_borrow_result
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals try cases internal_leaf_borrow_value_ensures_1
-  all_goals verex_type_bounds
-  all_goals
-    have inside : oit_Position.val < size internal_leaf_iter_borrow_entries_and_next_leaf_index_result_0 := by assumption
-    have low : 0 ≤ oit_Position.val := by omega
-    have leaf := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_7 oit_Position.val low inside
-    have read := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_8 oit_Position.val low inside
-    have selected := congrArg (fun v => (VerexSL.Contract.selectVariantField v
-      ⟨⟨0⟩, 1⟩ #[ ("Leaf", 0) ]).asInt) iter_borrow_ensures_1
-    rw [VerexSL.Contract.asInt_select_eraseGhosts] at selected
-    have global := congrArg RuntimeValue.asInt read
-    simp only [asInt_eraseGhosts] at global
-    have returned := internal_leaf_borrow_value_ensures_1
-    have value := returned.trans (selected.trans global)
-    try rw [show size internal_leaf_iter_borrow_entries_and_next_leaf_index_result_0 =
-      oit_Position.val + 1 by omega]
-    conv => rhs; rw [spec_test_sum_upto.spec.unfold]
-    dsimp only
-    split
-    · omega
-    · simp only [Int.add_sub_assoc, Int.sub_self, Int.add_zero]
-      rw [integer_asInt_keyAt m_keys (by omega) (by omega), value]
+      -- The entry the inner walk reads is the leaf's at the iterator's
+      -- position, which the leaf reads as the map's value at its offset.
+      have inside : oit_Position.val < entries.size := by
+        assumption
+      have low : 0 ≤ oit_Position.val := by
+        omega
+      have read := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_8 oit_Position.val low inside
+      have leaf := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_7 oit_Position.val low inside
+      verex_canonical_families
+      try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at read leaf iter_borrow_ensures_1
+      first
+      | obtain ⟨payload, node⟩ := variantCarrier.second_of_name "Inner" "Leaf" (by decide) leaf
+      | obtain ⟨payload, node⟩ := variantCarrier.second_of_name "Inner" "Leaf" (by decide) leaf.symm
+      first
+      | rw [node] at read iter_borrow_ensures_1
+      simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval,
+        Option.some.injEq, String.reduceEq, reduceCtorEq,
+        and_false, false_and] at read iter_borrow_ensures_1
+      all_goals first
+      | (exfalso; exact iter_borrow_ensures_1)
+      | (exfalso; simp at iter_borrow_ensures_1; done)
+      | (first
+         | (have size_eq : entries.size = oit_Position.val + 1 := by omega
+            rw [size_eq])
+         | rw [iter_next_ensures_2]
+         conv => rhs; rw [spec_test_sum_upto.spec.unfold]
+         dsimp only
+         try verex_name_maps
+         rw [dif_neg (by omega)]
+         simp only [← Int.add_assoc, Int.add_sub_cancel]
+         omega)
+  | _ =>
+    verex_prepare typed
+    all_goals try verex_cases it
+    all_goals try verex_cases internal_leaf_new_begin_iter_result
+    all_goals try verex_cases internal_leaf_iter_borrow_entries_and_next_leaf_index_result_1
+    all_goals try verex_cases oit
+    all_goals try verex_cases internal_new_begin_iter_result
+    all_goals try verex_cases iter_next_result
+    all_goals try verex_cases iter_borrow_result
+    all_goals verex_canonical_families
+    all_goals try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at *
+    all_goals try simp only [internal_leaf_new_begin_iter_ensures_3] at *
+    all_goals first
+    | verex_decide
+    | omega
+    | (exfalso; simp_all; done)
+    | (rw [spec_test_sum_upto.spec.unfold]; simp; done)
+    | (have offset := invariant_5 (by assumption)
+       rw [offset] at invariant_6
+       exact invariant_6)
+    | (simp only [Int.add_zero, Int.zero_add] at *; assumption)
+    | (have empty : SpecMap.size internal_leaf_iter_borrow_entries_and_next_leaf_index_result_0 = 0 := by omega
+       simp only [empty, Int.add_zero] at *
+       assumption)
+    | (simp only [internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_9,
+         internal_new_begin_iter_ensures_1, Int.add_zero, Int.zero_add] at *
+       first | assumption | omega)
+    | (simp only [internal_new_begin_iter_ensures_2, Int.add_zero, Int.zero_add] at *
+       first | assumption | omega)
 
 verify test_verify_upsert by
-  verex_obligations
-  verex_group inserted := assert_1, assert_2, assert_3
-  verex_group replaced := assert_4, assert_5, assert_6, assert_7, assert_8
-  verex_group preserved := assert_9, assert_10, assert_11
-  verex_group removed := assert_13, assert_14, assert_15, assert_16, assert_17
-  all_goals verex_prepare values
-  all_goals try verex_cases upsert_result
-  all_goals try verex_cases old_upsert_result
-  all_goals verex_canonical_families
-  all_goals verex_normalize_context
-  all_goals verex_normalize_dependent
-  all_goals try simp only [variantCarrier.ofSkolem, HList.ofSkolem, NTy.ofSkolem,
-    variantPayload, variantName, NTy.encode_enum_payload, vir_denote_norm] at *
-  all_goals verex_lift_maps
-  all_goals simp_all [SpecMap.size, SpecMap.hasKey, SpecMap.containsB,
-    SpecMap.valueAt, SpecMap.get, SpecMap.update, SpecMap.Discipline.set, SpecMap.ordSet,
-    SpecMap.remove, SpecMap.Discipline.del, SpecMap.ordDel, SpecMap.Valid,
-    SpecMap.Ascending, SpecMap.intOrder, compare, compareOfLessAndEq]
-  all_goals try verex_decide
-
+  on assert 3 {
+    split upsert_result
+  }
+  on assert 6, assert 7 {
+    split upsert_result
+  }
+  on data invariant, requires of upsert at call 1, requires of borrow_back at call 1 { }
 
 verify test_verify_drain_loop by
-  verex_obligations
-  verex_group initial := assert_1, assert_2, assert_3, assert_7, assert_8, assert_9, assert_10, assert_11, assert_12, assert_13
-  verex_on
-  | invariant_2_entry, invariant_3_entry =>
-    verex_prepare only
-    have indices : i = 0 ∨ i = 1 ∨ i = 2 := by omega
-    rcases indices with rfl | rfl | rfl <;> simp_all [new_from_result_eq, vir_denote_norm]
-  | assert_14 =>
-    verex_prepare only
-    simpa only [x_eq, Int.reduceSub, Int.reduceMul, Int.reduceTDiv] using invariant_4
-  | invariant_1_step, invariant_2_step, invariant_3_step, invariant_4_step =>
-    verex_prepare only
-    have present : hasKey map (keyAt map 0) = true := hasKey_keyAt (by omega) (by omega)
-    have sizes : size value = size map - 1 := by
-      simp only [value_eq, size_restamp, size_remove, present, if_true]
-    first
-    | omega
-    | (
-      have read := congrArg RuntimeValue.asInt consumed
-      simp only [asInt_integer] at read
+  on assert 7 { assert spec_contains_key(new_from_result, 1) by eval }
+  on assert 8 { assert spec_contains_key(new_from_result, 2) by eval }
+  on assert 9 { assert spec_contains_key(new_from_result, 3) by eval }
+  on assert 10 { assert spec_len(new_from_result) == 3 by eval }
+  on assert 11 { assert spec_get(new_from_result, 1) == 10 by eval }
+  on assert 12 { assert spec_get(new_from_result, 2) == 20 by eval }
+  on assert 13 { assert spec_get(new_from_result, 3) == 30 by eval }
+  on invariant 1 step {
+    apply lemma_contains_key_key_at(map, 0)
+    apply lemma_len_remove(map, spec_key_at(map, 0))
+  }
+  on invariant 2 step {
+    apply lemma_contains_key_key_at(map, 0)
+    apply lemma_len_remove(map, spec_key_at(map, 0))
+    apply lemma_rank_key_at(map, 0)
+    apply lemma_key_at_remove(map, spec_key_at(map, 0), i)
+    assert spec_key_at(map, i + 1) == i + 1 + 4 - spec_len(map)
+  }
+  on invariant 3 step {
+    apply lemma_contains_key_key_at(map, 0)
+    apply lemma_len_remove(map, spec_key_at(map, 0))
+    apply lemma_rank_key_at(map, 0)
+    apply lemma_key_at_remove(map, spec_key_at(map, 0), i)
+    apply lemma_key_at_eq_iff(map, i + 1, 0)
+    apply lemma_get_remove(map, spec_key_at(map, 0), spec_key_at(map, i + 1))
+  }
+  on invariant 4 step {
+    apply lemma_contains_key_key_at(map, 0)
+    apply lemma_len_remove(map, spec_key_at(map, 0))
+    lean =>
       have val := invariant_3 0 (by omega) (by omega)
-      rw [integer_asInt_keyAt map_keys (by omega) (by omega)] at val
       have key := invariant_2 0 (by omega) (by omega)
-      rw [read, val, key, invariant_4, sizes]
-      rcases (show size map = 1 ∨ size map = 2 ∨ size map = 3 from by omega) with len | len | len <;> simp [len])
-    | (
-      have shift : keyAt value i = keyAt map (i + 1) := by
-        rw [value_eq, keyAt_restamp, keyAt_remove_ordered]
-        rw [rank_keyAt map_valid (by omega) (by omega)]
-        simp only [if_neg (by omega : ¬i < 0)]
-      rw [shift]
-      first
-      | (have previous := invariant_2 (i + 1) (by omega) (by omega); omega)
-      | (
-        have different : keyAt map (i + 1) ≠ keyAt map 0 := fun equal =>
-          (by omega : ¬i + 1 = 0) ((keyAt_eq_keyAt_iff map_valid (by omega) (by omega) (by omega) (by omega)).mp equal)
-        rw [value_eq, valueAt_restamp, valueAt_remove _ map_valid _ _ different]
-        simpa only [integer_asInt_keyAt (index := i + 1) map_keys (by omega) (by omega)] using
-          invariant_3 (i + 1) (by omega) (by omega)))
-  | _ =>
-    first | verex_decide | (
-      verex_prepare only
-      all_goals first
-      | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
-      | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
-      | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-      | simp_all [vir_denote_norm]
-      | omega)
+      have sizes : SpecMap.size map' = SpecMap.size map - 1 := by omega
+      rcases (show SpecMap.size map = 1 ∨ SpecMap.size map = 2 ∨ SpecMap.size map = 3 by omega)
+        with len | len | len <;>
+      simp only [sizes, len, pop_front_result_1_eq, pop_front_result_0_eq, Int.reduceSub, Int.reduceMul,
+        Int.reduceTDiv, Int.reduceAdd] at * <;> omega
+  }
+  on invariant 2 entry {
+    split i in 0..3
+  }
+  on invariant 3 entry {
+    assert spec_key_at(new_from_result, 0) == 1
+    assert spec_key_at(new_from_result, 1) == 2
+    assert spec_key_at(new_from_result, 2) == 3
+    split i in 0..3
+  }
+  on invariant 4 entry {
+    assert 10 * (3 - spec_len(new_from_result)) * (4 - spec_len(new_from_result)) / 2 == 0 by eval
+  }
+  on assert 14 {
+    lean => simpa only [x_eq, Int.reduceSub, Int.reduceMul, Int.reduceDiv] using invariant_4
+  }
+  on assert 5 {
+    lean => verex_goal_witnesses
+  }
+  on requires of ground_enum_123 at call 1 { }
 
 verify test_verify_leaf_iter by
-  verex_obligations
-  verex_on
-  | requires_of_borrow, requires_of_keys =>
-    verex_prepare values
-    verex_lift_maps only [new_from_result_valid, internal_leaf_new_begin_iter_ensures_3,
-      internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5,
-      internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6]
-    apply SpecMap.valid_slice new_from_result_valid
-      (by rw [internal_leaf_new_begin_iter_ensures_3]; omega)
-      internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5
-    intro i low high
-    exact (internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6 i low high).symm
-  | assert_2 =>
-    verex_prepare only
-    have related := congrArg RuntimeValue.asInt
-      (internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_3_2 _ (by assumption))
-    verex_cases borrow_result
-    all_goals verex_canonical_families
-    all_goals verex_normalize_context
-    all_goals verex_normalize_dependent
-    all_goals try cases internal_leaf_borrow_value_ensures_1
-    all_goals try simp only [consumed, vir_denote_norm, asInt_eraseGhosts] at related
-    all_goals try simpa only [internal_leaf_borrow_value_ensures_1] using related
-  | _ => first | verex_decide | (verex_prepare only; all_goals verex_decide)
+  on requires of borrow at call 1, requires of keys at call 1 {
+    lean =>
+      refine SpecMap.valid_slice new_from_result_valid ?low
+        internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_5 ?same
+      case same =>
+        intro j low high
+        exact (internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_6 j low high).symm
+      case low =>
+        first
+        | omega
+        | (rw [internal_leaf_new_begin_iter_ensures_3]; omega)
+        | (simp only [internal_leaf_new_begin_iter_ensures_3]; omega)
+  }
+  on assert 2 {
+    lean =>
+      rw [internal_leaf_borrow_value_ensures_1]
+      exact internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_3_2 _ (by omega) (by omega)
+        (by assumption)
+  }
+  on assert 1 { }
+  on data invariant, requires of remove at call 1, requires of internal_leaf_new_begin_iter at call 1,
+    requires of internal_leaf_iter_borrow_entries_and_next_leaf_index at call 1,
+    requires 1 of internal_leaf_iter_borrow_entries_and_next_leaf_index at call 1 { }
 
--- Typed map arguments; encoding is handled by preparation.
-
-verify ground_enum_123 by
+verify ground_enum_123 by lean =>
   verex_obligations
   verex_group facts := assert_1, assert_2, assert_3, assert_4, assert_5, assert_6, assert_7, assert_8, assert_9, assert_10, assert_11
   all_goals verex_prepare typed
@@ -1042,128 +726,111 @@ verify ground_enum_123 by
     have key1 := SpecMap.keyAt_rank h1
     have key2 := SpecMap.keyAt_rank h2
     have key3 := SpecMap.keyAt_rank h3
-    simp_all only [Int.reduceLT, Int.reduceLE, and_self, true_and]
+    simp_all only [Int.reduceLT, Int.reduceLE, and_self]
     try omega
 
 verify test_verify_remove_shift_symbolic by
-  verex_obligations
-  verex_on
-  | ensures_1, ensures_2, ensures_3, ensures_4 =>
-    verex_prepare typed
-    have present : SpecMap.hasKey m k.val = true := by assumption
-    have valid : SpecMap.Valid (.ordered SpecMap.intOrder) m := by assumption
-    have equal : value = SpecMap.remove (.ordered SpecMap.intOrder) m k.val :=
-      (show SpecMap.hasKey m k.val = true → _ from by assumption) present
-    solve
-    | simp only [equal, SpecMap.size_remove, present, if_true]
-    | simp only [equal, SpecMap.hasKey_remove valid, decide_true, Bool.not_true, Bool.false_and]
-    | simp only [equal, SpecMap.keyAt_remove_ordered]
-    | (have key_present : SpecMap.hasKey value (SpecMap.keyAt value i) = true := SpecMap.hasKey_keyAt (by omega) (by omega)
-       have different : SpecMap.keyAt value i ≠ k.val := by
-         intro same
-         rw [same, equal, SpecMap.hasKey_remove valid] at key_present
-         simp at key_present
-       exact (congrArg (fun map => SpecMap.valueAt map (SpecMap.keyAt value i)) equal).trans
-         (SpecMap.valueAt_remove valid _ _ different))
-  | _ =>
-    verex_prepare typed
-    all_goals simp_all
+  on ensures 1 {
+    apply lemma_len_remove(m, k)
+  }
+  on ensures 2 {
+    apply lemma_contains_key_remove(m, k, k)
+  }
+  on ensures 3 {
+    apply lemma_key_at_remove(m, k, i)
+  }
+  on ensures 4 {
+    assert spec_len(m') == spec_len(m) - 1 by apply lemma_len_remove(m, k)
+    apply lemma_contains_key_key_at(m', i)
+    apply lemma_contains_key_remove(m, k, spec_key_at(m', i))
+    apply lemma_get_remove(m, k, spec_key_at(m', i))
+  }
+  on _ { }
 
 verify test_verify_drain_symbolic by
-  verex_obligations
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step =>
-    verex_prepare typed
-    have present : SpecMap.hasKey m (SpecMap.keyAt m 0) = true := SpecMap.hasKey_keyAt (by omega) (by omega)
-    have length : SpecMap.size value = SpecMap.size m - 1 := by
-      rw [value_eq, SpecMap.size_remove, if_pos present]
-    first
-    | omega
-    | (have shift : SpecMap.keyAt value i = SpecMap.keyAt m (i + 1) := by
-         rw [value_eq, SpecMap.keyAt_remove_ordered,
-           SpecMap.rank_keyAt m_valid (by omega) (by omega), if_neg (by omega)]
-       rw [shift]
-       first
-       | simpa only [Int.add_assoc, Int.add_comm, Int.add_left_comm] using invariant_2 (i + 1) (by omega) (by omega)
-       | (rw [value_eq, SpecMap.valueAt_remove m_valid _ _ (by
-            intro equal
-            have := (SpecMap.keyAt_eq_keyAt_iff m_valid (by omega) (by omega) (by omega) (by omega)).mp equal
-            omega)]
-          exact invariant_3 (i + 1) (by omega) (by omega)))
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare typed; all_goals (first | assumption | omega))
+  on invariant 1 step {
+    apply lemma_contains_key_key_at(m, 0)
+    assert spec_len(m') == spec_len(m) - 1 by apply lemma_len_remove(m, spec_key_at(m, 0))
+  }
+  on invariant 2 step {
+    let k0 := spec_key_at(m, 0)
+    apply lemma_contains_key_key_at(m, 0)
+    apply lemma_len_remove(m, k0)
+    apply lemma_rank_key_at(m, 0)
+    apply lemma_key_at_remove(m, k0, i)
+    assert spec_key_at(m, i + 1) == spec_key_at(old(m), i + 1 + count)
+    assert spec_key_at(m', i) == spec_key_at(old(m), i + (count + 1)) by congr
+  }
+  on invariant 3 step {
+    let k0 := spec_key_at(m, 0)
+    let k := spec_key_at(m, i + 1)
+    apply lemma_contains_key_key_at(m, 0)
+    apply lemma_len_remove(m, k0)
+    apply lemma_rank_key_at(m, 0)
+    apply lemma_key_at_remove(m, k0, i)
+    assert k != k0 by apply lemma_key_at_eq_iff(m, i + 1, 0)
+    apply lemma_get_remove(m, k0, k)
+  }
+  on aborts_if 1, ensures 1, ensures 2, invariant 2 entry { }
 
 verify test_verify_pop_back_drain_symbolic by
-  verex_obligations
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step =>
-    verex_prepare typed
-    have present : SpecMap.hasKey m (SpecMap.keyAt m (SpecMap.size m - 1)) = true := SpecMap.hasKey_keyAt (by omega) (by omega)
-    have length : SpecMap.size value = SpecMap.size m - 1 := by
-      rw [value_eq, SpecMap.size_remove, if_pos present]
-    first
-    | omega
-    | (have shift : SpecMap.keyAt value i = SpecMap.keyAt m i := by
-         rw [value_eq, SpecMap.keyAt_remove_ordered,
-           SpecMap.rank_keyAt m_valid (by omega) (by omega), if_pos (by omega)]
-       rw [shift]
-       first
-       | exact invariant_2 i (by omega) (by omega)
-       | (rw [value_eq, SpecMap.valueAt_remove m_valid _ _ (by
-            intro equal
-            have := (SpecMap.keyAt_eq_keyAt_iff m_valid (by omega) (by omega) (by omega) (by omega)).mp equal
-            omega)]
-          exact invariant_3 i (by omega) (by omega)))
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare typed; all_goals (first | assumption | omega))
+  on invariant 1 step {
+    apply lemma_contains_key_key_at(m, spec_len(m) - 1)
+    apply lemma_len_remove(m, spec_key_at(m, spec_len(m) - 1))
+  }
+  on invariant 2 step {
+    let kl := spec_key_at(m, spec_len(m) - 1)
+    apply lemma_contains_key_key_at(m, spec_len(m) - 1)
+    apply lemma_len_remove(m, kl)
+    apply lemma_rank_key_at(m, spec_len(m) - 1)
+    assert i < spec_rank(m, kl)
+    apply lemma_key_at_remove(m, kl, i)
+  }
+  on invariant 3 step {
+    let kl := spec_key_at(m, spec_len(m) - 1)
+    let k := spec_key_at(m, i)
+    apply lemma_contains_key_key_at(m, spec_len(m) - 1)
+    apply lemma_len_remove(m, kl)
+    apply lemma_rank_key_at(m, spec_len(m) - 1)
+    assert i < spec_rank(m, kl)
+    apply lemma_key_at_remove(m, kl, i)
+    assert k != kl by apply lemma_key_at_eq_iff(m, i, spec_len(m) - 1)
+    apply lemma_get_remove(m, kl, k)
+  }
+  on aborts_if 1, ensures 1, ensures 2, invariant 2 entry { }
 
 verify test_verify_front_remove_drain_symbolic by
-  verex_obligations
-  verex_on
-  | invariant_1_step, invariant_2_step, invariant_3_step =>
-    verex_prepare typed
-    have front : front_key_result.val = SpecMap.keyAt m 0 := by
-      symm
-      assumption
-    rw [front] at value_eq
-    have present : SpecMap.hasKey m (SpecMap.keyAt m 0) = true := SpecMap.hasKey_keyAt (by omega) (by omega)
-    have length : SpecMap.size value = SpecMap.size m - 1 := by
-      rw [value_eq, SpecMap.size_remove, if_pos present]
-    first
-    | omega
-    | (have shift : SpecMap.keyAt value i = SpecMap.keyAt m (i + 1) := by
-         rw [value_eq, SpecMap.keyAt_remove_ordered,
-           SpecMap.rank_keyAt m_valid (by omega) (by omega), if_neg (by omega)]
-       rw [shift]
-       first
-       | simpa only [Int.add_assoc, Int.add_comm, Int.add_left_comm] using invariant_2 (i + 1) (by omega) (by omega)
-       | (rw [value_eq, SpecMap.valueAt_remove m_valid _ _ (by
-            intro equal
-            have := (SpecMap.keyAt_eq_keyAt_iff m_valid (by omega) (by omega) (by omega) (by omega)).mp equal
-            omega)]
-          exact invariant_3 (i + 1) (by omega) (by omega)))
-  | aborts_if_1 =>
-    verex_prepare typed
-    all_goals first
-    | omega
-    | (have present : SpecMap.hasKey m (SpecMap.keyAt m 0) = true := SpecMap.hasKey_keyAt (by omega) (by omega)
-       rw [show SpecMap.keyAt m 0 = front_key_result.val from by assumption] at present
-       simp_all only [Bool.true_eq_false])
-  | _ =>
-    first
-    | verex_decide
-    | (verex_prepare typed; all_goals (first | assumption | omega | skip))
+  on aborts_if 1, invariant 1 step {
+    apply lemma_contains_key_key_at(m, 0)
+    apply lemma_len_remove(m, spec_key_at(m, 0))
+  }
+  on invariant 2 step {
+    let k0 := spec_key_at(m, 0)
+    apply lemma_contains_key_key_at(m, 0)
+    apply lemma_len_remove(m, k0)
+    apply lemma_rank_key_at(m, 0)
+    apply lemma_key_at_remove(m, k0, i)
+    assert spec_key_at(m, i + 1) == spec_key_at(old(m), i + 1 + count)
+    assert spec_key_at(m', i) == spec_key_at(old(m), i + (count + 1)) by congr
+  }
+  on invariant 3 step {
+    let k0 := spec_key_at(m, 0)
+    let k := spec_key_at(m, i + 1)
+    apply lemma_contains_key_key_at(m, 0)
+    apply lemma_len_remove(m, k0)
+    apply lemma_rank_key_at(m, 0)
+    apply lemma_key_at_remove(m, k0, i)
+    assert k != k0 by apply lemma_key_at_eq_iff(m, i + 1, 0)
+    apply lemma_get_remove(m, k0, k)
+  }
+  on ensures 1, ensures 2, invariant 2 entry { }
 
-verify test_verify_back_key_rank_symbolic by
+verify test_verify_back_key_rank_symbolic by lean =>
   verex_obligations
   verex_on
   | ensures_1, ensures_2 =>
     verex_prepare typed
-    rw [← x (by omega)]
+    rw [← x]
     first
     | exact SpecMap.hasKey_keyAt (by omega) (by omega)
     | exact SpecMap.rank_keyAt (by assumption) (by omega) (by omega)

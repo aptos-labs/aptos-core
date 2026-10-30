@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/fixed_point_arithm.move:31:9: error: the specification clause `ensures result == 1` is not established
 tests/sources/functional/fixed_point_arithm.move:29:5: error: verex verification failed: the automatic verification of `multiply_0_x_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify multiply_0_x_incorrect by
+  verify multiply_0_x_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/fixed_point_arithm.move:29:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/fixed_point_arithm.move:47:9: error: the specification clause `ensures result == 1` is not established
 tests/sources/functional/fixed_point_arithm.move:45:5: error: verex verification failed: the automatic verification of `multiply_x_0_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify multiply_x_0_incorrect by
+  verify multiply_x_0_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/fixed_point_arithm.move:45:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/fixed_point_arithm.move:70:9: error: the specification clause `ensures result != x.value >> 32` is not established
 tests/sources/functional/fixed_point_arithm.move:67:5: error: verex verification failed: the automatic verification of `multiply_1_x_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify multiply_1_x_incorrect by
+  verify multiply_1_x_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -25,27 +25,27 @@ tests/sources/functional/fixed_point_arithm.move:67:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/fixed_point_arithm.move:86:9: error: the specification clause `ensures result != x` is not established
 tests/sources/functional/fixed_point_arithm.move:84:5: error: verex verification failed: the automatic verification of `multiply_x_1_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify multiply_x_1_incorrect by
+  verify multiply_x_1_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/fixed_point_arithm.move:113:9: error: the specification clause `ensures result > x` is not established
-tests/sources/functional/fixed_point_arithm.move:112:9: error: the specification clause `ensures result < x` is not established
 tests/sources/functional/fixed_point_arithm.move:110:9: error: the specification clause `ensures result >= x` is not established
+tests/sources/functional/fixed_point_arithm.move:112:9: error: the specification clause `ensures result < x` is not established
+tests/sources/functional/fixed_point_arithm.move:113:9: error: the specification clause `ensures result > x` is not established
 tests/sources/functional/fixed_point_arithm.move:109:5: error: verex verification failed: the automatic verification of `mul_div_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify mul_div_incorrect by
+  verify mul_div_incorrect by lean =>
     verex_obligations
     verex_on
-    | ensures_3 => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
+    | ensures_3 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/fixed_point_arithm.move:144:9: error: the specification clause `ensures result != 10` is not established
 tests/sources/functional/fixed_point_arithm.move:142:5: error: verex verification failed: the automatic verification of `mul_2_times_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify mul_2_times_incorrect by
+  verify mul_2_times_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -53,7 +53,7 @@ tests/sources/functional/fixed_point_arithm.move:142:5: error: verex verificatio
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/fixed_point_arithm.move:152:9: error: the specification clause `ensures result != 10` is not established
 tests/sources/functional/fixed_point_arithm.move:150:5: error: verex verification failed: the automatic verification of `mul_3_times_incorrect` failed; provide a proof in `tests/sources/functional/fixed_point_arithm.proof.lean`:
-  verify mul_3_times_incorrect by
+  verify mul_3_times_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

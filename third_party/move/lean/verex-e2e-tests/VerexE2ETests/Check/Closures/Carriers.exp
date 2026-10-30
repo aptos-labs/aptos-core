@@ -1,6 +1,6 @@
 VerexE2ETests/Check/Closures/Carriers.lean:42:4: error: the specification clause `ensures result == x * 2` is not established
 VerexE2ETests/Check/Closures/Carriers.lean:41:7: error: verex verification failed: the automatic verification of `apply_triple_incorrect` failed; provide a proof in the module:
-  verify apply_triple_incorrect by
+  verify apply_triple_incorrect by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

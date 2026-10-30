@@ -30,7 +30,7 @@ inductive SemTy where
   /-- A rigid type parameter: a generic body is typed once, under its
   parameters, for every instantiation. -/
   | param (index : Nat)
-  /-- A ghost field's slot in a nominal value (`designs/ghost-fields.md`):
+  /-- A ghost field's slot in a nominal value (`doc/designs/ghost-fields.md`):
   a value of the field's type, which no equality reads. -/
   | ghost (slot : SemTy)
 /-- A generic argument as values see it: a type, a constant, or an argument

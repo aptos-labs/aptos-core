@@ -62,7 +62,7 @@ target monovm_shim pkg : System.FilePath := Job.async do
   return object
 
 /-- Runs one problem of the verification benchmark natively
-(`designs/verification-benchmarks.md`). -/
+(`doc/status/verification-benchmarks.md`). -/
 lean_exe «verex-bench» where
   root := `VerexBench
   supportInterpreter := true

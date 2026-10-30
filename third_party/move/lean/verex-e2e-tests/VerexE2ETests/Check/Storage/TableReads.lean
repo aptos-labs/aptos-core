@@ -107,7 +107,7 @@ verex module 0x42::table_reads where
 error: the specification clause `ensures result != get(t, k)` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_lookup` failed; provide a proof in the module:
-  verify wrong_lookup by
+  verify wrong_lookup by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -121,7 +121,7 @@ verify 0x42::table_reads::wrong_lookup
 error: the specification clause `ensures result.length <= 1` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_payload_bound` failed; provide a proof in the module:
-  verify wrong_payload_bound by
+  verify wrong_payload_bound by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -132,7 +132,7 @@ error: verex verification failed: the automatic verification of `wrong_payload_b
 verify 0x42::table_reads::wrong_payload_bound
 
 -- The read roles run in the interpreter on the table's value, its entries in
--- the owner's last field (`designs/intrinsic-maps.md`, "Tables in the runtime
+-- the owner's last field (`doc/designs/intrinsic-maps.md`, "Tables in the runtime
 -- semantics").
 open Lean Elab Command VerexIR VerexIR.SemanticOperations VerexE2ETests.CheckSupport in
 run_cmd do

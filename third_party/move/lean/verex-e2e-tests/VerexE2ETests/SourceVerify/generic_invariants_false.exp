@@ -1,7 +1,7 @@
 VerexE2ETests/SourceVerify/generic_invariants_false.move:11:9: error: the module invariant `invariant {T} ∀ (a : Address),
         exists<Box<T> >(a) ==> global<Box<T> >(a).count > 0` does not hold after a write of memory it reads
 VerexE2ETests/SourceVerify/generic_invariants_false.move:18:5: error: verex verification failed: the automatic verification of `publish_zero` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_invariants_false.proof.lean`:
-  verify publish_zero by
+  verify publish_zero by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry
@@ -10,7 +10,7 @@ VerexE2ETests/SourceVerify/generic_invariants_false.move:18:5: error: verex veri
 VerexE2ETests/SourceVerify/generic_invariants_false.move:11:9: error: the module invariant `invariant {T} ∀ (a : Address),
         exists<Box<T> >(a) ==> global<Box<T> >(a).count > 0` does not hold after a write of memory it reads
 VerexE2ETests/SourceVerify/generic_invariants_false.move:26:5: error: verex verification failed: the automatic verification of `reset_u64` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_invariants_false.proof.lean`:
-  verify reset_u64 by
+  verify reset_u64 by lean =>
     verex_obligations
     verex_on
     | module_invariant => verex_prepare; sorry

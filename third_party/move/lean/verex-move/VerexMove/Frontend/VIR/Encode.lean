@@ -81,7 +81,7 @@ structure BuildState where
   /-- The steps of the function's proof the Move Prover runs at each return. -/
   exitSteps : Array Proofs.Step := #[]
   /-- The package's and its dependencies' ghost fields, by struct: the
-  verification model's alone (`designs/ghost-fields.md`). -/
+  verification model's alone (`doc/designs/ghost-fields.md`). -/
   ghostFields : List (QualifiedName × List String) := []
 
 abbrev BuildM := StateT BuildState (Except String)
@@ -379,7 +379,7 @@ private def addParameter (parameter : Param) (loc : VerexIR.LocId) : BuildM Vere
 
 /-- A specification function's parameter, at its specification type. One
 declared with a fixed-width integer type keeps that type: the function is
-defined where its argument fits it (G15 in `designs/prover-test-problems.md`). -/
+defined where its argument fits it (G15 in `doc/status/prover-test-problems.md`). -/
 private def addSpecificationParameter (parameter : Param)
     (loc : VerexIR.LocId) : BuildM VerexIR.Parameter := do
   let ty := if (BitVectorConversion.fixedWidth? parameter.ty).isSome then parameter.ty
@@ -549,7 +549,7 @@ private def virOperation : Xast.Operation → BuildM VerexIR.Operation
   | .deref => return .reference .dereference
   | .freeze explicit => return .reference (.freeze explicit)
   | .select name field => do
-      -- A ghost field is read from its slot (`designs/ghost-fields.md`).
+      -- A ghost field is read from its slot (`doc/designs/ghost-fields.md`).
       let ghost := (← get).ghostFields.any fun (owner, ghosts) =>
         owner == name && ghosts.contains field
       if ghost then return .data (.selectGhost (← addQualifiedRef name) field)
@@ -591,6 +591,15 @@ private def toPragma (pragma : Xast.Pragma) : VerexIR.Attribute :=
     | .name name => .name none name
     | .qualifiedName name => .qualifiedName name)
 
+/-- A block's pragmas as Verex reads them: `verex_verify = false`, which only
+Verex reads, resolves `verify` to false. -/
+private def toPragmas (pragmas : List Xast.Pragma) : Array VerexIR.Attribute :=
+  let off := pragmas.any fun pragma =>
+    pragma.name == "verex_verify" && pragma.value == .value (.bool false)
+  let kept := pragmas.toArray.filter fun pragma =>
+    pragma.name != "verex_verify" && !(off && pragma.name == "verify")
+  kept.map toPragma ++ (if off then #[.assign "verify" (.constant (.bool false))] else #[])
+
 /-- The `proof_file` pragma naming the proof file beside a module's source,
 which every function of the module inherits. -/
 private def proofFilePragma (module : Xast.Module) : Array VerexIR.Attribute :=
@@ -599,7 +608,7 @@ private def proofFilePragma (module : Xast.Module) : Array VerexIR.Attribute :=
 
 /-- A module's pragmas: its own, and the proof file named on it. -/
 private def modulePragmas (module : Xast.Module) : Array VerexIR.Attribute :=
-  module.pragmas.toArray.map toPragma ++ proofFilePragma module
+  toPragmas module.pragmas ++ proofFilePragma module
 
 /-- Instantiate a declaration type with a call or nominal's type arguments. -/
 private partial def instantiateTypeParameters (args : List Xast.Ty) : Xast.Ty → Xast.Ty
@@ -1446,7 +1455,7 @@ mutual
               pure <| .operation (.reference .mutate)
                 #[] #[← addMutationTarget target, ← addExpr value]
           -- An `update` writes model state only: a ghost field, or the ghost
-          -- resource backing a spec variable (`designs/ghost-fields.md`).
+          -- resource backing a spec variable (`doc/designs/ghost-fields.md`).
           | .specBlock spec => .spec <$> addSpecBlock spec loc
           | .quant kind ranges triggers condition body => do
               let kind := match kind with
@@ -1539,7 +1548,7 @@ mutual
     | _ => pure none
 
   /-- An `update`'s target: a read of the ghost field's place, through the
-  reference where the base is one (`designs/ghost-fields.md`); any other
+  reference where the base is one (`doc/designs/ghost-fields.md`); any other
   target as its expression. -/
   private partial def addUpdateTarget (target : Exp) : BuildM VerexIR.ExprId := do
     match target with
@@ -1627,7 +1636,7 @@ mutual
           auxiliary := auxiliary.push ("updateTarget", ← addUpdateTarget value)
         let encoded ← addExpr expression
         -- Updates cross the boundary between mathematical integers and
-        -- fixed-width fields in either direction (`designs/ghost-fields.md`).
+        -- fixed-width fields in either direction (`doc/designs/ghost-fields.md`).
         let encoded ← match kind, updateTarget, expression with
           | .update, some (.mk targetType _ _), .mk .num valueLoc _ =>
               match targetType with
@@ -1760,7 +1769,7 @@ mutual
     | .mk sourceLoc pragmas conditions frame _ _ => logically do
         let sourceLoc ← sourceLoc.mapM addLocation
         let loc := sourceLoc.getD fallback
-        let pragmas := pragmas.toArray.map toPragma
+        let pragmas := toPragmas pragmas
         return {
           loc
           sourceLoc
@@ -2233,7 +2242,7 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
         -- A function's pragmas resolve its contract's, the explicit frame's
         -- included; a dependency's resolve `verify = false` from its namespace.
         pragmas := if module.isTarget then
-            function.pragmas.toArray.map toPragma ++
+            toPragmas function.pragmas ++
               (if VerexSL.hasLooseFrame functionContract then #[Frames.loosePragma] else #[]) ++
               proofFilePragma module
           else

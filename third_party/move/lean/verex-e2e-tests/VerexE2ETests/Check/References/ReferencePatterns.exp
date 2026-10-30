@@ -1,6 +1,6 @@
 VerexE2ETests/Check/References/ReferencePatterns.lean:60:4: error: the specification clause `aborts_if false` is not established
 VerexE2ETests/Check/References/ReferencePatterns.lean:59:7: error: verex verification failed: the automatic verification of `reset_incorrect` failed; provide a proof in the module:
-  verify reset_incorrect by
+  verify reset_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

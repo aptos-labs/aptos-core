@@ -160,6 +160,7 @@ def RuntimeState.resolveReturned (results : Array RuntimeValue) (state : Runtime
   { state with globals := state.globals.resolveReturned results }
 
 def Proofs.Denote.StorageEncodesReturned (unit : Validation.ValidatedUnit)
+    [Proofs.Denote.FunctionCarriers unit]
     (memory : Proofs.Denote.Memory unit) (state : RuntimeState)
     (results : Array RuntimeValue) : Prop :=
   Proofs.Denote.StorageEncodes unit memory (state.resolveReturned results)

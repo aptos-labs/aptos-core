@@ -6,60 +6,69 @@ import VerexMove.Proofs
 verex proofs for "for_loop_invariants.move"
 verex proofs where
 
--- Triangular sums use Move integer division (truncating toward zero).
--- Nonnegative loop indices let us use Euclidean division identities.
-theorem triangular_nonneg (i : Int) (lo : 0 ≤ i) : 0 ≤ i * (i - 1) := by
-  by_cases zero : i = 0
-  · simp [zero]
-  · exact Int.mul_nonneg lo (by omega)
+-- Triangular sums of nonnegative loop indices: the product is nonnegative,
+-- so the quotient is the Euclidean one, and one step adds the index.
+lemma triangular_nonneg(i : Int)
+  requires 0 <= i
+  ensures 0 <= i * (i - 1)
+by
+  split i == 0
+  apply i != 0 ==> lemma_mul_nonneg(i, i - 1)
 
-theorem triangular_step (i : Int) (lo : 0 ≤ i) :
-    (i * (i - 1)).tdiv 2 + i = ((i + 1) * (i + 1 - 1)).tdiv 2 := by
-  simp only [Int.add_sub_cancel]
-  rw [Int.tdiv_eq_ediv_of_nonneg (triangular_nonneg i lo),
-    Int.tdiv_eq_ediv_of_nonneg (Int.mul_nonneg (by omega) lo)]
-  have h : (i + 1) * i = i * (i - 1) + i * 2 := by grind
-  rw [h, Int.add_mul_ediv_right _ _ (by decide)]
+lemma triangular_step(i : Int)
+  requires 0 <= i
+  ensures i * (i - 1) / 2 + i == (i + 1) * (i + 1 - 1) / 2
+by
+  apply triangular_nonneg(i)
+  assert (i + 1) * (i + 1 - 1) == i * (i - 1) + i * 2 by ring
+  apply lemma_div_add_mul(i * (i - 1), i, 2)
 
-theorem triangular_bounds (i : Int) (lo : 0 ≤ i) (hi : i ≤ 1000) :
-    0 ≤ (i * (i - 1)).tdiv 2 ∧ (i * (i - 1)).tdiv 2 ≤ 500000 := by
-  have nonnegative := triangular_nonneg i lo
-  rw [Int.tdiv_eq_ediv_of_nonneg nonnegative]
-  have square : i * i ≤ 1000000 := by
-    simpa using Int.mul_le_mul hi hi lo (by decide)
-  have product : i * (i - 1) ≤ i * i :=
-    Int.mul_le_mul_of_nonneg_left (by omega) lo
-  omega
-
-@[vir_denote_norm] theorem triangular_div (i : Int) :
-    (i * (i - 1)).tdiv 2 = (i * (i - 1)) / 2 := by
-  apply Int.tdiv_eq_ediv_of_nonneg
-  by_cases h : 0 ≤ i
-  · exact triangular_nonneg i h
-  · exact Int.mul_nonneg_of_nonpos_of_nonpos (by omega) (by omega)
+lemma triangular_bounds(i : Int)
+  requires 0 <= i && i <= 1000
+  ensures 0 <= i * (i - 1) / 2 && i * (i - 1) / 2 <= 500000
+by
+  apply triangular_nonneg(i)
+  split i == 0
+  apply i != 0 ==> lemma_mul_mono(i, 1000, i - 1, 1000)
+  apply lemma_div_nonneg(i * (i - 1), 2)
+  apply lemma_div_le(i * (i - 1), 500000, 2)
 
 verify sum_range by
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals first | omega |
-    have bounded := triangular_bounds i.val (by omega) (by omega)
-    have step := triangular_step i.val (by omega)
-    simp only [triangular_div] at *
-    first | omega | grind
+  at loop 1 step {
+    apply triangular_step(i)
+    apply triangular_bounds(i)
+  }
+  on invariant 2 entry {
+    assert 0 * -1 / 2 == 0 by eval
+  }
+  on ensures 1 {
+    assert i == n
+    assert i * (i - 1) / 2 == n * (n - 1) / 2 by congr
+  }
+  on _ { }
+
 verify sum_from by
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals first | omega |
-    have bounded := triangular_bounds i.val (by omega) (by omega)
-    have lower := triangular_bounds a.val (by omega) (by omega)
-    have step := triangular_step i.val (by omega)
-    simp only [triangular_div] at *
-    first | omega | grind
+  at loop 1 step {
+    apply triangular_step(i)
+    apply triangular_bounds(i)
+    apply triangular_bounds(a)
+  }
+  on ensures 1 {
+    assert i == b
+    assert i * (i - 1) / 2 == b * (b - 1) / 2 by congr
+  }
+  on _ { }
+
 verify sum_skip_first by
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals first | omega |
-    have bounded := triangular_bounds i.val (by omega) (by omega)
-    have step := triangular_step i.val (by omega)
-    simp only [triangular_div] at *
-    first | omega | grind
+  at loop 1 step {
+    apply triangular_step(i)
+    apply triangular_bounds(i)
+  }
+  on invariant 2 of loop 1 entry {
+    assert 0 * -1 / 2 == 0 by eval
+  }
+  on ensures 1 {
+    assert i == n
+    assert i * (i - 1) / 2 == n * (n - 1) / 2 by congr
+  }
+  on _ { }

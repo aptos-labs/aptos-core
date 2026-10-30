@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/signed_int/cast.move:54:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/cast.move:53:5: error: verex verification failed: the automatic verification of `aborting_i8_cast_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/cast.proof.lean`:
-  verify aborting_i8_cast_incorrect by
+  verify aborting_i8_cast_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -9,7 +9,7 @@ tests/sources/functional/signed_int/cast.move:53:5: error: verex verification fa
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/cast.move:68:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/cast.move:67:5: error: verex verification failed: the automatic verification of `aborting_i16_cast_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/cast.proof.lean`:
-  verify aborting_i16_cast_incorrect by
+  verify aborting_i16_cast_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -17,7 +17,7 @@ tests/sources/functional/signed_int/cast.move:67:5: error: verex verification fa
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/cast.move:82:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/cast.move:81:5: error: verex verification failed: the automatic verification of `aborting_i32_cast_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/cast.proof.lean`:
-  verify aborting_i32_cast_incorrect by
+  verify aborting_i32_cast_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -25,7 +25,7 @@ tests/sources/functional/signed_int/cast.move:81:5: error: verex verification fa
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/cast.move:96:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/cast.move:95:5: error: verex verification failed: the automatic verification of `aborting_i64_cast_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/cast.proof.lean`:
-  verify aborting_i64_cast_incorrect by
+  verify aborting_i64_cast_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
@@ -33,7 +33,7 @@ tests/sources/functional/signed_int/cast.move:95:5: error: verex verification fa
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/signed_int/cast.move:110:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/signed_int/cast.move:109:5: error: verex verification failed: the automatic verification of `aborting_i128_cast_incorrect` failed; provide a proof in `tests/sources/functional/signed_int/cast.proof.lean`:
-  verify aborting_i128_cast_incorrect by
+  verify aborting_i128_cast_incorrect by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

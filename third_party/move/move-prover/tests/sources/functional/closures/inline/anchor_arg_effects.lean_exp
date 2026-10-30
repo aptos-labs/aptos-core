@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/inline/anchor_arg_effects.move:48:5: error: the assertion `with_state_anchor!(1, global<R>(a).v == old(global<R>(a).v) + 1)` does not hold
 tests/sources/functional/closures/inline/anchor_arg_effects.move:54:5: error: verex verification failed: the automatic verification of `noop_after_bump` failed; provide a proof in `tests/sources/functional/closures/inline/anchor_arg_effects.proof.lean`:
-  verify noop_after_bump by
+  verify noop_after_bump by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

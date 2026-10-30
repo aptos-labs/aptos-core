@@ -756,7 +756,7 @@ mutual
     | .deref base => pure s!"(*{← placeText context loops base sourceLoc (fuel - 1)})"
     | .field base _ field =>
         pure s!"({← placeText context loops base sourceLoc (fuel - 1)}).{← fieldSelector context.unit.tables field}"
-    -- The Rust profile declares no ghost fields (`designs/ghost-fields.md`).
+    -- The Rust profile declares no ghost fields (`doc/designs/ghost-fields.md`).
     | .ghostField .. => throw "a ghost field place has no Rust source"
     | .index base index =>
         let baseText ← placeText context loops base sourceLoc (fuel - 1)

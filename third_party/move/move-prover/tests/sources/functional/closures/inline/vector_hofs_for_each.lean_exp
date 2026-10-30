@@ -49,7 +49,7 @@ warning: cannot derive `aborts_of` exactly for this lambda argument: per-applica
 
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:26:13: error: the loop invariant `∀ (j in 0 .. i), result[j] == v[j] * 3` is not preserved by an iteration
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: verex verification failed: the automatic verification of `map_double_wrong` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
-  verify map_double_wrong by
+  verify map_double_wrong by lean =>
     verex_obligations
     verex_on
     | invariant_4_step => verex_prepare; sorry
@@ -57,7 +57,7 @@ tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:103:9: error: the specification clause `ensures result ==> v.length > spec.result[1] && v[spec.result[1]] == x` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: verex verification failed: the automatic verification of `find_value` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
-  verify find_value by
+  verify find_value by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -113,8 +113,7 @@ permitted_2 :
     0 ≤ i →
       i < ↑old_v.values.size →
         (old_v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
-            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                    (initialState✝
+            ((initialState✝
                       {
                         type :=
                           VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
@@ -122,8 +121,8 @@ permitted_2 :
                             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                               VerexIR.Proofs.Denote.NRow.nil),
                         arguments := VerexIR.Proofs.Denote.NRow.nil }
-                      (VerexIR.StorageKey.address a))).getD
-                VerexIR.RuntimeValue.unit).asInt ≤
+                      (VerexIR.StorageKey.address a)).getD
+                  ({ val := 0, fits := ⋯ }, ())).fst.val ≤
           18446744073709551615
 v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
 i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
@@ -139,7 +138,7 @@ invariant_4 :
 a✝ : ↑old_v.values.size ≤ i.val
 this✝ :
   VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
-    ((old_v, v), a, PUnit.unit) initialState✝
+    ((old_v, v), a, ()) initialState✝
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -249,7 +248,6 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
 x✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
 ⊢ state✝ = initialState✝
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:246:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verification failed with a residual obligation:
 case h_1.right
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -300,8 +298,7 @@ permitted_2 :
     0 ≤ i →
       i < ↑old_v.values.size →
         (old_v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
-            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                    (initialState✝
+            ((initialState✝
                       {
                         type :=
                           VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
@@ -309,8 +306,8 @@ permitted_2 :
                             (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                               VerexIR.Proofs.Denote.NRow.nil),
                         arguments := VerexIR.Proofs.Denote.NRow.nil }
-                      (VerexIR.StorageKey.address a))).getD
-                VerexIR.RuntimeValue.unit).asInt ≤
+                      (VerexIR.StorageKey.address a)).getD
+                  ({ val := 0, fits := ⋯ }, ())).fst.val ≤
           18446744073709551615
 v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
 i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
@@ -326,7 +323,7 @@ invariant_4 :
 a✝ : ↑old_v.values.size ≤ i.val
 this✝ :
   VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
-    ((old_v, v), a, PUnit.unit) initialState✝
+    ((old_v, v), a, ()) initialState✝
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
@@ -350,8 +347,7 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                 i < ↑(v, v).snd.values.size →
                   ((v, v).snd.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val =
                     (old_v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
-                      ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
-                              (final
+                      ((final
                                 {
                                   type :=
                                     VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
@@ -359,8 +355,8 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
                                         VerexIR.Proofs.Denote.NRow.nil),
                                   arguments := VerexIR.Proofs.Denote.NRow.nil }
-                                (VerexIR.StorageKey.address a))).getD
-                          VerexIR.RuntimeValue.unit).asInt) ∧
+                                (VerexIR.StorageKey.address a)).getD
+                            ({ val := 0, fits := ⋯ }, ())).fst.val) ∧
           final = initialState✝)
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/closures/inline/.verex/vector_hofs_for_each.move.lean" 13972
@@ -488,18 +484,19 @@ reference✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
 x : reference✝.fst = reference✝.snd
 ⊢ state✝ = initialState✝
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:245:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:246:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verex verification failed: the automatic verification of `bump_all` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
-  verify bump_all by
+  verify bump_all by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:267:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:263:5: error: verex verification failed: the automatic verification of `bump_all_via_call` failed; provide a proof in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean`:
-  verify bump_all_via_call by
+  verify bump_all_via_call by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

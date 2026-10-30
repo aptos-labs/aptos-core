@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/intrinsic_errors.move:13:9: error: the specification clause `ensures result == 2` is not established
 VerexE2ETests/SourceVerify/intrinsic_errors.move:11:5: error: verex verification failed: the automatic verification of `one` failed; provide a proof in `VerexE2ETests/SourceVerify/intrinsic_errors.proof.lean`:
-  verify one by
+  verify one by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

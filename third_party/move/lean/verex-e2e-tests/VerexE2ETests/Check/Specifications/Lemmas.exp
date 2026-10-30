@@ -5,7 +5,7 @@ VerexE2ETests/Check/Specifications/Lemmas.lean:101:13: warning: unused terminati
 VerexE2ETests/Check/Specifications/Lemmas.lean:101:13: error: verex verification failed: the lemma `upper_bound` is not established
 VerexE2ETests/Check/Specifications/Lemmas.lean:112:15: error: the requirement of the lemma applied at `needs_positive(x)` does not hold
 VerexE2ETests/Check/Specifications/Lemmas.lean:114:7: error: verex verification failed: the automatic verification of `might_be_zero` failed; provide a proof in the module:
-  verify might_be_zero by
+  verify might_be_zero by lean =>
     verex_obligations
     verex_on
     | apply_1 => verex_prepare; sorry
@@ -13,7 +13,7 @@ VerexE2ETests/Check/Specifications/Lemmas.lean:114:7: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/Lemmas.lean:118:15: error: the requirement of the lemma applied at `x >= 0 ==> add_zero_right(x)` does not hold
 VerexE2ETests/Check/Specifications/Lemmas.lean:120:7: error: verex verification failed: the automatic verification of `out_of_range` failed; provide a proof in the module:
-  verify out_of_range by
+  verify out_of_range by lean =>
     verex_obligations
     verex_on
     | apply_1 => verex_prepare; sorry
@@ -21,7 +21,7 @@ VerexE2ETests/Check/Specifications/Lemmas.lean:120:7: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/Lemmas.lean:126:4: error: the specification clause `ensures prefix_sum(v, i) + v[i] <= prefix_sum(v, v.length)` is not established
 VerexE2ETests/Check/Specifications/Lemmas.lean:124:7: error: verex verification failed: the automatic verification of `step_bound_unapplied` failed; provide a proof in the module:
-  verify step_bound_unapplied by
+  verify step_bound_unapplied by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -29,7 +29,7 @@ VerexE2ETests/Check/Specifications/Lemmas.lean:124:7: error: verex verification 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Specifications/Lemmas.lean:141:4: error: the specification clause `ensures result == x` is not established
 VerexE2ETests/Check/Specifications/Lemmas.lean:139:7: error: verex verification failed: the automatic verification of `needs_unestablished` failed; provide a proof in the module:
-  verify needs_unestablished by
+  verify needs_unestablished by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

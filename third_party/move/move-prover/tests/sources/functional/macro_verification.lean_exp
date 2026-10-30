@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/macro_verification.move:32:9: error: the specification clause `ensures ∀ (i in range(v)), v[i] == old(v)[i] + 2` is not established
 tests/sources/functional/macro_verification.move:29:5: error: verex verification failed: the automatic verification of `foreach` failed; provide a proof in `tests/sources/functional/macro_verification.proof.lean`:
-  verify foreach by
+  verify foreach by lean =>
     verex_obligations
     verex_on
     | ensures_3 => verex_prepare; sorry
@@ -9,19 +9,19 @@ tests/sources/functional/macro_verification.move:29:5: error: verex verification
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/macro_verification.move:57:9: error: the specification clause `ensures v.length <= 4 ==> result == spec_sum(v, v.length) + 1` is not established
 tests/sources/functional/macro_verification.move:54:5: error: verex verification failed: the automatic verification of `reduce` failed; provide a proof in `tests/sources/functional/macro_verification.proof.lean`:
-  verify reduce by
+  verify reduce by lean =>
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/macro_verification.move:76:9: error: the specification clause `ensures result == x + y + y` is not established
 tests/sources/functional/macro_verification.move:75:9: error: the specification clause `ensures result == x + y + z` is not established
+tests/sources/functional/macro_verification.move:76:9: error: the specification clause `ensures result == x + y + y` is not established
 tests/sources/functional/macro_verification.move:74:5: error: verex verification failed: the automatic verification of `reduce_test` failed; provide a proof in `tests/sources/functional/macro_verification.proof.lean`:
-  verify reduce_test by
+  verify reduce_test by lean =>
     verex_obligations
     verex_on
-    | ensures_2 => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

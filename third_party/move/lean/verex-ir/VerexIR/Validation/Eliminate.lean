@@ -9,7 +9,7 @@ import VerexIR.Validation.Validated
 
 The borrow certificates record where each mutable loan dies: before an
 anchor expression runs, or after it produced a value, per
-[`designs/prophetic-references.md`](../../../designs/prophetic-references.md).
+[`doc/designs/prophetic-references.md`](../../../designs/prophetic-references.md).
 The semantics reads them at the anchor (`loanDeathsAt`), so the validated
 unit is the one every consumer reads: its expression indexes are the ones
 the interpreter, the big-step relation, and compilation see.

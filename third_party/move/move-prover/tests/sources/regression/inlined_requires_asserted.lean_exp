@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/inlined_requires_asserted.move:131:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/inlined_requires_asserted.move:130:5: error: verex verification failed: the automatic verification of `pub_entry` failed; provide a proof in the module:
-  verify pub_entry by
+  verify pub_entry by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -9,35 +9,35 @@ tests/sources/regression/inlined_requires_asserted.move:130:5: error: verex veri
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/inlined_requires_asserted.move:14:9: error: the precondition `requires x < 10` of `g` does not hold at this call
 tests/sources/regression/inlined_requires_asserted.move:29:5: error: verex verification failed: the automatic verification of `pub_entry` failed; provide a proof in the module:
-  verify pub_entry by
+  verify pub_entry by lean =>
     verex_obligations
     verex_on
-    | requires_of_g => verex_prepare; sorry
+    | requires_1_of_g => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/inlined_requires_asserted.move:72:9: error: the precondition `requires x < 10` of `g` does not hold at this call
 tests/sources/regression/inlined_requires_asserted.move:88:9: error: the specification clause `ensures result == 0` is not established
-tests/sources/regression/inlined_requires_asserted.move:87:5: error: the precondition of `g` is not established
 tests/sources/regression/inlined_requires_asserted.move:87:5: error: verex verification failed: the automatic verification of `pub_entry` failed; provide a proof in the module:
-  verify pub_entry by
+  verify pub_entry by lean =>
     verex_obligations
     verex_on
+    | requires_1_of_g => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
-    | requires_of_g => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/inlined_requires_asserted.move:39:9: error: the precondition `requires x < 10` of `g` does not hold at this call
 tests/sources/regression/inlined_requires_asserted.move:54:5: error: verex verification failed: the automatic verification of `pub_entry` failed; provide a proof in the module:
-  verify pub_entry by
+  verify pub_entry by lean =>
     verex_obligations
     verex_on
-    | requires_of_g => verex_prepare; sorry
+    | requires_1_of_g => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/regression/inlined_requires_asserted.move:39:9: error: the precondition `requires x < 10` of `g` does not hold at this call
+tests/sources/regression/inlined_requires_asserted.move:39:9: error: the precondition `requires x < 10` of `g` does not hold at call 1
 tests/sources/regression/inlined_requires_asserted.move:61:5: error: verex verification failed: the automatic verification of `direct` failed; provide a proof in the module:
-  verify direct by
+  verify direct by lean =>
     verex_obligations
     verex_on
-    | requires_of_g => verex_prepare; sorry
+    | requires_1_of_g_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -59,7 +59,22 @@ deriving instance ToJson, FromJson for
   SurfaceSyntax, GlobalKind, PrimitiveOperation, ReferenceOperation,
   DataOperation, MemoryRange, TraceKind, BehaviorKind, SpecOperation, Operation, Place,
   QuantifierKind, MatchArm, QuantifierBinder, ConditionKind, Condition, Frame,
-  SpecBlock, ExprKind, Expr, PatternKind, Pattern, BinderKind, GenericBinder,
+  SpecBlock, ExprKind, ExprOrigin
+
+/-- An expression's origin is present only where an import pass records one,
+so expressions without one keep their canonical encoding. -/
+instance : ToJson Expr where
+  toJson expression := Json.mkObj <|
+    [("loc", toJson expression.loc), ("typeId", toJson expression.typeId),
+      ("kind", toJson expression.kind)] ++
+    (match expression.origin with
+      | some origin => [("origin", toJson origin)]
+      | none => [])
+
+deriving instance FromJson for Expr
+
+deriving instance ToJson, FromJson for
+  PatternKind, Pattern, BinderKind, GenericBinder,
   Parameter, LocalDecl, Signature, ParameterFrame, FunctionContract, ConstantDecl, FieldDecl,
   VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
   TraitDecl, AssociatedItemValue, AssociatedItemBinding, ImplDecl,

@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/proof/calc.move:72:9: error: the assertion `x + 1 + 1 == x + 3` does not hold
 tests/sources/functional/proof/calc.move:68:5: error: verex verification failed: the automatic verification of `add_two` failed; provide a proof in `tests/sources/functional/proof/calc.proof.lean`:
-  verify add_two by
+  verify add_two by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry

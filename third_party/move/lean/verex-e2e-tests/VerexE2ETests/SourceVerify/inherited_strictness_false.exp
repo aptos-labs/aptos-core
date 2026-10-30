@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/inherited_strictness_false.move:17:9: error: the specification clause `aborts_if x == 0 with 1` is not established
 VerexE2ETests/SourceVerify/inherited_strictness_false.move:15:5: error: verex verification failed: the automatic verification of `caller` failed; provide a proof in `VerexE2ETests/SourceVerify/inherited_strictness_false.proof.lean`:
-  verify caller by
+  verify caller by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry

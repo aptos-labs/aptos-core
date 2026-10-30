@@ -40,7 +40,7 @@ other native by the host. -/
 
 /-- Whether the runtime provides a function: it has no body, or it plays a
 role of a table owner, whose body the runtime does not run
-(`designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
+(`doc/designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
 def runtimeProvided (unit : ValidatedUnit) (handle : FunctionHandle)
     (declaration : FunctionDecl FunctionBody) : Bool :=
   match declaration.body with

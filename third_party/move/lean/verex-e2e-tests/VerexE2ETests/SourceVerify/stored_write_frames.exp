@@ -1,6 +1,6 @@
 VerexE2ETests/SourceVerify/stored_write_frames.move:72:9: error: the specification clause `ensures global<Config>(owner) == old(global<Config>(owner))` is not established
 VerexE2ETests/SourceVerify/stored_write_frames.move:70:5: error: verex verification failed: the automatic verification of `wrong_frame` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_write_frames.proof.lean`:
-  verify wrong_frame by
+  verify wrong_frame by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -8,7 +8,7 @@ VerexE2ETests/SourceVerify/stored_write_frames.move:70:5: error: verex verificat
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/stored_write_frames.move:82:9: error: the specification clause `ensures global<Counter<Bool> >(owner) == old(global<Counter<Bool> >(owner))` is not established
 VerexE2ETests/SourceVerify/stored_write_frames.move:79:5: error: verex verification failed: the automatic verification of `wrong_slot` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_write_frames.proof.lean`:
-  verify wrong_slot by
+  verify wrong_slot by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -16,7 +16,7 @@ VerexE2ETests/SourceVerify/stored_write_frames.move:79:5: error: verex verificat
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/stored_write_frames.move:48:5: error: the data invariant `action : Fn(Address, u64) -> u64 has Copy, Drop, Store` does not hold where a value is constructed
 VerexE2ETests/SourceVerify/stored_write_frames.move:54:5: error: verex verification failed: the automatic verification of `invalid` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_write_frames.proof.lean`:
-  verify invalid by
+  verify invalid by lean =>
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry

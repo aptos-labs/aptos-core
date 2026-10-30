@@ -1,7 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 #
-# The problems of the verification benchmark (designs/verification-benchmarks.md),
+# The problems of the verification benchmark (doc/status/verification-benchmarks.md),
 # read from the tree at the benchmarked commit. Paths are relative to the
 # repository root. A problem is `move` (modules of an in-tree package),
 # `lean` (a VerexSL file), or `rust` (a Rust file with its specification).

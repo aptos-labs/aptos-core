@@ -1,0 +1,192 @@
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:21:5: error: `assume` in a proof file is not supported yet: an assumption of an obligation has no place in the target's theorem (`doc/plan/proof-language.md`, "Semantics and lowering"); a `spec assume` in the Move proof block is an in-body assumption
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:17:21: error: the step's fact is not proved:
+  x✝³ : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x✝² : SpecInt (IntWidth.bits 64) false
+  x✝¹ : x✝² == x✝³ + 1
+  a✝¹ : 0 ≤ x✝³ + 1
+  a✝ x : x✝³ + 1 ≤ 18446744073709551615
+  i✝ : Int
+  i_lower : 0 ≤ i✝
+  i_upper : i✝ ≤ 18446744073709551615
+  x✝ : i✝ ≤ x✝³
+  x_lower : 0 ≤ x✝³
+  x_upper : x✝³ ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  i : Int
+  fact_0_guard_0 : i ≤ x✝³
+  fact_0_0_0 : i + 1 ≤ x✝²
+  ⊢ x✝² == 2 + x✝³
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:12:7: error: the step's fact is not proved:
+  x✝³ : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x✝² : SpecInt (IntWidth.bits 64) false
+  x✝¹ : x✝² == x✝³ + 1
+  a✝¹ : 0 ≤ x✝³ + 1
+  a✝ x : x✝³ + 1 ≤ 18446744073709551615
+  i✝ : Int
+  i_lower : 0 ≤ i✝
+  i_upper : i✝ ≤ 18446744073709551615
+  x✝ : i✝ ≤ x✝³
+  x_lower : 0 ≤ x✝³
+  x_upper : x✝³ ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  i : Int
+  fact_0_guard_0 : i ≤ x✝³
+  ⊢ i < x✝³
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:9:8: error: verex verification failed: the proof of `bump` does not establish its specification
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:29:12: error: the step's fact is not proved:
+  x : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x_upper : x ≤ 10
+  x_lower : 0 ≤ x
+  right✝ : x ≤ 18446744073709551615
+  i : Int
+  a✝¹ : 0 ≤ i
+  a✝ : i ≤ 18446744073709551615
+  x✝ : 10 < i
+  fact_0_0 : 10 < x → 12 ≤ x
+  «fact_0.1_guard_0» : x ≤ 10
+  ⊢ x ≤ 9
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:24:8: error: verex verification failed: the proof of `clamp` does not establish its specification
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:41:5: error: the step's fact is not proved:
+  x✝³ : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x✝² : SpecInt (IntWidth.bits 64) false
+  x✝¹ : x✝² == x✝³ + 1
+  a✝¹ : 0 ≤ x✝³ + 1
+  a✝ x : x✝³ + 1 ≤ 18446744073709551615
+  i : Int
+  i_lower : 0 ≤ i
+  i_upper : i ≤ 18446744073709551615
+  x✝ : i ≤ x✝³
+  x_lower : 0 ≤ x✝³
+  x_upper : x✝³ ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  ⊢ i < x✝³
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` does not close the obligation from the block's facts:
+  case ensures_2.right.left
+  x✝³ : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x✝² : SpecInt (IntWidth.bits 64) false
+  x✝¹ : x✝² == x✝³ + 1
+  i : Int
+  i_lower : 0 ≤ i
+  i_upper : i ≤ 18446744073709551615
+  x✝ : i ≤ x✝³
+  x_lower : 0 ≤ x✝³
+  x_upper : x✝³ ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  a✝¹ : 0 ≤ x✝²
+  a✝ x : x✝² ≤ 18446744073709551615
+  ⊢ i + 2 ≤ 18446744073709551615
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` does not close the obligation from the block's facts:
+  case ensures_2.right.right.right
+  x✝³ : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x✝² : SpecInt (IntWidth.bits 64) false
+  x✝¹ : x✝² == x✝³ + 1
+  i : Int
+  i_lower : 0 ≤ i
+  i_upper : i ≤ 18446744073709551615
+  x✝ : i ≤ x✝³
+  x_lower : 0 ≤ x✝³
+  x_upper : x✝³ ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  a✝¹ : 0 ≤ x✝²
+  a✝ x : x✝² ≤ 18446744073709551615
+  ⊢ i + 2 ≤ x✝²
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:34:3: error: `decide` does not close the obligation from the block's facts:
+  case ensures_1.right.right
+  x✝² : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  x✝¹ : SpecInt (IntWidth.bits 64) false
+  x✝ : x✝¹ == x✝² + 1
+  x_lower : 0 ≤ x✝²
+  x_upper : x✝² ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ x✝¹ ∧ x✝¹ ≤ 2 ^ 64 - 1
+  a✝¹ : 0 ≤ x✝¹
+  a✝ x : x✝¹ ≤ 18446744073709551615
+  ⊢ x✝¹ < x✝¹
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:33:8: error: verex verification failed: the proof of `pick` does not establish its specification
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:47:5: error: the step's fact is not proved:
+  p_a p_b : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  named : SpecInt (IntWidth.bits 64) false
+  named_eq : named == p_a + p_b
+  a✝² : 0 ≤ p_a + p_b
+  a✝¹ a✝ : p_a + p_b ≤ 18446744073709551615
+  i : Int
+  i_lower : 0 ≤ i
+  i_upper : i ≤ 18446744073709551615
+  x✝ : i ≤ p_a
+  p_a_lower : 0 ≤ p_a
+  p_a_upper : p_a ≤ 2 ^ 64 - 1
+  p_b_lower : 0 ≤ p_b
+  p_b_upper : p_b ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ named ∧ named ≤ 2 ^ 64 - 1
+  ⊢ i ≤ p_b
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:45:8: error: verex verification failed: the proof of `total` does not establish its specification
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:53:5: error: the step's fact is not proved:
+  x : (Proofs.Denote.NTy.int 64 false).carrier
+  assumed : True
+  permitted : x + 2 ≤ 18446744073709551615
+  old_inc_result : inc.shape.carrier
+  a✝³ : x + 1 ≤ 18446744073709551615
+  inc_result : inc.shape.carrier
+  final : Proofs.Denote.Memory unit
+  a✝² : old_inc_result + 1 ≤ 18446744073709551615
+  old_inc_ensures_1 : x < old_inc_result
+  old_inc_ensures_2 : old_inc_result ≤ x + 1
+  inc_ensures_1 : old_inc_result < inc_result
+  inc_ensures_2 : inc_result ≤ old_inc_result + 1
+  named : SpecInt (IntWidth.bits 64) false
+  named_eq : named == inc_result - 1
+  a✝¹ : 0 ≤ inc_result - 1
+  a✝ : inc_result - 1 ≤ 18446744073709551615
+  i : Int
+  i_lower : 0 ≤ i
+  i_upper : i ≤ 18446744073709551615
+  x✝ : i ≤ x
+  x_lower : 0 ≤ x
+  x_upper : x ≤ 2 ^ 64 - 1
+  old_inc_result_lower : 0 ≤ old_inc_result
+  old_inc_result_upper : old_inc_result ≤ 2 ^ 64 - 1
+  inc_result_lower : 0 ≤ inc_result
+  inc_result_upper : inc_result ≤ 2 ^ 64 - 1
+  bounds : 0 ≤ named ∧ named ≤ 2 ^ 64 - 1
+  ⊢ old_inc_result + 2 ≤ inc_result
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:51:8: error: verex verification failed: the proof of `twice` does not establish its specification
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:58:3: error: `decide` does not close the obligation from the block's facts:
+  case requires_1_of_same_at_call_1.right.right
+  m : (Proofs.Denote.NTy.int 64 false).carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  permitted : m + m + 2 ≤ 18446744073709551615
+  a✝³ : 0 ≤ m + m
+  a✝² : m + m ≤ 18446744073709551615
+  a✝¹ : 0 ≤ m + m + 2
+  a✝ : m + m + 2 ≤ 18446744073709551615
+  bounds : 0 ≤ m ∧ m ≤ 2 ^ 64 - 1
+  ⊢ 2 * m == m + m + 2
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:7:1: error: unsolved goals
+case requires_1_of_same_at_call_1.right.right
+m : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed : True
+permitted : m.val + m.val + 2 ≤ 18446744073709551615
+a✝³ : 0 ≤ m.val + m.val
+a✝² : m.val + m.val ≤ 18446744073709551615
+a✝¹ : 0 ≤ m.val + m.val + 2
+a✝ : m.val + m.val + 2 ≤ 18446744073709551615
+bounds : 0 ≤ m.val ∧ m.val ≤ 2 ^ 64 - 1
+⊢ 2 * m.val = m.val + m.val + 2
+VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:57:8: error: verex verification failed: the proof of `same_flag` does not establish its specification

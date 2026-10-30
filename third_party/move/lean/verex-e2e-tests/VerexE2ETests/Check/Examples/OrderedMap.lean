@@ -68,8 +68,8 @@ verex module 0x42::ordered_map where
     aborts_if false
 
   /-- An entry left of the middle, whose key is below the needle, is below it. -/
-  theorem search_below (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : Int → RuntimeValue) (needle : RuntimeValue) (size : Int) (low middle i : Int)
+  theorem search_below {α : Type} (order : α → α → Ordering)
+      (key : Int → α) (needle : α) (size : Int) (low middle i : Int)
       (transitive : Std.TransCmp order)
       (sorted : ∀ i j : Int, 0 ≤ i → i < j → j < size → order (key i) (key j) = .lt)
       (below : ∀ i : Int, 0 ≤ i → i < low → order (key i) needle = .lt)
@@ -83,8 +83,8 @@ verex module 0x42::ordered_map where
 
   /-- An entry right of the middle, whose key is not below the needle, is not
   below it. -/
-  theorem search_above (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : Int → RuntimeValue) (needle : RuntimeValue) (size : Int) (high middle i : Int)
+  theorem search_above {α : Type} (order : α → α → Ordering)
+      (key : Int → α) (needle : α) (size : Int) (high middle i : Int)
       (transitive : Std.TransCmp order)
       (sorted : ∀ i j : Int, 0 ≤ i → i < j → j < size → order (key i) (key j) = .lt)
       (above : ∀ i : Int, high ≤ i → i < size → ¬order (key i) needle = .lt)
@@ -97,19 +97,19 @@ verex module 0x42::ordered_map where
     intro lt
     exact atMiddle (Std.TransCmp.lt_trans (sorted middle i h0 (by omega) hsize) lt)
 
-  verify! lower_bound_loop by
+  verify! lower_bound_loop by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    case requires_of_lower_bound_loop_1 =>
-      apply search_above (order := RuntimeValue.order _) (i := i) (high := high.val)
+    case requires_3_of_lower_bound_loop_at_call_2 =>
+      apply search_above (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (high := high.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
         | assumption
         | omega
         | infer_instance
         | (rw [‹(_ : Array _)[_]? = some _›]; assumption)
-    case requires_of_lower_bound_loop_7 =>
-      apply search_below (order := RuntimeValue.order _) (i := i) (low := low.val)
+    case requires_2_of_lower_bound_loop_at_call_1 =>
+      apply search_below (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (low := low.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
         | assumption
@@ -162,8 +162,8 @@ verex module 0x42::ordered_map where
 
   /-- Nothing below the lower bound carries the needle; past the end nothing
   is left. -/
-  theorem absent_past_end (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : Int → RuntimeValue) (needle : RuntimeValue) (size : Int) (index : Int)
+  theorem absent_past_end {α : Type} (order : α → α → Ordering)
+      (key : Int → α) (needle : α) (size : Int) (index : Int)
       (transitive : Std.TransCmp order)
       (below : ∀ i : Int, 0 ≤ i → i < index → order (key i) needle = .lt)
       (past : size ≤ index) :
@@ -175,9 +175,9 @@ verex module 0x42::ordered_map where
 
   /-- At the lower bound of a sorted range the needle is present exactly when
   the entry there carries it. -/
-  theorem present_at_bound (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : Int → RuntimeValue) (needle : RuntimeValue) (size : Int) (index : Int)
-      (value : RuntimeValue) (transitive : Std.TransCmp order)
+  theorem present_at_bound {α : Type} (order : α → α → Ordering)
+      (key : Int → α) (needle : α) (size : Int) (index : Int)
+      (value : α) (transitive : Std.TransCmp order)
       (sorted : ∀ i j : Int, 0 ≤ i → i < j → j < size → order (key i) (key j) = .lt)
       (below : ∀ i : Int, 0 ≤ i → i < index → order (key i) needle = .lt)
       (above : ∀ i : Int, index ≤ i → i < size → ¬order (key i) needle = .lt)
@@ -194,18 +194,17 @@ verex module 0x42::ordered_map where
       rw [i2] at h
       exact absurd h (above index (Int.le_refl _) hi)
 
-  verify contains by
+  verify contains by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case ensures_1_1 =>
-      apply absent_past_end (order := RuntimeValue.order _)
+      apply absent_past_end (order := VerexIR.Proofs.Denote.TypedOrder.order _ _)
       all_goals first
         | assumption
         | omega
         | infer_instance
     case ensures_1_2 =>
-      rw [← (Proofs.Codec.encode_injective _).eq_iff]
-      apply present_at_bound (order := RuntimeValue.order _)
+      apply present_at_bound (order := VerexIR.Proofs.Denote.TypedOrder.order _ _)
       all_goals first
         | assumption
         | omega
@@ -227,33 +226,37 @@ verex module 0x42::ordered_map where
     aborts_if !has_key(map.entries, key) with 2
 
   /-- An entry found at a position is the lookup there. -/
-  theorem entryAt_found {α : Type} (project : α → RuntimeValue) (xs : Array α) (i : Int)
+  theorem entryAt_found {α β : Type} (project : α → β) (xs : Array α) (d : α) (i : Int)
       (e : α) (found : xs[i.toNat]? = some e) :
-      (Option.map project xs[i.toNat]?).getD .unit = project e := by
+      project (xs[i.toNat]?.getD d) = project e := by
     simp [found]
 
   /-- An entry found at a position carries its key there. -/
-  theorem present {α : Type} (key : α → RuntimeValue) (xs : Array α) (i : Int) (e : α)
+  theorem present {α β : Type} (key : α → β) (xs : Array α) (d : α) (i : Int) (e : α)
       (found : xs[i.toNat]? = some e) (h0 : 0 ≤ i) (hi : i < xs.size) :
-      ∃ a : Int, 0 ≤ a ∧ a < xs.size ∧ (Option.map key xs[a.toNat]?).getD .unit = key e :=
-    ⟨i, h0, hi, entryAt_found key xs i e found⟩
+      ∃ a : Int, 0 ≤ a ∧ a < xs.size ∧ key (xs[a.toNat]?.getD d) = key e :=
+    ⟨i, h0, hi, entryAt_found key xs d i e found⟩
 
   /-- An entry found at a position carries its key and value there. -/
-  theorem present_with {α : Type} (key value : α → RuntimeValue) (xs : Array α) (i : Int)
-      (e : α) (found : xs[i.toNat]? = some e) (h0 : 0 ≤ i) (hi : i < xs.size) :
-      ∃ a : Int, 0 ≤ a ∧ a < xs.size ∧ (Option.map key xs[a.toNat]?).getD .unit = key e ∧
-        (Option.map value xs[a.toNat]?).getD .unit = value e :=
-    ⟨i, h0, hi, entryAt_found key xs i e found, entryAt_found value xs i e found⟩
+  theorem present_with {α β γ : Type} (key : α → β) (value : α → γ) (xs : Array α) (d : α)
+      (i : Int) (e : α) (found : xs[i.toNat]? = some e) (h0 : 0 ≤ i) (hi : i < xs.size) :
+      ∃ a : Int, 0 ≤ a ∧ a < xs.size ∧ key (xs[a.toNat]?.getD d) = key e ∧
+        value (xs[a.toNat]?.getD d) = value e :=
+    ⟨i, h0, hi, entryAt_found key xs d i e found, entryAt_found value xs d i e found⟩
+
+  /-- An entry found at a position whose key is not the needle. -/
+  theorem found_ne {α β : Type} (key : α → β) (xs : Array α) (d : α) (i : Int) (e : α)
+      (needle : β) (found : xs[i.toNat]? = some e) (different : ¬key e = needle) :
+      key (xs[i.toNat]?.getD d) ≠ needle := by
+    rw [found]; exact different
 
   /-- Past the end, nothing below the lower bound carries the needle. -/
-  theorem absent_past {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : α → RuntimeValue) (transitive : Std.TransCmp order) (xs : Array α)
-      (index : Int) (needle : RuntimeValue)
-      (below : ∀ a : Int, 0 ≤ a → a < index →
-        order ((Option.map key xs[a.toNat]?).getD .unit) needle = .lt)
+  theorem absent_past {α β : Type} (order : β → β → Ordering)
+      (key : α → β) (transitive : Std.TransCmp order) (xs : Array α) (d : α)
+      (index : Int) (needle : β)
+      (below : ∀ a : Int, 0 ≤ a → a < index → order (key (xs[a.toNat]?.getD d)) needle = .lt)
       (past : xs.size ≤ index) :
-      ∀ a : Int, 0 ≤ a → a < xs.size →
-        ¬(Option.map key xs[a.toNat]?).getD .unit = needle := by
+      ∀ a : Int, 0 ≤ a → a < xs.size → ¬key (xs[a.toNat]?.getD d) = needle := by
     intro a a0 a1 a2
     have lt := below a a0 (by omega)
     rw [a2, Std.ReflCmp.compare_self (cmp := order)] at lt
@@ -261,20 +264,17 @@ verex module 0x42::ordered_map where
 
   /-- At the lower bound of increasing keys, an entry without the needle
   means the needle is absent. -/
-  theorem absent_at {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : α → RuntimeValue) (transitive : Std.TransCmp order) (xs : Array α)
-      (index : Int) (needle : RuntimeValue)
+  theorem absent_at {α β : Type} (order : β → β → Ordering)
+      (key : α → β) (transitive : Std.TransCmp order) (xs : Array α) (d : α)
+      (index : Int) (needle : β)
       (sorted : ∀ a b : Int, 0 ≤ a → a < b → b < xs.size →
-        order ((Option.map key xs[a.toNat]?).getD .unit)
-          ((Option.map key xs[b.toNat]?).getD .unit) = .lt)
-      (below : ∀ a : Int, 0 ≤ a → a < index →
-        order ((Option.map key xs[a.toNat]?).getD .unit) needle = .lt)
+        order (key (xs[a.toNat]?.getD d)) (key (xs[b.toNat]?.getD d)) = .lt)
+      (below : ∀ a : Int, 0 ≤ a → a < index → order (key (xs[a.toNat]?.getD d)) needle = .lt)
       (above : ∀ a : Int, index ≤ a → a < xs.size →
-        ¬order ((Option.map key xs[a.toNat]?).getD .unit) needle = .lt)
+        ¬order (key (xs[a.toNat]?.getD d)) needle = .lt)
       (h0 : 0 ≤ index) (hi : index < xs.size)
-      (miss : (Option.map key xs[index.toNat]?).getD .unit ≠ needle) :
-      ∀ a : Int, 0 ≤ a → a < xs.size →
-        ¬(Option.map key xs[a.toNat]?).getD .unit = needle := by
+      (miss : key (xs[index.toNat]?.getD d) ≠ needle) :
+      ∀ a : Int, 0 ≤ a → a < xs.size → ¬key (xs[a.toNat]?.getD d) = needle := by
     intro a a0 a1 a2
     rcases Int.lt_trichotomy a index with lt | eq | gt
     · have lt := below a a0 lt
@@ -285,16 +285,15 @@ verex module 0x42::ordered_map where
       rw [a2] at step
       exact above index (Int.le_refl _) hi step
 
-  verify borrow by
+  verify borrow by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals first
-      | (apply absent_past (order := RuntimeValue.order _) <;>
+      | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
-      | (apply absent_at (order := RuntimeValue.order _) <;>
+      | (apply absent_at (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance |
-            (rw [entryAt_found (found := ‹_›)]; intro same
-             exact ‹¬_ = _› (Proofs.Codec.encode_injective _ same)))
+            (apply found_ne Prod.fst <;> assumption))
 
   -- ## Update
 
@@ -316,12 +315,12 @@ verex module 0x42::ordered_map where
     aborts_if has_key(map.entries, key) with 1
 
   /-- A lookup after an insertion. -/
-  theorem entryAt_insert {α : Type} (project : α → RuntimeValue) (xs : Array α) (i : Int)
+  theorem entryAt_insert {α β : Type} (project : α → β) (xs : Array α) (d : α) (i : Int)
       (e : α) (h : i.toNat ≤ xs.size) (hi : 0 ≤ i) (k : Int) (hk : 0 ≤ k) :
-      (Option.map project (xs.insertIdx i.toNat e h)[k.toNat]?).getD .unit =
-        if k < i then (Option.map project xs[k.toNat]?).getD .unit
+      project ((xs.insertIdx i.toNat e h)[k.toNat]?.getD d) =
+        if k < i then project (xs[k.toNat]?.getD d)
         else if k = i then project e
-        else (Option.map project xs[(k - 1).toNat]?).getD .unit := by
+        else project (xs[(k - 1).toNat]?.getD d) := by
     simp only [Array.getElem?_insertIdx]
     by_cases lt : k < i
     · rw [if_pos (by omega), if_pos lt]
@@ -331,9 +330,9 @@ verex module 0x42::ordered_map where
       · rw [if_neg (by omega), if_neg eq, show k.toNat - 1 = (k - 1).toNat by omega]
 
   /-- A key not below the needle and different from it is above it. -/
-  theorem above_of_not_below (order : RuntimeValue → RuntimeValue → Ordering)
+  theorem above_of_not_below {β : Type} (order : β → β → Ordering)
       (transitive : Std.TransCmp order) (lawful : Std.LawfulEqCmp order)
-      (a b : RuntimeValue) (notBelow : ¬order a b = .lt) (different : a ≠ b) :
+      (a b : β) (notBelow : ¬order a b = .lt) (different : a ≠ b) :
       order b a = .lt := by
     cases e : order a b
     · exact absurd e notBelow
@@ -341,28 +340,25 @@ verex module 0x42::ordered_map where
     · exact Std.OrientedCmp.gt_iff_lt.mp e
 
   /-- Inserting a key at its lower bound keeps the keys increasing. -/
-  theorem sorted_insert {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : α → RuntimeValue) (transitive : Std.TransCmp order)
-      (lawful : Std.LawfulEqCmp order) (xs : Array α) (i : Int) (e : α)
+  theorem sorted_insert {α β : Type} (order : β → β → Ordering)
+      (key : α → β) (transitive : Std.TransCmp order)
+      (lawful : Std.LawfulEqCmp order) (xs : Array α) (d : α) (i : Int) (e : α)
       (h : i.toNat ≤ xs.size) (hi : 0 ≤ i)
       (sorted : ∀ a b : Int, 0 ≤ a → a < b → b < xs.size →
-        order ((Option.map key xs[a.toNat]?).getD .unit)
-          ((Option.map key xs[b.toNat]?).getD .unit) = .lt)
-      (below : ∀ a : Int, 0 ≤ a → a < i →
-        order ((Option.map key xs[a.toNat]?).getD .unit) (key e) = .lt)
+        order (key (xs[a.toNat]?.getD d)) (key (xs[b.toNat]?.getD d)) = .lt)
+      (below : ∀ a : Int, 0 ≤ a → a < i → order (key (xs[a.toNat]?.getD d)) (key e) = .lt)
       (above : ∀ a : Int, i ≤ a → a < xs.size →
-        ¬order ((Option.map key xs[a.toNat]?).getD .unit) (key e) = .lt)
-      (absent : ∀ a : Int, 0 ≤ a → a < xs.size →
-        ¬(Option.map key xs[a.toNat]?).getD .unit = key e) :
+        ¬order (key (xs[a.toNat]?.getD d)) (key e) = .lt)
+      (absent : ∀ a : Int, 0 ≤ a → a < xs.size → ¬key (xs[a.toNat]?.getD d) = key e) :
       ∀ a b : Int, 0 ≤ a → a < b → b < ((xs.size + 1 : Nat) : Int) →
-        order ((Option.map key (xs.insertIdx i.toNat e h)[a.toNat]?).getD .unit)
-          ((Option.map key (xs.insertIdx i.toNat e h)[b.toNat]?).getD .unit) = .lt := by
+        order (key ((xs.insertIdx i.toNat e h)[a.toNat]?.getD d))
+          (key ((xs.insertIdx i.toNat e h)[b.toNat]?.getD d)) = .lt := by
     have greater : ∀ a : Int, i ≤ a → a < xs.size →
-        order (key e) ((Option.map key xs[a.toNat]?).getD .unit) = .lt :=
+        order (key e) (key (xs[a.toNat]?.getD d)) = .lt :=
       fun a h1 h2 => above_of_not_below order transitive lawful _ _ (above a h1 h2)
         fun same => absent a (by omega) h2 same
     intro a b h0 hab hb
-    rw [entryAt_insert key xs i e h hi a h0, entryAt_insert key xs i e h hi b (by omega)]
+    rw [entryAt_insert key xs d i e h hi a h0, entryAt_insert key xs d i e h hi b (by omega)]
     by_cases a1 : a < i
     · rw [if_pos a1]
       by_cases b1 : b < i
@@ -380,38 +376,39 @@ verex module 0x42::ordered_map where
 
   /-- An insertion at a position: the new entry there, the entries before it
   in place, those after it shifted up by one. -/
-  theorem insert_at {α : Type} (key value entry : α → RuntimeValue) (xs : Array α) (i : Int)
-      (e : α) (h : i.toNat ≤ xs.size) (hi : 0 ≤ i) :
+  theorem insert_at {α β γ : Type} (key : α → β) (value : α → γ) (xs : Array α) (d : α)
+      (i : Int) (e : α) (h : i.toNat ≤ xs.size) (hi : 0 ≤ i) :
       ∃ p : Int, 0 ≤ p ∧ p ≤ xs.size ∧
-        (Option.map key (xs.insertIdx i.toNat e h)[p.toNat]?).getD .unit = key e ∧
-        (Option.map value (xs.insertIdx i.toNat e h)[p.toNat]?).getD .unit = value e ∧
+        key ((xs.insertIdx i.toNat e h)[p.toNat]?.getD d) = key e ∧
+        value ((xs.insertIdx i.toNat e h)[p.toNat]?.getD d) = value e ∧
         (∀ k : Int, 0 ≤ k → k < p →
-          (Option.map entry (xs.insertIdx i.toNat e h)[k.toNat]?).getD .unit =
-            (Option.map entry xs[k.toNat]?).getD .unit) ∧
+          (xs.insertIdx i.toNat e h)[k.toNat]?.getD d = xs[k.toNat]?.getD d) ∧
         (∀ k : Int, p < k → k < ((xs.size + 1 : Nat) : Int) →
-          (Option.map entry (xs.insertIdx i.toNat e h)[k.toNat]?).getD .unit =
-            (Option.map entry xs[(k - 1).toNat]?).getD .unit) := by
+          (xs.insertIdx i.toNat e h)[k.toNat]?.getD d = xs[(k - 1).toNat]?.getD d) := by
     refine ⟨i, hi, by omega, ?_, ?_, fun k h0 hk => ?_, fun k hk _ => ?_⟩
-    · rw [entryAt_insert key xs i e h hi i hi, if_neg (Int.lt_irrefl _), if_pos rfl]
-    · rw [entryAt_insert value xs i e h hi i hi, if_neg (Int.lt_irrefl _), if_pos rfl]
-    · rw [entryAt_insert entry xs i e h hi k h0, if_pos hk]
-    · rw [entryAt_insert entry xs i e h hi k (by omega), if_neg (by omega), if_neg (by omega)]
+    · rw [entryAt_insert key xs d i e h hi i hi, if_neg (Int.lt_irrefl _), if_pos rfl]
+    · rw [entryAt_insert value xs d i e h hi i hi, if_neg (Int.lt_irrefl _), if_pos rfl]
+    · have step := entryAt_insert id xs d i e h hi k h0
+      simp only [id] at step
+      rw [step, if_pos hk]
+    · have step := entryAt_insert id xs d i e h hi k (by omega)
+      simp only [id] at step
+      rw [step, if_neg (by omega), if_neg (by omega)]
 
-  verify add by
+  verify add by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    case ensures_2_1 | ensures_2_2 =>
+      apply insert_at Prod.fst (Prod.fst ∘ Prod.snd) <;> first | assumption | omega
     all_goals first
-      | (apply absent_past (order := RuntimeValue.order _) <;>
+      | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
-      | (apply absent_at (order := RuntimeValue.order _) <;>
+      | (apply absent_at (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance |
-            (rw [entryAt_found (found := ‹_›)]; intro same
-             exact ‹¬_ = _› (Proofs.Codec.encode_injective _ same)))
-      | (have found := ‹(_ : Array _)[_]? = some _›
-         apply present _ _ _ _ found <;> first | assumption | omega)
-      | (apply sorted_insert (order := RuntimeValue.order _) <;>
+            (apply found_ne Prod.fst <;> assumption))
+      | (apply present Prod.fst <;> first | assumption | omega)
+      | (apply sorted_insert (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
-      | (apply insert_at <;> first | assumption | omega)
 
   -- Remove an existing key; abort code 2 is `EKEY_NOT_FOUND`.
   public fun remove {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &mut Map<K, V>,
@@ -435,27 +432,26 @@ verex module 0x42::ordered_map where
     aborts_if !has_key(map.entries, key) with 2
 
   /-- A lookup after a removal. -/
-  theorem entryAt_erase {α : Type} (project : α → RuntimeValue) (xs : Array α) (i : Int)
+  theorem entryAt_erase {α β : Type} (project : α → β) (xs : Array α) (d : α) (i : Int)
       (h : i.toNat < xs.size) (k : Int) (hk : 0 ≤ k) :
-      (Option.map project (xs.eraseIdx i.toNat h)[k.toNat]?).getD .unit =
-        if k < i then (Option.map project xs[k.toNat]?).getD .unit
-        else (Option.map project xs[(k + 1).toNat]?).getD .unit := by
+      project ((xs.eraseIdx i.toNat h)[k.toNat]?.getD d) =
+        if k < i then project (xs[k.toNat]?.getD d)
+        else project (xs[(k + 1).toNat]?.getD d) := by
     simp only [Array.getElem?_eraseIdx]
     by_cases lt : k < i
     · rw [if_pos (by omega), if_pos lt]
     · rw [if_neg (by omega), if_neg lt, show k.toNat + 1 = (k + 1).toNat by omega]
 
   /-- Removing an entry keeps the keys increasing. -/
-  theorem sorted_erase {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
-      (key : α → RuntimeValue) (xs : Array α) (i : Int) (h : i.toNat < xs.size)
+  theorem sorted_erase {α β : Type} (order : β → β → Ordering)
+      (key : α → β) (xs : Array α) (d : α) (i : Int) (h : i.toNat < xs.size)
       (sorted : ∀ a b : Int, 0 ≤ a → a < b → b < xs.size →
-        order ((Option.map key xs[a.toNat]?).getD .unit)
-          ((Option.map key xs[b.toNat]?).getD .unit) = .lt) :
+        order (key (xs[a.toNat]?.getD d)) (key (xs[b.toNat]?.getD d)) = .lt) :
       ∀ a b : Int, 0 ≤ a → a < b → b < ((xs.size - 1 : Nat) : Int) →
-        order ((Option.map key (xs.eraseIdx i.toNat h)[a.toNat]?).getD .unit)
-          ((Option.map key (xs.eraseIdx i.toNat h)[b.toNat]?).getD .unit) = .lt := by
+        order (key ((xs.eraseIdx i.toNat h)[a.toNat]?.getD d))
+          (key ((xs.eraseIdx i.toNat h)[b.toNat]?.getD d)) = .lt := by
     intro a b h0 hab hb
-    rw [entryAt_erase key xs i h a h0, entryAt_erase key xs i h b (by omega)]
+    rw [entryAt_erase key xs d i h a h0, entryAt_erase key xs d i h b (by omega)]
     split <;> split
     · exact sorted a b h0 hab (by omega)
     · exact sorted a (b + 1) h0 (by omega) (by omega)
@@ -464,35 +460,36 @@ verex module 0x42::ordered_map where
 
   /-- A removal at a position holding an entry: the entry was there, the
   entries before it stay, those after it shift down by one. -/
-  theorem erase_at {α : Type} (key value entry : α → RuntimeValue) (xs : Array α) (i : Int)
-      (e : α) (h : i.toNat < xs.size) (hi : 0 ≤ i) (found : xs[i.toNat]? = some e) :
-      ∃ p : Int, 0 ≤ p ∧ p < xs.size ∧ (Option.map key xs[p.toNat]?).getD .unit = key e ∧
-        (Option.map value xs[p.toNat]?).getD .unit = value e ∧
-        (∀ k : Int, 0 ≤ k → k < p →
-          (Option.map entry (xs.eraseIdx i.toNat h)[k.toNat]?).getD .unit =
-            (Option.map entry xs[k.toNat]?).getD .unit) ∧
+  theorem erase_at {α β γ : Type} (key : α → β) (value : α → γ) (xs : Array α) (d : α)
+      (i : Int) (e : α) (h : i.toNat < xs.size) (hi : 0 ≤ i) (found : xs[i.toNat]? = some e) :
+      ∃ p : Int, 0 ≤ p ∧ p < xs.size ∧ key (xs[p.toNat]?.getD d) = key e ∧
+        value (xs[p.toNat]?.getD d) = value e ∧
+        (∀ k : Int, 0 ≤ k → k < p → (xs.eraseIdx i.toNat h)[k.toNat]?.getD d = xs[k.toNat]?.getD d) ∧
         (∀ k : Int, p ≤ k → k < ((xs.size - 1 : Nat) : Int) →
-          (Option.map entry (xs.eraseIdx i.toNat h)[k.toNat]?).getD .unit =
-            (Option.map entry xs[(k + 1).toNat]?).getD .unit) := by
-    refine ⟨i, hi, by omega, entryAt_found key xs i e found, entryAt_found value xs i e found,
+          (xs.eraseIdx i.toNat h)[k.toNat]?.getD d = xs[(k + 1).toNat]?.getD d) := by
+    refine ⟨i, hi, by omega, entryAt_found key xs d i e found, entryAt_found value xs d i e found,
       fun k h0 hk => ?_, fun k hk _ => ?_⟩
-    · rw [entryAt_erase entry xs i h k h0, if_pos hk]
-    · rw [entryAt_erase entry xs i h k (by omega), if_neg (by omega)]
+    · have step := entryAt_erase id xs d i h k h0
+      simp only [id] at step
+      rw [step, if_pos hk]
+    · have step := entryAt_erase id xs d i h k (by omega)
+      simp only [id] at step
+      rw [step, if_neg (by omega)]
 
-  verify remove by
+  verify remove by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+    case ensures_2 =>
+      have found := ‹(_ : Array _)[_]? = some _›
+      erw [(Array.getElem_of_getElem? found).choose_spec]
+      apply erase_at Prod.fst (Prod.fst ∘ Prod.snd) _ _ _ _ _ _ found <;> first | assumption | omega
     all_goals first
-      | (apply absent_past (order := RuntimeValue.order _) <;>
+      | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
-      | (apply absent_at (order := RuntimeValue.order _) <;>
+      | (apply absent_at (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance |
-            (rw [entryAt_found (found := ‹_›)]; intro same
-             exact ‹¬_ = _› (Proofs.Codec.encode_injective _ same)))
-      | (apply sorted_erase <;> first | assumption | omega)
-      | (have found := ‹(_ : Array _)[_]? = some _›
-         rw [(Array.getElem_of_getElem? found).choose_spec]
-         apply erase_at _ _ _ _ _ _ _ _ found <;> first | assumption | omega)
+            (apply found_ne Prod.fst <;> assumption))
+      | (apply sorted_erase (key := Prod.fst) <;> first | assumption | omega)
 
   -- ## Scenarios
 

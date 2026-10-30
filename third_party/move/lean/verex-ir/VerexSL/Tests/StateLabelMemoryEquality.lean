@@ -50,7 +50,7 @@ verify 0x42::state_label_memory_equality::caller
 error: the specification clause `ensures S.. |~ update<Counter>(addr, new Counter { value := 3 })` is not established
 ---
 error: verex verification failed: the automatic verification of `wrong_update` failed; provide a proof in the module:
-  verify wrong_update by
+  verify wrong_update by lean =>
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry

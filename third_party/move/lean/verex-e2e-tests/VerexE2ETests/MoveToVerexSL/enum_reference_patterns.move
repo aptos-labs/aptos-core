@@ -71,4 +71,18 @@ module 0x42::enum_reference_patterns {
             },
         }
     }
+
+    // A match through a reference to a stored value, its last arm a
+    // wildcard: the arms print from the variant tests.
+    enum Store has key {
+        Full { value: u64 },
+        Empty,
+    }
+
+    fun full_value(addr: address): u64 acquires Store {
+        match (&Store[addr]) {
+            Store::Full { value } => *value,
+            _ => abort 9,
+        }
+    }
 }

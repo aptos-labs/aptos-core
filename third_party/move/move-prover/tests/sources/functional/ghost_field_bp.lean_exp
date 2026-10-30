@@ -1,7 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/ghost_field_bp.move:40:23: error: the specification clause `ensures result` is not established
 tests/sources/functional/ghost_field_bp.move:40:5: error: verex verification failed: the automatic verification of `bp_exploit` failed; provide a proof in `tests/sources/functional/ghost_field_bp.proof.lean`:
-  verify bp_exploit by
+  verify bp_exploit by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

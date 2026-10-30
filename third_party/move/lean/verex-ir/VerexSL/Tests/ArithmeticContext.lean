@@ -3,6 +3,60 @@
 
 import VerexSL
 
+-- Carrier conversion maps an array while its search fuel already uses the
+-- original length. Search characterization must normalize the same length.
+example (elements : Array Nat) (encode : Nat → Nat) (eq : Nat → Nat → Bool)
+    (needle index : Nat)
+    (found : VerexIR.Proofs.Denote.findIndex? eq (elements.map encode) needle
+      elements.size 0 = some index) : index < elements.size := by
+  verex_split_search
+  all_goals simp_all only [Option.some.injEq, reduceCtorEq]
+  all_goals omega
+
+-- Partial searches still provide a bound, without claiming the full-array
+-- characterization of membership or of the first matching element.
+example {α : Type} (elements : Array α) (eq : α → α → Bool)
+    (needle : α) (fuel start index : Nat)
+    (found : VerexIR.Proofs.Denote.findIndex? eq elements needle fuel start = some index) :
+    index < elements.size := by
+  verex_split_search
+  all_goals simp_all only [Option.some.injEq, reduceCtorEq]
+  all_goals omega
+
+-- Literal shift constants must reach arithmetic preparation as numbers.
+-- Signed right shifts round downward; they are not truncating division.
+example (P : Int → Prop) (h : P 18446744073709551616) : P (Int.shiftLeft 1 64) := by
+  simp only [vir_denote_norm]
+  guard_target =ₛ P 18446744073709551616
+  exact h
+
+example (P : Int → Prop) (h : P (-48)) : P (Int.shiftLeft (-3) 4) := by
+  simp only [vir_denote_norm]
+  guard_target =ₛ P (-48)
+  exact h
+
+example (P : Int → Prop) (h : P (-3)) : P (Int.shiftLeft (-3) 0) := by
+  simp only [vir_denote_norm]
+  guard_target =ₛ P (-3)
+  exact h
+
+example (P : Int → Prop) (h : P (-2)) : P (Int.shiftRight (-3) 1) := by
+  simp only [vir_denote_norm]
+  guard_target =ₛ P (-2)
+  exact h
+
+example (P : Int → Prop) (h : P 0) : P (Int.shiftRight 3 64) := by
+  simp only [vir_denote_norm]
+  guard_target =ₛ P 0
+  exact h
+
+-- The usual exponentiation threshold also limits eager shift evaluation.
+set_option exponentiation.threshold 8 in
+example (P : Int → Prop) (h : P (Int.shiftLeft 1 16)) : P (Int.shiftLeft 1 16) := by
+  try simp only [vir_denote_norm]
+  guard_target =ₛ P (Int.shiftLeft 1 16)
+  exact h
+
 -- Distinct path binders can share preparation, while each path must still
 -- receive a proof at its own argument (including dependent local definitions).
 example : (∀ n : Nat, let k := n + 1; k > n) ∧
@@ -50,7 +104,7 @@ verex module 0x42::authored_context_sharing where
     ensures result >= x
 
 verify 0x42::authored_context_sharing::source
-verify 0x42::authored_context_sharing::copy_twice by
+verify 0x42::authored_context_sharing::copy_twice by lean =>
   verex_obligations
   verex_group_contexts
   all_goals verex_prepare only
@@ -76,8 +130,8 @@ example (x : Int) (_h : x = 255) : True := by
   fail_if_success have : (x + 1) % 256 = 1 := by verex_ground_arithmetic
   trivial
 
-example (x y : Int) (_h : x = 255) : True := by
-  fail_if_success have : (x + y) % 256 = 0 := by verex_ground_arithmetic
+example (x _y : Int) (_h : x = 255) : True := by
+  fail_if_success have : (x + _y) % 256 = 0 := by verex_ground_arithmetic
   trivial
 
 -- Conditional equations are proof facts, but expanding their own left side
@@ -96,11 +150,13 @@ example (x y : Nat) (p : Prop) (hp : p) (h : p → x = x + y) : p ∧ x + y = x 
 example (x y : Int) (h : x ≤ y) (p : Prop) (_irrelevant : p ∨ ¬p) : x < y + 1 := by
   verex_arithmetic_only
 
--- Mixed propositions are deliberately outside the fast path. The full
--- solver must still be available when such a proposition supplies the bound.
+-- Mixed propositions supply their arithmetic consequences: the conjuncts,
+-- and the negated disjuncts of a negated disjunction.
 example (x y : Int) (p : Prop) (h : x ≤ y ∧ p) : x ≤ y := by
-  fail_if_success verex_arithmetic_only
-  verex_omega
+  verex_arithmetic_only
+
+example (x y : Int) (p : Prop) (h : ¬(p ∨ y < x)) : x ≤ y := by
+  verex_arithmetic_only
 
 -- Call summaries can reuse one binder name. Rewriting by identity must find
 -- the first scalar equation even after another `consumed` shadows it.
@@ -115,32 +171,28 @@ example (amount other : VerexIR.SpecInt (.bits 64) false) (coins shares total : 
   verex_scalar_equalities
   omega
 
-open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
+open VerexIR in
 -- Membership, equal cardinality and distinctness jointly rule out a failed
 -- search. This is the branch pool_u64 leaves when it ignores index_of's flag.
-example (map : RuntimeValue) (keys : Array String) (key : String)
-    (covered : ∀ i : Int, 0 ≤ i → i < keys.size →
-      Maps.hasKey map (.address ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString) = true)
-    (cardinality : Maps.size map = keys.size)
+example (map : SpecMap String Int) (keys : Array String) (key : String)
+    (covered : ∀ i : Int, 0 ≤ i → i < keys.size → SpecMap.hasKey map (keys[i.toNat]?.getD "") = true)
+    (cardinality : SpecMap.size map = keys.size)
     (distinct : ∀ i : Int, 0 ≤ i → i < keys.size → ∀ j : Int, 0 ≤ j → j < keys.size →
-      ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString =
-      ((Option.map Codec.address.encode keys[j.toNat]?).getD .unit).asString → i = j)
-    (present : Maps.hasKey map (.address key) = true)
+      keys[i.toNat]?.getD "" = keys[j.toNat]?.getD "" → i = j)
+    (present : SpecMap.hasKey map key = true)
     (missing : ∀ i : Int, 0 ≤ i → i < keys.size → ¬keys[i.toNat]? = some key) :
-    Maps.hasKey map (.address key) = false := by
+    SpecMap.hasKey map key = false := by
   verex_map_coverage_prepared
 
-open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
+open VerexIR in
 -- Equal cardinality is essential: without it the vector can omit a key.
-example (map : RuntimeValue) (keys : Array String) (key : String)
-    (_covered : ∀ i : Int, 0 ≤ i → i < keys.size →
-      Maps.hasKey map (.address ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString) = true)
+example (map : SpecMap String Int) (keys : Array String) (key : String)
+    (_covered : ∀ i : Int, 0 ≤ i → i < keys.size → SpecMap.hasKey map (keys[i.toNat]?.getD "") = true)
     (_distinct : ∀ i : Int, 0 ≤ i → i < keys.size → ∀ j : Int, 0 ≤ j → j < keys.size →
-      ((Option.map Codec.address.encode keys[i.toNat]?).getD .unit).asString =
-      ((Option.map Codec.address.encode keys[j.toNat]?).getD .unit).asString → i = j)
-    (present : Maps.hasKey map (.address key) = true)
+      keys[i.toNat]?.getD "" = keys[j.toNat]?.getD "" → i = j)
+    (present : SpecMap.hasKey map key = true)
     (_missing : ∀ i : Int, 0 ≤ i → i < keys.size → ¬keys[i.toNat]? = some key) :
-    Maps.hasKey map (.address key) = true := by
+    SpecMap.hasKey map key = true := by
   fail_if_success verex_map_coverage_prepared
   exact present
 

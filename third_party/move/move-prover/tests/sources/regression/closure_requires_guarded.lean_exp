@@ -1,39 +1,39 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/closure_requires_guarded.move:99:5: error: the precondition of `reset` is not established
+tests/sources/regression/closure_requires_guarded.move:81:9: error: the precondition `requires global<R>(a).v == 0` of `reset` does not hold at this call
 tests/sources/regression/closure_requires_guarded.move:99:5: error: verex verification failed: the automatic verification of `opaque_post_state_fails` failed; provide a proof in the module:
-  verify opaque_post_state_fails by
+  verify opaque_post_state_fails by lean =>
     verex_obligations
     verex_on
-    | requires_of_reset => verex_prepare; sorry
+    | requires_2_of_reset => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/regression/closure_requires_guarded.move:121:5: error: the precondition of `in_range` is not established
+tests/sources/regression/closure_requires_guarded.move:55:9: error: the precondition `requires x < 10` of `in_range` does not hold at this call
 tests/sources/regression/closure_requires_guarded.move:121:5: error: verex verification failed: the automatic verification of `opaque_ensures_fails` failed; provide a proof in the module:
-  verify opaque_ensures_fails by
+  verify opaque_ensures_fails by lean =>
     verex_obligations
     verex_on
-    | requires_of_in_range => verex_prepare; sorry
+    | requires_1_of_in_range => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/regression/closure_requires_guarded.move:128:5: error: the precondition of `narrow` is not established
+tests/sources/regression/closure_requires_guarded.move:67:9: error: the precondition `requires x < 10` of `narrow` does not hold at this call
 tests/sources/regression/closure_requires_guarded.move:128:5: error: verex verification failed: the automatic verification of `opaque_result_range_ok` failed; provide a proof in the module:
-  verify opaque_result_range_ok by
+  verify opaque_result_range_ok by lean =>
     verex_obligations
     verex_on
-    | requires_of_narrow => verex_prepare; sorry
+    | requires_1_of_narrow => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/regression/closure_requires_guarded.move:138:5: error: the precondition of `narrow` is not established
+tests/sources/regression/closure_requires_guarded.move:67:9: error: the precondition `requires x < 10` of `narrow` does not hold at this call
 tests/sources/regression/closure_requires_guarded.move:138:5: error: verex verification failed: the automatic verification of `opaque_result_of_ok` failed; provide a proof in the module:
-  verify opaque_result_of_ok by
+  verify opaque_result_of_ok by lean =>
     verex_obligations
     verex_on
-    | requires_of_narrow => verex_prepare; sorry
+    | requires_1_of_narrow => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/closure_requires_guarded.move:149:26: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/closure_requires_guarded.move:149:5: error: verex verification failed: the automatic verification of `mut_ref_fails` failed; provide a proof in the module:
-  verify mut_ref_fails by
+  verify mut_ref_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -41,7 +41,7 @@ tests/sources/regression/closure_requires_guarded.move:149:5: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/closure_requires_guarded.move:163:30: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/closure_requires_guarded.move:163:5: error: verex verification failed: the automatic verification of `transparent_fails` failed; provide a proof in the module:
-  verify transparent_fails by
+  verify transparent_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
@@ -49,25 +49,25 @@ tests/sources/regression/closure_requires_guarded.move:163:5: error: verex verif
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/regression/closure_requires_guarded.move:174:30: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/closure_requires_guarded.move:174:5: error: verex verification failed: the automatic verification of `through_hof_fails` failed; provide a proof in the module:
-  verify through_hof_fails by
+  verify through_hof_fails by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/regression/closure_requires_guarded.move:185:5: error: the precondition of `g_opaque` is not established
+tests/sources/regression/closure_requires_guarded.move:25:9: error: the precondition `requires x < 10` of `g_opaque` does not hold at this call
 tests/sources/regression/closure_requires_guarded.move:185:5: error: verex verification failed: the automatic verification of `opaque_abort_fails` failed; provide a proof in the module:
-  verify opaque_abort_fails by
+  verify opaque_abort_fails by lean =>
     verex_obligations
     verex_on
-    | requires_of_g_opaque => verex_prepare; sorry
+    | requires_1_of_g_opaque => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/regression/closure_requires_guarded.move:200:5: error: the precondition of `bump` is not established
+tests/sources/regression/closure_requires_guarded.move:36:9: error: the precondition `requires x < 10` of `bump` does not hold at this call
 tests/sources/regression/closure_requires_guarded.move:200:5: error: verex verification failed: the automatic verification of `opaque_frame_fails` failed; provide a proof in the module:
-  verify opaque_frame_fails by
+  verify opaque_frame_fails by lean =>
     verex_obligations
     verex_on
-    | requires_of_bump => verex_prepare; sorry
+    | requires_1_of_bump => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

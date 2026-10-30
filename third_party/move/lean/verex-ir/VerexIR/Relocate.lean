@@ -22,7 +22,7 @@ deriving instance Remap for
   TraitRef, GenericPredicate, Ty, AttributeValue, Attribute, Comment, BorrowKind, ThrowKind,
   CallKind, SurfaceSyntax, GlobalKind, PrimitiveOperation, ReferenceOperation, DataOperation,
   MemoryRange, TraceKind, BehaviorKind, SpecOperation, Operation, Place, QuantifierKind,
-  MatchArm, QuantifierBinder, ConditionKind, Condition, Frame, SpecBlock, ExprKind, Expr,
+  MatchArm, QuantifierBinder, ConditionKind, Condition, Frame, SpecBlock, ExprKind, ExprOrigin, Expr,
   PatternKind, Pattern, BinderKind, GenericBinder, Parameter, LocalDecl, Signature,
   ParameterFrame, FunctionContract, ConstantDecl, FieldDecl, VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl,
   AssociatedItemKind, AssociatedItemDecl, TraitDecl, AssociatedItemValue,

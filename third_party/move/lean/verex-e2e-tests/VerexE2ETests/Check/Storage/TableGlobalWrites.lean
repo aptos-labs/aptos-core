@@ -41,7 +41,7 @@ verex module 0x42::table_global_writes where
   spec three where
     ensures size(result) == 3
     ensures get(result, 1u8) == 2
-  verify three by
+  verify three by lean =>
     verex_obligations
     all_goals verex_prepare only
     all_goals verex_decide
@@ -79,7 +79,7 @@ verex module 0x42::table_global_writes where
 error: the data invariant `invariant value != 0` does not hold for a value written to memory
 ---
 error: verex verification failed: the automatic verification of `zero` failed; provide a proof in the module:
-  verify zero by
+  verify zero by lean =>
     verex_obligations
     verex_on
     | stored_invariant => verex_prepare; sorry
@@ -93,7 +93,7 @@ verify 0x42::table_global_writes::zero
 error: the data invariant `invariant value != 0` does not hold for a value written to memory
 ---
 error: verex verification failed: the automatic verification of `plain_zero` failed; provide a proof in the module:
-  verify plain_zero by
+  verify plain_zero by lean =>
     verex_obligations
     verex_on
     | stored_invariant => verex_prepare; sorry

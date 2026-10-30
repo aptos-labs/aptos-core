@@ -7,7 +7,7 @@ import VerexIR.Semantics.ValueTyping
 # Typed frames and states
 
 The invariants preservation threads through evaluation
-(`designs/static-typing.md`, Phase 3), and the operations' lemmas over them.
+(`doc/historical/static-typing.md`, Phase 3), and the operations' lemmas over them.
 A frame types its initialized locals at their declared types under the
 frame's semantic arguments; a state types global memory at its keys' types
 and pending write-backs at their loans' referents, every loan below the
@@ -2800,7 +2800,7 @@ theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
       | tuple elementTypes =>
           simp only at static
           split at static
-          · rename_i expression position _ expression_eq
+          · rename_i expression position _ _ expression_eq
             split at static
             · cases static
             rename_i nonnegative

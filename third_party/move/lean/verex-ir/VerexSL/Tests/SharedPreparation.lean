@@ -86,14 +86,14 @@ verex module 0x42::shared_preparation where
     ensures result <= limit
 
 verify 0x42::shared_preparation::source
-verify 0x42::shared_preparation::copy_twice by
+verify 0x42::shared_preparation::copy_twice by lean =>
   verex_obligations preparing
     verex_prepare values
     all_goals have preparing : True := trivial
   all_goals verex_decide
 
 -- Call and loop obligations share the same preparation interface.
-verify 0x42::shared_preparation::count by
+verify 0x42::shared_preparation::count by lean =>
   verex_obligations preparing
     verex_prepare values
   all_goals verex_decide

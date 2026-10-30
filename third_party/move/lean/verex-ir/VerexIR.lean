@@ -34,6 +34,7 @@ import VerexIR.Proofs.Maps.Table
 import VerexIR.Proofs.Denote.TableMemory
 import VerexIR.Proofs.Spec
 import VerexIR.Proofs.Representation
+import VerexIR.Proofs.Serialization
 import VerexIR.Proofs.Contract
 import VerexIR.Proofs.Typed
 import VerexIR.Proofs.Meaning
