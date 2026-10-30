@@ -10,9 +10,9 @@ use aptos_executor_types::{
 };
 use aptos_storage_interface::{
     state_store::{
-        positions::PositionOverlay, sharded_jmt_state::PositionStateWithSummary,
-        state::LedgerState, state_summary::LedgerStateSummary,
-        state_with_summary::LedgerWithSummary,
+        orders::OrderOverlay, positions::PositionOverlay,
+        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
     LedgerSummary,
 };
@@ -37,8 +37,11 @@ impl PartialStateComputeResult {
     pub fn new_empty(ledger_summary: LedgerSummary) -> Self {
         // Deliberately not reusing Self::new() here to make sure we don't leave
         // any OnceCell unset.
-        let execution_output =
-            ExecutionOutput::new_empty(ledger_summary.state, ledger_summary.positions);
+        let execution_output = ExecutionOutput::new_empty(
+            ledger_summary.state,
+            ledger_summary.positions,
+            ledger_summary.orders,
+        );
         let ledger_update_output = OnceCell::new();
         ledger_update_output
             .set(LedgerUpdateOutput::new_empty(
@@ -88,6 +91,10 @@ impl PartialStateComputeResult {
 
     pub fn result_positions(&self) -> Option<&PositionOverlay> {
         self.execution_output.positions.as_ref()
+    }
+
+    pub fn result_orders(&self) -> Option<&OrderOverlay> {
+        self.execution_output.orders.as_ref()
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

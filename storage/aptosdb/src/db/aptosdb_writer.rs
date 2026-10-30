@@ -14,7 +14,7 @@ use crate::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
     native_state_store::decode_position_writes,
-    native_store::{NativeStoreSpec, PositionStore},
+    native_store::{NativeStoreSpec, OrderStore, PositionStore},
     pruner::PrunerManager,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -30,7 +30,10 @@ use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit,
     db_ensure as ensure,
-    state_store::positions::{PositionOverlay, ShardedPositionLayers},
+    state_store::{
+        orders::{decode_order_writes, OrderOverlay, ShardedOrderLayers},
+        positions::{PositionOverlay, ShardedPositionLayers},
+    },
     AptosDbError, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 #[cfg(any(test, feature = "fuzzing"))]
@@ -100,6 +103,23 @@ impl DbWriter for AptosDB {
             }
             self.observe_position_overlay();
             Ok(Some(bundle.position_base.layers()))
+        })
+    }
+
+    fn advance_order_base(
+        &self,
+        target: Option<&OrderOverlay>,
+    ) -> Result<Option<ShardedOrderLayers>> {
+        gauged_api("advance_order_base", || {
+            let Some(bundle) = self.order.as_ref() else {
+                return Ok(None);
+            };
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["advance_order_base"]);
+            if let Some(target) = target {
+                // Declined folds are expected, as for positions.
+                bundle.order_base.fold(target);
+            }
+            Ok(Some(bundle.order_base.layers()))
         })
     }
 
@@ -494,15 +514,41 @@ impl AptosDB {
 
     fn commit_native_order(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_order"]);
-        let Some(order) = self.order.as_ref() else {
+        let Some(bundle) = self.order.as_ref() else {
             return Ok(());
         };
-        if order.commit_kv(chunk)?.is_none() {
+        let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
             return Ok(());
+        };
+
+        // Advance the published tip, as `commit_native_position` does.
+        match chunk.orders {
+            Some(executed) => {
+                assert!(
+                    bundle.order_base.is_ancestor_of(executed),
+                    "published order overlay does not descend from the base",
+                );
+                *bundle.orders.lock() = executed.clone();
+            },
+            None => {
+                let writes = decode_order_writes(
+                    chunk
+                        .transaction_outputs
+                        .iter()
+                        .flat_map(|output| OrderStore::write_set_ops(output.write_set()))
+                        .map(|(key, op)| (key, op.as_state_value_opt())),
+                )?;
+                if !writes.is_empty() {
+                    let floor = bundle.order_base.layers();
+                    let mut orders = bundle.orders.lock();
+                    *orders = orders.extend(&floor, chunk_last_inclusive, writes);
+                }
+            },
         }
+
         // Orders have no consensus-committed root yet, so the store always
         // computes its own summary.
-        order.advance_pipeline(chunk, None, sync_commit)
+        bundle.store.advance_pipeline(chunk, None, sync_commit)
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
@@ -833,7 +879,7 @@ impl AptosDB {
                 bundle.store.wake_value_pruner(version);
             }
             if let Some(order) = self.order.as_ref() {
-                order.wake_value_pruner(version);
+                order.store.wake_value_pruner(version);
             }
         }
 

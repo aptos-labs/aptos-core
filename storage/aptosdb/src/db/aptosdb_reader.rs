@@ -707,12 +707,17 @@ impl DbReader for AptosDB {
                 .position
                 .as_ref()
                 .map(|bundle| bundle.positions.lock().clone());
+            let orders = self
+                .order
+                .as_ref()
+                .map(|bundle| bundle.orders.lock().clone());
             Ok(LedgerSummary {
                 state,
                 state_summary,
                 transaction_accumulator,
                 position_state_summary,
                 positions,
+                orders,
             })
         })
     }

@@ -27,6 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
+        orders::OrderParent,
         positions::PositionParent,
         state::State,
         state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
@@ -404,11 +405,12 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         // next chunk is enqueued, so the base cannot move while a chunk
         // is being executed or applied.
         let committed_positions = chunk.output.result_positions().cloned();
+        let committed_orders = chunk.output.result_orders().cloned();
 
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
         self.commit_queue
             .lock()
-            .dequeue_committed(committed_positions)?;
+            .dequeue_committed(committed_positions, committed_orders)?;
 
         Ok(chunk)
     }
@@ -436,6 +438,12 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .writer
             .advance_position_base(committed.as_ref())
             .map_err(anyhow::Error::from)?;
+        let committed_orders = self.commit_queue.lock().committed_orders();
+        let order_floor = self
+            .db
+            .writer
+            .advance_order_base(committed_orders.as_ref())
+            .map_err(anyhow::Error::from)?;
 
         let first_version = chunk.first_version;
         let expecting_version = self.commit_queue.lock().expecting_version();
@@ -454,6 +462,11 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .as_ref()
             .zip(position_floor.as_ref())
             .map(|(overlay, floor)| PositionParent { overlay, floor });
+        let latest_orders = self.commit_queue.lock().latest_orders();
+        let parent_orders = latest_orders
+            .as_ref()
+            .zip(order_floor.as_ref())
+            .map(|(overlay, floor)| OrderParent { overlay, floor });
 
         // Hold back partial blocks until the next chunk completes them. The one in the queue is only
         // replaced once enqueued, so it survives failures.
@@ -471,7 +484,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         let transaction_infos = std::mem::take(&mut chunk.transaction_infos);
         let execution_output =
-            chunk.into_output::<V>(&parent_state, parent_positions, state_view)?;
+            chunk.into_output::<V>(&parent_state, parent_positions, parent_orders, state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
 
         // Enqueue for next stage.
@@ -875,6 +888,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             auxiliary_info,
             &parent_state,
             // Verification only; nothing here is committed.
+            None,
             None,
             state_view,
             onchain_config,

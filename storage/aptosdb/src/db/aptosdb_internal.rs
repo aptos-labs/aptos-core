@@ -261,7 +261,7 @@ impl AptosDB {
                 bundle.store.activate_pruners(synced_version);
             }
             if let Some(order) = myself.order.as_ref() {
-                order.activate_pruners(synced_version);
+                order.store.activate_pruners(synced_version);
             }
         }
 

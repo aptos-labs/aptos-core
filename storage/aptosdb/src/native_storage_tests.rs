@@ -1046,7 +1046,7 @@ mod reopen {
     /// As [`block`], also writing each `(order key, value)`; `None` deletes.
     fn block_with_orders(
         writes: &[(StateKey, u64)],
-        orders: &[(StateKey, Option<&'static [u8]>)],
+        orders: &[(StateKey, Option<&[u8]>)],
         position_root: Option<HashValue>,
     ) -> TransactionToCommit {
         let txn_info = TransactionInfo::builder_v1()
@@ -1382,6 +1382,29 @@ mod reopen {
         );
     }
 
+    /// A serialized single order, told apart by `tag`.
+    fn order_value(tag: u8) -> Vec<u8> {
+        use aptos_types::state_store::native_order::{
+            NativeSingleOrder, SingleOrderV1, TimeInForce,
+        };
+        NativeSingleOrder::V1(SingleOrderV1 {
+            account: super::account(2),
+            order_id: 0,
+            client_order_id: None,
+            price: u64::from(tag),
+            orig_size: 1,
+            remaining_size: 1,
+            is_bid: true,
+            trigger_condition: None,
+            time_in_force: TimeInForce::Gtc,
+            creation_time_micros: 0,
+            unique_priority_idx: 0,
+            metadata: vec![].into(),
+        })
+        .serialize()
+        .unwrap()
+    }
+
     fn order_key(order_id: u128) -> StateKey {
         StateKey::order(exchange(1), super::market(7), order_id)
     }
@@ -1390,7 +1413,7 @@ mod reopen {
         db: &AptosDB,
         version: Version,
         positions: &[(StateKey, u64)],
-        orders: &[(StateKey, Option<&'static [u8]>)],
+        orders: &[(StateKey, Option<&[u8]>)],
     ) {
         db.save_transactions_for_test(
             &[block_with_orders(positions, orders, None)],
@@ -1407,11 +1430,13 @@ mod reopen {
         let order = db.order.as_ref().expect("order store attached");
         let tip = db.get_synced_version().unwrap().expect("synced version");
         let snapshot = order
+            .store
             .merkle_db
             .latest_snapshot_version_at_or_before(tip)
             .unwrap();
         assert_eq!(snapshot, Some(tip), "order snapshot at the tip");
         order
+            .store
             .snapshot_rows(tip)
             .unwrap()
             .map(|row| {
@@ -1447,22 +1472,25 @@ mod reopen {
         {
             let db = open(&dir, true);
             commit_orders(&db, 0, &[(position_key(1), 10)], &[
-                (order_key(1), Some(b"a")),
-                (order_key(2), Some(b"b")),
+                (order_key(1), Some(&order_value(b'a'))),
+                (order_key(2), Some(&order_value(b'b'))),
             ]);
             commit_orders(&db, 1, &[], &[
                 (order_key(1), None),
-                (order_key(3), Some(b"c")),
+                (order_key(3), Some(&order_value(b'c'))),
             ]);
             commit_orders(&db, 2, &[(position_key(2), 20)], &[(
                 order_key(2),
-                Some(b"B"),
+                Some(&order_value(b'B')),
             )]);
         }
         let db = open(&dir, true);
         assert_eq!(
             order_rows(&db),
-            BTreeMap::from([(order_key(2), b"B".to_vec()), (order_key(3), b"c".to_vec()),])
+            BTreeMap::from([
+                (order_key(2), order_value(b'B')),
+                (order_key(3), order_value(b'c')),
+            ])
         );
         let positions = position_row_keys(&db);
         assert_eq!(positions.len(), 2, "{positions:?}");
@@ -1478,18 +1506,21 @@ mod reopen {
         let dir = TempPath::new();
         {
             let db = open(&dir, true);
-            commit_orders(&db, 0, &[], &[(order_key(1), Some(b"a"))]);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
         }
         {
             let db = open(&dir, false);
             assert!(db.order.is_none());
-            commit_orders(&db, 1, &[], &[(order_key(1), Some(b"b"))]);
-            commit_orders(&db, 2, &[], &[(order_key(2), Some(b"c"))]);
+            commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'b')))]);
+            commit_orders(&db, 2, &[], &[(order_key(2), Some(&order_value(b'c')))]);
         }
         let db = open(&dir, true);
         assert_eq!(
             order_rows(&db),
-            BTreeMap::from([(order_key(1), b"b".to_vec()), (order_key(2), b"c".to_vec()),])
+            BTreeMap::from([
+                (order_key(1), order_value(b'b')),
+                (order_key(2), order_value(b'c')),
+            ])
         );
     }
 
@@ -1522,14 +1553,14 @@ mod reopen {
         let dir = TempPath::new();
         {
             let db = open(&dir, true);
-            commit_orders(&db, 0, &[], &[(order_key(1), Some(b"a"))]);
-            commit_orders(&db, 1, &[], &[(order_key(2), Some(b"b"))]);
+            commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+            commit_orders(&db, 1, &[], &[(order_key(2), Some(&order_value(b'b')))]);
 
             let order = db.order.as_ref().unwrap();
-            let committer = NativeStateCommitter::new(Arc::clone(&order.kv_db));
+            let committer = NativeStateCommitter::new(Arc::clone(&order.store.kv_db));
             let mut batches = new_sharded_kv_batches();
             let mut in_chunk_prior = InChunkPriorVersions::new();
-            let ahead = WriteOp::legacy_modification(b"x".to_vec().into());
+            let ahead = WriteOp::legacy_modification(order_value(b'x').into());
             committer
                 .apply(
                     2,
@@ -1538,22 +1569,32 @@ mod reopen {
                     &mut in_chunk_prior,
                 )
                 .unwrap();
-            order.kv_db.commit(2, None, batches).unwrap();
-            assert_eq!(get_native_commit_progress(&order.kv_db).unwrap(), Some(2));
+            order.store.kv_db.commit(2, None, batches).unwrap();
+            assert_eq!(
+                get_native_commit_progress(&order.store.kv_db).unwrap(),
+                Some(2)
+            );
         }
         let db = open(&dir, true);
         let order = db.order.as_ref().unwrap();
-        assert_eq!(get_native_commit_progress(&order.kv_db).unwrap(), Some(1));
+        assert_eq!(
+            get_native_commit_progress(&order.store.kv_db).unwrap(),
+            Some(1)
+        );
         let (version, value) = order
+            .store
             .kv_db
             .get_value(order_key(1).hash(), 2)
             .unwrap()
             .expect("v0 row survives");
         assert_eq!(version, 0, "the row ahead of the ledger is gone");
-        assert_eq!(value.bytes().as_ref(), b"a");
+        assert_eq!(value.bytes().as_ref(), order_value(b'a'));
         assert_eq!(
             order_rows(&db),
-            BTreeMap::from([(order_key(1), b"a".to_vec()), (order_key(2), b"b".to_vec()),])
+            BTreeMap::from([
+                (order_key(1), order_value(b'a')),
+                (order_key(2), order_value(b'b')),
+            ])
         );
     }
 
@@ -1588,16 +1629,17 @@ mod reopen {
             HotStateConfig::default(),
         )
         .expect("open");
-        commit_orders(&db, 0, &[], &[(order_key(1), Some(b"a"))]);
-        commit_orders(&db, 1, &[], &[(order_key(1), Some(b"b"))]);
-        commit_orders(&db, 2, &[], &[(order_key(2), Some(b"c"))]);
+        commit_orders(&db, 0, &[], &[(order_key(1), Some(&order_value(b'a')))]);
+        commit_orders(&db, 1, &[], &[(order_key(1), Some(&order_value(b'b')))]);
+        commit_orders(&db, 2, &[], &[(order_key(2), Some(&order_value(b'c')))]);
 
         let order = db.order.as_ref().unwrap();
-        let value_pruner = &order.pruner.as_ref().unwrap().value_pruner;
+        let value_pruner = &order.store.pruner.as_ref().unwrap().value_pruner;
         value_pruner.wait_for_pruner().unwrap();
         assert_eq!(value_pruner.get_min_readable_version(), 2);
         assert!(
             order
+                .store
                 .kv_db
                 .get_value(order_key(1).hash(), 0)
                 .unwrap()
@@ -1605,6 +1647,7 @@ mod reopen {
             "the superseded v0 row is pruned"
         );
         let (version, _) = order
+            .store
             .kv_db
             .get_value(order_key(1).hash(), 2)
             .unwrap()
@@ -1649,10 +1692,90 @@ mod reopen {
         let order = db.order.as_ref().expect("order store attached");
         assert_eq!(
             order
+                .store
                 .merkle_db
                 .latest_snapshot_version_at_or_before(Version::MAX)
                 .unwrap(),
             Some(2),
         );
+    }
+
+    /// The order index follows commits through the published tip, folds into
+    /// its base, and cold-loads the same orders from the order JMT on reopen.
+    #[test]
+    fn order_index_follows_commits_and_cold_loads() {
+        use aptos_storage_interface::{
+            state_store::orders::{NativeOrder, OrderKey},
+            DbWriter,
+        };
+        use aptos_types::state_store::native_order::{
+            NativeSingleOrder, SingleOrderV1, TimeInForce,
+        };
+
+        fn order(order_id: u128, price: u64) -> NativeSingleOrder {
+            NativeSingleOrder::V1(SingleOrderV1 {
+                account: super::account(2),
+                order_id,
+                client_order_id: None,
+                price,
+                orig_size: 10,
+                remaining_size: 10,
+                is_bid: true,
+                trigger_condition: None,
+                time_in_force: TimeInForce::Gtc,
+                creation_time_micros: 0,
+                unique_priority_idx: order_id,
+                metadata: vec![].into(),
+            })
+        }
+        fn bytes(order_id: u128, price: u64) -> Vec<u8> {
+            order(order_id, price).serialize().unwrap()
+        }
+        fn key(order_id: u128) -> OrderKey {
+            OrderKey::Single {
+                exchange: exchange(1),
+                market: super::market(7),
+                order_id,
+            }
+        }
+        fn read(db: &AptosDB, order_id: u128) -> Option<NativeOrder> {
+            let bundle = db.order().expect("order store attached");
+            let tip = bundle.orders.lock().clone();
+            bundle
+                .order_base
+                .with_view(&tip, |view| view.get(&key(order_id)))
+        }
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[], &[
+                (order_key(1), Some(&bytes(1, 100))),
+                (order_key(2), Some(&bytes(2, 101))),
+            ]);
+            commit_orders(&db, 1, &[], &[
+                (order_key(1), None),
+                (order_key(3), Some(&bytes(3, 102))),
+            ]);
+            assert_eq!(read(&db, 1), None);
+            assert_eq!(read(&db, 2), Some(NativeOrder::Single(order(2, 101))));
+            assert_eq!(read(&db, 3), Some(NativeOrder::Single(order(3, 102))));
+
+            let bundle = db.order().unwrap();
+            let tip = bundle.orders.lock().clone();
+            db.advance_order_base(Some(&tip)).unwrap();
+            assert_eq!(bundle.order_base.version(), Some(1));
+            bundle
+                .order_base
+                .read(|view| assert_eq!(view.num_orders(), 2));
+        }
+        let db = open(&dir, true);
+        let bundle = db.order().unwrap();
+        bundle.order_base.read(|view| {
+            assert_eq!(view.version(), Some(1), "cold-loaded at the snapshot");
+            assert_eq!(view.num_orders(), 2);
+        });
+        assert_eq!(read(&db, 2), Some(NativeOrder::Single(order(2, 101))));
+        assert_eq!(read(&db, 3), Some(NativeOrder::Single(order(3, 102))));
     }
 }

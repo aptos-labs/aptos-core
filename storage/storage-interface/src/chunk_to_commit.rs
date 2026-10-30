@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
+    orders::OrderOverlay,
     positions::PositionOverlay,
     sharded_jmt_state::PositionStateWithSummary,
     state::LedgerState,
@@ -40,6 +41,9 @@ pub struct ChunkToCommit<'a> {
     /// The chunk's latest only. The executor tracks a last-checkpoint
     /// overlay alongside it, but nothing outside the executor reads one.
     pub positions: Option<&'a PositionOverlay>,
+    /// Order writes since the base, published by commit as the order tip
+    /// as `positions` is. `None` when trading-native storage is off.
+    pub orders: Option<&'a OrderOverlay>,
     pub is_reconfig: bool,
 }
 
