@@ -6,6 +6,7 @@ use crate::{
     event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::{API_LATENCY_SECONDS, CONCURRENCY_GAUGE},
+    native_store::bundle::NativeStoreConfigs,
     pruner::{LedgerPrunerManager, PrunerManager},
     rocksdb_property_reporter::RocksdbPropertyReporter,
     state_kv_db::StateKvDb,
@@ -22,8 +23,7 @@ use crate::{
     },
 };
 use aptos_config::config::{
-    HotStateConfig, PrunerConfig, RocksdbConfigs, StateMerklePrunerConfig, StorageDirPaths,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
@@ -114,6 +114,7 @@ impl AptosDB {
             commit_lock: std::sync::Mutex::new(()),
             update_subscriber: None,
             position: None,
+            order: None,
         }
     }
 
@@ -163,12 +164,15 @@ impl AptosDB {
             hot_state_kv_db.write_pruner_progress(synced_version)?;
         }
 
-        // Capture before `pruner_config` is moved; the position pruners
+        // Capture before `pruner_config` is moved; the native stores' pruners
         // reuse the same windows as main state's value/merkle pruners.
-        let position_value_pruner_config = pruner_config.ledger_pruner_config;
-        let position_state_merkle_pruner_config = pruner_config.state_merkle_pruner_config;
-        let position_epoch_snapshot_pruner_config: StateMerklePrunerConfig =
-            pruner_config.epoch_snapshot_pruner_config.into();
+        let native_store_configs = NativeStoreConfigs {
+            kv_config: rocksdb_configs.state_kv_db_config,
+            merkle_config: rocksdb_configs.state_merkle_db_config,
+            value_pruner_config: pruner_config.ledger_pruner_config,
+            state_merkle_pruner_config: pruner_config.state_merkle_pruner_config,
+            epoch_snapshot_pruner_config: pruner_config.epoch_snapshot_pruner_config.into(),
+        };
 
         let state_store_mode = if for_restore {
             StateStoreMode::Restore
@@ -193,11 +197,15 @@ impl AptosDB {
         if enable_trading_native {
             myself.init_native_position(
                 db_paths,
-                rocksdb_configs.state_kv_db_config,
-                rocksdb_configs.state_merkle_db_config,
-                position_value_pruner_config,
-                position_state_merkle_pruner_config,
-                position_epoch_snapshot_pruner_config,
+                &native_store_configs,
+                &env,
+                &block_cache,
+                readonly,
+                for_restore,
+            )?;
+            myself.init_native_order(
+                db_paths,
+                &native_store_configs,
                 &env,
                 &block_cache,
                 readonly,
@@ -245,32 +253,15 @@ impl AptosDB {
                     .maybe_set_pruner_target_db_version(version);
             }
 
-            // Activate the native-position pruners; otherwise their
-            // workers idle at persisted progress until the next position
-            // commit, even when committed versions are already ahead.
+            // Activate the native stores' pruners; otherwise their workers
+            // idle at persisted progress until the next commit, even when
+            // committed versions are already ahead.
             let synced_version = myself.get_synced_version()?;
-            if let Some(bundle) = myself.position.as_ref()
-                && let Some(position_pruner) = bundle.position_pruner.as_ref()
-            {
-                if let Some(version) = synced_version {
-                    position_pruner
-                        .value_pruner
-                        .maybe_set_pruner_target_db_version(version);
-                }
-                // Drive the merkle pruners to the persisted base version
-                // (set after init's seed + replay).
-                if let Some(version) = bundle
-                    .persisted
-                    .as_ref()
-                    .and_then(|persisted| persisted.get().version())
-                {
-                    position_pruner
-                        .state_merkle_pruner
-                        .maybe_set_pruner_target_db_version(version);
-                    position_pruner
-                        .epoch_snapshot_pruner
-                        .maybe_set_pruner_target_db_version(version);
-                }
+            if let Some(bundle) = myself.position.as_ref() {
+                bundle.store.activate_pruners(synced_version);
+            }
+            if let Some(order) = myself.order.as_ref() {
+                order.activate_pruners(synced_version);
             }
         }
 

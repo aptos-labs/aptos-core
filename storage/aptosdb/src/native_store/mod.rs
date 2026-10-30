@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 
 pub(crate) mod buffered_state;
+pub(crate) mod bundle;
 pub(crate) mod kv_db;
 pub(crate) mod merkle_batch_committer;
 pub(crate) mod merkle_db;
@@ -24,6 +25,7 @@ use crate::{
         COLLATERAL_DB_FOLDER_NAME, COLLATERAL_MERKLE_DB_FOLDER_NAME, ORDER_DB_FOLDER_NAME,
         ORDER_MERKLE_DB_FOLDER_NAME, POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME,
     },
+    native_metrics::{ORDER_WRITES, POSITION_WRITES},
     pruner::{
         CollateralEpochSnapshot, CollateralStateMerkle, CollateralValue, MerklePrunerSchema,
         OrderEpochSnapshot, OrderStateMerkle, OrderValue, PositionEpochSnapshot,
@@ -36,7 +38,12 @@ use crate::{
     },
 };
 use aptos_config::config::StorageDirPaths;
-use aptos_types::transaction::Version;
+use aptos_metrics_core::IntCounterVec;
+use aptos_types::{
+    state_store::state_key::StateKey,
+    transaction::Version,
+    write_set::{WriteOp, WriteSet},
+};
 use std::path::PathBuf;
 
 pub(crate) trait NativeStoreSpec: 'static + Send + Sync {
@@ -66,6 +73,12 @@ pub(crate) trait NativeStoreSpec: 'static + Send + Sync {
     fn commit_progress_key() -> DbMetadataKey;
     fn shard_commit_progress_key(shard_id: usize) -> DbMetadataKey;
     fn snapshot_kv_restore_progress_key(version: Version) -> DbMetadataKey;
+
+    /// The store's writes in `write_set`, from its own extension bucket.
+    fn write_set_ops(write_set: &WriteSet) -> impl Iterator<Item = (&StateKey, &WriteOp)>;
+
+    /// Counts writes applied to the store, labeled `upsert` / `delete`.
+    fn writes_counter() -> &'static IntCounterVec;
 }
 
 /// Native positions, keyed by `(exchange, account, market)`.
@@ -73,8 +86,6 @@ pub(crate) enum PositionStore {}
 
 /// Native orders, keyed by `(exchange, market, order_id)` and
 /// `(exchange, market, account)` for bulk orders.
-// Constructed by the order write path (PR 6); until then only tests use it.
-#[allow(dead_code)]
 pub(crate) enum OrderStore {}
 
 /// Native collateral, keyed by `(exchange, account, scope)`.
@@ -124,6 +135,16 @@ impl NativeStoreSpec for PositionStore {
     fn snapshot_kv_restore_progress_key(version: Version) -> DbMetadataKey {
         DbMetadataKey::PositionSnapshotKvRestoreProgress(version)
     }
+
+    fn write_set_ops(write_set: &WriteSet) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
+        write_set
+            .native_position_iter()
+            .map(|(key, op)| (key, op.as_write_op()))
+    }
+
+    fn writes_counter() -> &'static IntCounterVec {
+        &POSITION_WRITES
+    }
 }
 
 impl NativeStoreSpec for OrderStore {
@@ -167,6 +188,16 @@ impl NativeStoreSpec for OrderStore {
 
     fn snapshot_kv_restore_progress_key(version: Version) -> DbMetadataKey {
         DbMetadataKey::OrderSnapshotKvRestoreProgress(version)
+    }
+
+    fn write_set_ops(write_set: &WriteSet) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
+        write_set
+            .native_order_iter()
+            .map(|(key, op)| (key, op.as_write_op()))
+    }
+
+    fn writes_counter() -> &'static IntCounterVec {
+        &ORDER_WRITES
     }
 }
 

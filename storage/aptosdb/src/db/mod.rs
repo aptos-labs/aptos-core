@@ -5,7 +5,11 @@ use crate::{
     backup::backup_handler::BackupHandler,
     event_store::EventStore,
     ledger_db::LedgerDb,
-    native_store::{kv_db::PositionDb, merkle_db::PositionMerkleDb},
+    native_store::{
+        kv_db::{NativeKvDb, PositionDb},
+        merkle_db::{NativeMerkleDb, PositionMerkleDb},
+        OrderStore,
+    },
     pruner::LedgerPrunerManager,
     rocksdb_property_reporter::RocksdbPropertyReporter,
     state_kv_db::StateKvDb,
@@ -44,6 +48,7 @@ pub struct AptosDB {
     commit_lock: std::sync::Mutex<()>,
     update_subscriber: Option<Sender<(Instant, Version)>>,
     pub(crate) position: Option<Arc<PositionBundle>>,
+    pub(crate) order: Option<Arc<OrderBundle>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -53,9 +58,12 @@ mod aptosdb_writer;
 // Other private methods.
 mod aptosdb_internal;
 // Native-position subsystem: `PositionBundle` + `impl AptosDB` for
-// `position()` / `native_state_committer()` / `init_native_position()`.
+// `position()` / `init_native_position()`.
 mod aptosdb_native_position;
 pub(crate) use aptosdb_native_position::PositionBundle;
+// Native-order store: `OrderBundle` + `init_native_order()`.
+mod aptosdb_native_order;
+pub(crate) use aptosdb_native_order::OrderBundle;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 mod aptosdb_testonly;
@@ -245,6 +253,8 @@ impl AptosDB {
         // matches state's always-create behavior.
         PositionDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         PositionMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeKvDb::<OrderStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeMerkleDb::<OrderStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
 
         info!(
             db_path = db_path.as_ref(),

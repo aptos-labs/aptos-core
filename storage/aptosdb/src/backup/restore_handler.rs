@@ -75,8 +75,8 @@ impl RestoreHandler {
             AptosDbError::Other("native-position storage is not enabled on this DB".into())
         })?;
         new_native_snapshot_restore(
-            &position.kv_db,
-            &position.merkle_db,
+            &position.store.kv_db,
+            &position.store.merkle_db,
             version,
             expected_root_hash,
         )
