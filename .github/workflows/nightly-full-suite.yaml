@@ -4,6 +4,12 @@ on:
   # PIES dispatches this workflow nightly on main. GitHub cron is prohibited by
   # repository policy. See devtools/aptos-cargo-cli/README.md for rollout.
   workflow_dispatch:
+    inputs:
+      rust_ci_provider:
+        description: "Rust CI provider (default honors RUST_CI_PROVIDER, otherwise hosted)"
+        type: choice
+        default: default
+        options: [default, hosted, aws]
 
 permissions:
   contents: read
@@ -18,16 +24,44 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  rust-ci-provider:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      provider: ${{ steps.select.outputs.provider }}
+    steps:
+      - id: select
+        env:
+          MANUAL_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}
+          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
+        run: |
+          provider="${CONFIGURED_PROVIDER:-hosted}"
+          if [ "$MANUAL_PROVIDER" != default ]; then
+            provider="$MANUAL_PROVIDER"
+          fi
+          case "$provider" in
+            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
+          esac
+
   cargo-tests:
     name: Full suite (${{ matrix.suite }})
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: rust-ci-provider
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     timeout-minutes: 720
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite: workspace
-            command: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --exclude aptos-batch-encryption --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          # The workspace suite is sharded into the same four static package groups
+          # as lint-test.yaml's hosted full suite; the excluded packages stay excluded.
+          - suite: workspace-compiler
+            command: cargo nextest run --locked -p move-compiler-v2 -p move-compiler-v2-transactional-tests --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: workspace-mono-move
+            command: cargo nextest run --locked -p mono-move-testsuite --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: workspace-move-e2e
+            command: cargo nextest run --locked -p e2e-move-tests --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: workspace-remaining
+            command: cargo nextest run --locked --workspace --exclude move-compiler-v2 --exclude move-compiler-v2-transactional-tests --exclude mono-move-testsuite --exclude e2e-move-tests --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --exclude aptos-batch-encryption --profile ci --cargo-profile ci --no-fail-fast --retries 3
           - suite: doc-tests
             command: cargo test --locked --workspace --profile ci --doc
           - suite: vm-features
@@ -39,7 +73,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-nightly-${{ matrix.suite }}
       - uses: ./.github/actions/rust-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider != 'hosted' }}
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Run postgres database
@@ -75,13 +114,19 @@ jobs:
           retention-days: 14
 
   batch-encryption:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: rust-ci-provider
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu24-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-nightly-batch-encryption
       - uses: ./.github/actions/rust-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider != 'hosted' }}
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Export pnpm path
