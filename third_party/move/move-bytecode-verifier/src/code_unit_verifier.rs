@@ -61,6 +61,9 @@ impl<'a> CodeUnitVerifier<'a> {
         // whose names happen to contain '$' (the struct API delimiter), since those names are
         // structurally valid but carry no struct API attribute.
         let struct_api_ctx = if module.version() >= VERSION_10 {
+            if verifier_config.invariant_violation_fixes {
+                struct_api_checker::check_function_handles(&BinaryIndexedView::Module(module))?;
+            }
             Some(struct_api_checker::StructApiContext::new(module)?)
         } else {
             None
@@ -130,13 +133,13 @@ impl<'a> CodeUnitVerifier<'a> {
             }
         }
 
-        // INVARIANT: `struct_api_checker` is NOT called here for scripts, unlike for modules
-        // (see `verify_module_impl`). This is safe because `CompiledScript` has no mechanism
-        // to attach `FunctionAttribute`s to its main function: there is no `attributes` field
-        // on the main function's representation (it is stored as a bare `CodeUnit`, not as a
-        // `FunctionDefinition` with attributes). Therefore a script can never carry struct API
-        // attributes such as `BorrowFieldMutable`, and `reference_safety` (called inside
-        // `verify_common`) has no attributes to trust or mistrust.
+        // A script has no function definitions for `check_function`, but its imported
+        // handles can carry struct API attributes that `reference_safety` (inside
+        // `verify_common`) trusts, so check them first.
+        if verifier_config.invariant_violation_fixes && script.version >= VERSION_10 {
+            struct_api_checker::check_function_handles(&resolver)?;
+        }
+
         meter.enter_scope("script", Scope::Function);
         let code_unit_verifier = CodeUnitVerifier {
             resolver,

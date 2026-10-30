@@ -178,6 +178,7 @@ pub fn aptos_prod_verifier_config(
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
     let check_function_type_abilities =
         features.is_enabled(FeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES);
+    let invariant_violation_fixes = features.is_enabled(FeatureFlag::INVARIANT_VIOLATION_FIXES);
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     // Resource access control was never enabled and has been removed. Access specifiers
     // are permanently rejected by the verifier.
@@ -230,6 +231,7 @@ pub fn aptos_prod_verifier_config(
         sig_checker_v2_fix_script_ty_param_count,
         sig_checker_v2_fix_function_signatures,
         check_function_type_abilities,
+        invariant_violation_fixes,
         enable_enum_types,
         enable_resource_access_control,
         enable_function_values,

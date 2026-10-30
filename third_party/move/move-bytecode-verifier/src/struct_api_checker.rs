@@ -23,6 +23,14 @@
 //! 2. Attribute type must match name pattern (e.g., pack$S requires Pack attribute)
 //! 3. Only one struct API attribute allowed per function
 //!
+//! ### Handle-level checks (`check_function_handles`)
+//! Applied to all function handles of a module or script, including imported ones,
+//! which `check_function` never visits. reference_safety trusts the borrow field
+//! attribute on any call target, so the handle's signature must match before it runs:
+//! - At most one struct API attribute per handle
+//! - Borrow field handles take one reference to a struct and return one reference,
+//!   with mutability matching the attribute
+//!
 //! ### Phase 2: Implementation Validation
 //!
 //! **Name Parsing:**
@@ -53,15 +61,17 @@
 
 use move_binary_format::{
     access::ModuleAccess,
+    binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         Bytecode, CodeUnit, CompiledModule, FieldDefinition, FieldHandleIndex,
         FieldInstantiationIndex, FunctionAttribute, FunctionDefinition, FunctionHandle,
         MemberCount, Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
         StructDefinitionIndex, StructFieldInformation, StructHandleIndex, StructVariantHandleIndex,
-        StructVariantInstantiationIndex, VariantDefinition, VariantFieldHandleIndex,
+        StructVariantInstantiationIndex, TableIndex, VariantDefinition, VariantFieldHandleIndex,
         VariantFieldInstantiationIndex, VariantIndex,
     },
+    IndexKind,
 };
 use move_core_types::{
     language_storage::{
@@ -164,6 +174,78 @@ impl StructApiContext {
         enum_name: &str,
     ) -> Option<&BTreeMap<(u16, SignatureToken), Vec<u16>>> {
         self.enum_variant_indices_maps.get(enum_name)
+    }
+}
+
+/// Applies the handle-level checks (see module docs) to every function handle of a
+/// module or script. The field type and offset are not checked here; only the
+/// defining module can check them, in `check_function`.
+pub(crate) fn check_function_handles(view: &BinaryIndexedView) -> PartialVMResult<()> {
+    for (idx, handle) in view.function_handles().iter().enumerate() {
+        check_function_handle(view, handle)
+            .map_err(|e| e.at_index(IndexKind::FunctionHandle, idx as TableIndex))?;
+    }
+    Ok(())
+}
+
+fn check_function_handle(view: &BinaryIndexedView, handle: &FunctionHandle) -> PartialVMResult<()> {
+    use FunctionAttribute::*;
+    let is_mut = match try_get_struct_api_attr(&handle.attributes)? {
+        Some(BorrowFieldImmutable(_)) => false,
+        Some(BorrowFieldMutable(_)) => true,
+        Some(Pack | PackVariant(_) | Unpack | UnpackVariant(_) | TestVariant(_))
+        | Some(Persistent | ModuleLock)
+        | None => return Ok(()),
+    };
+    let param_ok = matches!(
+        view.signature_at(handle.parameters).0.as_slice(),
+        [p] if borrow_ref_inner(p, is_mut).is_some_and(|s| s.struct_idx_and_ty_args().is_some())
+    );
+    if !param_ok {
+        return Err(struct_api_err(
+            "borrow field function must have exactly one parameter: a reference to a struct with mutability matching the attribute",
+        ));
+    }
+    let ret_ok = matches!(
+        view.signature_at(handle.return_).0.as_slice(),
+        [r] if borrow_ref_inner(r, is_mut).is_some()
+    );
+    if !ret_ok {
+        return Err(struct_api_err(
+            "borrow field function must return exactly one reference with mutability matching the attribute",
+        ));
+    }
+    Ok(())
+}
+
+/// Returns the referenced type if `token` is a reference with the given mutability.
+fn borrow_ref_inner(token: &SignatureToken, is_mut: bool) -> Option<&SignatureToken> {
+    use SignatureToken::*;
+    match token {
+        Reference(inner) if !is_mut => Some(inner),
+        MutableReference(inner) if is_mut => Some(inner),
+        Reference(_)
+        | MutableReference(_)
+        | Bool
+        | U8
+        | U16
+        | U32
+        | U64
+        | U128
+        | U256
+        | I8
+        | I16
+        | I32
+        | I64
+        | I128
+        | I256
+        | Address
+        | Signer
+        | Vector(_)
+        | Function(..)
+        | Struct(_)
+        | StructInstantiation(..)
+        | TypeParameter(_) => None,
     }
 }
 

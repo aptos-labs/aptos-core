@@ -181,6 +181,7 @@ pub enum FeatureFlag {
     EnableMonoMove,
     CheckFunctionTypeAbilities,
     DisableEagerModuleInitialization,
+    InvariantViolationFixes,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -473,6 +474,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DisableEagerModuleInitialization => {
                 AptosFeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION
             },
+            FeatureFlag::InvariantViolationFixes => AptosFeatureFlag::INVARIANT_VIOLATION_FIXES,
         }
     }
 }
@@ -692,6 +694,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION => {
                 FeatureFlag::DisableEagerModuleInitialization
             },
+            AptosFeatureFlag::INVARIANT_VIOLATION_FIXES => FeatureFlag::InvariantViolationFixes,
         }
     }
 }
