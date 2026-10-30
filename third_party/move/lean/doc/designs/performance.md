@@ -185,10 +185,25 @@ native ones; most act on the normalization of encoded terms.
    (`verex.sharedContinuations`) already shares entry decomposition,
    cases, certificate bounds and position facts: −30% automatic
    OrderedMap, 0% authored, +7% micro-targets.
-6. **Indexed contexts**: per-pass indexes, simultaneous substitution,
+6. **Fact dependencies of normalized subterms.** Reusing a normal part of
+   the goal is sound only where no fact added since its normalization
+   reads what it reads: facts known on an arrival path simplify parts of
+   a folded continuation that were normal without them (an attempt at
+   exit failed `EnumResources`), and the goal before a bind is not
+   normal. Record per normalized subterm above a size threshold the
+   locals it reads and the facts its rewrites and discharges read (from
+   simp's post-step and the context discharger); keep it while no newer
+   fact mentions either, the connected-facts key of the hypothesis cache
+   applied per subterm, checked through `normalizeAround`'s stop
+   predicate with a generation counter. It would unlock exit (about 165M
+   on the benchmark), loop steps (about 60M) and reuse at bind. A stop
+   that is too early weakens the normal form, so it costs completeness,
+   not soundness. Incremental normalization after a split, where the new
+   case fact's locals are known, is the special case already in place.
+7. **Indexed contexts**: per-pass indexes, simultaneous substitution,
    per-pass discharger caches, a memo of canonical hypotheses; 1–8% of
    preparation today, linear as contexts grow.
-7. **Formula interning and theory-state reuse** only if a measurement
+8. **Formula interning and theory-state reuse** only if a measurement
    shows the need after the above.
 
 ### Calls
@@ -213,7 +228,9 @@ native ones; most act on the normalization of encoded terms.
   not outcome.
 - **Fail fast where no decider applies**: each saturation round over a
   large context costs 8–18M (P3 of
-  [`proof-strategy.md`](proof-strategy.md)).
+  [`proof-strategy.md`](proof-strategy.md)); up to 280M on the benchmark.
+- **Ground evaluation of leaves whose inputs are literals**, instead of
+  the decider cascade: about 181M on the benchmark.
 - **Carrier unfolding in `simp`**: instances stated at the row type would
   avoid the smart unfolding of `NTy.carrier`; a deeper change to
   `Types.lean`.
@@ -228,8 +245,8 @@ native ones; most act on the normalization of encoded terms.
 - **Certificates across importers** (R3 of
   [`relocatable-namespaces.md`](relocatable-namespaces.md)): 10–45% of a
   problem's run. Native evaluation of `compileFunction`
-  (`Lean.ofReduceBool`) widens the trusted base to the compiler: a trust
-  decision to take separately.
+  (`Lean.ofReduceBool`) was measured slower than the kernel and is not
+  pursued; certificates stay kernel-checked.
 - **Per process**, 18–27% of wall time is export, load and certificates
   (2–4 s); bounded by `scripts/verify-modules.py` and `verex.jobs`.
 - **Wall time beside heartbeats** in the stage logs, so kernel checks show.

@@ -284,26 +284,30 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
     | some t' => return .done t'
     | none => return .continue)
 
-/-- The canonical spelling of an expression's families, where it converts. -/
+/-- The canonical spelling of an expression's families, where it converts.
+An expression the search left as it was is not searched again. -/
 private def canonicalFamilyResult (e : Lean.Expr) : MetaM Simp.Result := do
+  if (← (← targetState).canonicalForms.get).contains e then return { expr := e }
   let canonical ← canonicalFamilies e
-  if canonical == e then return { expr := e }
+  if canonical == e then
+    unless e.hasMVar do (← targetState).canonicalForms.modify (·.insert e)
+    return { expr := e }
   if ← isDefEq e canonical then return { expr := canonical }
   return { expr := e }
 
-/-- Make the family spellings of a goal and its hypotheses canonical
-(`canonicalFamilies`). -/
-elab_rules : tactic
-  | `(tactic| verex_canonical_families) => do
+/-- Make the family spellings of the goals canonical, their targets too
+where `target` holds (`canonicalFamilies`). -/
+def canonicalFamiliesOf (target : Bool) : TacticM Unit := do
   let goals ← getGoals
   let mut result := #[]
   for goal in goals do
     if ← goal.isAssigned then continue
     let mut goal := goal
-    let target ← goal.withContext (instantiateMVars (← goal.getType))
-    let canonical ← goal.withContext (canonicalFamilyResult target)
-    if canonical.expr != target then
-      goal ← goal.withContext (applySimpResultToTarget goal target canonical)
+    if target then
+      let type ← goal.withContext (instantiateMVars (← goal.getType))
+      let canonical ← goal.withContext (canonicalFamilyResult type)
+      if canonical.expr != type then
+        goal ← goal.withContext (applySimpResultToTarget goal type canonical)
     for decl in ← goal.withContext getLCtx do
       if decl.isImplementationDetail then continue
       let type ← goal.withContext (instantiateMVars decl.type)
@@ -314,6 +318,12 @@ elab_rules : tactic
         goal := next
     result := result.push goal
   setGoals result.toList
+
+elab_rules : tactic
+  | `(tactic| verex_canonical_families) => canonicalFamiliesOf true
+
+elab_rules : tactic
+  | `(tactic| verex_canonical_hypotheses) => canonicalFamiliesOf false
 
 /-- The outer frame, the type arguments, and their spelled row of a frame a
 call's type arguments induce. -/
@@ -1440,6 +1450,14 @@ private partial def nonnegative? (e : Lean.Expr) : Simp.SimpM (Option Lean.Expr)
     | HMul.hMul _ _ _ _ left right => parts ``Int.mul_nonneg left right
     | HDiv.hDiv _ _ _ _ left right => parts ``Int.ediv_nonneg left right
     | Nat.cast _ _ n => return some (mkApp (mkConst ``Int.natCast_nonneg) n)
+    -- A certified unsigned value by its bounds, not by a search.
+    | VerexIR.SpecInt.val width signed value =>
+        if signed.isConstOf ``Bool.false && width.isAppOfArity ``VerexIR.IntWidth.bits 1 then
+          return some (← mkAppM ``And.left #[← mkAppM ``VerexIR.SpecInt.unsigned_bounds #[value]])
+        else whole
+    | Int.shiftLeft value distance => do
+        let some first ← nonnegative? value | whole
+        return some (mkApp3 (mkConst ``VerexIR.Proofs.Denote.shiftLeft_nonneg) value distance first)
     | _ => whole
   if structural.isSome || !(e.isAppOfArity ``HAdd.hAdd 6 || e.isAppOfArity ``HMul.hMul 6 ||
       e.isAppOfArity ``HDiv.hDiv 6) then

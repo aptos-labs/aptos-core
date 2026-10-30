@@ -2089,13 +2089,25 @@ def normalForm (goal : MVarId) (e : Lean.Expr) (rules? : Option BlockRules := no
   let rules ← match rules? with
     | some rules => pure rules
     | none => blockRules goal
+  let e ← instantiateMVars e
+  let (forward, reversed) := rules.normalRules
+  let locals ← goal.withContext do return (← getLCtx).foldl (init := #[]) (·.push ·.fvarId)
+  let key := (e, rules.reads, forward, reversed, locals)
+  let cache := (← targetState).stepNormalForms
+  if !e.hasMVar then
+    if let some found := (← cache.get)[key]? then
+      setGoals [goal]
+      return found
   let instantiated := (e.find? (·.isConstOf ``Skolems.instantiate)).isSome
   let some result ← normalPhases rules instantiated ({ expr := e } : Simp.Result)
       fun read call forward reversed normal => do
     let result ← simpTerm goal call forward reversed read.expr (contextual := normal && e.isArrow)
     goal.withContext do return some (← read.mkEqTrans result)
     | unreachable!
-  return (result.expr, result.proof?)
+  let found := (← instantiateMVars result.expr, ← result.proof?.mapM instantiateMVars)
+  unless e.hasMVar || found.1.hasMVar || found.2.any (·.hasMVar) do
+    cache.modify (·.insert key found)
+  return found
 
 /-- Substitute a hypothesis equating a local with a term not holding it over
 the whole context, as preparation substitutes values; of two locals, the
@@ -3468,6 +3480,33 @@ def ringMaxDegree : Nat := 16
     open_ := open_ ++ (← getUnsolvedGoals).toArray
   setGoals open_.toList
 
+/-- The heads of what the rules rewrite, from their simp theorems' keys: a
+constant, a local, or `none` for any other key, which may match anything. -/
+private def ruleHeads (forward reversed : Array FVarId) :
+    TacticM (Option (NameSet × FVarIdSet)) := do
+  let mut constants : NameSet := {}
+  let mut locals : FVarIdSet := {}
+  for (rules, inverse) in [(forward, false), (reversed, true)] do
+    for rule in rules do
+      for theorem_ in ← ruleTheorems rule inverse true do
+        match theorem_.keys[0]? with
+        | some (DiscrTree.Key.const name _) => constants := constants.insert name
+        | some (DiscrTree.Key.fvar x _) => locals := locals.insert x
+        | _ => return none
+  return some (constants, locals)
+
+/-- Whether a rule of these heads may rewrite a term: it holds one of the
+heads, or a constant that reduces at reducible transparency, behind which a
+head may stand, as the rules' keys are read (instances are no keys). -/
+private def mayBeRewritten (heads : Option (NameSet × FVarIdSet)) (term : Lean.Expr) :
+    MetaM Bool := do
+  let some (constants, locals) := heads | return true
+  if (collectFVars {} term).fvarIds.any locals.contains then return true
+  for name in term.getUsedConstants do
+    if constants.contains name then return true
+    if (← getReducibilityStatus name) == .reducible && !(← isInstance name) then return true
+  return false
+
 /-- The leaf's own hypotheses in the block's spelling: the rules the target
 is normalized with (`normalizeTarget`), the facts' and the definition folds,
 so that a fact and the hypothesis it is about read alike (one spelling inside
@@ -3478,10 +3517,15 @@ def foldLeafHypotheses (goal : MVarId) : TacticM (Option MVarId) := do
   let reversed := rules.definitions ++ rules.aliasesReversed ++ rules.factsReversed
   if forward.isEmpty && reversed.isEmpty then return some goal
   let ruled := forward ++ reversed ++ rules.reads ++ rules.booleans
+  -- Only the hypotheses a rule may rewrite (`ruleHeads`): the others are in
+  -- the normal form, which the rules' call does not change without a rule.
+  let heads ← goal.withContext (ruleHeads forward reversed)
   let targets ← goal.withContext do
     (← getLCtx).foldlM (init := #[]) fun found decl => do
       if decl.isImplementationDetail || ruled.contains decl.fvarId then return found
-      return if ← isProp decl.type then found.push decl.fvarId else found
+      unless ← isProp decl.type do return found
+      return if ← mayBeRewritten heads (← instantiateMVars decl.type) then found.push decl.fvarId
+        else found
   if targets.isEmpty then return ← foldFacts goal
   let some next ← simpCached goal .rules forward reversed targets false | return none
   -- The hypotheses the rules changed, in the normal form again: what a
@@ -3493,11 +3537,8 @@ def foldLeafHypotheses (goal : MVarId) : TacticM (Option MVarId) := do
       return if ← isProp decl.type then found.push decl.fvarId else found
   let some next ← (if changed.isEmpty then pure (some next)
     else simpCached next .normal #[] #[] changed false) | return none
-  -- A part the rules decided leaves its connective: `True ∧ p` is `p`.
-  setGoals [next]
-  evalTactic (← `(tactic| try simp only [true_and, and_true, true_or, or_true, not_true_eq_false,
-    not_false_eq_true, false_and, and_false] at *))
-  let some next := (← getGoals).head? | return none
+  -- A part the rules decided leaves its connective (`True ∧ p` is `p`) only
+  -- in a changed hypothesis, which the normal form's call above settled.
   foldFacts next
 where
   /-- The facts by the definitions alone: a definition the leaf states after

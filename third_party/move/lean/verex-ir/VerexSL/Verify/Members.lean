@@ -312,6 +312,25 @@ entries with its declarations. -/
 private initialize usedConstantsExt : EnvExtension (NameMap (Array Name)) ←
   registerEnvExtension (pure {})
 
+/-- The unit definitions whose value the audit compared with the registered
+unit's quotation (`auditedUnit`). An environment extension, as
+`usedConstantsExt`. -/
+private initialize auditedUnitsExt : EnvExtension NameSet ← registerEnvExtension (pure {})
+
+/-- The unit definition of a registered unit, its value compared once per
+environment with the unit's quotation: the audit states a target's theorem
+over the definition, as the theorem does, instead of quoting the unit and
+unfolding the definition at every target. -/
+private def auditedUnit (segments : Array String) (unit : ValidatedUnit) : TermElabM Lean.Expr := do
+  let name := unitName segments
+  if (auditedUnitsExt.getState (← getEnv)).contains name then return mkConst name
+  let some (.defnInfo info) := (← getEnv).find? name
+    | throwError m!"the unit `{name}` has no definition"
+  unless info.value == (← VerexSL.Quote.quoteUnit unit) do
+    throwError m!"the definition of the unit `{name}` is not the registered unit"
+  modifyEnv fun env => auditedUnitsExt.modifyState env (·.insert name)
+  return mkConst name
+
 /-- The constants `name` uses (`usedConstantsExt`), and whether it is an
 axiom. -/
 private def usedConstantsOf (name : Name) : CommandElabM (Array Name × Bool) := do
@@ -445,7 +464,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
     let readsRequires :=
       Contract.contractReadsRequires unit ⟨namespaceIndex⟩
         (ContractView.implementation.of declaration)
-    let unitExpr ← VerexSL.Quote.quoteUnit unit
+    let unitExpr ← auditedUnit segments unit
     -- The unit's function values: the instance declared with the unit.
     let functions ← functionCarriersOf (mkConst unitDefinition)
     let requiresMeaning := mkApp (mkConst (functionRequiresName segments))

@@ -1541,7 +1541,9 @@ elab "verex_call_result_cases" : tactic => focusGoal <| withoutRecover do
       evalTactic (← `(tactic| all_goals verex_split_hypotheses))
       evalTactic (← `(tactic| all_goals verex_subst_vars))
       evalTactic (← `(tactic| all_goals verex_reduce_projections))
-      evalTactic (← `(tactic| verex_canonical_families))
+      -- The facts' family spellings: the continuation keeps its own until
+      -- its leaves are prepared.
+      evalTactic (← `(tactic| verex_canonical_hypotheses))
       evalTactic (← `(tactic| all_goals verex_normalize_hypotheses))
     let [normal] ← getGoals | return
     -- The results the contract pins are substituted; one in a few values is

@@ -453,6 +453,13 @@ structure TargetState where
   /-- The rules of the proof steps' normal form at a goal, by the goal: a
   function of its context, its kinds of rules in the steps' order. -/
   stepBlockRules : IO.Ref (Std.HashMap MVarId (Array (Array FVarId)))
+  /-- The normal forms of the proof steps' statements, by the statement, the
+  rules, and the context's locals: a function of these, so that a statement
+  normalized again in the same context (a lemma's premises, the premises of
+  the context's implications at every `decide`) is normalized once. -/
+  stepNormalForms : IO.Ref (Std.HashMap
+    (Lean.Expr × Array FVarId × Array FVarId × Array FVarId × Array FVarId)
+    (Lean.Expr × Option Lean.Expr))
   /-- The source decisions on each handed-over leaf's path, and on each
   path of a clause's goal once taken apart: what a selector of `verex_on`
   reads. -/
@@ -467,6 +474,14 @@ structure TargetState where
   form, and the constants the proofs use. A constant a backtracked attempt
   added is absent from the environment; its proofs are found again. -/
   contractNormalForms : IO.Ref (Std.HashMap Lean.Expr (Array Lean.Expr × Array Name))
+  /-- The expressions whose family spellings are canonical
+  (`verex_canonical_families`): a pass skips them, as their canonical
+  spelling is themselves. -/
+  canonicalForms : IO.Ref (Std.HashSet Lean.Expr)
+  /-- The contract patterns met once (`contractNormalForms`): a pattern's
+  normal forms are found where it is met again, so that a callee called once
+  is normalized at its call, without the cost of normal forms. -/
+  contractPatternsMet : IO.Ref (Std.HashSet Lean.Expr)
   /-- The theorem being proved (`verex_proof`), which declares the
   auxiliary theorems its proof uses (`declareHiddenTheorems`). -/
   proofName : IO.Ref Name
@@ -544,8 +559,11 @@ def TargetState.new : IO TargetState := do
     stepSimpContexts := ← IO.mkRef #[]
     stepRuleTheorems := ← IO.mkRef {}
     stepBlockRules := ← IO.mkRef {}
+    stepNormalForms := ← IO.mkRef {}
     leafPaths := ← IO.mkRef {}
     contractNormalForms := ← IO.mkRef {}
+    canonicalForms := ← IO.mkRef {}
+    contractPatternsMet := ← IO.mkRef {}
     proofName := ← IO.mkRef .anonymous
     hiddenTheorems := ← IO.mkRef {}
     hiddenCount := ← IO.mkRef 0
@@ -1196,9 +1214,8 @@ register_option verex.solverDebug : Bool := {
 }
 
 register_option verex.contractLemmas : Bool := {
-  defValue := false
-  descr := "call through a callee's contract normalized once per contract and argument pattern \
-    (development)"
+  defValue := true
+  descr := "call through a callee's contract normalized once per contract and argument pattern"
 }
 
 register_option verex.solverProfile : Bool := {
@@ -1598,9 +1615,6 @@ private def operationFact? (goal : MVarId) (reads : DivisionReads) (sub : Lean.E
             else ``VerexIR.Proofs.Denote.emod_bounds_of_nonneg
           some <$> mkAppM lemma #[leftNonnegative, rightNonnegative]
       | _, _ => pure none
-    -- No division algorithm at a divisor that is not a literal: it stops the
-    -- deciders' instance closing on leaves it is unrelated to
-    -- (`doc/plan/proof-language.md`, "One spelling of a quotient").
     let cancellation ← if !isQuotient then pure none
       else if dividend == divisor then some <$> mkAppOptM ``Int.ediv_self #[dividend]
       else if dividend.isAppOfArity ``HMul.hMul 6 && dividend.getArg! 5 == divisor then
@@ -1608,7 +1622,35 @@ private def operationFact? (goal : MVarId) (reads : DivisionReads) (sub : Lean.E
       else if dividend.isAppOfArity ``HMul.hMul 6 && dividend.getArg! 4 == divisor then
         some <$> mkAppOptM ``Int.mul_ediv_cancel_left #[divisor, dividend.getArg! 5]
       else pure none
-    return ← conjoin? bounds cancellation
+    -- The division algorithm of nonnegative operands where the leaf reads
+    -- the remainder or a product with the divisor or the quotient, as at a
+    -- truncating division (`Int.tdiv`, above): the same facts in the one
+    -- spelling of a quotient.
+    let quotient ← mkAppM ``HDiv.hDiv #[dividend, divisor]
+    let remainder ← mkAppM ``HMod.hMod #[dividend, divisor]
+    let readsRemainder := reads.remainders.contains remainder
+    let needsIdentity := readsRemainder ||
+      reads.readsFactor divisor || reads.readsFactor quotient
+    let algorithm ← if !needsIdentity then pure none else
+      match ← nonnegative? dividend, ← nonnegative? divisor with
+      | some dividendNonnegative, some divisorNonnegative =>
+          let identity ← mkAppM ``Int.ediv_mul_add_emod #[dividend, divisor]
+          let nonnegative ← mkAppM ``And.left
+            #[← mkAppM ``VerexIR.Proofs.Denote.emod_bounds_of_nonneg
+              #[dividendNonnegative, divisorNonnegative]]
+          let positive ← mkAppM ``LT.lt #[mkIntLit 0, divisor]
+          let positivity ← omegaProof? goal
+            (← mkArrow (← inferType divisorNonnegative) positive)
+          let below ← match positivity with
+            | some proof =>
+                some <$> mkAppM ``Int.emod_lt_of_pos #[dividend, proof.app divisorNonnegative]
+            | none =>
+                if !readsRemainder then pure none else
+                  some <$> withLocalDeclD `positive positive fun h => do
+                    mkLambdaFVars #[h] (← mkAppM ``Int.emod_lt_of_pos #[dividend, h])
+          conjoin? (some identity) (← conjoin? (some nonnegative) below)
+      | _, _ => pure none
+    return ← conjoin? (← conjoin? bounds algorithm) cancellation
   if sub.isAppOfArity ``Int.shiftLeft 2 then
     let product ← if literalDistance then
         some <$> mkAppM ``VerexIR.Proofs.Denote.shiftLeft_eq_mul #[sub.getArg! 0, sub.getArg! 1]
@@ -5403,5 +5445,8 @@ def closesBy (goal : MVarId) (tactic : TSyntax `tactic) : TacticM Bool := do
 
 /-- Canonical family spellings (`canonicalFamilies`). -/
 syntax "verex_canonical_families" : tactic
+
+/-- `verex_canonical_families` on the hypotheses only. -/
+syntax "verex_canonical_hypotheses" : tactic
 
 end VerexIR.Proofs.Denote

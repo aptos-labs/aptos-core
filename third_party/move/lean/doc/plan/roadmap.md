@@ -70,6 +70,8 @@ Designs: [`denotation.md`](../designs/denotation.md),
   map modules on native leaves; the P4 goal is all 38 BigOrderedMap targets
   below roughly 1.9G heartbeats including authored proofs. Then the levers of
   [`performance.md`](../designs/performance.md), "Open levers", in its order,
+  postponed for now; the next is fact dependencies of normalized subterms
+  (Preparation, 6), then fail fast and ground evaluation of literal leaves,
   and the opt-in join scheduler (`verex.sharedContinuations`) enabled for
   automatic verification or removed. Debts:
   [`measurement-debts.md`](../status/measurement-debts.md).

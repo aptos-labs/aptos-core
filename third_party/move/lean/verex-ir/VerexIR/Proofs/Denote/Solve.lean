@@ -991,6 +991,36 @@ private def callCheckedStep (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   charge "call returned" stageStart
   return true
 
+/-- The subterms of a normal target that a split leaves normal in a case:
+those reading no local a hypothesis the case added mentions, as the
+split's condition (`splitStep`). Each shared subterm is visited once. -/
+private def unaffectedParts (target : Lean.Expr) (affected : FVarIdSet) : Array Lean.Expr := Id.run do
+  -- Post-order with memo: whether a subterm reads an affected local.
+  let mut reads : Std.HashMap Lean.Expr Bool := {}
+  let mut parts : Array Lean.Expr := #[]
+  let mut pending : Array (Lean.Expr × Bool) := #[(target, false)]
+  while let some (e, expanded) := pending.back? do
+    pending := pending.pop
+    if reads.contains e then continue
+    let children : Array Lean.Expr := match e with
+      | .app f a => #[f, a]
+      | .lam _ t b _ | .forallE _ t b _ => #[t, b]
+      | .letE _ t v b _ => #[t, v, b]
+      | .mdata _ b | .proj _ _ b => #[b]
+      | _ => #[]
+    if !expanded && children.any (!reads.contains ·) then
+      pending := pending.push (e, true)
+      for child in children do
+        unless reads.contains child do pending := pending.push (child, false)
+      continue
+    let own := match e with
+      | .fvar id => affected.contains id
+      | _ => false
+    let read := own || children.any fun child => reads.getD child false
+    reads := reads.insert e read
+    if !read && !children.isEmpty && !e.hasLooseBVars then parts := parts.push e
+  return parts
+
 /-- A bind rule: a straight-line action keeps its continuation in place,
 since it reaches it on one path; a branching one has it folded. -/
 private def bindStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
@@ -1670,6 +1700,10 @@ private def contractEquations? (contract args initial : Lean.Expr)
       let env ← getEnv
       if constants.all env.contains then
         return some (proofs.map fun proof => (mkAppN proof actual).headBeta)
+    -- A pattern met for the first time is normalized at its call.
+    unless (← (← targetState).contractPatternsMet.get).contains key do
+      (← targetState).contractPatternsMet.modify (·.insert key)
+      return none
     let { ctx, simprocs, .. } ← mkSimpContext
       (← `(tactic| simp only [$lemmas,*, vir_denote, vir_denote_norm, vir_denote_eval,
         Prod.fst, Prod.snd]))
@@ -2142,6 +2176,8 @@ private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := d
       return !(storageAddresses target).isEmpty
   let readsMap ← if !ctx.shared || owners.isEmpty || hasEntry then pure false
     else readsConditionalMap goal
+  let (parentTarget, parentLocals) ← goal.withContext do
+    return (← instantiateMVars (← goal.getType), (← getLCtx).getFVarIds)
   let some (subgoals, conditional) ← splitOnce goal
     -- Resolve a read across a memory write before general normalization.
     -- Its address cases remain within the existing clause allowance.
@@ -2162,7 +2198,16 @@ private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := d
           pure ((← getGoals) != [subgoal])
         else pure false
       if conditional || consumed then
-        evalTactic (← `(tactic| try verex_normalize))
+        -- The parts of the target the split's facts do not read are normal
+        -- as the target was.
+        let normal ← (← getMainGoal).withContext do
+          let mut affected : FVarIdSet := {}
+          for decl in ← getLCtx do
+            if decl.isImplementationDetail || parentLocals.contains decl.fvarId then continue
+            affected := affected.insert decl.fvarId
+            affected := (collectFVars { fvarSet := affected } (← instantiateMVars decl.type)).fvarSet
+          return unaffectedParts parentTarget affected
+        normalizeAround ctx.normalization normal
     queue (← getGoals) provenance clauses prepared
   let finished ← IO.getNumHeartbeats
   if let some target := splitTarget then
