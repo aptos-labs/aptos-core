@@ -129,7 +129,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(
                 set(job["needs"]), {"file_change_determinator", "rust-ci-provider"}
             )
-            self.assertIn("64cpu-aptos-image-ubuntu22-x64", job["runs-on"])
+            self.assertIn("64cpu-aptos-image-ubuntu24-x64", job["runs-on"])
             self.assertIn("runs-on,cpu=64", job["runs-on"])
             prebuilt = next(
                 s
@@ -184,7 +184,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('test "$SHARDS_RESULT" = success', gate["run"])
 
     def test_phase_a_followup_workflows_route_hosted_with_aws_fallback(self):
-        HOSTED = "64cpu-aptos-image-ubuntu22-x64"
+        HOSTED = "64cpu-aptos-image-ubuntu24-x64"
         AWS = "runs-on,cpu=64"
         # workflow -> hosted-routed jobs that must carry rust-prebuilt-setup
         routed = {
