@@ -11,6 +11,10 @@
 
 #![forbid(unsafe_code)]
 
+use crate::state_store::native_overlay::{
+    NativeOverlay, NativeParent, NativeWrites, ShardedKey, ShardedNativeLayers,
+    NUM_NATIVE_INDEX_SHARDS,
+};
 use ahash::AHashMap;
 use aptos_experimental_layered_map::MapLayer;
 use aptos_infallible::RwLock;
@@ -23,15 +27,14 @@ use aptos_types::{
             StateKey,
         },
         state_value::StateValue,
-        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
 use arr_macro::arr;
 use rayon::prelude::*;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 
-pub const NUM_POSITION_SHARDS: usize = NUM_STATE_SHARDS;
+pub const NUM_POSITION_SHARDS: usize = NUM_NATIVE_INDEX_SHARDS;
 
 /// The `(exchange, account)` an account's positions group under.
 ///
@@ -74,11 +77,22 @@ pub fn shard_of(account: &AccountKey) -> usize {
     usize::from(byte) % NUM_POSITION_SHARDS
 }
 
-pub type PositionLayer = MapLayer<PositionKey, Option<NativePosition>>;
-pub type ShardedPositionLayers = [PositionLayer; NUM_POSITION_SHARDS];
+impl ShardedKey for PositionKey {
+    fn shard(&self) -> usize {
+        shard_of(&self.account())
+    }
+}
+
+pub type ShardedPositionLayers = ShardedNativeLayers<PositionKey, NativePosition>;
 
 /// A block's position writes. `None` deletes.
-pub type PositionWrites = Vec<(PositionKey, Option<NativePosition>)>;
+pub type PositionWrites = NativeWrites<PositionKey, NativePosition>;
+
+/// Speculative overlay: one layer per shard per chunk, chained from the
+/// parent's.
+pub type PositionOverlay = NativeOverlay<PositionKey, NativePosition>;
+
+pub type PositionParent<'a> = NativeParent<'a, PositionKey, NativePosition>;
 
 struct PositionBaseInner {
     version: Option<Version>,
@@ -274,10 +288,7 @@ impl PositionBase {
     /// Empty overlay sitting directly on the base's current layers.
     pub fn new_overlay(&self) -> PositionOverlay {
         let inner = self.inner.read();
-        PositionOverlay {
-            next_version: inner.version.map_or(0, |v| v + 1),
-            tops: Arc::new(inner.layers.clone()),
-        }
+        PositionOverlay::new(inner.version.map_or(0, |v| v + 1), inner.layers.clone())
     }
 
     /// The guard [`Self::fold`] and [`Self::with_view`] require. Walks the
@@ -332,12 +343,12 @@ impl PositionBase {
             return false;
         }
         if !(0..NUM_POSITION_SHARDS)
-            .all(|shard| overlay.tops[shard].is_descendant_of(&inner.layers[shard]))
+            .all(|shard| overlay.shards()[shard].is_descendant_of(&inner.layers[shard]))
         {
             return false;
         }
         for shard in 0..NUM_POSITION_SHARDS {
-            let view = overlay.tops[shard].view_layers_after(&inner.layers[shard]);
+            let view = overlay.shards()[shard].view_layers_after(&inner.layers[shard]);
             for (key, write) in view.iter() {
                 let account = key.account();
                 match write {
@@ -360,133 +371,9 @@ impl PositionBase {
                 }
             }
         }
-        inner.layers = (*overlay.tops).clone();
+        inner.layers = overlay.shards().clone();
         inner.version = overlay.version();
         true
-    }
-}
-
-/// Speculative overlay: one layer per shard per chunk, chained from the
-/// parent's. Like main state's `State`, it holds the layers only; the base
-/// they are read over is supplied at read time, so an overlay cannot name
-/// a base other than the one it is merged with.
-#[derive(Clone, Debug)]
-pub struct PositionOverlay {
-    next_version: Version,
-    tops: Arc<ShardedPositionLayers>,
-}
-
-/// What a chunk's overlay extends from: the parent overlay and the base
-/// layers it was checked against, captured together at the top of the
-/// execution stage so the new layer is viewable from that base.
-#[derive(Clone, Copy)]
-pub struct PositionParent<'a> {
-    pub overlay: &'a PositionOverlay,
-    pub floor: &'a ShardedPositionLayers,
-}
-
-impl PositionOverlay {
-    pub fn next_version(&self) -> Version {
-        self.next_version
-    }
-
-    pub fn version(&self) -> Option<Version> {
-        self.next_version.checked_sub(1)
-    }
-
-    pub fn shards(&self) -> &ShardedPositionLayers {
-        &self.tops
-    }
-
-    pub fn is_descendant_of(&self, rhs: &Self) -> bool {
-        self.descends_from(&rhs.tops)
-    }
-
-    /// Whether every shard's top descends from `layers`. Shards move in
-    /// lockstep, so one predicate covers all of them.
-    pub fn descends_from(&self, layers: &ShardedPositionLayers) -> bool {
-        (0..NUM_POSITION_SHARDS).all(|shard| self.tops[shard].is_descendant_of(&layers[shard]))
-    }
-
-    /// Layers between `floor` and the top, i.e. chunks not yet folded into a
-    /// base at `floor`.
-    pub fn layers_above(&self, floor: &ShardedPositionLayers) -> u64 {
-        (0..NUM_POSITION_SHARDS)
-            .map(|shard| {
-                self.tops[shard]
-                    .layer()
-                    .saturating_sub(floor[shard].layer())
-            })
-            .max()
-            .unwrap_or(0)
-    }
-
-    /// Writes above `floor` — what the overlay shadows when read over a
-    /// base at `floor`. Walks layers only, so it is safe inside
-    /// `PositionBase::read`.
-    pub fn writes_since(&self, floor: &ShardedPositionLayers) -> PositionWrites {
-        (0..NUM_POSITION_SHARDS)
-            .into_par_iter()
-            .flat_map_iter(|shard| {
-                self.tops[shard]
-                    .view_layers_after(&floor[shard])
-                    .iter()
-                    .collect::<Vec<_>>()
-            })
-            .collect()
-    }
-
-    fn split_by_shard(writes: PositionWrites) -> Vec<PositionWrites> {
-        let mut per_shard = vec![PositionWrites::new(); NUM_POSITION_SHARDS];
-        for (key, write) in writes {
-            per_shard[shard_of(&key.account())].push((key, write));
-        }
-        per_shard
-    }
-
-    /// Push one layer per shard atop `self`, built over `floor` — the
-    /// base's layers at the time. A layer links to nothing at or below
-    /// its floor, so this is the lowest base it can ever be read from;
-    /// the base's current layers are the right floor because the base
-    /// only moves forward.
-    pub fn extend(
-        &self,
-        floor: &ShardedPositionLayers,
-        new_version: Version,
-        writes: PositionWrites,
-    ) -> Self {
-        // The new layer covers `[self.next_version(), new_version]`, so a
-        // lower version means the caller is extending from the wrong
-        // parent. `fold` later makes skip/advance decisions off this
-        // stamp, so a bad one propagates. Main state guards the same
-        // thing in `State::update`.
-        assert!(
-            new_version >= self.next_version(),
-            "extend at version {new_version} but overlay is already at {}",
-            self.next_version(),
-        );
-        // A sibling of the floor satisfies `can_view_after` yet shares no
-        // ancestry; building over it would mix branches.
-        assert!(
-            self.descends_from(floor),
-            "extending an overlay over a floor it does not descend from",
-        );
-        let per_shard = Self::split_by_shard(writes);
-        let tops: Vec<PositionLayer> = (0..NUM_POSITION_SHARDS)
-            .into_par_iter()
-            .map(|shard| {
-                self.tops[shard]
-                    .view_layers_after(&floor[shard])
-                    .new_layer(&per_shard[shard])
-            })
-            .collect();
-        Self {
-            next_version: new_version + 1,
-            tops: Arc::new(
-                tops.try_into()
-                    .expect("Known to be NUM_POSITION_SHARDS shards."),
-            ),
-        }
     }
 }
 
@@ -708,6 +595,7 @@ fn decode_position_row(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn addr(byte: u8) -> AccountAddress {
         let mut a = [0u8; AccountAddress::LENGTH];
