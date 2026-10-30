@@ -377,6 +377,23 @@ proof file's item that raised it, or at `verex proofs where`
 (`verex.relocateMessages`, which the driver turns off to report it in the
 Move file).
 
+Loading a proof file costs the header's elaboration of the rendering and
+the lowering of the items' step expressions, which runs with the items
+skipped so that their errors show. The language server interprets Verex's
+metaprograms, which the command line runs compiled: `ordered_map.proof.lean`
+loads in about 21 s, all of it interpretation. Two improvements are open:
+
+- **Compiled metaprograms in the server**: `precompileModules` for
+  `verex-ir`, so that the server loads native code; costs a shared library
+  per module at build time. Expected to bring a load to a few seconds.
+- **Asynchronous lowering**: elaborating each `verify` item's steps as its
+  own snapshot task makes the file usable item by item; it does not shorten
+  the load.
+
+Work repeated per item belongs once per module or namespace: the printing
+context of a namespace (`Print.PrintNamespace.of`) is prepared once per
+scope, not per type.
+
 The package tooling never compiles a proof file as a Lean-authored Move
 module: `.proof.lean` files are not package sources and do not enter the
 package digest (`move-command-line-common::files::is_lean_source`).

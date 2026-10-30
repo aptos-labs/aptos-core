@@ -767,6 +767,8 @@ as specification syntax, a state label's binder of the state domain. -/
 def dataInvariantBinderTypes (unit : ValidatedUnit) : CommandElabM (Array (String × Syntax)) := do
   let mut found := #[]
   for ns in unit.namespaces do
+    unless ns.structs.any (·.contract.conditions.any (·.kind == .structInvariant)) do continue
+    let printing := (Print.PrintNamespace.of unit ns).toOption
     for declaration in ns.structs do
       for condition in declaration.contract.conditions do
         unless condition.kind == .structInvariant do continue
@@ -779,8 +781,8 @@ def dataInvariantBinderTypes (unit : ValidatedUnit) : CommandElabM (Array (Strin
           -- A state label's binder ranges over the state domain.
           let text := if (stateBinders ns condition.expression).contains localDecl.name then
               some "StateDomain"
-            else (Print.specificationTypeText unit ns declaration.generics
-              localDecl.type.typeId).toOption
+            else printing.bind fun printing => (printing.specificationTypeText unit
+              declaration.generics localDecl.type.typeId).toOption
           let some text := text | continue
           let .ok type := Parser.runParserCategory (← getEnv) `verexType text | continue
           found := found.push (name, type)

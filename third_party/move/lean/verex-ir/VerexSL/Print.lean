@@ -397,7 +397,7 @@ private def importFreeSurfaceName (unit : ValidatedUnit) (ns : ValidatedNamespac
 /-- A namespace as its source prints: its declarations, and how the source
 spells the names of other namespaces, decided once from the names it
 references. -/
-private structure PrintNamespace extends ValidatedNamespace where
+structure PrintNamespace extends ValidatedNamespace where
   /-- The namespaces the references spell each surface name from, or `none`
   when a reference names nothing. -/
   referencedSpellings : Option (Std.HashMap String (Array NamespaceId))
@@ -412,7 +412,7 @@ private structure PrintNamespace extends ValidatedNamespace where
   /-- The `use` paths the source imports. -/
   usePaths : Array String := #[]
 
-private instance : Coe PrintNamespace ValidatedNamespace := ⟨(·.toValidatedNamespace)⟩
+instance : Coe PrintNamespace ValidatedNamespace := ⟨(·.toValidatedNamespace)⟩
 
 /-- A referenced symbol can be imported without an alias when its surface
 name is unambiguous among this namespace's actual references and does not
@@ -444,7 +444,7 @@ private def PrintNamespace.importsNamespace (ns : PrintNamespace) (unit : Valida
   | some alias =>
       !alias.isEmpty && !ns.currentNames.contains alias && ns.aliasCounts.getD alias 0 == 1
 
-private def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
+def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     Except String PrintNamespace := do
   let references := referencedNames unit ns
   let mut spellings : Std.HashMap String (Array NamespaceId) := {}
@@ -641,13 +641,19 @@ mutual
 end
 
 /-- A type of a namespace as its rendering spells it, a reference as its
-referent: the type a specification value of it has. -/
-def specificationTypeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (binders : Array VerexIR.GenericBinder) (id : TypeId) : Except String String := do
+referent: the type a specification value of it has. The namespace is
+prepared once (`PrintNamespace.of`) for the types of many calls. -/
+def PrintNamespace.specificationTypeText (ns : PrintNamespace) (unit : ValidatedUnit)
+    (binders : Array VerexIR.GenericBinder) (id : TypeId) : Except String String :=
   let id := match unit.tables.types[id.index]? with
     | some (.reference reference) => reference.referent
     | _ => id
-  typeTextFuel unit (← PrintNamespace.of unit ns) binders id (unit.tables.types.size + 1)
+  typeTextFuel unit ns binders id (unit.tables.types.size + 1)
+
+/-- `PrintNamespace.specificationTypeText` of one type. -/
+def specificationTypeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (binders : Array VerexIR.GenericBinder) (id : TypeId) : Except String String := do
+  (← PrintNamespace.of unit ns).specificationTypeText unit binders id
 
 /-- A specification type's text with the generic binders `binders` read as
 the type texts `arguments`, as a call instantiates its callee's types. -/

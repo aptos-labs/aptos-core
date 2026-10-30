@@ -105,7 +105,7 @@ private def referenceOf? (unit : ValidatedUnit) (typeId : VerexIR.TypeId) :
 `ensures`: `result`, or with several results `result_k` the `k`-th (`result.k`
 and `spec.result[k]` in a step) and `result` the first, as a clause reads
 them. None beside a local of the name, and none for a returned reference. -/
-def resultScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
+def resultScope (unit : ValidatedUnit) (printing : Print.PrintNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (scope : Array (String × String × Bool)) : Except String (Array (String × String × Bool)) := do
   let results := declaration.signature.results
@@ -121,7 +121,7 @@ def resultScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     | some (.tuple elements) => elements
     | _ => resultTypes
   let types ← components.mapM fun typeId =>
-    Print.specificationTypeText unit ns generics typeId
+    printing.specificationTypeText unit generics typeId
   if types.size == 1 then return #[("result", types[0]!, false)]
   return #[("result", types[0]!, false)] ++
     types.mapIdx fun k type => (s!"result_{k}", type, false)
@@ -145,6 +145,7 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (withResult := false) :
     Except String (Array (String × String × Bool)) := do
   let generics := declaration.signature.generics
+  let printing ← Print.PrintNamespace.of unit ns
   let mutableReference (typeId : VerexIR.TypeId) : Bool :=
     (referenceOf? unit typeId).any (·.kind == .mutable)
   let mut scope := #[]
@@ -153,11 +154,11 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     unless (name.front.isAlpha || name.front == '_') && name.all (fun c => c.isAlphanum || c == '_') do
       continue
     if scope.any (·.1 == name) then continue
-    let type ← Print.specificationTypeText unit ns generics localDecl.type.typeId
+    let type ← printing.specificationTypeText unit generics localDecl.type.typeId
     let isReference := mutableReference localDecl.type.typeId
     scope := scope ++ #[(name, type, isReference), (name ++ "'", type, isReference),
       ("old_" ++ name, type, isReference)]
-  if withResult then scope := scope ++ (← resultScope unit ns declaration scope)
+  if withResult then scope := scope ++ (← resultScope unit printing declaration scope)
   let .structured root := declaration.body | return scope
   -- The calls in evaluation order: a call's arguments before it.
   let mut calls : Array (String × VerexIR.TypeId) := #[]
@@ -183,10 +184,10 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
         else s!"old_{callee}_result_{position}"
       let results ← match unit.tables.types[typeId.index]? with
         | some (.tuple elements) => elements.zipIdx.mapM fun (element, index) => do
-            pure (s!"{name}_{index}", ← Print.specificationTypeText unit ns generics element,
+            pure (s!"{name}_{index}", ← printing.specificationTypeText unit generics element,
               mutableReference element)
         | some .unit => pure #[]
-        | _ => pure #[(name, ← Print.specificationTypeText unit ns generics typeId, mutableReference typeId)]
+        | _ => pure #[(name, ← printing.specificationTypeText unit generics typeId, mutableReference typeId)]
       for (resultName, type, isReference) in results do
         if scope.any (·.1 == resultName) then
           throw s!"`{resultName}` names two values in scope: a result of `{callee}` and another"
