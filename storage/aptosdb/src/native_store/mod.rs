@@ -25,7 +25,7 @@ use crate::{
         COLLATERAL_DB_FOLDER_NAME, COLLATERAL_MERKLE_DB_FOLDER_NAME, ORDER_DB_FOLDER_NAME,
         ORDER_MERKLE_DB_FOLDER_NAME, POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME,
     },
-    native_metrics::{ORDER_WRITES, POSITION_WRITES},
+    native_metrics::{COLLATERAL_WRITES, ORDER_WRITES, POSITION_WRITES},
     pruner::{
         CollateralEpochSnapshot, CollateralStateMerkle, CollateralValue, MerklePrunerSchema,
         OrderEpochSnapshot, OrderStateMerkle, OrderValue, PositionEpochSnapshot,
@@ -242,6 +242,16 @@ impl NativeStoreSpec for CollateralStore {
 
     fn snapshot_kv_restore_progress_key(version: Version) -> DbMetadataKey {
         DbMetadataKey::CollateralSnapshotKvRestoreProgress(version)
+    }
+
+    fn write_set_ops(write_set: &WriteSet) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
+        write_set
+            .native_collateral_iter()
+            .map(|(key, op)| (key, op.as_write_op()))
+    }
+
+    fn writes_counter() -> &'static IntCounterVec {
+        &COLLATERAL_WRITES
     }
 }
 
