@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod account_index;
+pub mod collateral;
 mod hot_state;
 pub mod leaf_entry;
 pub mod native_overlay;

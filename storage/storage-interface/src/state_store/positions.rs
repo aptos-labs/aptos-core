@@ -1,23 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Native position index: a complete [`PositionBase`] with a speculative
-//! [`PositionOverlay`] over it, both sharded on `(exchange, account)`.
-//!
-//! Keyed as the write set is, so writes apply blind. The base nests by
-//! account and sorts exchange-major, making a per-exchange scan a range;
-//! the overlay is a hash-ordered `MapLayer` holding only writes since the
-//! base, few enough to group on the fly.
+//! Native position index: the account index keyed by `(exchange, account)`
+//! and, within an account, by market.
 
 #![forbid(unsafe_code)]
 
-use crate::state_store::native_overlay::{
-    NativeOverlay, NativeParent, NativeWrites, ShardedKey, ShardedNativeLayers,
-    NUM_NATIVE_INDEX_SHARDS,
+pub use crate::state_store::account_index::{shard_of, AccountKey};
+use crate::state_store::{
+    account_index::{
+        AccountEntries, AccountIndex, AccountIndexBase, AccountIndexBaseView, AccountIndexKey,
+        AccountIndexView,
+    },
+    native_overlay::{
+        NativeOverlay, NativeParent, NativeWrites, ShardedKey, ShardedNativeLayers,
+        NUM_NATIVE_INDEX_SHARDS,
+    },
 };
-use ahash::AHashMap;
-use aptos_experimental_layered_map::MapLayer;
-use aptos_infallible::RwLock;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
@@ -28,25 +27,9 @@ use aptos_types::{
         },
         state_value::StateValue,
     },
-    transaction::Version,
 };
-use arr_macro::arr;
-use rayon::prelude::*;
-use std::collections::BTreeMap;
 
 pub const NUM_POSITION_SHARDS: usize = NUM_NATIVE_INDEX_SHARDS;
-
-/// The `(exchange, account)` an account's positions group under.
-///
-/// **Field order is load-bearing.** The derived `Ord` is exchange-major,
-/// which is what lets [`PositionBaseView::accounts_in_exchange`] be a
-/// range rather than a filter. Guarded by
-/// `account_key_orders_by_exchange_first`.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
-pub struct AccountKey {
-    pub exchange: AccountAddress,
-    pub account: AccountAddress,
-}
 
 /// One position, keyed as the write set keys it.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, Debug)]
@@ -65,23 +48,48 @@ impl PositionKey {
     }
 }
 
-/// An account's positions, by market.
-pub type AccountPositions = BTreeMap<AccountAddress, NativePosition>;
-
-/// Shard on the account, which is the base's outer key, so an account's
-/// positions never split across shards and grouping needs no
-/// coordination between them.
-pub fn shard_of(account: &AccountKey) -> usize {
-    let last = AccountAddress::LENGTH - 1;
-    let byte = account.account.as_ref()[last] ^ account.exchange.as_ref()[last];
-    usize::from(byte) % NUM_POSITION_SHARDS
-}
-
 impl ShardedKey for PositionKey {
     fn shard(&self) -> usize {
         shard_of(&self.account())
     }
 }
+
+impl AccountIndexKey for PositionKey {
+    type Entry = AccountAddress;
+
+    fn account(&self) -> AccountKey {
+        PositionKey::account(self)
+    }
+
+    fn entry(&self) -> AccountAddress {
+        self.market
+    }
+}
+
+/// The position index: an account's positions, by market.
+#[derive(Debug)]
+pub enum PositionIndex {}
+
+impl AccountIndex for PositionIndex {
+    type Key = PositionKey;
+    type Value = NativePosition;
+
+    const NAME: &'static str = "position";
+
+    fn decode_row(
+        state_key: &StateKey,
+        state_value: &StateValue,
+    ) -> crate::Result<(PositionKey, NativePosition)> {
+        let key = position_key_of(state_key)?;
+        let position = NativePosition::deserialize(state_value.bytes()).map_err(|e| {
+            crate::AptosDbError::Other(format!("native position at startup failed to decode: {e}"))
+        })?;
+        Ok((key, position))
+    }
+}
+
+/// An account's positions, by market.
+pub type AccountPositions = AccountEntries<PositionIndex>;
 
 pub type ShardedPositionLayers = ShardedNativeLayers<PositionKey, NativePosition>;
 
@@ -94,286 +102,42 @@ pub type PositionOverlay = NativeOverlay<PositionKey, NativePosition>;
 
 pub type PositionParent<'a> = NativeParent<'a, PositionKey, NativePosition>;
 
-struct PositionBaseInner {
-    version: Option<Version>,
-    /// Nested rather than keyed by the flat `PositionKey` so the grouping
-    /// risk reads by is structural. Free on the write side: the base is
-    /// owned and mutated in place, unlike the overlay.
-    shards: [BTreeMap<AccountKey, AccountPositions>; NUM_POSITION_SHARDS],
-    /// Layer handles at `version` — the view base handed to new blocks.
-    layers: ShardedPositionLayers,
-}
+pub type PositionBase = AccountIndexBase<PositionIndex>;
 
-impl std::fmt::Debug for PositionBaseInner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let len: usize = self.shards.iter().map(|s| s.len()).sum();
-        write!(f, "PositionBaseInner(version={:?}, {len})", self.version)
-    }
-}
+pub type PositionBaseView<'a> = AccountIndexBaseView<'a, PositionIndex>;
 
-/// Resolves overlay misses, as the state KV DB does for main state.
-/// Resident and complete, because the durable store is hash-keyed and can
-/// enumerate neither an exchange's accounts nor an account's markets.
-///
-/// Single-version, so it must not move while a block executes: the
-/// executor advances it under its execution lock.
-#[derive(Debug)]
-pub struct PositionBase {
-    inner: RwLock<PositionBaseInner>,
-}
+/// A [`PositionOverlay`] merged over the base it sits on.
+pub type NativeStateView<'a> = AccountIndexView<'a, PositionIndex>;
 
-/// Guarded view of a [`PositionBase`], scope-bound to a closure so no
-/// caller can park a lock and stall folds.
-pub struct PositionBaseView<'a> {
-    inner: &'a PositionBaseInner,
-}
-
-impl PositionBaseView<'_> {
-    pub fn version(&self) -> Option<Version> {
-        self.inner.version
-    }
-
-    pub fn get(&self, key: &PositionKey) -> Option<&NativePosition> {
-        self.inner.shards[shard_of(&key.account())]
-            .get(&key.account())
-            .and_then(|markets| markets.get(&key.market))
-    }
-
-    pub fn shard(&self, shard: usize) -> &BTreeMap<AccountKey, AccountPositions> {
-        &self.inner.shards[shard]
-    }
-
-    /// The account's positions, in market order. `None` when it holds
-    /// none — the fold prunes accounts whose last position is deleted,
-    /// so an empty entry never lingers.
+impl AccountIndexBaseView<'_, PositionIndex> {
     pub fn account_positions(&self, account: &AccountKey) -> Option<&AccountPositions> {
-        self.inner.shards[shard_of(account)].get(account)
-    }
-
-    /// The exchange's accounts within one shard, in account order.
-    ///
-    /// A range, not a filter — `AccountKey` sorts exchange-major — so this
-    /// costs what the exchange holds, not what every exchange holds.
-    pub fn accounts_in_exchange(
-        &self,
-        shard: usize,
-        exchange: AccountAddress,
-    ) -> impl Iterator<Item = (&AccountKey, &AccountPositions)> {
-        self.inner.shards[shard]
-            .range(
-                AccountKey {
-                    exchange,
-                    account: AccountAddress::ZERO,
-                }..,
-            )
-            .take_while(move |(key, _)| key.exchange == exchange)
-    }
-
-    /// Borrowed from the guarded view, so a descent check can run without
-    /// re-entering the lock.
-    pub fn layers(&self) -> &ShardedPositionLayers {
-        &self.inner.layers
-    }
-
-    pub fn num_accounts(&self) -> usize {
-        self.inner.shards.iter().map(|s| s.len()).sum()
+        self.account_entries(account)
     }
 
     pub fn num_positions(&self) -> usize {
-        self.inner
-            .shards
-            .iter()
-            .map(|s| s.values().map(|markets| markets.len()).sum::<usize>())
-            .sum()
+        self.num_entries()
     }
 }
 
-impl PositionBase {
-    pub fn new_empty(family: &'static str) -> Self {
-        Self::new_at_version(None, family, Vec::new())
-    }
-
-    /// Cold-load entry point: `seed` is the decoded durable snapshot.
-    pub fn new_at_version(
-        version: Option<Version>,
-        family: &'static str,
-        seed: impl IntoIterator<Item = (PositionKey, NativePosition)>,
-    ) -> Self {
-        Self {
-            inner: RwLock::new(
-                Self::build(
-                    version,
-                    family,
-                    seed.into_iter().map(Ok::<_, crate::AptosDbError>),
-                )
-                .expect("Infallible rows."),
-            ),
-        }
-    }
-
-    /// Cold-load from undecoded durable rows, so the decoded set is never
-    /// materialized alongside the base it feeds.
-    pub fn new_from_rows<I>(
-        version: Option<Version>,
-        family: &'static str,
-        rows: I,
-    ) -> crate::Result<Self>
-    where
-        I: IntoIterator<Item = crate::Result<(StateKey, StateValue)>>,
-    {
-        Ok(Self {
-            inner: RwLock::new(Self::build(
-                version,
-                family,
-                rows.into_iter().map(decode_position_row),
-            )?),
-        })
-    }
-
-    /// Rebuild in place from durable rows, for fast sync. Starts a new
-    /// layer family, so overlays on the old base stop descending from it
-    /// and must be re-seated.
-    pub fn reset_from_rows<I>(
+impl AccountIndexView<'_, PositionIndex> {
+    pub fn iter_position_accounts_for_exchange(
         &self,
-        version: Option<Version>,
-        family: &'static str,
-        rows: I,
-    ) -> crate::Result<()>
-    where
-        I: IntoIterator<Item = crate::Result<(StateKey, StateValue)>>,
-    {
-        let rebuilt = Self::build(version, family, rows.into_iter().map(decode_position_row))?;
-        *self.inner.write() = rebuilt;
-        Ok(())
+        exchange: AccountAddress,
+    ) -> Vec<AccountAddress> {
+        self.iter_accounts_for_exchange(exchange)
     }
 
-    fn build<E>(
-        version: Option<Version>,
-        family: &'static str,
-        rows: impl Iterator<Item = std::result::Result<(PositionKey, NativePosition), E>>,
-    ) -> std::result::Result<PositionBaseInner, E> {
-        let mut shards: [BTreeMap<AccountKey, AccountPositions>; NUM_POSITION_SHARDS] =
-            arr![BTreeMap::new(); 16];
-        for row in rows {
-            let (key, position) = row?;
-            let account = key.account();
-            shards[shard_of(&account)]
-                .entry(account)
-                .or_default()
-                .insert(key.market, position);
-        }
-        Ok(PositionBaseInner {
-            version,
-            shards,
-            layers: arr![MapLayer::new_family(family); 16],
-        })
+    pub fn count_positions_for_exchange(&self, exchange: AccountAddress) -> usize {
+        self.count_entries_for_exchange(exchange)
     }
 
-    pub fn version(&self) -> Option<Version> {
-        self.inner.read().version
-    }
-
-    /// Layer handles at the current base version. New overlays extend
-    /// from these, which is what lets layers below them be freed once
-    /// the blocks holding older handles are pruned.
-    pub fn layers(&self) -> ShardedPositionLayers {
-        self.inner.read().layers.clone()
-    }
-
-    pub fn read<R>(&self, f: impl FnOnce(&PositionBaseView<'_>) -> R) -> R {
-        let guard = self.inner.read();
-        f(&PositionBaseView { inner: &guard })
-    }
-
-    /// Empty overlay sitting directly on the base's current layers.
-    pub fn new_overlay(&self) -> PositionOverlay {
-        let inner = self.inner.read();
-        PositionOverlay::new(inner.version.map_or(0, |v| v + 1), inner.layers.clone())
-    }
-
-    /// The guard [`Self::fold`] and [`Self::with_view`] require. Walks the
-    /// ancestry rather than using `can_view_after`, which an abandoned
-    /// sibling fork also satisfies while sharing no ancestry.
-    pub fn is_ancestor_of(&self, overlay: &PositionOverlay) -> bool {
-        overlay.descends_from(&self.inner.read().layers)
-    }
-
-    /// Runs `f` against `overlay` merged over this base.
-    ///
-    /// Holds the read lock for the scope, so a fold cannot land mid-view
-    /// and leave the two halves at different versions; whatever `f` does
-    /// delays the next fold, so keep it to the queries. The base must not
-    /// have moved past `overlay` — never true of the committed tip, and
-    /// true of a block's overlay until the base folds past that block.
-    pub fn with_view<R>(
+    /// In market order.
+    pub fn get_account_positions(
         &self,
-        overlay: &PositionOverlay,
-        f: impl FnOnce(&NativeStateView<'_>) -> R,
-    ) -> R {
-        self.read(|base_view| {
-            // Under the lock, so the layers checked are the ones merged
-            // against; checking before locking lets a fold land in between.
-            assert!(
-                overlay.descends_from(base_view.layers()),
-                "position overlay does not descend from the base it would be merged over",
-            );
-            let mut by_shard: OverlayByShard = (0..NUM_POSITION_SHARDS)
-                .map(|_| OverlayByAccount::default())
-                .collect();
-            for (key, write) in overlay.writes_since(base_view.layers()) {
-                let account = key.account();
-                by_shard[shard_of(&account)]
-                    .entry(account)
-                    .or_default()
-                    .push((key.market, write));
-            }
-            f(&NativeStateView {
-                base: base_view,
-                by_shard,
-            })
-        })
-    }
-
-    /// Applies everything written since the base layers. Returns whether
-    /// the base moved; declines an overlay at or behind the base, or one
-    /// not descended from it, re-checked here under the write lock.
-    pub fn fold(&self, overlay: &PositionOverlay) -> bool {
-        let mut inner = self.inner.write();
-        if inner.version.is_some() && overlay.next_version() <= inner.version.map_or(0, |v| v + 1) {
-            return false;
-        }
-        if !(0..NUM_POSITION_SHARDS)
-            .all(|shard| overlay.shards()[shard].is_descendant_of(&inner.layers[shard]))
-        {
-            return false;
-        }
-        for shard in 0..NUM_POSITION_SHARDS {
-            let view = overlay.shards()[shard].view_layers_after(&inner.layers[shard]);
-            for (key, write) in view.iter() {
-                let account = key.account();
-                match write {
-                    Some(position) => {
-                        inner.shards[shard]
-                            .entry(account)
-                            .or_default()
-                            .insert(key.market, position);
-                    },
-                    None => {
-                        // Drop the account with its last position, or it
-                        // lingers empty and reads as a live account.
-                        if let Some(markets) = inner.shards[shard].get_mut(&account) {
-                            markets.remove(&key.market);
-                            if markets.is_empty() {
-                                inner.shards[shard].remove(&account);
-                            }
-                        }
-                    },
-                }
-            }
-        }
-        inner.layers = overlay.shards().clone();
-        inner.version = overlay.version();
-        true
+        exchange: AccountAddress,
+        account: AccountAddress,
+    ) -> Vec<(AccountAddress, NativePosition)> {
+        self.get_account_entries(exchange, account)
     }
 }
 
@@ -413,183 +177,6 @@ pub fn position_key_of(state_key: &StateKey) -> crate::Result<PositionKey> {
             "non-Position native StateKey: {other:?}"
         ))),
     }
-}
-
-/// The overlay's writes grouped by account, bucketed per shard. Built once
-/// per view, affordable because the overlay holds only writes since the
-/// last fold; sorting it instead would cost a 96-byte-key sort for nothing.
-type OverlayByAccount = AHashMap<AccountKey, Vec<(AccountAddress, Option<NativePosition>)>>;
-type OverlayByShard = Vec<OverlayByAccount>;
-
-/// A [`PositionOverlay`] merged over the base it sits on, valid for the
-/// scope of [`PositionOverlay::with_view`].
-pub struct NativeStateView<'a> {
-    base: &'a PositionBaseView<'a>,
-    by_shard: OverlayByShard,
-}
-
-impl NativeStateView<'_> {
-    /// Visits each of the exchange's accounts exactly once, with its
-    /// full position set.
-    ///
-    /// Scoped to the exchange by a range rather than a filter, so it
-    /// costs what the exchange holds rather than what every exchange
-    /// holds together. The base is nested by account, so the grouping
-    /// is structural. Only the overlay's accounts need merging in, and
-    /// there are at most one chunk's worth.
-    pub fn for_each_account_in_exchange<T, F>(&self, exchange: AccountAddress, f: F) -> Vec<T>
-    where
-        T: Send,
-        F: Fn(&AccountKey, &[(AccountAddress, NativePosition)]) -> Option<T> + Sync + Send,
-    {
-        (0..NUM_POSITION_SHARDS)
-            .into_par_iter()
-            .flat_map_iter(|shard| {
-                let mut out = Vec::new();
-                let mut buf: Vec<(AccountAddress, NativePosition)> = Vec::new();
-
-                for (account, markets) in self.base.accounts_in_exchange(shard, exchange) {
-                    buf.clear();
-                    for (market, position) in markets {
-                        match self.overlay_write(account, market) {
-                            // Overridden or deleted by a later write.
-                            Some(Some(newer)) => buf.push((*market, newer)),
-                            Some(None) => {},
-                            None => buf.push((*market, position.clone())),
-                        }
-                    }
-                    if let Some(writes) = self.by_shard[shard_of(account)].get(account) {
-                        for (market, write) in writes {
-                            if let Some(position) = write
-                                && !markets.contains_key(market)
-                            {
-                                buf.push((*market, position.clone()));
-                            }
-                        }
-                        buf.sort_by_key(|(market, _)| *market);
-                    }
-                    if !buf.is_empty()
-                        && let Some(item) = f(account, &buf)
-                    {
-                        out.push(item);
-                    }
-                }
-
-                // Accounts the overlay opened that the base has never
-                // seen. Few enough to test each against the base.
-                for (account, writes) in self.by_shard[shard].iter() {
-                    if account.exchange != exchange || self.base.shard(shard).contains_key(account)
-                    {
-                        continue;
-                    }
-                    let mut positions: Vec<_> = writes
-                        .iter()
-                        .filter_map(|(market, write)| write.clone().map(|p| (*market, p)))
-                        .collect();
-                    positions.sort_by_key(|(market, _)| *market);
-                    if !positions.is_empty()
-                        && let Some(item) = f(account, &positions)
-                    {
-                        out.push(item);
-                    }
-                }
-                out
-            })
-            .collect()
-    }
-
-    /// The account's overlay write for `market`, if any. `Some(None)` is
-    /// a delete. An account holds few markets, so a linear walk beats
-    /// building a second map.
-    fn overlay_write(
-        &self,
-        account: &AccountKey,
-        market: &AccountAddress,
-    ) -> Option<Option<NativePosition>> {
-        self.by_shard[shard_of(account)]
-            .get(account)
-            .and_then(|writes| {
-                writes
-                    .iter()
-                    .find(|(m, _)| m == market)
-                    .map(|(_, write)| write.clone())
-            })
-    }
-
-    /// The version the base is folded to.
-    pub fn base_version(&self) -> Option<Version> {
-        self.base.version()
-    }
-
-    /// Overlay first, then the base. `None` for a tombstone or a miss.
-    pub fn get(&self, key: &PositionKey) -> Option<NativePosition> {
-        match self.overlay_write(&key.account(), &key.market) {
-            Some(write) => write,
-            None => self.base.get(key).cloned(),
-        }
-    }
-
-    /// Order is shard-interleaved, not address-sorted. Callers needing a
-    /// stable order must sort.
-    pub fn iter_position_accounts_for_exchange(
-        &self,
-        exchange: AccountAddress,
-    ) -> Vec<AccountAddress> {
-        self.for_each_account_in_exchange(exchange, |account, positions| {
-            (!positions.is_empty()).then_some(account.account)
-        })
-    }
-
-    pub fn count_positions_for_exchange(&self, exchange: AccountAddress) -> usize {
-        self.for_each_account_in_exchange(exchange, |_, positions| Some(positions.len()))
-            .into_iter()
-            .sum()
-    }
-
-    /// One lookup into the account's base positions, merged with its
-    /// overlay writes. In market order.
-    pub fn get_account_positions(
-        &self,
-        exchange: AccountAddress,
-        account: AccountAddress,
-    ) -> Vec<(AccountAddress, NativePosition)> {
-        let key = AccountKey { exchange, account };
-        let base_markets = self.base.account_positions(&key);
-        let mut positions: Vec<(AccountAddress, NativePosition)> = base_markets
-            .into_iter()
-            .flatten()
-            .filter_map(
-                |(market, position)| match self.overlay_write(&key, market) {
-                    Some(Some(newer)) => Some((*market, newer)),
-                    Some(None) => None,
-                    None => Some((*market, position.clone())),
-                },
-            )
-            .collect();
-        if let Some(writes) = self.by_shard[shard_of(&key)].get(&key) {
-            for (market, write) in writes {
-                if let Some(position) = write
-                    && !base_markets.is_some_and(|m| m.contains_key(market))
-                {
-                    positions.push((*market, position.clone()));
-                }
-            }
-            positions.sort_by_key(|(market, _)| *market);
-        }
-        positions
-    }
-}
-
-/// Decodes one durable JMT row into a [`PositionBase`] entry.
-fn decode_position_row(
-    row: crate::Result<(StateKey, StateValue)>,
-) -> crate::Result<(PositionKey, NativePosition)> {
-    let (state_key, state_value) = row?;
-    let key = position_key_of(&state_key)?;
-    let position = NativePosition::deserialize(state_value.bytes()).map_err(|e| {
-        crate::AptosDbError::Other(format!("native position at startup failed to decode: {e}"))
-    })?;
-    Ok((key, position))
 }
 
 #[cfg(test)]
