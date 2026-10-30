@@ -3,7 +3,10 @@
 
 //! Tests for the hot state snapshot APIs used by fast sync to serve and restore hot state.
 
-use crate::{db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager, AptosDB};
+use crate::{
+    db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager,
+    state_store::StateStore, AptosDB,
+};
 use aptos_config::config::{
     HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
@@ -35,7 +38,7 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -585,6 +588,10 @@ fn test_hot_state_restore() {
     }
     receiver.finish_box().unwrap();
     finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.get_state_storage_usage(Some(version)).unwrap(),
+        src.get_state_storage_usage(Some(version)).unwrap()
+    );
 
     let pruners = &dst.state_store.state_pruner;
     assert_eq!(
@@ -719,6 +726,38 @@ fn test_hot_state_restore() {
 }
 
 #[test]
+fn test_hot_state_usage_delta() {
+    let cold: HashMap<_, _> = [
+        (key("stale"), val(b"old")),
+        (key("deleted"), val(b"gone")),
+        (key("read"), val(b"read")),
+    ]
+    .into_iter()
+    .collect();
+    let hot = [
+        (key("stale"), Some(val(b"newer"))),
+        (key("deleted"), None),
+        (key("created"), Some(val(b"c"))),
+        (key("read"), Some(val(b"read"))),
+        (key("absent"), None),
+    ]
+    .into_iter()
+    .map(|(k, v)| Ok((k, HotStateValue::new(v, 0))));
+
+    let delta = StateStore::hot_state_usage_delta(hot, |k| Ok(cold.get(k).cloned())).unwrap();
+
+    let size = |k: &str, v: &[u8]| (key(k).size() + val(v).size()) as i64;
+    assert_eq!(
+        delta,
+        (
+            0, // "deleted" is gone and "created" is new.
+            size("stale", b"newer") - size("stale", b"old") - size("deleted", b"gone")
+                + size("created", b"c"),
+        )
+    );
+}
+
+#[test]
 fn test_hot_state_restore_empty() {
     fast_sync_empty_hot_state(Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
 }
@@ -757,6 +796,10 @@ fn fast_sync_empty_hot_state(hot_root: Option<HashValue>) {
     let dst = open_persistent_hot_state_db(&tmp_dst);
     restore_cold_state(&src, &dst, version);
     finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.get_state_storage_usage(Some(version)).unwrap(),
+        src.get_state_storage_usage(Some(version)).unwrap()
+    );
     assert_eq!(
         dst.state_store
             .hot_state_merkle_db
