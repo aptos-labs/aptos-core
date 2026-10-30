@@ -24,7 +24,7 @@ use aptos_bitvec::BitVec;
 use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
-    common::Round,
+    common::{Payload, Round},
     pipelined_block::{ExecutionSummary, OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -35,6 +35,7 @@ use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::accumulator::InMemoryTransactionAccumulator,
 };
@@ -53,6 +54,46 @@ mod block_store_test;
 
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
+
+/// Extract (batch_digest, inclusion_type) pairs from a block payload for tracing.
+fn extract_batch_digests(
+    payload: &Payload,
+) -> Vec<(
+    aptos_crypto::HashValue,
+    aptos_transaction_tracing::types::BatchInclusionType,
+)> {
+    use aptos_consensus_types::{payload::OptQuorumStorePayload, proof_of_store::TBatchInfo};
+    use aptos_transaction_tracing::types::BatchInclusionType;
+
+    let mut out = Vec::new();
+    macro_rules! collect {
+        ($p:expr) => {{
+            for b in $p.inline_batches().iter() {
+                out.push((*b.info().digest(), BatchInclusionType::Inline));
+            }
+            for b in $p.opt_batches().iter() {
+                out.push((*b.digest(), BatchInclusionType::Opt));
+            }
+            for b in $p.proof_with_data().iter() {
+                out.push((*b.info().digest(), BatchInclusionType::Proof));
+            }
+        }};
+    }
+    match payload {
+        Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+            collect!(p);
+        },
+        Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+            collect!(p);
+        },
+        Payload::DirectMempool(_)
+        | Payload::DeprecatedInQuorumStore(_)
+        | Payload::DeprecatedInQuorumStoreWithLimit(_)
+        | Payload::DeprecatedQuorumStoreInlineHybrid(_)
+        | Payload::DeprecatedQuorumStoreInlineHybridV2(_) => {},
+    }
+    out
+}
 
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
     for block in ordered_blocks {
@@ -475,6 +516,30 @@ impl BlockStore {
                     .expect("Payload block must have author"),
                 pipelined_block.timestamp_usecs(),
             );
+        }
+
+        // Register both proposed and fetched blocks before starting the execution pipeline.
+        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled() {
+            let block = pipelined_block.block();
+            if let Some(payload) = block.payload() {
+                let batch_digests = extract_batch_digests(payload);
+                let proposal_info = block.author().map(|author| {
+                    aptos_transaction_tracing::types::BlockProposalInfo {
+                        proposer: author.short_str().to_string(),
+                        round: block.round(),
+                    }
+                });
+                let parent_block_timestamp_usecs =
+                    block.quorum_cert().certified_block().timestamp_usecs();
+                aptos_transaction_tracing::store::TransactionTraceStore::global()
+                    .process_proposed_block(
+                        block.id(),
+                        block.timestamp_usecs(),
+                        parent_block_timestamp_usecs,
+                        &batch_digests,
+                        proposal_info,
+                    );
+            }
         }
 
         // build pipeline
