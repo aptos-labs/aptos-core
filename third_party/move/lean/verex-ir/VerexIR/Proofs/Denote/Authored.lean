@@ -93,6 +93,12 @@ macro "verex_prepare" &"values" &"splitting" " [" values:ident,* "]" : tactic =>
 macro "verex_prepare" &"typed" &"splitting" " [" values:ident,* "]" : tactic =>
   `(tactic| (verex_prepare values splitting [$values,*]; all_goals verex_name_maps))
 
+/-- An integer as the literal the normal form spells: a numeral, negated
+where negative. -/
+def integerLiteral (value : Int) : MetaM Lean.Expr := do
+  let numeral ← mkNumeral (mkConst ``Int) value.natAbs
+  if value < 0 then mkAppM ``Neg.neg #[numeral] else pure numeral
+
 /-- Reduce closed map observations directly, avoiding a rewrite proof for
 every list cell. Leave symbolic observations available to mathematical lemmas.
 These procedures are opt-in: they are not in the global simp inventory. -/
@@ -101,6 +107,10 @@ private def evaluateClosedMap : Simp.DSimproc := fun expression => do
     return .continue
   let result ← withTransparency .all (whnf expression)
   if result == expression then return .continue
+  -- A closed integer the observation computes is a literal.
+  if result.isAppOfArity ``Int.ofNat 1 then
+    if let some n := (← withTransparency .all (whnf result.appArg!)).rawNatLit? then
+      return .done (← integerLiteral (Int.ofNat n))
   return .done result
 
 dsimproc_decl evaluateMapSize (SpecMap.size _) := evaluateClosedMap
@@ -108,6 +118,22 @@ dsimproc_decl evaluateMapHasKey (SpecMap.hasKey _ _) := evaluateClosedMap
 dsimproc_decl evaluateMapContains (SpecMap.containsB _ _) := evaluateClosedMap
 dsimproc_decl evaluateMapValueAt (SpecMap.valueAt _ _) := evaluateClosedMap
 dsimproc_decl evaluateMapGet (SpecMap.get _ _) := evaluateClosedMap
+
+/-- A bitwise operation on two integer literals, computed: `eval` decides
+ground arithmetic, Move's bitwise operations among it. -/
+private def evaluateBitwise (operation : Int → Int → Int) : Simp.DSimproc := fun e => do
+  let arguments := e.getAppArgs
+  unless arguments.size == 2 do return .continue
+  let some left ← getIntValue? arguments[0]! | return .continue
+  let some right ← getIntValue? arguments[1]! | return .continue
+  return .done (← integerLiteral (operation left right))
+
+dsimproc_decl evaluateBitwiseAnd (VerexIR.Proofs.IntegerArithmetic.bitwiseAnd _ _) :=
+  evaluateBitwise VerexIR.Proofs.IntegerArithmetic.bitwiseAnd
+dsimproc_decl evaluateBitwiseOr (VerexIR.Proofs.IntegerArithmetic.bitwiseOr _ _) :=
+  evaluateBitwise VerexIR.Proofs.IntegerArithmetic.bitwiseOr
+dsimproc_decl evaluateBitwiseXor (VerexIR.Proofs.IntegerArithmetic.bitwiseXor _ _) :=
+  evaluateBitwise VerexIR.Proofs.IntegerArithmetic.bitwiseXor
 
 /-- Simplify finite maps in the goal and its assumptions. Evaluate closed
 observations before unfolding map construction and again after substitutions
@@ -129,6 +155,27 @@ macro "verex_typed_prepare" : tactic => `(tactic| (
   all_goals verex_reduce_projections
   all_goals try simp only [VerexIR.Proofs.Obligation_eq] at *))
 
+/-- An equation of an integer literal and a term, stated term first: the
+literal is what the term computes to, the direction a rewrite by the
+hypotheses takes it in (`verex_typed_close`). -/
+elab "verex_orient_literals" : tactic => focusGoal do
+  let mut goal ← getMainGoal
+  for decl in ← goal.withContext getLCtx do
+    if decl.isImplementationDetail then continue
+    let type ← goal.withContext (instantiateMVars decl.type)
+    let some (_, lhs, rhs) := type.eq? | continue
+    let literal (e : Lean.Expr) : MetaM Bool := do
+      return (← getIntValue? e).isSome || (← getNatValue? e).isSome
+    unless ← goal.withContext (literal lhs) do continue
+    if ← goal.withContext (literal rhs) then continue
+    let next ← goal.withContext do
+      let flipped ← mkEqSymm decl.toExpr
+      let (fvarId, next) ← (← goal.assert decl.userName (← inferType flipped) flipped).intro1P
+      let _ := fvarId
+      next.tryClear decl.fvarId
+    goal := next
+  replaceMainGoal [goal]
+
 /-- Close a leaf stated over typed maps: the variables equations identify
 substituted; then substitute the equations that give maps their values,
 evaluate the closed observations, and decide; a literal vector's membership
@@ -138,11 +185,22 @@ macro "verex_typed_close" : tactic => `(tactic| (
   (try verex_subst_vars)
   first
   | (simp only [*, ↓evaluateMapSize, evaluateMapSize, ↓evaluateMapHasKey, evaluateMapHasKey,
-      ↓evaluateMapValueAt, evaluateMapValueAt]; done)
+      ↓evaluateMapValueAt, evaluateMapValueAt, evaluateBitwiseAnd, evaluateBitwiseOr,
+      evaluateBitwiseXor]; done)
   | (simp only [*]; decide)
+  -- Observations the hypotheses state of closed maps, evaluated there too,
+  -- so that the values they read are known.
+  | ((try simp only [↓evaluateMapSize, evaluateMapSize, ↓evaluateMapHasKey, evaluateMapHasKey,
+        ↓evaluateMapValueAt, evaluateMapValueAt] at *)
+     verex_orient_literals
+     simp only [*, ↓evaluateMapSize, evaluateMapSize, ↓evaluateMapHasKey, evaluateMapHasKey,
+       ↓evaluateMapValueAt, evaluateMapValueAt, evaluateBitwiseAnd, evaluateBitwiseOr,
+       evaluateBitwiseXor]
+     done)
   | (verex_goal_witnesses; done)
   | (verex_decide; done)
   | (simp [*, ↓evaluateMapHasKey, evaluateMapHasKey, ↓evaluateMapValueAt, evaluateMapValueAt,
+      evaluateBitwiseAnd, evaluateBitwiseOr, evaluateBitwiseXor,
       VerexIR.Proofs.Denote.NativeMaps.get_integers_asInt]; done)))
 
 /-- Generate a function's obligations, prepare shared contexts, and route

@@ -1325,25 +1325,13 @@ private def wovenBehavior (rule : Name) (e : Lean.Expr) : SimpM Step := withDefa
     |>.push (mkConst ``Unit.unit) |>.push typed
   let named := mkAppN (mkConst ``Skolems.construct) namedArguments
   let naming := mkAppN (mkConst ``Skolems.closure_construct) namedArguments
-  let equation ← mkConstWithFreshMVarLevels rule
-  let equationType ← inferType equation
-  let (arguments, _, statement) ← forallMetaTelescope equationType
-  let some (_, lhs, rhs) := statement.eq? | return .continue
-  let names := equationType.getForallBinderNames
-  unless ← isDefEq lhs e do return .continue
-  let some closedIndex := names.idxOf? `closed | return .continue
-  unless ← isDefEq (← inferType arguments[closedIndex]!) (← inferType literal.closed) do
-    return .continue
-  unless ← isDefEq arguments[closedIndex]! literal.closed do return .continue
-  for (name, value) in [(`named, named), (`naming, naming)] do
-    let some index := names.idxOf? name | return .continue
-    unless ← isDefEq arguments[index]! value do return .continue
-  let some free := names.idxOf? `free | return .continue
-  let freeType ← instantiateMVars (← inferType arguments[free]!)
-  unless ← isDefEq arguments[free]! (← mkDecideProof freeType) do return .continue
-  let proof ← instantiateMVars (mkAppN equation arguments)
-  if proof.hasMVar then return .continue
-  return .visit { expr := ← instantiateMVars rhs, proof? := some proof }
+  -- The reference-freedom premise `free` decided; no other premise is open.
+  let premise (name : Name) (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+    if name == `free then mkDecideProof condition else return none
+  let some (rhs, proof) ← rewriteByEquationCore? rule e premise
+      #[(`closed, literal.closed), (`named, named), (`naming, naming)]
+    | return .continue
+  return .visit { expr := rhs, proof? := some proof }
 
 open Lean Meta Simp in
 /-- `ensures_of` of a literal function value capturing values, as of the
@@ -1438,6 +1426,124 @@ attribute [vir_denote_norm] VerexIR.Proofs.Denote.findIndex?_eq_none_iff
 -- remainder of a nonnegative shift, the runtime's.
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.shiftLeft_emod_of_fits
   VerexIR.Proofs.Denote.shiftLeft_tmod_of_fits VerexIR.Proofs.Denote.shiftLeft_tmod_of_nonneg
+/-- A proof of `0 ≤ e` through sums, products and quotients of terms the
+normalization's discharger shows nonnegative. -/
+private partial def nonnegative? (e : Lean.Expr) : Simp.SimpM (Option Lean.Expr) := do
+  let parts (lemma : Name) (left right : Lean.Expr) : Simp.SimpM (Option Lean.Expr) := do
+    let some first ← nonnegative? left | return none
+    let some second ← nonnegative? right | return none
+    return some (mkApp4 (mkConst lemma) left right first second)
+  let whole : Simp.SimpM (Option Lean.Expr) := do
+    (← Simp.getMethods).discharge? (mkIntLE (mkIntLit 0) e)
+  let structural ← match_expr e with
+    | HAdd.hAdd _ _ _ _ left right => parts ``Int.add_nonneg left right
+    | HMul.hMul _ _ _ _ left right => parts ``Int.mul_nonneg left right
+    | HDiv.hDiv _ _ _ _ left right => parts ``Int.ediv_nonneg left right
+    | Nat.cast _ _ n => return some (mkApp (mkConst ``Int.natCast_nonneg) n)
+    | _ => whole
+  if structural.isSome || !(e.isAppOfArity ``HAdd.hAdd 6 || e.isAppOfArity ``HMul.hMul 6 ||
+      e.isAppOfArity ``HDiv.hDiv 6) then
+    return structural
+  -- A sum, product or quotient whose sign a fact states as a whole.
+  whole
+
+/-- One spelling of a quotient (`doc/plan/proof-language.md`, "One spelling of
+a quotient"): a truncating quotient or remainder of a nonnegative dividend is
+the Euclidean one, `/` and `%` of unbounded integers; `Int.tdiv` and
+`Int.tmod` stay only where the dividend's sign is open. -/
+simproc [vir_denote_norm] tdivOfNonnegative (Int.tdiv _ _) := fun e => do
+  let_expr Int.tdiv dividend divisor := e | return .continue
+  let some nonnegative ← nonnegative? dividend | return .continue
+  let quotient := mkIntDiv dividend divisor
+  let proof := mkApp3 (mkConst ``Int.tdiv_eq_ediv_of_nonneg) dividend divisor nonnegative
+  return .visit { expr := quotient, proof? := some proof }
+
+simproc [vir_denote_norm] tmodOfNonnegative (Int.tmod _ _) := fun e => do
+  let_expr Int.tmod dividend divisor := e | return .continue
+  let some nonnegative ← nonnegative? dividend | return .continue
+  let remainder := mkIntMod dividend divisor
+  let proof := mkApp3 (mkConst ``Int.tmod_eq_emod_of_nonneg) dividend divisor nonnegative
+  return .visit { expr := remainder, proof? := some proof }
+
+-- The identities of zero and one, which a substitution or a case split
+-- leaves (`r - 0`, `r * 0`): the arithmetic in its simplest spelling.
+attribute [vir_denote_norm] Int.add_zero Int.zero_add Int.sub_zero Int.mul_zero Int.zero_mul
+  Int.mul_one Int.one_mul Int.zero_ediv Int.ediv_zero Int.ediv_one Int.zero_emod Int.emod_one
+
+/-! Membership (`doc/plan/proof-language.md`, N2): the leaf's deciders read
+`e ∈ v` by its positions (`mem_iff_exists_int_index`); the step normal form
+keeps it an atom with its own algebra, and reads a search for an element as
+that atom (`VerexSL.Verify`'s step simp context). -/
+
+@[vir_denote_norm] theorem mem_swapIfInBounds {α : Type} (xs : Array α) (i j : Nat) (a : α) :
+    a ∈ xs.swapIfInBounds i j ↔ a ∈ xs := by
+  unfold Array.swapIfInBounds
+  split
+  · split
+    · exact (Array.swap_perm ‹_› ‹_›).mem_iff
+    · rfl
+  · rfl
+
+/-- A statement or its negation holds, whatever spelling it has. -/
+@[vir_denote_norm] theorem or_not_self_iff (p : Prop) : (p ∨ ¬p) ↔ True :=
+  iff_true_intro (Classical.em p)
+
+@[vir_denote_norm] theorem not_or_self_iff (p : Prop) : (¬p ∨ p) ↔ True :=
+  iff_true_intro ((Classical.em p).symm)
+
+/-- An integer read at its own width is itself: the identity coercion of a
+vector's elements, and of a needle, which membership reads. -/
+@[vir_denote_norm] theorem SpecInt.mk_val_eq {width : IntWidth} {signed : Bool}
+    (x : SpecInt width signed) (fits : IntegerValueFits width signed x.val) :
+    (⟨x.val, fits⟩ : SpecInt width signed) = x := rfl
+
+@[vir_denote_norm] theorem Array.map_mk_val {width : IntWidth} {signed : Bool}
+    (xs : Array (SpecInt width signed)) (fits : ∀ x : SpecInt width signed,
+      IntegerValueFits width signed x.val) :
+    xs.map (fun x => (⟨x.val, fits x⟩ : SpecInt width signed)) = xs := by
+  have : (fun x => (⟨x.val, fits x⟩ : SpecInt width signed)) = id := rfl
+  rw [this, Array.map_id]
+
+/-- A search for an element is membership, by its value for an integer, or
+over a vector's positions whatever its reads fall back to: the spellings the
+step normal form reads as the atom (`doc/plan/proof-language.md`, N2). -/
+theorem exists_mem_val_eq_iff {width : IntWidth} {signed : Bool}
+    (xs : Array (SpecInt width signed)) (e : SpecInt width signed) :
+    (∃ x, x ∈ xs ∧ x.val = e.val) ↔ e ∈ xs :=
+  ⟨fun ⟨_, mem, same⟩ => SpecInt.ext same ▸ mem, fun mem => ⟨e, mem, rfl⟩⟩
+
+theorem forall_mem_val_ne_iff {width : IntWidth} {signed : Bool}
+    (xs : Array (SpecInt width signed)) (e : SpecInt width signed) :
+    (∀ x, x ∈ xs → ¬x.val = e.val) ↔ ¬e ∈ xs :=
+  ⟨fun all mem => all e mem rfl, fun absent _ mem same => absent (SpecInt.ext same ▸ mem)⟩
+
+theorem exists_position_some_iff {α : Type} (xs : Array α) (e : α) :
+    (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ xs[i.toNat]? = some e) ↔ e ∈ xs :=
+  (mem_iff_exists_int_index xs e).symm
+
+theorem forall_position_some_ne_iff {α : Type} (xs : Array α) (e : α) :
+    (∀ i : Int, 0 ≤ i → i < xs.size → ¬xs[i.toNat]? = some e) ↔ ¬e ∈ xs := by
+  rw [mem_iff_exists_int_index]
+  exact ⟨fun all ⟨i, low, high, read⟩ => all i low high read,
+    fun absent i low high read => absent ⟨i, low, high, read⟩⟩
+
+theorem exists_position_eq_iff {α : Type} (xs : Array α) (d e : α) :
+    (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ xs[i.toNat]?.getD d = e) ↔ e ∈ xs := by
+  rw [mem_iff_exists_int_index]
+  refine exists_congr fun i => ⟨fun ⟨low, high, read⟩ => ⟨low, high, ?_⟩,
+    fun ⟨low, high, found⟩ => ⟨low, high, by rw [found, Option.getD_some]⟩⟩
+  rw [Array.getElem?_eq_getElem (by omega : i.toNat < xs.size), Option.getD_some] at read
+  rw [Array.getElem?_eq_getElem (by omega : i.toNat < xs.size), read]
+
+theorem forall_position_ne_iff {α : Type} (xs : Array α) (d e : α) :
+    (∀ i : Int, 0 ≤ i → i < xs.size → ¬xs[i.toNat]?.getD d = e) ↔ ¬e ∈ xs := by
+  rw [← exists_position_eq_iff xs d e]
+  exact ⟨fun all ⟨i, low, high, read⟩ => all i low high read,
+    fun absent i low high read => absent ⟨i, low, high, read⟩⟩
+
+attribute [vir_denote_norm] Array.mem_push Array.mem_append Array.mem_singleton List.mem_toArray
+  Array.mem_map
+
 -- A resolved prophecy brings an operation's result into a leaf.
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.wrapInt_unsigned
   VerexIR.Proofs.Denote.wrapInt_signed VerexIR.Proofs.Denote.ModularOp.run_val

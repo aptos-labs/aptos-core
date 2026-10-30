@@ -29,15 +29,28 @@ Designs: [`denotation.md`](../designs/denotation.md),
   interleaved with steps 2b and 3, then the language's function-value
   constructs (its L4). L0's keys of calls are done; its path decisions and
   selectors are next.
-- **Turned off, to fix.** The benchmark leaves out the paper example `amm`
-  (`higher-order-paper-26/examples`): its authored proof
-  (`amm_example.proof.lean`) is stated over runtime values and is written
-  again in the proof language once closures are data
-  ([`native-function-values.md`](native-function-values.md), steps 2b and
-  3). `pool_u64::deduct_shares` sets `pragma verex_verify = false`: the
+- **Turned off, to fix.** `pool_u64::deduct_shares` sets `pragma verex_verify = false`: the
   obligation that a removed shareholder is no longer in `shareholders` (a
   quantified read after `eraseIdx`) falls to the general pipeline, which
   does not decide it; its authored proof is written in the proof language.
+- **Structure of the solver and the step layer.** Found in review, each a
+  change of mechanism rather than a cleanup:
+  - the function-value codec (`Denote/FunctionValues.lean`,
+    `carrierWith`/`encodeWith`/`decodeWith` and their laws) restates
+    `NTy.codec` and its laws over an explicit function arm; one codec with
+    the arm as a parameter removes the second stack;
+  - the step normal form and the leaf's are two pipelines joined by
+    refolding (`foldLeafHypotheses`, `renormalizeFacts`,
+    `reduceDefinitions`); one entry point parametrized by the rule set;
+  - rule orientation is decided in `factRule`, `scanRules`, `settle` and
+    `settleCaseEquations` separately; one `ruleOf` over a declaration;
+  - memory-case values are named after the fact (`nameSomeReads`,
+    `renormalizeFacts`); naming them at the split removes the repairs;
+  - positional argument matching on solver heads (`isAppOfArity`,
+    `getArg!`) made the `FunctionCarriers` parameter a tree-wide edit;
+    recognizers per head;
+  - step caches keyed by goal survive backtracking (`setNGen` after
+    restore); a backtrackable cache.
 - **Key-instance spelling.** The normal form spells the `DecidableEq`
   instance of a concrete key type as `NTy.decEq carriers τ` (typed views,
   `NTy.readDecEq`); a term elaborated outside the normal form gets the

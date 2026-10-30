@@ -10,206 +10,198 @@ open VerexIR.Proofs.Denote
 
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
-verify constant_product by lean =>
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals
-    have bound : reserve_out.val * amount_in.val / (reserve_in.val + amount_in.val)
-        ≤ reserve_out.val := by
-      apply Int.ediv_le_of_le_mul (by omega)
-      exact Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
-    first
-      | omega
-      | (intro positive_in positive_out positive_amount
-         apply Int.ediv_lt_of_lt_mul (by omega)
-         exact Int.mul_lt_mul_of_pos_left (by omega) positive_out)
+verify constant_product by
+  at entry {
+    apply lemma_mul_mono(reserve_out, reserve_out, amount_in, reserve_in + amount_in)
+    apply lemma_mul_nonneg(reserve_out, amount_in)
+    apply lemma_mul_mono(reserve_out, 18446744073709551615, amount_in, 18446744073709551615)
+    apply reserve_in + amount_in > 0 ==>
+      lemma_div_nonneg(reserve_out * amount_in, reserve_in + amount_in)
+    apply reserve_in + amount_in > 0 ==>
+      lemma_div_le(reserve_out * amount_in, reserve_out, reserve_in + amount_in)
+    apply reserve_in > 0 && reserve_out > 0 ==>
+      lemma_mul_strict_mono(amount_in, reserve_in + amount_in, reserve_out)
+    assert amount_in * reserve_out == reserve_out * amount_in by ring
+    assert (reserve_in + amount_in) * reserve_out == reserve_out * (reserve_in + amount_in) by ring
+    apply reserve_in > 0 && reserve_out > 0 ==>
+      lemma_div_lt(reserve_out * amount_in, reserve_out, reserve_in + amount_in)
+  }
+  on _ { }
 
--- Bounds for fees and rounded constant-product swaps.
-theorem effective_bound (a scale : Int) (ha : 0 ≤ a) (hs : 0 ≤ scale) (hs' : scale ≤ 10000) :
-    0 ≤ a * scale / 10000 ∧ a * scale / 10000 ≤ a := by
-  constructor
-  · exact Int.ediv_nonneg (Int.mul_nonneg ha hs) (by decide)
-  · apply Int.ediv_le_of_le_mul (by decide)
-    exact Int.mul_le_mul_of_nonneg_left hs' ha
+-- A product scaled down by at most one stays within the factor.
+lemma effective_bound(a : Int, scale : Int)
+  requires 0 <= a && 0 <= scale && scale <= 10000
+  ensures 0 <= a * scale / 10000 && a * scale / 10000 <= a
+by
+  apply lemma_mul_nonneg(a, scale)
+  apply lemma_mul_mono(a, a, scale, 10000)
+  apply lemma_div_nonneg(a * scale, 10000)
+  apply lemma_div_le(a * scale, a, 10000)
 
-theorem market_bounds (r o a e : Int) (hr : 0 ≤ r) (ho : 0 ≤ o)
-    (ho' : o ≤ 18446744073709551615) (ha : a ≤ 18446744073709551615)
-    (he : 0 ≤ e) (hea : e ≤ a) :
-    (0 ≤ o * e ∧ o * e ≤ 340282366920938463463374607431768211455) ∧
-    (0 ≤ o * e / (r + e) ∧ o * e / (r + e) ≤ o) ∧
-    r * o ≤ (r + a) * (o - o * e / (r + e)) := by
-  have product_nonneg := Int.mul_nonneg ho he
-  have product_bound := Int.mul_le_mul ho' (show e ≤ 18446744073709551615 by omega) he (by omega)
-  refine ⟨⟨product_nonneg, by omega⟩, ?_⟩
-  by_cases zero : e = 0
-  · subst e
-    simp only [Int.mul_zero, Int.zero_ediv, Int.sub_zero]
-    exact ⟨⟨by omega, ho⟩, Int.mul_le_mul_of_nonneg_right (by omega) ho⟩
-  · have hden : 0 < r + e := by omega
-    have bound : o * e / (r + e) ≤ o :=
-      Int.ediv_le_of_le_mul hden (Int.mul_le_mul_of_nonneg_left (by omega) ho)
-    refine ⟨⟨Int.ediv_nonneg product_nonneg (by omega), bound⟩, ?_⟩
-    have divided := Int.ediv_mul_le (o * e) (Int.ne_of_gt hden)
-    have extension := Int.mul_nonneg (Int.sub_nonneg_of_le hea) (Int.sub_nonneg_of_le bound)
-    grind
+-- A rounded constant-product swap of a positive effective input `e <= a`
+-- stays within the output reserve and preserves the reserves' product.
+lemma market_bounds(r : Int, o : Int, a : Int, e : Int)
+  requires 0 <= r && 0 <= o && o <= 18446744073709551615
+  requires a <= 18446744073709551615 && 0 < e && e <= a
+  ensures 0 <= o * e && o * e <= 340282366920938463463374607431768211455
+  ensures 0 <= o * e / (r + e) && o * e / (r + e) <= o
+  ensures r * o <= (r + a) * (o - o * e / (r + e))
+by
+  let q := o * e / (r + e)
+  apply lemma_mul_nonneg(o, e)
+  apply lemma_mul_mono(o, 18446744073709551615, e, 18446744073709551615)
+  apply lemma_mul_mono(o, o, e, r + e)
+  apply lemma_div_nonneg(o * e, r + e)
+  apply lemma_div_le(o * e, o, r + e)
+  apply lemma_div_mul_le(o * e, r + e)
+  apply lemma_mul_mono(r + e, r + a, o - q, o - q)
+  assert (r + e) * (o - q) == r * o + e * o - q * (r + e) by ring
+  assert e * o == o * e by ring
 
-verify constant_product_with_fee by lean =>
-  verex_obligations
-  all_goals verex_paths
-  all_goals (repeat' verex_split)
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals
-    have bound := effective_bound amount_in.val 9500 (by omega) (by omega) (by omega)
-    have facts := market_bounds reserve_in.val reserve_out.val amount_in.val
-      (amount_in.val * 9500 / 10000) (by omega) (by omega) (by omega) (by omega) bound.1 bound.2
-    first
-      | omega
-      | (simpa only [Int.sub_zero] using
-          Int.mul_le_mul_of_nonneg_right
-            (show reserve_in.val ≤ reserve_in.val + amount_in.val by omega)
-            (show 0 ≤ reserve_out.val by omega))
-      | (let fee : SpecInt (.bits 64) false := by assumption
-         have feeBounds : 0 ≤ fee.val ∧ fee.val ≤ 10000 := by
-           dsimp only [fee]
-           omega
-         have boundFee := effective_bound amount_in.val (10000 - fee.val)
-           (by omega) (by omega) (by omega)
-         have factsFee := market_bounds reserve_in.val reserve_out.val amount_in.val
-           (amount_in.val * (10000 - fee.val) / 10000)
-           (by omega) (by omega) (by omega) (by omega) boundFee.1 boundFee.2
-         try dsimp only [fee] at boundFee factsFee
-         omega)
+-- A swap of the input scaled by `s / 10000`: the scaled input's bounds, and,
+-- where it is positive, the market bounds; without input the product of the
+-- reserves is preserved as well.
+lemma scaled_market(r : Int, o : Int, a : Int, s : Int)
+  requires 0 <= r && 0 <= o && o <= 18446744073709551615
+  requires 0 <= a && a <= 18446744073709551615 && 0 <= s && s <= 10000
+  ensures 0 <= a * s && a * s <= 340282366920938463463374607431768211455
+  ensures 0 <= a * s / 10000 && a * s / 10000 <= a
+  ensures a * s / 10000 > 0 ==> 0 <= o * (a * s / 10000)
+  ensures a * s / 10000 > 0 ==> o * (a * s / 10000) <= 340282366920938463463374607431768211455
+  ensures a * s / 10000 > 0 ==> 0 <= o * (a * s / 10000) / (r + a * s / 10000)
+  ensures a * s / 10000 > 0 ==> o * (a * s / 10000) / (r + a * s / 10000) <= o
+  ensures a * s / 10000 > 0 ==>
+    r * o <= (r + a) * (o - o * (a * s / 10000) / (r + a * s / 10000))
+  ensures r * o <= (r + a) * o
+by
+  apply lemma_mul_nonneg(a, s)
+  apply lemma_mul_mono(a, 18446744073709551615, s, 10000)
+  apply effective_bound(a, s)
+  apply a * s / 10000 > 0 ==> market_bounds(r, o, a, a * s / 10000)
+  apply lemma_mul_mono(r, r + a, o, o)
 
-verify constant_product_with_fee_non_compliant by lean =>
-  verex_obligations
-  all_goals verex_paths
-  all_goals (repeat' verex_split)
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  -- Abort branches can have an out-of-range fee. Discharge their abort
-  -- condition before deriving the fee bounds needed by successful returns.
-  all_goals (try (simp only [reduceCtorEq, false_or]; omega))
-  all_goals
-    let fee : SpecInt (.bits 64) false := by assumption
-    have feeBounds : 0 ≤ fee.val ∧ fee.val ≤ 10000 := by
-      dsimp only [fee]
-      omega
-    have bound := effective_bound amount_in.val (10000 - fee.val)
-      (by omega) (by omega) (by omega)
-    have facts := market_bounds reserve_in.val reserve_out.val amount_in.val
-      (amount_in.val * (10000 - fee.val) / 10000)
-      (by omega) (by omega) (by omega) (by omega) bound.1 bound.2
-    dsimp only [fee] at bound facts
-    try simp only [reduceCtorEq, false_or]
-    omega
+-- The swap at a fee of `fee` basis points.
+lemma fee_market(r : Int, o : Int, a : Int, fee : u64)
+  requires 0 <= r && 0 <= o && o <= 18446744073709551615
+  requires 0 <= a && a <= 18446744073709551615 && fee <= 10000
+  ensures 0 <= a * (10000 - fee) && a * (10000 - fee) <= 340282366920938463463374607431768211455
+  ensures 0 <= a * (10000 - fee) / 10000 && a * (10000 - fee) / 10000 <= a
+  ensures a * (10000 - fee) / 10000 > 0 ==> 0 <= o * (a * (10000 - fee) / 10000)
+  ensures a * (10000 - fee) / 10000 > 0 ==>
+    o * (a * (10000 - fee) / 10000) <= 340282366920938463463374607431768211455
+  ensures a * (10000 - fee) / 10000 > 0 ==>
+    0 <= o * (a * (10000 - fee) / 10000) / (r + a * (10000 - fee) / 10000)
+  ensures a * (10000 - fee) / 10000 > 0 ==>
+    o * (a * (10000 - fee) / 10000) / (r + a * (10000 - fee) / 10000) <= o
+  ensures a * (10000 - fee) / 10000 > 0 ==>
+    r * o <= (r + a) * (o - o * (a * (10000 - fee) / 10000) / (r + a * (10000 - fee) / 10000))
+by
+  apply scaled_market(r, o, a, 10000 - fee)
+
+verify constant_product_with_fee by
+  at entry {
+    apply scaled_market(reserve_in, reserve_out, amount_in, 9500)
+  }
+  on aborts_if 1, ensures 1, ensures 2, ensures 3, ensures 4, assert 1 when if 1 then {
+    apply fee_market(reserve_in, reserve_out, amount_in, global<Fee>(owner).bps)
+  }
+  on _ { }
+
+-- The stored fee, where the owner has one within 100%.
+verify constant_product_with_fee_non_compliant by
+  on _ {
+    apply exists<Fee>(owner) && global<Fee>(owner).bps <= 10000 ==>
+      fee_market(reserve_in, reserve_out, amount_in, global<Fee>(owner).bps)
+  }
 
 -- Rounded constant-product pricing is monotone in its input.
-theorem ratio_monotone (r o a b : Int) (hr : 0 ≤ r) (ho : 0 ≤ o)
-    (_ha : 0 ≤ a) (hab : a ≤ b) (hden : 0 < r + a) :
-    o * a / (r + a) ≤ o * b / (r + b) := by
-  have bound : o * a / (r + a) ≤ o :=
-    Int.ediv_le_of_le_mul hden (Int.mul_le_mul_of_nonneg_left (by omega) ho)
-  have divided := Int.ediv_mul_le (o * a) (Int.ne_of_gt hden)
-  have extension := Int.mul_le_mul_of_nonneg_right bound (show 0 ≤ b - a by omega)
-  apply Int.le_ediv_of_mul_le (by omega)
-  grind
+lemma ratio_monotone(r : Int, o : Int, a : Int, b : Int)
+  requires 0 <= r && 0 <= o && 0 <= a && a <= b && 0 < r + a
+  ensures o * a / (r + a) <= o * b / (r + b)
+by
+  let q := o * a / (r + a)
+  apply lemma_mul_nonneg(o, a)
+  apply lemma_div_mul_le(o * a, r + a)
+  apply lemma_mul_mono(o, o, a, r + a)
+  apply lemma_div_le(o * a, o, r + a)
+  apply lemma_div_nonneg(o * a, r + a)
+  apply lemma_mul_mono(q, o, b - a, b - a)
+  assert q * (r + b) == q * (r + a) + q * (b - a) by ring
+  assert o * b == o * a + o * (b - a) by ring
+  apply lemma_mul_nonneg(o, b)
+  apply lemma_le_div(o * b, q, r + b)
 
-verify create_constant_product_pool by lean =>
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals first
-    | (have nonneg := Int.mul_nonneg
-          (show 0 ≤ quantified_19 by omega) (show 0 ≤ quantified_20 by omega)
-       simp only [Int.tdiv_eq_ediv_of_nonneg nonneg] at *
-       have bound := market_bounds quantified_18 quantified_19 quantified_20 quantified_20
-         (by omega) (by omega) (by omega) (by omega) (by omega) (by omega)
-       grind)
-    | (have nonneg1 := Int.mul_nonneg
-          (show 0 ≤ quantified_14 by omega) (show 0 ≤ quantified_15 by omega)
-       have nonneg2 := Int.mul_nonneg
-          (show 0 ≤ quantified_14 by omega) (show 0 ≤ quantified_16 by omega)
-       simp only [Int.tdiv_eq_ediv_of_nonneg nonneg1, Int.tdiv_eq_ediv_of_nonneg nonneg2] at *
-       by_cases zero : quantified_13 + quantified_15 = 0
-       · grind
-       · have monotone := ratio_monotone quantified_13 quantified_14 quantified_15 quantified_16
-           (by omega) (by omega) (by omega) (by omega) (by omega)
-         grind)
-    | (verex_memory_invariants
-       all_goals try dsimp only [storedInvariant]
-       all_goals simp_all [vir_denote_norm, NTy.encode_function,
-         Proofs.Obligation_iff, IntegerValueFits_unsigned_succ]
-       all_goals grind)
+verify create_constant_product_pool by
+  on data invariant 3 {
+    apply r_in + a1 > 0 ==> ratio_monotone(r_in, r_out, a1, a2)
+  }
+  on data invariant 4 {
+    split amt > 0
+    apply amt > 0 ==> market_bounds(r_in, r_out, amt, amt)
+    if amt > 0 { assert !(r_in == 0 && amt == 0) }
+    if amt <= 0 { assert amt == 0 }
+    split amt <= 0 && r_in == 0
+  }
+  on _ { }
 
--- Specialize the quantified pricing laws, then reduce its singleton result.
-verify swap by lean =>
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals try clear verexContinuation
-  all_goals simp_all [vir_denote_norm, NTy.encode_function]
-  all_goals grind [packResults_single]
+-- The pool's laws at the swap's reserves: the pricing call does not abort,
+-- stays within the output reserve, and preserves the reserves' product.
+verify swap by
+  on aborts_if 1 {
+    assert !aborts_of<pool.pricing>(pool.reserve_x, pool.reserve_y, amount_in)
+  }
+  after invoke 1 {
+    assert result_of<pool.pricing>(pool.reserve_x, pool.reserve_y, amount_in) <= pool.reserve_y
+    assert pool.reserve_x * pool.reserve_y <= (pool.reserve_x + amount_in) *
+      (pool.reserve_y - result_of<pool.pricing>(pool.reserve_x, pool.reserve_y, amount_in))
+  }
+  on ensures 5 {
+    assert pool'.reserve_x == pool.reserve_x + amount_in
+    assert pool'.reserve_y == pool.reserve_y -
+      result_of<pool.pricing>(pool.reserve_x, pool.reserve_y, amount_in)
+  }
+  on _ { }
 
--- Selecting a bounded fee preserves monotonicity of the effective input.
-theorem selected_fee_bounds (slot : Option (SpecInt (.bits 64) false × Unit)) :
-    let raw := ((slot.map fun value => RuntimeValue.integer value.1.val).getD RuntimeValue.unit).asInt
-    let fee := if slot.isSome = true ∧ raw ≤ 10000 then raw else 500
-    0 ≤ fee ∧ fee ≤ 10000 := by
-  cases slot with
-  | none => decide
-  | some value =>
-    have bounds := value.1.fits
-    simp only [IntegerValueFits_unsigned_succ] at bounds
-    dsimp [RuntimeValue.asInt]
-    split <;> omega
+-- The fee-adjusted swap is monotone in its input: the effective inputs are,
+-- and the rounded constant-product ratio is.
+lemma fee_monotone(r : Int, o : Int, a : Int, b : Int, fee : u64)
+  requires 0 <= r && 0 <= o && 0 <= a && a <= b && fee <= 10000
+  ensures a * (10000 - fee) / 10000 > 0 ==>
+    o * (a * (10000 - fee) / 10000) / (r + a * (10000 - fee) / 10000) <=
+      o * (b * (10000 - fee) / 10000) / (r + b * (10000 - fee) / 10000)
+  ensures b * (10000 - fee) / 10000 > 0 ==>
+    0 <= o * (b * (10000 - fee) / 10000) / (r + b * (10000 - fee) / 10000)
+  ensures a * (10000 - fee) / 10000 <= b * (10000 - fee) / 10000
+by
+  apply lemma_mul_nonneg(a, 10000 - fee)
+  apply lemma_mul_mono(a, b, 10000 - fee, 10000 - fee)
+  apply lemma_div_mono(a * (10000 - fee), b * (10000 - fee), 10000)
+  apply lemma_div_nonneg(a * (10000 - fee), 10000)
+  apply a * (10000 - fee) / 10000 > 0 ==>
+    ratio_monotone(r, o, a * (10000 - fee) / 10000, b * (10000 - fee) / 10000)
+  apply lemma_mul_nonneg(o, b * (10000 - fee) / 10000)
+  apply b * (10000 - fee) / 10000 > 0 ==>
+    lemma_div_nonneg(o * (b * (10000 - fee) / 10000), r + b * (10000 - fee) / 10000)
 
-theorem fee_monotone (r o a b fee : Int) {q1 q2 : Int}
-    (hr : 0 ≤ r) (ho : 0 ≤ o) (ha : 0 ≤ a) (hab : a ≤ b)
-    (hf : 0 ≤ fee) (hf' : fee ≤ 10000) (hq2 : 0 ≤ q2)
-    (zero1 : (a * (10000 - fee)).tdiv 10000 = 0 → q1 = 0)
-    (value1 : 0 < (a * (10000 - fee)).tdiv 10000 →
-      q1 = (o * ((a * (10000 - fee)).tdiv 10000)).tdiv
-        (r + (a * (10000 - fee)).tdiv 10000))
-    (value2 : 0 < (b * (10000 - fee)).tdiv 10000 →
-      q2 = (o * ((b * (10000 - fee)).tdiv 10000)).tdiv
-        (r + (b * (10000 - fee)).tdiv 10000)) : q1 ≤ q2 := by
-  have scaled1 := Int.mul_nonneg ha (show 0 ≤ 10000 - fee by omega)
-  have scaled2 := Int.mul_nonneg (show 0 ≤ b by omega) (show 0 ≤ 10000 - fee by omega)
-  have eff1 : 0 ≤ a * (10000 - fee) / 10000 := Int.ediv_nonneg scaled1 (by decide)
-  have eff2 : 0 ≤ b * (10000 - fee) / 10000 := Int.ediv_nonneg scaled2 (by decide)
-  simp only [Int.tdiv_eq_ediv_of_nonneg scaled1, Int.tdiv_eq_ediv_of_nonneg scaled2,
-    Int.tdiv_eq_ediv_of_nonneg (Int.mul_nonneg ho eff1),
-    Int.tdiv_eq_ediv_of_nonneg (Int.mul_nonneg ho eff2)] at zero1 value1 value2
-  have increasing := Int.ediv_le_ediv (show (0 : Int) < 10000 by decide)
-    (Int.mul_le_mul_of_nonneg_right hab (show 0 ≤ 10000 - fee by omega))
-  by_cases zero : a * (10000 - fee) / 10000 = 0
-  · have := zero1 zero
-    omega
-  · rw [value1 (by omega), value2 (by omega)]
-    exact ratio_monotone r o _ _ hr ho eff1 increasing (by omega)
-
-verify create_compliant_fee_pool by lean =>
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals first
-    | (verex_memory_invariants
-       all_goals try dsimp only [storedInvariant]
-       all_goals simp_all [vir_denote_norm, NTy.encode_function,
-         Proofs.Obligation_iff, IntegerValueFits_unsigned_succ])
-    | (try clear verexContinuation
-       run_tac
-         let goal ← Lean.Elab.Tactic.getMainGoal
-         goal.withContext do
-          let hyps ← goal.getNondepPropHyps
-          let mut fee? : Option Lean.Expr := none
-          for hyp in hyps do
-            let ty ← Lean.instantiateMVars (← hyp.getType)
-            if let some fee := ty.find? (fun e => e.isAppOfArity ``ite 5 &&
-                e.getArg! 0 == Lean.mkConst ``Int && e.appArg! == Lean.toExpr (500 : Int)) then
-              fee? := some fee
-              break
-          let some fee := fee? | throwError "no selected fee"
-          let (_, _, next) ← goal.generalizeHyp #[{ expr := fee, xName? := some `fee, hName? := some `feeDef }] hyps
-          Lean.Elab.Tactic.replaceMainGoal [next]
-       have feeBounds : 0 ≤ fee ∧ fee ≤ 10000 := by
-         rw [← feeDef]
-         exact selected_fee_bounds _
-       apply fee_monotone quantified_13 quantified_14 quantified_15 quantified_16 fee
-       all_goals first | assumption | omega)
+-- At the fee the state holds, or the default.
+verify create_compliant_fee_pool by
+  on data invariant 3 {
+    split S |~ (exists<Fee>(account.address) && global<Fee>(account.address).bps <= 10000)
+    apply (S |~ (exists<Fee>(account.address) && global<Fee>(account.address).bps <= 10000)) ==>
+      fee_monotone(r_in, r_out, a1, a2, (S |~ global<Fee>(account.address).bps))
+    apply fee_monotone(r_in, r_out, a1, a2, 500)
+    if S |~ (exists<Fee>(account.address) && global<Fee>(account.address).bps <= 10000) {
+      let fee := S |~ global<Fee>(account.address).bps
+      apply lemma_mul_nonneg(a1, 10000 - fee)
+      apply lemma_div_nonneg(a1 * (10000 - fee), 10000)
+      split 0 < a1 * (10000 - fee) / 10000
+      if 0 < a1 * (10000 - fee) / 10000 { assert 0 < a2 * (10000 - fee) / 10000 }
+      if a1 * (10000 - fee) / 10000 <= 0 { assert a1 * (10000 - fee) / 10000 == 0 }
+    }
+    if !(S |~ (exists<Fee>(account.address) && global<Fee>(account.address).bps <= 10000)) {
+      split 0 < a1 * 9500 / 10000
+      if 0 < a1 * 9500 / 10000 { assert 0 < a2 * 9500 / 10000 }
+      if a1 * 9500 / 10000 <= 0 { assert a1 * 9500 / 10000 == 0 }
+    }
+  }
+  on _ { }

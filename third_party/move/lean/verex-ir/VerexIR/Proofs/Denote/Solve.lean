@@ -79,12 +79,18 @@ private def leafKey (goal : MVarId) (provenance : Option Provenance)
     -- An invariant a clause states, where the step owing it names no
     -- invariant of its own (a stored or data invariant where a write or a
     -- mutation ends).
-    | _, none => match invariant, provenance with
-      | some kind, some origin =>
-          if origin.key.kind.endsWith "invariant" then origin.key else { kind }
-      | some kind, none => { kind }
+    | _, none => match invariant.map clauseKey, provenance with
+      | some key, some origin =>
+          if origin.key.kind.endsWith "invariant" then
+            if origin.key.kind == key.kind then key else origin.key
+          else key
+      | some key, none => key
       | none, some origin => origin.key
-      | none, none => { kind := "leaf" }
+      -- The stored invariants a memory owes, where no write names them:
+      -- after a call of a function value, at the exit.
+      | none, none =>
+        if target.consumeMData.isAppOf ``MemoryInvariants then { kind := "stored invariant" }
+        else { kind := "leaf" }
 
 /-- The keys of a path's clauses, as its leaves will have them (`leafKey`):
 each clause a range of its target or a stripped clause names, and the key
@@ -811,6 +817,11 @@ private def exitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let goal ← match ctx.labeled, values[0]?, values[1]? with
     | true, some value, some state => noteProgramPoint goal value state ctx.shared
     | _, _, _ => pure goal
+  -- In a step proof, the memory the path continues with is the state of the
+  -- steps after it.
+  let goal ← match values[1]? with
+    | some state => bindStateEntry goal state
+    | none => pure goal
   setGoals [goal]
   -- The values the continuation is applied to, and the conditions it
   -- passes on, are normal already.
@@ -2309,6 +2320,9 @@ private def prepareObligations (ctx : SolveContext) (step : SolveStep) : SolveM 
   -- These are path binders, including a callee's results and assumptions.
   -- Clause-specific binders remain inside their conjunction or marker.
   if target.isForall then return false
+  -- A binding site the walk names values at comes first.
+  if target.isAppOf ``LetIn || target.isAppOf ``LetRowIn || !(← resultSites target).isEmpty then
+    return false
   if (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then return false
   -- A folded continuation still contains program, even when no `wp` is
   -- syntactically visible. Its values must reach `exitStep` before a proof
@@ -2367,7 +2381,9 @@ its body, where the hooks `at entry` run. -/
 private def entryStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   if (← get).entryReached || !ctx.points.any (·.1 == .entry) then return false
   let target ← step.goal.withContext (instantiateMVars (← step.goal.getType))
-  unless target.isAppOf ``VerexIR.Proofs.wp do return false
+  -- A source `let` the body starts with is a step of it (`LetIn`).
+  unless target.isAppOf ``VerexIR.Proofs.wp || target.isAppOf ``LetIn ||
+      target.isAppOf ``LetRowIn do return false
   modify fun s => { s with entryReached := true }
   setGoals [step.goal]
   atPoint ctx .entry
@@ -2645,6 +2661,9 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   setGoals (← (← getGoals).mapM fun goal => do
     let target ← instantiateMVars (← goal.getType)
     if target.isMData then goal.replaceTargetDefEq target.consumeMData else pure goal)
+  -- A step proof's postcondition reads the returned value as `result`.
+  if handOver then
+    setGoals (← (← getGoals).mapM fun goal => (enterResult goal : MetaM MVarId))
   let startHeartbeats ← IO.getNumHeartbeats
   let normalization ← normalization
   let ctx : SolveContext := {
@@ -3331,7 +3350,7 @@ syntax (name := keyAssert) &"assert" num
   (&"of" ((&"at" verexPoint) <|> (&"after" verexSite)))? : verexKey
 syntax (name := keyInvariant) &"invariant" num (&"of" &"loop" num)? (&"entry" <|> &"step") : verexKey
 syntax (name := keyRequires) &"requires" (num)? &"of" ident (&"at" &"call" num)? : verexKey
-syntax (name := keyDataInvariant) &"data" &"invariant" : verexKey
+syntax (name := keyDataInvariant) &"data" &"invariant" (num)? : verexKey
 syntax (name := keyModuleInvariant) &"module" &"invariant" : verexKey
 syntax (name := keyStoredInvariant) &"stored" &"invariant" : verexKey
 syntax (name := keyLemmaRequires) &"lemma" &"requires" : verexKey
@@ -3378,7 +3397,8 @@ def keyPattern {m : Type → Type} [Monad m] [MonadError m] (stx : Syntax) : m O
   | `(verexKey| requires $[$k?:num]? of $callee:ident $[at call $call?:num]?) =>
       pure { kind := "requires", index := k?.map (·.getNat), callee := callee.getId.toString,
              call := call?.map (·.getNat) }
-  | `(verexKey| data invariant) => pure { kind := "data invariant" }
+  | `(verexKey| data invariant $[$k?]?) =>
+      pure { kind := "data invariant", index := k?.map (·.getNat) }
   | `(verexKey| module invariant) => pure { kind := "module invariant" }
   | `(verexKey| stored invariant) => pure { kind := "stored invariant" }
   | `(verexKey| lemma requires) => pure { kind := "lemma requires" }

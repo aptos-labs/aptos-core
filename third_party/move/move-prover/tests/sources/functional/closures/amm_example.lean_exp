@@ -1,7 +1,5 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/amm_example.move:133:9: error: the specification clause `aborts_if false` is not established
-tests/sources/functional/closures/amm_example.move:145:9: error: the specification clause `ensures effective_in > 0
-        ==> result == reserve_out * effective_in / (reserve_in + effective_in)` is not established
 tests/sources/functional/closures/amm_example.move:148:9: error: the specification clause `ensures result <= reserve_out` is not established
 tests/sources/functional/closures/amm_example.move:152:9: error: the specification clause `ensures (reserve_in + amount_in) * (reserve_out - result)
         >= reserve_in * reserve_out` is not established
@@ -10,7 +8,6 @@ tests/sources/functional/closures/amm_example.move:129:5: error: verex verificat
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
     | ensures_3 => verex_prepare; sorry
     | ensures_4 => verex_prepare; sorry
     | _ => verex_decide
@@ -18,13 +15,11 @@ tests/sources/functional/closures/amm_example.move:129:5: error: verex verificat
 tests/sources/functional/closures/amm_example.move:176:9: error: the specification clause `aborts_if !exists<Fee>(client)` is not established
 tests/sources/functional/closures/amm_example.move:178:9: error: the specification clause `aborts_if global<Fee>(client).bps > 10000` is not established
 tests/sources/functional/closures/amm_example.move:182:9: error: the specification clause `aborts_if reserve_in + effective_in == 0` is not established
-tests/sources/functional/closures/amm_example.move:185:9: error: the specification clause `ensures result == reserve_out * effective_in / (reserve_in + effective_in)` is not established
 tests/sources/functional/closures/amm_example.move:173:5: error: verex verification failed: the automatic verification of `constant_product_with_fee_non_compliant` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
   verify constant_product_with_fee_non_compliant by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
-    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/amm_example.move:220:9: error: the specification clause `aborts_if amount_in == 0` is not established
@@ -60,7 +55,8 @@ tests/sources/functional/closures/amm_example.move:247:5: error: verex verificat
   verify create_constant_product_pool by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_3 => verex_prepare; sorry
+    | data_invariant_4 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/amm_example.move:28:9: error: the data invariant `invariant ∀ (S : StateDomain;
@@ -96,7 +92,10 @@ tests/sources/functional/closures/amm_example.move:255:5: error: verex verificat
   verify create_noncompliant_fee_pool by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
+    | data_invariant_2 => verex_prepare; sorry
+    | data_invariant_3 => verex_prepare; sorry
+    | data_invariant_4 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/amm_example.move:36:9: error: the data invariant `invariant ∀ (S : StateDomain;
@@ -112,6 +111,6 @@ tests/sources/functional/closures/amm_example.move:264:5: error: verex verificat
   verify create_compliant_fee_pool by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_3 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

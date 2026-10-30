@@ -285,7 +285,7 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
   let requiresIdent := rootIdent (functionRequiresName segments)
   let runtimeFrame ← `(VerexIR.Proofs.Denote.Skolems.runtime $unitIdent)
   let runtimeCarriers ← `(VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)
-  let closures := closureSites unit
+  let closures ← closureSitesOf segments unit
   let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
   let mut equations : Array (Nat × Term) := #[]
   -- Whether every site's value reads as `True`: no target declares a precondition.
@@ -316,10 +316,18 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
             ⟨$row, by decide⟩))
         pure (some arguments)
       else pure none
+    let ctor := rootIdent (name "site")
+    let captures := mkIdent `captures
+    let args := mkIdent `args
+    let state := mkIdent `state
     -- A precondition stating a behavioral predicate would read the meaning
-    -- itself: a contract reading the meaning is rejected (`requiresMeaningTerm`).
+    -- itself: a contract reading the meaning is rejected (`requiresMeaningTerm`),
+    -- and no meaning reads the site's target's precondition: uninterpreted.
     if siteRequiresRejected unit site.target then
       everywhere := false
+      arms := arms.push (← `(Lean.Parser.Term.matchAltExpr|
+        | $ctor $captures, $args => VerexIR.Proofs.requiresForeign $unitIdent _ _ _
+            ($ctor $captures) $args $state))
       continue
     let targetRequires := name "requiresTarget"
     defineSiteRequires unit unitDefinition instanceName targetRequires site.target instantiation?
@@ -328,10 +336,6 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
     let fullRow ← literal "fullRow" fullOwn
     let capturedRow ← literal "capturedRow" capturedOwn
     let suppliedRow ← literal "suppliedRow" suppliedOwn
-    let ctor := rootIdent (name "site")
-    let captures := mkIdent `captures
-    let args := mkIdent `args
-    let state := mkIdent `state
     let body ← match instantiation? with
       | none => `($(rootIdent targetRequires)
           (@VerexIR.Proofs.Denote.Weave.compose $unitIdent _ $runtimeFrame $fullRow $capturedRow
@@ -348,13 +352,6 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
     equations := equations.push (index, body)
   let foreignCtor := rootIdent (family ++ `foreign)
   let (key, args, state, foreign) := (mkIdent `key, mkIdent `args, mkIdent `state, mkIdent `foreign)
-  -- A site whose target's precondition no meaning reads: uninterpreted.
-  for site in closures, index in [0:closures.size] do
-    unless siteRequiresRejected unit site.target do continue
-    let ctor := rootIdent (family ++ Name.mkSimple s!"site{index}")
-    arms := arms.push (← `(Lean.Parser.Term.matchAltExpr|
-      | $ctor $(mkIdent `captures), $args => VerexIR.Proofs.requiresForeign $unitIdent _ _ _
-          ($ctor $(mkIdent `captures)) $args $state))
   arms := arms.push (← `(Lean.Parser.Term.matchAltExpr|
     | $foreignCtor $key, $args => $foreign _ _ _ ($foreignCtor $key) $args $state))
   elabCommand (← `(command|
@@ -405,7 +402,7 @@ def ensureFunctionCarriers (segments : Array String) (unit : ValidatedUnit) :
   let unitDefinition ← ensureUnitDefinition segments unit
   let unitIdent := rootIdent unitDefinition
   let instanceId ← `(Lean.Parser.Command.declId| $(rootIdent name):ident)
-  let sites := siteSpecs (closureSites unit)
+  let sites := siteSpecs (← closureSitesOf segments unit)
   let requiresIdent := rootIdent (functionRequiresName segments)
   if sites.isEmpty then
     elabCommand (← `(command|

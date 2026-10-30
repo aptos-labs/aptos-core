@@ -188,6 +188,15 @@ repeat = 3
 # ## Higher-order paper (move-prover/doc/higher-order-paper-26/examples)
 
 [[problem]]
+name = "amm"
+expected_rejections = ["«0x42».amm::create_noncompliant_fee_pool"]
+kind = "move"
+package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
+modules = ["0x42::amm"]
+dev = true
+inputs = ["third_party/move/move-stdlib"]
+
+[[problem]]
 name = "calculator"
 kind = "move"
 package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"

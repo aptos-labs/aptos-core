@@ -94,6 +94,46 @@ where
     if parts.isEmpty then "_"
     else "⟨" ++ ", ".intercalate (parts.map fun (σ, name) => carrierPattern unit name σ) ++ ", _⟩"
 
+/-- The reference type a type is, if it is one. -/
+private def referenceOf? (unit : ValidatedUnit) (typeId : VerexIR.TypeId) :
+    Option VerexIR.ReferenceType :=
+  match unit.tables.types[typeId.index]? with
+  | some (.reference reference) => some reference
+  | _ => none
+
+/-- The names of a function's results in its proof's scope, read at its
+`ensures`: `result`, or with several results `result_k` the `k`-th (`result.k`
+and `spec.result[k]` in a step) and `result` the first, as a clause reads
+them. None beside a local of the name, and none for a returned reference. -/
+def resultScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+    (scope : Array (String × String × Bool)) : Except String (Array (String × String × Bool)) := do
+  let results := declaration.signature.results
+  if results.isEmpty || scope.any (·.1.startsWith "result") then return #[]
+  if results.any (fun (result : VerexIR.TypeUse) => (referenceOf? unit result.typeId).isSome) then
+    return #[]
+  let generics := declaration.signature.generics
+  -- One result of a tuple type has its components, as several results do.
+  let single : Option VerexIR.TypeId := if results.size == 1 then some results[0]!.typeId else none
+  let resultTypes : Array VerexIR.TypeId := results.map fun (result : VerexIR.TypeUse) => result.typeId
+  let components : Array VerexIR.TypeId :=
+    match single.bind fun typeId => unit.tables.types[typeId.index]? with
+    | some (.tuple elements) => elements
+    | _ => resultTypes
+  let types ← components.mapM fun typeId =>
+    Print.specificationTypeText unit ns generics typeId
+  if types.size == 1 then return #[("result", types[0]!, false)]
+  return #[("result", types[0]!, false)] ++
+    types.mapIdx fun k type => (s!"result_{k}", type, false)
+
+/-- Whether a proof's syntax reads the function's result (`result`,
+`result.k`, `spec.result[k]`): only then is the exit a binding site of it,
+which names the returned value in the leaves. A dotted name (`result.t`) is
+one identifier. -/
+def readsResult (stx : Syntax) : Bool :=
+  (stx.find? fun stx => (stx.isOfKind ``verexLocalExpr && stx[0].getId.getRoot == `result) ||
+    stx.isOfKind ``verexSpecificationResultExpr).isSome
+
 /-- The names in scope at every step of a function's proof, with their
 specification types: each local with a source name, as `x`, `x'` and
 `old_x`, and each callee's result as the leaf names it: in evaluation
@@ -102,13 +142,11 @@ order, the last call's result `g_result`, the earlier ones `old_g_result`,
 mutable reference, its loan and current value, which a specification reads
 through. A name given twice is an error. -/
 def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (withResult := false) :
     Except String (Array (String × String × Bool)) := do
   let generics := declaration.signature.generics
-  let reference (typeId : VerexIR.TypeId) : Bool :=
-    match unit.tables.types[typeId.index]? with
-    | some (.reference reference) => reference.kind == .mutable
-    | _ => false
+  let mutableReference (typeId : VerexIR.TypeId) : Bool :=
+    (referenceOf? unit typeId).any (·.kind == .mutable)
   let mut scope := #[]
   for localDecl in declaration.locals do
     let name := localDecl.name
@@ -116,9 +154,10 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
       continue
     if scope.any (·.1 == name) then continue
     let type ← Print.specificationTypeText unit ns generics localDecl.type.typeId
-    let isReference := reference localDecl.type.typeId
+    let isReference := mutableReference localDecl.type.typeId
     scope := scope ++ #[(name, type, isReference), (name ++ "'", type, isReference),
       ("old_" ++ name, type, isReference)]
+  if withResult then scope := scope ++ (← resultScope unit ns declaration scope)
   let .structured root := declaration.body | return scope
   -- The calls in evaluation order: a call's arguments before it.
   let mut calls : Array (String × VerexIR.TypeId) := #[]
@@ -145,9 +184,9 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
       let results ← match unit.tables.types[typeId.index]? with
         | some (.tuple elements) => elements.zipIdx.mapM fun (element, index) => do
             pure (s!"{name}_{index}", ← Print.specificationTypeText unit ns generics element,
-              reference element)
+              mutableReference element)
         | some .unit => pure #[]
-        | _ => pure #[(name, ← Print.specificationTypeText unit ns generics typeId, reference typeId)]
+        | _ => pure #[(name, ← Print.specificationTypeText unit ns generics typeId, mutableReference typeId)]
       for (resultName, type, isReference) in results do
         if scope.any (·.1 == resultName) then
           throw s!"`{resultName}` names two values in scope: a result of `{callee}` and another"
@@ -177,11 +216,11 @@ parameter a local of its name, the scope's names recorded for the target
 (`verex_scope_bind`), then each parameter taken apart as the argument
 pattern takes it, which rewrites its entry. -/
 private def scopedArguments (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (params : NRow) :
-    CommandElabM (TSyntax `tactic) := do
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (params : NRow)
+    (withResult : Bool) : CommandElabM (TSyntax `tactic) := do
   let names := declaration.signature.parameters.mapIdx fun index parameter =>
     if parameter.name.isEmpty then s!"argument{index}" else parameter.name
-  let scope ← match functionScope unit ns declaration with
+  let scope ← match functionScope unit ns declaration withResult with
     | .ok scope => pure scope
     | .error message => throwError message
   let quoted (names : Array String) := ", ".intercalate (names.toList.map fun name => s!"\"{name}\"")
@@ -191,6 +230,7 @@ private def scopedArguments (unit : ValidatedUnit) (ns : ValidatedNamespace)
   lines := lines.push s!"verex_scope_names [{quoted (scope.map (·.1))}] \
     [{quoted (scope.filterMap fun (name, _, reference) => if reference then some name else none)}] \
     [{quoted (declaration.locals.map (·.name))}]"
+  lines := lines.push "verex_scope_row"
   unless names.isEmpty do
     lines := lines.push s!"verex_scope_bind [{", ".intercalate (names.toList.map (s!"«{·}»"))}]"
   for (τ, name) in params.toList.zip names.toList do
@@ -216,7 +256,7 @@ instantiation for a generic native. A non-generic native's types mention no
 type parameter, so the statement is the same at every family; stated at each,
 it serves a generic caller as well as the runtime family. -/
 private def nativeHypothesisType (unit : ValidatedUnit)
-    (stored : Contract.StoredInvariants) (executable functions requiresTable : Lean.Expr)
+    (stored : Contract.StoredInvariants) (executable functions requiresMeaning : Lean.Expr)
     (handle : FunctionHandle) : MetaM Lean.Expr := do
   let some nativeNs := unit.namespaces[handle.namespaceId.index]?
     | throwError "a native's namespace is out of range"
@@ -239,7 +279,7 @@ private def nativeHypothesisType (unit : ValidatedUnit)
     let leading := if readsUnit then #[unitExpr, functions, executable, skolems]
       else #[unitExpr, functions, skolems]
     let applied := mkAppN typed (leading ++ arguments)
-    (if readsUnit && readsRequires then mkApp applied requiresTable else applied).headBeta
+    (if readsUnit && readsRequires then mkApp applied requiresMeaning else applied).headBeta
   let row ← quoteRow params
   let shape ← quoteShape result
   let meaningAt (skolems instantiation : Lean.Expr) :=
@@ -408,7 +448,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
     let unitExpr ← VerexSL.Quote.quoteUnit unit
     -- The unit's function values: the instance declared with the unit.
     let functions ← functionCarriersOf (mkConst unitDefinition)
-    let requiresTable := mkApp (mkConst (functionRequiresName segments))
+    let requiresMeaning := mkApp (mkConst (functionRequiresName segments))
       (mkApp2 (mkConst ``VerexIR.Proofs.requiresForeign) unitExpr functions)
     let publicContract ← publicContractOf params result (isGeneric declaration) typed readsUnit
       readsRequires
@@ -423,7 +463,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
         let preparation ← mkEq prepared success
         let contractAt (arguments : Array Lean.Expr) :=
           (mkAppN publicContract (#[unitExpr, functions, executable] ++ arguments ++
-            (if readsRequires then #[requiresTable] else #[]))).headBeta
+            (if readsRequires then #[requiresMeaning] else #[]))).headBeta
         -- A generic function's theorem holds at every instantiation a call
         -- gives it, coherent with the frame its type arguments induce.
         let conclusion ← if isGeneric declaration then
@@ -448,7 +488,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
         -- The natives the theorems assume, in their binding order.
         let natives := ((nativeDependencies.getState env).find? base).getD #[]
         let hypotheses ← natives.mapM fun (nativeHandle, _) =>
-          nativeHypothesisType unit stored executable functions requiresTable nativeHandle
+          nativeHypothesisType unit stored executable functions requiresMeaning nativeHandle
         -- Then the assumed steps of the lemmas it applies.
         let trusted := ((lemmaTrustDependencies.getState env).find? base).getD #[]
         let hypotheses := hypotheses ++ trusted.map mkConst
@@ -640,10 +680,10 @@ def contractTakes (env : Environment) (name : Name) : Bool × Bool :=
 where
   takes : Lean.Expr → Bool × Bool
     | .forallE _ domain body _ =>
-        let (unit, table) := takes body
+        let (unit, requires) := takes body
         (unit || domain.isAppOf ``VerexIR.Validation.ExecutableUnit ||
             domain.isAppOf ``VerexIR.Proofs.ModelUnit,
-          table || domain.isAppOf ``VerexIR.Proofs.RequiresMeaning)
+          requires || domain.isAppOf ``VerexIR.Proofs.RequiresMeaning)
     | _ => (false, false)
 
 /-- Prove once per unit, by evaluation, that its resource types correspond
@@ -692,7 +732,7 @@ def unitReaderTerm (unit : ValidatedUnit) : CommandElabM Term :=
 unit's, reading a value no closure site encodes by the uninterpreted
 `requiresForeign`. -/
 def requiresMeaningTerm (segments : Array String) (unit : ValidatedUnit) : CommandElabM Term := do
-  for site in closureSites unit do
+  for site in ← closureSitesOf segments unit do
     if siteRequiresRejected unit site.target then
       throwError m!"`requires_of` cannot read `{functionKey unit site.target}`: its precondition \
         states a behavioral predicate"
@@ -704,10 +744,10 @@ def requiresMeaningTerm (segments : Array String) (unit : ValidatedUnit) : Comma
 module's requires meaning, where the contract takes them. -/
 def atUnit (segments : Array String) (unit : ValidatedUnit) (name : Name) (contract : Term)
     (frame? : Option Term := none) (args : Array Term := #[]) : CommandElabM Term := do
-  let (readsUnit, readsTable) := contractTakes (← getEnv) name
+  let (readsUnit, readsRequires) := contractTakes (← getEnv) name
   let unitTerm ← unitTermOf segments unit
   let reader ← unitReaderTerm unit
-  let table : Array Term ← if readsTable then
+  let requiresMeaning : Array Term ← if readsRequires then
       pure #[← requiresMeaningTerm segments unit]
     else pure #[]
   match frame? with
@@ -715,9 +755,9 @@ def atUnit (segments : Array String) (unit : ValidatedUnit) (name : Name) (contr
       let functions ← `(term| _)
       let leading : Array Term ← if readsUnit then pure #[unitTerm, functions, reader]
         else pure #[unitTerm, functions]
-      `(term| (@$contract $leading* $frame $args* $table*))
+      `(term| (@$contract $leading* $frame $args* $requiresMeaning*))
   | none =>
-      if readsUnit then `(term| ($contract $reader $args* $table*))
+      if readsUnit then `(term| ($contract $reader $args* $requiresMeaning*))
       else if args.isEmpty then pure contract
       else `(term| ($contract $args*))
 
@@ -1064,8 +1104,8 @@ private def lemmaTheoremCommand (unit : ValidatedUnit)
     readArguments := readArguments.push (← `(term| executable))
   if readsRequires then
     readBinders := readBinders.push
-      (← `(bracketedBinder| (requiresTable : VerexIR.Proofs.RequiresMeaning unit)))
-    readArguments := readArguments.push (← `(term| requiresTable))
+      (← `(bracketedBinder| (requiresMeaning : VerexIR.Proofs.RequiresMeaning unit)))
+    readArguments := readArguments.push (← `(term| requiresMeaning))
   if readsFrame then
     readBinders := readBinders.push (← `(bracketedBinder| (frame : VerexIR.Proofs.Denote.Skolems unit)))
     readArguments := readArguments.push (← `(term| frame))
@@ -1605,7 +1645,7 @@ private def modelInvokeBinders (segments : Array String) (unit : ValidatedUnit) 
     return (#[meaning, defined, coherent], routing, lemmas)
   -- At the base frame, a closure site's constructor of a routed member.
   let environment ← getEnv
-  let sites := siteSpecs (closureSites unit)
+  let sites := siteSpecs (← closureSitesOf segments unit)
   for site in sites, index in [0:sites.size] do
     let some entry := siteEquationsAt? environment
         (functionValuesName segments ++ Name.mkSimple s!"site{index}") | continue
@@ -2420,8 +2460,10 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
   -- Every invariant clause keyed by what it is.
   let invariantClauses := (unit.namespaces.map fun invariantNs =>
     (invariantNs.structs.flatMap fun declaration =>
-      (declaration.contract.conditions.filter (·.kind == .structInvariant)).map fun condition =>
-        ("data invariant", Contract.locRange unit condition.loc)) ++
+      -- A data invariant numbered by its position in its type's spec block.
+      (declaration.contract.conditions.filter (·.kind == .structInvariant)).zipIdx.map
+        fun (condition, position) =>
+          (s!"data invariant_{position + 1}", Contract.locRange unit condition.loc)) ++
     (invariantNs.invariants.map fun invariant =>
       ("module invariant", Contract.locRange unit invariant.condition.loc))).flatten
   let keyed ← invariantClauses.mapM fun (kind, range) =>
@@ -2471,17 +2513,23 @@ private def introductionTactic (m : Member) (stored : Contract.StoredInvariants)
   -- them apart.
   let steps := m.script?.any (·.steps)
   let arguments := mkIdent `verexArguments
+  let withResult := m.script?.any fun script => readsResult script.tactic.raw
   if readsStart then
-    let destructure ← if steps then scopedArguments unit ns declaration compiled.params
+    let destructure ← if steps then scopedArguments unit ns declaration compiled.params withResult
       else `(tactic| rcases $arguments:ident with $pattern:rcasesPat)
-    `(tactic| (intro $arguments:ident initialState $assumed:ident $permitted:ident
-               have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments
-                 initialState
-               $destructure:tactic))
+    let introduce ← `(tactic|
+      (intro $arguments:ident initialState $assumed:ident $permitted:ident
+       have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments
+         initialState
+       $destructure:tactic))
+    if steps then `(tactic| ($introduce:tactic; all_goals verex_scope_state initialState))
+    else pure introduce
   else if steps then
-    `(tactic| (intro $arguments:ident
-               $(← scopedArguments unit ns declaration compiled.params):tactic
-               all_goals intro initialState $assumed:ident $permitted:ident))
+    let introduce ← `(tactic|
+      (intro $arguments:ident
+       $(← scopedArguments unit ns declaration compiled.params withResult):tactic
+       all_goals intro initialState $assumed:ident $permitted:ident))
+    `(tactic| ($introduce:tactic; all_goals verex_scope_state initialState))
   else `(tactic| rintro $pattern:rcasesPat initialState $assumed:ident $permitted:ident)
 
 /-- What a theorem assuming typing knows of its unit: global memory typed by

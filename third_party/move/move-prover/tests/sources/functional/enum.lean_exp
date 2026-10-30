@@ -4,7 +4,7 @@ tests/sources/functional/enum.move:21:5: error: verex verification failed: the a
   verify t9_common_field by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/enum.move:18:9: error: the data invariant `invariant this is Bar ==> this.z > 10` does not hold where a mutation ends
@@ -12,7 +12,7 @@ tests/sources/functional/enum.move:31:5: error: verex verification failed: the a
   verify test_data_invariant by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/enum.move:76:13: error: the assertion `_common_vector_1.x != _common_vector_2.x` does not hold

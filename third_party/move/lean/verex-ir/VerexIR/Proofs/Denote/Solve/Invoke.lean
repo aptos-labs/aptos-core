@@ -281,6 +281,8 @@ partial def resolveAnchors (goal : MVarId) (predicate : Lean.Expr) :
   runs program: an obligation's own conditionals stay in its leaf. -/
 def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := true) :
     TacticM (Option (List MVarId × Bool)) := do
+  -- The exit binds `result` in a step proof, before the paths split.
+  if let some next ← bindResult goal then return some ([next], false)
   let target ← goal.withContext (instantiateMVars (← goal.getType))
   if target.isForall then
     -- A quantified variable keeps its name, for an authored proof; a
@@ -295,6 +297,9 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   -- A dependent action carries its bounds proof into the result. Introduce
   -- the branch assumption before normalization, so the continuation is
   -- processed as computation rather than left beneath a proof binder.
+  -- A source `let` binds its locals' names in a step proof, and the exit
+  -- `result`.
+  if let some next ← bindLet goal then return some ([next], false)
   if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
     let action := target.getArg! 3
     if action.isAppOfArity ``dite 5 then

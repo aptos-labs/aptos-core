@@ -1100,6 +1100,7 @@ private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Arra
   let invariantContext : Context := {
     context with
     namespaceId, ns, locals, localTypes, oldLocals := locals
+    localNames := declaration.locals.map (·.name)
     results := #[], resultTypes := #[], typeArgumentTypes }
   -- An invariant reading memory, through a behavioral predicate, holds in
   -- every memory: what a value satisfies does not change with the memory

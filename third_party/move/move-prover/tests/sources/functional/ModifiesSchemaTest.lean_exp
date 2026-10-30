@@ -97,12 +97,14 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
     | VerexIR.Proofs.Denote.Flow.value value env =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
-          (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-            ((VerexIR.Proofs.Denote.Term.writePlace none VerexIR.Proofs.Denote.Var.here.there
-                  (VerexIR.Proofs.Denote.Proj.field VerexIR.Proofs.Denote.Var.here VerexIR.Proofs.Denote.Proj.nil).deref
-                  (VerexIR.Proofs.Denote.Term.lit { val := 2, fits := ⋯ })).drop
-              (VerexIR.Proofs.Denote.Term.lit ()))
-            (VerexIR.Proofs.Denote.Var.here.there.set value env))
+          (VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there value
+            (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+              ((VerexIR.Proofs.Denote.Term.writePlace none VerexIR.Proofs.Denote.Var.here.there
+                    (VerexIR.Proofs.Denote.Proj.field VerexIR.Proofs.Denote.Var.here
+                        VerexIR.Proofs.Denote.Proj.nil).deref
+                    (VerexIR.Proofs.Denote.Term.lit { val := 2, fits := ⋯ })).drop
+                (VerexIR.Proofs.Denote.Term.lit ()))
+              (VerexIR.Proofs.Denote.Var.here.there.set value env)))
           fun v env =>
           VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
@@ -212,12 +214,14 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     | VerexIR.Proofs.Denote.Flow.value value env =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
-          (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-            ((VerexIR.Proofs.Denote.Term.writePlace none VerexIR.Proofs.Denote.Var.here.there
-                  (VerexIR.Proofs.Denote.Proj.field VerexIR.Proofs.Denote.Var.here VerexIR.Proofs.Denote.Proj.nil).deref
-                  (VerexIR.Proofs.Denote.Term.lit { val := 2, fits := ⋯ })).drop
-              (VerexIR.Proofs.Denote.Term.lit ()))
-            (VerexIR.Proofs.Denote.Var.here.there.set value env))
+          (VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there value
+            (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+              ((VerexIR.Proofs.Denote.Term.writePlace none VerexIR.Proofs.Denote.Var.here.there
+                    (VerexIR.Proofs.Denote.Proj.field VerexIR.Proofs.Denote.Var.here
+                        VerexIR.Proofs.Denote.Proj.nil).deref
+                    (VerexIR.Proofs.Denote.Term.lit { val := 2, fits := ⋯ })).drop
+                (VerexIR.Proofs.Denote.Term.lit ()))
+              (VerexIR.Proofs.Denote.Var.here.there.set value env)))
           fun v env =>
           VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])

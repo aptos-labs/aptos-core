@@ -5,6 +5,7 @@ tests/sources/functional/invariants_positional.move:17:5: error: verex verificat
   verify pack_positional_struct_incorrect by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
+    | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

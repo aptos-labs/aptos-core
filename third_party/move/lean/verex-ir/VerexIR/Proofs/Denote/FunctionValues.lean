@@ -278,17 +278,6 @@ theorem List.isSome_mapM_congr {g : β → Option α} {g' : β → Option γ} :
       cases hg : g raw <;> cases hg' : g' raw <;> simp_all <;>
         cases hr : raws.mapM g <;> cases hr' : raws.mapM g' <;> simp_all
 
-theorem List.length_of_mapM_eq_some {g : β → Option α} :
-    (raws : List β) → (values : List α) → raws.mapM g = some values → values.length = raws.length
-  | [], values, decoded => by
-      simp only [List.mapM_nil, Option.pure_def, Option.some.injEq] at decoded
-      subst decoded; rfl
-  | raw :: raws, values, decoded => by
-      simp only [List.mapM_cons, Option.bind_eq_bind, Option.pure_def, Option.bind_eq_some_iff,
-        Option.some.injEq] at decoded
-      obtain ⟨_, _, rest, tail, rfl⟩ := decoded
-      simp only [List.length_cons, List.length_of_mapM_eq_some raws rest tail]
-
 /-- A bounded decoding of a list is defined where the elements' decodings
 are and the list is within the bound. -/
 theorem List.isSome_mapM_bind_bound {g : β → Option α} (raws : List β) (bound : Nat)
@@ -299,7 +288,7 @@ theorem List.isSome_mapM_bind_bound {g : β → Option α} (raws : List β) (bou
   cases decoded : raws.mapM g with
   | none => rfl
   | some values =>
-      have := List.length_of_mapM_eq_some raws values decoded
+      have := List.mapM_length decoded
       by_cases h : values.length < bound
       · simp [h, ← this]
       · simp [h, ← this]
@@ -1280,10 +1269,18 @@ theorem SiteSpec.typed_of_all {unit : Validation.ValidatedUnit} {sites : List Si
 def siteIndex? (sites : List SiteSpec) (closure : ClosureValue) : Option (Fin sites.length) :=
   (List.finRange sites.length).find? fun index => (sites.get index).key.matches closure
 
-/-- Whether sites have distinct keys. -/
-def sitesDistinct (sites : List SiteSpec) : Bool :=
-  (List.finRange sites.length).all fun left => (List.finRange sites.length).all fun right =>
-    !((sites.get left).key == (sites.get right).key) || left == right
+/-- Whether sites have distinct keys, by structural recursion (decided by
+the kernel). -/
+def sitesDistinct : List SiteSpec → Bool
+  | [] => true
+  | site :: rest => rest.all (fun other => site.key != other.key) && sitesDistinct rest
+
+theorem sitesDistinct_pairwise : {sites : List SiteSpec} → sitesDistinct sites = true →
+    sites.Pairwise (fun left right => left.key ≠ right.key)
+  | [], _ => List.Pairwise.nil
+  | _ :: _, distinct => by
+      simp only [sitesDistinct, Bool.and_eq_true, List.all_eq_true, bne_iff_ne] at distinct
+      exact List.Pairwise.cons distinct.1 (sitesDistinct_pairwise distinct.2)
 
 theorem siteIndex?_matches {sites : List SiteSpec} {closure : ClosureValue}
     {index : Fin sites.length} (found : siteIndex? sites closure = some index) :
@@ -1299,11 +1296,11 @@ theorem siteIndex?_of_matches {sites : List SiteSpec} (distinct : sitesDistinct 
     List.find?_isSome.mpr ⟨index, List.mem_finRange index, matched⟩
   obtain ⟨other, found⟩ := Option.isSome_iff_exists.mp some
   have same := SiteKey.eq_of_matches (siteIndex?_matches found) matched
-  simp only [sitesDistinct, List.all_eq_true, List.mem_finRange, true_implies, Bool.or_eq_true,
-    Bool.not_eq_true', beq_eq_false_iff_ne, ne_eq, beq_iff_eq] at distinct
-  rcases distinct other index with different | equal
-  · exact absurd same different
-  · rw [found, equal]
+  have pairwise := List.pairwise_iff_getElem.mp (sitesDistinct_pairwise distinct)
+  rcases Nat.lt_trichotomy other.val index.val with before | equal | after
+  · exact absurd same (pairwise other index other.isLt index.isLt before)
+  · rw [found, Fin.ext equal]
+  · exact absurd same.symm (pairwise index other index.isLt other.isLt after)
 
 /-- The unit's typing of closures, as a function arm decoding no value. -/
 def closureTyping (unit : Validation.ValidatedUnit) (parameters : NRow) (shared : Sharing)

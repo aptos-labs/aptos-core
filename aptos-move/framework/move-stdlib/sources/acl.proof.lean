@@ -42,9 +42,9 @@ verify remove by lean =>
   all_goals verex_clear_computations
   all_goals verex_lookups_after_writes
   all_goals try verex_decide
-  case data_invariant =>
+  case data_invariant_1 =>
     rename_i same
-    refine erase_unique self_list.values (fun x => x.getD "") _ ?_ permitted found index
+    refine erase_unique self_list.values (fun x => x.getD "") _ ?_ permitted i j
       (by omega) (by omega) ?_ ?_ same
     · omega
     · simp only [Array.size_eraseIdx]; omega

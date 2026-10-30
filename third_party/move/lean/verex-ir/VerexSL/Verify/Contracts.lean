@@ -717,6 +717,22 @@ structure ClosureSite where
   type : FunctionType
   deriving DecidableEq, Repr, Inhabited
 
+/-- A site's hash, by its target, mask and type instantiation: equal sites
+hash equally. -/
+instance : Hashable ClosureSite where
+  hash site := hash (site.target.namespaceId, site.target.functionId, site.mask,
+    site.typeInstantiation)
+
+/-- A function at an instantiation whose body `closureSites` walks, hashed by
+the function and its runtime instantiation. -/
+private structure SiteInstance where
+  value : FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId)
+  deriving BEq
+
+private instance : Hashable SiteInstance where
+  hash instance_ := hash (instance_.value.1.namespaceId, instance_.value.1.functionId,
+    instance_.value.2.2)
+
 /-- The function types of one mutual block, each with its sites;
 `recursive` where a captured row holds a type of the block. -/
 structure ClosureSiteGroup where
@@ -783,8 +799,9 @@ def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
     for declaration in ns.functions, functionIndex in [0:ns.functions.size] do
       unless declaration.signature.generics.any (·.kind == .typeArg) do
         pending := pending.push (⟨⟨index⟩, ⟨functionIndex⟩⟩, .nil, #[])
-  let mut seen := pending
+  let mut seen : Std.HashSet SiteInstance := Std.HashSet.ofArray (pending.map SiteInstance.mk)
   let mut sites : Array ClosureSite := #[]
+  let mut known : Std.HashSet ClosureSite := {}
   let mut next := 0
   while h : next < pending.size do
     let (handle, outer, outerRuntime) := pending[next]
@@ -798,13 +815,16 @@ def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
       (fun _ _ found => found)
       (fun target mask typeArgs θ (instances, found) =>
         match closureSiteAt? unit outer outerRuntime target mask typeArgs θ with
-        | some site => (instances, if found.contains site then found else found.push site)
+        | some site => (instances, found.push site)
         | none => (instances, found))
-      ((#[] : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId))), sites)
-    sites := found
+      ((#[] : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId))), #[])
+    for site in found do
+      unless known.contains site do
+        known := known.insert site
+        sites := sites.push site
     for called in instances do
-      unless seen.contains called do
-        seen := seen.push called
+      unless seen.contains ⟨called⟩ do
+        seen := seen.insert ⟨called⟩
         pending := pending.push called
   -- A literal function value a specification writes, of a target without
   -- type parameters capturing no function value, is a site at the base
@@ -819,7 +839,22 @@ def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
       let some site := closureSiteAt? unit .nil #[] target mask #[] none | continue
       unless site.captured.closureFree && site.captured.paramFree && site.type.parameters.paramFree &&
           site.type.results.paramFree do continue
-      unless sites.contains site do sites := sites.push site
+      unless known.contains site do
+        known := known.insert site
+        sites := sites.push site
+  return sites
+
+/-- The closure sites of each unit (`closureSites`), by its module's
+segments, computed once per elaboration branch. -/
+private initialize closureSitesCache : EnvExtension (Std.HashMap (Array String) (Array ClosureSite)) ←
+  registerEnvExtension (pure {}) (asyncMode := .local)
+
+/-- The closure sites of a module's unit (`closureSites`), computed once. -/
+def closureSitesOf (segments : Array String) (unit : ValidatedUnit) :
+    CommandElabM (Array ClosureSite) := do
+  if let some sites := (closureSitesCache.getState (← getEnv)).get? segments then return sites
+  let sites := closureSites unit
+  modifyEnv (closureSitesCache.modifyState · (·.insert segments sites))
   return sites
 
 /-- Sites grouped by function type, in order of first occurrence, and the

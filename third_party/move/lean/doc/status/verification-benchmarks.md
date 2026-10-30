@@ -100,7 +100,7 @@ crypto natives, and the kernel-heavy unit preparation. The initial set:
 | `storage` | `bench/package` | the typed memory: publish, take, frames, two calls in a row, `Coin<A>` beside `Coin<B>`, generic callers, stored data invariants |
 | `behavior` | `bench/package` | behavioral predicates: `aborts_of`, `ensures_of`, `result_of`, `requires_of` over lambdas and named functions |
 | `closures`, `closure_loop` | `bench/package` | function values: captures, struct fields, higher-order functions with bodies, invocation in a loop |
-| `calculator` | `higher-order-paper-26/examples` | the higher-order paper's example of an enum state holding a continuation closure; `amm` is left out until its proof is ported (roadmap) |
+| `calculator`, `amm` | `higher-order-paper-26/examples` | the higher-order paper's examples: an enum state holding a continuation closure, and `amm`, a pool whose pricing closure is stored data, with its intended rejection |
 | `Quicksort`, `OrderedMap` | `Check/Examples` | VerexSL: nested loops, authored proofs |
 | `VectorOperations`, `GenericStorage` | `Check/Vectors`, `Check/Generics` | shared terms, generic storage |
 | `bounds` | `SourceVerify` | the Rust frontend |

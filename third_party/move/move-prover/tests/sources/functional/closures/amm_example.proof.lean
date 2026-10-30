@@ -8,16 +8,20 @@ verex proofs where
 
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
-verify constant_product by lean =>
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals
-    have bound : reserve_out.val * amount_in.val / (reserve_in.val + amount_in.val)
-        ≤ reserve_out.val := by
-      apply Int.ediv_le_of_le_mul (by omega)
-      exact Int.mul_le_mul_of_nonneg_left (by omega) (by omega)
-    first
-      | omega
-      | (intro positive_in positive_out positive_amount
-         apply Int.ediv_lt_of_lt_mul (by omega)
-         exact Int.mul_lt_mul_of_pos_left (by omega) positive_out)
+verify constant_product by
+  at entry {
+    apply lemma_mul_nonneg(reserve_out, amount_in)
+    apply lemma_mul_mono(reserve_out, 18446744073709551615, amount_in, 18446744073709551615)
+    apply lemma_mul_mono(reserve_out, reserve_out, amount_in, reserve_in + amount_in)
+    apply reserve_in + amount_in > 0 ==>
+      lemma_div_nonneg(reserve_out * amount_in, reserve_in + amount_in)
+    apply reserve_in + amount_in > 0 ==>
+      lemma_div_le(reserve_out * amount_in, reserve_out, reserve_in + amount_in)
+    apply reserve_in > 0 && reserve_out > 0 ==>
+      lemma_mul_strict_mono(amount_in, reserve_in + amount_in, reserve_out)
+    assert amount_in * reserve_out == reserve_out * amount_in by ring
+    assert (reserve_in + amount_in) * reserve_out == reserve_out * (reserve_in + amount_in) by ring
+    apply reserve_in > 0 && reserve_out > 0 ==>
+      lemma_div_lt(reserve_out * amount_in, reserve_out, reserve_in + amount_in)
+  }
+  on _ { }

@@ -134,14 +134,15 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     match flow with
     | VerexIR.Proofs.Denote.Flow.value value env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-          ((VerexIR.Proofs.Denote.Term.invoke 256685 VerexIR.Proofs.Denote.ResultShape.none
-                (VerexIR.Proofs.Denote.Term.field VerexIR.Proofs.Denote.Var.here
-                  (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there))
-                (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
-                  VerexIR.Proofs.Denote.Args.nil)).drop
-            (VerexIR.Proofs.Denote.Term.lit ()))
-          (VerexIR.Proofs.Denote.Var.here.there.there.set value env))
+        (VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there.there value
+          (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+            ((VerexIR.Proofs.Denote.Term.invoke 256685 VerexIR.Proofs.Denote.ResultShape.none
+                  (VerexIR.Proofs.Denote.Term.field VerexIR.Proofs.Denote.Var.here
+                    (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there))
+                  (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
+                    VerexIR.Proofs.Denote.Args.nil)).drop
+              (VerexIR.Proofs.Denote.Term.lit ()))
+            (VerexIR.Proofs.Denote.Var.here.there.there.set value env)))
         verexContinuation✝
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 15299 15348
@@ -198,10 +199,10 @@ heq✝ :
       (VerexIR.StorageKey.address modifier_addr) =
     some (fst✝, ())
 stored_1 :
-  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (quantified_2 : String),
+  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (s : String),
     ¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (quantified_2, ()) memory
+        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) memory
 stored_2 :
   VerexIR.Proofs.FramedAt executable✝
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
@@ -306,7 +307,7 @@ tests/sources/functional/closures/stored_fun_values.move:419:5: error: verex ver
   verify use_counter_modifier_wrong by lean =>
     verex_obligations
     verex_on
-    | leaf => verex_prepare; sorry
+    | stored_invariant => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
@@ -410,14 +411,15 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     match flow with
     | VerexIR.Proofs.Denote.Flow.value value env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-          ((VerexIR.Proofs.Denote.Term.invoke 352379 VerexIR.Proofs.Denote.ResultShape.none
-                (VerexIR.Proofs.Denote.Term.field VerexIR.Proofs.Denote.Var.here
-                  (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there))
-                (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
-                  VerexIR.Proofs.Denote.Args.nil)).drop
-            (VerexIR.Proofs.Denote.Term.lit ()))
-          (VerexIR.Proofs.Denote.Var.here.there.there.set value env))
+        (VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there.there value
+          (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+            ((VerexIR.Proofs.Denote.Term.invoke 352379 VerexIR.Proofs.Denote.ResultShape.none
+                  (VerexIR.Proofs.Denote.Term.field VerexIR.Proofs.Denote.Var.here
+                    (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there))
+                  (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
+                    VerexIR.Proofs.Denote.Args.nil)).drop
+              (VerexIR.Proofs.Denote.Term.lit ()))
+            (VerexIR.Proofs.Denote.Var.here.there.there.set value env)))
         verexContinuation✝
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18450 18495
@@ -474,10 +476,10 @@ heq✝ :
       (VerexIR.StorageKey.address modifier_addr) =
     some (fst✝, ())
 stored :
-  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (quantified_2 : String),
+  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (s : String),
     ¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (quantified_2, ()) memory
+        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) memory
 verexResult : VerexIR.Proofs.Denote.ResultShape.none.carrier
 verexFinal : VerexIR.Proofs.Denote.Memory unit
 verexEnsures :
@@ -514,7 +516,7 @@ tests/sources/functional/closures/stored_fun_values.move:504:5: error: verex ver
   verify use_any_modifier by lean =>
     verex_obligations
     verex_on
-    | leaf => verex_prepare; sorry
+    | stored_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:514:5: error: verification failed with a residual obligation:
@@ -652,14 +654,15 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     match flow with
     | VerexIR.Proofs.Denote.Flow.value value env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
-          ((VerexIR.Proofs.Denote.Term.invoke 371090 VerexIR.Proofs.Denote.ResultShape.none
-                (VerexIR.Proofs.Denote.Term.field VerexIR.Proofs.Denote.Var.here
-                  (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there))
-                (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
-                  VerexIR.Proofs.Denote.Args.nil)).drop
-            (VerexIR.Proofs.Denote.Term.lit ()))
-          (VerexIR.Proofs.Denote.Var.here.there.there.set value env))
+        (VerexIR.Proofs.Denote.letAt VerexIR.Proofs.Denote.Var.here.there.there value
+          (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+            ((VerexIR.Proofs.Denote.Term.invoke 371090 VerexIR.Proofs.Denote.ResultShape.none
+                  (VerexIR.Proofs.Denote.Term.field VerexIR.Proofs.Denote.Var.here
+                    (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there))
+                  (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there)
+                    VerexIR.Proofs.Denote.Args.nil)).drop
+              (VerexIR.Proofs.Denote.Term.lit ()))
+            (VerexIR.Proofs.Denote.Var.here.there.there.set value env)))
         verexContinuation✝
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18813 18858
@@ -716,10 +719,10 @@ heq✝ :
       (VerexIR.StorageKey.address modifier_addr) =
     some (fst✝, ())
 stored :
-  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (quantified_2 : String),
+  ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (s : String),
     ¬VerexIR.Proofs.AbortsOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (quantified_2, ()) memory
+        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) memory
 verexResult : VerexIR.Proofs.Denote.ResultShape.none.carrier
 verexFinal : VerexIR.Proofs.Denote.Memory unit
 verexEnsures :
@@ -757,7 +760,7 @@ tests/sources/functional/closures/stored_fun_values.move:514:5: error: verex ver
   verify use_any_modifier_wrong by lean =>
     verex_obligations
     verex_on
-    | leaf => verex_prepare; sorry
+    | stored_invariant => verex_prepare; sorry
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
@@ -766,7 +769,7 @@ tests/sources/functional/closures/stored_fun_values.move:47:5: error: verex veri
   verify create_invalid by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:73:9: error: the data invariant `invariant ∀ (x : u64; r : u64), ensures_of<f>(x, r) ==> r >= x` does not hold where a value is constructed
@@ -774,7 +777,7 @@ tests/sources/functional/closures/stored_fun_values.move:92:5: error: verex veri
   verify create_monotone_invalid by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:115:9: error: the data invariant `invariant ∀ (x : u64), !aborts_of<f>(x)` does not hold where a value is constructed
@@ -783,7 +786,8 @@ tests/sources/functional/closures/stored_fun_values.move:128:5: error: verex ver
   verify create_doubler_unsafe by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
+    | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:145:9: error: the data invariant `invariant ∀ (a : Address), !aborts_of<f>(a)` does not hold where a value is constructed
@@ -791,7 +795,7 @@ tests/sources/functional/closures/stored_fun_values.move:160:5: error: verex ver
   verify create_reader_invalid by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:195:5: error: the data invariant `f : Fn(&Signer) -> Unit has Copy, Drop, Store` does not hold where a value is constructed
@@ -801,6 +805,7 @@ tests/sources/functional/closures/stored_fun_values.move:218:5: error: verex ver
     verex_obligations
     verex_on
     | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/stored_fun_values.move:195:5: error: the data invariant `f : Fn(&Signer) -> Unit has Copy, Drop, Store` does not hold where a value is constructed

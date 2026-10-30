@@ -4,7 +4,7 @@ tests/sources/functional/data_invariant_for_mut_ref_arg.move:15:5: error: verex 
   verify push_1 by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/data_invariant_for_mut_ref_arg.move:8:9: error: the specification clause `invariant v.length == 0` is not established
@@ -12,7 +12,7 @@ tests/sources/functional/data_invariant_for_mut_ref_arg.move:22:5: error: verex 
   verify push_2 by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/data_invariant_for_mut_ref_arg.move:8:9: error: the specification clause `invariant v.length == 0` is not established
@@ -20,6 +20,6 @@ tests/sources/functional/data_invariant_for_mut_ref_arg.move:31:5: error: verex 
   verify push_3 by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

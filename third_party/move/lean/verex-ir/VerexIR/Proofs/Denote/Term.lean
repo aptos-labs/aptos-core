@@ -1767,6 +1767,30 @@ operation itself. -/
 def opAfterAt {α : Type} (_site : Nat) (meaning : Comp unit α) : Comp unit α :=
   meaning
 
+/-- A source `let` of the local `x` to `value` around its body `k`
+(`doc/plan/proof-language.md`, "Expressions"): semantically `k`, a binding
+site where a step proof's walk names the value by the local's source name.
+Generic in the value's type, as `prophecyOf` is. -/
+def letAt {α β : Type} {Γ : NRow} {τ : NTy} (_x : Var Γ τ) (_value : β) (k : Comp unit α) :
+    Comp unit α :=
+  k
+
+/-- A row's `let` (`let (a, b) := …`) of its targets to `values` around `k`,
+as `letAt` for each target. -/
+def letRowAt {α : Type} {Γ σs : NRow} (_targets : Vars Γ σs) (_values : HList σs)
+    (k : Comp unit α) : Comp unit α :=
+  k
+
+/-- What a path owes after a source `let` of the local `x` to `value`:
+`holds`, a binding site a step proof's walk meets (`letAt`). Not reducible:
+the normal form rewrites in it but does not distribute across it. -/
+def LetIn {β : Type} {Γ : NRow} {τ : NTy} (_x : Var Γ τ) (_value : β) (holds : Prop) : Prop :=
+  holds
+
+/-- What a path owes after a row's `let` (`letRowAt`), as `LetIn`. -/
+def LetRowIn {Γ σs : NRow} (_targets : Vars Γ σs) (_values : HList σs) (holds : Prop) : Prop :=
+  holds
+
 /-- What a path owes after an operation, marked with the operation's site so
 that verification meets the point on every path continuing there, however
 the normal form distributes the path. Not reducible: the normal form
@@ -1812,18 +1836,6 @@ def functionOfGeneric (unit : VerexIR.Validation.ValidatedUnit) [FunctionCarrier
     (NTy.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row).carrier :=
   Skolems.construct (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row handle weave.mask
     (frameInstantiation unit handle outer typeArgs) captures typed
-
-/-- A closure with type arguments is constructed at the frame its
-instantiation gives it. -/
-theorem functionOfGeneric_eq (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse)
-    (θ : TypeArgs) {full captured supplied : NRow} (weave : Weave full captured supplied)
-    (shape : ResultShape) (shared : Sharing) (handle : FunctionHandle)
-    (captures : HList (NRow.subst θ.1 captured))
-    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
-      handle weave.mask (frameInstantiation unit handle outer typeArgs) (NRow.subst θ.1 captured)) :
-    functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed =
-      Skolems.construct (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row handle weave.mask
-        (frameInstantiation unit handle outer typeArgs) captures typed := rfl
 
 /-- A created generic function value's runtime closure is the closure
 created. -/
@@ -1927,7 +1939,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
         if (b : Bool) then branchIn site true (thenBranch.denote meanings env)
         else branchIn site false (elseBranch.denote meanings env)
   | _, _, .let_ x value body, env =>
-      Flow.bind (value.denote meanings env) fun v env => body.denote meanings (x.set v env)
+      Flow.bind (value.denote meanings env) fun v env => letAt x v (body.denote meanings (x.set v env))
   | _, _, .drop value body, env =>
       Flow.bind (value.denote meanings env) fun _ env => body.denote meanings env
   | _, _, .assign x value, env =>
@@ -1990,7 +2002,8 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
         | some field => Spec.pure (.value field env)
         | none => mismatchOutcome mismatch
   | _, _, .letRow targets value body, env =>
-      Flow.bind (value.denote meanings env) fun values env => body.denote meanings (targets.set values env)
+      Flow.bind (value.denote meanings env) fun values env =>
+        letRowAt targets values (body.denote meanings (targets.set values env))
   | _, _, .letFields targets value body, env =>
       Flow.bind (value.denote meanings env) fun values env => body.denote meanings (targets.set values env)
   | _, _, .caseOf scrutinee arms, env =>
@@ -2050,15 +2063,15 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
   | _, _, .index site vector position, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
-          if i.val < 0 then abortAt site (Failure.ofInts .abort #[i.val])
+          opAt site (if i.val < 0 then abortAt site (Failure.ofInts .abort #[i.val])
           else match values.values[i.val.toNat]? with
             | some element => Spec.pure (.value element env)
-            | none => abortAt site (Failure.ofInts .abort #[i.val])
+            | none => abortAt site (Failure.ofInts .abort #[i.val]))
   | _, _, .checkIndex site failure vector position, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
-          if 0 ≤ i.val ∧ i.val < values.values.size then Spec.pure (.value () env)
-          else abortAt site (Failure.ofInts failure #[1])
+          opAt site (if 0 ≤ i.val ∧ i.val < values.values.size then Spec.pure (.value () env)
+          else abortAt site (Failure.ofInts failure #[1]))
   | _, _, .push vector element, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (element.denote meanings env) fun e env =>
@@ -2069,14 +2082,15 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
           Flow.bind (element.denote meanings env) fun e env =>
-            if i.val < 0 ∨ values.values.size < i.val.toNat then abortAt site (Failure.ofInts .abort #[i.val])
+            opAt site (if i.val < 0 ∨ values.values.size < i.val.toNat then
+              abortAt site (Failure.ofInts .abort #[i.val])
             else match SpecVector.ofArray? (values.values.insertIdxIfInBounds i.val.toNat e) with
               | some vector => Spec.pure (.value vector env)
-              | none => Spec.bottom
+              | none => Spec.bottom)
   | _, _, .remove site vector position, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (position.denote meanings env) fun i env =>
-          if i.val < 0 then abortAt site (Failure.ofInts .abort #[i.val])
+          opAt site (if i.val < 0 then abortAt site (Failure.ofInts .abort #[i.val])
           else match values.values[i.val.toNat]? with
             | some element =>
                 match SpecVector.ofArray? (values.values.eraseIdxIfInBounds i.val.toNat) with
@@ -2084,7 +2098,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
                     Spec.pure (.value ((element, (remaining, ())) :
                       HList (.cons _ (.cons (.vector _) .nil))) env)
                 | none => Spec.bottom
-            | none => abortAt site (Failure.ofInts .abort #[i.val])
+            | none => abortAt site (Failure.ofInts .abort #[i.val]))
   | _, _, .swap site vector left right, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (left.denote meanings env) fun i env =>

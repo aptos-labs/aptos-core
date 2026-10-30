@@ -284,7 +284,9 @@ close, in specification form. Only `solve` can spend the automatic budget.
 ## What a proof may mention
 
 A step's expressions are the module's specification vocabulary: parameters
-and locals by their Move names, `old(x)` for entry values, `result`, the
+and locals by their Move names (a local of straight-line code from its
+`let` on), `old(x)` for entry values, `result` (`result.k` the `k`-th of
+several results), the
 value written back to a local by a `&mut` borrow as `x'` (after the call
 that borrows it; at an `ensures`, the final value), callee results as `g_result`, the
 block's `let` bindings and quantifier binders, variant payload fields under
@@ -473,11 +475,15 @@ The parameters are the vector, the operation's operands, then the position:
 | `lemma_vector_len_concat`, `lemma_vector_index_concat` | `(v, w)`, `(v, w, k)` |
 | `lemma_vector_len_slice`, `lemma_vector_index_slice` | `(v, a, b)`, `(v, a, b, k)` |
 | `lemma_vector_index_of` | `(v, e)` |
+| `lemma_vector_contains_remove` | `(v, i, e)` |
 | `lemma_vector_ext` | `(v, w)` |
 
 `lemma_vector_index_of(v, e)` states the search `index_of` makes:
 `spec_contains(v, e) ==> index < len(v) && v[index] == e`, `index` the
-position the search returns.
+position the search returns. `lemma_vector_contains_remove(v, i, e)` states
+that a removal takes a distinct vector's element out: where the elements of
+`v` are pairwise distinct, `0 <= i && i < len(v)` and `v[i] == e`,
+`!spec_contains(remove(v, i), e)`.
 
 For `remove`:
 

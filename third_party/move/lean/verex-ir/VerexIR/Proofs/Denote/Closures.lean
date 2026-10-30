@@ -1063,6 +1063,49 @@ attribute [vir_denote]
 
 attribute [vir_denote] ResultShape.toSkolem ResultShape.functionOfSkolem
 
+open Lean Meta in
+/-- Rewrite by an equation whose left-hand side unifies with the expression:
+its right-hand side and proof. `beforeLhs` unifies first (given the
+left-hand side), the binders `preassigned` names take their values after
+the left-hand side, and each binder still open is proved by `premise` (given
+its name and statement). The caller sets the transparency; on failure the
+metavariable context is restored. -/
+def rewriteByEquationCore? (rule : Name) (e : Lean.Expr)
+    (premise : Name → Lean.Expr → MetaM (Option Lean.Expr))
+    (preassigned : Array (Name × Lean.Expr) := #[])
+    (beforeLhs : Lean.Expr → MetaM Bool := fun _ => pure true) :
+    MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let saved ← saveState
+  let result ← attempt
+  if result.isNone then saved.restore
+  return result
+where
+  attempt : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+    let equation ← mkConstWithFreshMVarLevels rule
+    let equationType ← inferType equation
+    let (arguments, _, statement) ← forallMetaTelescope equationType
+    let some (_, lhs, rhs) := statement.eq? | return none
+    unless ← beforeLhs lhs do return none
+    unless ← isDefEq lhs e do return none
+    let names := equationType.getForallBinderNames
+    for (name, value) in preassigned do
+      let some index := names.idxOf? name | return none
+      unless ← isDefEq arguments[index]! value do return none
+    for (argument, name) in arguments.zip names.toArray do
+      if (← instantiateMVars argument).isMVar then
+        let condition ← instantiateMVars (← inferType argument)
+        let some proof ← premise name condition | return none
+        unless ← isDefEq argument proof do return none
+    let proof ← instantiateMVars (mkAppN equation arguments)
+    if proof.hasMVar then return none
+    return some (← instantiateMVars rhs, proof)
+
+open Lean Meta in
+/-- A closed equation premise, by `decide` (checked by the kernel). -/
+def decideEquationPremise (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  unless condition.isAppOfArity ``Eq 3 && !condition.hasMVar do return none
+  mkDecideProof condition
+
 open Lean Meta Simp in
 /-- Rewrite by an equation over a function value at the frame a call's type
 arguments induce (`closureMeaning_instantiate` and its kin): unified at
@@ -1070,18 +1113,10 @@ default transparency, since the value a caller holds is one of the induced
 family (the transports of values between the views are identities), and its
 type-argument conditions decided. -/
 def rewriteInducedFrame (rule : Name) (e : Lean.Expr) : SimpM Step := do
-  let equation ← mkConstWithFreshMVarLevels rule
-  let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
-  let some (_, lhs, rhs) := statement.eq? | return .continue
-  unless ← withTransparency .default (isDefEq lhs e) do return .continue
-  for argument in arguments do
-    if (← instantiateMVars argument).isMVar then
-      let condition ← instantiateMVars (← inferType argument)
-      unless condition.isAppOfArity ``Eq 3 && !condition.hasMVar do return .continue
-      unless ← isDefEq argument (← mkDecideProof condition) do return .continue
-  let proof ← instantiateMVars (mkAppN equation arguments)
-  if proof.hasMVar then return .continue
-  return .visit { expr := ← instantiateMVars rhs, proof? := some proof }
+  let some (rhs, proof) ← withTransparency .default <|
+      rewriteByEquationCore? rule e fun _ => decideEquationPremise
+    | return .continue
+  return .visit { expr := rhs, proof? := some proof }
 
 open Lean Meta Simp in
 /-- An invocation inside a callee inlined at type arguments is the
@@ -1157,26 +1192,16 @@ simproc [vir_denote] invokeGenericClosure
   -- The pattern leaves the function value open: spelled as a generic
   -- closure, its type would fix the rows to their substitution.
   unless e.getAppNumArgs == 9 && (e.getArg! 7).isAppOf ``functionOfGeneric do return .continue
-  let equation ← mkConstWithFreshMVarLevels ``closureMeaning_closureOfGeneric
-  let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
-  let some (_, lhs, rhs) := statement.eq? | return .continue
+  let premise (_ : Name) (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+    -- The target's frame is coherent as the closure's creation took it.
+    if condition.isAppOfArity ``Coherent 5 then coherentProof? condition
+    else decideEquationPremise condition
   -- The function value first: the rows the invocation spells substitute the
   -- ones its weave and type arguments carry.
-  unless ← isDefEq (lhs.getArg! 7) (e.getArg! 7) do return .continue
-  unless ← isDefEq lhs e do return .continue
-  for argument in arguments do
-    if (← instantiateMVars argument).isMVar then
-      let condition ← instantiateMVars (← inferType argument)
-      if condition.isAppOfArity ``Coherent 5 then
-        -- The target's frame is coherent as the closure's creation took it.
-        let some proof ← coherentProof? condition | return .continue
-        unless ← isDefEq argument proof do return .continue
-        continue
-      unless condition.isAppOfArity ``Eq 3 && !condition.hasMVar do return .continue
-      unless ← isDefEq argument (← mkDecideProof condition) do return .continue
-  let proof ← instantiateMVars (mkAppN equation arguments)
-  if proof.hasMVar then return .continue
-  return .visit { expr := ← instantiateMVars rhs, proof? := some proof }
+  let some (rhs, proof) ← rewriteByEquationCore? ``closureMeaning_closureOfGeneric e premise
+      (beforeLhs := fun lhs => isDefEq (lhs.getArg! 7) (e.getArg! 7))
+    | return .continue
+  return .visit { expr := rhs, proof? := some proof }
 
 /-! ## Equality and order of known function values
 

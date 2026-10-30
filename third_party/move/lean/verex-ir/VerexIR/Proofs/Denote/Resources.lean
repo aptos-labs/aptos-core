@@ -423,6 +423,13 @@ theorem NTy.encode_castCarrier {Φ : Carriers} {ρ ρ' : NTy} (same : ρ = ρ')
   subst same
   rfl
 
+/-- A row's encoding does not see a cast between the carriers of equal rows. -/
+theorem HList.encode_castCarrier {Φ : Carriers} {row row' : NRow} (same : row = row')
+    (carriers : @HList Φ row = @HList Φ row') (values : @HList Φ row) :
+    @HList.encode Φ row' (cast carriers values) = @HList.encode Φ row values := by
+  subst same
+  rfl
+
 /-- Moving a value to the frame of its type arguments keeps its encoding. -/
 theorem Skolems.encode_reframe (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
     (value : @NTy.carrier Θ.toCarriers τ) :

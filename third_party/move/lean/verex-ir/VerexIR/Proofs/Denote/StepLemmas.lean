@@ -340,6 +340,13 @@ theorem vector_index_of (v : SpecVector α) (fallback e : α) (eq : α → α �
 
 end
 
+/-- A vector holds the element at each of its positions. -/
+theorem vector_contains_index (v : SpecVector α) (fallback : α) (i : Int) (_ : 0 ≤ i)
+    (_ : i < v.values.size) : v.values[i.toNat]?.getD fallback ∈ v.values := by
+  have within : i.toNat < v.values.size := by omega
+  rw [Array.getElem?_eq_getElem within, Option.getD_some]
+  exact Array.getElem_mem within
+
 /-- A distinct vector without the element at a position holds that element
 no more. -/
 theorem vector_contains_remove {β : Sort _} (read : α → β) (v : SpecVector α) (fallback : α)

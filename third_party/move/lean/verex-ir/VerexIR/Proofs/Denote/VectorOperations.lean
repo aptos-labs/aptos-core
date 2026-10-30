@@ -89,19 +89,20 @@ def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
         (vector.denote meanings env) fun values env =>
         Flow.bind (β := NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
           (position.denote meanings env) fun i env =>
-          if h : i.val < 0 ∨ values.values.size ≤ i.val.toNat then
+          opAt site (if h : i.val < 0 ∨ values.values.size ≤ i.val.toNat then
             (abortAt site (Failure.ofInts .abort #[i.val]) :
               Comp unit (Flow ρ Γ (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))))
           else Spec.pure (@Flow.value unit _ _ ρ Γ
             (NTy.carrier (.tuple (.cons τ (.cons (.vector τ) .nil))))
             ((values.values[i.val.toNat]'(Nat.lt_of_not_ge (fun outside => h (Or.inr outside))),
               (eraseBounded values i.val.toNat, ())) :
-              HList (.cons τ (.cons (.vector τ) .nil))) env) := by
+              HList (.cons τ (.cons (.vector τ) .nil))) env)) := by
   rw [Term.denote]
   congr 1
   funext values env
   congr 1
   funext i env
+  congr 1
   by_cases low : i.val < 0
   · simp only [if_pos low, dif_pos (Or.inl low)]
   · simp only [if_neg low]

@@ -677,7 +677,7 @@ verify test_verify_drain_loop by
     assert 10 * (3 - spec_len(new_from_result)) * (4 - spec_len(new_from_result)) / 2 == 0 by eval
   }
   on assert 14 {
-    lean => simpa only [x_eq, Int.reduceSub, Int.reduceMul, Int.reduceTDiv] using invariant_4
+    lean => simpa only [x_eq, Int.reduceSub, Int.reduceMul, Int.reduceDiv] using invariant_4
   }
   on assert 5 {
     lean => verex_goal_witnesses

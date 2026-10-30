@@ -6,20 +6,20 @@ import VerexMove.Proofs
 verex proofs for "bitwise_table.move"
 verex proofs where
 
--- The table holds 22 at the first key after both additions; the borrow
--- reads it, and the write stores `22 & 1`.
-verify add_R by lean =>
-  verex_obligations
-  verex_on
-  | ensures_1 =>
-    verex_prepare only
-    subst old_value'' old_value' old_value
-    simp only [vir_denote_norm] at *
-    rfl
-  | ensures_3 =>
-    verex_prepare only
-    subst old_value'' old_value' old_value
-    simp only [VerexIR.SpecMap.valueAt_update, vir_denote_norm] at *
-    rw [← (‹22 = borrow_mut_result_0.val› : 22 = borrow_mut_result_0.val)]
-    decide
-  | _ => first | verex_decide | (verex_prepare only; all_goals verex_decide)
+-- The table is closed: both additions and the write through the borrow,
+-- which stores `22 & 1` at the first key, evaluate.
+verify add_R by
+  on ensures 1 {
+    assert spec_len(result.t) == 2 by eval
+  }
+  on ensures 2 {
+    assert spec_contains(result.t, new Key { v := concat(vec(1), vec(2)) }) by eval
+    assert spec_contains(result.t, new Key { v := concat(vec(2), vec(3)) }) by eval
+  }
+  on ensures 3 {
+    assert spec_get(result.t, new Key { v := concat(vec(1), vec(2)) }) == 0 by eval
+  }
+  on ensures 4 {
+    assert spec_get(result.t, new Key { v := concat(vec(2), vec(3)) }) == 23 by eval
+  }
+  on _ { }

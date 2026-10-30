@@ -75,8 +75,6 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` d
   assumed permitted : True
   x✝² : SpecInt (IntWidth.bits 64) false
   x✝¹ : x✝² == x✝³ + 1
-  a✝¹ : 0 ≤ x✝³ + 1
-  a✝ x : x✝³ + 1 ≤ 18446744073709551615
   i : Int
   i_lower : 0 ≤ i
   i_upper : i ≤ 18446744073709551615
@@ -84,6 +82,8 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` d
   x_lower : 0 ≤ x✝³
   x_upper : x✝³ ≤ 2 ^ 64 - 1
   bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  a✝¹ : 0 ≤ x✝²
+  a✝ x : x✝² ≤ 18446744073709551615
   ⊢ i + 2 ≤ 18446744073709551615
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` does not close the obligation from the block's facts:
   case ensures_2.right.right.right
@@ -92,8 +92,6 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` d
   assumed permitted : True
   x✝² : SpecInt (IntWidth.bits 64) false
   x✝¹ : x✝² == x✝³ + 1
-  a✝¹ : 0 ≤ x✝³ + 1
-  a✝ x : x✝³ + 1 ≤ 18446744073709551615
   i : Int
   i_lower : 0 ≤ i
   i_upper : i ≤ 18446744073709551615
@@ -101,6 +99,8 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:37:3: error: `decide` d
   x_lower : 0 ≤ x✝³
   x_upper : x✝³ ≤ 2 ^ 64 - 1
   bounds : 0 ≤ x✝² ∧ x✝² ≤ 2 ^ 64 - 1
+  a✝¹ : 0 ≤ x✝²
+  a✝ x : x✝² ≤ 18446744073709551615
   ⊢ i + 2 ≤ x✝²
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:34:3: error: `decide` does not close the obligation from the block's facts:
   case ensures_1.right.right
@@ -109,11 +109,11 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:34:3: error: `decide` d
   assumed permitted : True
   x✝¹ : SpecInt (IntWidth.bits 64) false
   x✝ : x✝¹ == x✝² + 1
-  a✝¹ : 0 ≤ x✝² + 1
-  a✝ x : x✝² + 1 ≤ 18446744073709551615
   x_lower : 0 ≤ x✝²
   x_upper : x✝² ≤ 2 ^ 64 - 1
   bounds : 0 ≤ x✝¹ ∧ x✝¹ ≤ 2 ^ 64 - 1
+  a✝¹ : 0 ≤ x✝¹
+  a✝ x : x✝¹ ≤ 18446744073709551615
   ⊢ x✝¹ < x✝¹
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:33:8: error: verex verification failed: the proof of `pick` does not establish its specification
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:47:5: error: the step's fact is not proved:

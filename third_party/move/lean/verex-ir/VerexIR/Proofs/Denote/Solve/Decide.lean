@@ -3296,7 +3296,7 @@ macro "verex_pipeline" : tactic => `(tactic| verex_focus ( (
   all_goals verex_timed "pipe-simp" (verex_bounded
     (try simp (disch := omega) only [VerexIR.Proofs.Obligation_eq,
       Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow, Nat.reduceSub,
-      Int.tmod_eq_emod_of_nonneg, Int.tdiv_eq_ediv_of_nonneg, vir_denote_norm] at *))
+      vir_denote_norm] at *))
   all_goals first
   | done
   | verex_timed "pipe-assumption" verex_assumption
@@ -3459,12 +3459,20 @@ elab "verex_unname" : tactic => focusGoal do
         -- simpAt rewrites propositions and the goal, but a saved continuation
         -- can still mention the name in its local definition. Keep the equation
         -- until that use disappears; otherwise later unfolding loses the value.
-        let used ← next.withContext do
-          if (← next.getType).containsFVar result then return true
+        let uses (hidden : Bool) : MetaM Bool := next.withContext do
+          if !hidden && (← next.getType).containsFVar result then return true
           return (← getLCtx).any fun decl =>
-            decl.fvarId != equation && decl.fvarId != result &&
+            decl.isImplementationDetail == hidden &&
+              decl.fvarId != equation && decl.fvarId != result &&
               (decl.type.containsFVar result || decl.value?.any (·.containsFVar result))
-        goal ← if used then pure next else (← next.clear equation).tryClear result
+        -- A step proof's scope entry (hidden) reading the name keeps it, and
+        -- its definition hidden: the leaf reads the expression, so no rule
+        -- folds the expression back into the name.
+        goal ← if ← uses false then pure next
+          else if ← uses true then do
+            next.withContext do next.setFVarKind equation .implDetail
+            pure next
+          else (← next.clear equation).tryClear result
   replaceMainGoal [goal]
 
 /-- Maps and address vectors connected by a quantified coverage hypothesis.
@@ -3719,7 +3727,7 @@ elab "verex_frames" : tactic => focusGoal do
 
 /-- The facts a proof states: its conjuncts, recursively, each with its
 type. -/
-private partial def typedConjuncts (proof : Lean.Expr) : MetaM (Array (Lean.Expr × Lean.Expr)) := do
+partial def typedConjuncts (proof : Lean.Expr) : MetaM (Array (Lean.Expr × Lean.Expr)) := do
   let type ← whnfR (← instantiateMVars (← inferType proof))
   if let some (left, right) := type.and? then
     return (← typedConjuncts (mkApp3 (mkConst ``And.left) left right proof)) ++

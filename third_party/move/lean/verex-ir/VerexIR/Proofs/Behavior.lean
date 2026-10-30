@@ -254,13 +254,9 @@ theorem Skolems.functionToRuntime_construct (parameters : NRow) (shared : Sharin
         handle mask typeInstantiation σs.resolved (HList.toRuntime σs captures) typed.atRuntime := by
   apply @NTy.encode_injective (Carriers.runtime unit)
     (.function parameters.resolved shared results.resolved)
-  have held : ∀ {τ τ' : NTy} (same : τ = τ') (value : @NTy.carrier (Carriers.runtime unit) τ),
-      @NTy.encode (Carriers.runtime unit) τ'
-          (cast (congrArg (@NTy.carrier (Carriers.runtime unit)) same) value) =
-        @NTy.encode (Carriers.runtime unit) τ value := by
-    intro _ _ same _; subst same; rfl
   unfold Skolems.functionToRuntime
-  rw [held (Skolems.resolve_function parameters shared results), Θ.encode_toRuntime]
+  rw [NTy.encode_castCarrier (Skolems.resolve_function parameters shared results),
+    Θ.encode_toRuntime]
   show ((Carriers.functions parameters shared results).closure _).encode =
     ((FunctionCarriers.functions parameters.resolved shared results.resolved).closure _).encode
   rw [Skolems.closure_construct]
@@ -290,14 +286,6 @@ theorem requiresOf_construct (requires : RequiresMeaning unit) (parameters : NRo
         (HList.toRuntime parameters args) state := by
   rw [RequiresOf, Skolems.functionToRuntime_construct]
 
-omit Θ in
-private theorem encode_cast_runtime {τ τ' : NTy} (same : τ = τ')
-    (value : @NTy.carrier (Carriers.runtime unit) τ) :
-    @NTy.encode (Carriers.runtime unit) τ'
-        (cast (congrArg (@NTy.carrier (Carriers.runtime unit)) same) value) =
-      @NTy.encode (Carriers.runtime unit) τ value := by
-  subst same; rfl
-
 /-- A value at the frame of a type without type parameters, at the base
 frame at the same type. -/
 def Denote.Skolems.toRuntimeFree (τ : NTy) (free : τ.paramFree = true) (value : τ.carrier) :
@@ -308,7 +296,7 @@ def Denote.Skolems.toRuntimeFree (τ : NTy) (free : τ.paramFree = true) (value 
 theorem Denote.Skolems.encode_toRuntimeFree (τ : NTy) (free : τ.paramFree = true) (value : τ.carrier) :
     @NTy.encode (Carriers.runtime unit) τ (Θ.toRuntimeFree τ free value) = NTy.encode τ value := by
   unfold Skolems.toRuntimeFree
-  rw [encode_cast_runtime (Skolems.resolve_paramFree free), Θ.encode_toRuntime]
+  rw [NTy.encode_castCarrier (Skolems.resolve_paramFree free), Θ.encode_toRuntime]
 
 /-! A scalar is the same value at the base frame; a reference is the pair of
 its current value and prophecy there. -/
@@ -361,13 +349,8 @@ def HList.toRuntimeFree (row : NRow) (free : row.paramFree = true) (values : HLi
 theorem HList.encode_toRuntimeFree (row : NRow) (free : row.paramFree = true) (values : HList row) :
     @HList.encode (Carriers.runtime unit) row (HList.toRuntimeFree row free values) =
       HList.encode values := by
-  have moved : ∀ {row row' : NRow} (same : row = row') (values : @HList (Carriers.runtime unit) row),
-      @HList.encode (Carriers.runtime unit) row'
-          (cast (congrArg (@HList (Carriers.runtime unit)) same) values) =
-        @HList.encode (Carriers.runtime unit) row values := by
-    intro _ _ same _; subst same; rfl
   unfold HList.toRuntimeFree
-  rw [moved (NRow.resolved_paramFree row free), HList.encode_toRuntime]
+  rw [HList.encode_castCarrier (NRow.resolved_paramFree row free), HList.encode_toRuntime]
 
 @[vir_denote_norm] theorem HList.toRuntimeFree_nil (free : NRow.nil.paramFree = true)
     (values : HList .nil) : HList.toRuntimeFree (unit := unit) .nil free values = () := rfl

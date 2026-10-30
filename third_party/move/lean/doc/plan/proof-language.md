@@ -878,8 +878,19 @@ marks it, and an inner scope reads the mark).
    parts under the names the leaf gives them: a structure's or a tuple's
    components (`x_f`, `x_k`). A frame
    local the walk never binds (a Move local assigned a call's result) is
-   read by the result's name. `result` is not in scope yet; the leaf's names
-   for a function's results come with the templates (L3). A call's result is named after
+   read by the result's name. A source `let` is a binding site: the
+   denotation marks it (`letAt`, `letRowAt`), and in a step proof the normal
+   form states what its body owes under the binding (`LetIn`, `LetRowIn`),
+   which the walk meets and turns into the entries of the locals of the
+   target's own frame the scope names; elsewhere the mark is erased. The
+   exit is a binding site of the returned value: where the postcondition
+   meets it (`ResultAt`), the walk binds `result`, and with several results
+   `result.k` (`spec.result[k]`), in a proof that reads them. Open: the
+   locals of an inlined callee by a qualified name (`zip_reverse.self`, with
+   the call's site where a callee is inlined twice); the VIR of an inlined
+   body does not record the callee its locals come from, so this needs that
+   provenance from the frontend first, and until then a step names only the
+   target's own locals. A call's result is named after
    the callee (`g_result`) and its clauses after the callee's (`g_ensures_1`);
    those of an earlier call of the same callee keep old names
    (`old_g_result`, `old_g_ensures_1`), so no fact is hidden.
@@ -1123,6 +1134,33 @@ gated on the automatic targets (N1 and N2 in "Milestones"):
   proof's facts, which the point steps place before preparation (L2), and
   never leaves one quotient in both forms. The arithmetic lemmas are stated
   over the specification's `/`, so a proof never sees the difference.
+  The spelling is `/` and `%` of unbounded integers, as in the Move
+  Prover: the rewrite of `Int.tdiv`/`Int.tmod` to them moves into
+  `vir_denote_norm` under the nonnegative-dividend premise, the solver's
+  quotient facts (`tdivBounds?`, `divisionReads`, cancellation) are stated
+  over `/` and `%` for non-literal divisors, and `tdiv`/`tmod` remain only
+  for signed operands whose sign is open. Spelling quotients as `tdiv`
+  instead fails: `omega` reads `/` and `%` by literals and `tdiv` as an
+  atom.
+  At a divisor that is not a literal the facts are the bounds and the
+  cancellations; the division algorithm (`a / b * b + a % b = a`, with the
+  remainder's range) is left out: added there, it stops `verex_decide`'s
+  instance closing on leaves unrelated to the division (`pool_u64`'s
+  `redeem_shares`, the distinctness instances of `deduct_shares`'
+  precondition). Open: why the extra fact blocks those instances.
+- **One spelling of membership.** Current state, which the gate holds:
+  the leaf's normal form reads `e ∈ v` by its positions
+  (`mem_iff_exists_int_index`), so the deciders see the positional spelling
+  they decide; the step normal form keeps `e ∈ v` an atom with its algebra
+  (`mem_push`, `mem_append`, `mem_singleton`, `mem_map`,
+  `mem_swapIfInBounds`) and reads a search for an element (`∃ x ∈ v, x ==
+  e`, a found `findIndex?`, `∃ i, … v[i] == e`) and their negations as the
+  atom; the block's decider bridges the two (`statedProof?` proves an atom
+  or its negation from its positional statement, also at a position a
+  split left, and the converse). The bridge is not the design: open (N2),
+  the deciders' own theory of membership, a hypothesis `t ∈ xs` taken
+  apart into a positional witness and a goal `t ∈ xs` closed by finding
+  one, with the atom in both normal forms.
 - **Predicates of intrinsic operations.** `SpecMap.AbortsNewFrom keys
   values` is `keys.length ≠ values.length ∨ ¬keys.Nodup`, which
   `aborts_if_new_from_2` unfolds by hand and maps to the specification's
@@ -1280,6 +1318,24 @@ a third of the others. What those items do in Lean, and what replaces it:
 | Sequences | `verify_vector`, `acl::remove`, `iter_collect` | `SpecVector.ext`, `eraseBounded_values`, `Array.getElem?_eraseIdx*`, `Array.getElem?_push` in the decider's simp set | vector lemmas |
 | Solver gaps showing through | `capability`, `acl`, `nested_loop_inv`, `keys_for_loop`, `lower_bound_scan_start`, `next_key_scan`, `leaf_walk_sum`, `aborts_if_new_from_2`, `for_loop_invariants`, `pool_u64::balance` | `@[vir_denote_norm]` rules in proof files, `SpecInt.val_ofInt`, `IntegerValueFits_unsigned_succ`, `.fits`, `keyAt_satisfies(_all)`, `hasKey_satisfies`, `NTy.eqb_address`, `Option.getD_some`, `SpecMap.AbortsNewFrom`, `tdiv_eq_ediv_of_nonneg` | normal-form fixes |
 | Function values and memory | `calculator`, `stored_fun_values`, the paper's `amm_example`, `specialize_generic_caller` | `NTy.encode_function`, `Weave`, `Which`, `MemoryInvariants`, `Skolems.instantiate`, `lemmaRequires` | the function-value lemmas and the frame lemma ([`native-function-values.md`](native-function-values.md), steps 2b and 3), generic `apply` (L1) |
+
+Gaps recorded while porting the Prover tests to steps:
+
+- An obligation closed by `eval` itself. The grammar gives closers to
+  `assert` and `calc` only, and `on k { … }` closes by `decide`. Asserting
+  the obligation by `eval` does not close it where `eval` normalizes the
+  fact further than the leaf's normal form does: `simple_vector_client`'s
+  `test_index_of`, whose fact drops a repeated branch of the
+  `Option.any (fun x => decide (x == 4)) (some ⟨7, _⟩)` chain the goal
+  keeps. Either a closer on the obligation (`on ensures k by eval`) or a
+  block normal form that evaluates ground conditionals.
+- The position of a membership witness. `∃ (x in v), x == 1` takes `witness
+  1`, but the existential over the position that membership states is no
+  source binder, so no `witness` reaches it (`test_contains`, `ensures 8–12`).
+- Chaining conditional equalities. From `E[i] == E[j]`, `i < p → E[i] ==
+  L[i]`, `j < p → E[j] == L[j]`, `i < p`, `j < p` and `L[i] == L[j] → i == j`,
+  `decide` does not derive `i == j`: two rewrites under premises the context
+  states, then an instance (`acl::remove`'s data invariant).
 
 `ground_enum_123` is not in the table: its script applies rank lemmas
 (`rank_nonneg`, `rank_lt_size`, `rank_lt_rank`, `keyAt_rank`) and closes by

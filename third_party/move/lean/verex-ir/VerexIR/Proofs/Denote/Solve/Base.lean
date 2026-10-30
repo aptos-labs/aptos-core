@@ -327,6 +327,14 @@ inductive RuntimeMention where
   | found (message : MessageData)
   | reported
 
+/-- How the step block being run reads its context: at a program point,
+where its facts are only given and never substituted into the goal the walk
+continues over, and the scope names an `on` block reads, where an entry a
+binding site gave keeps its definition only if the block reads it. -/
+structure StepMode where
+  pointFacts : Bool := false
+  blockReads : Option (Array String) := none
+
 /-- The solver's state of one target. -/
 structure TargetState where
   /-- The name of each clause of the target by its source range
@@ -481,6 +489,12 @@ structure TargetState where
   /-- The source names of a step proof's locals by declaration index, where
   a borrow's prophecy reads the name of the local it borrows. -/
   scopeLocals : IO.Ref (Array String)
+  /-- The row of a step proof's locals: a source `let` of another frame (an
+  inlined callee's) binds no name of the scope. -/
+  scopeRow : IO.Ref (Option Lean.Expr)
+  /-- The names a source `let` or the exit binds (`bindLet`, `bindResult`):
+  a block keeps their definitions only where it reads them. -/
+  bindingNames : IO.Ref (Array String)
   /-- The goals a point's `assert` owes, by goal, with the point and the
   assert's number: obligations the walk queues (`.pointAssert`). -/
   pointOwed : IO.Ref (Std.HashMap MVarId (ProgramPointKey × Nat))
@@ -490,6 +504,11 @@ structure TargetState where
   routedKeys : IO.Ref (Option (Array ObligationKey × Bool))
   /-- Whether the path being prepared has a clause a proof's `on` step takes. -/
   pathRouted : IO.Ref Bool
+  /-- How the step block being run reads its context. -/
+  stepMode : IO.Ref StepMode
+  /-- The statement of each closure site's generated `closure` equation over
+its captures, its literals unfolded (`literalValue?`), by constructor. -/
+  siteClosureTypes : IO.Ref (NameMap Lean.Expr)
 
 /-- The state a target begins with. -/
 def TargetState.new : IO TargetState := do
@@ -533,9 +552,13 @@ def TargetState.new : IO TargetState := do
     hiddenStatements := ← IO.mkRef {}
     scopeNames := ← IO.mkRef none
     scopeLocals := ← IO.mkRef #[]
+    scopeRow := ← IO.mkRef none
+    bindingNames := ← IO.mkRef #[]
     pointOwed := ← IO.mkRef {}
     routedKeys := ← IO.mkRef none
     pathRouted := ← IO.mkRef true
+    stepMode := ← IO.mkRef {}
+    siteClosureTypes := ← IO.mkRef {}
   }
 
 /-- The state of the target being proved, in its elaboration branch's
@@ -581,6 +604,20 @@ rewrites as it rewrites the leaf; an `ensures` binds it as `name'`
 (`bindFinals`). -/
 structure FinalEntry (name : String) {α : Sort u} (value : α) : Prop where
   intro ::
+
+/-- What a step proof's target owes of its returned value `value`: `holds`, a
+binding site of `result` the walk meets where the postcondition meets the
+returned value (`bindResult`). Not reducible: the normal form rewrites in it
+but does not distribute across it. -/
+def ResultAt {α : Sort u} (_value : α) (holds : Prop) : Prop :=
+  holds
+
+/-- A postcondition read under `ResultAt` gives the postcondition. -/
+theorem wp_resultAt {σ ε Result : Type} {action : Spec σ ε Result}
+    {ensures : Result → σ → Prop} {aborts : ε → Prop} {initial : σ}
+    (entered : wp action (fun result final => ResultAt result (ensures result final)) aborts initial) :
+    wp action ensures aborts initial :=
+  wp_mono entered (fun _ _ holds => holds) (fun _ holds => holds)
 
 /-- A scope entry's name, binding index and value. -/
 def scopeEntry? (type : Lean.Expr) : Option (String × Nat × Lean.Expr) := do
@@ -745,6 +782,61 @@ def consumeProphecy (goal : MVarId) (mark : FVarId) : MetaM MVarId := do
   unless names.contains written do return goal
   addScopeEntries goal #[(written, value)]
 
+/-- Record names a binding site bound (`TargetState.bindingNames`). -/
+def noteBindingNames (names : Array String) : CoreM Unit := do
+  (← targetState).bindingNames.modify fun found =>
+    names.foldl (fun found name => if found.contains name then found else found.push name) found
+
+/-- The values a source `let` binds (`LetIn`, `LetRowIn`): each target
+local's declaration index where it is a numeral path, and its value. -/
+def letBindings (binding : Lean.Expr) : MetaM (Array (Option Nat × Lean.Expr)) := do
+  let arguments := binding.getAppArgs
+  let size := arguments.size
+  if binding.isAppOf ``LetIn then
+    return #[(varIndex? arguments[size - 3]!.consumeMData, arguments[size - 2]!)]
+  unless binding.isAppOf ``LetRowIn do return #[]
+  let mut found := #[]
+  let mut targets := arguments[size - 3]!.consumeMData
+  let mut values := arguments[size - 2]!
+  while targets.isAppOf ``Vars.cons do
+    let target := (targets.getArg! (targets.getAppNumArgs - 2)).consumeMData
+    if target.isAppOfArity ``Option.some 2 then
+      found := found.push (varIndex? target.appArg!.consumeMData, ← mkAppM ``Prod.fst #[values])
+    targets := targets.appArg!.consumeMData
+    values ← mkAppM ``Prod.snd #[values]
+  return found
+
+/-- A goal of what a source `let`'s body owes (`LetIn`, `LetRowIn`): in a
+step proof, the locals' scope entries where the scope names them, then what
+the body owes, which it is by definition. -/
+def bindLet (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
+  -- Only a step proof's walk binds a `let` (`bindLetAt`).
+  let some (names, references) ← scopeTable? | return none
+  let target := (← instantiateMVars (← goal.getType)).consumeMData
+  unless target.isAppOf ``LetIn || target.isAppOf ``LetRowIn do return none
+  let goal ← goal.replaceTargetDefEq target.appArg!
+  -- Only the target's own frame: an inlined callee's locals are not the
+  -- scope's.
+  let some row ← (← targetState).scopeRow.get | return some goal
+  let arguments := target.getAppArgs
+  let frame := if target.isAppOf ``LetIn then arguments[1]! else arguments[3]!
+  unless ← withDefault (isDefEq frame row) do return some goal
+  let locals ← (← targetState).scopeLocals.get
+  let mut entries := #[]
+  for (index?, value) in ← letBindings target do
+    let some index := index? | continue
+    let some name := locals[index]? | continue
+    unless names.contains name do continue
+    -- A mutable reference's entry holds its current value, its prophecy
+    -- the value written back, as a binder's does (`scopedBinderGoal`).
+    if references.contains name then
+      entries := entries.push (name, ← mkAppM ``Prod.fst #[value])
+      if names.contains (name ++ "'") then
+        entries := entries.push (name ++ "'", ← mkAppM ``Prod.snd #[value])
+    else entries := entries.push (name, value)
+  noteBindingNames (entries.map (·.1))
+  return some (← addScopeEntries goal entries)
+
 /-- At an obligation of the function's exit, each `&mut` parameter's value
 there, its prophecy (`FinalEntry`), bound as the value written back, `x'`. -/
 def bindFinals (goal : MVarId) : MetaM MVarId := goal.withContext do
@@ -756,6 +848,134 @@ def bindFinals (goal : MVarId) : MetaM MVarId := goal.withContext do
     let written := name ++ "'"
     return if names.contains written then found.push (written, type.getArg! 2) else found
   addScopeEntries goal finals
+
+/-- The components of a returned value bound as the step proof's scope names
+them: `result` the value, or with several results `result_k` the `k`-th, a
+right-nested pair's projections, and `result` the first. -/
+private def resultEntries (names : List String) (value : Lean.Expr) :
+    MetaM (Array (String × Lean.Expr)) := do
+  let count := (List.range names.length).takeWhile (fun k => names.contains s!"result_{k}") |>.length
+  if count == 0 then
+    return if names.contains "result" then #[("result", value)] else #[]
+  let mut entries := #[]
+  let mut rest := value
+  -- A row of results ends in a unit (`HList`), a pair does not.
+  let rowEnd (pair : Lean.Expr) : MetaM Bool := do
+    let type ← whnfD (← inferType pair)
+    unless type.isAppOfArity ``Prod 2 do return false
+    let tail ← whnfD (type.getArg! 1)
+    return tail.isConstOf ``PUnit || tail.isConstOf ``Unit || tail.isAppOf ``PUnit
+  for k in [0:count] do
+    let component ← if k + 1 == count && !(← rowEnd rest) then pure rest
+      else whnfR (← mkAppM ``Prod.fst #[rest])
+    entries := entries.push (s!"result_{k}", component)
+    if k == 0 && names.contains "result" then entries := entries.push ("result", component)
+    if k + 1 < count then rest ← whnfR (← mkAppM ``Prod.snd #[rest])
+  return entries
+
+/-- The returned values a goal states what it owes of (`ResultAt`), outside
+the binders of a postcondition still to be met: none, without a walk, where
+it states none, or outside a step proof, whose walk alone marks the returned
+value (`enterResult`). Each shared subterm is visited once. -/
+def resultSites (target : Lean.Expr) : MetaM (Array Lean.Expr) := do
+  if (← scopeTable?).isNone then return #[]
+  if (target.find? (·.isAppOf ``ResultAt)).isNone then return #[]
+  -- Binders are not entered with fresh locals: a site under one reads its
+  -- bound variables as loose and is not met yet.
+  let mut found := #[]
+  let mut visited : Std.HashSet Lean.Expr := {}
+  let mut pending := #[target]
+  while let some e := pending.back? do
+    pending := pending.pop
+    if visited.contains e then continue
+    visited := visited.insert e
+    if e.isAppOfArity ``ResultAt 3 && !e.hasLooseBVars then
+      found := found.push e
+      continue
+    match e with
+    | .app f a => pending := pending.push f |>.push a
+    | .lam _ t b _ | .forallE _ t b _ => pending := pending.push t |>.push b
+    | .mdata _ b => pending := pending.push b
+    | .letE _ t v b _ => pending := pending.push t |>.push v |>.push b
+    | .proj _ _ b => pending := pending.push b
+    | _ => pure ()
+  return found
+
+/-- A goal stating what the target owes of its returned value (`ResultAt`),
+met where the postcondition met the value: in a step proof, `result` and the
+components the scope names bound to it; the marks dropped, which they are by
+definition. -/
+def bindResult (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
+  if (← scopeTable?).isNone then return none
+  let target ← instantiateMVars (← goal.getType)
+  let sites ← resultSites target
+  if sites.isEmpty then return none
+  let stripped := target.replace fun e =>
+    if e.isAppOfArity ``ResultAt 3 && !e.hasLooseBVars then some (e.getArg! 2) else none
+  let goal ← goal.replaceTargetDefEq stripped
+  let some (names, _) ← scopeTable? | return some goal
+  -- One returned value on every path the goal states: its entries.
+  let values := sites.map (·.getArg! 1)
+  unless values.all (· == values[0]!) do return some goal
+  let entries ← resultEntries names values[0]!
+  noteBindingNames (entries.map (·.1))
+  return some (← addScopeEntries goal entries)
+
+/-- Record the row of a step proof's locals, the frame its body starts in
+(`initialEnv`), for `bindLet`. -/
+def captureScopeRow (goal : MVarId) : MetaM Unit := goal.withContext do
+  let some _ ← scopeTable? | return
+  let target ← instantiateMVars (← goal.getType)
+  let some env := target.find? (·.isAppOfArity ``initialEnv 4) | return
+  let type ← inferType env
+  let type ← if type.isAppOf ``HEnv then pure type else whnfR type
+  if type.isAppOf ``HEnv then (← targetState).scopeRow.set (some type.appArg!)
+
+/-- `verex_scope_row`: record the row of the step proof's locals
+(`captureScopeRow`), before the body's denotation is normalized. -/
+elab "verex_scope_row" : tactic => focusGoal do
+  (← targetState).scopeRow.set none
+  captureScopeRow (← getMainGoal)
+
+/-- A step proof's goal whose postcondition reads the returned value under its
+`ResultAt`, where the target's scope names `result`: the goal of a
+weakest precondition, after the theorem's introductions. -/
+def enterResult (goal : MVarId) : MetaM MVarId := do
+  let some (names, _) ← scopeTable? | return goal
+  unless names.contains "result" do return goal
+  goal.withContext do
+    let target := (← instantiateMVars (← goal.getType)).consumeMData
+    unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return goal
+    let .lam resultName resultType body info := target.getArg! 4 | return goal
+    let .lam finalName finalType inner finalInfo := body | return goal
+    let level ← getLevel resultType
+    let entered := Lean.Expr.lam resultName resultType
+      (.lam finalName finalType (mkApp3 (mkConst ``ResultAt [level]) resultType (.bvar 1) inner)
+        finalInfo) info
+    let next ← mkFreshExprSyntheticOpaqueMVar
+      (mkAppN target.getAppFn (target.getAppArgs.set! 4 entered)) (← goal.getTag)
+    goal.assign (← mkAppM ``wp_resultAt #[next])
+    return next.mvarId!
+
+/-- The scope name of the memory a step proof reads where it stands
+(`doc/plan/proof-language.md`, "Steps": a step reads the state of its
+position); its earliest binding, the entry memory, is what `old` reads. -/
+def stateScopeName : String := "$state"
+
+/-- In a step proof, bind the memory `state` as the state of the steps after
+this point: a scope entry of `stateScopeName`. -/
+def bindStateEntry (goal : MVarId) (state : Lean.Expr) : MetaM MVarId := do
+  let some _ ← scopeTable? | return goal
+  let isMemory ← goal.withContext do
+    return (← whnfR (← inferType state)).isAppOf ``VerexIR.Proofs.Denote.Memory
+  unless isMemory do return goal
+  addScopeEntries goal #[(stateScopeName, state)]
+
+/-- `verex_scope_state x`: the memory `x` is the state of the steps after it. -/
+elab "verex_scope_state " x:ident : tactic => focusGoal do
+  let goal ← getMainGoal
+  let state ← goal.withContext do return mkFVar (← getFVarId x)
+  replaceMainGoal [← bindStateEntry goal state]
 
 /-- `verex_scope_bind [x, …]`: the locals' scope entries, their binding. -/
 elab "verex_scope_bind " "[" locals:ident,* "]" : tactic => focusGoal do
@@ -1131,6 +1351,21 @@ private partial def nonnegative? (e : Lean.Expr) : MetaM (Option Lean.Expr) := d
     return some (← mkAppM ``Int.emod_nonneg #[e.getArg! 4, nonzero])
   return none
 
+/-- A Euclidean quotient or remainder of nonnegative operands is between
+zero and the dividend. -/
+theorem ediv_bounds_of_nonneg {left right : Int} (leftNonnegative : 0 ≤ left)
+    (rightNonnegative : 0 ≤ right) : 0 ≤ left / right ∧ left / right ≤ left :=
+  ⟨Int.ediv_nonneg leftNonnegative rightNonnegative, Int.ediv_le_self right leftNonnegative⟩
+
+theorem emod_bounds_of_nonneg {left right : Int} (leftNonnegative : 0 ≤ left)
+    (rightNonnegative : 0 ≤ right) : 0 ≤ left % right ∧ left % right ≤ left := by
+  have quotient := Int.ediv_nonneg leftNonnegative rightNonnegative
+  have product := Int.mul_nonneg rightNonnegative quotient
+  have definition := Int.emod_def left right
+  rcases Int.lt_or_eq_of_le rightNonnegative with positive | zero
+  · exact ⟨Int.emod_nonneg _ (by omega), by omega⟩
+  · subst zero; simp only [Int.emod_zero]; omega
+
 /-- Both facts, either, or none. -/
 private def conjoin? : Option Lean.Expr → Option Lean.Expr → MetaM (Option Lean.Expr)
   | some left, some right => some <$> mkAppM ``And.intro #[left, right]
@@ -1243,7 +1478,6 @@ its remainder's bound by the divisor's positivity, which omega decides over
 the leaf's hypotheses (`goal`). -/
 private def operationFact? (goal : MVarId) (reads : DivisionReads) (sub : Lean.Expr) :
     MetaM (Option Lean.Expr) := do
-  if sub.hasLooseBVars then return none
   if sub.isAppOfArity ``VerexIR.Proofs.IntegerArithmetic.bitwiseAnd 2 then
     match unsignedValue? (sub.getArg! 0), unsignedValue? (sub.getArg! 1) with
     | some (_, left), some (_, right) =>
@@ -1351,6 +1585,30 @@ private def operationFact? (goal : MVarId) (reads : DivisionReads) (sub : Lean.E
         some <$> mkAppOptM ``Int.mul_tdiv_cancel_left #[divisor, dividend.getArg! 5]
       else pure none
     return ← conjoin? (← conjoin? bounds algorithm) cancellation
+  if (sub.isAppOfArity ``HDiv.hDiv 6 || sub.isAppOfArity ``HMod.hMod 6) &&
+      (sub.getArg! 0).isConstOf ``Int then
+    let (dividend, divisor) := (sub.getArg! 4, sub.getArg! 5)
+    -- omega reads a quotient or remainder by a literal itself; one under a
+    -- binder is no term of the leaf's context.
+    if (divisor.int? <|> (divisor.nat?.map Int.ofNat)).isSome || sub.hasLooseBVars then return none
+    let isQuotient := sub.isAppOfArity ``HDiv.hDiv 6
+    let bounds ← match ← nonnegative? dividend, ← nonnegative? divisor with
+      | some leftNonnegative, some rightNonnegative =>
+          let lemma := if isQuotient then ``VerexIR.Proofs.Denote.ediv_bounds_of_nonneg
+            else ``VerexIR.Proofs.Denote.emod_bounds_of_nonneg
+          some <$> mkAppM lemma #[leftNonnegative, rightNonnegative]
+      | _, _ => pure none
+    -- No division algorithm at a divisor that is not a literal: it stops the
+    -- deciders' instance closing on leaves it is unrelated to
+    -- (`doc/plan/proof-language.md`, "One spelling of a quotient").
+    let cancellation ← if !isQuotient then pure none
+      else if dividend == divisor then some <$> mkAppOptM ``Int.ediv_self #[dividend]
+      else if dividend.isAppOfArity ``HMul.hMul 6 && dividend.getArg! 5 == divisor then
+        some <$> mkAppOptM ``Int.mul_ediv_cancel #[dividend.getArg! 4, divisor]
+      else if dividend.isAppOfArity ``HMul.hMul 6 && dividend.getArg! 4 == divisor then
+        some <$> mkAppOptM ``Int.mul_ediv_cancel_left #[divisor, dividend.getArg! 5]
+      else pure none
+    return ← conjoin? bounds cancellation
   if sub.isAppOfArity ``Int.shiftLeft 2 then
     let product ← if literalDistance then
         some <$> mkAppM ``VerexIR.Proofs.Denote.shiftLeft_eq_mul #[sub.getArg! 0, sub.getArg! 1]
@@ -1376,14 +1634,17 @@ where
     | .mdata _ b | .proj _ _ b => go b
     | _ => pure ()
 
-/-- The operations propositions apply whose results have bounds. -/
+/-- The operations propositions apply whose results have bounds, outside
+binders (no loose bound variables). -/
 private def operationSites (terms : Array Lean.Expr) : Array Lean.Expr :=
-  sitesWhere (fun e => e.isAppOfArity ``VerexIR.Proofs.IntegerArithmetic.bitwiseAnd 2 ||
+  sitesWhere (fun e => !e.hasLooseBVars &&
+    (e.isAppOfArity ``VerexIR.Proofs.IntegerArithmetic.bitwiseAnd 2 ||
     (e.isAppOfArity ``Int.ofNat 1 &&
       (e.appArg!.isAppOfArity ``HOr.hOr 6 || e.appArg!.isAppOfArity ``HXor.hXor 6)) ||
     e.isAppOfArity ``Int.shiftRight 2 || e.isAppOfArity ``Int.shiftLeft 2 ||
     e.isAppOfArity ``Int.tdiv 2 || e.isAppOfArity ``Int.tmod 2 ||
-    e.isAppOfArity ``HMul.hMul 6) terms
+    e.isAppOfArity ``HDiv.hDiv 6 || e.isAppOfArity ``HMod.hMod 6 ||
+    e.isAppOfArity ``HMul.hMul 6)) terms
 
 /-- The closed applications of structure projections propositions mention. -/
 private def projectionSites (env : Environment) (terms : Array Lean.Expr) : Array Lean.Expr :=
@@ -1411,7 +1672,7 @@ private def divisionReads (terms : Array Lean.Expr) : DivisionReads :=
   let products := sitesWhere (·.isAppOfArity ``HMul.hMul 6) terms
   let equalities := sitesWhere
     (fun e => e.isAppOfArity ``Eq 3 && (e.getArg! 0).isConstOf ``Int) terms
-  { remainders := sitesWhere (·.isAppOfArity ``Int.tmod 2) terms
+  { remainders := sitesWhere (fun e => e.isAppOfArity ``Int.tmod 2 || e.isAppOfArity ``HMod.hMod 6) terms
     factors := products.flatMap fun product => #[product.getArg! 4, product.getArg! 5]
     equalities := equalities.map fun equality => (equality.getArg! 1, equality.getArg! 2) }
 
@@ -2172,7 +2433,15 @@ def literalValue? (e : Lean.Expr) : MetaM (Option LiteralValue) := do
   let .const constructor _ := e.getAppFn | return none
   unless e.getAppNumArgs == 1 do return none
   let some entry := siteEquationsAt? (← getEnv) constructor | return none
-  let closedType ← unfoldLiterals (← instantiateMVars (← inferType (mkApp (mkConst entry.closure) e.appArg!)))
+  -- The equation's statement over its captures, its literals unfolded once.
+  let cache := (← targetState).siteClosureTypes
+  let statement ← match (← cache.get).find? constructor with
+    | some statement => pure statement
+    | none =>
+        let statement ← unfoldLiterals (← inferType (mkConst entry.closure))
+        cache.modify (·.insert constructor statement)
+        pure statement
+  let closedType ← instantiateForall statement #[e.appArg!]
   let closed ← mkExpectedTypeHint (mkApp (mkConst entry.closure) e.appArg!) closedType
   let some (_, read, closure) := closedType.eq? | return none
   unless closure.isAppOfArity ``closureOf 8 && read.isAppOfArity ``TypedFunctions.closure 3 do
@@ -2224,24 +2493,21 @@ def siteOfConstruct? (e : Lean.Expr) : MetaM (Option LiteralValue) := withDefaul
     saved.restore
   return none
 
+/-- A closed equation premise of closed data, by definitional equality
+(`Eq.refl`). -/
+def reflEquationPremise (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let_expr Eq _ left right := condition | return none
+  if condition.hasMVar then return none
+  unless ← isDefEq left right do return none
+  return some (← mkEqRefl left)
+
 /-- Rewrite by an equation whose left-hand side unifies with the
-expression, its open equation premises decided. -/
+expression, its open equation premises closed by definitional equality. -/
 def rewriteByEquation? (rule : Name) (e : Lean.Expr) : MetaM (Option Simp.Step) :=
     withDefault do
-  let saved ← saveState
-  let equation ← mkConstWithFreshMVarLevels rule
-  let (arguments, _, statement) ← forallMetaTelescope (← inferType equation)
-  let some (_, lhs, rhs) := statement.eq? | return none
-  unless ← isDefEq lhs e do saved.restore; return none
-  for argument in arguments do
-    if (← instantiateMVars argument).isMVar then
-      let condition ← instantiateMVars (← inferType argument)
-      unless condition.isAppOfArity ``Eq 3 && !condition.hasMVar do saved.restore; return none
-      unless (← whnf (← mkDecide condition)).isConstOf ``true do saved.restore; return none
-      unless ← isDefEq argument (← mkDecideProof condition) do saved.restore; return none
-  let proof ← instantiateMVars (mkAppN equation arguments)
-  if proof.hasMVar then saved.restore; return none
-  return some (.visit { expr := ← unfoldLiterals (← instantiateMVars rhs), proof? := some proof })
+  let some (rhs, proof) ← rewriteByEquationCore? rule e fun _ => reflEquationPremise
+    | return none
+  return some (.visit { expr := ← unfoldLiterals rhs, proof? := some proof })
 
 open Lean Meta Simp in
 /-- A construction at the base frame of a closure site's key is the site's
@@ -2294,27 +2560,14 @@ their targets' (`closedLeft`, `closedRight`) by the values' own, and its
 open premises decided. -/
 private def rewriteKnownPair? (rule : Name) (e : Lean.Expr) (left right : LiteralValue) :
     MetaM (Option Simp.Step) := withDefault do
-  let saved ← saveState
-  let equation ← mkConstWithFreshMVarLevels rule
-  let equationType ← inferType equation
-  let (arguments, _, statement) ← forallMetaTelescope equationType
-  let some (_, lhs, rhs) := statement.eq? | return none
-  unless ← isDefEq lhs e do saved.restore; return none
-  let names := equationType.getForallBinderNames
-  for (name, closed) in [(`closedLeft, left.closed), (`closedRight, right.closed)] do
-    let some index := names.idxOf? name | saved.restore; return none
-    unless ← isDefEq (← inferType arguments[index]!) (← inferType closed) do
-      saved.restore; return none
-    unless ← isDefEq arguments[index]! closed do saved.restore; return none
-  for argument in arguments do
-    if (← instantiateMVars argument).isMVar then
-      let condition ← instantiateMVars (← inferType argument)
-      unless (← isProp condition) && !condition.hasMVar do saved.restore; return none
-      unless (← whnf (← mkDecide condition)).isConstOf ``true do saved.restore; return none
-      unless ← isDefEq argument (← mkDecideProof condition) do saved.restore; return none
-  let proof ← instantiateMVars (mkAppN equation arguments)
-  if proof.hasMVar then saved.restore; return none
-  return some (.visit { expr := ← unfoldLiterals (← instantiateMVars rhs), proof? := some proof })
+  let premise (_ : Name) (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+    unless (← isProp condition) && !condition.hasMVar do return none
+    unless (← whnf (← mkDecide condition)).isConstOf ``true do return none
+    mkDecideProof condition
+  let some (rhs, proof) ← rewriteByEquationCore? rule e premise
+      #[(`closedLeft, left.closed), (`closedRight, right.closed)]
+    | return none
+  return some (.visit { expr := ← unfoldLiterals rhs, proof? := some proof })
 
 /-- Whether two known function values are at one key: target, mask and
 instantiation. -/
@@ -2351,6 +2604,50 @@ simproc [vir_denote, vir_denote_norm] knownFunctionsOrder
 attribute [vir_denote_norm] closureKeyOrder
 
 open Lean Meta Simp in
+/-- A source `let` (`head` is `letAt` or `letRowAt`) outside a step proof is
+its body: only a step proof's walk names values by their source names. -/
+private def eraseLetSite (head : Name) (e : Lean.Expr) : SimpM DStep := do
+  if (← scopeTable?).isSome then return .continue
+  unless e.isAppOf head do return .continue
+  return .visit e.appArg!
+
+open Lean Meta Simp in
+/-- In a step proof, a source `let` (`head`) under `wp` is a binding site:
+what its body owes, under the binding (`binder`, whose arguments `implicits`
+selects from the `let`'s), which the walk meets (`bindLet`). By definition. -/
+private def bindLetSite (head binder : Name) (implicits : Array Lean.Expr → Array Lean.Expr)
+    (e : Lean.Expr) : SimpM DStep := do
+  if (← scopeTable?).isNone then return .continue
+  unless e.isAppOfArity ``VerexIR.Proofs.wp 7 do return .continue
+  let action := (e.getArg! 3).consumeMData
+  unless action.isAppOf head do return .continue
+  let arguments := action.getAppArgs
+  let body := mkAppN e.getAppFn (e.getAppArgs.set! 3 arguments.back!)
+  return .visit (mkAppN (mkConst binder) (implicits arguments |>.push body))
+
+/-- A source `let` outside a step proof is its body (`eraseLetSite`). -/
+dsimproc ↓ [vir_denote, vir_denote_norm] eraseLetAt (@letAt _ ?carriers _ _ _ _ _ _ _) :=
+  eraseLetSite ``letAt
+
+/-- In a step proof, a source `let` is a binding site (`LetIn`,
+`bindLetSite`); `LetIn`'s implicit arguments are `letAt`'s after its result
+type. -/
+dsimproc [vir_denote, vir_denote_norm] bindLetAt
+    (@VerexIR.Proofs.wp _ _ _ (@letAt _ ?carriers _ _ _ _ _ _ _) _ _ _) :=
+  bindLetSite ``letAt ``LetIn fun arguments => arguments.extract 3 (arguments.size - 1)
+
+/-- A row's `let` in a step proof, as `bindLetAt` (`LetRowIn`). -/
+dsimproc [vir_denote, vir_denote_norm] bindLetRowAt
+    (@VerexIR.Proofs.wp _ _ _ (@letRowAt _ ?carriers ?skolems _ _ _ _ _ _) _ _ _) :=
+  bindLetSite ``letRowAt ``LetRowIn fun arguments =>
+    #[arguments[0]!, arguments[1]!, arguments[2]!] ++ arguments.extract 4 (arguments.size - 1)
+
+/-- A row's `let` outside a step proof is its body (`eraseLetSite`). -/
+dsimproc ↓ [vir_denote, vir_denote_norm] eraseLetRowAt
+    (@letRowAt _ ?carriers ?skolems _ _ _ _ _ _) :=
+  eraseLetSite ``letRowAt
+
+
 /-- An invocation at a site, its arm known: the arm a site's constructor
 takes, which the invocation's rewriting marked (`invokeSite`) without the
 site, gets the site; an invocation of the family's `foreign` is marked. So
@@ -4541,14 +4838,26 @@ private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.Has
     Simp.Discharge := fun condition => do
   let condition ← instantiateMVars condition
   let atoms := (collectFVars {} condition).fvarSet
-  -- A condition asked before in this pass, decided or not, is answered again.
+  -- A condition asked before in this pass, decided or not, is answered again;
+  -- an answer whose proof reads a local of a binder simp entered holds only
+  -- under that binder and is not kept.
   if let some known := (← decided.get)[condition]? then return known
+  let remember (result : Option Lean.Expr) : MetaM Unit := do
+    -- At the leaf's own context, outside any binder simp entered, every
+    -- local a proof reads is the leaf's.
+    let current ← getLCtx
+    let atLeaf := current.decls.size == context.decls.size &&
+      current.lastDecl.map (·.fvarId) == context.lastDecl.map (·.fvarId)
+    let proofLocals ← match result, atLeaf with
+      | some proof, false => pure (collectFVars {} (← instantiateMVars proof)).fvarIds
+      | _, _ => pure #[]
+    if proofLocals.all context.contains then decided.modify (·.insert condition result)
   -- A closed condition, such as a slot's position against its layout's
   -- count or a map lemma's precondition over literal vectors, is decided by
   -- the normalization's own lemmas.
   if atoms.isEmpty then
     let result ← Simp.dischargeDefault? condition
-    decided.modify (·.insert condition result)
+    remember result
     return result
   if atoms.any fun fvarId => !context.contains fvarId then return none
   let started ← IO.getNumHeartbeats
@@ -4557,7 +4866,7 @@ private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.Has
   -- normal form the context has.
   if result.isNone && !arithmeticProposition condition then
     result ← normalizedDischarge context condition
-  decided.modify (·.insert condition result)
+  remember result
   if verex.solverDebug.get (← getOptions) then
     let finished ← IO.getNumHeartbeats
     let shown ← if result.isSome then pure "" else do
@@ -4565,6 +4874,11 @@ private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.Has
     (← targetState).dischargeLog.modify fun (calls, cost, failed) =>
       (calls + 1, cost + (finished - started), if result.isSome then failed else failed.push shown)
   return result
+
+/-- The normalization's discharger over a goal's context (`contextDischarge`),
+for a normal form computed outside a leaf's normalization, such as a step's. -/
+def goalDischarge (goal : MVarId) : MetaM Simp.Discharge := goal.withContext do
+  return contextDischarge (← getLCtx) (← IO.mkRef {})
 
 /-- Record the normal form `result` of a hypothesis of type `type`, if its
 proof reads only the hypothesis's variables and facts of the context whose
@@ -4775,7 +5089,7 @@ private def normalizeContext (target : Bool) : TacticM Unit := withMainContext d
   -- hypothesis it compares against.
   let stx ← `(tactic| simp only
     [VerexIR.Proofs.Obligation_eq, Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow,
-    Nat.reduceSub, Int.tmod_eq_emod_of_nonneg, Int.tdiv_eq_ediv_of_nonneg, vir_denote_norm, dif_pos,
+    Nat.reduceSub, vir_denote_norm, dif_pos,
     dif_neg, if_pos, if_neg, Prod.fst, Prod.snd])
   let goal ← getMainGoal
   let started ← IO.getNumHeartbeats

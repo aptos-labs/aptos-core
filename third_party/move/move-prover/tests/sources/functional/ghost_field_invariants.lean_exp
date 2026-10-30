@@ -4,7 +4,7 @@ tests/sources/functional/ghost_field_invariants.move:106:5: error: verex verific
   verify mono_break_write by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ghost_field_invariants.move:51:9: error: the data invariant `invariant g >= x` does not hold where a value is constructed
@@ -12,7 +12,7 @@ tests/sources/functional/ghost_field_invariants.move:53:5: error: verex verifica
   verify bad_init_pack by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ghost_field_invariants.move:60:9: error: the specification clause `invariant total >= x` is not established
@@ -21,7 +21,8 @@ tests/sources/functional/ghost_field_invariants.move:76:5: error: verex verifica
   verify sum_break by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
+    | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ghost_field_invariants.move:113:9: error: the data invariant `invariant g_lo <= g_hi` does not hold where a value is constructed
@@ -29,7 +30,7 @@ tests/sources/functional/ghost_field_invariants.move:120:5: error: verex verific
   verify range_pack_reversed by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/ghost_field_invariants.move:127:9: error: the specification clause `invariant h < 100` is not established
@@ -38,6 +39,6 @@ tests/sources/functional/ghost_field_invariants.move:134:5: error: verex verific
   verify einit_update_bad by lean =>
     verex_obligations
     verex_on
-    | data_invariant => verex_prepare; sorry
+    | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

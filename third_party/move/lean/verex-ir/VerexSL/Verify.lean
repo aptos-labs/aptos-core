@@ -153,7 +153,7 @@ def elabVerexFunctionValues : CommandElab := fun stx => do
   let some unit := VerexSL.registeredUnit? (← getEnv) name
     | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
   discard <| ensureFunctionCarriers (pathSegments pathSyntax) unit
-  let sites := closureSites unit
+  let sites ← closureSitesOf (pathSegments pathSyntax) unit
   logInfoAt stx (if sites.isEmpty then "no closure sites" else displayFunctionValues unit sites)
 
 @[command_elab VerexSL.Contract.verexUnitCommand]
