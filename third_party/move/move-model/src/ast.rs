@@ -1808,8 +1808,13 @@ impl ExpData {
             match e {
                 Call(id, Exists(label), _) | Call(id, Global(label), _) => {
                     let inst = &env.get_node_instantiation(*id);
-                    let (mid, sid, sinst) = inst[0].require_struct();
-                    result.insert((mid.qualified_inst(sid, sinst.to_owned()), label.to_owned()));
+                    let mut concrete = BTreeSet::new();
+                    Self::add_resource_type_memory(&mut concrete, inst.first());
+                    result.extend(
+                        concrete
+                            .into_iter()
+                            .map(|memory| (memory, label.to_owned())),
+                    );
                 },
                 Call(id, SpecFunction(mid, fid, range), _) => {
                     let inst = &env.get_node_instantiation(*id);
@@ -1862,8 +1867,7 @@ impl ExpData {
             match e {
                 Call(id, Exists(_), _) | Call(id, Global(_), _) => {
                     let inst = &env.get_node_instantiation(*id);
-                    let (mid, sid, sinst) = inst[0].require_struct();
-                    result.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                    Self::add_resource_type_memory(&mut result, inst.first());
                 },
                 Call(id, SpecFunction(mid, fid, _range), _) => {
                     let inst = &env.get_node_instantiation(*id);
@@ -1919,6 +1923,16 @@ impl ExpData {
         let mut result = BTreeSet::new();
         self.visit_post_order(&mut |e: &ExpData| {
             match e {
+                ExpData::Call(id, Operation::Exists(_), _)
+                | ExpData::Call(id, Operation::Global(_), _) => {
+                    if let Some(Type::TypeParameter(type_param)) = env
+                        .get_node_instantiation(*id)
+                        .first()
+                        .map(Type::skip_reference)
+                    {
+                        result.insert(*type_param);
+                    }
+                },
                 ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
                     let inst = &env.get_node_instantiation(*id);
                     let module = env.get_module(*mid);
@@ -2021,6 +2035,18 @@ impl ExpData {
                     VisitorPosition::Pre => in_old_depth += 1,
                     VisitorPosition::Post => in_old_depth -= 1,
                     _ => {},
+                },
+                ExpData::Call(id, Operation::Global(_), _)
+                | ExpData::Call(id, Operation::Exists(_), _)
+                    if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+                {
+                    if let Some(Type::TypeParameter(type_param)) = env
+                        .get_node_instantiation(*id)
+                        .first()
+                        .map(Type::skip_reference)
+                    {
+                        result.insert(*type_param);
+                    }
                 },
                 ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _)
                     if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
@@ -5731,13 +5757,14 @@ impl fmt::Display for AccessSpecifierKind {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Address, Condition, ConditionKind, ExpData, Spec, Value},
-        model::{Loc, NodeId},
+        ast::{Address, Condition, ConditionKind, ExpData, Operation, Spec, Value},
+        model::{GlobalEnv, Loc, NodeId},
         symbol::Symbol,
+        ty::{PrimitiveType, Type},
         AccountAddress,
     };
     use num::BigInt;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn update_condition(exp_node_id: usize, val: bool) -> Condition {
         Condition {
@@ -5967,5 +5994,35 @@ mod tests {
 
         assert!(spec1.structural_eq(&spec2));
         assert!(spec2.structural_eq(&spec1));
+    }
+
+    #[test]
+    fn test_generic_global_and_exists_memory() {
+        let env = GlobalEnv::new();
+        for operation in [Operation::Exists(None), Operation::Global(None)] {
+            let result_type = if matches!(&operation, Operation::Exists(_)) {
+                Type::Primitive(PrimitiveType::Bool)
+            } else {
+                Type::TypeParameter(0)
+            };
+            let access_id = env.new_node(Loc::default(), result_type);
+            env.set_node_instantiation(access_id, vec![Type::TypeParameter(0)]);
+            let access = ExpData::Call(access_id, operation, vec![]).into_exp();
+
+            assert!(access.used_memory(&env).is_empty());
+            assert!(access.directly_used_memory(&env).is_empty());
+            assert_eq!(
+                access.directly_generic_used_memory(&env),
+                BTreeSet::from([0])
+            );
+            assert!(access.directly_old_memory(&env).is_empty());
+
+            let old_id = env.new_node(Loc::default(), Type::TypeParameter(0));
+            let old_access = ExpData::Call(old_id, Operation::Old, vec![access]).into_exp();
+            assert_eq!(
+                old_access.directly_generic_old_memory(&env),
+                BTreeSet::from([0])
+            );
+        }
     }
 }
