@@ -6,9 +6,9 @@ use crate::{
     delta::{load_delta, save_delta},
     txn_output::{save_events, save_write_set},
 };
-use anyhow::Result;
+use anyhow::{bail, ensure, Result};
 use aptos_crypto::HashValue;
-use aptos_gas_profiling::GasProfiler;
+use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{
@@ -23,14 +23,15 @@ use aptos_types::{
     randomness::PerBlockRandomness,
     state_store::{state_key::StateKey, TStateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        SignedTransaction, Transaction, TransactionExecutable, TransactionOutput,
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        signature_verified_transaction::SignatureVerifiedTransaction,
+        AuxiliaryInfo, SignedTransaction, Transaction, TransactionExecutable, TransactionOutput,
         TransactionPayload, TransactionPayloadInner, TransactionStatus,
     },
     vm_status::VMStatus,
 };
 use aptos_validator_interface::{DebuggerStateView, RestDebuggerInterface};
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
@@ -132,6 +133,74 @@ pub struct NewBlockResult {
     /// The epoch after the block. May differ from `old_epoch` if the block
     /// triggered a reconfiguration.
     pub new_epoch: u64,
+}
+
+/// AptosSimulationVM panics when given a transaction with a valid signature.
+/// Reject those up front with a normal `Result` error instead.
+///
+/// Every signer slot (sender, secondary signers, fee payer) must be
+/// `NoAccountAuthenticator`. Any fee payer address is accepted: `@0x0` waives
+/// gas, any other address pays gas from its own balance.
+fn ensure_unauthenticated_simulation_txn(txn: &SignedTransaction) -> Result<()> {
+    let is_no_account =
+        |auth: &AccountAuthenticator| matches!(auth, AccountAuthenticator::NoAccountAuthenticator);
+    let ensure_secondaries = |addresses: &[AccountAddress], signers: &[AccountAuthenticator]| {
+        ensure!(
+            addresses.len() == signers.len(),
+            "secondary signer addresses ({}) and authenticators ({}) must have the same length",
+            addresses.len(),
+            signers.len()
+        );
+        ensure!(
+            signers.iter().all(is_no_account),
+            "unauthenticated simulation requires NoAccountAuthenticator for every secondary signer"
+        );
+        Ok(())
+    };
+    match txn.authenticator_ref() {
+        TransactionAuthenticator::SingleSender { sender } => {
+            ensure!(
+                is_no_account(sender),
+                "unauthenticated simulation requires NoAccountAuthenticator for the sender"
+            );
+        },
+        TransactionAuthenticator::MultiAgent {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        } => {
+            ensure!(
+                is_no_account(sender),
+                "unauthenticated simulation requires NoAccountAuthenticator for the sender"
+            );
+            ensure_secondaries(secondary_signer_addresses, secondary_signers)?;
+        },
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address: _,
+            fee_payer_signer,
+        } => {
+            ensure!(
+                is_no_account(sender),
+                "unauthenticated simulation requires NoAccountAuthenticator for the sender"
+            );
+            ensure!(
+                is_no_account(fee_payer_signer),
+                "unauthenticated simulation requires NoAccountAuthenticator for the fee payer"
+            );
+            ensure_secondaries(secondary_signer_addresses, secondary_signers)?;
+        },
+        TransactionAuthenticator::Ed25519 { .. }
+        | TransactionAuthenticator::MultiEd25519 { .. } => {
+            bail!(
+                "unauthenticated simulation cannot use a signed Ed25519 / MultiEd25519 \
+                 authenticator; use NoAccountAuthenticator"
+            );
+        },
+    }
+    Ok(())
 }
 
 /// A session for simulating transactions, with data being persisted to a directory, allowing the session
@@ -636,8 +705,70 @@ impl Session {
             (vm_status, txn_output, None)
         };
 
+        // Authenticated session execution historically applies the write set
+        // unconditionally (discard outputs are typically empty).
         self.state_store.apply_write_set(txn_output.write_set())?;
+        self.persist_execute_artifacts(&txn, &txn_output, gas_log, true)?;
 
+        Ok((vm_status, txn_output))
+    }
+
+    /// Executes a transaction without authenticating the sender, using the same
+    /// simulation-VM path as fullnode `POST /transactions/simulate`.
+    ///
+    /// Every signer slot must use [`AccountAuthenticator::NoAccountAuthenticator`].
+    /// Single-sender, multi-agent, and fee-payer transactions are supported; a fee
+    /// payer of `@0x0` waives gas, any other fee payer pays from its own balance.
+    /// On a kept status the write set is applied so subsequent session commands
+    /// observe it; discarded outputs leave session state unchanged.
+    ///
+    /// Returns an error (instead of panicking inside the simulation VM) when the
+    /// transaction carries a verifiable signature.
+    pub fn execute_unauthenticated_transaction(
+        &mut self,
+        txn: SignedTransaction,
+    ) -> Result<(VMStatus, TransactionOutput)> {
+        ensure_unauthenticated_simulation_txn(&txn)?;
+
+        let (vm_status, txn_output) =
+            AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &self.state_store);
+
+        // Match simulation-VM / FakeExecutor keep-vs-discard rules: only apply
+        // kept outputs. Move aborts are kept and may still charge gas.
+        let kept = !txn_output.status().is_discarded();
+        if kept {
+            self.state_store.apply_write_set(txn_output.write_set())?;
+        }
+        self.persist_execute_artifacts(&txn, &txn_output, None, kept)?;
+
+        Ok((vm_status, txn_output))
+    }
+
+    /// Dry-runs a transaction against the current session state without applying
+    /// any write set — the same keep/discard semantics as fullnode
+    /// `POST /transactions/simulate`, but evaluated on this session's view.
+    ///
+    /// Unlike [`execute_unauthenticated_transaction`], this never mutates session
+    /// state or advances the op counter.
+    ///
+    /// Returns an error (instead of panicking inside the simulation VM) when the
+    /// transaction carries a verifiable signature.
+    pub fn simulate_transaction(
+        &self,
+        txn: SignedTransaction,
+    ) -> Result<(VMStatus, TransactionOutput)> {
+        ensure_unauthenticated_simulation_txn(&txn)?;
+        Ok(AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &self.state_store))
+    }
+
+    /// Persists execution artifacts and advances the session op counter.
+    fn persist_execute_artifacts(
+        &mut self,
+        txn: &SignedTransaction,
+        txn_output: &TransactionOutput,
+        gas_log: Option<TransactionGasLog>,
+        save_state: bool,
+    ) -> Result<()> {
         fn name_from_executable(executable: &TransactionExecutable) -> String {
             match executable {
                 TransactionExecutable::Script(_script) => "script".to_string(),
@@ -694,14 +825,12 @@ impl Session {
         let write_set_path = output_path.join("write_set.json");
         save_write_set(&self.state_store, &write_set_path, txn_output.write_set())?;
 
-        // Generate gas profiling report if enabled.
         if let Some(gas_log) = gas_log {
             gas_log.generate_html_report(output_path.join("gas-report"), name)?;
         }
 
-        self.finish_op(true)?;
-
-        Ok((vm_status, txn_output))
+        self.finish_op(save_state)?;
+        Ok(())
     }
 
     /// Executes a view function and returns the output values.
