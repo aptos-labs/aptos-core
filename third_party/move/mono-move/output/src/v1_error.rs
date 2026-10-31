@@ -28,8 +28,8 @@
 //! equality and would report the divergence as a mismatch.
 
 use mono_move_core::{
-    BytecodeOffset, CallFrame, ErrorLocation, ExecutionErrorKind, GasExhaustedError, IntTy,
-    VMInternalError,
+    storage::resource_provider::ResourceProviderError, BytecodeOffset, CallFrame, ErrorLocation,
+    ExecutionErrorKind, GasExhaustedError, IntTy, VMInternalError,
 };
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
@@ -381,9 +381,12 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         E::ArgumentStorageRead(inner) => return describe(inner),
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
-        E::Unsupported(_) => return V1Equivalent::NoV1Failure,
+        E::Unsupported(_) | E::ResourceProvider(ResourceProviderError::Unsupported(_)) => {
+            return V1Equivalent::NoV1Failure;
+        },
 
-        E::InvariantViolation(_) | E::ResourceProvider(_) => {
+        E::InvariantViolation(_)
+        | E::ResourceProvider(ResourceProviderError::InvariantViolation(_)) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
         },
     })
