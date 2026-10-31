@@ -321,7 +321,7 @@ verex module aptos_framework::ordered_map where
     self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
     v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(79)
+    spec assume folds_capture_anchor!(83)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
@@ -342,15 +342,15 @@ verex module aptos_framework::ordered_map where
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(79, old(self')).length >= len
+      invariant with_state_anchor!(83, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(79, old(self')).length
-        == with_state_anchor!(79, old(v2)).length
+      invariant with_state_anchor!(83, old(self')).length
+        == with_state_anchor!(83, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(79, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(79, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(79, old(self')).length), true
+        self'[j] == with_state_anchor!(83, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(83, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(83, old(self')).length), true
       invariant true
     core.prim.destroyEmptyVector(self')
     core.prim.destroyEmptyVector(v2)
@@ -371,7 +371,7 @@ verex module aptos_framework::ordered_map where
     self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
     v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(97)
+    spec assume folds_capture_anchor!(101)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
@@ -392,15 +392,15 @@ verex module aptos_framework::ordered_map where
       self.upsert(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(97, old(self')).length >= len
+      invariant with_state_anchor!(101, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(97, old(self')).length
-        == with_state_anchor!(97, old(v2)).length
+      invariant with_state_anchor!(101, old(self')).length
+        == with_state_anchor!(101, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(97, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(97, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(97, old(self')).length), true
+        self'[j] == with_state_anchor!(101, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(101, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(101, old(self')).length), true
       invariant true
     core.prim.destroyEmptyVector(self')
     core.prim.destroyEmptyVector(v2)
@@ -996,10 +996,10 @@ verex module aptos_framework::ordered_map where
   public fun keys {K has Copy} {V}(self : &OrderedMap<K, V>) -> Vector<K> := do
     let self := &self.entries
     spec assume spec.inlineCallSummary(
-      «spec_map_ref$lambda$0»(self, self.length),
-      «spec_map_ref_aborts$lambda$1»(self, self.length)
+      «spec_map_ref$lambda$2»(self, self.length),
+      «spec_map_ref_aborts$lambda$3»(self, self.length)
     )
-    let _inline_summary_result_87 :=
+    let _inline_summary_result_91 :=
       do
         let mut result := vector<K>[]
         let i := 0
@@ -1015,14 +1015,14 @@ verex module aptos_framework::ordered_map where
         where
           invariant i <= len
           invariant result.length == i
-          invariant result == «spec_map_ref$lambda$0»(self, i)
-          invariant !«spec_map_ref_aborts$lambda$1»(self, i)
+          invariant result == «spec_map_ref$lambda$2»(self, i)
+          invariant !«spec_map_ref_aborts$lambda$3»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].key
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_87
-      == «spec_map_ref$lambda$0»(self, self.length)
-    _inline_summary_result_87
+    spec assert _inline_summary_result_91
+      == «spec_map_ref$lambda$2»(self, self.length)
+    _inline_summary_result_91
 
   spec keys where
     pragma intrinsic
@@ -1036,10 +1036,10 @@ verex module aptos_framework::ordered_map where
   ) -> Vector<V> := do
     let self := &self.entries
     spec assume spec.inlineCallSummary(
-      «spec_map_ref$lambda$2»(self, self.length),
-      «spec_map_ref_aborts$lambda$3»(self, self.length)
+      «spec_map_ref$lambda$4»(self, self.length),
+      «spec_map_ref_aborts$lambda$5»(self, self.length)
     )
-    let _inline_summary_result_92 :=
+    let _inline_summary_result_96 :=
       do
         let mut result := vector<V>[]
         let i := 0
@@ -1055,14 +1055,14 @@ verex module aptos_framework::ordered_map where
         where
           invariant i <= len
           invariant result.length == i
-          invariant result == «spec_map_ref$lambda$2»(self, i)
-          invariant !«spec_map_ref_aborts$lambda$3»(self, i)
+          invariant result == «spec_map_ref$lambda$4»(self, i)
+          invariant !«spec_map_ref_aborts$lambda$5»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].value
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_92
-      == «spec_map_ref$lambda$2»(self, self.length)
-    _inline_summary_result_92
+    spec assert _inline_summary_result_96
+      == «spec_map_ref$lambda$4»(self, self.length)
+    _inline_summary_result_96
 
   spec values where
     pragma intrinsic
@@ -1081,7 +1081,7 @@ verex module aptos_framework::ordered_map where
     let mut self := entries
     self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
-    spec assume folds_capture_anchor!(93)
+    spec assume folds_capture_anchor!(97)
     let len := self.length
     while len > 0 do
       let e :=
@@ -1097,11 +1097,11 @@ verex module aptos_framework::ordered_map where
       values := core.prim.pushVector(values, value)
       len := len - 1
     where
-      invariant with_state_anchor!(93, old(self)).length >= len
+      invariant with_state_anchor!(97, old(self)).length >= len
       invariant len == self.length
       invariant ∀ (j in 0 .. len),
-        self[j] == with_state_anchor!(93, old(self))[j]
-      invariant ∀ (j in len .. with_state_anchor!(93, old(self)).length), true
+        self[j] == with_state_anchor!(97, old(self))[j]
+      invariant ∀ (j in len .. with_state_anchor!(97, old(self)).length), true
       invariant true
     core.prim.destroyEmptyVector(self)
     (keys, values)
@@ -1857,28 +1857,20 @@ verex module aptos_framework::ordered_map where
   /--
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
-  spec fun «spec_map_ref$lambda$0» {T0} {T1}(
+  spec fun «spec_map_ref$lambda$2» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : u64
   ) : Vector<T0> :=
     if end == 0 then vec::<T0>()
-    else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
+    else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].key))
 
   /--
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
-  spec fun «spec_map_ref$lambda$2» {T0} {T1}(
+  spec fun «spec_map_ref$lambda$4» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : u64
   ) : Vector<T1> :=
     if end == 0 then vec::<T1>()
-    else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
-
-  /--
-  Whether mapping `f` over the prefix `v[0..end]` aborts.
-  -/
-  spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
-    v : Vector<Entry<T0, T1> >, end : u64
-  ) : Bool :=
-    end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
+    else concat(«spec_map_ref$lambda$4»(v, end - 1), vec(v[end - 1].value))
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
@@ -1887,3 +1879,11 @@ verex module aptos_framework::ordered_map where
     v : Vector<Entry<T0, T1> >, end : u64
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)
+
+  /--
+  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  -/
+  spec fun «spec_map_ref_aborts$lambda$5» {T0} {T1}(
+    v : Vector<Entry<T0, T1> >, end : u64
+  ) : Bool :=
+    end > 0 && («spec_map_ref_aborts$lambda$5»(v, end - 1) || false)
