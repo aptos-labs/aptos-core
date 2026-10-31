@@ -6,6 +6,7 @@ pub mod collateral;
 mod hot_state;
 pub mod leaf_entry;
 pub mod native_overlay;
+pub mod order_books;
 pub mod orders;
 pub mod positions;
 pub mod sharded_jmt_state;
