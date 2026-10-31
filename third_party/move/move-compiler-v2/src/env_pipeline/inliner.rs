@@ -94,6 +94,8 @@ type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<Node
 struct UnresolvedBehaviorNodes {
     nodes: RefCell<BTreeSet<NodeId>>,
     spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
+    /// The subset of `nodes` weakened from an `unchanged_of` frame.
+    frame_nodes: RefCell<BTreeSet<NodeId>>,
 }
 
 fn unresolved_behavior_nodes(env: &GlobalEnv) -> Rc<UnresolvedBehaviorNodes> {
@@ -128,6 +130,19 @@ fn is_unresolved_behavior(env: &GlobalEnv, exp: &ExpData) -> bool {
                         if unresolved.spec_funs.borrow().contains(&mid.qualified(*sid))
                 )
         })
+}
+
+fn is_unresolved_frame(env: &GlobalEnv, exp: &ExpData) -> bool {
+    env.get_extension::<UnresolvedBehaviorNodes>()
+        .is_some_and(|unresolved| unresolved.frame_nodes.borrow().contains(&exp.node_id()))
+}
+
+fn weaken_or_mark_unresolved_frame(env: &GlobalEnv, exp: Exp) -> Exp {
+    unresolved_behavior_nodes(env)
+        .frame_nodes
+        .borrow_mut()
+        .insert(exp.node_id());
+    weaken_or_mark_unresolved(env, exp)
 }
 
 fn weaken_or_mark_unresolved(env: &GlobalEnv, exp: Exp) -> Exp {
@@ -2052,7 +2067,12 @@ fn substitute_bp_by_lambda_spec(
     // occurrence would strengthen it under a negation), or leave it intact.
     let underivable = || -> Exp {
         if report_underivable_bp(env, &loc, &lambda_loc, kind, context) {
-            weaken_or_mark_unresolved(env, env.new_bool_const(&loc, true))
+            let weakened = env.new_bool_const(&loc, true);
+            if kind == BehaviorKind::UnchangedOf {
+                weaken_or_mark_unresolved_frame(env, weakened)
+            } else {
+                weaken_or_mark_unresolved(env, weakened)
+            }
         } else {
             intact()
         }
@@ -7577,7 +7597,20 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
         }
         let (exp, unresolved) = weaken_unresolved_conjuncts(self.env, &cond.exp);
         if unresolved {
-            self.unresolved_behavior_in_spec |= cond.kind == ConditionKind::LoopInvariant;
+            // A weakened `unchanged_of` frame is not material a `folds_of`
+            // invariant depends on: only other unresolved material weakens
+            // the block's `folds_of` invariants with it. A kept invariant is
+            // still checked on entry and preservation.
+            let beyond_frame = cond.exp.any(&mut |sub| {
+                (is_unresolved_behavior(self.env, sub) && !is_unresolved_frame(self.env, sub))
+                    || matches!(
+                        sub,
+                        ExpData::Call(_, Operation::SpecFunction(mid, sid, _), args)
+                            if spec_fun_call_has_underivable_behavior(self.env, *mid, *sid, args)
+                    )
+            });
+            self.unresolved_behavior_in_spec |=
+                cond.kind == ConditionKind::LoopInvariant && beyond_frame;
             result.exp = exp;
             changed = true;
         }

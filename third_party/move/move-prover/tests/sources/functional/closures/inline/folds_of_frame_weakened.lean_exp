@@ -1,0 +1,149 @@
+Move prover returns: exiting with verification errors
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:27:41
+   │
+27 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the per-iteration effect of the lambda's body cannot be derived exactly; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:28:23
+   │
+28 │                 invariant folds_of<f>(v, i);
+   │                           ^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                         ^^^^^^^^^^^^^^^^^^^^^
+   ·
+54 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                         ^^^^^^^^^^^^^^^^^^^^^
+   ·
+65 │         each_ref(keys, |k| { total = total + table_read_noinline(sheet, *k); });
+   │         -----------------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                         ^^^^^^^^^^^^^^^^^^^^^
+   ·
+76 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │                 invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │             invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                      ^^^^^^^^^^^^^^^^^^
+   ·
+54 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │             invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                      ^^^^^^^^^^^^^^^^^^
+   ·
+65 │         each_ref(keys, |k| { total = total + table_read_noinline(sheet, *k); });
+   │         -----------------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │             invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                      ^^^^^^^^^^^^^^^^^^
+   ·
+76 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │                 invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                          ^^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+tests/sources/functional/closures/inline/folds_of_frame_weakened.move:81:9: error: the specification clause `ensures result == «spec_fold$lambda$2»(keys, 0, keys.length, sheet)` is not established
+tests/sources/functional/closures/inline/folds_of_frame_weakened.move:79:5: error: verex verification failed: the automatic verification of `sum_false` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_frame_weakened.proof.lean`:
+  verify sum_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/inline/folds_of_frame_weakened.move:98:9: error: the specification clause `ensures result == «spec_fold$lambda$1»(keys, 0, keys.length, sheet)` is not established
+tests/sources/functional/closures/inline/folds_of_frame_weakened.move:96:5: error: verex verification failed: the automatic verification of `sum_and_bump` failed; provide a proof in `tests/sources/functional/closures/inline/folds_of_frame_weakened.proof.lean`:
+  verify sum_and_bump by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -1,0 +1,215 @@
+Move prover returns: exiting with verification errors
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:27:41
+   │
+27 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the per-iteration effect of the lambda's body cannot be derived exactly; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:28:23
+   │
+28 │                 invariant folds_of<f>(v, i);
+   │                           ^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                         ^^^^^^^^^^^^^^^^^^^^^
+   ·
+54 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                         ^^^^^^^^^^^^^^^^^^^^^
+   ·
+65 │         each_ref(keys, |k| { total = total + table_read_noinline(sheet, *k); });
+   │         -----------------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                         ^^^^^^^^^^^^^^^^^^^^^
+   ·
+76 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29:41
+   │
+29 │                 invariant forall j in i..n: unchanged_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │             invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                      ^^^^^^^^^^^^^^^^^^
+   ·
+54 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │             invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                      ^^^^^^^^^^^^^^^^^^
+   ·
+65 │         each_ref(keys, |k| { total = total + table_read_noinline(sheet, *k); });
+   │         -----------------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │             invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                      ^^^^^^^^^^^^^^^^^^
+   ·
+76 │         each_ref(keys, |k| { total = total + table_read(sheet, *k); });
+   │         --------------------------------------------------------------
+   │         │              │
+   │         │              lambda argument
+   │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30:70
+   │
+30 │                 invariant forall x: T: (forall j in 0..i: x != v[j]) ==> unchanged_of<f>(x);
+   │                                                                          ^^^^^^^^^^^^^^^^^^
+   ·
+89 │ ╭           each_ref(keys, |k| {
+   │ │ ╭────────────────────────'
+90 │ │ │             let v = table::borrow_mut(&mut sheet.stores, *k);
+91 │ │ │             total = total + *v;
+92 │ │ │             *v = *v + 1;
+93 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:81:9
+   │
+81 │ ╭         ensures result == spec_fold<u64, u64>( // error: one per element too many
+82 │ │             |acc, k| acc + table::spec_get(sheet.stores, k) + 1, keys, 0, len(keys));
+   │ ╰─────────────────────────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:74: sum_false
+   =         sheet = <redacted>
+   =         keys = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:75: sum_false
+   =         total = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:18: each_ref
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:74: sum_false
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:19: each_ref
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:20: each_ref
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:24: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:25: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:26: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:27: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:28: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30: each_ref
+   =     enter loop, variable(s) total, i havocked and reassigned
+   =         total = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:25: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:26: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:27: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:28: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:21: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:74: sum_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:81: sum_false (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/folds_of_frame_weakened.move:98:9
+   │
+98 │ ╭         ensures result == spec_fold<u64, u64>( // error: repeated keys read bumped values
+99 │ │             |acc, k| acc + table::spec_get(old(sheet).stores, k), keys, 0, len(keys));
+   │ ╰──────────────────────────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:87: sum_and_bump
+   =         sheet = <redacted>
+   =         keys = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:88: sum_and_bump
+   =         total = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:18: each_ref
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:19: each_ref
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:20: each_ref
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:24: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:25: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:26: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:27: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:28: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30: each_ref
+   =     enter loop, variable(s) sheet, total, i havocked and reassigned
+   =         sheet = <redacted>
+   =         total = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:25: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:26: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:27: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:28: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:29: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:30: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:21: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:87: sum_and_bump
+   =         result = <redacted>
+   =         sheet = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_frame_weakened.move:98: sum_and_bump (spec)
