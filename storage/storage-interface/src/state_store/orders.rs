@@ -7,9 +7,12 @@
 
 #![forbid(unsafe_code)]
 
-use crate::state_store::native_overlay::{
-    NativeOverlay, NativeParent, NativeWrites, ShardedKey, ShardedNativeLayers,
-    NUM_NATIVE_INDEX_SHARDS,
+use crate::state_store::{
+    native_overlay::{
+        NativeOverlay, NativeParent, NativeWrites, ShardedKey, ShardedNativeLayers,
+        NUM_NATIVE_INDEX_SHARDS,
+    },
+    order_books::MarketBook,
 };
 use ahash::AHashMap;
 use aptos_experimental_layered_map::MapLayer;
@@ -100,12 +103,14 @@ pub type OrderOverlay = NativeOverlay<OrderKey, NativeOrder>;
 
 pub type OrderParent<'a> = NativeParent<'a, OrderKey, NativeOrder>;
 
-/// A market's resting orders.
+/// A market's resting orders and the book derived from them. Only
+/// [`MarketOrders::apply`] mutates either, which keeps them in step.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MarketOrders {
-    pub singles: BTreeMap<u128, NativeSingleOrder>,
+    singles: BTreeMap<u128, NativeSingleOrder>,
     /// By account.
-    pub bulks: BTreeMap<AccountAddress, NativeBulkOrder>,
+    bulks: BTreeMap<AccountAddress, NativeBulkOrder>,
+    book: MarketBook,
 }
 
 impl MarketOrders {
@@ -115,6 +120,18 @@ impl MarketOrders {
 
     pub fn len(&self) -> usize {
         self.singles.len() + self.bulks.len()
+    }
+
+    pub fn singles(&self) -> &BTreeMap<u128, NativeSingleOrder> {
+        &self.singles
+    }
+
+    pub fn bulks(&self) -> &BTreeMap<AccountAddress, NativeBulkOrder> {
+        &self.bulks
+    }
+
+    pub fn book(&self) -> &MarketBook {
+        &self.book
     }
 
     pub fn get(&self, key: &OrderKey) -> Option<NativeOrder> {
@@ -129,23 +146,31 @@ impl MarketOrders {
     }
 
     /// Applies one write blind; the caller has checked the key and value
-    /// kinds agree.
-    fn apply(&mut self, key: &OrderKey, write: Option<NativeOrder>) {
+    /// kinds agree. The old value's book entries are retracted before the
+    /// new value's go in, since the two can share keys.
+    pub(crate) fn apply(&mut self, key: &OrderKey, write: Option<NativeOrder>) {
         match (key, write) {
-            (OrderKey::Single { order_id, .. }, Some(NativeOrder::Single(order))) => {
-                self.singles.insert(*order_id, order);
+            (OrderKey::Single { order_id, .. }, write) => {
+                if let Some(old) = self.singles.remove(order_id) {
+                    self.book.remove_single(&old);
+                }
+                if let Some(NativeOrder::Single(order)) = write {
+                    self.book.insert_single(&order);
+                    self.singles.insert(*order_id, order);
+                } else if let Some(order) = write {
+                    unreachable!("order kind does not match key {key:?}: {order:?}")
+                }
             },
-            (OrderKey::Bulk { account, .. }, Some(NativeOrder::Bulk(order))) => {
-                self.bulks.insert(*account, order);
-            },
-            (OrderKey::Single { order_id, .. }, None) => {
-                self.singles.remove(order_id);
-            },
-            (OrderKey::Bulk { account, .. }, None) => {
-                self.bulks.remove(account);
-            },
-            (key, Some(order)) => {
-                unreachable!("order kind does not match key {key:?}: {order:?}")
+            (OrderKey::Bulk { account, .. }, write) => {
+                if let Some(old) = self.bulks.remove(account) {
+                    self.book.remove_bulk(&old);
+                }
+                if let Some(NativeOrder::Bulk(order)) = write {
+                    self.book.insert_bulk(&order);
+                    self.bulks.insert(*account, order);
+                } else if let Some(order) = write {
+                    unreachable!("order kind does not match key {key:?}: {order:?}")
+                }
             },
         }
     }
@@ -762,5 +787,338 @@ mod tests {
 
         let position = StateKey::position(addr(1), addr(2), addr(7));
         assert!(decode_order_writes([(&position, None)]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod book_tests {
+    use super::*;
+    use crate::state_store::order_books::{BookEntry, BookOrder};
+    use aptos_types::state_store::native_order::{
+        BulkOrderV1, SingleOrderV1, TimeInForce, TriggerCondition,
+    };
+    use proptest::prelude::*;
+    use std::cmp::Reverse;
+
+    fn addr(byte: u8) -> AccountAddress {
+        let mut a = [0u8; AccountAddress::LENGTH];
+        a[AccountAddress::LENGTH - 1] = byte;
+        AccountAddress::new(a)
+    }
+
+    fn single_key(order_id: u128) -> OrderKey {
+        OrderKey::Single {
+            exchange: addr(1),
+            market: addr(7),
+            order_id,
+        }
+    }
+
+    fn bulk_key(account: u8) -> OrderKey {
+        OrderKey::Bulk {
+            exchange: addr(1),
+            market: addr(7),
+            account: addr(account),
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct Single {
+        order_id: u128,
+        account: u8,
+        price: u64,
+        remaining_size: u64,
+        is_bid: bool,
+        trigger: Option<TriggerCondition>,
+        with_coid: bool,
+    }
+
+    impl Single {
+        fn order(&self) -> NativeOrder {
+            NativeOrder::Single(NativeSingleOrder::V1(SingleOrderV1 {
+                account: addr(self.account),
+                order_id: self.order_id,
+                // Unique per account, as the order book keeps it.
+                client_order_id: self.with_coid.then(|| format!("coid-{}", self.order_id)),
+                price: self.price,
+                orig_size: 100,
+                remaining_size: self.remaining_size,
+                is_bid: self.is_bid,
+                trigger_condition: self.trigger,
+                time_in_force: TimeInForce::Gtc,
+                creation_time_micros: 0,
+                // Unique per order, as `IncreasingIdx` is.
+                unique_priority_idx: self.order_id,
+                metadata: vec![].into(),
+            }))
+        }
+
+        fn active(order_id: u128, price: u64, remaining_size: u64, is_bid: bool) -> Self {
+            Self {
+                order_id,
+                account: 2,
+                price,
+                remaining_size,
+                is_bid,
+                trigger: None,
+                with_coid: false,
+            }
+        }
+    }
+
+    fn bulk(account: u8, bids: &[(u64, u64)], asks: &[(u64, u64)]) -> NativeOrder {
+        NativeOrder::Bulk(NativeBulkOrder::V1(BulkOrderV1 {
+            account: addr(account),
+            order_id: 1000 + u128::from(account),
+            sequence_number: 0,
+            bid_prices: bids.iter().map(|(price, _)| *price).collect(),
+            bid_sizes: bids.iter().map(|(_, size)| *size).collect(),
+            ask_prices: asks.iter().map(|(price, _)| *price).collect(),
+            ask_sizes: asks.iter().map(|(_, size)| *size).collect(),
+            unique_priority_idx: 1000 + u128::from(account),
+            creation_time_micros: 0,
+            metadata: vec![].into(),
+        }))
+    }
+
+    fn set_single(orders: &mut MarketOrders, single: &Single) {
+        orders.apply(&single_key(single.order_id), Some(single.order()));
+    }
+
+    /// Rebuilt from the orders alone, in key order.
+    fn rebuilt(orders: &MarketOrders) -> MarketOrders {
+        let mut fresh = MarketOrders::default();
+        for (order_id, order) in orders.singles() {
+            fresh.apply(
+                &single_key(*order_id),
+                Some(NativeOrder::Single(order.clone())),
+            );
+        }
+        for (account, order) in orders.bulks() {
+            let key = OrderKey::Bulk {
+                exchange: addr(1),
+                market: addr(7),
+                account: *account,
+            };
+            fresh.apply(&key, Some(NativeOrder::Bulk(order.clone())));
+        }
+        fresh
+    }
+
+    #[test]
+    fn best_prices_follow_price_then_priority() {
+        let mut orders = MarketOrders::default();
+        set_single(&mut orders, &Single::active(3, 100, 5, true));
+        set_single(&mut orders, &Single::active(1, 100, 5, true));
+        set_single(&mut orders, &Single::active(2, 99, 5, true));
+        set_single(&mut orders, &Single::active(5, 105, 5, false));
+        set_single(&mut orders, &Single::active(4, 105, 5, false));
+        set_single(&mut orders, &Single::active(6, 106, 5, false));
+        let book = orders.book();
+        assert_eq!(
+            book.best_bid().map(|(price, entry)| (price, entry.order)),
+            Some((100, BookOrder::Single { order_id: 1 }))
+        );
+        assert_eq!(
+            book.best_ask().map(|(price, entry)| (price, entry.order)),
+            Some((105, BookOrder::Single { order_id: 4 }))
+        );
+        assert_eq!(
+            book.bid_depth
+                .iter()
+                .map(|(Reverse(p), s)| (*p, *s))
+                .collect::<Vec<_>>(),
+            vec![(100, 10), (99, 5)]
+        );
+    }
+
+    /// A partial fill keeps the order's key, so it keeps its priority; a full
+    /// fill or a delete takes every entry with it.
+    #[test]
+    fn fills_keep_priority_and_deletes_clear_entries() {
+        let mut orders = MarketOrders::default();
+        let mut order = Single::active(1, 100, 10, true);
+        order.with_coid = true;
+        set_single(&mut orders, &order);
+        order.remaining_size = 4;
+        set_single(&mut orders, &order);
+        let book = orders.book();
+        assert_eq!(
+            book.bids.get(&(Reverse(100), 1)),
+            Some(&BookEntry {
+                order: BookOrder::Single { order_id: 1 },
+                size: 4
+            })
+        );
+        assert_eq!(book.bid_depth.get(&Reverse(100)), Some(&4));
+        assert_eq!(book.client_order_ids.len(), 1);
+
+        orders.apply(&single_key(1), None);
+        assert_eq!(orders.book(), &MarketBook::default());
+        assert!(orders.is_empty());
+    }
+
+    #[test]
+    fn zero_remaining_rests_nowhere_but_stays_indexed_by_account() {
+        let mut orders = MarketOrders::default();
+        set_single(&mut orders, &Single::active(1, 100, 0, false));
+        let book = orders.book();
+        assert!(book.asks.is_empty() && book.ask_depth.is_empty());
+        assert_eq!(
+            book.account_orders.get(&addr(2)).map(|ids| ids.len()),
+            Some(1)
+        );
+    }
+
+    /// A pending order sits in its trigger's index only; once its trigger is
+    /// cleared it moves to the price-time index.
+    #[test]
+    fn triggers_route_to_their_pending_index() {
+        let mut orders = MarketOrders::default();
+        for (order_id, trigger) in [
+            (1, TriggerCondition::PriceMoveAbove(120)),
+            (2, TriggerCondition::PriceMoveBelow(80)),
+            (3, TriggerCondition::TimeBased(1_000)),
+        ] {
+            let mut order = Single::active(order_id, 100, 5, true);
+            order.trigger = Some(trigger);
+            set_single(&mut orders, &order);
+        }
+        let book = orders.book();
+        assert_eq!(book.pending_up.get(&(120, 1)), Some(&1));
+        assert_eq!(book.pending_down.get(&(80, 2)), Some(&2));
+        assert_eq!(book.pending_time.get(&(1_000, 3)), Some(&3));
+        assert!(book.bids.is_empty() && book.bid_depth.is_empty());
+
+        set_single(&mut orders, &Single::active(1, 100, 5, true));
+        let book = orders.book();
+        assert!(book.pending_up.is_empty());
+        assert_eq!(book.best_bid().map(|(price, _)| price), Some(100));
+    }
+
+    /// The price-time index holds a bulk order's first level on each side;
+    /// consuming it moves the entry to the next level at the same priority.
+    /// Depth holds every level.
+    #[test]
+    fn bulk_levels_progress() {
+        let mut orders = MarketOrders::default();
+        orders.apply(
+            &bulk_key(3),
+            Some(bulk(3, &[(100, 5), (99, 6)], &[(101, 7)])),
+        );
+        let book = orders.book();
+        assert_eq!(
+            book.bids.get(&(Reverse(100), 1003)).map(|entry| entry.size),
+            Some(5)
+        );
+        assert_eq!(
+            book.bid_depth
+                .iter()
+                .map(|(Reverse(p), s)| (*p, *s))
+                .collect::<Vec<_>>(),
+            vec![(100, 5), (99, 6)]
+        );
+        assert_eq!(book.bulk_order_ids.get(&1003), Some(&addr(3)));
+
+        orders.apply(&bulk_key(3), Some(bulk(3, &[(99, 6)], &[(101, 7)])));
+        let book = orders.book();
+        assert!(!book.bids.contains_key(&(Reverse(100), 1003)));
+        assert_eq!(
+            book.bids.get(&(Reverse(99), 1003)).map(|entry| entry.size),
+            Some(6)
+        );
+        assert_eq!(
+            book.bid_depth
+                .iter()
+                .map(|(Reverse(p), s)| (*p, *s))
+                .collect::<Vec<_>>(),
+            vec![(99, 6)]
+        );
+
+        orders.apply(&bulk_key(3), None);
+        assert_eq!(orders.book(), &MarketBook::default());
+    }
+
+    /// Single and bulk orders aggregate into one depth level per price.
+    #[test]
+    fn depth_aggregates_singles_and_bulk_levels() {
+        let mut orders = MarketOrders::default();
+        set_single(&mut orders, &Single::active(1, 101, 2, false));
+        orders.apply(&bulk_key(3), Some(bulk(3, &[], &[(101, 3), (102, 4)])));
+        assert_eq!(
+            orders
+                .book()
+                .ask_depth
+                .iter()
+                .map(|(p, s)| (*p, *s))
+                .collect::<Vec<_>>(),
+            vec![(101, 5), (102, 4)]
+        );
+    }
+
+    #[derive(Clone, Debug)]
+    enum Op {
+        SetSingle(Single),
+        DeleteSingle(u128),
+        SetBulk {
+            account: u8,
+            bids: Vec<(u64, u64)>,
+            asks: Vec<(u64, u64)>,
+        },
+        DeleteBulk(u8),
+    }
+
+    fn trigger() -> impl Strategy<Value = Option<TriggerCondition>> {
+        prop_oneof![
+            3 => Just(None),
+            1 => (90u64..110).prop_map(|p| Some(TriggerCondition::PriceMoveAbove(p))),
+            1 => (90u64..110).prop_map(|p| Some(TriggerCondition::PriceMoveBelow(p))),
+            1 => (0u64..5).prop_map(|t| Some(TriggerCondition::TimeBased(t))),
+        ]
+    }
+
+    fn levels() -> impl Strategy<Value = Vec<(u64, u64)>> {
+        prop::collection::vec((95u64..105, 0u64..5), 0..4)
+    }
+
+    fn op() -> impl Strategy<Value = Op> {
+        prop_oneof![
+            4 => (0u128..12, 0u8..3, 95u64..105, 0u64..5, any::<bool>(), trigger(), any::<bool>())
+                .prop_map(|(order_id, account, price, remaining_size, is_bid, trigger, with_coid)| {
+                    Op::SetSingle(Single {
+                        order_id,
+                        account,
+                        price,
+                        remaining_size,
+                        is_bid,
+                        trigger,
+                        with_coid,
+                    })
+                }),
+            2 => (0u128..12).prop_map(Op::DeleteSingle),
+            2 => (0u8..3, levels(), levels())
+                .prop_map(|(account, bids, asks)| Op::SetBulk { account, bids, asks }),
+            1 => (0u8..3).prop_map(Op::DeleteBulk),
+        ]
+    }
+
+    proptest! {
+        /// The index rule: however the orders got there, the incrementally
+        /// maintained book equals one rebuilt from the final orders alone.
+        #[test]
+        fn incremental_book_equals_rebuilt(ops in prop::collection::vec(op(), 0..60)) {
+            let mut orders = MarketOrders::default();
+            for op in &ops {
+                match op {
+                    Op::SetSingle(single) => set_single(&mut orders, single),
+                    Op::DeleteSingle(order_id) => orders.apply(&single_key(*order_id), None),
+                    Op::SetBulk { account, bids, asks } => {
+                        orders.apply(&bulk_key(*account), Some(bulk(*account, bids, asks)))
+                    },
+                    Op::DeleteBulk(account) => orders.apply(&bulk_key(*account), None),
+                }
+            }
+            prop_assert_eq!(&orders, &rebuilt(&orders));
+        }
     }
 }
