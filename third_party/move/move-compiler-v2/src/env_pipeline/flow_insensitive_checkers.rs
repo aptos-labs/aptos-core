@@ -160,7 +160,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         self.seen_uses.exit_scope();
                     },
                     Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
-                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
+                    | BeforeMatchBody(_) | AfterMatchBody(_) | AfterQuantRange(_) => {},
                 };
             },
             Match(_, _, arms) => match position {
@@ -172,7 +172,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                     self.seen_uses.exit_scope();
                 },
                 Pre | Post | BeforeBody | MidMutate | BeforeThen | BeforeElse
-                | PreSequenceValue => {},
+                | PreSequenceValue | AfterQuantRange(_) => {},
             },
             Lambda(_, pat, _, _, _) => {
                 match position {
@@ -184,7 +184,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         self.seen_uses.exit_scope();
                     },
                     BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
-                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
+                    | BeforeMatchBody(_) | AfterMatchBody(_) | AfterQuantRange(_) => {},
                 };
             },
             Quant(_, _, ranges, ..) => {
@@ -202,7 +202,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         self.seen_uses.exit_scope();
                     },
                     BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue
-                    | BeforeMatchBody(_) | AfterMatchBody(_) => {},
+                    | BeforeMatchBody(_) | AfterMatchBody(_) | AfterQuantRange(_) => {},
                 };
             },
             Assign(_, pat, _) => {

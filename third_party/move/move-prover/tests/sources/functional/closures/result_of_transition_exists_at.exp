@@ -1,0 +1,35 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+   ┌─ tests/sources/functional/closures/result_of_transition_exists_at.move:32:13
+   │
+32 │     fun bad(a: address): u64 {
+   │             ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_exists_at.move:37:9
+   │
+37 │         ensures result_of<take>(a) == 5;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:32: bad
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:36: bad (spec)
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:32: bad
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:33: bad
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:37: bad (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_transition_exists_at.move:48:9
+   │
+48 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:41: caller_false
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:46: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:41: caller_false
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:42: caller_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:47: caller_false (spec)
+   =     at tests/sources/functional/closures/result_of_transition_exists_at.move:48: caller_false (spec)

@@ -171,6 +171,16 @@ fn move_framework_prover_tests() {
     run_prover_for_pkg("aptos-framework");
 }
 
+/// Both false postconditions in the package must be reported; a missing `walk`
+/// diagnostic means the counter model lets a false claim verify.
+#[test]
+fn move_prover_counter_model_test() {
+    run_prover_for_pkg_with_baseline(
+        "aptos-move/framework/tests/counter_model/sources/counter_model.move",
+        "tests/counter_model",
+    );
+}
+
 #[test]
 fn move_token_prover_tests() {
     run_prover_for_pkg("aptos-token");

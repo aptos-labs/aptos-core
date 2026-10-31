@@ -2737,7 +2737,7 @@ fn substitute_bp_by_lambda_spec(
             // split.
             unreachable!("folds_of handled before argument-layout split")
         },
-        BehaviorKind::WriteOf(_) => {
+        BehaviorKind::WriteOf(_) | BehaviorKind::TransitionOf => {
             env.diag(
                 Severity::Bug,
                 &loc,

@@ -2272,6 +2272,20 @@ impl SpecTranslator<'_> {
                 let fun_exp = &args[0];
                 let pred_args = &args[1..];
 
+                if matches!(kind, BehaviorKind::TransitionOf)
+                    && !matches!(
+                        fun_exp.as_ref(),
+                        ExpData::Call(_, Operation::Closure(..), _)
+                    )
+                {
+                    // The backend builds the witness over a concrete closure only.
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "bug: transition witness over a function value",
+                    );
+                    return;
+                }
+
                 match fun_exp.as_ref() {
                     ExpData::Call(closure_id, Operation::Closure(mid, fid, mask), closure_args) => {
                         // Closure: use per-function behavioral spec function
@@ -2720,7 +2734,8 @@ impl SpecTranslator<'_> {
             | BehaviorKind::ResultOf
             | BehaviorKind::UnchangedOf
             | BehaviorKind::FoldsOf
-            | BehaviorKind::WriteOf(_) => post,
+            | BehaviorKind::WriteOf(_)
+            | BehaviorKind::TransitionOf => post,
         };
         let mut first = true;
         for memory in &union_used_memory {
@@ -3001,7 +3016,8 @@ impl SpecTranslator<'_> {
             | BehaviorKind::ResultOf
             | BehaviorKind::UnchangedOf
             | BehaviorKind::FoldsOf
-            | BehaviorKind::WriteOf(_) => post,
+            | BehaviorKind::WriteOf(_)
+            | BehaviorKind::TransitionOf => post,
         };
         let mut first = true;
         for memory in used_memory.iter() {
@@ -3098,6 +3114,7 @@ impl SpecTranslator<'_> {
             BehaviorKind::UnchangedOf => "unchanged_of",
             BehaviorKind::FoldsOf => "folds_of",
             BehaviorKind::WriteOf(_) => "write_of",
+            BehaviorKind::TransitionOf => "transition",
         };
         let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
         let mem_display = struct_env.get_full_name_with_address().to_string();
@@ -4200,6 +4217,7 @@ impl SpecTranslator<'_> {
                             BehaviorKind::EnsuresOf
                             | BehaviorKind::ResultOf
                             | BehaviorKind::WriteOf(_)
+                            | BehaviorKind::TransitionOf
                             | BehaviorKind::RequiresOf
                             | BehaviorKind::AbortsOf
                             | BehaviorKind::UnchangedOf
