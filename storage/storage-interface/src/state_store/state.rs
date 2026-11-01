@@ -244,6 +244,7 @@ impl State {
                     let mut config = ConfigCursor::new(self.hot_state_config, &config_changes);
                     let mut lru = HotStateLRU::new(
                         config.current().max_items(shard_id),
+                        config.current().max_value_bytes(shard_id),
                         Arc::clone(&persisted_hot_state),
                         overlay,
                         hot_metadata.latest,
@@ -272,7 +273,11 @@ impl State {
                             }
                         }
                         // Only evict at the checkpoints.
-                        lru.set_capacity(config.for_eviction(*ckpt_version).max_items(shard_id));
+                        let eviction_config = config.for_eviction(*ckpt_version);
+                        lru.set_limits(
+                            eviction_config.max_items(shard_id),
+                            eviction_config.max_value_bytes(shard_id),
+                        );
                         for (key_hash, slot) in lru.maybe_evict() {
                             assert!(slot.is_hot());
                             shard_updates
@@ -628,6 +633,7 @@ mod tests {
 
     const TEST_CONFIG: HotStateConfig = HotStateConfig {
         max_items_per_shard: 100,
+        max_value_bytes_per_shard: usize::MAX,
         refresh_interval_versions: 100,
         delete_on_restart: false,
     };
@@ -673,6 +679,7 @@ mod tests {
     fn empty_lru<'a>(overlay: &'a LayeredMap<HashValue, StateSlot>) -> HotStateLRU<'a> {
         HotStateLRU::new(
             NonZeroUsize::new(100).unwrap(),
+            usize::MAX,
             Arc::new(EmptyHotState),
             overlay,
             None,
@@ -1147,10 +1154,14 @@ mod tests {
 
     // ===== on-chain config changes =====
 
-    fn on_chain_config_op(max_items: u64, refresh_interval_versions: Version) -> BaseStateOp {
+    fn on_chain_config_op(
+        max_items: u64,
+        max_value_bytes: u64,
+        refresh_interval_versions: Version,
+    ) -> BaseStateOp {
         let config = OnChainHotStateConfig::V1(HotStateConfigV1 {
             max_items_per_shard: vec![max_items; NUM_STATE_SHARDS],
-            max_value_bytes_per_shard: vec![],
+            max_value_bytes_per_shard: vec![max_value_bytes; NUM_STATE_SHARDS],
             refresh_interval_versions,
             max_promotions_per_block: 0,
         });
@@ -1196,7 +1207,7 @@ mod tests {
         // Like a reconfig txn, v1 shrinks the hot state and is a checkpoint.
         let write_sets = [creations(&keys), vec![(
             ON_CHAIN_CONFIG_KEY.clone(),
-            on_chain_config_op(1, 100),
+            on_chain_config_op(1, u64::MAX, 100),
         )]];
         let (state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1]);
 
@@ -1214,6 +1225,46 @@ mod tests {
             assert!(evictions.values().all(|op| op.eviction_version == 1));
         }
         assert_eq!(state.hot_state_config().max_items(0).get(), 1);
+    }
+
+    #[test]
+    fn test_on_chain_value_bytes_limit_evicts_at_its_checkpoint() {
+        let empty = LedgerState::new_empty(TEST_CONFIG);
+        let keys = (0..64).map(|i| key(&format!("k{i}"))).collect_vec();
+        let value = val(&[0; 10]);
+        let write_sets = [
+            keys.iter()
+                .map(|k| (k.clone(), BaseStateOp::Creation(value.clone())))
+                .collect(),
+            // Room for 2 of the values per shard. The config value itself is larger than that.
+            vec![(
+                ON_CHAIN_CONFIG_KEY.clone(),
+                on_chain_config_op(100, 25, 100),
+            )],
+        ];
+        let (state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1]);
+
+        let mut num_keys = [0; NUM_STATE_SHARDS];
+        for k in &keys {
+            num_keys[k.get_shard_id()] += 1;
+        }
+        let config_shard_id = ON_CHAIN_CONFIG_KEY.get_shard_id();
+        num_keys[config_shard_id] += 1;
+        let updates = updates.for_last_checkpoint.unwrap();
+        for shard_id in 0..NUM_STATE_SHARDS {
+            let num_hot = if shard_id == config_shard_id {
+                0
+            } else {
+                num_keys[shard_id].min(2)
+            };
+            assert_eq!(state.num_hot_items(shard_id), num_hot);
+            assert!(state.hot_value_bytes(shard_id) <= 25);
+            let evictions = &updates[shard_id].evictions;
+            assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
+            assert!(evictions.values().all(|op| op.eviction_version == 1));
+        }
+        assert!(state.latest_hot_key(config_shard_id).is_none());
+        assert!(state.oldest_hot_key(config_shard_id).is_none());
     }
 
     #[test]
@@ -1235,7 +1286,10 @@ mod tests {
         // `k` became hot at v0. With the local refresh interval (100), a promotion at v1 doesn't
         // refresh it, while the new interval (1) would.
         let write_sets = [vec![
-            (ON_CHAIN_CONFIG_KEY.clone(), on_chain_config_op(100, 1)),
+            (
+                ON_CHAIN_CONFIG_KEY.clone(),
+                on_chain_config_op(100, u64::MAX, 1),
+            ),
             (k.clone(), BaseStateOp::MakeHot),
         ]];
         let (state, updates) = apply_write_sets(&empty, &state, &write_sets, vec![0]);
@@ -1253,7 +1307,10 @@ mod tests {
         let write_sets = [
             creations(&keys[..32]),
             vec![
-                (ON_CHAIN_CONFIG_KEY.clone(), on_chain_config_op(2, 1)),
+                (
+                    ON_CHAIN_CONFIG_KEY.clone(),
+                    on_chain_config_op(2, u64::MAX, 1),
+                ),
                 (keys[0].clone(), BaseStateOp::MakeHot),
             ],
             vec![(keys[1].clone(), BaseStateOp::MakeHot)],

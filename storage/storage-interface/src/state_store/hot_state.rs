@@ -13,6 +13,8 @@ use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 pub(crate) struct HotStateLRU<'a> {
     /// Max total number of items in the cache.
     capacity: NonZeroUsize,
+    /// Max sum of `StateSlot::size()` across all entries in the cache.
+    max_value_bytes: usize,
     /// The entire committed hot state. While this contains all the shards, this struct is supposed
     /// to handle a single shard.
     committed: Arc<dyn HotStateView>,
@@ -33,6 +35,7 @@ pub(crate) struct HotStateLRU<'a> {
 impl<'a> HotStateLRU<'a> {
     pub fn new(
         capacity: NonZeroUsize,
+        max_value_bytes: usize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<HashValue, StateSlot>,
         head: Option<HashValue>,
@@ -42,6 +45,7 @@ impl<'a> HotStateLRU<'a> {
     ) -> Self {
         Self {
             capacity,
+            max_value_bytes,
             committed,
             overlay,
             pending: HashMap::new(),
@@ -53,8 +57,9 @@ impl<'a> HotStateLRU<'a> {
     }
 
     /// Takes effect at the next `maybe_evict`.
-    pub fn set_capacity(&mut self, capacity: NonZeroUsize) {
+    pub fn set_limits(&mut self, capacity: NonZeroUsize, max_value_bytes: usize) {
         self.capacity = capacity;
+        self.max_value_bytes = max_value_bytes;
     }
 
     /// Inserts a hot slot as the most recent entry. Returns the old `hot_since_version` if
@@ -105,29 +110,23 @@ impl<'a> HotStateLRU<'a> {
         }
     }
 
-    /// Returns the list of entries evicted, beginning from the LRU.
+    /// Returns the list of entries evicted, beginning from the LRU. Can evict everything, if a
+    /// single value exceeds `max_value_bytes`.
     pub fn maybe_evict(&mut self) -> Vec<(HashValue, StateSlot)> {
-        let mut current = match self.tail {
-            Some(tail) => tail,
-            None => {
-                assert_eq!(self.num_items, 0);
-                return Vec::new();
-            },
-        };
-
         let mut evicted = Vec::new();
-        while self.num_items > self.capacity.get() {
-            let slot = self
-                .delete(&current)
-                .expect("There must be entries to evict when current size is above capacity.");
-            let prev_key_hash = *slot
-                .prev()
-                .expect("There must be at least one newer entry (num_items > capacity >= 1).");
+        while self.num_items > self.capacity.get() || self.total_value_bytes > self.max_value_bytes
+        {
+            let tail = self
+                .tail
+                .expect("There must be entries to evict when over the limits.");
+            let slot = self.delete(&tail).expect("The tail must be hot.");
             self.total_value_bytes -= slot.size();
-            evicted.push((current, slot.clone()));
-            self.pending.insert(current, slot.to_cold());
-            current = prev_key_hash;
             self.num_items -= 1;
+            evicted.push((tail, slot.clone()));
+            self.pending.insert(tail, slot.to_cold());
+        }
+        if self.tail.is_none() {
+            assert_eq!(self.num_items, 0);
         }
         evicted
     }
@@ -375,10 +374,11 @@ mod tests {
     }
 
     /// Runs one block against a fresh `HotStateLRU` built from `committed` and `overlay`: applies
-    /// `updates`, evicts down to `capacity`, and checks every step against the `naive_lru` oracle.
+    /// `updates`, evicts down to the limits, and checks every step against the `naive_lru` oracle.
     /// Returns `into_updates()` so the caller can commit or stack the result per its own model.
     fn run_block(
         capacity: NonZeroUsize,
+        max_value_bytes: usize,
         committed: Arc<dyn HotStateView>,
         overlay: &LayeredMap<HashValue, StateSlot>,
         head: Option<HashValue>,
@@ -396,6 +396,7 @@ mod tests {
     ) {
         let mut lru = HotStateLRU::new(
             capacity,
+            max_value_bytes,
             committed,
             overlay,
             head,
@@ -416,7 +417,9 @@ mod tests {
 
         let actual_evicted = lru.maybe_evict();
         let mut expected_evicted = Vec::new();
-        while naive_lru.len() > capacity.get() {
+        while naive_lru.len() > capacity.get()
+            || naive_lru.iter().map(|(_, s)| s.size()).sum::<usize>() > max_value_bytes
+        {
             expected_evicted.push(naive_lru.pop_lru().unwrap());
         }
         itertools::zip_eq(actual_evicted, expected_evicted).for_each(|(actual, expected)| {
@@ -519,6 +522,8 @@ mod tests {
                     blocks
                 }),
             capacity in (1..10usize).prop_map(|n| NonZeroUsize::new(n).unwrap()),
+            // Values are up to `ARB_STATE_VALUE_MAX_SIZE` (100) bytes, so this often binds.
+            max_value_bytes in 0..500usize,
         ) {
             let test_obj = LRUTest::new_empty();
             let mut head = None;
@@ -533,6 +538,7 @@ mod tests {
                 let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
                     run_block(
                         capacity,
+                        max_value_bytes,
                         Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
                         &test_obj.overlay,
                         head,
@@ -567,6 +573,7 @@ mod tests {
                     (blocks, vec(any::<bool>(), num_blocks))
                 }),
             capacity in (1..10usize).prop_map(|n| NonZeroUsize::new(n).unwrap()),
+            max_value_bytes in 0..500usize,
         ) {
             let (blocks, flushes) = blocks_and_flushes;
             let mut test_obj = OverlayTest::new_empty();
@@ -581,6 +588,7 @@ mod tests {
                 let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
                     run_block(
                         capacity,
+                        max_value_bytes,
                         test_obj.committed_view(),
                         &test_obj.overlay,
                         head,

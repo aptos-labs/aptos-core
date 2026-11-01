@@ -24,6 +24,7 @@ pub struct EffectiveHotStateConfig {
     /// The fallback, kept to resolve later changes of the on-chain config.
     local: HotStateConfig,
     max_items_per_shard: [NonZeroUsize; NUM_STATE_SHARDS],
+    max_value_bytes_per_shard: [usize; NUM_STATE_SHARDS],
     refresh_interval_versions: Version,
 }
 
@@ -34,6 +35,7 @@ impl EffectiveHotStateConfig {
         Self {
             local,
             max_items_per_shard: [max_items; NUM_STATE_SHARDS],
+            max_value_bytes_per_shard: [local.max_value_bytes_per_shard; NUM_STATE_SHARDS],
             refresh_interval_versions: local.refresh_interval_versions,
         }
     }
@@ -49,6 +51,9 @@ impl EffectiveHotStateConfig {
                 max_items_per_shard: std::array::from_fn(|shard_id| {
                     NonZeroUsize::new(config.max_items_per_shard[shard_id] as usize)
                         .expect("Already validated.")
+                }),
+                max_value_bytes_per_shard: std::array::from_fn(|shard_id| {
+                    config.max_value_bytes_per_shard[shard_id] as usize
                 }),
                 refresh_interval_versions: config.refresh_interval_versions,
             },
@@ -92,6 +97,10 @@ impl EffectiveHotStateConfig {
 
     pub fn max_items(&self, shard_id: usize) -> NonZeroUsize {
         self.max_items_per_shard[shard_id]
+    }
+
+    pub fn max_value_bytes(&self, shard_id: usize) -> usize {
+        self.max_value_bytes_per_shard[shard_id]
     }
 
     pub fn refresh_interval_versions(&self) -> Version {
@@ -148,14 +157,19 @@ mod tests {
 
     const LOCAL: HotStateConfig = HotStateConfig {
         max_items_per_shard: 100,
+        max_value_bytes_per_shard: 1000,
         refresh_interval_versions: 10,
         delete_on_restart: false,
     };
 
-    fn on_chain_bytes(max_items_per_shard: Vec<u64>, refresh_interval_versions: u64) -> Vec<u8> {
+    fn on_chain_bytes(
+        max_items_per_shard: Vec<u64>,
+        max_value_bytes_per_shard: Vec<u64>,
+        refresh_interval_versions: u64,
+    ) -> Vec<u8> {
         let config = OnChainHotStateConfig::V1(HotStateConfigV1 {
             max_items_per_shard,
-            max_value_bytes_per_shard: vec![],
+            max_value_bytes_per_shard,
             refresh_interval_versions,
             max_promotions_per_block: 0,
         });
@@ -167,15 +181,21 @@ mod tests {
         let config = EffectiveHotStateConfig::new(LOCAL, None);
         assert_eq!(config, EffectiveHotStateConfig::from_local(LOCAL));
         assert_eq!(config.max_items(0).get(), 100);
+        assert_eq!(config.max_value_bytes(0), 1000);
         assert_eq!(config.refresh_interval_versions(), 10);
     }
 
     #[test]
     fn test_on_chain_config_overrides_local() {
         let max_items = (1..=NUM_STATE_SHARDS as u64).collect();
-        let config = EffectiveHotStateConfig::new(LOCAL, Some(&on_chain_bytes(max_items, 7)));
+        let max_value_bytes = (1..=NUM_STATE_SHARDS as u64).map(|n| n * 10).collect();
+        let config = EffectiveHotStateConfig::new(
+            LOCAL,
+            Some(&on_chain_bytes(max_items, max_value_bytes, 7)),
+        );
         for shard_id in 0..NUM_STATE_SHARDS {
             assert_eq!(config.max_items(shard_id).get(), shard_id + 1);
+            assert_eq!(config.max_value_bytes(shard_id), (shard_id + 1) * 10);
         }
         assert_eq!(config.refresh_interval_versions(), 7);
         assert_eq!(config.local(), LOCAL);
@@ -191,15 +211,14 @@ mod tests {
     fn test_invalid_on_chain_config_uses_local() {
         let local = EffectiveHotStateConfig::from_local(LOCAL);
         assert_eq!(EffectiveHotStateConfig::new(LOCAL, Some(&[1, 2, 3])), local);
-        let too_few_shards = on_chain_bytes(vec![5; NUM_STATE_SHARDS - 1], 7);
-        assert_eq!(
-            EffectiveHotStateConfig::new(LOCAL, Some(&too_few_shards)),
-            local
-        );
-        let zero_items = on_chain_bytes(vec![0; NUM_STATE_SHARDS], 7);
-        assert_eq!(
-            EffectiveHotStateConfig::new(LOCAL, Some(&zero_items)),
-            local
-        );
+        let valid = vec![5; NUM_STATE_SHARDS];
+        for invalid in [
+            on_chain_bytes(vec![5; NUM_STATE_SHARDS - 1], valid.clone(), 7),
+            on_chain_bytes(vec![0; NUM_STATE_SHARDS], valid.clone(), 7),
+            on_chain_bytes(valid.clone(), vec![5; NUM_STATE_SHARDS - 1], 7),
+            on_chain_bytes(valid.clone(), vec![0; NUM_STATE_SHARDS], 7),
+        ] {
+            assert_eq!(EffectiveHotStateConfig::new(LOCAL, Some(&invalid)), local);
+        }
     }
 }

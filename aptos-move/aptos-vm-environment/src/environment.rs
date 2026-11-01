@@ -415,7 +415,7 @@ pub mod tests {
     fn hot_state_config(max_items_per_shard: Vec<u64>) -> OnChainHotStateConfig {
         OnChainHotStateConfig::V1(HotStateConfigV1 {
             max_items_per_shard,
-            max_value_bytes_per_shard: vec![],
+            max_value_bytes_per_shard: vec![1; NUM_STATE_SHARDS],
             refresh_interval_versions: 0,
             max_promotions_per_block: 0,
         })

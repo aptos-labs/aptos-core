@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 /// The on-chain hot state config, wrapped in an enum to allow adding fields later.
 ///
 /// A new config takes effect in the reconfig txn that applies it: the hot state is evicted down to
-/// the new `max_items_per_shard` at that txn, while the other fields apply from the next epoch.
+/// the new `max_items_per_shard` and `max_value_bytes_per_shard` at that txn, while the other
+/// fields apply from the next epoch.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainHotStateConfig {
     V1(HotStateConfigV1),
@@ -20,19 +21,27 @@ impl OnChainHotStateConfig {
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::V1(config) => {
-                ensure!(
-                    config.max_items_per_shard.len() == NUM_STATE_SHARDS,
-                    "Expecting {} entries in max_items_per_shard, got {}.",
-                    NUM_STATE_SHARDS,
-                    config.max_items_per_shard.len(),
-                );
-                ensure!(
-                    config.max_items_per_shard.iter().all(|n| *n > 0),
-                    "max_items_per_shard must be positive: {:?}",
-                    config.max_items_per_shard,
-                );
+                Self::validate_per_shard("max_items_per_shard", &config.max_items_per_shard)?;
+                Self::validate_per_shard(
+                    "max_value_bytes_per_shard",
+                    &config.max_value_bytes_per_shard,
+                )?;
             },
         }
+        Ok(())
+    }
+
+    fn validate_per_shard(name: &str, values: &[u64]) -> Result<()> {
+        ensure!(
+            values.len() == NUM_STATE_SHARDS,
+            "Expecting {} entries in {name}, got {}.",
+            NUM_STATE_SHARDS,
+            values.len(),
+        );
+        ensure!(
+            values.iter().all(|n| *n > 0),
+            "{name} must be positive: {values:?}"
+        );
         Ok(())
     }
 }
@@ -64,6 +73,8 @@ pub struct HotStateConfigV1 {
     pub max_items_per_shard: Vec<u64>,
     /// Max sum of value sizes in each shard, indexed by shard id. Values vary a lot in size, so
     /// capping the item count alone doesn't bound memory usage.
+    ///
+    /// N.b. like `max_items_per_shard`, lowering it evicts all the excess in the reconfig txn.
     pub max_value_bytes_per_shard: Vec<u64>,
     /// Refresh `hot_since_version` of a hot item when it's accessed again after this many
     /// versions, to keep frequently read items from being evicted.
@@ -105,24 +116,29 @@ mod tests {
 
     #[test]
     fn test_validate() {
-        let config = |max_items_per_shard| {
+        let config = |max_items_per_shard, max_value_bytes_per_shard| {
             OnChainHotStateConfig::V1(HotStateConfigV1 {
                 max_items_per_shard,
-                max_value_bytes_per_shard: vec![],
+                max_value_bytes_per_shard,
                 refresh_interval_versions: 0,
                 max_promotions_per_block: 0,
             })
         };
-
-        config(vec![1; NUM_STATE_SHARDS]).validate().unwrap();
-        config(vec![1; NUM_STATE_SHARDS - 1])
-            .validate()
-            .unwrap_err();
-        config(vec![1; NUM_STATE_SHARDS + 1])
-            .validate()
-            .unwrap_err();
-        let mut with_zero = vec![1; NUM_STATE_SHARDS];
+        let valid = vec![1; NUM_STATE_SHARDS];
+        let mut with_zero = valid.clone();
         with_zero[3] = 0;
-        config(with_zero).validate().unwrap_err();
+        let invalid = [
+            vec![1; NUM_STATE_SHARDS - 1],
+            vec![1; NUM_STATE_SHARDS + 1],
+            with_zero,
+        ];
+
+        config(valid.clone(), valid.clone()).validate().unwrap();
+        for invalid in invalid {
+            config(invalid.clone(), valid.clone())
+                .validate()
+                .unwrap_err();
+            config(valid.clone(), invalid).validate().unwrap_err();
+        }
     }
 }

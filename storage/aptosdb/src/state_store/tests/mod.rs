@@ -203,7 +203,7 @@ fn test_load_on_chain_hot_state_config() {
     };
     let on_chain = OnChainHotStateConfig::V1(HotStateConfigV1 {
         max_items_per_shard: vec![3; NUM_STATE_SHARDS],
-        max_value_bytes_per_shard: vec![],
+        max_value_bytes_per_shard: vec![1000; NUM_STATE_SHARDS],
         refresh_interval_versions: 7,
         max_promotions_per_block: 0,
     });
@@ -226,6 +226,7 @@ fn test_load_on_chain_hot_state_config() {
             .commit_block_for_test(0, [vec![(key, Some(value))]]);
         let config = current_config(&db);
         assert_eq!(config.max_items(0).get(), 3);
+        assert_eq!(config.max_value_bytes(0), 1000);
         assert_eq!(config.refresh_interval_versions(), 7);
         config
     };

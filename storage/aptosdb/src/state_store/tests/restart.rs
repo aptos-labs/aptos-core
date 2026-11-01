@@ -33,6 +33,7 @@ fn open_db<P: AsRef<Path>>(
         max_items_per_shard,
         refresh_interval_versions: 1_000,
         delete_on_restart: false,
+        ..HotStateConfig::default()
     };
     AptosDB::open(
         StorageDirPaths::from_path(path),

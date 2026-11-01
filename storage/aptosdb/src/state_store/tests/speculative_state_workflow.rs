@@ -52,6 +52,9 @@ use std::{
 
 const NUM_KEYS: usize = NUM_STATE_SHARDS * 6;
 const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = NUM_KEYS / NUM_STATE_SHARDS / 2;
+// Values are up to `ARB_STATE_VALUE_MAX_SIZE` (100) bytes, so this regularly binds before the item
+// count does.
+const HOT_STATE_MAX_VALUE_BYTES_PER_SHARD: usize = 120;
 
 // Small enough that a block leaves many keys read but not written, so they are eligible for
 // promotion.
@@ -63,6 +66,7 @@ const REFRESH_INTERVAL_VERSIONS: Version = 20;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+    max_value_bytes_per_shard: HOT_STATE_MAX_VALUE_BYTES_PER_SHARD,
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
 };
@@ -287,7 +291,10 @@ impl VersionState {
 
         if is_checkpoint {
             for shard in hot_state.iter_mut() {
-                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD {
+                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD
+                    || shard.iter().map(|(_, slot)| slot.size()).sum::<usize>()
+                        > HOT_STATE_MAX_VALUE_BYTES_PER_SHARD
+                {
                     let (k, _) = shard.pop_lru().unwrap();
                     hot_smt_updates.push((k.hash(), None));
                 }
