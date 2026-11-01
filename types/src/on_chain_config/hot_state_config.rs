@@ -1,14 +1,40 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::on_chain_config::OnChainConfig;
-use anyhow::{format_err, Result};
+use crate::{on_chain_config::OnChainConfig, state_store::NUM_STATE_SHARDS};
+use anyhow::{ensure, format_err, Result};
 use serde::{Deserialize, Serialize};
 
 /// The on-chain hot state config, wrapped in an enum to allow adding fields later.
+///
+/// A new config takes effect in the reconfig txn that applies it: the hot state is evicted down to
+/// the new `max_items_per_shard` at that txn, while the other fields apply from the next epoch.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainHotStateConfig {
     V1(HotStateConfigV1),
+}
+
+impl OnChainHotStateConfig {
+    /// Nodes treat an invalid config as if it didn't exist, so a bad governance proposal can't
+    /// halt the chain.
+    pub fn validate(&self) -> Result<()> {
+        match self {
+            Self::V1(config) => {
+                ensure!(
+                    config.max_items_per_shard.len() == NUM_STATE_SHARDS,
+                    "Expecting {} entries in max_items_per_shard, got {}.",
+                    NUM_STATE_SHARDS,
+                    config.max_items_per_shard.len(),
+                );
+                ensure!(
+                    config.max_items_per_shard.iter().all(|n| *n > 0),
+                    "max_items_per_shard must be positive: {:?}",
+                    config.max_items_per_shard,
+                );
+            },
+        }
+        Ok(())
+    }
 }
 
 impl OnChainConfig for OnChainHotStateConfig {
@@ -32,6 +58,9 @@ impl OnChainConfig for OnChainHotStateConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct HotStateConfigV1 {
     /// Max number of items in each shard, indexed by shard id.
+    ///
+    /// N.b. lowering it evicts all the excess items in the reconfig txn at once, which can make
+    /// that block heavy. Consider lowering it in steps.
     pub max_items_per_shard: Vec<u64>,
     /// Max sum of value sizes in each shard, indexed by shard id. Values vary a lot in size, so
     /// capping the item count alone doesn't bound memory usage.
@@ -72,5 +101,28 @@ mod tests {
 
         let result: OnChainHotStateConfig = payload.get().unwrap();
         assert_eq!(result, config);
+    }
+
+    #[test]
+    fn test_validate() {
+        let config = |max_items_per_shard| {
+            OnChainHotStateConfig::V1(HotStateConfigV1 {
+                max_items_per_shard,
+                max_value_bytes_per_shard: vec![],
+                refresh_interval_versions: 0,
+                max_promotions_per_block: 0,
+            })
+        };
+
+        config(vec![1; NUM_STATE_SHARDS]).validate().unwrap();
+        config(vec![1; NUM_STATE_SHARDS - 1])
+            .validate()
+            .unwrap_err();
+        config(vec![1; NUM_STATE_SHARDS + 1])
+            .validate()
+            .unwrap_err();
+        let mut with_zero = vec![1; NUM_STATE_SHARDS];
+        with_zero[3] = 0;
+        config(with_zero).validate().unwrap_err();
     }
 }
