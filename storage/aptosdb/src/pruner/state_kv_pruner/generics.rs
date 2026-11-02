@@ -125,8 +125,6 @@ impl StateValuePrunerSchema for OrderValue {
 }
 
 /// Native-collateral value pruner.
-// Used once the collateral store is attached to AptosDB.
-#[allow(dead_code)]
 pub(crate) enum CollateralValue {}
 impl StateValuePrunerSchema for CollateralValue {
     type StaleIndexSchema = NativeStaleValueIndexSchema;

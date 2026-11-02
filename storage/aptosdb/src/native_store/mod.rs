@@ -89,8 +89,6 @@ pub(crate) enum PositionStore {}
 pub(crate) enum OrderStore {}
 
 /// Native collateral, keyed by `(exchange, account, scope)`.
-// Attached to AptosDB in a later change; until then only tests use it.
-#[allow(dead_code)]
 pub(crate) enum CollateralStore {}
 
 impl NativeStoreSpec for PositionStore {
