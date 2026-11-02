@@ -29,6 +29,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    function::FunctionResolutionError,
     gas_algebra::{InternalGas, NumBytes},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
@@ -299,15 +300,6 @@ pub struct LoaderContext<'a, 'b> {
     module_storage: ModuleStorageWrapper<'a>,
     gas_meter: DependencyGasMeterWrapper<'a>,
     traversal_context: &'a mut TraversalContext<'b>,
-}
-
-/// Error returned by `LoaderContext::resolve_function`
-pub enum FunctionResolutionError {
-    Reserved = 0x0,
-    FunctionNotFound = 0x1,
-    FunctionNotAccessible = 0x2,
-    FunctionIncompatibleType = 0x3,
-    FunctionNotInstantiated = 0x4,
 }
 
 impl<'a, 'b> LoaderContext<'a, 'b> {
