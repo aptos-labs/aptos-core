@@ -2382,171 +2382,6 @@ mod unit_tests {
     use claims::{assert_err, assert_matches, assert_ok};
     use move_binary_format::file_format::StructHandleIndex;
 
-<<<<<<< HEAD
-    fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
-        Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-            ty_args: TriompheArc::new(ty_args),
-=======
-    #[test]
-    fn unknown_function_ability_bits_satisfy_known_ability_constraints() {
-        let expected = AbilitySet::from_u8(0x07).expect("0x07 is a valid ability set");
-        let malformed =
-            bcs::from_bytes::<AbilitySet>(&[0x17]).expect("Deserialize accepts any ability byte");
-        let function_type = Type::function(vec![], vec![], malformed);
-
-        assert_ne!(expected, malformed);
-        assert!(expected.is_subset(malformed));
-        assert!(Type::verify_ty_arg_abilities([&expected], &[function_type]).is_ok());
-    }
-
-    fn function_tag_with_abilities(abilities_byte: u8) -> TypeTag {
-        TypeTag::Function(Box::new(FunctionTag {
-            args: vec![],
-            results: vec![],
-            abilities: bcs::from_bytes::<AbilitySet>(&[abilities_byte])
-                .expect("Deserialize accepts any ability byte"),
-        }))
-    }
-
-    #[test]
-    fn create_ty_rejects_function_types_with_excess_abilities() {
-        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
-        let no_op = |_: &StructTag| unreachable!("Should not be called");
-
-        // 0x08 and 0x0f include `key`; 0x10, 0x17, and 0xff include undefined bits.
-        for abilities_byte in [0x0F, 0x08, 0x17, 0x10, 0xFF] {
-            let err = assert_err!(
-                ty_builder.create_ty(&function_tag_with_abilities(abilities_byte), no_op)
-            );
-            assert_eq!(
-                err.major_status(),
-                StatusCode::CONSTRAINT_NOT_SATISFIED,
-                "expected ability byte {:#x} to be rejected",
-                abilities_byte
-            );
-        }
-
-        // Representative subsets of `PUBLIC_FUNCTIONS` remain valid.
-        for abilities_byte in [0x00, 0x01, 0x02, 0x03, 0x04, 0x07] {
-            assert_ok!(ty_builder.create_ty(&function_tag_with_abilities(abilities_byte), no_op));
-        }
-    }
-
-    /// Rejects excess abilities in nested function types as well as top-level tags.
-    #[test]
-    fn create_ty_rejects_nested_function_types_with_excess_abilities() {
-        let ty_builder = TypeBuilder::with_limits(20, 10, true, true, true);
-        let no_op = |_: &StructTag| unreachable!("Should not be called");
-
-        let bad = function_tag_with_abilities(0x0F);
-        let nested = [
-            TypeTag::Vector(Box::new(bad.clone())),
-            TypeTag::Vector(Box::new(TypeTag::Vector(Box::new(bad.clone())))),
-            TypeTag::Function(Box::new(FunctionTag {
-                args: vec![FunctionParamOrReturnTag::Value(bad.clone())],
-                results: vec![],
-                abilities: AbilitySet::PUBLIC_FUNCTIONS,
-            })),
-            TypeTag::Function(Box::new(FunctionTag {
-                args: vec![],
-                results: vec![FunctionParamOrReturnTag::Reference(bad)],
-                abilities: AbilitySet::PUBLIC_FUNCTIONS,
-            })),
-        ];
-
-        for ty_tag in nested {
-            let err = assert_err!(ty_builder.create_ty(&ty_tag, no_op));
-            assert_eq!(
-                err.major_status(),
-                StatusCode::CONSTRAINT_NOT_SATISFIED,
-                "nested function type must be rejected in {:?}",
-                ty_tag
-            );
-        }
-    }
-
-    /// Retains raw ability bytes when function-ability validation is disabled.
-    #[test]
-    fn create_ty_preserves_excess_abilities_when_the_check_is_disabled() {
-        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, false);
-        let no_op = |_: &StructTag| unreachable!("Should not be called");
-
-        for abilities_byte in [0x0F, 0x17] {
-            let ty = assert_ok!(
-                ty_builder.create_ty(&function_tag_with_abilities(abilities_byte), no_op)
-            );
-            assert_eq!(assert_ok!(ty.abilities()).into_u8(), abilities_byte);
-        }
-    }
-
-    /// Subset-based type-argument checks accept a function type that claims `key`. Because `0x0f`
-    /// is a valid `AbilitySet` encoding, encoding validation alone cannot prevent this.
-    #[test]
-    fn function_type_claiming_key_satisfies_a_key_constraint() {
-        let claims_key = AbilitySet::from_u8(0x0F).expect("0x0F is a well-formed ability set");
-        assert!(claims_key.has_key());
-        assert!(!claims_key.is_subset(AbilitySet::PUBLIC_FUNCTIONS));
-
-        let function_type = Type::function(vec![], vec![], claims_key);
-        assert_eq!(function_type.abilities().unwrap(), claims_key);
-
-        let key_constraint = AbilitySet::singleton(Ability::Key);
-        assert_ok!(Type::verify_ty_arg_abilities(
-            [&key_constraint],
-            std::slice::from_ref(&function_type)
-        ));
-        assert_ok!(function_type.paranoid_check_abilities(key_constraint));
-
-        let honest_function_type = Type::function(vec![], vec![], AbilitySet::PUBLIC_FUNCTIONS);
-        assert_err!(Type::verify_ty_arg_abilities([&key_constraint], &[
-            honest_function_type
-        ]));
-    }
-
-    #[test]
-    fn test_struct_identifier_identity_is_interner_history_independent() {
-        use move_core_types::account_address::AccountAddress;
-        use std::{
-            cmp::Ordering,
-            hash::{DefaultHasher, Hash, Hasher},
-        };
-
-        fn hash_of(identifier: &StructIdentifier) -> u64 {
-            let mut hasher = DefaultHasher::new();
-            identifier.hash(&mut hasher);
-            hasher.finish()
->>>>>>> 1f9aa1514a ([vm] Make runtime type checks O(1) in type size)
-        }
-
-        let alpha = ModuleId::new(AccountAddress::ONE, Identifier::new("alpha").unwrap());
-        let beta = ModuleId::new(AccountAddress::TWO, Identifier::new("beta").unwrap());
-        let name = Identifier::new("S").unwrap();
-
-        // Warm two pools in opposite orders, so the same module gets different interned ids.
-        let cold_pool = InternedModuleIdPool::new();
-        let cold_beta = StructIdentifier::new(&cold_pool, beta.clone(), name.clone());
-        let cold_alpha = StructIdentifier::new(&cold_pool, alpha.clone(), name.clone());
-
-        let warm_pool = InternedModuleIdPool::new();
-        let warm_alpha = StructIdentifier::new(&warm_pool, alpha, name.clone());
-        let warm_beta = StructIdentifier::new(&warm_pool, beta, name);
-
-        assert_ne!(
-            cold_alpha.interned_module_id(),
-            warm_alpha.interned_module_id()
-        );
-
-        // Identity, hashing, and ordering must not depend on interner history.
-        assert_eq!(cold_alpha, warm_alpha);
-        assert_eq!(cold_beta, warm_beta);
-        assert_eq!(hash_of(&cold_alpha), hash_of(&warm_alpha));
-        assert_eq!(cold_alpha.cmp(&warm_alpha), Ordering::Equal);
-        assert_eq!(cold_alpha.partial_cmp(&warm_alpha), Some(Ordering::Equal));
-        assert_eq!(cold_alpha.cmp(&cold_beta), warm_alpha.cmp(&warm_beta));
-    }
-
     fn wide_fn_ty(abilities: AbilitySet) -> Type {
         let args = (0..64u32)
             .map(|i| {
@@ -2603,7 +2438,7 @@ mod unit_tests {
 
     #[test]
     fn substitution_shares_the_type_argument_node() {
-        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true);
         let arg = Type::struct_instantiation(
             StructNameIndex::new(3),
             vec![Type::vector(Type::U8), Type::Bool],
@@ -2808,13 +2643,8 @@ mod unit_tests {
         let ty_params = [TyParam(0), Bool, TyParam(1)];
 
         // Should succeed, type size limit is 5, and we have 5 nodes.
-<<<<<<< HEAD
         let ty_builder = TypeBuilder::with_limits(5, 100, true, true);
-        let ty_args = [Bool, Vector(TriompheArc::new(Bool))];
-=======
-        let ty_builder = TypeBuilder::with_limits(5, 100, true, true, true);
         let ty_args = [Bool, Type::vector(Bool)];
->>>>>>> 1f9aa1514a ([vm] Make runtime type checks O(1) in type size)
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have size of 6 now.
@@ -3032,8 +2862,6 @@ mod unit_tests {
         let err = assert_err!(ty_builder.create_ty(&vec_tag, no_op));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
-<<<<<<< HEAD
-=======
 
     fn struct_ty_for_test_with(abilities: AbilitySet, phantom_mask: &[bool]) -> StructType {
         let mut ty = StructType::for_test();
@@ -3057,7 +2885,7 @@ mod unit_tests {
     fn sample_tys() -> Vec<Type> {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(1000, 1000, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(1000, 1000, true, true);
         let p = struct_ty_for_test_with(
             AbilitySet::singleton(Ability::Copy) | AbilitySet::singleton(Ability::Drop),
             &[true],
@@ -3123,7 +2951,7 @@ mod unit_tests {
         }
 
         // Types with type parameters: counts are still exact, abilities are unknown.
-        let ty_builder = TypeBuilder::with_limits(1000, 1000, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(1000, 1000, true, true);
         let n = struct_ty_for_test_with(AbilitySet::ALL, &[false, true]);
         let template = Type::struct_instantiation(
             n.idx,
@@ -3180,7 +3008,7 @@ mod unit_tests {
     fn test_create_ref_and_vec_ty_share_inner_ty() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true);
         for ty in sample_tys() {
             let node_arc = match &ty {
                 StructInstantiation(node) => node.clone(),
@@ -3218,7 +3046,7 @@ mod unit_tests {
         for v2 in [false, true] {
             for max_size in 1..=130u64 {
                 for max_depth in 1..=12u64 {
-                    let ty_builder = TypeBuilder::with_limits(max_size, max_depth, v2, true, true);
+                    let ty_builder = TypeBuilder::with_limits(max_size, max_depth, v2, true);
                     let check = |c: &mut u64, d: u64| ty_builder.check_before_count_increment(c, d);
                     for ty in &tys {
                         for generic in [Type::TyParam(0), Type::vector(Type::TyParam(0))] {
@@ -3252,7 +3080,7 @@ mod unit_tests {
         for v2 in [false, true] {
             for max_size in 1..=130u64 {
                 for max_depth in 1..=12u64 {
-                    let ty_builder = TypeBuilder::with_limits(max_size, max_depth, v2, true, true);
+                    let ty_builder = TypeBuilder::with_limits(max_size, max_depth, v2, true);
                     for ty in &tys {
                         for is_mut in [false, true] {
                             let mut count = 1 - ty_builder.ref_ty_count_decrement;
@@ -3302,7 +3130,7 @@ mod unit_tests {
 
     #[test]
     fn test_create_ref_ty_rejects_ty_params() {
-        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true);
         let ty = Type::vector(Type::TyParam(0));
         let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
         assert_eq!(
@@ -3346,9 +3174,8 @@ mod unit_tests {
         assert_eq!(ty.num_nodes(), (1 << 17) - 1);
         assert!(ty.has_consistent_type_info());
         // Limit checks must still reject it with the right error.
-        let ty_builder = TypeBuilder::with_limits(128, 20, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(128, 20, true, true);
         let err = assert_err!(ty_builder.create_vec_ty(&ty));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
->>>>>>> 1f9aa1514a ([vm] Make runtime type checks O(1) in type size)
 }

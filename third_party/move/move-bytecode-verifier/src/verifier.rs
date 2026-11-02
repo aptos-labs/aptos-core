@@ -65,15 +65,9 @@ pub struct VerifierConfig {
     /// If enabled, signature checker V2 also checks parameter and return types in function
     /// signatures.
     pub sig_checker_v2_fix_function_signatures: bool,
-<<<<<<< HEAD
-=======
-    /// Rejects function types whose abilities are not a subset of
-    /// `AbilitySet::PUBLIC_FUNCTIONS` when enabled.
-    pub check_function_type_abilities: bool,
     /// Requires every variant field handle to list distinct variants that all
     /// declare the field with the same (uninstantiated) type.
     pub uniform_variant_field_handles: bool,
->>>>>>> 4e48db89bb ([vm] Enforce uniform variant field handles)
 }
 
 /// Scope of verification.
@@ -278,67 +272,13 @@ impl Default for VerifierConfig {
 
             max_function_return_values: None,
             max_type_depth: None,
+
+            uniform_variant_field_handles: true,
         }
     }
 }
 
 impl VerifierConfig {
-<<<<<<< HEAD
-=======
-    /// The default configuration, usable in `const` contexts.
-    pub const DEFAULT: Self = Self {
-        scope: VerificationScope::Everything,
-        max_loop_depth: None,
-        max_function_parameters: None,
-        max_generic_instantiation_length: None,
-        max_basic_blocks: None,
-        max_type_nodes: None,
-        // Max size set to 1024 to match the size limit in the interpreter.
-        max_value_stack_size: 1024,
-        // Max number of pushes in one function
-        max_push_size: None,
-        // Max count of structs in a module
-        max_struct_definitions: None,
-        // Max count of fields in a struct
-        max_fields_in_struct: None,
-        // Max count of variants in a struct
-        max_struct_variants: None,
-        // Max count of functions in a module
-        max_function_definitions: None,
-        // Max size set to 10000 to restrict number of pushes in one function
-        // max_push_size: Some(10000),
-        // max_dependency_depth: Some(100),
-        // max_struct_definitions: Some(200),
-        // max_fields_in_struct: Some(30),
-        // max_function_definitions: Some(1000),
-        max_back_edges_per_function: None,
-        max_back_edges_per_module: None,
-        max_basic_blocks_in_script: None,
-        // General metering for the verifier.
-        // max_per_fun_meter_units: Some(1000 * 8000),
-        // max_per_mod_meter_units: Some(1000 * 8000),
-        max_per_fun_meter_units: None,
-        max_per_mod_meter_units: None,
-
-        _use_signature_checker_v2: true,
-
-        sig_checker_v2_fix_script_ty_param_count: true,
-        sig_checker_v2_fix_function_signatures: true,
-        check_function_type_abilities: true,
-
-        enable_enum_types: true,
-        enable_resource_access_control: false,
-        enable_function_values: true,
-
-        max_function_return_values: None,
-        max_type_depth: None,
-
-        uniform_variant_field_handles: true,
-    };
-}
-
-impl VerifierConfig {
->>>>>>> 4e48db89bb ([vm] Enforce uniform variant field handles)
     /// Returns truly unbounded config, even relaxing metering.
     pub fn unbounded() -> Self {
         Self {

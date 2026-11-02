@@ -2,7 +2,7 @@
 
 // A closure type can have `key` and thus satisfy `T: key`. Calling
 // `address_to_object<||u64 has key>` must still fail.
-// Note: On gas feature versions before RELEASE_V1_50 the exists_at native
+// Note: On gas feature versions before TESTNET_RESET_OCT_2026 (54) the exists_at native
 // does not yet emit ENOT_A_RESOURCE_TYPE, so this surfaces as an ExecutionFailure
 // instead.
 

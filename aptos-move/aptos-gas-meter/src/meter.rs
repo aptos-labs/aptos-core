@@ -34,7 +34,6 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 
-<<<<<<< HEAD
 // Charges for traversing the value graph produced when a resource is loaded and
 // deserialized by the interpreter. Mirrors the serialize-side `bcs` traversal
 // pricing (3x `cmp::compare`'s base and per-abstract-value-unit costs).
@@ -42,13 +41,12 @@ use move_vm_types::{
 const LOAD_RESOURCE_PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
 const LOAD_RESOURCE_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
     InternalGasPerAbstractValueUnit::new(420);
-=======
+
 // `MeterPackClosureCapturedValues` can turn metering on before 1.50 puts
 // `pack_closure.per_abs_val_unit` on chain. Same value, so the switch does not
 // change pricing.
 const PACK_CLOSURE_PER_ABS_VAL_UNIT_BEFORE_V1_50: InternalGasPerAbstractValueUnit =
     InternalGasPerAbstractValueUnit::new(140);
->>>>>>> 6cada48131 ([vm] Meter captured values when packing closures)
 
 /// The official gas meter used inside the Aptos VM.
 /// It maintains an internal gas counter, measured in internal gas units, and carries an environment
