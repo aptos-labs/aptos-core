@@ -1,5 +1,7 @@
 // RUN: publish
 module 0x42::target {
+    friend 0x42::m;
+
     public fun add(x: u64, y: u64): u64 {
         x + y
     }
@@ -27,6 +29,19 @@ module 0x42::target {
     public fun call_private(x: u64): u64 {
         private_add(x, 1)
     }
+
+    public(friend) fun friend_add(x: u64, y: u64): u64 {
+        x + y
+    }
+
+    entry fun entry_noop(x: u64) {
+        let _ = x;
+    }
+
+    // `T` appears only in the return type.
+    public fun make<T: drop>(): vector<T> {
+        vector[]
+    }
 }
 
 module 0x42::m {
@@ -34,6 +49,10 @@ module 0x42::m {
     use std::string::utf8;
 
     struct NoStore has copy, drop {}
+
+    struct HasStore has copy, drop, store {}
+
+    struct Tagged<phantom T> has copy, drop, store {}
 
     public fun resolve_and_call(x: u64, y: u64): u64 {
         let f = reflect::resolve<|u64, u64|u64 has copy + drop>(
@@ -124,6 +143,46 @@ module 0x42::m {
             @0x42, &utf8(b"target"), &utf8(b"phantom_generic")
         ).unwrap_err().error_code()
     }
+
+    public fun ability_satisfied(): u64 {
+        let f = reflect::resolve<|HasStore|u64 has copy + drop>(
+            @0x42, &utf8(b"target"), &utf8(b"needs_store")
+        ).unwrap();
+        f(HasStore {})
+    }
+
+    public fun phantom_ty_arg(): u64 {
+        let f = reflect::resolve<|Tagged<NoStore>|u64 has copy + drop>(
+            @0x42, &utf8(b"target"), &utf8(b"needs_store")
+        ).unwrap();
+        f(Tagged {})
+    }
+
+    public fun friend_function(): u64 {
+        reflect::resolve<|u64, u64|u64 has copy + drop>(
+            @0x42, &utf8(b"target"), &utf8(b"friend_add")
+        ).unwrap_err().error_code()
+    }
+
+    public fun entry_function(): u64 {
+        reflect::resolve<|u64| has copy + drop>(
+            @0x42, &utf8(b"target"), &utf8(b"entry_noop")
+        ).unwrap_err().error_code()
+    }
+
+    public fun infer_from_return(): u64 {
+        let f = reflect::resolve<||vector<u64> has copy + drop>(
+            @0x42, &utf8(b"target"), &utf8(b"make")
+        ).unwrap();
+        f().length()
+    }
+
+    public fun call_twice(): u64 {
+        let f = reflect::resolve<|u64, u64|u64 has copy + drop>(
+            @0x42, &utf8(b"target"), &utf8(b"add")
+        ).unwrap();
+        f(1, 2) + f(3, 4)
+    }
 }
 
 // RUN: execute 0x42::m::resolve_and_call --args 40, 2
@@ -167,3 +226,21 @@ module 0x42::m {
 
 // RUN: execute 0x42::m::not_instantiated
 // CHECK: results: 4
+
+// RUN: execute 0x42::m::ability_satisfied
+// CHECK: results: 8
+
+// RUN: execute 0x42::m::phantom_ty_arg
+// CHECK: results: 8
+
+// RUN: execute 0x42::m::friend_function
+// CHECK: results: 2
+
+// RUN: execute 0x42::m::entry_function
+// CHECK: results: 2
+
+// RUN: execute 0x42::m::infer_from_return
+// CHECK: results: 0
+
+// RUN: execute 0x42::m::call_twice
+// CHECK: results: 10

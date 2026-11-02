@@ -19,8 +19,8 @@ use crate::{
     memory::{
         copy_8, read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
         read_int, read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
-        write_bool, write_enum_tag, write_fat_ptr, write_int, write_ptr, write_u32, write_u64,
-        write_u8, MemoryRegion,
+        write_bool, write_closure_func_ref_and_mask, write_enum_tag, write_fat_ptr, write_int,
+        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
     },
     native_context::{LoaderAccess, ProductionNativeContext, ProductionNativeRegistry},
     types::{
@@ -48,11 +48,11 @@ use mono_move_core::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    BytecodeOffset, CallClosureOp, CallFrame, ClosureFuncRef, CmpKind, CodeOffset,
-    ConstantPoolIndex, ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef,
-    GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
-    PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult,
-    VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
+    ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
+    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -93,39 +93,6 @@ macro_rules! resolve_resource_group {
             $read_set.get_loaded(arena_ref)?.resource_group_of(name),
         )
     }};
-}
-
-/// Writes the `func_ref` enum and the capture `mask` into a freshly allocated
-/// closure heap object.
-///
-/// # Safety
-///
-/// `closure` points at a live closure object, allocated under
-/// [`CLOSURE_DESCRIPTOR_ID`].
-#[inline]
-pub(crate) unsafe fn write_closure_func_ref_and_mask(
-    closure: *mut u8,
-    func_ref: &ClosureFuncRef,
-    mask: u64,
-) {
-    let (tag, payload) = match func_ref {
-        ClosureFuncRef::Resolved(func_ptr) => (
-            FUNC_REF_TAG_RESOLVED,
-            func_ptr.as_non_null().as_ptr() as *const u8,
-        ),
-        ClosureFuncRef::Unresolved(func_ref) => {
-            (FUNC_REF_TAG_UNRESOLVED, func_ref.as_raw_ptr() as *const u8)
-        },
-    };
-    unsafe {
-        *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = tag;
-        write_ptr(
-            closure,
-            CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
-            payload,
-        );
-        write_u64(closure, CLOSURE_MASK_OFFSET, mask);
-    }
 }
 
 /// Gives a native call loader access while hiding the loader's lifetimes behind

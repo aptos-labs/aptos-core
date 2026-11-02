@@ -25,8 +25,8 @@ use crate::{
 use mono_move_core::{
     abilities::{AbilityCalculator, AbilityError},
     interner::{
-        script_module_id, view_module_id, InternedFunctionRef, InternedIdentifier,
-        InternedModuleId, SCRIPT_MAIN,
+        is_script_module_id, script_module_id, view_module_id, InternedFunctionRef,
+        InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
     },
     native::{FunctionResolutionError, NativeResolver},
     types::{
@@ -34,8 +34,9 @@ use mono_move_core::{
         InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST,
     },
     verify_function, DescriptorId, ErrorLocation, ExecutionErrorKind, FrameOffset,
-    FrameworkSymbols, Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider, ModuleId,
-    ModuleProvider, NominalFields, PreparedModule, VMInternalError, VMResult, ValueLayout,
+    FrameworkSymbols, Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider,
+    ModuleId, ModuleProvider, NominalFields, PreparedModule, VMInternalError, VMResult,
+    ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -313,6 +314,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
         use FunctionResolutionError::*;
 
+        // Every script loads under this one ID, so it names a different `main`
+        // in each transaction. Scripts are never stored as modules.
+        if is_script_module_id(module_id) {
+            return Ok(Err(FunctionNotFound));
+        }
+
         // Every load that succeeds leaves the entry loaded, so a pending entry
         // means an earlier load of this module failed and left it behind.
         // Resolution is the one caller that survives a failed load, so it has
@@ -324,6 +331,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         let module = match self.get_or_load_module(read_set, gas_meter, module_id) {
             Ok(module) => module,
+            // TODO(completeness): under `LoadingPolicy::Package`, a missing
+            // module fails with a provider error or an invariant violation,
+            // not a linking error. Resolution then aborts instead of returning
+            // `FunctionNotFound`, so it is only correct under the Lazy policies.
             Err(err) if err.kind() == ExecutionErrorKind::LinkingError => {
                 return Ok(Err(FunctionNotFound))
             },
@@ -377,8 +388,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
     /// Whether every type argument satisfies the constraint declared for it.
     ///
-    /// A [`Type::Nominal`] carries no abilities, so each module an argument
-    /// names has to be loaded to reach the declaration that does.
+    /// A [`Type::Nominal`] carries no abilities, so each module a constrained
+    /// argument names has to be loaded to reach the declaration that does.
     fn ty_args_satisfy_constraints(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
@@ -386,12 +397,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         constraints: &[AbilitySet],
         ty_args: &[InternedType],
     ) -> VMResult<bool> {
-        if constraints.iter().all(|c| *c == AbilitySet::EMPTY) {
-            return Ok(true);
-        }
+        let constrained = constraints
+            .iter()
+            .zip(ty_args)
+            .filter(|(constraint, _)| **constraint != AbilitySet::EMPTY);
 
         let mut nominal_modules = vec![];
-        for &ty in ty_args {
+        for (_, &ty) in constrained.clone() {
             collect_nominal_modules(ty, &mut nominal_modules);
         }
         let mut modules = UnorderedMap::with_capacity(nominal_modules.len());
@@ -400,6 +412,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             modules.insert(nominal_module, &module.ir().module);
         }
 
+        // TODO(correctness): this uses the abilities of each nominal's
+        // definition. V1 uses the handle of the module that wrote the nominal
+        // in the expected type, and that handle travels with the type through
+        // generic calls. After an upgrade adds abilities, that handle can have
+        // fewer than the definition, so V1 rejects where this accepts. An
+        // interned type does not record which module wrote it.
         let lookup = |module_id, name| {
             modules
                 .get(&module_id)
@@ -407,7 +425,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 .ok_or(AbilityError::UnknownNominal)
         };
         let mut calculator = AbilityCalculator::new(lookup, &[]);
-        for (constraint, &ty) in constraints.iter().zip(ty_args) {
+        for (constraint, &ty) in constrained {
             if !constraint.is_subset(calculator.abilities_of(ty)?) {
                 return Ok(false);
             }

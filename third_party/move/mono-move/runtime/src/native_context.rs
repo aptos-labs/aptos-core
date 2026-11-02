@@ -13,10 +13,9 @@ use crate::{
         alloc_obj, alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc,
         deserialize_or_gc, heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
-    interpreter::write_closure_func_ref_and_mask,
     memory::{
-        read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_enum_tag,
-        write_ptr, write_u64, MemoryRegion,
+        read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len,
+        write_closure_func_ref_and_mask, write_enum_tag, write_ptr, write_u64, MemoryRegion,
     },
     types::{
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
@@ -971,6 +970,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<Boxed<'a, Opaque>, FunctionResolutionError>> {
+        // TODO(security): the caller-supplied address and module name are
+        // interned before the load, even if no such module exists, and nothing
+        // charges for it.
         let module_id = self.guard.module_id_of(&address, module_name);
 
         // SAFETY: `gas` is reborrowed exclusively here; the callee borrows the
