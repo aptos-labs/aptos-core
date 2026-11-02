@@ -8854,8 +8854,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                             None
                         };
 
-                        let true_block = true_offset.and_then(&find_block_at_offset);
-                        let false_block = false_offset.and_then(&find_block_at_offset);
+                        let true_block = true_offset.and_then(find_block_at_offset);
+                        let false_block = false_offset.and_then(find_block_at_offset);
 
                         // Check which side our block is dominated by
                         if let Some(tb) = true_block {
@@ -9019,8 +9019,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         // Determine which branch side each state came from.
         // `current.origin_block` was set when the first state arrived at this block.
         // `incoming_pred_block` is the predecessor block ID for the second state.
-        let current_is_true = current.origin_block.and_then(&classify_block);
-        let incoming_is_true = incoming_pred_block.and_then(&classify_block);
+        let current_is_true = current.origin_block.and_then(classify_block);
+        let incoming_is_true = incoming_pred_block.and_then(classify_block);
 
         match (current_is_true, incoming_is_true) {
             (Some(c), Some(i)) if c != i => {
