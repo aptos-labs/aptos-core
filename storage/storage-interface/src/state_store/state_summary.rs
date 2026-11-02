@@ -164,9 +164,6 @@ impl StateSummary {
         let current_hot = self.hot_state_summary.as_ref().ok_or_else(|| {
             anyhow::anyhow!("update_hot_state_summary on a StateSummary with no hot half")
         })?;
-        if !self.hot_state_config.compute_root_hash {
-            return Ok(SparseMerkleTree::new_empty());
-        }
         let persisted_hot_smt = persisted
             .hot_state_summary
             .as_ref()
@@ -429,6 +426,11 @@ impl<'db> ProvablePositionStateSummary<'db> {
 
     pub fn summary(&self) -> &StateSummary {
         self.persisted.summary()
+    }
+
+    /// The persisted position state: the floor new layers are built over.
+    pub fn persisted(&self) -> &PositionStateWithSummary {
+        &self.persisted
     }
 
     /// The pre-committed position tip — seeds the in-memory parent at genesis

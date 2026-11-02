@@ -1691,6 +1691,88 @@ impl ExpData {
         self.visit_positions(&mut visitor);
     }
 
+    /// Collects the symbols bound by any binder (let, lambda, quantifier range,
+    /// match arm) within the expression.
+    pub fn binder_syms(&self) -> BTreeSet<Symbol> {
+        let mut bound = BTreeSet::new();
+        self.visit_pre_order(&mut |e| {
+            let mut add = |pat: &Pattern| bound.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+            match e {
+                ExpData::Block(_, pat, ..) | ExpData::Lambda(_, pat, ..) => add(pat),
+                ExpData::Quant(_, _, ranges, ..) => ranges.iter().for_each(|(pat, _)| add(pat)),
+                ExpData::Match(_, _, arms) => arms.iter().for_each(|arm| add(&arm.pattern)),
+                _ => {},
+            }
+            true
+        });
+        bound
+    }
+
+    /// Instantiates type parameters in the expression, covering pattern node
+    /// types and struct pattern instantiations in addition to the expression
+    /// nodes `ExpRewriter::set_type_args` handles.
+    pub fn instantiate_with_patterns(&self, env: &GlobalEnv, type_args: &[Type]) -> Exp {
+        struct Instantiator<'a> {
+            env: &'a GlobalEnv,
+            type_args: &'a [Type],
+        }
+        impl Instantiator<'_> {
+            fn instantiate_pattern_id(&self, id: NodeId) -> Option<NodeId> {
+                ExpData::instantiate_node(self.env, id, self.type_args)
+            }
+        }
+        impl ExpRewriterFunctions for Instantiator<'_> {
+            fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
+                ExpData::instantiate_node(self.env, id, self.type_args)
+            }
+
+            fn rewrite_pattern(&mut self, pat: &Pattern, _creating_scope: bool) -> Option<Pattern> {
+                // Sub-patterns have already been rewritten when this is called;
+                // only the pattern's own node (and struct instantiation) is
+                // handled here.
+                match pat {
+                    Pattern::Var(id, sym) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::Var(new_id, *sym)),
+                    Pattern::Wildcard(id) => {
+                        self.instantiate_pattern_id(*id).map(Pattern::Wildcard)
+                    },
+                    Pattern::Tuple(id, pats) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::Tuple(new_id, pats.clone())),
+                    Pattern::Struct(id, sid, variant, pats) => {
+                        let new_id = self.instantiate_pattern_id(*id);
+                        let new_inst = Type::instantiate_slice(&sid.inst, self.type_args);
+                        if new_id.is_none() && new_inst == sid.inst {
+                            None
+                        } else {
+                            let mut new_sid = sid.clone();
+                            new_sid.inst = new_inst;
+                            Some(Pattern::Struct(
+                                new_id.unwrap_or(*id),
+                                new_sid,
+                                *variant,
+                                pats.clone(),
+                            ))
+                        }
+                    },
+                    Pattern::LiteralValue(id, value) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::LiteralValue(new_id, value.clone())),
+                    Pattern::Range(id, lo, hi, inclusive) => self
+                        .instantiate_pattern_id(*id)
+                        .map(|new_id| Pattern::Range(new_id, lo.clone(), hi.clone(), *inclusive)),
+                    Pattern::Error(id) => self.instantiate_pattern_id(*id).map(Pattern::Error),
+                }
+            }
+        }
+        let exp = self.clone().into_exp();
+        if type_args.is_empty() {
+            return exp;
+        }
+        Instantiator { env, type_args }.rewrite_exp(exp)
+    }
+
     /// Returns just the free local variables in this expression.
     pub fn free_vars(&self) -> BTreeSet<Symbol> {
         let mut vars = BTreeSet::new();

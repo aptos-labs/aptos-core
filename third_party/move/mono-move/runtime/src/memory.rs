@@ -1,107 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Owned VM memory buffer ([`MemoryRegion`]) and heap-object header access. The
-//! raw value read/write helpers live in [`mono_move_core::memory`] and are
-//! re-exported here.
+//! Heap-object header access. The raw value read/write helpers and the owned
+//! VM memory buffer ([`MemoryRegion`]) are re-exported from
+//! [`mono_move_core::memory`].
 
 use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use mono_move_core::memory::*;
-use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET, MAX_ALIGN};
-use std::alloc::{self, Layout};
-
-// ---------------------------------------------------------------------------
-// Aligned buffer — owns a zeroed, [`MAX_ALIGN`]-aligned allocation
-// ---------------------------------------------------------------------------
-
-pub struct MemoryRegion {
-    ptr: *mut u8,
-    layout: Layout,
-}
-
-impl MemoryRegion {
-    /// Allocates a zeroed, [`MAX_ALIGN`]-aligned memory region of the given size.
-    ///
-    /// Use this whenever a caller may read a slot before writing it (e.g. the
-    /// interpreter stack). For memory that is always written before it is read,
-    /// prefer [`Self::new_uninit`] to skip the zeroing.
-    ///
-    /// OOM is handled by aborting via `handle_alloc_error`.
-    pub fn new_zeroed(size: usize) -> Self {
-        Self::new::<true>(size)
-    }
-
-    /// Allocates an uninitialized, [`MAX_ALIGN`]-aligned memory region of the
-    /// given size. The bytes hold arbitrary values, so the region must be
-    /// written before it is read.
-    ///
-    /// # Invariants
-    ///
-    /// The caller must write every byte before it is read. The region carries
-    /// no guarantee about its initial contents; callers must not rely on any
-    /// (in particular, must not assume it is zeroed).
-    ///
-    /// OOM is handled by aborting via `handle_alloc_error`.
-    pub fn new_uninit(size: usize) -> Self {
-        let region = Self::new::<false>(size);
-
-        // The allocator often hands back fresh, already-zeroed OS pages, so in
-        // practice uninitialized memory reads as zeros and code that wrongly
-        // relies on the old zeroing would keep passing. Poison the region in
-        // debug builds so the write-before-read contract is exercised in tests
-        // and CI. Gated on `not(miri)`: this write initializes the memory, which
-        // would otherwise hide genuine uninitialized reads from Miri.
-        #[cfg(all(debug_assertions, not(miri)))]
-        // SAFETY: `region.ptr` is a valid, `size`-byte allocation just returned
-        // by `Self::new` above.
-        unsafe {
-            std::ptr::write_bytes(region.ptr, 0xAA, size);
-        }
-        region
-    }
-
-    /// Shared body of [`Self::new_zeroed`] / [`Self::new_uninit`]. `ZEROED`
-    /// selects `alloc_zeroed` vs `alloc`; both paths null-check and abort via
-    /// `handle_alloc_error` on OOM.
-    fn new<const ZEROED: bool>(size: usize) -> Self {
-        assert!(size > 0);
-        let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
-        // SAFETY: layout is valid (power-of-two alignment, non-zero size). Null
-        // is checked below.
-        let ptr = unsafe {
-            if ZEROED {
-                alloc::alloc_zeroed(layout)
-            } else {
-                alloc::alloc(layout)
-            }
-        };
-        if ptr.is_null() {
-            alloc::handle_alloc_error(layout);
-        }
-        Self { ptr, layout }
-    }
-
-    #[inline(always)]
-    pub fn as_ptr(&self) -> *mut u8 {
-        self.ptr
-    }
-
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.layout.size()
-    }
-
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.layout.size() == 0
-    }
-}
-
-impl Drop for MemoryRegion {
-    fn drop(&mut self) {
-        unsafe { alloc::dealloc(self.ptr, self.layout) };
-    }
-}
+use mono_move_core::{
+    ClosureFuncRef, DescriptorId, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_TAG_OFFSET,
+    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
+};
 
 /// Reads a vector's length, treating the null pointer as the empty vector.
 ///
@@ -137,6 +46,39 @@ pub unsafe fn read_enum_tag(obj_ptr: *const u8) -> u64 {
 pub unsafe fn write_enum_tag(obj_ptr: *mut u8, tag: u64) {
     // SAFETY: caller guarantees this is an enum object.
     unsafe { write_u64(obj_ptr, ENUM_TAG_OFFSET, tag) }
+}
+
+/// Writes the `func_ref` enum and the capture `mask` into a freshly allocated
+/// closure heap object.
+///
+/// # Safety
+///
+/// `closure` points at a live closure object, allocated under
+/// [`CLOSURE_DESCRIPTOR_ID`](mono_move_core::CLOSURE_DESCRIPTOR_ID).
+#[inline]
+pub(crate) unsafe fn write_closure_func_ref_and_mask(
+    closure: *mut u8,
+    func_ref: &ClosureFuncRef,
+    mask: u64,
+) {
+    let (tag, payload) = match func_ref {
+        ClosureFuncRef::Resolved(func_ptr) => (
+            FUNC_REF_TAG_RESOLVED,
+            func_ptr.as_non_null().as_ptr() as *const u8,
+        ),
+        ClosureFuncRef::Unresolved(func_ref) => {
+            (FUNC_REF_TAG_UNRESOLVED, func_ref.as_raw_ptr() as *const u8)
+        },
+    };
+    unsafe {
+        *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = tag;
+        write_ptr(
+            closure,
+            CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+            payload,
+        );
+        write_u64(closure, CLOSURE_MASK_OFFSET, mask);
+    }
 }
 
 /// Pointer to the `idx`-th element inside a vector's data region.

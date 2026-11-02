@@ -10,7 +10,7 @@ use codespan_reporting::{
 use move_compiler_v2::Experiment;
 use move_model::model::{CwdRelativeFiles, FunId, GlobalEnv, Loc, ModuleId, QualifiedId};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
 
@@ -28,6 +28,8 @@ pub(crate) enum VerifiedScope {
     Package,
     Module(ModuleId),
     Function(QualifiedId<FunId>),
+    /// Several functions verified together.
+    Functions(BTreeSet<QualifiedId<FunId>>),
 }
 
 impl VerifiedScope {
@@ -42,11 +44,18 @@ impl VerifiedScope {
             VerifiedScope::Module(m) => match request {
                 VerifiedScope::Module(m2) => m == m2,
                 VerifiedScope::Function(qid) => qid.module_id == *m,
-                _ => false,
+                VerifiedScope::Functions(qids) => qids.iter().all(|qid| qid.module_id == *m),
+                VerifiedScope::Package => false,
             },
             VerifiedScope::Function(f) => match request {
                 VerifiedScope::Function(f2) => f == f2,
-                _ => false,
+                VerifiedScope::Functions(qids) => qids.iter().all(|qid| qid == f),
+                VerifiedScope::Package | VerifiedScope::Module(_) => false,
+            },
+            VerifiedScope::Functions(qids) => match request {
+                VerifiedScope::Function(f) => qids.contains(f),
+                VerifiedScope::Functions(requested) => requested.is_subset(qids),
+                VerifiedScope::Package | VerifiedScope::Module(_) => false,
             },
         }
     }
@@ -111,28 +120,31 @@ impl PackageData {
     /// top of the session-level `target_filter` so per-call narrowing cannot
     /// widen the scope beyond what the session was started with. The cached
     /// env held by `PackageData` is unchanged. Errors when both knobs are empty.
+    /// `filters` keeps the modules any of them names as targets; none keeps
+    /// every module.
     pub(crate) fn build_filtered_env(
         &self,
-        filter: Option<&str>,
+        filters: &[String],
         excluded_modules: &[String],
     ) -> anyhow::Result<GlobalEnv> {
-        if filter.is_none() && excluded_modules.is_empty() {
+        if filters.is_empty() && excluded_modules.is_empty() {
             anyhow::bail!("build_filtered_env called with no filter and no exclusions");
         }
         let mut args = self.args.clone();
         args.experiments
             .push(Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string());
         let mut env = Self::build_env(&self.path, &args, args.target_filter.clone())?;
-        let filter_module = filter.map(|f| super::tools::module_part_of(f).to_string());
-        let exclude_names: std::collections::BTreeSet<&str> =
-            excluded_modules.iter().map(|s| s.as_str()).collect();
+        let filter_modules: Vec<&str> = filters
+            .iter()
+            .map(|filter| super::tools::module_part_of(filter))
+            .collect();
+        let exclude_names: BTreeSet<&str> = excluded_modules.iter().map(|s| s.as_str()).collect();
         // Best-effort file-granular demote; on file-share conflicts, fall
         // back to verify_scope on the unchanged env.
-        if filter_module.is_some() || !exclude_names.is_empty() {
+        if !filter_modules.is_empty() || !exclude_names.is_empty() {
             let demote_result = env.demote_modules_from_primary_targets(|m| {
-                let filter_demotes = filter_module
-                    .as_ref()
-                    .is_some_and(|name| !m.matches_name(name));
+                let filter_demotes = !filter_modules.is_empty()
+                    && !filter_modules.iter().any(|name| m.matches_name(name));
                 let exclude_demotes = exclude_names.iter().any(|n| m.matches_name(n));
                 filter_demotes || exclude_demotes
             });
@@ -141,7 +153,7 @@ impl PackageData {
                     "build_filtered_env: filter `{:?}` / exclude `{:?}` cannot \
                      narrow without splitting a source file (siblings: {:?}); \
                      falling back to verify_scope on the broader env",
-                    filter_module,
+                    filter_modules,
                     excluded_modules,
                     blocked
                 );

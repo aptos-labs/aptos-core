@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 53,
+        "offset": 2725,
+        "sha256": "7a3518aabe6f3c26e3f2e8bacc07bc5b94ac39c8545e4d2496a4a96bd91bb525"
+      },
+      "edit": {
+        "at": 21,
+        "kind": "substitute",
+        "length": 2,
+        "to": "&&"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-sanitize-028-one-sided-rejected",
+      "obligation_category": "abort",
+      "rationale": "An order with only bids or only asks is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 74,
+        "offset": 3252,
+        "sha256": "d6564940213f5af285eaeecf2e68c51d5b90303bbe69ebd4340643e42f231794"
+      },
+      "edit": {
+        "at": 45,
+        "kind": "substitute",
+        "length": 5,
+        "to": "true"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-sanitize-028-asks-descending",
+      "obligation_category": "abort",
+      "rationale": "Asks must descend instead of ascend.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 100,
+        "offset": 3718,
+        "sha256": "c1b98b27afe95f6f0513d7e590bb5d6d2a6de5eb4c6dddca3ac9d78b42094c97"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 57,
+        "to": "ask_sizes,\n            ask_prices,\n            bid_sizes,"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-sanitize-028-sides-swapped",
+      "obligation_category": "normal-result",
+      "rationale": "The request records the ask sizes for the bids and the bid sizes for the asks.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "edfb877ee10f48c2bfdd8c3ff4036817d5fc8bcf682649caeca0d410cdef3b7e",
+  "task_id": "TR-sanitize-028"
+}

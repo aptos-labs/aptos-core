@@ -16,7 +16,7 @@
 //!     test_utils::KeyPair
 //! };
 //! use rand::{rngs::StdRng, SeedableRng};
-//! use rand_core::OsRng;
+//! use rand::rngs::OsRng;
 //! use serde::{Serialize, Deserialize};
 //!
 //! #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]

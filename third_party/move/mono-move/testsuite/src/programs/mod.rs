@@ -12,6 +12,7 @@
 //!   files and drive them through the shared [`crate::engine`].
 
 pub mod bst;
+pub mod calls;
 pub mod fib;
 pub mod int_arith_loop;
 pub mod match_sum;

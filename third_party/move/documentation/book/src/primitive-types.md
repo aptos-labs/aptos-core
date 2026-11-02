@@ -94,9 +94,9 @@ All arithmetic operations abort instead of behaving in a way that mathematical i
 | Syntax  | Operation           | Aborts If                                      |
 | ------- | ------------------- | ---------------------------------------------- |
 | `a + b` | addition            | Result is too large/small for the integer type |
-| `a - b` | subtraction         | Result is less than zero                       |
+| `a - b` | subtraction         | Result is too large/small for the integer type |
 | `a * b` | multiplication      | Result is too large/small for the integer type |
-| `a % b` | modular division    | The divisor is `0`                             |
+| `a % b` | modular division    | The divisor is `0`, or `a` is the minimum value of a signed type and `b` is `-1` |
 | `a / b` | truncating division | The divisor is `0`, or the result overflows    |
 | `-a`    | negation            | Negated result too large (e.g. `-MIN_I64`)     |
 

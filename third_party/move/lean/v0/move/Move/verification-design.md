@@ -4,7 +4,7 @@ Status: living design document
 
 This document describes how contracts written with `import Move` can be
 specified and verified directly in Lean. The source proof experience is the
-primary concern. Compilation still goes through `Move.Compiler.LIR` and
+primary concern. Compilation still goes through `Move.Compiler.VIR` and
 `MoveModel.IR`, and imported `.move` code continues to use the existing
 `MoveModel.IR` semantics.
 
@@ -105,7 +105,7 @@ against the semantics derived from its authored body — no example states a
 relational `sourceSpec` manually. Automatic global publication/removal and
 invariant annotations for `continue`-lowered loops remain incomplete. Most
 importantly, the compiler-correctness theorem connecting generated `Spec`
-behavior to LIR lowering has not yet been proved.
+behavior to VIR lowering has not yet been proved.
 
 ## Goals
 
@@ -148,7 +148,7 @@ Lean source declaration
        |                         v
        |                 kernel theorem `f.verified`
        |
-       +-- Move.Compiler.LIR -> MoveModel.IR
+       +-- Move.Compiler.VIR -> MoveModel.IR
                  |                  \
                  |                   +-> interpreter / existing IR prover
                  v
@@ -500,7 +500,7 @@ actuals until that binding dies.
 This is also the executable verifier's modular call rule. Its
 [`core_call`](../../../../move-bytecode-verifier/src/reference_safety/abstract_state.rs)
 creates each returned mutable reference as a borrower of every mutable
-reference argument, then releases the transferred argument references. Leaner
+reference argument, then releases the transferred argument references. Verex
 should mirror that conservative edge set, not replace it with a body-derived
 single path.
 
@@ -869,7 +869,7 @@ Compilation continues through the established pipeline:
 
 ```text
 Move source declarations
-  -> Move.Compiler.LIR
+  -> Move.Compiler.VIR
   -> MoveModel.IR
   -> MoveModel.Frontend.XIR
   -> compiler-v2
@@ -1031,7 +1031,7 @@ theorem.
 
 ### 7. Compiler correctness — not implemented
 
-- Prove type/value correspondence from source types to LIR and IR types.
+- Prove type/value correspondence from source types to VIR and IR types.
 - Prove expression and checked-operation lowering.
 - Prove mutable-loan lowering against IR reference semantics.
 - Compose with reference-elimination correctness.
@@ -1091,7 +1091,7 @@ The implementation is incomplete until the following properties are proved:
 - source checked operations agree with IR arithmetic and abort codes;
 - source calls, including returned mutations, agree with their mutation-level
   relations, value-level contract wrappers, and compiled callees;
-- accepted source control flow lowers to behaviorally equivalent LIR/IR;
+- accepted source control flow lowers to behaviorally equivalent VIR/IR;
 - source contracts transfer across compilation.
 
 ## Settled decisions

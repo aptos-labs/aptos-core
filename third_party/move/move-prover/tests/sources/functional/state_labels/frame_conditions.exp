@@ -1,11 +1,11 @@
 Move prover returns: exiting with verification errors
 warning: opaque call to `frame_conditions::set_balance_without_frame` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
-    ┌─ tests/sources/functional/state_labels/frame_conditions.move:242:5
+    ┌─ tests/sources/functional/state_labels/frame_conditions.move:243:5
     │
-242 │ ╭     spec set_balance_without_frame {
-243 │ │         pragma opaque;
-244 │ │         ensures Balance[addr].coins == 7;
-245 │ │     }
+243 │ ╭     spec set_balance_without_frame {
+244 │ │         pragma opaque;
+245 │ │         ensures Balance[addr].coins == 7;
+246 │ │     }
     │ ╰─────^
 
 error: function does not abort under this condition
@@ -31,3 +31,16 @@ error: post-condition does not hold
     =     at tests/sources/functional/state_labels/frame_conditions.move:164: test_reads_frame_wrong_result
     =         result = <redacted>
     =     at tests/sources/functional/state_labels/frame_conditions.move:171: test_reads_frame_wrong_result (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/frame_conditions.move:190:9
+    │
+190 │ ╭         ensures forall a: address where a != addr:
+191 │ │             Balance[a] == old(Balance[a]); // error: post-condition does not hold
+    │ ╰──────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/state_labels/frame_conditions.move:181: test_writes_at_frame
+    =         addr = <redacted>
+    =     at tests/sources/functional/state_labels/frame_conditions.move:182: test_writes_at_frame
+    =     at tests/sources/functional/state_labels/frame_conditions.move:189: test_writes_at_frame (spec)
+    =     at tests/sources/functional/state_labels/frame_conditions.move:190: test_writes_at_frame (spec)

@@ -11,7 +11,7 @@ use prometheus::{
     Opts,
 };
 use std::sync::Arc;
-use sysinfo::{DiskExt, RefreshKind, System, SystemExt};
+use sysinfo::{DiskRefreshKind, Disks};
 
 const DISK_SUBSYSTEM: &str = "disk";
 
@@ -22,9 +22,13 @@ const NAME_LABEL: &str = "name";
 const TYPE_LABEL: &str = "type";
 const FILE_SYSTEM_LABEL: &str = "file_system";
 
+fn disk_refresh_kind() -> DiskRefreshKind {
+    DiskRefreshKind::nothing().with_kind().with_storage()
+}
+
 /// A Collector for exposing Disk metrics
 pub(crate) struct DiskMetricsCollector {
-    system: Arc<Mutex<System>>,
+    disks: Arc<Mutex<Disks>>,
 
     total_space: Desc,
     available_space: Desc,
@@ -32,8 +36,8 @@ pub(crate) struct DiskMetricsCollector {
 
 impl DiskMetricsCollector {
     fn new() -> Self {
-        let system = Arc::new(Mutex::new(System::new_with_specifics(
-            RefreshKind::new().with_disks_list().with_disks(),
+        let disks = Arc::new(Mutex::new(Disks::new_with_refreshed_list_specifics(
+            disk_refresh_kind(),
         )));
         let total_space = Opts::new(TOTAL_SPACE, "Total disk size in bytes")
             .namespace(NAMESPACE)
@@ -57,7 +61,7 @@ impl DiskMetricsCollector {
             .unwrap();
 
         Self {
-            system,
+            disks,
             total_space,
             available_space,
         }
@@ -78,21 +82,21 @@ impl Collector for DiskMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("disk".into());
 
-        let mut system = self.system.lock();
-        system.refresh_disks_list();
-        system.refresh_disks();
+        let mut disks = self.disks.lock();
+        disks.refresh_specifics(true, disk_refresh_kind());
 
-        system
-            .disks()
+        disks
             .iter()
+            // Older sysinfo versions skipped disks without a known size.
+            .filter(|disk| disk.total_space() != 0)
             .flat_map(|disk| {
                 let total_space = ConstMetric::new_counter(
                     self.total_space.clone(),
                     disk.total_space() as f64,
                     Some(&[
                         disk.name().to_string_lossy().into_owned(),
-                        format!("{:?}", disk.type_()),
-                        String::from_utf8_lossy(disk.file_system()).to_string(),
+                        format!("{:?}", disk.kind()),
+                        disk.file_system().to_string_lossy().into_owned(),
                     ]),
                 )
                 .unwrap();
@@ -101,8 +105,8 @@ impl Collector for DiskMetricsCollector {
                     disk.available_space() as f64,
                     Some(&[
                         disk.name().to_string_lossy().into_owned(),
-                        format!("{:?}", disk.type_()),
-                        String::from_utf8_lossy(disk.file_system()).to_string(),
+                        format!("{:?}", disk.kind()),
+                        disk.file_system().to_string_lossy().into_owned(),
                     ]),
                 )
                 .unwrap();

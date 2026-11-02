@@ -17,8 +17,7 @@ use ark_ec::CurveGroup;
 use ark_ff::{batch_inversion, FftField, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
-use rand::{seq::IteratorRandom, Rng};
-use rand_core::{CryptoRng, RngCore};
+use rand::{seq::IteratorRandom, CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 

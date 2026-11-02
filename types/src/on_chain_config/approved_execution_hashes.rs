@@ -14,6 +14,13 @@ impl ApprovedExecutionHashes {
     pub fn to_btree_map(self) -> BTreeMap<u64, Vec<u8>> {
         self.entries.into_iter().collect()
     }
+
+    /// Whether governance has approved a script with this hash.
+    pub fn contains_script_hash(&self, script_hash: &[u8]) -> bool {
+        self.entries
+            .iter()
+            .any(|(_, hash)| hash.as_slice() == script_hash)
+    }
 }
 
 impl OnChainConfig for ApprovedExecutionHashes {

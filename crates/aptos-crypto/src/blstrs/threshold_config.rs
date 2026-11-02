@@ -9,8 +9,7 @@ use crate::{
     traits::{self, ThresholdConfig as _},
 };
 use anyhow::anyhow;
-use rand::{seq::IteratorRandom, Rng};
-use rand_core::{CryptoRng, RngCore};
+use rand::{seq::IteratorRandom, CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
 

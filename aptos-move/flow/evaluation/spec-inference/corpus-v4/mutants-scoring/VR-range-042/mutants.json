@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 48,
+        "offset": 398,
+        "sha256": "86f4099c79f742b2a836162842a411bd1f5c95fc156abfdcf0ba35da26f7b27a"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 48,
+        "to": "start += step;\n            vec.push_back(start);"
+      },
+      "essential": true,
+      "file": "sources/stdlib/extracted_vector_range.move",
+      "mutant_id": "VR-range-042-push-after-step",
+      "obligation_category": "normal-result",
+      "rationale": "Each element is pushed after stepping, so the range starts one step late.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 21,
+        "offset": 364,
+        "sha256": "ca98e117fc7c410530a238f90731740c5000b90e4c0f05c447d4d227688982e4"
+      },
+      "edit": {
+        "at": 7,
+        "kind": "substitute",
+        "length": 11,
+        "to": "start + step <= end"
+      },
+      "essential": true,
+      "file": "sources/stdlib/extracted_vector_range.move",
+      "mutant_id": "VR-range-042-stops-a-step-early",
+      "obligation_category": "normal-result",
+      "rationale": "The last element is dropped unless a whole step still fits.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 33,
+        "offset": 293,
+        "sha256": "89373e7c5dac20d5beba5f3820461f5587e651c7130673477a9fb57676f4e724"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 8,
+        "to": "step > 1"
+      },
+      "essential": true,
+      "file": "sources/stdlib/extracted_vector_range.move",
+      "mutant_id": "VR-range-042-unit-step-rejected",
+      "obligation_category": "abort",
+      "rationale": "A step of one is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "96e9a23e050bdc8b21aa042149fe93cb269c59d7a92e86ddcd5694aabc20344c",
+  "task_id": "VR-range-042"
+}

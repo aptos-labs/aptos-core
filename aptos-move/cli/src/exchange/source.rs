@@ -38,7 +38,7 @@ pub fn move_source_to_module(source: &str) -> Result<exchange::Module> {
 /// standard `0x1::vector` module. Load the same source dependency used by
 /// compiler-v2's own tests so source checking and the model both have the
 /// native function declarations available.
-fn single_file_options(path: &std::path::Path) -> Result<move_compiler_v2::Options> {
+pub(crate) fn single_file_options(path: &std::path::Path) -> Result<move_compiler_v2::Options> {
     let stdlib_sources = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../third_party/move/move-stdlib/sources")
         .canonicalize()?;

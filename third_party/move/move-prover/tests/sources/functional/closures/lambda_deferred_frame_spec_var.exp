@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `g` may modify: `lambda_deferred_frame_spec_var::call_g` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_spec_var.move:27:9
+   │
+27 │         call_g(|z| bump(z), 1)
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot establish what function argument `g` may modify: `lambda_deferred_frame_spec_var::call_g` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_spec_var.move:34:9
+   │
+34 │         call_g(|z| bump(z), 1)
+   │         ^^^^^^^^^^^^^^^^^^^^^^

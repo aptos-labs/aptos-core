@@ -31,9 +31,9 @@ module 0x66::calculator {
     }
     spec process(s: &signer, input: Input) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies State[signer::address_of(s)];
-        ensures [inferred = sathard] (old(State[signer::address_of(s)]) is Continuation) && (input is Number) ==> {
+        ensures [inferred] (old(State[signer::address_of(s)]) is Continuation) && (input is Number) ==> {
             let a = signer::address_of(s);
             let b = State::Value(S1.. |~ result_of<old(State[signer::address_of(s)]).Continuation.0>(input.0));
             S1.. |~ publish<State>(a, b)
@@ -74,6 +74,7 @@ module 0x66::calculator {
         aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Add) && (S1 |~ exists<State>(signer::address_of(s)));
         aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Sub) && (S1 |~ exists<State>(signer::address_of(s)));
         aborts_if [inferred] (State[signer::address_of(s)] is Empty) && (input is Number) && (S1 |~ exists<State>(signer::address_of(s)));
+        aborts_if [inferred] (State[signer::address_of(s)] is Continuation) && (input is Number) && (S1 |~ aborts_of<State[signer::address_of(s)].Continuation.0>(input.0));
     }
 
 
@@ -119,9 +120,10 @@ module 0x66::calculator {
     }
     spec number {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Number(x));
+        aborts_if [inferred] aborts_of<process>(s, Input::Number(x));
     } proof {
         split State[address_of(s)];
     }
@@ -131,9 +133,10 @@ module 0x66::calculator {
     }
     spec add(s: &signer) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Add{});
+        aborts_if [inferred] aborts_of<process>(s, Input::Add{});
     }
 
 
@@ -142,9 +145,10 @@ module 0x66::calculator {
     }
     spec sub(s: &signer) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Sub{});
+        aborts_if [inferred] aborts_of<process>(s, Input::Sub{});
     }
 
 
@@ -164,46 +168,5 @@ module 0x66::calculator {
 
 }
 /*
-Inference diagnostics:
-warning: WP could not characterize the aborts of `calculator::process` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = a dynamic call has no trusted complete abort summary
-   ┌─ tests/inference/calculator.move:21:5
-   │
-21 │ ╭     fun process(s: &signer, input: Input) acquires State {
-22 │ │         let addr = address_of(s);
-23 │ │         match ((move_from<State>(addr), input)) {
-24 │ │             (Empty, Number(x)) => move_to(s, State::Value(x)),
-   · │
-30 │ │         }
-31 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `calculator::number` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = callee `0x66::calculator::process` has no trusted complete abort summary
-   ┌─ tests/inference/calculator.move:50:5
-   │
-50 │ ╭     entry fun number(s: &signer, x: u64) acquires State {
-51 │ │         process(s, Input::Number(x))
-52 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `calculator::add` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = callee `0x66::calculator::process` has no trusted complete abort summary
-   ┌─ tests/inference/calculator.move:58:5
-   │
-58 │ ╭     entry fun add(s: &signer) acquires State {
-59 │ │         process(s, Input::Add)
-60 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `calculator::sub` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = callee `0x66::calculator::process` has no trusted complete abort summary
-   ┌─ tests/inference/calculator.move:62:5
-   │
-62 │ ╭     entry fun sub(s: &signer) acquires State {
-63 │ │         process(s, Input::Sub)
-64 │ │     }
-   │ ╰─────^
-
 Verification: Succeeded.
 */

@@ -103,12 +103,17 @@ pub struct ProverOptions {
     /// checks whether the prover succeeded.
     #[arg(long)]
     pub uninvariant_loop_is_error: bool,
+    /// Report an abort characterization which WP cannot make exact as an error
+    /// rather than emitting `aborts_if_is_partial`, including partiality
+    /// inherited from a callee whose own contract is partial.
+    #[arg(long)]
+    pub aborts_if_is_strict: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
     pub borrow_natives: Vec<String>,
     /// Targets to exclude from verification. Each entry must be
-    /// `VerificationScope::Only(name)` or `VerificationScope::OnlyModule(name)`.
+    /// `VerificationScope::Only(names)` or `VerificationScope::OnlyModule(name)`.
     #[arg(skip)]
     pub verify_exclude: Vec<VerificationScope>,
     /// Inline spec let bindings by substituting the expression directly into conditions,
@@ -140,6 +145,7 @@ impl Default for ProverOptions {
             no_infer_lambda_specs: false,
             no_inference_opaque: false,
             uninvariant_loop_is_error: false,
+            aborts_if_is_strict: false,
             borrow_natives: vec![],
             verify_exclude: vec![],
             inline_spec_lets: false,

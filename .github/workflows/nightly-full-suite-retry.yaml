@@ -1,0 +1,31 @@
+name: Nightly Full Test Suite Retry
+
+# Dispatched by a failed first attempt of the nightly full suite; re-runs its
+# failed jobs once after the run completes. See nightly-full-suite.yaml.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Nightly full-suite run whose failed jobs to re-run
+        required: true
+        type: string
+
+permissions:
+  actions: write
+
+jobs:
+  rerun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Re-run failed nightly jobs once the run completes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          run="repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID"
+          test "$(gh api "$run" --jq .path)" = .github/workflows/nightly-full-suite.yaml
+          test "$(gh api "$run" --jq .run_attempt)" = 1
+          until [ "$(gh api "$run" --jq .status)" = completed ]; do sleep 30; done
+          gh run rerun "$RUN_ID" --repo "$GITHUB_REPOSITORY" --failed

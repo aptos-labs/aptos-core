@@ -1,0 +1,121 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::n {
+    public fun fwd(x: u64): u64 {
+        n::impl(x)
+    }
+    public fun impl(x: u64): u64 {
+        x
+    }
+    public fun max(a: u64,b: u64): u64 {
+        if Gt<u64>(a, b) {
+          a
+        } else {
+          b
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::m {
+    use 0xc0ffee::n; // resolved as: 0xc0ffee::n
+    public fun t_fwd(x: u64): u64 {
+        n::fwd(x)
+    }
+    public fun t_max(x: u64): u64 {
+        n::max(x, 7)
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::n {
+    public fun fwd(x: u64): u64 {
+        impl(x)
+    }
+    public fun impl(x: u64): u64 {
+        x
+    }
+    public fun max(a: u64, b: u64): u64 {
+        if (a > b) a else b
+    }
+}
+module 0xc0ffee::m {
+    use 0xc0ffee::n;
+    public fun t_fwd(x: u64): u64 {
+        n::fwd(x)
+    }
+    public fun t_max(x: u64): u64 {
+        n::max(x, 7)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::n {
+    public fun fwd(x: u64): u64 {
+        {
+          let (x: u64): (u64) = Tuple(x);
+          x
+        }
+    }
+    public fun impl(x: u64): u64 {
+        x
+    }
+    public fun max(a: u64,b: u64): u64 {
+        if Gt<u64>(a, b) {
+          a
+        } else {
+          b
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::m {
+    use 0xc0ffee::n; // resolved as: 0xc0ffee::n
+    public fun t_fwd(x: u64): u64 {
+        n::fwd(x)
+    }
+    public fun t_max(x: u64): u64 {
+        n::max(x, 7)
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::n
+// Function definition at index 0
+#[persistent] public fun fwd(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 1
+#[persistent] public fun impl(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 2
+#[persistent] public fun max(l0: u64, l1: u64): u64
+    copy_loc l0
+    copy_loc l1
+    gt
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: move_loc l1
+    ret
+
+// Bytecode version v10
+module 0xc0ffee::m
+use 0xc0ffee::n
+// Function definition at index 0
+#[persistent] public fun t_fwd(l0: u64): u64
+    move_loc l0
+    call n::fwd
+    ret
+
+// Function definition at index 1
+#[persistent] public fun t_max(l0: u64): u64
+    move_loc l0
+    ld_u64 7
+    call n::max
+    ret
+
+
+============ bytecode verification succeeded ========

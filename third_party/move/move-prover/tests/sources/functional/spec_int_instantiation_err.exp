@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: expected `0x1::option::Option<u64>` but found a value of type `0x1::option::Option<num>`
+   ┌─ tests/sources/functional/spec_int_instantiation_err.move:18:50
+   │
+18 │         ensures result == Pair { first: x, rest: option::spec_some(x + 1) }; // error: expected `Option<u64>`
+   │                                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `0x1::option::Option<u64>` but found a value of type `0x1::option::Option<num>`
+   ┌─ tests/sources/functional/spec_int_instantiation_err.move:26:27
+   │
+26 │         ensures result == (if (c) option::spec_some(x + 1) else option::spec_none<u64>()); // error: expected `Option<u64>`
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

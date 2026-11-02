@@ -24,7 +24,7 @@ use aptos_executor_benchmark::{
         },
     },
     pipeline::PipelineConfig,
-    BenchmarkWorkload, FeatureFlagOverrides, StorageTestConfig,
+    BenchmarkWorkload, BlockSource, FeatureFlagOverrides, StorageTestConfig,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
@@ -117,6 +117,11 @@ struct StorageOpt {
 
     #[clap(long)]
     enable_indexer_grpc: bool,
+
+    /// Attach native-position storage on open. Pair with the
+    /// `native-position-set` / `native-position-delete` workloads.
+    #[clap(long)]
+    enable_trading_native: bool,
 }
 
 impl StorageOpt {
@@ -124,6 +129,7 @@ impl StorageOpt {
         StorageTestConfig {
             pruner_config: self.pruner_opt.pruner_config(),
             enable_indexer_grpc: self.enable_indexer_grpc,
+            enable_trading_native: self.enable_trading_native,
         }
     }
 }
@@ -141,6 +147,16 @@ pub struct PipelineOpt {
     /// Allows to see individual throughput of each stage, avoiding resource contention.
     #[clap(long)]
     split_stages: bool,
+
+    /// Derive the executor's on-chain config from the DB's `Features`, as a
+    /// node does. Required to exercise TransactionInfoV1 / the position root.
+    #[clap(long)]
+    onchain_config_from_features: bool,
+
+    /// After each block commits, check the in-memory position index against
+    /// a replay of the committed write sets and log a few entries.
+    #[clap(long)]
+    verify_positions_each_block: bool,
     /// Skip commit stage - i.e. create executed blocks in memory, but never commit them.
     /// Useful when commit is the bottleneck, to see throughput of the rest of the pipeline.
     #[clap(long)]
@@ -186,6 +202,9 @@ impl PipelineOpt {
             num_sig_verify_threads: self.num_sig_verify_threads,
             print_transactions: false,
             wait_for_indexer_grpc: enable_indexer_grpc,
+            onchain_config_from_features: self.onchain_config_from_features,
+            verify_positions_each_block: self.verify_positions_each_block,
+            ..Default::default()
         }
     }
 }
@@ -451,6 +470,19 @@ enum Command {
             value_delimiter = ' ',
             help = "Feature flags to disable on-chain after the init/publish phase and before the measured run, via a governance transaction that reconfigures. Enable / disable flags cannot overlap.")]
         disable_feature_after_init: Vec<FeatureFlag>,
+
+        /// Generate the blocks, write them here, and exit without executing.
+        /// Leaves --checkpoint-dir holding the initialized DB the blocks were
+        /// generated against; pass that as --data-dir when replaying. No feature
+        /// flag override is applied, since each replay applies its own.
+        #[clap(long, value_parser, conflicts_with = "replay_blocks")]
+        dump_blocks: Option<PathBuf>,
+
+        /// Execute blocks recorded by an earlier --dump-blocks run instead of
+        /// generating them, so that two runs execute identical transactions.
+        /// --data-dir must be that run's --checkpoint-dir.
+        #[clap(long, value_parser)]
+        replay_blocks: Option<PathBuf>,
     },
     AddAccounts {
         #[clap(long, value_parser)]
@@ -526,7 +558,16 @@ where
             disable_feature,
             enable_feature_after_init,
             disable_feature_after_init,
+            dump_blocks,
+            replay_blocks,
         } => {
+            let block_source = match (dump_blocks, replay_blocks) {
+                (Some(blocks_path), None) => BlockSource::Record { blocks_path },
+                (None, Some(blocks_path)) => BlockSource::Replay { blocks_path },
+                (None, None) => BlockSource::Generate,
+                (Some(_), Some(_)) => unreachable!("clap rejects both"),
+            };
+
             let workload = if transaction_type.is_empty() {
                 BenchmarkWorkload::Transfer {
                     connected_tx_grps: opt.connected_tx_grps,
@@ -573,6 +614,7 @@ where
                     enable: enable_feature_after_init,
                     disable: disable_feature_after_init,
                 },
+                block_source,
             );
         },
         Command::AddAccounts {

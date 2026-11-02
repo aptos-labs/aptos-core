@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .identifiers import require_plain_name
+from .materialize import preparation_patch
 from .artifacts import copy_snapshot, load_object, sha256_file, tree_hash, write_json
 
 
@@ -118,7 +119,7 @@ def stage_reviews(
             "prepared_snapshot": _relative(prepared, recipe_path.parent),
             "prepared_sha256": record["prepared_sha256"],
             "preparation_patch": _relative(
-                (provenance_path.parent / record["preparation_patch"]).resolve(),
+                preparation_patch(provenance_path.parent, record),
                 recipe_path.parent,
             ),
             "preparation_patch_sha256": record["preparation_patch_sha256"],

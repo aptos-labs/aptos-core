@@ -26,10 +26,10 @@ const EINVALID_INITIALIZE_CALLER: u64 = error::invalid_argument(1);
 pub fn native_get_caller_address_and_module_id<C: NativeContext>(
     ctx: &C,
 ) -> VMResult<NativeStatus> {
-    let Some(module_id) = ctx.caller_module() else {
+    let Some(module_id) = ctx.direct_caller_module() else {
         return Ok(NativeStatus::Abort {
             code: EINVALID_INITIALIZE_CALLER,
-            message: Some("caller has no associated module (e.g. a script)".into()),
+            message: Some("initializer must be invoked by a direct module call".into()),
         });
     };
     let module_id = view_module_id(module_id);

@@ -119,7 +119,11 @@ pub fn build_dkg_pvss_config(
     let rounding_time = timer.elapsed();
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()
-        .map(|vi| vi.public_key.clone())
+        .map(|vi| {
+            vi.public_key()
+                .expect("on-chain validator consensus keys must be valid")
+                .clone()
+        })
         .collect();
 
     let consensus_keys: Vec<EncPK> = validator_consensus_keys

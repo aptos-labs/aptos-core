@@ -25,6 +25,7 @@ use super::*;
 #[test]
 fn test_platform_display_name() {
     assert_eq!(Platform::Claude.display_name(), "Claude Code");
+    assert_eq!(Platform::Codex.display_name(), "Codex");
 }
 
 #[test]
@@ -53,4 +54,66 @@ fn mcp_package_cache_can_be_disabled() {
         panic!("expected MCP command");
     };
     assert!(args.no_package_cache);
+}
+
+#[tokio::test]
+async fn evaluation_mcp_rejects_packages_and_dependencies_outside_its_root() {
+    let root = tempfile::TempDir::new().expect("temporary root");
+    let package = root.path().join("workspace");
+    let outside = root.path().join("baseline");
+    std::fs::create_dir_all(package.join("sources")).expect("workspace sources");
+    std::fs::create_dir_all(outside.join("sources")).expect("baseline sources");
+    std::fs::write(
+        package.join("Move.toml"),
+        "[package]\nname = \"workspace\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("workspace manifest");
+    std::fs::write(
+        outside.join("Move.toml"),
+        "[package]\nname = \"baseline\"\nversion = \"1.0.0\"\n",
+    )
+    .expect("baseline manifest");
+
+    let client = common::make_evaluation_client_with_package_root(&package).await;
+    let error = common::call_tool_raw(
+        &client,
+        "move_package_status",
+        serde_json::json!({"package_path": outside}),
+    )
+    .await
+    .expect_err("a caller path outside the package root must be refused");
+    assert!(error.to_string().contains("outside the configured root"));
+
+    std::fs::write(
+        package.join("Move.toml"),
+        "[package]\nname = \"workspace\"\nversion = \"1.0.0\"\n\n[dependencies]\nbaseline = { local = \"../baseline\" }\n",
+    )
+    .expect("manifest with escaping dependency");
+    let error = common::call_tool_raw(
+        &client,
+        "move_package_status",
+        serde_json::json!({"package_path": package}),
+    )
+    .await
+    .expect_err("a local dependency outside the package root must be refused");
+    assert!(error.to_string().contains("outside"));
+
+    #[cfg(unix)]
+    {
+        std::fs::write(
+            package.join("Move.toml"),
+            "[package]\nname = \"workspace\"\nversion = \"1.0.0\"\n",
+        )
+        .expect("restore workspace manifest");
+        std::os::unix::fs::symlink(outside.join("sources"), package.join("sources/linked"))
+            .expect("symlink baseline sources into workspace");
+        let error = common::call_tool_raw(
+            &client,
+            "move_package_status",
+            serde_json::json!({"package_path": package}),
+        )
+        .await
+        .expect_err("a symlink inside the package root must be refused");
+        assert!(error.to_string().contains("cannot contain symlink"));
+    }
 }

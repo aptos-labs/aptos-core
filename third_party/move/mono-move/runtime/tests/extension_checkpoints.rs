@@ -9,6 +9,7 @@ mod common;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::{NativeExtension, NativeExtensions},
+    types::EMPTY_TYPE_LIST,
     Code, FrameLayoutInfo, Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries,
     VMResult,
 };
@@ -42,10 +43,13 @@ fn trivial_program() -> Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
         def_idx: FunctionDefinitionIndex(0),
+        has_module_lock: false,
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],
         param_tys: vec![],
+        return_slots: vec![],
+        return_tys: EMPTY_TYPE_LIST,
         param_region_size: 0,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
@@ -60,7 +64,7 @@ fn checkpoint_rollback_drives_extensions_in_lockstep() {
     let func = trivial_program();
     let mut extensions = NativeExtensions::new();
     extensions.add(CheckpointProbe::default());
-    common::with_test_interpreter(&func, u64::MAX, extensions, |ctx| {
+    common::with_test_interpreter(&func, u64::MAX, extensions, |ctx, _entry| {
         ctx.checkpoint().unwrap();
         ctx.checkpoint().unwrap();
         assert_eq!(ctx.checkpoint_depth(), 2);

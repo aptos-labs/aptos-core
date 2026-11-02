@@ -5,9 +5,10 @@
 use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress, aggregate_signature::AggregateSignature,
-    ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
+    lazy_bls::LazyBlsPublicKey, ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
+use aptos_bcs_utils::BoundedVec;
 use aptos_bitvec::BitVec;
 use aptos_crypto::{
     bls12381,
@@ -27,6 +28,9 @@ use std::{
     fmt,
 };
 use thiserror::Error;
+
+/// The on-chain validator set cannot exceed the `u16` index space used by `BitVec`.
+pub const MAX_VALIDATOR_SET_SIZE: usize = (u16::MAX as usize) + 1;
 
 /// Errors possible during signature verification.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -56,6 +60,8 @@ pub enum VerifyError {
     InconsistentBlockInfo,
     #[error("Failed to aggregate public keys")]
     FailedToAggregatePubKey,
+    #[error("Invalid validator public key")]
+    InvalidPublicKey,
     #[error("Failed to aggregate signatures")]
     FailedToAggregateSignature,
     #[error("Failed to verify multi-signature")]
@@ -71,7 +77,7 @@ pub enum VerifyError {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConsensusInfo {
     pub address: AccountAddress,
-    pub public_key: PublicKey,
+    pub public_key: LazyBlsPublicKey,
     pub voting_power: u64,
 }
 
@@ -79,13 +85,13 @@ impl ValidatorConsensusInfo {
     pub fn new(address: AccountAddress, public_key: PublicKey, voting_power: u64) -> Self {
         ValidatorConsensusInfo {
             address,
-            public_key,
+            public_key: public_key.into(),
             voting_power,
         }
     }
 
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public_key
+    pub fn public_key(&self) -> std::result::Result<&PublicKey, aptos_crypto::CryptoMaterialError> {
+        self.public_key.decompress()
     }
 }
 
@@ -169,13 +175,13 @@ impl<'de> Deserialize<'de> for ValidatorVerifier {
         #[derive(Deserialize)]
         #[serde(rename = "ValidatorVerifier")]
         struct RawValidatorVerifier {
-            validator_infos: Vec<ValidatorConsensusInfo>,
+            validator_infos: BoundedVec<ValidatorConsensusInfo, MAX_VALIDATOR_SET_SIZE>,
         }
 
         let RawValidatorVerifier { validator_infos } =
             RawValidatorVerifier::deserialize(deserializer)?;
 
-        Ok(ValidatorVerifier::new(validator_infos))
+        Ok(ValidatorVerifier::new(validator_infos.into_inner()))
     }
 }
 
@@ -258,8 +264,10 @@ impl ValidatorVerifier {
         message: &T,
         signature: &bls12381::Signature,
     ) -> std::result::Result<(), VerifyError> {
-        match self.get_public_key(&author) {
-            Some(public_key) => public_key
+        match self.get_validator_info(&author) {
+            Some(validator) => validator
+                .public_key()
+                .map_err(|_| VerifyError::InvalidPublicKey)?
                 .verify_struct_signature(message, signature)
                 .map_err(|_| VerifyError::InvalidMultiSignature),
             None => Err(VerifyError::UnknownAuthor),
@@ -272,7 +280,7 @@ impl ValidatorVerifier {
         message: &T,
         signature_with_status: &SignatureWithStatus,
     ) -> std::result::Result<(), VerifyError> {
-        if self.get_public_key(&author).is_none() {
+        if self.get_validator_info(&author).is_none() {
             return Err(VerifyError::UnknownAuthor);
         }
         if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
@@ -365,7 +373,11 @@ impl ValidatorVerifier {
                 .get(index)
                 .ok_or(VerifyError::UnknownAuthor)?;
             authors.push(validator.address);
-            pub_keys.push(validator.public_key());
+            pub_keys.push(
+                validator
+                    .public_key()
+                    .map_err(|_| VerifyError::InvalidPublicKey)?,
+            );
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter(), true)?;
@@ -409,7 +421,11 @@ impl ValidatorVerifier {
                 .get(index)
                 .ok_or(VerifyError::UnknownAuthor)?;
             authors.push(validator.address);
-            pub_keys.push(validator.public_key());
+            pub_keys.push(
+                validator
+                    .public_key()
+                    .map_err(|_| VerifyError::InvalidPublicKey)?,
+            );
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter(), true)?;
@@ -504,9 +520,27 @@ impl ValidatorVerifier {
 
     /// Returns the public key for this address.
     pub fn get_public_key(&self, author: &AccountAddress) -> Option<PublicKey> {
+        self.get_validator_info(author)
+            .and_then(|validator| validator.public_key().ok().cloned())
+    }
+
+    /// Materialize every validator public key after the validator set has been
+    /// authenticated. This preserves the old invariant that a trusted
+    /// `ValidatorVerifier` contains only curve-valid public keys without doing
+    /// attacker-amplifiable G1 decompression during wire decoding.
+    pub fn validate_public_keys(&self) -> std::result::Result<(), VerifyError> {
+        self.validator_infos.iter().try_for_each(|validator| {
+            validator
+                .public_key()
+                .map(|_| ())
+                .map_err(|_| VerifyError::InvalidPublicKey)
+        })
+    }
+
+    fn get_validator_info(&self, author: &AccountAddress) -> Option<&ValidatorConsensusInfo> {
         self.address_to_validator_index
             .get(author)
-            .map(|index| self.validator_infos[*index].public_key().clone())
+            .map(|index| &self.validator_infos[*index])
     }
 
     /// Returns the voting power for this address.
@@ -790,6 +824,43 @@ mod tests {
         assert_eq!(
             validator.verify(validator_signer.author(), &dummy_struct, &unknown_signature),
             Err(VerifyError::InvalidMultiSignature)
+        );
+    }
+
+    #[test]
+    fn test_rejects_oversized_validator_set_before_elements() {
+        // ValidatorVerifier's only serialized field is validator_infos. This is the
+        // canonical ULEB128 encoding of a vector length of 65,537, with no elements.
+        // A length-first rejection returns the bound error instead of reaching EOF
+        // while attempting to deserialize the first public key.
+        let bytes = [0x81, 0x80, 0x04];
+        let error = bcs::from_bytes::<ValidatorVerifier>(&bytes).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("sequence length 65537 exceeds maximum 65536"),
+            "unexpected error: {}",
+            error
+        );
+    }
+
+    #[test]
+    fn test_validator_set_deserialization_defers_public_key_materialization() {
+        let verifier = ValidatorVerifier::new(vec![ValidatorConsensusInfo {
+            address: AccountAddress::ONE,
+            public_key: LazyBlsPublicKey::from_raw_bytes_for_test(
+                [0u8; bls12381::PublicKey::LENGTH],
+            ),
+            voting_power: 1,
+        }]);
+        let bytes = bcs::to_bytes(&verifier).unwrap();
+
+        let decoded: ValidatorVerifier =
+            bcs::from_bytes(&bytes).expect("wire decoding must not decompress G1 points");
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(
+            decoded.validate_public_keys(),
+            Err(VerifyError::InvalidPublicKey)
         );
     }
 

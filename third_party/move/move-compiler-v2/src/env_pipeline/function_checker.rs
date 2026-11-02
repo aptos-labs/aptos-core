@@ -159,6 +159,18 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
         );
     };
 
+    if let Some((msg, primary)) = call_access_error(caller, callee) {
+        report(&msg, &primary);
+    }
+}
+
+/// Why `caller` may not call `callee`, as a message and a label for the
+/// caller, or `None` if the call is allowed.
+pub(crate) fn call_access_error(
+    caller: &FunctionEnv,
+    callee: &FunctionEnv,
+) -> Option<(String, String)> {
+    let env = caller.module_env.env;
     let caller_desc = || {
         let caller_name = caller.get_full_name_with_address();
         if caller.is_inline() {
@@ -170,39 +182,37 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
 
     // 1. Callee is script → error
     if callee.module_env.is_script_module() {
-        report(
-            &format!(
+        return Some((
+            format!(
                 "script function `{}` cannot be called from Move code",
                 callee.get_name_str()
             ),
-            "script function",
-        );
-        return;
+            "script function".to_owned(),
+        ));
     }
 
     // Now: callee is not a script
     // 2. Same module → allowed
     if caller.module_env.get_id() == callee.module_env.get_id() {
-        return;
+        return None;
     }
 
     // Now: callee is not a script; cross-module
     // 3. Callee is public → allowed
     if callee.visibility() == Visibility::Public {
-        return;
+        return None;
     }
 
     // Now: callee is not a script; cross-module; callee is not public
     // 4. Caller is script → error (scripts can only call public functions)
     if caller.module_env.is_script_module() {
-        report(
-            &format!(
+        return Some((
+            format!(
                 "function `{}` cannot be called from a script because it is not public",
                 callee.get_full_name_with_address()
             ),
-            "called from a script",
-        );
-        return;
+            "called from a script".to_owned(),
+        ));
     }
 
     // Now: callee is not a script; cross-module; callee is not public; caller is not a script
@@ -210,20 +220,19 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
 
     // 5. Callee is private → error
     if callee.visibility() == Visibility::Private {
-        report(
-            &format!(
+        return Some((
+            format!(
                 "function `{callee_name}` is private to module `{}`",
                 callee.module_env.get_full_name_str()
             ),
-            &caller_desc(),
-        );
-        return;
+            caller_desc(),
+        ));
     }
 
     // Now: cross-module; callee is package or friend visible
     // 6. Caller is explicit friend → allowed
     if callee.module_env.has_friend(&caller.module_env.get_id()) {
-        return;
+        return None;
     }
 
     // Now: cross-module; callee is package or friend visible; caller is not a friend
@@ -231,35 +240,34 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
         // 7. Callee has package visibility → check address and package for more informative messages
         if callee.module_env.self_address() != caller.module_env.self_address() {
             // Now: different address
-            report(
-                &format!(
+            return Some((
+                format!(
                     "package function `{callee_name}` cannot be called from a different address"
                 ),
-                &caller_desc(),
-            );
-            return;
+                caller_desc(),
+            ));
         }
         // Now: same address; callee is from a dependency package
         let options = env
             .get_extension::<Options>()
             .expect("Options is available");
         if options.experiment_on(Experiment::UNSAFE_PACKAGE_VISIBILITY) {
-            return;
+            return None;
         }
-        report(
-            &format!("package function `{callee_name}` cannot be called from a different package"),
-            &caller_desc(),
-        );
+        Some((
+            format!("package function `{callee_name}` cannot be called from a different package"),
+            caller_desc(),
+        ))
     } else {
         // 8. Callee has friend but not package visibility
-        report(
-            &format!(
+        Some((
+            format!(
                 "friend function `{callee_name}` cannot be called from `{}` (not a friend of `{}`)",
                 caller.module_env.get_full_name_str(),
                 callee.module_env.get_full_name_str()
             ),
-            &caller_desc(),
-        );
+            caller_desc(),
+        ))
     }
 }
 

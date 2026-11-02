@@ -12,7 +12,7 @@ use mono_move_core::{
     VMResult,
 };
 #[cfg(feature = "testing")]
-use rand_core::{OsRng, RngCore};
+use rand::{rngs::OsRng, RngCore};
 use sha2::Sha512;
 
 /// A Move `Scalar`'s encoding is exactly 32 bytes.

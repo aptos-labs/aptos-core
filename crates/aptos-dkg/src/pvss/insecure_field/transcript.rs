@@ -103,7 +103,7 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: rand::RngCore + rand::CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
@@ -146,7 +146,7 @@ impl traits::Transcript for Transcript {
         rng: &mut R,
     ) -> Self
     where
-        R: rand_core::RngCore + rand_core::CryptoRng,
+        R: rand::RngCore + rand::CryptoRng,
     {
         Transcript {
             dealers: vec![sc.get_player(0)],

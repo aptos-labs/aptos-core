@@ -2,11 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    db::PositionBundle,
     ledger_db::LedgerDb,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
         BACKUP_TXN_VERSION,
     },
+    native_store::{state_sync::NativeStoreReader, PositionStore},
     state_store::StateStore,
 };
 use aptos_crypto::hash::HashValue;
@@ -36,13 +38,19 @@ fn no_cache_read_opts() -> ReadOptions {
 pub struct BackupHandler {
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
+    position: Option<Arc<PositionBundle>>,
 }
 
 impl BackupHandler {
-    pub(crate) fn new(state_store: Arc<StateStore>, ledger_db: Arc<LedgerDb>) -> Self {
+    pub(crate) fn new(
+        state_store: Arc<StateStore>,
+        ledger_db: Arc<LedgerDb>,
+        position: Option<Arc<PositionBundle>>,
+    ) -> Self {
         Self {
             state_store,
             ledger_db,
+            position,
         }
     }
 
@@ -195,6 +203,51 @@ impl BackupHandler {
     ) -> Result<SparseMerkleRangeProof> {
         self.state_store
             .get_value_range_proof(rightmost_key, version)
+    }
+
+    fn position(&self) -> Result<&Arc<PositionBundle>> {
+        self.position.as_ref().ok_or_else(|| {
+            AptosDbError::Other("native-position storage is not enabled on this node".into())
+        })
+    }
+
+    /// Positions are read at the latest snapshot at or before the requested
+    /// version, which carries the same root. No pruning check: backup only
+    /// serves retained versions.
+    fn position_store_reader(&self) -> Result<NativeStoreReader<'_, PositionStore>> {
+        let position = self.position()?;
+        Ok(NativeStoreReader {
+            kv_db: &position.store.kv_db,
+            merkle_db: &position.store.merkle_db,
+            pruner: None,
+            ledger_metadata_db: self.ledger_db.metadata_db(),
+        })
+    }
+
+    /// Gets the number of positions in the snapshot at `version`.
+    pub fn get_position_state_item_count(&self, version: Version) -> Result<usize> {
+        self.position_store_reader()?.item_count(version)
+    }
+
+    /// Iterate through positions in the snapshot at `version`.
+    pub fn get_position_state_item_iter(
+        &self,
+        version: Version,
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
+        self.position_store_reader()?
+            .value_chunk_iter(version, start_idx, limit)
+    }
+
+    /// Gets the proof that proves a range of positions.
+    pub fn get_position_state_range_proof(
+        &self,
+        rightmost_key: HashValue,
+        version: Version,
+    ) -> Result<SparseMerkleRangeProof> {
+        self.position_store_reader()?
+            .range_proof(rightmost_key, version)
     }
 
     /// Gets the epoch, committed version, and synced version of the DB.

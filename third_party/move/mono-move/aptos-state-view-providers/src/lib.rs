@@ -31,13 +31,13 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap, SharedArena};
-use move_binary_format::CompiledModule;
+use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
 use std::{cell::RefCell, ptr::NonNull};
 use thiserror::Error;
-use triomphe::Arc;
 
 /// Default size of the provider's value arena. Occupancy is bounded by one
 /// materialization per distinct key read, so this fits any realistic use.
@@ -81,16 +81,19 @@ impl<S: StateView> ModuleProvider for StateViewModuleProvider<'_, S> {
             .map(|value| value.bytes().clone()))
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> VMResult<CompiledModule> {
-        // TODO(correctness): use the on-chain deserializer config (max version, etc.).
-        CompiledModule::deserialize(bytes)
-            .map_err(|e| provider_error(format!("deserialize failed: {e:?}")))
+    fn verify_module(&self, module: &CompiledModule) -> VMResult<()> {
+        move_bytecode_verifier::verify_module_with_config(self.verifier_config(), module)
+            .map_err(|e| provider_error(format!("verification failed: {e:?}")))
     }
 
-    fn verify_module(&self, module: &CompiledModule) -> VMResult<()> {
-        // TODO(correctness): use the on-chain verifier config instead of the default.
-        move_bytecode_verifier::verify_module(module)
-            .map_err(|e| provider_error(format!("verification failed: {e:?}")))
+    fn deserializer_config(&self) -> &DeserializerConfig {
+        // TODO(correctness): return the on-chain deserializer config.
+        &DeserializerConfig::DEFAULT
+    }
+
+    fn verifier_config(&self) -> &VerifierConfig {
+        // TODO(correctness): return the on-chain verifier config.
+        &VerifierConfig::DEFAULT
     }
 
     // TODO(perf): fetches and BCS-deserializes the address's entire
@@ -163,7 +166,7 @@ struct ProviderState {
     ///
     /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
     /// gets hashed by its crypto digest.
-    groups: FxHashMap<StateKey, Option<Arc<GroupMembers>>>,
+    groups: FxHashMap<StateKey, Option<GroupMembers>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -208,9 +211,10 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             Some(group_ty) => {
                 let tag = nominal_tag(group_ty)?;
                 let group_key = StateKey::resource_group(&key.address(), &tag);
+                let member_tag = nominal_tag(key.value_ty())?;
                 Ok(self
                     .group_members(&group_key)?
-                    .and_then(|members| members.get(&key.value_ty()).cloned()))
+                    .and_then(|members| members.get(&member_tag).cloned()))
             },
         }
     }
@@ -278,17 +282,20 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     /// Loaded from the state view on first access, caching absence as well so a
     /// missing group is read at most once.
+    // TODO(perf): Change read-API to be fine grained! We only need to get all members
+    //   for materialization on the write path where copy is needed. But read-path can
+    //   and should avoid full copies.
     fn group_members(
         &self,
         group_key: &StateKey,
-    ) -> Result<Option<Arc<GroupMembers>>, ResourceProviderError> {
+    ) -> Result<Option<GroupMembers>, ResourceProviderError> {
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
         let members = match self.state_view.get_state_value(group_key).map_err(|e| {
             ResourceProviderError::InvariantViolation(format!("group read failed: {e}"))
         })? {
-            Some(value) => Some(Arc::new(decode_group_members(value.bytes(), self.guard)?)),
+            Some(value) => Some(decode_group_members(value.bytes())?),
             None => None,
         };
         self.inner

@@ -134,9 +134,8 @@ pub fn load_inputs(
     let mut inputs = vec![];
     for (block, read_set) in blocks.into_iter().zip(read_sets) {
         let state = InMemoryStateStore::new_with_state_values(read_set);
-        crate::gas::make_gas_free(&state)?;
+        vm_comparison::prepare_state(&state)?;
         let state = Arc::new(state);
-        let mut version = block.begin_version;
         for (i, txn) in block.transactions.iter().enumerate() {
             if let Some(txn) = as_benchmark_transaction(txn) {
                 let aux_info = block
@@ -145,13 +144,12 @@ pub fn load_inputs(
                     .copied()
                     .unwrap_or(PersistedAuxiliaryInfo::None);
                 inputs.push(BenchmarkInput {
-                    version,
+                    version: block.begin_version + i as u64,
                     txn,
                     aux_info,
                     state: Arc::clone(&state),
                 });
             }
-            version += 1;
         }
     }
     Ok(inputs)

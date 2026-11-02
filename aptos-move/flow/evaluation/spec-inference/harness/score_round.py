@@ -27,6 +27,7 @@ import asyncio
 import hashlib
 import json
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ from typing import Any
 from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
 from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig
+from .identifiers import resolve_within
 from .mutants import (
     NO_MUTANTS,
     mutation_fingerprint,
@@ -43,8 +45,27 @@ from .mutants import (
 )
 
 
+class _ScoringApparatus:
+    """The live scoring identities, computed at most once for this round."""
+
+    def __init__(self, config: ExperimentConfig) -> None:
+        self.config = config
+
+    @cached_property
+    def config_sha256(self) -> str:
+        return hashlib.sha256(canonical_json(asdict(self.config))).hexdigest()
+
+    @cached_property
+    def harness_sha256(self) -> str:
+        return tree_hash(Path(__file__).resolve().parent)
+
+    @cached_property
+    def stage_executables(self) -> dict[str, dict[str, Any]]:
+        return tool_executables(self.config)
+
+
 def _require_scoring_apparatus_agrees(
-    config: ExperimentConfig, record: dict[str, Any], run_id: str
+    apparatus: _ScoringApparatus, record: dict[str, Any], run_id: str
 ) -> None:
     """Refuse to measure a run with an apparatus it did not run under.
 
@@ -61,7 +82,7 @@ def _require_scoring_apparatus_agrees(
     """
     expected_config = record.get("config_sha256")
     if expected_config is not None:
-        actual_config = hashlib.sha256(canonical_json(asdict(config))).hexdigest()
+        actual_config = apparatus.config_sha256
         if actual_config != expected_config:
             raise ValueError(
                 f"run {run_id} ran under experiment configuration "
@@ -75,7 +96,7 @@ def _require_scoring_apparatus_agrees(
     # ran under for the same reason, and scoring reads the same pin.
     expected_harness = record.get("controller_harness_sha256")
     if expected_harness is not None:
-        actual_harness = tree_hash(Path(__file__).resolve().parent)
+        actual_harness = apparatus.harness_sha256
         if actual_harness != expected_harness:
             raise ValueError(
                 f"harness changed since run {run_id} was recorded: expected "
@@ -85,7 +106,7 @@ def _require_scoring_apparatus_agrees(
             )
     expected_stages = record.get("stage_executables")
     if expected_stages:
-        changed = changed_stages(expected_stages, tool_executables(config))
+        changed = changed_stages(expected_stages, apparatus.stage_executables)
         if changed:
             raise ValueError(
                 f"stage executable(s) changed since run {run_id} was recorded "
@@ -182,6 +203,7 @@ async def score_round(
         raise FileNotFoundError(runs_dir)
     scored: list[dict[str, Any]] = []
     pending: list[PendingScore] = []
+    apparatus = _ScoringApparatus(config)
     for artifact in sorted(path for path in runs_dir.iterdir() if path.is_dir()):
         record_path = artifact / "run.json"
         if not record_path.is_file():
@@ -209,7 +231,7 @@ async def score_round(
         # records one for every run. Reporting the judge state as the terminal
         # status made a compile failure, a timeout and an exhausted budget
         # indistinguishable in the round's own scoring record.
-        _require_scoring_apparatus_agrees(config, record, run_id)
+        _require_scoring_apparatus_agrees(apparatus, record, run_id)
         result = record.get("result") or {}
         judge = result.get("eventual_judge") or {}
         status = judge.get("state")
@@ -265,7 +287,10 @@ async def score_round(
                 repeated = overlapping_mutations(
                     load_object(manifest)["mutants"],
                     set(shown),
-                    artifact / "baseline" / record["package_relpath"],
+                    resolve_within(
+                        artifact / "baseline", record["package_relpath"], "package_relpath",
+                        allow_root=True,
+                    ),
                 )
                 if repeated:
                     raise ValueError(
@@ -284,7 +309,10 @@ async def score_round(
             # escaping symlinks have been defused -- scoring the live
             # workspace would compile the wrong tree for a nested package and
             # could fail on a link the finalized record was built to survive.
-            baseline = artifact / "baseline" / record["package_relpath"]
+            baseline = resolve_within(
+                artifact / "baseline", record["package_relpath"], "package_relpath",
+                allow_root=True,
+            )
             pending.append(
                 PendingScore(
                     entry,

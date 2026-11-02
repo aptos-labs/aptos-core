@@ -6,7 +6,7 @@ use aptos_data_client::interface::{Response, ResponsePayload};
 use aptos_storage_interface::StateKind;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use std::{
@@ -46,6 +46,7 @@ pub enum DataPayload {
     ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProofV2),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     EndOfStream,
+    HotStateValuesWithProof(HotStateValueChunkWithProof),
     StateValuesWithProof(StateKind, StateValueChunkWithProof),
     TransactionOutputsWithProof(TransactionOutputListWithProofV2),
     TransactionsWithProof(TransactionListWithProofV2),
@@ -55,8 +56,10 @@ pub enum DataPayload {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataClientRequest {
     EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest),
+    HotStateValuesWithProof(HotStateValuesWithProofRequest),
     NewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest),
     NewTransactionsWithProof(NewTransactionsWithProofRequest),
+    NumberOfHotStates(NumberOfHotStatesRequest),
     NumberOfStates(NumberOfStatesRequest),
     StateValuesWithProof(StateValuesWithProofRequest),
     TransactionsWithProof(TransactionsWithProofRequest),
@@ -73,8 +76,10 @@ impl DataClientRequest {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::HotStateValuesWithProof(_) => "hot_state_values_with_proof",
             Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
             Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
+            Self::NumberOfHotStates(_) => "number_of_hot_states",
             Self::NumberOfStates(_) => "number_of_states",
             Self::StateValuesWithProof(_) => "state_values_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
@@ -129,6 +134,14 @@ pub struct StateValuesWithProofRequest {
     pub state_kind: StateKind,
 }
 
+/// A request for fetching hot state values.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HotStateValuesWithProofRequest {
+    pub version: Version,
+    pub start_index: u64,
+    pub end_index: u64,
+}
+
 /// A client request for fetching epoch ending ledger infos.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EpochEndingLedgerInfosRequest {
@@ -157,6 +170,12 @@ pub struct NewTransactionsOrOutputsWithProofRequest {
 pub struct NewTransactionOutputsWithProofRequest {
     pub known_version: Version,
     pub known_epoch: Epoch,
+}
+
+/// A client request for fetching the number of hot states at a version.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NumberOfHotStatesRequest {
+    pub version: Version,
 }
 
 /// A client request for fetching the number of states (of the given kind) at a version.

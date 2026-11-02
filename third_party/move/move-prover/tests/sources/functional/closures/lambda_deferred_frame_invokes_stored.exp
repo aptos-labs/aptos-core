@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `g` may modify: the closure's target invokes a function value whose effects no `modifies_of` declaration bounds
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_invokes_stored.move:38:9
+   │
+38 │         call_g(|y| run(y), before + 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -18,6 +18,7 @@ from harness.pilot_sandbox import (
     _require_inside_round,
     _required_solver,
     _round_directory,
+    _write_code_mode_host_wrapper,
     agent_landlock_paths,
     build_bwrap_command,
     build_bwrap_environment,
@@ -42,6 +43,7 @@ def _example_launch(root: Path) -> Launch:
         claude=root / "claude",
         boogie=root / "boogie",
         boogie_client=root / "boogie-proxy-client.py",
+        mcp_client=root / "stdio-proxy-client.py",
         z3=root / "z3",
         landlock=root / "landlock-exec",
         feedback_level="acceptance",
@@ -109,9 +111,12 @@ class PilotSandboxTest(unittest.TestCase):
         # The security property, asserted unconditionally: this is the only
         # test that runs the real `landlock-exec`, and nothing in CI runs it.
         result = preflight()
-        self.assertEqual(4, result["policy_version"])
+        self.assertEqual(8, result["policy_version"])
         self.assertTrue(result["isolation"], result["detail"])
-        self.assertIn("host-path-and-agent-proc-isolation=passed", result["detail"])
+        self.assertIn(
+            "host-path-agent-proc-and-all-protocol-network-isolation=passed",
+            result["detail"],
+        )
 
     def test_preflight_runs_the_prover_chain_as_an_agent_grandchild(self) -> None:
         # Whether this host can run the solver chain is a separate question,
@@ -154,6 +159,7 @@ class PilotSandboxTest(unittest.TestCase):
                     "claude",
                     "boogie",
                     "boogie-proxy-client.py",
+                    "stdio-proxy-client.py",
                     "z3",
                     "landlock",
                 )
@@ -175,6 +181,7 @@ class PilotSandboxTest(unittest.TestCase):
                 claude=paths["claude"],
                 boogie=paths["boogie"],
                 boogie_client=paths["boogie-proxy-client.py"],
+                mcp_client=paths["stdio-proxy-client.py"],
                 z3=paths["z3"],
                 landlock=paths["landlock"],
                 feedback_level="acceptance",
@@ -195,6 +202,30 @@ class PilotSandboxTest(unittest.TestCase):
             "test-subscription-token", environment["CLAUDE_CODE_OAUTH_TOKEN"]
         )
         self.assertNotIn("host-value", environment.values())
+
+    def test_codex_environment_excludes_other_provider_credentials(self) -> None:
+        launch = dataclasses.replace(
+            _example_launch(Path("/eval")),
+            agent_runtime="codex",
+            codex=Path("/eval/codex"),
+        )
+        inherited = {
+            "ANTHROPIC_AUTH_TOKEN": "glm-secret",
+            "ANTHROPIC_API_KEY": "api-secret",
+            "CLAUDE_CODE_OAUTH_TOKEN": "oauth-secret",
+            "ANTHROPIC_BASE_URL": "https://provider.invalid",
+            "SSL_CERT_FILE": "/etc/ssl/cert.pem",
+        }
+        with patch.dict(os.environ, inherited, clear=True):
+            environment = build_bwrap_environment(launch)
+        for name in (
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+        ):
+            self.assertNotIn(name, environment)
+        self.assertEqual("/etc/ssl/cert.pem", environment["SSL_CERT_FILE"])
 
     def test_the_agent_is_confined_more_narrowly_than_the_sandbox(self) -> None:
         launch = _example_launch(Path("/eval"))
@@ -217,6 +248,35 @@ class PilotSandboxTest(unittest.TestCase):
         self.assertNotIn(launch.boogie, readable + writable)
         self.assertIn(launch.z3, readable)
         self.assertIn(Path("/opt"), readable)
+
+    def test_codex_gets_only_the_mcp_bridge_not_move_flow(self) -> None:
+        launch = dataclasses.replace(
+            _example_launch(Path("/eval")),
+            agent_runtime="codex",
+            codex=Path("/eval/codex"),
+        )
+        readable, writable = agent_landlock_paths(launch)
+        run_dir = launch.artifacts / launch.run_id
+        self.assertNotIn(launch.move_flow, readable)
+        self.assertNotIn(launch.z3, readable)
+        self.assertIn(launch.artifacts / launch.run_id / "plugin", readable)
+        self.assertNotIn(run_dir / "mcp.runtime.json", readable)
+        self.assertNotIn(run_dir / "baseline", readable)
+        self.assertNotIn(run_dir / "flow-events.jsonl", writable)
+        self.assertIn(Path("/opt"), readable)
+
+    def test_codex_code_mode_host_cannot_read_the_private_auth_home(self) -> None:
+        launch = dataclasses.replace(
+            _example_launch(Path("/eval")),
+            agent_runtime="codex",
+            codex=Path("/eval/codex"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            wrapper = _write_code_mode_host_wrapper(launch, Path(temporary))
+            command = wrapper.read_text()
+        private_home = str(launch.artifacts / ".sandbox-home")
+        self.assertNotIn(f"--rw {private_home}", command)
+        self.assertIn(str(launch.artifacts / launch.run_id / "workspace"), command)
 
     def test_the_agent_boogie_is_the_proxy_client(self) -> None:
         launch = _example_launch(Path("/eval"))
@@ -242,7 +302,12 @@ class PilotSandboxTest(unittest.TestCase):
             _reject_development_options(
                 [sys.executable, "-m", "harness.controller", "--agent", "fake"]
             )
-        self.assertIn("permits only --agent claude", str(raised.exception))
+        self.assertIn("permits only --agent claude or codex", str(raised.exception))
+
+    def test_production_wrapper_accepts_codex_agent(self) -> None:
+        _reject_development_options(
+            [sys.executable, "-m", "harness.controller", "--agent", "codex"]
+        )
 
     def test_production_wrapper_rejects_development_options(self) -> None:
         for option in ("--fake-script", "--allow-unsandboxed"):

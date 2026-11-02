@@ -9,11 +9,11 @@ use crate::{
     engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
     resource_provider::InMemoryResourceProvider,
 };
-use aptos_types::on_chain_config::{Features, OnChainConfig};
+use aptos_types::on_chain_config::aptos_test_feature_flags_genesis;
 use legacy_move_compiler::unit_test::{ExpectedFailure, NamedOrBytecodeModule, TestCase};
 use mono_move_core::{
     types::{is_signer_or_signer_immut_ref, EMPTY_TYPE_LIST},
-    ExecutionErrorKind, GasMeter, Interner, VMInternalError,
+    ExecutionErrorKind, GasMeter, VMInternalError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
@@ -28,9 +28,9 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{AbortLocation, StatusCode},
 };
-use move_model::metadata::LanguageVersion;
 use move_package::BuildConfig;
 use move_unit_test::{test_reporter::MoveError, UnitTestingConfig};
+use move_vm_test_utils::InMemoryStorage;
 use std::{
     collections::BTreeMap,
     fmt::Write,
@@ -43,16 +43,8 @@ const GAS_BUDGET: u64 = u64::MAX;
 
 pub fn run_package_unit_tests(
     pkg_path: &Path,
-    use_latest_language: bool,
+    build_config: BuildConfig,
 ) -> anyhow::Result<RunSummary> {
-    let mut build_config = BuildConfig::default();
-    if use_latest_language {
-        let language_version = LanguageVersion::latest();
-        let bytecode_version = language_version.infer_bytecode_version(None);
-        build_config.compiler_config.language_version = Some(language_version);
-        build_config.compiler_config.bytecode_version = Some(bytecode_version);
-    }
-
     let test_plan = move_unit_test::package_test::build_test_plan_for_package(
         pkg_path,
         build_config,
@@ -69,7 +61,12 @@ pub fn run_package_unit_tests(
         module_provider.add_module(module_of(info));
     }
 
-    let resource_provider = seed_features(&guard);
+    // Seeds the state V1's unit-test runner starts from.
+    let mut storage = InMemoryStorage::new();
+    storage
+        .apply(aptos_test_feature_flags_genesis())
+        .expect("the feature flag genesis applies to empty storage");
+    let resource_provider = InMemoryResourceProvider::new(&guard, &storage);
 
     let mut summary = RunSummary::default();
     for (module_id, module_plan) in &test_plan.module_tests {
@@ -93,26 +90,6 @@ fn module_of(info: &NamedOrBytecodeModule) -> &CompiledModule {
         NamedOrBytecodeModule::Named(named) => &named.module,
         NamedOrBytecodeModule::Bytecode(module) => module,
     }
-}
-
-/// Heap for the seeded `Features` resource. Only that one small resource lives
-/// here, so a modest fixed size is plenty.
-const RESOURCE_HEAP_SIZE: usize = 1 << 20;
-
-/// Builds a resource provider publishing the framework `Features` resource at
-/// `0x1`, initialized to [`Features::default_for_tests`].
-fn seed_features<'guard, 'ctx>(
-    guard: &'guard ExecutionGuard<'ctx>,
-) -> InMemoryResourceProvider<'guard, 'ctx> {
-    let struct_tag = Features::struct_tag();
-    let module_id = guard.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
-    let name = guard.identifier_of(struct_tag.name.as_ident_str());
-    let ty = guard.nominal_of(module_id, name, guard.type_list_of(&[]));
-    let bytes = bcs::to_bytes(&Features::default_for_tests()).expect("Features serializes");
-
-    let mut provider = InMemoryResourceProvider::new(guard, RESOURCE_HEAP_SIZE);
-    provider.add_resource(struct_tag.address, ty, bytes);
-    provider
 }
 
 /// Execute one test function on mono-move and adjudicate it against its
@@ -176,8 +153,6 @@ fn execute(
         Ok(function) => function,
         Err(err) => return classify_error(&err),
     };
-    // TODO(correctness): remove once the loader verifies lowered functions itself.
-    mono_move_runtime::assert_verified(function, guard);
 
     assert_eq!(
         test.arguments.len(),
@@ -197,7 +172,7 @@ fn execute(
                 call.arg(arg)?;
             }
         }
-        call.run()
+        Ok(call.run()?.into_status())
     })();
 
     match outcome {
@@ -206,6 +181,7 @@ fn execute(
             code,
             message,
             location,
+            ..
         }) => TestResult::Failure(MoveError(
             StatusCode::ABORTED,
             Some(code),
@@ -264,12 +240,14 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
         // implement, or a feature the specializer/verifier can't lower.
         LoaderError::NativeFunctionNotLoadable { .. }
         | LoaderError::LoweringSkipped { .. }
+        | LoaderError::ResourceLayoutNotDerivable
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),
         // Genuine problems: storage/context infrastructure errors, or a VM bug.
         // Unit tests never load scripts.
         LoaderError::GlobalContext(_)
         | LoaderError::InvariantViolation(_)
+        | LoaderError::NativeShadowsMoveFunction { .. }
         | LoaderError::ScriptDeserializationFailed { .. }
         | LoaderError::ScriptVerificationFailed { .. } => TestResult::Error(err.to_string()),
     }

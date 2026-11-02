@@ -15,7 +15,8 @@ three invariants held jointly by the compiler, the verifier, and the runtime.
 Any change that could break one needs a matching verifier check or a proof:
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by
-   call/return, never by user micro-ops.
+   call/return (the call protocol also sets the checked-frame flag, packed into
+   the `saved_pc` word), never by user micro-ops.
 2. **Pointer-slot accuracy** — `Function::frame_layout` and the matching
    `safe_point_layouts` entries exactly describe the frame slots holding live
    heap pointers. The GC trusts them to find roots.
@@ -23,7 +24,8 @@ Any change that could break one needs a matching verifier check or a proof:
    `obj_ptr - 8` and `obj_ptr - 4`, written by the allocator. User micro-ops
    address only offsets `>= 0`, so they cannot reach the header.
 
-`verify_program` checks frame-access bounds, metadata overlap, jump targets, and
+`mono_move_core::verify_function` (run by the loader on every lowered function
+before it is cached) checks frame-access bounds, metadata overlap, jump targets, and
 descriptor validity before execution. Everything else is the compiler's
 responsibility.
 

@@ -29,11 +29,12 @@ use mono_move_core::{
     align_max, checked_align_max,
     native::{NativeABI, NativeExtensions},
     types::InternedType,
-    DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
-    ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    DescriptorId, DescriptorProvider, FrameOffset, Function, ObjectDescriptorInner, ReadPin,
+    RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
+use mono_move_global_context::ExecutionGuard;
 use std::{cell::RefCell, ptr::NonNull};
 
 // ---------------------------------------------------------------------------
@@ -205,17 +206,6 @@ pub(crate) mod macros {
 /// (likely driven by gas limits).
 const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
 
-/// True if `bump_ptr + size` still lies within the heap buffer (or one
-/// byte past the end). Compares integer addresses to avoid forming an
-/// out-of-bounds raw pointer through `add`.
-fn fits_in_buffer(heap: &Heap, size: usize) -> bool {
-    let bump_addr = heap.bump_ptr as usize;
-    let end_addr = heap.buffer.as_ptr() as usize + heap.buffer.len();
-    bump_addr
-        .checked_add(size)
-        .is_some_and(|end| end <= end_addr)
-}
-
 /// Heap state for a single interpreter context.
 pub struct Heap {
     /// Backing memory. Swapped with a fresh `MemoryRegion` on every GC
@@ -232,18 +222,37 @@ pub struct Heap {
 }
 
 impl Heap {
-    /// Creates a heap backed by an uninitialized buffer of the given size.
-    ///
-    /// The buffer is not zeroed. This is sound only while this contract holds:
-    /// every heap object is fully written before any byte of it is read, and
-    /// nothing reads the unbumped tail `[bump_ptr, buffer.end)`.
+    /// Creates a heap backed by a fresh buffer of the given size.
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new_uninit(size);
+        Self::from_region(MemoryRegion::new_scratch(size))
+    }
+
+    /// Creates a heap over `buffer`, with nothing allocated yet.
+    ///
+    /// The buffer is adopted as is and may hold a dead session's bytes.
+    /// `heap_alloc` zeroes every object over its full aligned size before
+    /// returning it, so no allocation can observe them.
+    pub(crate) fn from_region(buffer: MemoryRegion) -> Self {
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
             gc_count: 0,
         }
+    }
+
+    /// Gives up the backing buffer, discarding everything allocated in it.
+    pub(crate) fn into_region(self) -> MemoryRegion {
+        self.buffer
+    }
+
+    /// Bytes allocated so far. An upper bound on how much is still live.
+    pub(crate) fn used(&self) -> usize {
+        self.bump_ptr as usize - self.buffer.as_ptr() as usize
+    }
+
+    /// Size of the backing buffer, in bytes.
+    pub fn capacity(&self) -> usize {
+        self.buffer.len()
     }
 
     /// Rewinds the bump pointer to the start of the buffer, discarding all allocations. The buffer
@@ -271,15 +280,20 @@ impl Heap {
 }
 
 /// A session heap that has been frozen: no further execution can mutate it, so
-/// its allocations never move. It exposes no APIs; wrapping keeps the raw [`Heap`]
-/// methods unreachable so the only thing a holder can do is keep the heap alive,
-/// which is exactly what pinning a read against another transaction's heap needs.
-pub struct FrozenHeap(#[allow(dead_code)] Heap);
+/// its allocations never move. Wrapping keeps the raw [`Heap`] methods
+/// unreachable, so a holder can do nothing but keep the heap alive, which is
+/// exactly what pinning a read against another transaction's heap needs.
+pub struct FrozenHeap(Heap);
 
 impl FrozenHeap {
     /// Freezes a session heap.
     pub fn new(heap: Heap) -> Self {
         Self(heap)
+    }
+
+    /// Bytes this heap holds down for as long as it is pinned.
+    pub fn capacity(&self) -> usize {
+        self.0.capacity()
     }
 }
 
@@ -298,7 +312,7 @@ pub struct SharedArena {
 }
 
 impl SharedArena {
-    /// Creates a shared arena backed by an uninitialized buffer of `size` bytes.
+    /// Creates a shared arena backed by a fresh buffer of `size` bytes.
     pub fn new(size: usize) -> Self {
         Self {
             heap: RefCell::new(Heap::new(size)),
@@ -349,9 +363,9 @@ impl AllocationError {
 /// Runs allocation function; on [`AllocationError::OutOfHeapMemory`] runs GC
 /// once and retries again. If allocation fails on retry, returns a runtime
 /// error.
-pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
+pub(crate) fn alloc_or_gc(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -362,7 +376,7 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
     match try_alloc(heap) {
         Ok(ptr) => Ok(ptr),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
-            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+            gc_collect(heap, guard, rws, extra_roots, extensions, fp, top_frame)?;
             try_alloc(heap).map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
         Err(e) => Err(VMInternalError::new(e.into_runtime_error())),
@@ -376,9 +390,9 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
 ///
 /// `root` must point to the data region of a live object whose header is at
 /// `root - OBJECT_HEADER_SIZE`.
-pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
+pub(crate) unsafe fn deep_copy_or_gc(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -390,19 +404,82 @@ pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
     let root_guard = unsafe { extra_roots.root_object(root.as_ptr()) };
     // SAFETY: the rooted object is live, so its (possibly relocated) pointer is
     // non-null.
-    match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr())) } {
+    match unsafe { heap.try_deep_copy(guard, NonNull::new_unchecked(root_guard.ptr())) } {
         Ok(ptr) => Ok(ptr),
         Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
-            gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+            gc_collect(heap, guard, rws, extra_roots, extensions, fp, top_frame)?;
             // SAFETY: the handle kept the source live across GC; re-read its
             // relocated, still-non-null pointer.
             unsafe {
-                heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr()))
+                heap.try_deep_copy(guard, NonNull::new_unchecked(root_guard.ptr()))
                     .map_err(|e| VMInternalError::new(e.into_runtime_error()))
             }
         },
     }
+}
+
+/// Deep-copies each of `sources`, returning the new root pointers in the same
+/// order. Automatically runs GC and retries when out of memory.
+///
+/// All sources are rooted for the whole batch, so a GC triggered partway through
+/// preserves and relocates the not-yet-copied ones. Because `try_deep_copy`
+/// never GCs mid-copy, a *successful* pass builds every result without an
+/// intervening GC, so the already-built results need no root of their own — only
+/// the sources are rooted. Mirrors [`deep_copy_or_gc`]'s single
+/// GC-then-retry-once policy, batched over all sources.
+///
+/// # Safety
+///
+/// Every source must point to the data region of a live object whose header is
+/// at `source - OBJECT_HEADER_SIZE`.
+pub(crate) unsafe fn deep_copy_batch_or_gc(
+    heap: &mut Heap,
+    guard: &ExecutionGuard<'_>,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    sources: &[NonNull<u8>],
+) -> VMResult<Vec<NonNull<u8>>> {
+    // SAFETY: each source is a live object (this function's contract); the
+    // handle keeps it live and relocated across any GC during the batch.
+    let roots = sources
+        .iter()
+        .map(|&src| unsafe { extra_roots.root_object(src.as_ptr()) })
+        .collect::<Vec<_>>();
+
+    // First attempt. On out-of-memory, the partial copies are unrooted garbage;
+    // drop them, GC (which relocates the rooted sources), and retry the whole
+    // batch once.
+    let mut out = Vec::with_capacity(roots.len());
+    let mut needs_gc = false;
+    for root in &roots {
+        // SAFETY: each root holds a live object; GC keeps `root.ptr()` valid
+        // and relocated.
+        match unsafe { heap.try_deep_copy(guard, NonNull::new_unchecked(root.ptr())) } {
+            Ok(ptr) => out.push(ptr),
+            Err(AllocationError::RuntimeError(err)) => return Err(VMInternalError::new(err)),
+            Err(AllocationError::OutOfHeapMemory { .. }) => {
+                needs_gc = true;
+                break;
+            },
+        }
+    }
+    if !needs_gc {
+        return Ok(out);
+    }
+
+    gc_collect(heap, guard, rws, extra_roots, extensions, fp, top_frame)?;
+    out.clear();
+    for root in &roots {
+        // SAFETY: as above, after relocation.
+        let ptr = unsafe { heap.try_deep_copy(guard, NonNull::new_unchecked(root.ptr())) }
+            .map_err(|e| VMInternalError::new(e.into_runtime_error()))?;
+        out.push(ptr);
+    }
+    Ok(out)
 }
 
 /// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
@@ -414,16 +491,12 @@ pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
 /// `dst` must be writable for `ty`'s layout size, and `bytes` must not alias the
 /// heap, since a GC may relocate heap objects.
 #[allow(clippy::too_many_arguments)]
-pub(crate) unsafe fn deserialize_or_gc<
-    L: LayoutProvider + ?Sized,
-    P: DescriptorProvider + ?Sized,
->(
-    layouts: &L,
+pub(crate) unsafe fn deserialize_or_gc(
     heap: &mut Heap,
+    guard: &ExecutionGuard<'_>,
     ty: InternedType,
     bytes: &[u8],
     dst: *mut u8,
-    provider: &P,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -431,13 +504,13 @@ pub(crate) unsafe fn deserialize_or_gc<
     top_frame: TopFrame<'_>,
 ) -> VMResult<()> {
     // SAFETY: forwarded from this function's contract.
-    match unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) } {
+    match unsafe { crate::value_conv::bcs::deserialize(guard, heap, ty, bytes, dst) } {
         Ok(()) => Ok(()),
         Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
             gc_collect(
                 heap,
-                provider,
+                guard,
                 rws,
                 extra_roots,
                 extensions,
@@ -445,7 +518,7 @@ pub(crate) unsafe fn deserialize_or_gc<
                 top_frame,
             )?;
             // SAFETY: as above.
-            unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) }
+            unsafe { crate::value_conv::bcs::deserialize(guard, heap, ty, bytes, dst) }
                 .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
     }
@@ -531,12 +604,7 @@ pub(crate) fn heap_alloc(
         }));
     }
 
-    // Bound check uses integer arithmetic on addresses rather than
-    // `bump_ptr.add(aligned_size)` against `buffer.as_ptr().add(buffer.len())`:
-    // pointer arithmetic that produces a result more than one byte past
-    // the end of the buffer is UB, so we cannot legally form the
-    // out-of-bounds pointer just to compare it.
-    if !fits_in_buffer(heap, aligned_size) {
+    if !heap.buffer.contains_range(heap.bump_ptr, aligned_size) {
         return Err(AllocationError::OutOfHeapMemory {
             requested: aligned_size,
         });
@@ -571,9 +639,9 @@ pub(crate) fn heap_alloc(
 /// Reserve `total_size` bytes (object header + payload) on the heap, running a
 /// GC and retrying once on out-of-memory. Shared tail of the `alloc_*` entry
 /// points below, which differ only in how `total_size` is computed.
-fn alloc_sized<P: DescriptorProvider + ?Sized>(
+fn alloc_sized(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -584,7 +652,7 @@ fn alloc_sized<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<*mut u8> {
     alloc_or_gc(
         heap,
-        provider,
+        guard,
         rws,
         extra_roots,
         extensions,
@@ -600,9 +668,9 @@ fn alloc_sized<P: DescriptorProvider + ?Sized>(
 /// before needing to grow — *not* a byte size. Total bytes allocated
 /// are roughly `capacity_in_elems * elem_size + OBJECT_HEADER_SIZE +
 /// VEC_DATA_OFFSET`, rounded up to `MAX_ALIGN`.
-pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
+pub(crate) fn alloc_vec(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -616,7 +684,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     // `length` defaults to 0 via heap_alloc's zero-init.
     alloc_sized(
         heap,
-        provider,
+        guard,
         rws,
         extra_roots,
         extensions,
@@ -670,9 +738,9 @@ pub(crate) fn alloc_enum_no_gc(
 
 /// Allocate a new zeroed heap object (struct or enum). Size comes from the
 /// descriptor at `descriptor_id`.
-pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
+pub(crate) fn alloc_obj(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -680,7 +748,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
 ) -> VMResult<*mut u8> {
-    let desc = match provider.descriptor(descriptor_id) {
+    let desc = match guard.descriptor(descriptor_id) {
         Some(desc) => desc,
         None => invariant_violation!(DescriptorNotFound {
             descriptor_id: descriptor_id.as_u32(),
@@ -703,7 +771,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     let total_size = OBJECT_HEADER_SIZE + payload_size;
     alloc_sized(
         heap,
-        provider,
+        guard,
         rws,
         extra_roots,
         extensions,
@@ -718,9 +786,9 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
 /// is a parameter, not read from the descriptor, so layouts sharing a trace
 /// shape share one `descriptor_id`: `Trivial` when pointer-free, else a
 /// `CapturedData` descriptor.
-pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
+pub(crate) fn alloc_captured_data(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -732,7 +800,7 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
     let total_size = OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + values_size as usize;
     alloc_sized(
         heap,
-        provider,
+        guard,
         rws,
         extra_roots,
         extensions,
@@ -752,9 +820,9 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
 /// `old` is null or a live vector of `elem_size`-byte elements. Rooting keeps
 /// it live across the allocation's GC, so its contents survive the copy.
 #[allow(clippy::too_many_arguments)]
-pub(crate) unsafe fn realloc_vec<P: DescriptorProvider + ?Sized>(
+pub(crate) unsafe fn realloc_vec(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -784,7 +852,7 @@ pub(crate) unsafe fn realloc_vec<P: DescriptorProvider + ?Sized>(
     let old_handle = unsafe { extra_roots.root_object(old) };
     let new_ptr = alloc_vec(
         heap,
-        provider,
+        guard,
         rws,
         extra_roots,
         extensions,
@@ -819,9 +887,9 @@ pub(crate) unsafe fn realloc_vec<P: DescriptorProvider + ?Sized>(
 /// `fp` must point to a valid frame and `vec_ref_offset` to a 16-byte fat
 /// pointer whose target holds the current (non-null) vector pointer. The GC
 /// updates that fat pointer, so it is re-read for the write-back.
-pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
+pub(crate) fn grow_vec_ref(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -844,7 +912,7 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 
         let new_ptr = realloc_vec(
             heap,
-            provider,
+            guard,
             rws,
             extra_roots,
             extensions,
@@ -889,9 +957,9 @@ pub(crate) enum TopFrame<'a> {
 /// interpreter and the micro-op verifier:
 ///
 /// - **Frame metadata integrity**: each frame's saved `fp`, `func_ptr`,
-///   and `pc` are written by [`MicroOp::Return`], [`MicroOp::CallDirect`],
-///   [`MicroOp::CallIndirect`] and never modified by user-visible micro-ops.
-///   A corrupted saved `fp` leads to out-of-bounds stack reads (UB).
+///   and `pc` are written only by frame initialization and the call protocol,
+///   never by user-visible data operations. A corrupted saved `fp` leads to
+///   out-of-bounds stack reads (UB).
 /// - **Pointer-slot accuracy**: `Function::frame_layout` (and the
 ///   matching `safe_point_layouts` entry, if any) together list every
 ///   frame offset that may hold a live heap pointer, and *only* those
@@ -901,9 +969,9 @@ pub(crate) enum TopFrame<'a> {
 ///   in every heap object header are set by the allocator and never
 ///   overwritten by user code. Corrupted headers → wrong copy size or
 ///   wrong reference tracing (UB).
-pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
+pub(crate) fn gc_collect(
     heap: &mut Heap,
-    provider: &P,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     extra_roots: &RootPool,
     extensions: &NativeExtensions,
@@ -912,9 +980,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<()> {
     heap.gc_count += 1;
 
-    // Uninitialized is safe: the copy below fills to-space contiguously up to
-    // `free_ptr`, and the Phase-2 scan only reads `[to_space.start, free_ptr)`.
-    let to_space = MemoryRegion::new_uninit(heap.buffer.len());
+    let to_space = guard.take_region(heap.capacity());
     // `free_ptr` is a raw bump cursor — it points at the start of the
     // next *header* reservation, advancing by each object's total size.
     // Treating it as a raw cursor (rather than as an "object pointer"
@@ -1003,14 +1069,36 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
-    // `scan_ptr` is a raw cursor — header start of the next object to
-    // scan. Object pointers (data starts) are `scan_ptr + H`.
+    gc_scan_to_space(guard, &mut scanner, &to_space)?;
+
+    // Phase 3: swap — adopt to-space and park from-space for the next
+    // collection. The bump cursor semantics match `free_ptr` directly (both
+    // are raw header-start cursors).
+    let RootScanner { free_ptr, .. } = scanner;
+    guard.return_region(std::mem::replace(&mut heap.buffer, to_space));
+    heap.bump_ptr = free_ptr;
+    Ok(())
+}
+
+/// Cheney-style breadth-first scan of the objects already copied into
+/// `to_space`, following their pointers until nothing new is copied.
+///
+/// Mutates only the scanner, so the caller decides what becomes of from-space
+/// afterwards: [`gc_collect`] adopts `to_space` in place of it, while
+/// [`evacuate_session_roots`] leaves it behind.
+fn gc_scan_to_space<P: DescriptorProvider + ?Sized>(
+    provider: &P,
+    scanner: &mut RootScanner<'_>,
+    to_space: &MemoryRegion,
+) -> VMResult<()> {
+    // `scan_ptr` is a raw cursor — header start of the next object to scan.
+    // Object pointers (data starts) are `scan_ptr + H`.
     let mut scan_ptr = to_space.as_ptr();
     while (scan_ptr as usize) < scanner.cursor() {
         // SAFETY: scan_ptr advances through to-space by each object's
         // aligned size. Object headers were copied verbatim by
         // gc_copy_object, so descriptor_id and size are valid as long
-        // as the object-header-integrity invariant holds (see above).
+        // as the object-header-integrity invariant holds (see `gc_collect`).
         unsafe {
             let obj_ptr = scan_ptr.add(OBJECT_HEADER_SIZE);
             let descriptor_id = read_descriptor(obj_ptr);
@@ -1023,19 +1111,64 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
             if descriptor_id == FORWARDED_MARKER {
                 invariant_violation!(GcForwardingMarkerInToSpace);
             }
-            gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
+            gc_scan_object(provider, scanner, obj_ptr, DescriptorId(descriptor_id))?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
     }
-
-    // Phase 3: swap — drop old heap, adopt new one. The bump cursor
-    // semantics match `free_ptr` directly (both are raw header-start
-    // cursors).
-    let RootScanner { free_ptr, .. } = scanner;
-    heap.buffer = to_space;
-    heap.bump_ptr = free_ptr;
     Ok(())
+}
+
+/// Copies everything a finished session still exposes — its written resources
+/// and its native extensions — into a buffer sized to what the session
+/// allocated, and returns a heap over that buffer.
+///
+/// `heap` is left behind untouched by the caller's standards but unusable: the
+/// evacuated objects are overwritten with forwarding markers. Only the returned
+/// heap may be read afterwards.
+///
+/// The call stack is gone by this point and the root pool is empty, so `rws`
+/// and `extensions` are the complete root set. Missing a root would leave a
+/// pointer into the dead buffer, so the caller must be sure of that.
+///
+/// `to_space` must hold at least `heap.used()` bytes, and at least
+/// [`MAX_ALIGN`] so a session that allocated nothing still has a buffer a bump
+/// pointer can legally address.
+pub(crate) fn evacuate_session_roots<P: DescriptorProvider + ?Sized>(
+    heap: &Heap,
+    to_space: MemoryRegion,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extensions: &NativeExtensions,
+) -> VMResult<Heap> {
+    debug_assert!(to_space.len() >= heap.used().max(MAX_ALIGN));
+    let mut scanner = RootScanner {
+        heap,
+        free_ptr: to_space.as_ptr(),
+    };
+
+    rws.scan(&mut scanner);
+
+    // SAFETY: execution has finished, so no native holds an extension borrow
+    // and the closure cannot re-enter the extensions.
+    unsafe {
+        extensions
+            .relocate_all_roots(&mut |base| scanner.relocate(base))
+            .map_err(|_| {
+                VMInternalError::new(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::ExtensionBorrowedDuringGC,
+                ))
+            })?;
+    }
+
+    gc_scan_to_space(provider, &mut scanner, &to_space)?;
+
+    let RootScanner { free_ptr, .. } = scanner;
+    Ok(Heap {
+        bump_ptr: free_ptr,
+        buffer: to_space,
+        gc_count: 0,
+    })
 }
 
 /// Returns true if `ptr` is a valid object pointer (data-region start)
@@ -1259,4 +1392,116 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         },
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::global_storage::WriteClass;
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        storage::resource_provider::{InMemoryStorageKey, NoResourceProvider},
+        types::Type,
+        ObjectDescriptor, ObjectDescriptorTable, TRIVIAL_DESCRIPTOR_ID,
+    };
+    use mono_move_global_context::GlobalContext;
+    use move_core_types::account_address::AccountAddress;
+
+    // An `InternedType` is just an arena pointer, so a `'static` node gives a
+    // stable one without standing up an interner.
+    static TY: Type = Type::U64;
+
+    fn test_guard(ctx: &GlobalContext) -> ExecutionGuard<'_> {
+        ctx.try_execution_context(0)
+            .expect("worker 0 arena is free in a fresh context")
+    }
+
+    fn test_key() -> InMemoryStorageKey {
+        InMemoryStorageKey::Resource {
+            address: AccountAddress::ONE,
+            ty: GlobalArenaPtr::from_static(&TY),
+        }
+    }
+
+    #[test]
+    fn heap_gives_back_the_region_it_was_built_on() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = test_guard(&ctx);
+
+        let region = guard.take_region(DEFAULT_HEAP_SIZE);
+        let base = region.as_ptr();
+
+        let mut heap = Heap::from_region(region);
+        assert_eq!(heap.capacity(), DEFAULT_HEAP_SIZE);
+        assert_eq!(heap.used(), 0);
+        heap.alloc_object(OBJECT_HEADER_SIZE + 8, TRIVIAL_DESCRIPTOR_ID)
+            .expect("heap has room for one small object");
+
+        let region = heap.into_region();
+        assert_eq!(region.as_ptr(), base);
+        assert_eq!(region.len(), DEFAULT_HEAP_SIZE);
+        guard.return_region(region);
+    }
+
+    #[test]
+    fn evacuation_shrinks_to_what_the_session_allocated() {
+        const GARBAGE_COUNT: usize = 64;
+        const GARBAGE_PAYLOAD: usize = 4096;
+        const LIVE_PAYLOAD: usize = 16;
+        const SENTINEL: u64 = 0x0102_0304_0506_0708;
+
+        let mut descriptors = ObjectDescriptorTable::new();
+        let garbage_id = descriptors.push(
+            ObjectDescriptor::new_struct(GARBAGE_PAYLOAD as u32, vec![]).expect("valid descriptor"),
+        );
+        let live_id = descriptors.push(
+            ObjectDescriptor::new_struct(LIVE_PAYLOAD as u32, vec![]).expect("valid descriptor"),
+        );
+
+        let mut heap = Heap::new(DEFAULT_HEAP_SIZE);
+        for _ in 0..GARBAGE_COUNT {
+            heap.alloc_object(OBJECT_HEADER_SIZE + GARBAGE_PAYLOAD, garbage_id)
+                .expect("heap has room for the garbage");
+        }
+        let live = heap
+            .alloc_object(OBJECT_HEADER_SIZE + LIVE_PAYLOAD, live_id)
+            .expect("heap has room for the live object");
+        // SAFETY: the object was just allocated with a 16-byte payload.
+        unsafe { write_u64(live.as_ptr(), 0usize, SENTINEL) };
+
+        let key = test_key();
+        let mut rws = ResourceReadWriteSet::new();
+        rws.move_to(&NoResourceProvider, &key, None, live)
+            .expect("the resource does not exist yet");
+
+        let to_space = MemoryRegion::new_zeroed(heap.used().max(MAX_ALIGN));
+        let evacuated = evacuate_session_roots(
+            &heap,
+            to_space,
+            &descriptors,
+            &mut rws,
+            &NativeExtensions::new(),
+        )
+        .expect("evacuation succeeds");
+
+        // The copy is sized to what the session allocated, garbage included,
+        // but only the live object is copied into it.
+        assert_eq!(evacuated.capacity(), heap.used());
+        assert!(evacuated.capacity() < heap.capacity());
+        assert_eq!(
+            evacuated.used(),
+            align_max(OBJECT_HEADER_SIZE + LIVE_PAYLOAD)
+        );
+
+        let (_, class, _) = rws
+            .writes_unordered()
+            .next()
+            .expect("the resource is a write");
+        let WriteClass::Creation(moved) = class else {
+            panic!("a `move_to` of a fresh resource is a creation");
+        };
+        assert_ne!(moved, live);
+        // SAFETY: the write now points at the copy in the evacuated heap.
+        assert_eq!(unsafe { read_u64(moved.as_ptr(), 0usize) }, SENTINEL);
+    }
 }

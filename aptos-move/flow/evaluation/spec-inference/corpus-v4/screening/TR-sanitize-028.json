@@ -1,0 +1,22 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_bulk_order_utils",
+  "reference_proved": true,
+  "reference_sha256": "edfb877ee10f48c2bfdd8c3ff4036817d5fc8bcf682649caeca0d410cdef3b7e",
+  "schema_version": 2,
+  "target": "aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization",
+  "task_id": "TR-sanitize-028",
+  "task_tree_sha256": "ffca6b7834bab8e4e692226a0afba2a72cb1ae6c59cb0288e3c846654e978492",
+  "threshold_seconds": 20,
+  "wall_seconds": 7.0,
+  "well_formed": true,
+  "wp_failure_kind": "untrusted_inferred_contract",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

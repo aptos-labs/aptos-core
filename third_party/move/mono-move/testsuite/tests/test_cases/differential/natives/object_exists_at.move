@@ -3,7 +3,9 @@
 
 // RUN: publish
 module 0x1::object {
-    public native fun exists_at<T: key>(object: address): bool;
+    // The framework bounds `T` by `key`. The bound is dropped here to reach
+    // the native's own guard, which nothing the bound admits can reach.
+    public native fun exists_at<T>(object: address): bool;
 }
 module 0x42::m {
     struct R has key { v: u64 }
@@ -18,6 +20,10 @@ module 0x42::m {
     public fun absent(a: address): bool {
         0x1::object::exists_at<R>(a)
     }
+
+    public fun non_struct(a: address): bool {
+        0x1::object::exists_at<u64>(a)
+    }
 }
 
 // RUN: execute 0x42::m::present --args 0x42, 0x42
@@ -25,3 +31,6 @@ module 0x42::m {
 
 // RUN: execute 0x42::m::absent --args 0x99
 // CHECK: results: false
+
+// RUN: execute 0x42::m::non_struct --args 0x99
+// CHECK: aborted: code 11 (Object type argument must be a resource (struct) type) in 0x1::object

@@ -10,7 +10,7 @@ The Move Prover models the standard library's natives in its Boogie prelude
 (`prelude.bpl`, `native.bpl`): a hash is an otherwise uninterpreted injection
 onto 32-byte vectors, `bcs::serialize` an uninterpreted injection onto
 non-empty vectors, `signer::borrow_address` the signer's address.  A
-transpiled native has no body, so its Leaner contract is all its callers
+transpiled native has no body, so its Verex contract is all its callers
 know; where the Move source states none, the model here supplies it, in the
 prelude's terms: an uninterpreted spec function (`opaque`) with its axioms,
 and the native's `spec` relating the call to it.  A model is printed only
@@ -20,7 +20,7 @@ The axioms are about the uninterpreted spec functions, never about the native
 Lean functions themselves (whose placeholder bodies would make such axioms
 inconsistent); the report lists every axiom.  A model also declares the
 native's *specification version* (`spec fun`), what a call of the native in a
-specification denotes — a native has no body for Leaner to derive it from.
+specification denotes — a native has no body for Verex to derive it from.
 -/
 
 namespace Transpiler.Intrinsics

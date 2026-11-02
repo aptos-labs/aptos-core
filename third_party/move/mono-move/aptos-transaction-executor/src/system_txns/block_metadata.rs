@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::{call_block_function, system_txn_outcome, SystemTxnMetadata};
+use super::common::{
+    call_block_function, discard_system_session, system_txn_outcome, SystemTxnMetadata,
+};
 use crate::{
     errors::{invariant_violation, MoveExecutionFailure, SystemTxnFailure},
     executor::AptosTransactionExecutor,
@@ -11,15 +13,10 @@ use aptos_types::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, randomness::Randomness,
     transaction::AuxiliaryInfo,
 };
-use mono_move_global_context::ExecutionGuard;
+use mono_move_core::FrameworkSymbols;
 use mono_move_runtime::{CallBuilder, InterpreterContext};
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
+use move_core_types::account_address::AccountAddress;
 use move_value_view::IterAsMoveVector;
-
-const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
-const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
-const BLOCK_PROLOGUE_EXT_V2: &IdentStr = ident_str!("block_prologue_ext_v2");
-const BLOCK_PROLOGUE_EXT_V3: &IdentStr = ident_str!("block_prologue_ext_v3");
 
 impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes a block-metadata (system) transaction. The auxiliary info is
@@ -31,12 +28,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     ) -> TxnOutcome {
         let txn_data = SystemTxnMetadata::for_block_metadata(block_metadata);
         let mut interp = self.system_session(&txn_data);
-        match run_block_prologue(&mut interp, self.guard, block_metadata) {
+        match run_block_prologue(&mut interp, self.symbols, block_metadata) {
             Ok(()) => system_txn_outcome(interp),
-            Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
-                call: "block_prologue",
-                failure,
-            }),
+            Err(failure) => {
+                // The prologue failure already aborts the block, so a failure
+                // while closing the session adds nothing.
+                //
+                // TODO(cleanup): refactor the returned results so that we have
+                // a single source of truth locally.
+                let _ = discard_system_session(interp);
+                TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
+                    call: "block_prologue",
+                    failure,
+                })
+            },
         }
     }
 
@@ -53,12 +58,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         }
         let txn_data = SystemTxnMetadata::for_block_metadata_ext(block_metadata_ext);
         let mut interp = self.system_session(&txn_data);
-        match run_block_prologue_ext(&mut interp, self.guard, block_metadata_ext) {
+        match run_block_prologue_ext(&mut interp, self.symbols, block_metadata_ext) {
             Ok(()) => system_txn_outcome(interp),
-            Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
-                call: "block_prologue_ext",
-                failure,
-            }),
+            Err(failure) => {
+                // The prologue failure already aborts the block, so a failure
+                // while closing the session adds nothing.
+                //
+                // TODO(cleanup): refactor the returned results so that we have
+                // a single source of truth locally.
+                let _ = discard_system_session(interp);
+                TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
+                    call: "block_prologue_ext",
+                    failure,
+                })
+            },
         }
     }
 }
@@ -90,10 +103,10 @@ macro_rules! place_prologue_common_args {
 /// Calls `0x1::block::block_prologue` with the block's consensus metadata.
 fn run_block_prologue<'a>(
     interp: &mut InterpreterContext<'a>,
-    guard: &ExecutionGuard<'a>,
+    symbols: &FrameworkSymbols,
     block_metadata: &BlockMetadata,
 ) -> Result<(), MoveExecutionFailure> {
-    call_block_function(interp, guard, BLOCK_PROLOGUE, |call| {
+    call_block_function(interp, symbols, symbols.block_prologue, |call| {
         place_prologue_common_args!(call, block_metadata)
     })
 }
@@ -102,7 +115,7 @@ fn run_block_prologue<'a>(
 /// metadata.
 fn run_block_prologue_ext<'a>(
     interp: &mut InterpreterContext<'a>,
-    guard: &ExecutionGuard<'a>,
+    symbols: &FrameworkSymbols,
     block_metadata_ext: &BlockMetadataExt,
 ) -> Result<(), MoveExecutionFailure> {
     let seed =
@@ -112,13 +125,13 @@ fn run_block_prologue_ext<'a>(
             "V0 metadata must run as a plain block-metadata transaction",
         ))),
         BlockMetadataExt::V1(v1) => {
-            call_block_function(interp, guard, BLOCK_PROLOGUE_EXT, |call| {
+            call_block_function(interp, symbols, symbols.block_prologue_ext, |call| {
                 place_prologue_common_args!(call, block_metadata_ext)?;
                 call.arg(&seed(&v1.randomness))
             })
         },
         BlockMetadataExt::V2(v2) => {
-            call_block_function(interp, guard, BLOCK_PROLOGUE_EXT_V2, |call| {
+            call_block_function(interp, symbols, symbols.block_prologue_ext_v2, |call| {
                 place_prologue_common_args!(call, block_metadata_ext)?;
                 call.arg(&seed(&v2.randomness))?;
                 call.arg(
@@ -129,7 +142,7 @@ fn run_block_prologue_ext<'a>(
             })
         },
         BlockMetadataExt::V3(v3) => {
-            call_block_function(interp, guard, BLOCK_PROLOGUE_EXT_V3, |call| {
+            call_block_function(interp, symbols, symbols.block_prologue_ext_v3, |call| {
                 place_prologue_common_args!(call, block_metadata_ext)?;
                 call.arg(&seed(&v3.randomness))?;
                 let payload = v3.decryption_payload.as_ref();

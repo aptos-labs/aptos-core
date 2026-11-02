@@ -3,12 +3,18 @@
 
 //! Tests for the hot state snapshot APIs used by fast sync to serve and restore hot state.
 
-use crate::{db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager, AptosDB};
+use crate::{
+    db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager,
+    state_store::StateStore, AptosDB,
+};
 use aptos_config::config::{
     HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
 };
@@ -32,7 +38,7 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -68,6 +74,22 @@ fn block_epilogue_txn(writes: Vec<(StateKey, Option<StateValue>)>) -> Transactio
         false,                               /* is_reconfig */
         TransactionAuxiliaryData::default(), /* transaction_auxiliary_data */
     )
+}
+
+/// Builds an empty block epilogue whose `TransactionInfo` commits `hot_root`, to serve as a fast
+/// sync target.
+fn fast_sync_target_txn(hot_root: Option<HashValue>) -> TransactionToCommit {
+    let mut txn = block_epilogue_txn(vec![]);
+    txn.transaction_info = TransactionInfo::builder_v1()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .state_checkpoint_hash(HashValue::random())
+        .maybe_hot_state_checkpoint_hash(hot_root)
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
+    txn
 }
 
 /// Commits each element of `blocks` as a one-transaction (block-epilogue) block and returns the
@@ -476,7 +498,7 @@ fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
     .unwrap()
 }
 
-/// Restores cold state so reset can discover the snapshot version.
+/// Restores cold state so reload can discover the snapshot version.
 fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
     let root_hash = src.state_store.get_root_hash(version).unwrap();
     let num_items = src
@@ -496,35 +518,8 @@ fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
     receiver.finish_box().unwrap();
 }
 
-#[test]
-fn test_hot_state_restore() {
-    let tmp_src = TempPath::new();
-    let src = AptosDB::new_for_test(&tmp_src);
-    // Spread `hot_since_version` across checkpoints, refresh a key and leave a vacancy.
-    let version = commit_blocks(&src, vec![
-        vec![(key("a"), Some(val(b"a0"))), (key("b"), Some(val(b"b0")))],
-        vec![(key("c"), Some(val(b"c1"))), (key("a"), Some(val(b"a1")))],
-        vec![(key("d"), Some(val(b"d2"))), (key("b"), None)],
-        vec![(key("e"), Some(val(b"e3")))],
-    ]);
-    let expected = collect_paged(&src, version, usize::MAX);
-    assert!(!expected.is_empty());
-    let chunks = collect_chunks_with_proof(&src, version, 2);
-    let root_hash = chunks[0].root_hash;
-
-    let tmp_dst = TempPath::new();
-    let dst = open_persistent_hot_state_db(&tmp_dst);
-    let (empty_view, empty_state) = dst.get_persisted_state().unwrap();
-    restore_cold_state(&src, &dst, version);
-    let mut receiver = dst
-        .get_hot_state_snapshot_receiver(version, root_hash)
-        .unwrap();
-    for chunk in &chunks {
-        receiver
-            .add_chunk(chunk.raw_values.clone(), chunk.proof.clone())
-            .unwrap();
-    }
-    receiver.finish_box().unwrap();
+/// Finalizes fast syncing `dst` to `src` at `version`.
+fn finalize_fast_sync(src: &AptosDB, dst: &AptosDB, version: Version) {
     let ledger_info = LedgerInfoWithSignatures::new(
         LedgerInfo::new(
             BlockInfo::new(
@@ -546,6 +541,57 @@ fn test_hot_state_restore() {
         &[ledger_info],
     )
     .unwrap();
+}
+
+#[test]
+fn test_hot_state_restore() {
+    let tmp_src = TempPath::new();
+    let src = AptosDB::new_for_test(&tmp_src);
+    // Spread `hot_since_version` across checkpoints, refresh a key and leave a vacancy.
+    let version = commit_blocks(&src, vec![
+        vec![(key("a"), Some(val(b"a0"))), (key("b"), Some(val(b"b0")))],
+        vec![(key("c"), Some(val(b"c1"))), (key("a"), Some(val(b"a1")))],
+        vec![(key("d"), Some(val(b"d2"))), (key("b"), None)],
+        vec![(key("e"), Some(val(b"e3")))],
+    ]);
+    // Fast sync restores a hot state snapshot only for a target that commits its root. The empty
+    // target block leaves the hot state unchanged.
+    let root_hash = src
+        .state_store
+        .hot_state_merkle_db
+        .get_root_hash(version)
+        .unwrap();
+    let version = version + 1;
+    src.save_transactions_for_test(
+        &[fast_sync_target_txn(Some(root_hash))],
+        version,
+        None,
+        true,
+    )
+    .unwrap();
+    let expected = collect_paged(&src, version, usize::MAX);
+    assert!(!expected.is_empty());
+    let chunks = collect_chunks_with_proof(&src, version, 2);
+    assert_eq!(chunks[0].root_hash, root_hash);
+
+    let tmp_dst = TempPath::new();
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    let (empty_view, empty_state) = dst.get_persisted_state().unwrap();
+    restore_cold_state(&src, &dst, version);
+    let mut receiver = dst
+        .get_hot_state_snapshot_receiver(version, root_hash)
+        .unwrap();
+    for chunk in &chunks {
+        receiver
+            .add_chunk(chunk.raw_values.clone(), chunk.proof.clone())
+            .unwrap();
+    }
+    receiver.finish_box().unwrap();
+    finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.get_state_storage_usage(Some(version)).unwrap(),
+        src.get_state_storage_usage(Some(version)).unwrap()
+    );
 
     let pruners = &dst.state_store.state_pruner;
     assert_eq!(
@@ -582,9 +628,9 @@ fn test_hot_state_restore() {
     // Finalization must activate the restored hot state before returning.
     assert_hot_state_activated(&dst, &expected, root_hash);
 
-    // Retain a base view across a reset and subsequent writes.
+    // Retain a base view across a reload and subsequent writes.
     let (restored_view, restored_state) = dst.get_persisted_state().unwrap();
-    dst.state_store.reset();
+    dst.state_store.reload();
     assert_hot_state_activated(&dst, &expected, root_hash);
 
     // Retain this view to keep the next commit's delta from merging into its base.
@@ -609,7 +655,7 @@ fn test_hot_state_restore() {
         std::thread::sleep(Duration::from_millis(1));
     };
     let expected_after_write = collect_paged(&src, version + 1, usize::MAX);
-    dst.state_store.reset();
+    dst.state_store.reload();
 
     // Updating a key outside the retained delta must preserve its fall-through reads.
     let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c-new")))]);
@@ -617,7 +663,12 @@ fn test_hot_state_restore() {
         .unwrap();
     dst.save_transactions_for_test(&[txn], version + 2, None, true)
         .unwrap();
-    let hot_state = dst.state_store.persisted_state.get_hot_state();
+    let hot_state = dst
+        .state_store
+        .live()
+        .unwrap()
+        .persisted_state
+        .get_hot_state();
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         let entries = hot_state.get_all_entries(key("c").get_shard_id());
@@ -674,6 +725,140 @@ fn test_hot_state_restore() {
     assert_hot_state_activated(&reopened, &expected_final, expected_root);
 }
 
+#[test]
+fn test_hot_state_usage_delta() {
+    let cold: HashMap<_, _> = [
+        (key("stale"), val(b"old")),
+        (key("deleted"), val(b"gone")),
+        (key("read"), val(b"read")),
+    ]
+    .into_iter()
+    .collect();
+    let hot = [
+        (key("stale"), Some(val(b"newer"))),
+        (key("deleted"), None),
+        (key("created"), Some(val(b"c"))),
+        (key("read"), Some(val(b"read"))),
+        (key("absent"), None),
+    ]
+    .into_iter()
+    .map(|(k, v)| Ok((k, HotStateValue::new(v, 0))));
+
+    let delta = StateStore::hot_state_usage_delta(hot, |k| Ok(cold.get(k).cloned())).unwrap();
+
+    let size = |k: &str, v: &[u8]| (key(k).size() + val(v).size()) as i64;
+    assert_eq!(
+        delta,
+        (
+            0, // "deleted" is gone and "created" is new.
+            size("stale", b"newer") - size("stale", b"old") - size("deleted", b"gone")
+                + size("created", b"c"),
+        )
+    );
+}
+
+#[test]
+fn test_hot_state_restore_empty() {
+    fast_sync_empty_hot_state(Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+}
+
+/// Fast sync targets commit no hot root until `HOT_STATE_ROOT_IN_TXN_INFO` is enabled.
+#[test]
+fn test_hot_state_restore_without_hot_root() {
+    fast_sync_empty_hot_state(None);
+}
+
+/// Fast syncs to a target with an empty hot state, whose `TransactionInfo` commits `hot_root`.
+fn fast_sync_empty_hot_state(hot_root: Option<HashValue>) {
+    let tmp_src = TempPath::new();
+    let src = AptosDB::new_for_test(&tmp_src);
+    commit_blocks(&src, vec![vec![
+        (key("a"), Some(val(b"a0"))),
+        (key("b"), Some(val(b"b0"))),
+    ]]);
+    // Reopening wipes the hot state, so the next checkpoint has an empty hot state but a non-empty
+    // cold state.
+    drop(src);
+    let src = AptosDB::new_for_test(&tmp_src);
+    let version = 1;
+    src.save_transactions_for_test(&[fast_sync_target_txn(hot_root)], version, None, true)
+        .unwrap();
+    assert_eq!(
+        src.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version)
+            .unwrap(),
+        *SPARSE_MERKLE_PLACEHOLDER_HASH
+    );
+
+    // Fast sync streams no hot state values here, so it never creates a hot state receiver.
+    let tmp_dst = TempPath::new();
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    restore_cold_state(&src, &dst, version);
+    finalize_fast_sync(&src, &dst, version);
+    assert_eq!(
+        dst.get_state_storage_usage(Some(version)).unwrap(),
+        src.get_state_storage_usage(Some(version)).unwrap()
+    );
+    assert_eq!(
+        dst.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version)
+            .unwrap(),
+        *SPARSE_MERKLE_PLACEHOLDER_HASH
+    );
+    assert_hot_state_activated(&dst, &[], *SPARSE_MERKLE_PLACEHOLDER_HASH);
+
+    // A restart before the next commit reloads the empty hot state.
+    drop(dst);
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    assert_hot_state_activated(&dst, &[], *SPARSE_MERKLE_PLACEHOLDER_HASH);
+
+    // The next hot state commit builds on the empty root.
+    let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c1")))]);
+    src.save_transactions_for_test(std::slice::from_ref(&txn), version + 1, None, true)
+        .unwrap();
+    dst.save_transactions_for_test(&[txn], version + 1, None, true)
+        .unwrap();
+    assert_eq!(
+        dst.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version + 1)
+            .unwrap(),
+        src.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version + 1)
+            .unwrap()
+    );
+}
+
+/// A restore-mode open has no in-memory state until `reload` loads the state on disk.
+#[test]
+fn test_restore_mode_loads_state_on_reload() {
+    let tmp = TempPath::new();
+    let version = commit_blocks(&AptosDB::new_for_test(&tmp), vec![
+        vec![(key("a"), Some(val(b"a0")))],
+        vec![(key("b"), Some(val(b"b1")))],
+    ]);
+
+    let db = AptosDB::open_kv_only(
+        StorageDirPaths::from_path(tmp.path()),
+        false, /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None, /* internal_indexer_db */
+    )
+    .unwrap();
+    assert!(db.get_persisted_state().is_err());
+    assert!(db.get_pre_committed_version().is_err());
+
+    db.state_store.reload();
+    assert_eq!(db.get_pre_committed_version().unwrap(), Some(version));
+    assert_eq!(db.get_persisted_state().unwrap().1.version(), Some(version));
+}
+
 /// Checks hot entries and the current summary root.
 fn assert_hot_state_activated(
     db: &AptosDB,
@@ -697,6 +882,8 @@ fn assert_hot_state_activated(
     }
     assert_eq!(
         db.state_store
+            .live()
+            .unwrap()
             .current_state_locked()
             .summary()
             .hot_root_hash()

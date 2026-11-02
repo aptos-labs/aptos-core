@@ -82,7 +82,7 @@ impl RistrettoPointStore {
     }
 
     /// Reads the point at `handle`.
-    fn get(&self, handle: u64) -> VMResult<RistrettoPoint> {
+    pub(crate) fn get(&self, handle: u64) -> VMResult<RistrettoPoint> {
         self.points.get(handle as usize).copied().ok_or_else(|| {
             native_invariant_violation(format!("invalid ristretto255 point handle: {handle}"))
         })
@@ -138,7 +138,7 @@ impl NativeExtension for RistrettoPointStore {
 /// `RistrettoPoint` is a single inline `u64`, so the reference points straight
 /// at that `u64`. Nothing needs GC rooting here: the field holds no VM heap
 /// pointer and the handle is read immediately.
-fn point_handle(point: &Ref<u64>) -> u64 {
+pub(crate) fn point_handle(point: &Ref<u64>) -> u64 {
     // SAFETY: `handle` is the 0th (and only) field of `RistrettoPoint`, so the
     // reference points at that `u64`.
     unsafe { core::ptr::read_unaligned(point.ptr() as *const u64) }

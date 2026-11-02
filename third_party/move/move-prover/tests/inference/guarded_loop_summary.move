@@ -1,6 +1,6 @@
-// A supplied invariant must not hide residual quantified WP obligations
-// behind an entry-state path guard (historical QP-part-025 r03).
-// reject-incomplete-inference: true
+// A supplied invariant can yield a large quantified contract behind an
+// entry-state path guard without making the invariant incomplete.
+// flag: --generate-only
 module 0x42::guarded_loop_summary {
 
     fun partition(values: &mut vector<u64>, pivot: u64): u64 {

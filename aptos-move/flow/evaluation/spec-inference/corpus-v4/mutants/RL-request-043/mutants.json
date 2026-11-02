@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 52,
+        "offset": 1456,
+        "sha256": "289d3dcde2b34a357009fff96d84a7638164cac548ff2dc5e537affcaa06a24a"
+      },
+      "edit": {
+        "at": 27,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-request-043-exact-amount-refused",
+      "obligation_category": "normal-result",
+      "rationale": "A request for exactly the available tokens is refused.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 25,
+        "offset": 1423,
+        "sha256": "22984c5cf52beaf13874608f4b55bd1514bcddd4b0c6671c6833cd0eaaaa7a65"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 25,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-request-043-no-refill",
+      "obligation_category": "normal-result",
+      "rationale": "The bucket is never refilled before the request.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 46,
+        "offset": 1521,
+        "sha256": "bbb49cb677c0f04e8dece47c7792ca93ad53e0fc5cd33411c764eb05ad3c26c4"
+      },
+      "edit": {
+        "at": 23,
+        "kind": "substitute",
+        "length": 2,
+        "to": "="
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_rate_limiter.move",
+      "mutant_id": "RL-request-043-sets-instead-of-takes",
+      "obligation_category": "normal-result",
+      "rationale": "The bucket is set to the request instead of reduced by it.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "b6dcddbf64696687c8871357247833b914344d17356192d0b325b25800cd325c",
+  "task_id": "RL-request-043"
+}

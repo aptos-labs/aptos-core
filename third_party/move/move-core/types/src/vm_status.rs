@@ -850,8 +850,11 @@ pub enum StatusCode {
     // for instance, function attribute #[pack] must only be attached to the corresponding pack$S API.
     INVALID_STRUCT_API_CODE = 1136,
 
+    // A closure was packed over a function that must only be called directly, e.g.
+    // `0x1::init::internal_maybe_initialize`, which identifies its caller by the call stack.
+    CLOSURE_OVER_RESTRICTED_FUNCTION = 1137,
+
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1137,
     RESERVED_VERIFICATION_ERROR_2 = 1138,
     RESERVED_VERIFICATION_ERROR_3 = 1139,
     RESERVED_VERIFICATION_ERROR_4 = 1140,

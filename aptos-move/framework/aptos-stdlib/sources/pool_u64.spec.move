@@ -213,6 +213,8 @@ spec aptos_std::pool_u64 {
 
     spec deduct_shares(self: &mut Pool, shareholder: address, num_shares: u64): u64 {
         pragma opaque = true;
+        // Not yet verified by Verex (lean/doc/plan/roadmap.md).
+        pragma verex_verify = false;
         // aborts_if: self is pre-state
         aborts_if !spec_contains(self, shareholder);
         aborts_if spec_shares(self, shareholder) < num_shares;

@@ -9,12 +9,12 @@ pub mod env_pipeline;
 mod experiments;
 pub mod external_checks;
 pub mod file_format_generator;
-mod leaner;
 pub mod lint_common;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
+mod verex;
 pub mod xir;
 
 use crate::{
@@ -62,7 +62,7 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    model::{GlobalEnv, Loc, MoveIrLoc},
+    model::{DeferredClosureFrames, GlobalEnv, Loc, ModuleId, MoveIrLoc},
     PackageInfo,
 };
 use move_stackless_bytecode::function_target_pipeline::{
@@ -96,16 +96,16 @@ where
     logging::setup_logging(None);
     info!("Move Compiler v2");
 
-    // Leaner sources elaborate to versioned XIR in a child Lean process. Keep
+    // Verex sources elaborate to versioned XIR in a child Lean process. Keep
     // them out of the Move parser; they join the model after AST transforms.
-    let leaner_sources = leaner::extract_sources(&mut options)?;
-    let leaner_elaboration = leaner::elaborate_sources(&leaner_sources)?;
+    let verex_sources = verex::extract_sources(&mut options)?;
+    let verex_elaboration = verex::elaborate_sources(&verex_sources)?;
 
     // Run context check.
     let mut env = run_checker(options.clone())?;
     check_errors(&env, emitter, "context checking errors")?;
-    leaner::add_diagnostics(&mut env, &leaner_elaboration);
-    check_errors(&env, emitter, "Leaner elaboration errors")?;
+    verex::add_diagnostics(&mut env, &verex_elaboration);
+    check_errors(&env, emitter, "Verex elaboration errors")?;
 
     // Run a AST pipeline of checks and (non-optimization) transforms.
     env_check_and_transform_pipeline(&options).run(&mut env);
@@ -145,15 +145,9 @@ where
     // XIR already is stackless, so import it after all Move-AST transforms.
     // Check it in a separate holder: the regenerated Move targets have already
     // passed this pipeline, and rerunning it would duplicate their diagnostics.
-    if !leaner_elaboration.modules.is_empty() {
-        let mut xir_targets = FunctionTargetsHolder::default();
-        leaner::import_sources(&mut env, &leaner_elaboration.modules, &mut xir_targets)?;
-        run_stackless_bytecode_pipeline(
-            &env,
-            stackless_bytecode_check_pipeline(&options),
-            &mut xir_targets,
-        );
-        check_errors(&env, emitter, "Leaner stackless-bytecode checks failed")?;
+    if !verex_elaboration.modules.is_empty() {
+        let mut xir_targets = import_and_check_xir(&mut env, &options, &verex_elaboration.modules)?;
+        check_errors(&env, emitter, "Verex stackless-bytecode checks failed")?;
         merge_xir_targets(&mut targets, &mut xir_targets);
         env.set_function_size_estimates(targets.compute_function_size_estimates());
     }
@@ -193,16 +187,46 @@ where
     Ok((env, annotated_units))
 }
 
-/// Moves validated XIR targets into the generated Move target holder.
+/// Imports XIR modules and runs the stackless checks on them. The checks also
+/// need the Move functions XIR calls, regenerated after AST optimization; those
+/// were checked before it, so only errors are kept from them.
+fn import_and_check_xir(
+    env: &mut GlobalEnv,
+    options: &Options,
+    sources: &[xir::XirSource],
+) -> anyhow::Result<FunctionTargetsHolder> {
+    let first_module = env.get_module_count();
+    let mut xir_targets = FunctionTargetsHolder::default();
+    verex::import_sources(env, sources, &mut xir_targets)?;
+    let xir_files: BTreeSet<_> = (first_module..env.get_module_count())
+        .map(|index| env.get_module(ModuleId::new(index)).get_loc().file_id())
+        .collect();
+    let first_diag = env.diag_count(Severity::Help);
+    run_stackless_bytecode_pipeline(
+        env,
+        stackless_bytecode_check_pipeline(options),
+        &mut xir_targets,
+    );
+    env.retain_diags_since(first_diag, |diag| {
+        diag.severity >= Severity::Error
+            || diag
+                .labels
+                .iter()
+                .any(|label| xir_files.contains(&label.file_id))
+    });
+    Ok(xir_targets)
+}
+
+/// Moves validated XIR targets into the generated Move target holder. The XIR
+/// holder also holds the Move functions XIR calls, regenerated for its checks;
+/// where the Move pipeline already produced one, its target is kept.
 fn merge_xir_targets(targets: &mut FunctionTargetsHolder, xir_targets: &mut FunctionTargetsHolder) {
     let ids_and_variants = xir_targets.get_funs_and_variants().collect::<Vec<_>>();
     for (id, variant) in ids_and_variants {
-        assert!(
-            targets.get_data(&id, &variant).is_none(),
-            "XIR target overlaps generated Move target"
-        );
         let data = xir_targets.remove_target_data(&id, &variant);
-        targets.insert_target_data(&id, variant, data);
+        if targets.get_data(&id, &variant).is_none() {
+            targets.insert_target_data(&id, variant, data);
+        }
     }
 }
 
@@ -231,9 +255,9 @@ pub fn run_move_compiler_for_analysis(
 /// Each pipeline phase checks for errors and returns early, so the caller
 /// always receives the model up to the first failing phase.
 pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<GlobalEnv> {
-    let leaner_sources = leaner::extract_sources(&mut options)?;
+    let verex_sources = verex::extract_sources(&mut options)?;
     anyhow::ensure!(
-        leaner_sources.is_empty(),
+        verex_sources.is_empty(),
         "analysis-only compiler APIs do not yet model Lean-authored modules; compile `.lean` sources with run_move_compiler"
     );
     options.whole_program = true;
@@ -348,6 +372,9 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         env.treat_everything_as_target(true);
     }
     env.set_verify_mode(options.compile_verify_code);
+    env.set_extension(DeferredClosureFrames(
+        options.experiment_on(Experiment::DEFERRED_CLOSURE_FRAMES),
+    ));
     // Store options in env, for later access
     env.set_extension(options);
     Ok(env)
@@ -599,16 +626,7 @@ pub fn env_optimization_pipeline<'a, 'b>(options: &'a Options) -> EnvProcessorPi
     // those simplifications can take advantage of the inlining.
     let do_inlining_optimization = options.experiment_on(Experiment::INLINING_OPTIMIZATION);
     if do_inlining_optimization {
-        // This allows inlining a call that comes from a different package
-        let across_package = options.experiment_on(Experiment::ACROSS_PACKAGE_INLINING);
-        // This allows performing an inlining optimization to a function that does not belong to the primary target package
-        let allow_non_primary_targets =
-            options.experiment_on(Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS);
-        env_pipeline.add("inlining optimization", {
-            move |env: &mut GlobalEnv| {
-                inlining_optimization::optimize(env, across_package, allow_non_primary_targets)
-            }
-        });
+        env_pipeline.add("inlining optimization", inlining_optimization::optimize);
     }
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
         env_pipeline.add("simplifier with code elimination", {

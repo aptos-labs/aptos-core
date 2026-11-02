@@ -230,24 +230,25 @@ pub fn get_metadata(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> {
     }
 }
 
+/// The randomness annotation on the function named `function_name`, if any.
+pub fn get_randomness_annotation(
+    function_name: &str,
+    metadata: &[Metadata],
+) -> Option<RandomnessAnnotation> {
+    get_metadata(metadata)?
+        .fun_attributes
+        .get(function_name)?
+        .iter()
+        .find_map(KnownAttribute::try_as_randomness_annotation)
+}
+
 /// For the specified entry function, tries to find randomness attribute in its metadata. If it
 /// does not exist, [None] is returned.
 pub fn get_randomness_annotation_for_entry_function(
     entry_func: &EntryFunction,
     metadata: &[Metadata],
 ) -> Option<RandomnessAnnotation> {
-    get_metadata(metadata).and_then(|metadata| {
-        metadata
-            .fun_attributes
-            .get(entry_func.function().as_str())
-            .map(|attrs| {
-                attrs
-                    .iter()
-                    .filter_map(KnownAttribute::try_as_randomness_annotation)
-                    .next()
-            })
-            .unwrap_or(None)
-    })
+    get_randomness_annotation(entry_func.function().as_str(), metadata)
 }
 
 /// Check if the metadata has unknown key/data types

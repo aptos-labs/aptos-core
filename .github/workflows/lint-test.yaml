@@ -1,7 +1,7 @@
 name: "Lint+Test"
 on:
   pull_request:
-    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+    types: [opened, synchronize, reopened]
   push:
     branches:
       - main
@@ -11,6 +11,12 @@ on:
       - aptos-node-v*
       - aptos-release-v*
   workflow_dispatch:
+    inputs:
+      rust_ci_provider:
+        description: "Rust CI provider (default honors RUST_CI_PROVIDER, otherwise hosted)"
+        type: choice
+        default: default
+        options: [default, hosted, aws]
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -28,13 +34,41 @@ permissions:
 
 
 jobs:
-  # This job determines which files were changed
+  rust-ci-provider:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      provider: ${{ steps.select.outputs.provider }}
+    steps:
+      - id: select
+        env:
+          MANUAL_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}
+          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
+        run: |
+          provider="${CONFIGURED_PROVIDER:-hosted}"
+          if [ "$MANUAL_PROVIDER" != default ]; then
+            provider="$MANUAL_PROVIDER"
+          fi
+          case "$provider" in
+            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
+          esac
+
   file_change_determinator:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+      run_freshness: ${{ steps.classify_event.outputs.run_freshness }}
+      run_targeted_tests: ${{ steps.classify_event.outputs.run_targeted_tests }}
+      run_full_tests: ${{ steps.classify_event.outputs.run_full_tests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Classify Lint+Test event
+        id: classify_event
+        run: python3 .github/actions/lint-test-classifier/classify_lint_event.py
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_REF_NAME: ${{ github.ref_name }}
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -44,7 +78,7 @@ jobs:
     needs: file_change_determinator
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because python-lint-tests requires it.
@@ -53,27 +87,23 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: echo "Skipping general lints! Unrelated changes detected."
+      - name: Skip general lints for documentation-only changes
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-
-  # Run the crypto hasher domain separation checks
-  rust-cryptohasher-domain-separation-check:
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
-    steps:
-      - uses: actions/checkout@v4
-      - run: python3 scripts/check-cryptohasher-symbols.py
+        run: echo "Skipping general lints for documentation-only changes."
 
   # Run all rust lints. This is a PR required job.
   rust-lints:
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu22-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-lints
       - name: Run rust lints
         uses: ./.github/actions/rust-lints
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -87,7 +117,7 @@ jobs:
     needs: file_change_determinator
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - uses: EmbarkStudios/cargo-deny-action@v2
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -96,95 +126,43 @@ jobs:
       - run: echo "Skipping cargo deny! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run the docs tests. This is a PR required job.
-  rust-doc-tests:
-    if: | # Only run when an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null
-      )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run rust doc tests
-        uses: ./.github/actions/rust-doc-tests
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-
-  # Run all rust smoke tests (build + parallel test partitions).
-  rust-smoke-tests-workflow:
-    needs: file_change_determinator
-    if: | # Only run on each PR once an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
-      )
-    uses: ./.github/workflows/smoke-tests.yaml
-    with:
-      only_docs_changed: ${{ needs.file_change_determinator.outputs.only_docs_changed }}
-
-  # Required check compatibility shim. Maintains the "rust-smoke-tests" check name
-  # that branch protection rules expect, while the actual work happens in smoke-tests.yaml.
-  rust-smoke-tests:
-    needs: rust-smoke-tests-workflow
-    if: | # Always evaluate so failures are reported, but only when smoke tests are expected
-      always() && (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null ||
-        contains(github.event.pull_request.body, '#e2e')
-      )
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check smoke test results
-        run: |
-          result="${{ needs.rust-smoke-tests-workflow.result }}"
-          if [ "$result" = "success" ] || [ "$result" = "skipped" ]; then
-            echo "Smoke tests passed (result: $result)"
-          else
-            echo "Smoke tests failed: $result"
-            exit 1
-          fi
-
-  # Check the freshess of the merge base. This is a PR required job.
+  # Skip release freshness checks: cherry-picks don't advance the merge base.
   rust-check-merge-base:
-    if: | # Don't run on release branches
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    if: needs.file_change_determinator.outputs.run_freshness == 'true'
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu22-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-freshness
       - name: Run the merge base freshness check
         uses: ./.github/actions/rust-check-merge-base
         with:
+          PREBUILT_TOOLS: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run only the targeted rust unit tests. This is a PR required job.
   rust-targeted-unit-tests:
-    if: | # Don't run on release branches. Instead, all unit tests will be triggered.
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    if: needs.file_change_determinator.outputs.run_targeted_tests == 'true'
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu22-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
 
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-targeted
       - name: Run dev_setup.sh
+        if: ${{ needs.rust-ci-provider.outputs.provider == 'aws' }}
         run: |
           scripts/dev_setup.sh -b -p -r -y -P -t
 
@@ -192,112 +170,14 @@ jobs:
         uses: ./.github/actions/rust-targeted-unit-tests
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run aptos-batch-encryption (i.e., with TypeScript/Node.js). This is a PR required job.
-  rust-batch-encryption-tests:
-    needs: file_change_determinator
-    if: | # Only run on each PR once an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
-      )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-
-      - name: Run dev_setup.sh
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: |
-          scripts/dev_setup.sh -b -p -r -y -P -t -J
-          # Source profile and add paths to GITHUB_PATH for subsequent steps
-          source ~/.profile
-          echo "$HOME/.local/share/pnpm" >> $GITHUB_PATH
-
-      - name: Run aptos-batch-encryption tests
-        uses: ./.github/actions/rust-batch-encryption
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-
-      - run: echo "Skipping aptos-batch-encryption tests! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-
-  # Run all rust unit tests. This is not a PR required job.
   rust-unit-tests:
-    if: | # Only run when an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests') ||
-        contains(github.event.pull_request.base.ref, '-release-')
-      )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-      # Install Move Prover tools
-      - name: Run dev_setup.sh
-        run: |
-          scripts/dev_setup.sh -b -y
-      - name: Run rust unit tests
-        uses: ./.github/actions/rust-unit-tests
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
-
-  # Run the cached packages build. This is advisory (non-blocking) because
-  # concurrent PR merges can cause spurious staleness failures.
-  rust-build-cached-packages:
-    continue-on-error: true
-    needs: file_change_determinator
-    if: | # Only run on each PR once an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null
-      )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-      - name: Run aptos cached packages build test
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: scripts/cargo_build_aptos_cached_packages.sh --check
-      - run: echo "Skipping cached packages test! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-
-  # Run the consensus only unit tests
-  rust-consensus-only-unit-test:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
-        env:
-          RUST_MIN_STACK: 4297152
-
-  # Run the consensus only smoke test
-  rust-consensus-only-smoke-test:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
-    steps:
-      - uses: actions/checkout@v4
-      # prebuild aptos-node binary, so that tests don't start before node is built.
-      # also prebuild aptos-node binary as a separate step to avoid feature unification issues
-      - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all
-
-      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
-      - name: Upload smoke test logs for failed and flaky tests
-        uses: actions/upload-artifact@v4
-        if: ${{ failure() || success() }}
-        with:
-          name: failed-consensus-only-smoke-test-logs
-          # Retain all smoke test data except for the db (which may be large).
-          path: |
-            /tmp/.tmp*
-            !/tmp/.tmp*/**/db/
-          retention-days: 14
+    needs: [file_change_determinator, rust-ci-provider]
+    if: needs.file_change_determinator.outputs.run_full_tests == 'true'
+    uses: ./.github/workflows/hosted-rust-unit-tests.yaml
+    with:
+      provider: ${{ needs.rust-ci-provider.outputs.provider }}
+    secrets:
+      TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}

@@ -34,7 +34,9 @@ module 0x42::calculator {
         modifies State[signer::address_of(s)];
         ensures [inferred = sathard] (old(State[signer::address_of(s)]) is Continuation) && (input is Number) ==> {
             let a = signer::address_of(s);
-            let b = State::Value(S1.. |~ result_of<old(State[signer::address_of(s)]).Continuation.0>(input.0));
+            // Capture the continuation before selecting the state after removal.
+            let f = old(State[signer::address_of(s)]).Continuation.0;
+            let b = State::Value(S1.. |~ result_of<f>(input.0));
             S1.. |~ publish<State>(a, b)
         };
         ensures [inferred] (old(State[signer::address_of(s)]) is Value) && (input is Number) ==> {

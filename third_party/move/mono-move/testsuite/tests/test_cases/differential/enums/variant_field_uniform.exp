@@ -5,7 +5,7 @@ fun read_value() {
   frame_data_size: 48
   entry_gas: 95
   code:
-    0: EnumNew [8] desc=2 tag #0 @1
+    0: EnumNew [8] desc=3 tag #0 @1
     1: HeapMoveTo8 [8]+8 <- [0] @1
     2: SlotBorrow [16] <- &[8] @3
     3: HeapReadOffset(8) [32] <- (*[16]).8 @4
@@ -20,12 +20,12 @@ fun run_computed() {
   entry_gas: 211
   code:
     0: StoreImm8 [24] <- #0 @1
-    1: EnumNew [16] desc=2 tag #1 @2
+    1: EnumNew [16] desc=3 tag #1 @2
     2: HeapMoveTo8 [16]+8 <- [0] @2
     3: HeapMoveTo8 [16]+16 <- [24] @2
     4: SlotBorrow [80] <- &[16] @4
     5: Move8 [96] <- [8] @6
-    6: CallIndirect 0x42::enum_variant_field_uniform::write_computed @6
+    6: CallByNameExempt 0x42::enum_variant_field_uniform::write_computed @6
     7: SlotBorrow [32] <- &[16] @7
     8: HeapReadOffset(8) [24] <- (*[32]).8 @8
     9: Move8 [0] <- [24] @10
@@ -38,11 +38,11 @@ fun run_simple() {
   frame_data_size: 56
   entry_gas: 183
   code:
-    0: EnumNew [16] desc=2 tag #0 @1
+    0: EnumNew [16] desc=3 tag #0 @1
     1: HeapMoveTo8 [16]+8 <- [0] @1
     2: SlotBorrow [80] <- &[16] @3
     3: Move8 [96] <- [8] @5
-    4: CallIndirect 0x42::enum_variant_field_uniform::write_simple @5
+    4: CallByNameExempt 0x42::enum_variant_field_uniform::write_simple @5
     5: SlotBorrow [24] <- &[16] @6
     6: HeapReadOffset(8) [40] <- (*[24]).8 @7
     7: Move8 [0] <- [40] @9

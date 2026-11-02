@@ -7,4 +7,3 @@ error: failed to parse manifest
 5 | [dependencies]
 6 | a = { git = "bad" }
   |             ^^^^^ relative URL without a base: "bad"
-  |

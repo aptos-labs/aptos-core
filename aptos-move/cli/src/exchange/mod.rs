@@ -21,7 +21,6 @@
 //! through — the Lean model executes them; verifying borrow-based code goes
 //! through its reference elimination.
 
-mod ast;
 mod model_spec;
 mod source;
 mod spec;
@@ -31,7 +30,6 @@ use crate::exchange::{
     spec::{translate_clauses, FunSpecInput, SpecCtx, TranslatedSpec},
 };
 use anyhow::{anyhow, bail, Context, Result};
-pub use ast::dump_ast_module;
 use codespan_reporting::term::termcolor::Buffer;
 use either::Either;
 use move_asm::{
@@ -45,11 +43,14 @@ use move_model::{
     pragmas::ABORTS_IF_IS_STRICT_PRAGMA,
 };
 use move_model_exchange as exchange;
+pub use move_model_exchange::{dump_ast_module, module_closure, select_modules};
 use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
     graph::{DomRelation, Graph},
     stackless_bytecode::{AttrId, Bytecode, Constant, Label, Operation, PropKind},
 };
+#[cfg(test)]
+pub(crate) use source::single_file_options;
 pub use source::{move_file_to_ast, move_file_to_module, move_source_to_module};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -1240,7 +1241,7 @@ fn collect_loops(
                             },
                             // A call may modify anything; recognized when
                             // spec support lands. For now, reject.
-                            Oper::Function(_) | Oper::FunctionInst(_, _) => bail!(
+                            Oper::Function(_) | Oper::FunctionInst(_, _) | Oper::Invoke => bail!(
                                 "calls inside loops not yet supported by loop-target collection"
                             ),
                             // A reference write may target any borrowed
@@ -1304,7 +1305,9 @@ fn collect_loops(
                             | Oper::TestVariantRef(_)
                             | Oper::TestVariantRefInst(_, _)
                             | Oper::ReadRef
-                            | Oper::FreezeRef => {},
+                            | Oper::FreezeRef
+                            | Oper::Closure(_, _)
+                            | Oper::ClosureInst(_, _, _) => {},
                         }
                     },
                     exchange::Instr::Nop => {},

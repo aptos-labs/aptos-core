@@ -246,6 +246,11 @@ where
 
         fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()>;
 
+        fn charge_pack_closure_captured_values(
+            &mut self,
+            args: impl Iterator<Item = impl ValueView>,
+        ) -> PartialVMResult<()>;
+
         fn charge_move_loc(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
         fn charge_store_loc(&mut self, val: impl ValueView) -> PartialVMResult<()>;
@@ -574,7 +579,7 @@ where
                             .vm_gas_params()
                             .misc
                             .abs_val
-                            .abstract_packed_size(val)?,
+                            .abstract_packed_size(val, self.feature_version())?,
                     )
                 })?,
         )?;
@@ -596,7 +601,7 @@ where
                         .vm_gas_params()
                         .misc
                         .abs_val
-                        .abstract_packed_size(val)?,
+                        .abstract_packed_size(val, self.feature_version())?,
                 )
             },
         )?);
@@ -610,7 +615,7 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_packed_size(&val)?,
+                .abstract_packed_size(&val, self.feature_version())?,
         )?;
 
         self.base.charge_vec_push_back(val)
@@ -623,7 +628,7 @@ where
                 self.vm_gas_params()
                     .misc
                     .abs_val
-                    .abstract_packed_size(val)?,
+                    .abstract_packed_size(val, self.feature_version())?,
             );
         }
 

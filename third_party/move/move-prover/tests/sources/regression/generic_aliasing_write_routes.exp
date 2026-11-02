@@ -1,0 +1,154 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_write_routes.move:21:9
+   │
+21 │         ensures result == true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:14: read_sees_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:20: read_sees_write (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:14: read_sees_write
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:15: read_sees_write
+   =         before = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:16: read_sees_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:17: read_sees_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:14: read_sees_write
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:21: read_sees_write (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_write_routes.move:33:9
+   │
+33 │         ensures result == true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:26: two_reads_one_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:31: two_reads_one_write (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:32: two_reads_one_write (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:26: two_reads_one_write
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:27: two_reads_one_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:28: two_reads_one_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:26: two_reads_one_write
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:29: two_reads_one_write
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:33: two_reads_one_write (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_write_routes.move:50:9
+   │
+50 │         ensures result == true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:42: callee_writes
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:48: callee_writes (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:49: callee_writes (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:42: callee_writes
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:43: callee_writes
+   =         before = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:44: callee_writes
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:36: write_r
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:37: write_r
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:36: write_r
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:45: callee_writes
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:42: callee_writes
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:50: callee_writes (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_write_routes.move:68:9
+   │
+68 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:62: native_modifies
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:67: native_modifies (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:62: native_modifies
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:63: native_modifies
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:64: native_modifies
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:62: native_modifies
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:68: native_modifies (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_write_routes.move:86:9
+   │
+86 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:79: opaque_modifies
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:85: opaque_modifies (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:79: opaque_modifies
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:80: opaque_modifies
+   =         before = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:81: opaque_modifies
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:82: opaque_modifies
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:79: opaque_modifies
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:86: opaque_modifies (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_write_routes.move:99:9
+   │
+99 │         ensures result == true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:91: frame_writes
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:98: frame_writes (spec)
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:91: frame_writes
+   =         f = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:92: frame_writes
+   =         before = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:93: frame_writes
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:94: frame_writes
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:91: frame_writes
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_write_routes.move:99: frame_writes (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/generic_aliasing_write_routes.move:116:9
+    │
+116 │         ensures result;
+    │         ^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:108: closure_writes
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:114: closure_writes (spec)
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:115: closure_writes (spec)
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:108: closure_writes
+    =         a = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:109: closure_writes
+    =         g = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:110: closure_writes
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:102: write_r_acquires
+    =         a = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:103: write_r_acquires
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:102: write_r_acquires
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:111: closure_writes
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:108: closure_writes
+    =         result = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:116: closure_writes (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/generic_aliasing_write_routes.move:128:9
+    │
+128 │         ensures result == true;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:120: frame_only
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:127: frame_only (spec)
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:120: frame_only
+    =         f = <redacted>
+    =         a = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:121: frame_only
+    =         before = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:122: frame_only
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:123: frame_only
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:120: frame_only
+    =         result = <redacted>
+    =     at tests/sources/regression/generic_aliasing_write_routes.move:128: frame_only (spec)

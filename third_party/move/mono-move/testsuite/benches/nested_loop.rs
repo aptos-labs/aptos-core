@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
+use std::hint::black_box;
 
 const N: u64 = 1000;
 
@@ -20,7 +21,8 @@ fn bench_nested_loop(c: &mut Criterion) {
         let mut group = c.benchmark_group("nested_loop");
         group
             .warm_up_time(std::time::Duration::from_secs(1))
-            .measurement_time(std::time::Duration::from_secs(3));
+            .measurement_time(std::time::Duration::from_secs(3))
+            .sampling_mode(SamplingMode::Flat);
 
         group.bench_function("native", |b| {
             b.iter(|| black_box(native_nested_loop(N)));

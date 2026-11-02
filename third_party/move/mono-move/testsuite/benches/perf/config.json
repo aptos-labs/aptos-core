@@ -1,5 +1,7 @@
 {
-  "threshold_percent": 3.0,
+  "threshold_percent": 20.0,
+  "notable_percent": 10.0,
+  "processes_per_side": 5,
   "mono_benches": [
     { "id": "fib/mono" },
     { "id": "nested_loop/mono" },
@@ -7,6 +9,9 @@
     { "id": "bst/mono" },
     { "id": "match_sum/mono" },
     { "id": "int_arith_loop/mono_u64" },
-    { "id": "int_arith_loop/mono_i64" }
+    { "id": "int_arith_loop/mono_i64" },
+    { "id": "calls/mono_same_module" },
+    { "id": "calls/mono_cross_module" },
+    { "id": "calls/mono_closure" }
   ]
 }

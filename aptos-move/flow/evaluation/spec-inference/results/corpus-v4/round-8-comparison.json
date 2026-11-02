@@ -1,0 +1,1357 @@
+{
+  "models": [
+    "gpt-5.6-terra",
+    "gpt-5.6-sol"
+  ],
+  "difference": "gpt-5.6-sol minus gpt-5.6-terra",
+  "tactics": {
+    "gpt-5.6-terra": {
+      "round_id": "corpus4-run8-codex-terra56-high",
+      "arms": {
+        "agent_only": {
+          "cells": 104,
+          "measured": 102,
+          "unmeasured": 2,
+          "strict_successes": 97,
+          "disqualified": 5,
+          "cost_usd": 21.0535952,
+          "mean_cost_usd": 0.20243841538461538,
+          "mean_wall_seconds": 152.93451923076924
+        },
+        "hybrid_flexible": {
+          "cells": 104,
+          "measured": 104,
+          "unmeasured": 0,
+          "strict_successes": 98,
+          "disqualified": 6,
+          "cost_usd": 18.7918784,
+          "mean_cost_usd": 0.18069113846153848,
+          "mean_wall_seconds": 143.08241346153847
+        },
+        "hybrid_guided": {
+          "cells": 104,
+          "measured": 103,
+          "unmeasured": 1,
+          "strict_successes": 97,
+          "disqualified": 6,
+          "cost_usd": 16.7137988,
+          "mean_cost_usd": 0.16070960384615385,
+          "mean_wall_seconds": 148.03509615384615
+        }
+      },
+      "contrasts": {
+        "C1": {
+          "definition": "hybrid_flexible minus agent_only",
+          "metrics": {
+            "strict_success": {
+              "mean": -0.01282051282051282,
+              "low95": -0.05128205128205128,
+              "high95": 0.019230769230769232,
+              "low97_5": -0.057692307692307696,
+              "high97_5": 0.028846153846153848,
+              "tasks": 26,
+              "blocks": 102,
+              "randomization_p": 0.7504249575042495,
+              "holm_p": 1.0
+            },
+            "operational_success": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "mutation_adequacy": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 25,
+              "blocks": 95,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "cost_usd": {
+              "mean": -0.021747276923076923,
+              "low95": -0.053738915384615386,
+              "high95": 0.010111873076923076,
+              "low97_5": -0.05883553846153847,
+              "high97_5": 0.01447693076923077,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.10878912108789121,
+              "holm_p": 0.21757824217578242
+            },
+            "wall_seconds": {
+              "mean": -9.852105769230768,
+              "low95": -40.00692307692308,
+              "high95": 23.738346153846155,
+              "low97_5": -44.568326923076924,
+              "high97_5": 29.289451923076925,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.5392460753924607,
+              "holm_p": 1.0
+            },
+            "restricted_time_to_success_seconds": {
+              "mean": 38.893663461538466,
+              "low95": -89.25158012820512,
+              "high95": 179.9339903846154,
+              "low97_5": -104.71774358974358,
+              "high97_5": 200.83332051282053,
+              "tasks": 26,
+              "blocks": 102,
+              "randomization_p": 0.6021397860213978,
+              "holm_p": 1.0
+            }
+          }
+        },
+        "C2": {
+          "definition": "hybrid_guided minus hybrid_flexible",
+          "metrics": {
+            "strict_success": {
+              "mean": 0.0,
+              "low95": -0.038461538461538464,
+              "high95": 0.04807692307692308,
+              "low97_5": -0.04807692307692308,
+              "high97_5": 0.057692307692307696,
+              "tasks": 26,
+              "blocks": 103,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "operational_success": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "mutation_adequacy": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 25,
+              "blocks": 94,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "cost_usd": {
+              "mean": -0.019981534615384617,
+              "low95": -0.04097872307692308,
+              "high95": 0.006728311538461542,
+              "low97_5": -0.04332616153846154,
+              "high97_5": 0.011042846153846153,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.22457754224577542,
+              "holm_p": 0.22457754224577542
+            },
+            "wall_seconds": {
+              "mean": 4.952682692307691,
+              "low95": -41.12172115384615,
+              "high95": 67.24141346153846,
+              "low97_5": -46.14421153846153,
+              "high97_5": 77.38208653846154,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.8907109289071092,
+              "holm_p": 1.0
+            },
+            "restricted_time_to_success_seconds": {
+              "mean": -11.087987179487184,
+              "low95": -151.79795833333336,
+              "high95": 118.03466666666668,
+              "low97_5": -178.58725961538462,
+              "high97_5": 136.79859935897437,
+              "tasks": 26,
+              "blocks": 103,
+              "randomization_p": 0.8554144585541446,
+              "holm_p": 1.0
+            }
+          }
+        },
+        "C3": {
+          "definition": "hybrid_guided minus agent_only",
+          "metrics": {
+            "strict_success": {
+              "mean": -0.0032051282051282046,
+              "low95": -0.0673076923076923,
+              "high95": 0.057692307692307696,
+              "low97_5": -0.07692307692307693,
+              "high97_5": 0.0673076923076923,
+              "tasks": 26,
+              "blocks": 102
+            },
+            "operational_success": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 104
+            },
+            "mutation_adequacy": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 25,
+              "blocks": 94
+            },
+            "cost_usd": {
+              "mean": -0.04172881153846154,
+              "low95": -0.08253415,
+              "high95": 0.003395300000000004,
+              "low97_5": -0.08865909615384616,
+              "high97_5": 0.01056832307692308,
+              "tasks": 26,
+              "blocks": 104
+            },
+            "wall_seconds": {
+              "mean": -4.899423076923076,
+              "low95": -56.40107692307693,
+              "high95": 62.33799038461538,
+              "low97_5": -62.039413461538466,
+              "high97_5": 74.00007692307693,
+              "tasks": 26,
+              "blocks": 104
+            },
+            "restricted_time_to_success_seconds": {
+              "mean": -3.4009711538461525,
+              "low95": -196.28468269230768,
+              "high95": 209.43570192307695,
+              "low97_5": -226.05582692307692,
+              "high97_5": 244.39596153846153,
+              "tasks": 26,
+              "blocks": 102
+            }
+          }
+        }
+      }
+    },
+    "gpt-5.6-sol": {
+      "round_id": "corpus4-run8-codex-sol56-high",
+      "arms": {
+        "agent_only": {
+          "cells": 104,
+          "measured": 104,
+          "unmeasured": 0,
+          "strict_successes": 103,
+          "disqualified": 1,
+          "cost_usd": 36.7243208,
+          "mean_cost_usd": 0.3531184692307692,
+          "mean_wall_seconds": 120.6539423076923
+        },
+        "hybrid_flexible": {
+          "cells": 104,
+          "measured": 100,
+          "unmeasured": 4,
+          "strict_successes": 98,
+          "disqualified": 2,
+          "cost_usd": 31.8143912,
+          "mean_cost_usd": 0.3059076076923077,
+          "mean_wall_seconds": 114.92916346153847
+        },
+        "hybrid_guided": {
+          "cells": 104,
+          "measured": 103,
+          "unmeasured": 1,
+          "strict_successes": 98,
+          "disqualified": 5,
+          "cost_usd": 31.6668648,
+          "mean_cost_usd": 0.3044890846153846,
+          "mean_wall_seconds": 125.84907692307692
+        }
+      },
+      "contrasts": {
+        "C1": {
+          "definition": "hybrid_flexible minus agent_only",
+          "metrics": {
+            "strict_success": {
+              "mean": -0.009615384615384616,
+              "low95": -0.028846153846153848,
+              "high95": 0.0,
+              "low97_5": -0.038461538461538464,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 100,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "operational_success": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "mutation_adequacy": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 99,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "cost_usd": {
+              "mean": -0.047210861538461546,
+              "low95": -0.09376903076923078,
+              "high95": -0.0038023846153846263,
+              "low97_5": -0.10124193076923078,
+              "high97_5": 0.001857415384615379,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.0016998300169983002,
+              "holm_p": 0.0033996600339966003
+            },
+            "wall_seconds": {
+              "mean": -5.724778846153847,
+              "low95": -23.72105769230769,
+              "high95": 12.901124999999999,
+              "low97_5": -26.40260576923077,
+              "high97_5": 15.375836538461536,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.43485651434856515,
+              "holm_p": 0.8697130286971303
+            },
+            "restricted_time_to_success_seconds": {
+              "mean": 26.611858974358974,
+              "low95": -20.98078205128205,
+              "high95": 103.41622756410256,
+              "low97_5": -23.95130448717949,
+              "high97_5": 121.29542307692307,
+              "tasks": 26,
+              "blocks": 100,
+              "randomization_p": 0.837916208379162,
+              "holm_p": 0.837916208379162
+            }
+          }
+        },
+        "C2": {
+          "definition": "hybrid_guided minus hybrid_flexible",
+          "metrics": {
+            "strict_success": {
+              "mean": -0.019230769230769232,
+              "low95": -0.057692307692307696,
+              "high95": 0.0,
+              "low97_5": -0.07692307692307693,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 99,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "operational_success": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "mutation_adequacy": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 96,
+              "randomization_p": 1.0,
+              "holm_p": 1.0
+            },
+            "cost_usd": {
+              "mean": -0.001418523076923078,
+              "low95": -0.040274961538461544,
+              "high95": 0.04623776153846155,
+              "low97_5": -0.043809453846153854,
+              "high97_5": 0.05532438461538463,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.9473052694730527,
+              "holm_p": 0.9473052694730527
+            },
+            "wall_seconds": {
+              "mean": 10.91991346153846,
+              "low95": -12.088682692307694,
+              "high95": 43.515403846153845,
+              "low97_5": -14.032355769230769,
+              "high97_5": 50.756173076923076,
+              "tasks": 26,
+              "blocks": 104,
+              "randomization_p": 0.45425457454254575,
+              "holm_p": 0.8697130286971303
+            },
+            "restricted_time_to_success_seconds": {
+              "mean": 72.04893910256409,
+              "low95": -3.0974519230769224,
+              "high95": 209.76174038461536,
+              "low97_5": -4.80999358974359,
+              "high97_5": 262.65771794871796,
+              "tasks": 26,
+              "blocks": 99,
+              "randomization_p": 0.136986301369863,
+              "holm_p": 0.273972602739726
+            }
+          }
+        },
+        "C3": {
+          "definition": "hybrid_guided minus agent_only",
+          "metrics": {
+            "strict_success": {
+              "mean": -0.038461538461538464,
+              "low95": -0.10576923076923077,
+              "high95": 0.0,
+              "low97_5": -0.11538461538461539,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 103
+            },
+            "operational_success": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 104
+            },
+            "mutation_adequacy": {
+              "mean": 0.0,
+              "low95": 0.0,
+              "high95": 0.0,
+              "low97_5": 0.0,
+              "high97_5": 0.0,
+              "tasks": 26,
+              "blocks": 98
+            },
+            "cost_usd": {
+              "mean": -0.04862938461538462,
+              "low95": -0.12396268461538464,
+              "high95": 0.03115315384615384,
+              "low97_5": -0.1343505230769231,
+              "high97_5": 0.04378925384615385,
+              "tasks": 26,
+              "blocks": 104
+            },
+            "wall_seconds": {
+              "mean": 5.195134615384614,
+              "low95": -30.767999999999997,
+              "high95": 50.83338461538461,
+              "low97_5": -35.463557692307695,
+              "high97_5": 58.2771826923077,
+              "tasks": 26,
+              "blocks": 104
+            },
+            "restricted_time_to_success_seconds": {
+              "mean": 141.98070192307694,
+              "low95": -7.100846153846154,
+              "high95": 376.7178173076923,
+              "low97_5": -15.398307692307695,
+              "high97_5": 414.3585480769231,
+              "tasks": 26,
+              "blocks": 103
+            }
+          }
+        }
+      }
+    }
+  },
+  "model_differences": {
+    "agent_only": {
+      "strict_success": {
+        "mean": 0.038461538461538464,
+        "low95": 0.0,
+        "high95": 0.10576923076923077,
+        "low97_5": 0.0,
+        "high97_5": 0.11538461538461539,
+        "tasks": 26,
+        "pairs": 102
+      },
+      "cost_usd": {
+        "mean": 0.15068005384615385,
+        "low95": 0.1213702076923077,
+        "high95": 0.1842041730769231,
+        "low97_5": 0.11762011153846155,
+        "high97_5": 0.19005798076923078,
+        "tasks": 26,
+        "pairs": 104
+      },
+      "wall_seconds": {
+        "mean": -32.28057692307692,
+        "low95": -52.286019230769234,
+        "high95": -15.416634615384615,
+        "low97_5": -55.68584615384616,
+        "high97_5": -13.114759615384612,
+        "tasks": 26,
+        "pairs": 104
+      }
+    },
+    "hybrid_flexible": {
+      "strict_success": {
+        "mean": 0.044871794871794865,
+        "low95": 0.0,
+        "high95": 0.11538461538461539,
+        "low97_5": 0.0,
+        "high97_5": 0.1282051282051282,
+        "tasks": 26,
+        "pairs": 100
+      },
+      "cost_usd": {
+        "mean": 0.12521646923076923,
+        "low95": 0.10040122307692309,
+        "high95": 0.15508639230769228,
+        "low97_5": 0.09761683461538463,
+        "high97_5": 0.1600944269230769,
+        "tasks": 26,
+        "pairs": 104
+      },
+      "wall_seconds": {
+        "mean": -28.153249999999996,
+        "low95": -58.95500961538461,
+        "high95": -2.9057307692307672,
+        "low97_5": -63.66867307692308,
+        "high97_5": 0.2661250000000028,
+        "tasks": 26,
+        "pairs": 104
+      }
+    },
+    "hybrid_guided": {
+      "strict_success": {
+        "mean": 0.009615384615384616,
+        "low95": -0.019230769230769232,
+        "high95": 0.038461538461538464,
+        "low97_5": -0.028846153846153848,
+        "high97_5": 0.04807692307692308,
+        "tasks": 26,
+        "pairs": 102
+      },
+      "cost_usd": {
+        "mean": 0.14377948076923078,
+        "low95": 0.09359633461538461,
+        "high95": 0.20259509615384616,
+        "low97_5": 0.08808513076923076,
+        "high97_5": 0.21209856153846157,
+        "tasks": 26,
+        "pairs": 104
+      },
+      "wall_seconds": {
+        "mean": -22.186019230769237,
+        "low95": -87.36297115384617,
+        "high95": 19.632721153846152,
+        "low97_5": -102.23928846153848,
+        "high97_5": 22.522711538461536,
+        "tasks": 26,
+        "pairs": 104
+      }
+    }
+  },
+  "tasks": {
+    "DM-keepalive-035": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "DM-valid-036": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "EA-scheme-041": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "JW-upsert-049": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          3,
+          4
+        ],
+        "hybrid_flexible": [
+          3,
+          4
+        ],
+        "hybrid_guided": [
+          2,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          2,
+          4
+        ],
+        "hybrid_guided": [
+          1,
+          4
+        ]
+      }
+    },
+    "MS-capacity-048": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "MS-pending-046": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "MS-timelock-047": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          3,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "PT-taker-034": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "QP-part-025": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          0,
+          4
+        ],
+        "hybrid_flexible": [
+          0,
+          4
+        ],
+        "hybrid_guided": [
+          2,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          3,
+          4
+        ],
+        "hybrid_flexible": [
+          2,
+          4
+        ],
+        "hybrid_guided": [
+          3,
+          4
+        ]
+      }
+    },
+    "RL-refill-037": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "RL-request-043": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "SM-select-022": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          3,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          3,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          3,
+          4
+        ],
+        "hybrid_guided": [
+          3,
+          4
+        ]
+      }
+    },
+    "SU-split-045": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TL-build-039": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TL-enough-044": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TL-find-040": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TL-tiers-038": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TL-update-050": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TR-cancel-026": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          3,
+          4
+        ],
+        "hybrid_guided": [
+          2,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          3,
+          4
+        ],
+        "hybrid_guided": [
+          3,
+          4
+        ]
+      }
+    },
+    "TR-discard-011": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TR-match-029": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TR-nonzero-031": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TR-order-010": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TR-reinsert-030": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "TR-sanitize-028": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    },
+    "VR-range-042": {
+      "gpt-5.6-terra": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      },
+      "gpt-5.6-sol": {
+        "agent_only": [
+          4,
+          4
+        ],
+        "hybrid_flexible": [
+          4,
+          4
+        ],
+        "hybrid_guided": [
+          4,
+          4
+        ]
+      }
+    }
+  },
+  "scope": "model differences are exploratory; the preregistered contrasts are C1-C3 within a model"
+}

@@ -3,16 +3,18 @@
 
 //! Natives for the `object` module, plus the extension backing them.
 
-use crate::{
-    address_derivation::object_address_from_object, monomorphic_natives, polymorphic_natives,
-    NativeEntry,
-};
+use crate::{monomorphic_natives, polymorphic_natives, NativeEntry};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
+    types::is_resource_type,
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
 use std::collections::HashMap;
+
+/// The `exists_at` type argument is not a struct or enum.
+const NOT_A_RESOURCE_TYPE: u64 = 11;
 
 /// Per-transaction memo cache for derived object addresses. Pure compute
 /// optimization — the derivation is deterministic, so caching only saves work.
@@ -37,6 +39,15 @@ impl NativeExtension for ObjectContextExtension {
     fn on_rollback(&mut self, _n: usize) -> VMResult<()> {
         Ok(())
     }
+}
+
+/// Derives an object address from another object:
+/// `sha3_256(source || derive_from || DeriveObjectAddressFromObject)`.
+fn object_address_from_object(
+    source: &AccountAddress,
+    derive_from: &AccountAddress,
+) -> AccountAddress {
+    AuthenticationKey::object_address_from_object(source, derive_from).account_address()
 }
 
 /// `0x1::object::create_user_derived_object_address_impl(source: address, derive_from: address): address`
@@ -70,7 +81,19 @@ pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
 pub fn native_exists_at<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `address`.
     let address: AccountAddress = unsafe { ctx.arg(0)? };
-    let exists = ctx.resource_exists(address, ctx.ty_arg(0)?)?;
+
+    // Defensive, and matching V1: a non-struct `T` would reach global storage
+    // and trip an invariant violation instead of aborting. The framework's
+    // `key` bound rules it out in source, but the native cannot rely on that.
+    let ty = ctx.ty_arg(0)?;
+    if !is_resource_type(ty) {
+        return Ok(NativeStatus::Abort {
+            code: NOT_A_RESOURCE_TYPE,
+            message: Some("Object type argument must be a resource (struct) type".to_string()),
+        });
+    }
+
+    let exists = ctx.resource_exists(address, ty)?;
     // SAFETY: return 0 is `bool`.
     unsafe { ctx.set_return(0, exists)? };
     Ok(NativeStatus::Success)
@@ -87,4 +110,20 @@ pub fn make_all_object_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> 
         native_exists_at
     )]);
     natives
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn object_from_object_known_answer() {
+        let source = AccountAddress::from_hex_literal("0xa").unwrap();
+        let derive_from = AccountAddress::from_hex_literal("0xb").unwrap();
+        let addr = object_address_from_object(&source, &derive_from);
+        assert_eq!(
+            addr.to_hex_literal(),
+            "0xc168433b37d568f2c5cb143f04e177e102d9e40247cefdcb41b8dcc56caa44b0"
+        );
+    }
 }

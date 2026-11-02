@@ -1,0 +1,116 @@
+{
+  "agent_only": {
+    "terra_vs_sol": {
+      "estimate": 0.573,
+      "ci95": [
+        0.53,
+        0.623
+      ]
+    },
+    "cheaper_on_tasks": 26,
+    "task_ratios": {
+      "DM-keepalive-035": 0.53,
+      "DM-valid-036": 0.55,
+      "MS-capacity-048": 0.47,
+      "MS-timelock-047": 0.51,
+      "PT-taker-034": 0.62,
+      "RL-refill-037": 0.65,
+      "RL-request-043": 0.57,
+      "TL-enough-044": 0.75,
+      "TL-find-040": 0.59,
+      "TL-update-050": 0.57,
+      "TR-match-029": 0.72,
+      "TR-reinsert-030": 0.59,
+      "TR-sanitize-028": 0.62,
+      "EA-scheme-041": 0.41,
+      "JW-upsert-049": 0.55,
+      "MS-pending-046": 0.43,
+      "QP-part-025": 0.39,
+      "SM-select-022": 0.9,
+      "SU-split-045": 0.66,
+      "TL-build-039": 0.68,
+      "TL-tiers-038": 0.5,
+      "TR-cancel-026": 0.56,
+      "TR-discard-011": 0.71,
+      "TR-nonzero-031": 0.52,
+      "TR-order-010": 0.6,
+      "VR-range-042": 0.61
+    }
+  },
+  "hybrid_guided": {
+    "terra_vs_sol": {
+      "estimate": 0.528,
+      "ci95": [
+        0.453,
+        0.633
+      ]
+    },
+    "cheaper_on_tasks": 25,
+    "task_ratios": {
+      "DM-keepalive-035": 0.4,
+      "DM-valid-036": 0.45,
+      "MS-capacity-048": 0.45,
+      "MS-timelock-047": 0.53,
+      "PT-taker-034": 0.52,
+      "RL-refill-037": 0.49,
+      "RL-request-043": 0.39,
+      "TL-enough-044": 0.62,
+      "TL-find-040": 0.68,
+      "TL-update-050": 0.55,
+      "TR-match-029": 0.53,
+      "TR-reinsert-030": 0.46,
+      "TR-sanitize-028": 0.28,
+      "EA-scheme-041": 0.36,
+      "JW-upsert-049": 0.7,
+      "MS-pending-046": 0.44,
+      "QP-part-025": 0.46,
+      "SM-select-022": 1.18,
+      "SU-split-045": 0.41,
+      "TL-build-039": 0.54,
+      "TL-tiers-038": 0.62,
+      "TR-cancel-026": 0.64,
+      "TR-discard-011": 0.55,
+      "TR-nonzero-031": 0.64,
+      "TR-order-010": 0.54,
+      "VR-range-042": 0.35
+    }
+  },
+  "hybrid_flexible": {
+    "terra_vs_sol": {
+      "estimate": 0.591,
+      "ci95": [
+        0.534,
+        0.65
+      ]
+    },
+    "cheaper_on_tasks": 26,
+    "task_ratios": {
+      "DM-keepalive-035": 0.49,
+      "DM-valid-036": 0.53,
+      "MS-capacity-048": 0.55,
+      "MS-timelock-047": 0.6,
+      "PT-taker-034": 0.66,
+      "RL-refill-037": 0.54,
+      "RL-request-043": 0.58,
+      "TL-enough-044": 0.47,
+      "TL-find-040": 0.57,
+      "TL-update-050": 0.61,
+      "TR-match-029": 0.45,
+      "TR-reinsert-030": 0.45,
+      "TR-sanitize-028": 0.37,
+      "EA-scheme-041": 0.55,
+      "JW-upsert-049": 0.71,
+      "MS-pending-046": 0.54,
+      "QP-part-025": 0.43,
+      "SM-select-022": 0.92,
+      "SU-split-045": 0.51,
+      "TL-build-039": 0.77,
+      "TL-tiers-038": 0.79,
+      "TR-cancel-026": 0.54,
+      "TR-discard-011": 0.66,
+      "TR-nonzero-031": 0.57,
+      "TR-order-010": 0.53,
+      "VR-range-042": 0.6
+    }
+  }
+}

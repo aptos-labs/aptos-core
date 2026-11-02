@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 37,
+        "offset": 715,
+        "sha256": "67c92838c8d6f4b826e57efd01187f25d81f0bc29d3c490c30ccf1084aaa0d4b"
+      },
+      "edit": {
+        "at": 27,
+        "kind": "substitute",
+        "length": 8,
+        "to": "draws: i + 1"
+      },
+      "essential": true,
+      "file": "sources/authored/selection_machine.move",
+      "mutant_id": "SM-select-022-draw-count-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "The reported draw count is one too high.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 42,
+        "offset": 840,
+        "sha256": "b09022fcbf3b09ad9b72c7cda4e23ef31b72b88f92424b77bcca4d8e98bcace3"
+      },
+      "edit": {
+        "at": 21,
+        "kind": "substitute",
+        "length": 19,
+        "to": "restart_from: start"
+      },
+      "essential": true,
+      "file": "sources/authored/selection_machine.move",
+      "mutant_id": "SM-select-022-restarts-at-origin",
+      "obligation_category": "normal-result",
+      "rationale": "An exhausted search hands back the seed rather than the last candidate.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 20,
+        "offset": 634,
+        "sha256": "1a4900933d9d70a8a81596d8c0186f673073b0353d9bf3cd2b4592e7b4e68ce2"
+      },
+      "edit": {
+        "at": 7,
+        "kind": "substitute",
+        "length": 10,
+        "to": "i <= rounds"
+      },
+      "essential": true,
+      "file": "sources/authored/selection_machine.move",
+      "mutant_id": "SM-select-022-one-draw-too-many",
+      "obligation_category": "abort",
+      "rationale": "One more draw than the round count is tested.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5827e3b2f0cfef7a7ca67dc11623f71be8e8c086c9e67c42cff7ab49172429ca",
+  "task_id": "SM-select-022"
+}

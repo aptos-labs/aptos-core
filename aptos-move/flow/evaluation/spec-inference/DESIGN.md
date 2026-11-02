@@ -20,11 +20,13 @@ the workflow and the availability of WP differ:
 | arm | WP available | workflow |
 |---|---|---|
 | `agent_only` | no | the agent specifies unaided |
-| `hybrid_guided` | yes | prescribed: invariants → WP → repair → simplify → check |
+| `hybrid_guided` | yes | prescribed: invariants → WP → repair → (simplify) → check |
 | `hybrid_flexible` | yes | the agent chooses its own workflow |
 
 `agent_only` has no simplification step because it is never given
-mechanically generated conditions. In it the WP router is **absent**, not
+mechanically generated conditions. A round rendered with
+`--no-wp-simplification`, as corpus-v4 round 8 is, drops it from
+`hybrid_guided` as well. In it the WP router is **absent**, not
 discouraged: the tool cannot be listed or called.
 
 Three contrasts are planned:
@@ -239,16 +241,21 @@ A round is `tasks × arms × replicates` runs, each an isolated model session.
 `selection_seed + round_id`. Blocks are shuffled, and **arm order is shuffled
 within each block**, so position in the run sequence is not confounded with arm.
 
-**Session.** `harness/controller.py` drives a multi-turn Claude Agent SDK
-session under fixed limits (controller turns, model turns per controller turn,
+**Session.** `harness/controller.py` drives a multi-turn provider session:
+Claude through the Claude Agent SDK, or Codex through resumable
+`codex exec --json` threads. The runtime and version are pinned in the round
+configuration; Codex also pins its paired code-mode host by digest. Both
+adapters run the session under fixed limits (controller
+turns, model turns per controller turn,
 wall seconds, output tokens). The opening turn is `/move-inf` followed by
-`prompts/initial.txt`. That prompt is the same text for every arm and carries
+`prompts/initial.txt` for Claude. Codex receives the same scheduled plugin's
+immutable `move-inf` skill text inline because ephemeral non-interactive skill
+registration is not reliable. The task portion is the same text for every arm and carries
 only what the skill cannot know — which target, which package, and that a budget
 bounds the session. Every normative instruction (preserve behavior, preserve
 user-written specifications, finish with a full proof) belongs to the skill, so
 the plugin remains the sole arm boundary and there is one source of truth per
 rule. `harness/state_machine.py` supplies arm-blind follow-ups from
-`harness/state_machine.py` supplies arm-blind follow-ups from
 `prompts/followups.json`, keyed by outcome (compile failure, prover failure,
 timeout, forbidden weakening, no progress). It never learns which arm it is
 prompting. Built-in tools are
@@ -386,9 +393,10 @@ whether any task could have produced them.
 
 ## 6. Repetitions and analysis
 
-A full corpus round is five fresh runs for every task and arm. Runs are blocked
-by `(task, replicate)`; the three arm orders are randomized within blocks and
-all six orders are balanced across the schedule. Concurrency is fixed, and
+A full corpus round is four or five fresh runs for every task and arm;
+corpus-v4 rounds use four. Runs are blocked by `(task, replicate)`; the three
+arm orders are randomized within blocks and all six orders are balanced across
+the schedule. Concurrency is fixed, and
 members of one block do not contend on the same local solver lane. Failures
 consume the shared budget and are retained rather than retried away.
 

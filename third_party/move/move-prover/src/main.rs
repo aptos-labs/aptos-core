@@ -7,7 +7,7 @@
 
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use move_prover::{cli::Options, run_move_prover_v2};
-use std::env;
+use std::{env, io::IsTerminal};
 
 fn main() {
     if let Err(e) = run() {
@@ -24,7 +24,7 @@ fn main() {
 fn run() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let options = Options::create_from_args(&args)?;
-    let color = if atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout) {
+    let color = if std::io::stderr().is_terminal() && std::io::stdout().is_terminal() {
         ColorChoice::Auto
     } else {
         ColorChoice::Never

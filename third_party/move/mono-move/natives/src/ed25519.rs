@@ -16,7 +16,7 @@ use mono_move_core::{
     VMResult,
 };
 #[cfg(feature = "testing")]
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 
 /// `0x1::ed25519::public_key_validate_internal(bytes: vector<u8>): bool`
 ///

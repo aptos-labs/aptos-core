@@ -20,6 +20,7 @@ pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOncha
     BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
 pub struct TransactionExecutor<V> {
+    onchain_config: BlockExecutorConfigFromOnchain,
     num_blocks_processed: usize,
     executor: Arc<BlockExecutor<V>>,
     parent_block_id: HashValue,
@@ -35,8 +36,10 @@ where
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         ledger_update_sender: mpsc::SyncSender<LedgerUpdateMessage>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Self {
         Self {
+            onchain_config,
             num_blocks_processed: 0,
             executor,
             parent_block_id,
@@ -69,7 +72,7 @@ where
                 .execute_and_update_state(
                     executable_block,
                     self.parent_block_id,
-                    BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+                    self.onchain_config,
                 )
                 .unwrap();
         }

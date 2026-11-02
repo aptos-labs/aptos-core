@@ -24,7 +24,7 @@ from .compatibility import (
     tool_executables,
 )
 from .config import ExperimentConfig
-from .materialize import materialize_task
+from .materialize import materialize_task, preparation_patch
 
 
 async def screen_corpus(
@@ -69,7 +69,7 @@ async def screen_corpus(
         require_plain_name(record["task_id"], "task_id")
         shared = (manifest_path.parent / record["shared_package_path"]).resolve()
         shared_packages.add(shared)
-        patch = (manifest_path.parent / record["preparation_patch"]).resolve()
+        patch = preparation_patch(manifest_path.parent, record)
         with tempfile.TemporaryDirectory(
             prefix=f"move-inference-screen-{record['task_id']}-"
         ) as temporary:

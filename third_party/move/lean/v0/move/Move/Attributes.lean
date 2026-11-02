@@ -8,7 +8,7 @@ import Lean.Elab.Deriving.Basic
 import MoveModel.IR.Module
 
 /-!
-# Leaner declaration attributes
+# Verex declaration attributes
 
 Move abilities use Lean's standard `deriving` surface, backed by persistent
 declaration metadata. They are not inferred through open-world typeclass

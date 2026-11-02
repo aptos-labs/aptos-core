@@ -393,26 +393,25 @@ fun Test::resource_with_old($t0|val: u64) {
      var $t8: u64
      var $t9: u64
      var $t10: &mut u64
-  0: assume Gt($t0, 0)
-  1: $t2 := 0x0
-  2: $t3 := exists<0x42::Test::R>($t2)
-  3: if ($t3) goto 8 else goto 4
-  4: label L1
-  5: $t4 := 33
-  6: $t5 := move($t4)
-  7: goto 18
-  8: label L0
-  9: $t6 := 0x0
- 10: $t7 := borrow_global<0x42::Test::R>($t6) on_abort goto 18 with $t5
- 11: $t8 := get_field<0x42::Test::R>.v($t7)
- 12: $t9 := +($t8, $t0) on_abort goto 18 with $t5
- 13: $t10 := borrow_field<0x42::Test::R>.v($t7)
- 14: write_ref($t10, $t9)
- 15: write_back[Reference($t7).v (u64)]($t10)
- 16: write_back[0x42::Test::R@]($t7)
- 17: return ()
- 18: label L2
- 19: abort($t5)
+  0: $t2 := 0x0
+  1: $t3 := exists<0x42::Test::R>($t2)
+  2: if ($t3) goto 7 else goto 3
+  3: label L1
+  4: $t4 := 33
+  5: $t5 := move($t4)
+  6: goto 17
+  7: label L0
+  8: $t6 := 0x0
+  9: $t7 := borrow_global<0x42::Test::R>($t6) on_abort goto 17 with $t5
+ 10: $t8 := get_field<0x42::Test::R>.v($t7)
+ 11: $t9 := +($t8, $t0) on_abort goto 17 with $t5
+ 12: $t10 := borrow_field<0x42::Test::R>.v($t7)
+ 13: write_ref($t10, $t9)
+ 14: write_back[Reference($t7).v (u64)]($t10)
+ 15: write_back[0x42::Test::R@]($t7)
+ 16: return ()
+ 17: label L2
+ 18: abort($t5)
 }
 
 

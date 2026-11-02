@@ -4,8 +4,8 @@
 use aptos_logger::{prelude::*, sample, warn};
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge_vec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec, IntGaugeVec, TimerHelper,
+    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge, IntGaugeVec, TimerHelper,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -85,6 +85,23 @@ pub static CHUNK_EXECUTOR_REQUEST_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_executor_chunk_executor_request_rejected_total",
         "Cumulative number of rejected chunk executor requests, by entry point and reason",
         &["entry_point", "reason"]
+    )
+    .unwrap()
+});
+
+pub static CHUNK_PARTIAL_BLOCK_TXNS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_executor_chunk_partial_block_txns",
+        "Number of transactions the chunk executor holds back until their block is complete"
+    )
+    .unwrap()
+});
+
+pub static CHUNK_DISCARDED_OUTPUTS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_executor_chunk_discarded_outputs_total",
+        "Cumulative number of transaction outputs the chunk executor discards to execute the \
+        transactions instead, since they are in the same block as transactions without outputs"
     )
     .unwrap()
 });
@@ -338,8 +355,8 @@ pub fn update_counters_for_processed_chunk<T>(
                         sample!(
                             SampleRate::Duration(Duration::from_secs(15)),
                             warn!(
-                                "[sampled] Txn being discarded is {:?} with status code {:?}",
-                                txn, discard_status_code
+                                "[sampled] Txn discarded with status code {:?}: {:?}",
+                                discard_status_code, txn
                             );
                         );
                         "discard"

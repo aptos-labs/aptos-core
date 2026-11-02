@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-pub(in crate::pruner) mod generics;
+pub(crate) mod generics;
 pub(crate) mod leaked_stale_node_cleaner;
 mod state_merkle_metadata_pruner;
 pub(crate) mod state_merkle_pruner_manager;
@@ -55,7 +55,7 @@ where
     }
 
     fn prune(&self, batch_size: usize) -> Result<Version> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_merkle_pruner__prune"]);
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("{}__prune", M::name())]);
         let mut progress = self.progress();
         let target_version = self.target_version();
 

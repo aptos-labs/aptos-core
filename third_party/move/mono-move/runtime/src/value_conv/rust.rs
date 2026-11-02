@@ -329,11 +329,12 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
             descriptor_id,
             variants,
             max_size_across_variants,
+            ..
         } = &self.layout.kind
         else {
             return Err(self.mismatch(format!("a {num_fields}-field enum variant")));
         };
-        let variant_id = *variants.get(tag as usize).ok_or({
+        let variant_id = variants.get(tag as usize).map(|v| v.id).ok_or({
             RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
                 tag: tag as u64,
                 variant_count: variants.len(),
@@ -483,7 +484,8 @@ mod tests {
     use super::*;
     use crate::value_conv::bcs::AlignedBuf;
     use mono_move_core::{
-        intern_type_tag, reserved_layout_id, types::Type, DescriptorId, LayoutFlags, LayoutId,
+        intern_type_tag, interner::InternedIdentifier, reserved_layout_id, types::Type,
+        DescriptorId, LayoutFlags, LayoutId, VariantValueLayout,
     };
     use mono_move_global_context::{ExecutionGuard, GlobalContext};
     use move_core_types::{
@@ -495,12 +497,18 @@ mod tests {
     use serde::Serialize;
 
     /// A pointer-slot layout, as vectors and enums use.
-    fn ptr_layout(kind: LayoutKind) -> ValueLayout {
-        ValueLayout::new(8, 8, None, LayoutFlags::empty(), kind)
+    fn ptr_layout(ty: InternedType, kind: LayoutKind) -> ValueLayout {
+        ValueLayout::new(Some(ty), 8, 8, None, LayoutFlags::empty(), kind)
     }
 
-    fn struct_layout(size: u32, align: u32, fields: Vec<FieldValueLayout>) -> ValueLayout {
+    fn struct_layout(
+        ty: Option<InternedType>,
+        size: u32,
+        align: u32,
+        fields: Vec<FieldValueLayout>,
+    ) -> ValueLayout {
         ValueLayout::new(
+            ty,
             size,
             align,
             None,
@@ -512,7 +520,21 @@ mod tests {
     }
 
     fn field(offset: u32, id: LayoutId) -> FieldValueLayout {
-        FieldValueLayout { offset, id }
+        FieldValueLayout {
+            offset,
+            id,
+            name: InternedIdentifier::from_static("f"),
+        }
+    }
+
+    /// Names the published variant bodies. These tests never read the names.
+    fn variants(ids: &[LayoutId]) -> Box<[VariantValueLayout]> {
+        ids.iter()
+            .map(|&id| VariantValueLayout {
+                name: InternedIdentifier::from_static("V"),
+                id,
+            })
+            .collect()
     }
 
     fn tag(module: &str, name: &str, type_args: Vec<TypeTag>) -> TypeTag {
@@ -534,13 +556,10 @@ mod tests {
         elem_id: LayoutId,
     ) -> InternedType {
         let ty = intern_type_tag(&TypeTag::Vector(Box::new(elem_tag.clone())), guard).unwrap();
-        guard.publish_layout(
-            ty,
-            ptr_layout(LayoutKind::Vector {
-                elem_id,
-                descriptor_id: DescriptorId(0),
-            }),
-        );
+        guard.publish_layout(ptr_layout(ty, LayoutKind::Vector {
+            elem_id,
+            descriptor_id: DescriptorId(0),
+        }));
         ty
     }
 
@@ -552,18 +571,15 @@ mod tests {
         elem_size: u32,
     ) -> InternedType {
         let ty = intern_type_tag(&tag("option", "Option", vec![elem_tag.clone()]), guard).unwrap();
-        let variants = guard.publish_variant_layouts(ty, vec![
-            struct_layout(0, 1, vec![]),
-            struct_layout(elem_size, elem_size.max(1), vec![field(0, elem_id)]),
+        let variant_ids = guard.publish_variant_layouts(ty, vec![
+            struct_layout(None, 0, 1, vec![]),
+            struct_layout(None, elem_size, elem_size.max(1), vec![field(0, elem_id)]),
         ]);
-        guard.publish_layout(
-            ty,
-            ptr_layout(LayoutKind::FrozenEnum {
-                descriptor_id: DescriptorId(0),
-                variants,
-                max_size_across_variants: 8 + elem_size,
-            }),
-        );
+        guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
+            descriptor_id: DescriptorId(0),
+            variants: variants(&variant_ids),
+            max_size_across_variants: 8 + elem_size,
+        }));
         ty
     }
 
@@ -682,7 +698,8 @@ mod tests {
         let vec_u8 = publish_vector(&guard, &TypeTag::U8, reserved(&Type::U8));
         let vec_u8_id = guard.layout_id(vec_u8).unwrap();
         let string_ty = intern_type_tag(&tag("string", "String", vec![]), &guard).unwrap();
-        guard.publish_layout(string_ty, struct_layout(8, 8, vec![field(0, vec_u8_id)]));
+        let layout = struct_layout(Some(string_ty), 8, 8, vec![field(0, vec_u8_id)]);
+        guard.publish_layout(layout);
         check(&guard, string_ty, &"hello Move".to_string());
         check(&guard, string_ty, &String::new());
     }
@@ -711,19 +728,17 @@ mod tests {
         let vec_u8 = publish_vector(&guard, &TypeTag::U8, reserved(&Type::U8));
         let vec_u8_id = guard.layout_id(vec_u8).unwrap();
         let string_ty = intern_type_tag(&tag("string", "String", vec![]), &guard).unwrap();
-        guard.publish_layout(string_ty, struct_layout(8, 8, vec![field(0, vec_u8_id)]));
+        let layout = struct_layout(Some(string_ty), 8, 8, vec![field(0, vec_u8_id)]);
+        guard.publish_layout(layout);
         let string_id = guard.layout_id(string_ty).unwrap();
 
         let ty = intern_type_tag(&tag("m", "Metadata", vec![]), &guard).unwrap();
-        guard.publish_layout(
-            ty,
-            struct_layout(56, 8, vec![
-                field(0, reserved(&Type::Address)),
-                field(32, reserved(&Type::U64)),
-                field(40, vec_u8_id),
-                field(48, string_id),
-            ]),
-        );
+        guard.publish_layout(struct_layout(Some(ty), 56, 8, vec![
+            field(0, reserved(&Type::Address)),
+            field(32, reserved(&Type::U64)),
+            field(40, vec_u8_id),
+            field(48, string_id),
+        ]));
         check(&guard, ty, &Metadata {
             proposer: AccountAddress::ONE,
             round: 9,
@@ -742,10 +757,8 @@ mod tests {
         let ctx = GlobalContext::with_num_execution_workers(1);
         let guard = ctx.try_execution_context(0).unwrap();
         let ty = intern_type_tag(&tag("m", "Wrapper", vec![]), &guard).unwrap();
-        guard.publish_layout(
-            ty,
-            struct_layout(8, 8, vec![field(0, reserved(&Type::U64))]),
-        );
+        let layout = struct_layout(Some(ty), 8, 8, vec![field(0, reserved(&Type::U64))]);
+        guard.publish_layout(layout);
         check(&guard, ty, &Wrapper { inner: 7u64 });
     }
 
@@ -761,22 +774,19 @@ mod tests {
         let ctx = GlobalContext::with_num_execution_workers(1);
         let guard = ctx.try_execution_context(0).unwrap();
         let ty = intern_type_tag(&tag("m", "Protector", vec![]), &guard).unwrap();
-        let variants = guard.publish_variant_layouts(ty, vec![
-            struct_layout(8, 8, vec![field(0, reserved(&Type::U64))]),
-            struct_layout(16, 8, vec![
+        let variant_ids = guard.publish_variant_layouts(ty, vec![
+            struct_layout(None, 8, 8, vec![field(0, reserved(&Type::U64))]),
+            struct_layout(None, 16, 8, vec![
                 field(0, reserved(&Type::U64)),
                 field(8, reserved(&Type::U64)),
             ]),
-            struct_layout(0, 1, vec![]),
+            struct_layout(None, 0, 1, vec![]),
         ]);
-        guard.publish_layout(
-            ty,
-            ptr_layout(LayoutKind::FrozenEnum {
-                descriptor_id: DescriptorId(0),
-                variants,
-                max_size_across_variants: 24,
-            }),
-        );
+        guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
+            descriptor_id: DescriptorId(0),
+            variants: variants(&variant_ids),
+            max_size_across_variants: 24,
+        }));
         check(&guard, ty, &Protector::Nonce(7));
         check(&guard, ty, &Protector::Pair { lo: 1, hi: 2 });
         check(&guard, ty, &Protector::Nothing);
@@ -836,21 +846,18 @@ mod tests {
         let guard = ctx.try_execution_context(0).unwrap();
         // `Some` carries one field, but this enum's second variant has two.
         let ty = intern_type_tag(&tag("m", "Wrong", vec![]), &guard).unwrap();
-        let variants = guard.publish_variant_layouts(ty, vec![
-            struct_layout(0, 1, vec![]),
-            struct_layout(16, 8, vec![
+        let variant_ids = guard.publish_variant_layouts(ty, vec![
+            struct_layout(None, 0, 1, vec![]),
+            struct_layout(None, 16, 8, vec![
                 field(0, reserved(&Type::U64)),
                 field(8, reserved(&Type::U64)),
             ]),
         ]);
-        guard.publish_layout(
-            ty,
-            ptr_layout(LayoutKind::FrozenEnum {
-                descriptor_id: DescriptorId(0),
-                variants,
-                max_size_across_variants: 24,
-            }),
-        );
+        guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
+            descriptor_id: DescriptorId(0),
+            variants: variants(&variant_ids),
+            max_size_across_variants: 24,
+        }));
         let mut heap = Heap::new(1 << 20);
         let mut slot = AlignedBuf::zeroed(48);
         // SAFETY: the slot is aligned and wider than an enum's in-memory

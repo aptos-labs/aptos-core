@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/state_domain_valid_value.move:17:9
+   │
+17 │         ensures exists S in *: S.. |~ increments_to(_x, result);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/state_domain_valid_value.move:13: returns_zero
+   =         _x = <redacted>
+   =     at tests/sources/regression/state_domain_valid_value.move:14: returns_zero
+   =         result = <redacted>
+   =         _x = <redacted>
+   =     at tests/sources/regression/state_domain_valid_value.move:17: returns_zero (spec)

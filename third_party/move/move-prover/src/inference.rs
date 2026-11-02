@@ -313,7 +313,7 @@ fn matches_verify_scope(fun: &FunctionEnv, scope: &VerificationScope) -> bool {
     match scope {
         VerificationScope::All => true,
         VerificationScope::Public => fun.is_exposed(),
-        VerificationScope::Only(name) => fun.matches_name(name),
+        VerificationScope::Only(names) => fun.matches_any_name(names),
         VerificationScope::OnlyModule(name) => fun.module_env.matches_name(name),
         VerificationScope::None => false,
     }

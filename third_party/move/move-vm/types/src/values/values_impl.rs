@@ -25,6 +25,7 @@ use move_core_types::{
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
+        MAX_VALUE_NEST_DEPTH,
     },
     vm_status::{
         sub_status::{
@@ -54,7 +55,7 @@ use triomphe::Arc as TriompheArc;
 ///
 /// IMPORTANT: When changing this constant, make sure it is in-sync with one in VM config (it is
 /// used there now).
-pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
+pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = MAX_VALUE_NEST_DEPTH;
 
 /***************************************************************************************
  *
@@ -3821,12 +3822,12 @@ impl Value {
 }
 
 /***************************************************************************************
-*
-* Vector
-*
-*   Implemented as a built-in data type.
-*
-**************************************************************************************/
+ *
+ * Vector
+ *
+ *   Implemented as a built-in data type.
+ *
+ **************************************************************************************/
 
 pub const INDEX_OUT_OF_BOUNDS: u64 = NFE_VECTOR_ERROR_BASE + 1;
 pub const POP_EMPTY_VEC: u64 = NFE_VECTOR_ERROR_BASE + 2;
@@ -4670,12 +4671,12 @@ impl GlobalValue {
 }
 
 /***************************************************************************************
-*
-* Debug
-*
-*   Implementation of the Debug trait for VM Values.
-*
-**************************************************************************************/
+ *
+ * Debug
+ *
+ *   Implementation of the Debug trait for VM Values.
+ *
+ **************************************************************************************/
 
 impl Debug for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -4712,13 +4713,13 @@ impl Debug for Value {
 }
 
 /***************************************************************************************
-*
-* Display
-*
-*   Implementation of the Display trait for VM Values. These are supposed to be more
-*   friendly & readable than the generated Debug dump.
-*
-**************************************************************************************/
+ *
+ * Display
+ *
+ *   Implementation of the Display trait for VM Values. These are supposed to be more
+ *   friendly & readable than the generated Debug dump.
+ *
+ **************************************************************************************/
 
 /// Cap recursive `Display` of a `Value` so deeply nested values cannot blow the
 /// formatting thread's stack. Every recursive path (Value↔Container, Locals→Value,
@@ -5849,12 +5850,12 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
 }
 
 /***************************************************************************************
-*
-* Constants
-*
-*   Implementation of deserialization of constant data into a runtime value
-*
-**************************************************************************************/
+ *
+ * Constants
+ *
+ *   Implementation of deserialization of constant data into a runtime value
+ *
+ **************************************************************************************/
 
 impl Value {
     fn constant_sig_token_to_layout(constant_signature: &SignatureToken) -> Option<MoveTypeLayout> {
@@ -5897,10 +5898,10 @@ impl Value {
 }
 
 /***************************************************************************************
-*
-* Destructors
-*
-**************************************************************************************/
+ *
+ * Destructors
+ *
+ **************************************************************************************/
 // Locals may contain reference values that points to the same cotnainer through Rc, hencing forming
 // a cycle. Therefore values need to be manually taken out of the Locals in order to not leak memory.
 impl Drop for Locals {
@@ -5919,10 +5920,10 @@ impl Drop for Locals {
 }
 
 /***************************************************************************************
-*
-* Views
-*
-**************************************************************************************/
+ *
+ * Views
+ *
+ **************************************************************************************/
 impl Container {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use Container::*;
@@ -5994,8 +5995,8 @@ impl Container {
 
 impl Closure {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
-        let Self(_, captured) = self;
-        if visitor.visit_closure(depth, captured.len())? {
+        let Self(fun, captured) = self;
+        if visitor.visit_closure(depth, fun.as_ref(), captured.len())? {
             for val in captured.iter() {
                 val.visit_impl(visitor, depth + 1)?;
             }
@@ -6635,9 +6636,46 @@ impl DepthCheckingVisitor {
         }
         Ok(())
     }
+
+    /// Same result as visiting the vector and each of its elements, without the per-element walk.
+    #[inline]
+    fn check_primitive_vec(&self, depth: u64, len: usize) -> PartialVMResult<()> {
+        self.check(depth)?;
+        if len > 0 {
+            self.check(depth + 1)?;
+        }
+        Ok(())
+    }
+}
+
+macro_rules! check_primitive_vecs {
+    ($($visit:ident: $ty:ty),* $(,)?) => {
+        $(
+            fn $visit(&mut self, depth: u64, vals: &[$ty]) -> PartialVMResult<()> {
+                self.check_primitive_vec(depth, vals.len())
+            }
+        )*
+    };
 }
 
 impl ValueVisitor for DepthCheckingVisitor {
+    check_primitive_vecs!(
+        visit_vec_u8: u8,
+        visit_vec_u16: u16,
+        visit_vec_u32: u32,
+        visit_vec_u64: u64,
+        visit_vec_u128: u128,
+        visit_vec_u256: move_core_types::int256::U256,
+        visit_vec_i8: i8,
+        visit_vec_i16: i16,
+        visit_vec_i32: i32,
+        visit_vec_i64: i64,
+        visit_vec_i128: i128,
+        visit_vec_i256: move_core_types::int256::I256,
+        visit_vec_bool: bool,
+        visit_vec_address: AccountAddress,
+    );
+
     fn visit_delayed(&mut self, depth: u64, _id: DelayedFieldID) -> PartialVMResult<()> {
         self.check(depth)
     }
@@ -6711,7 +6749,12 @@ impl ValueVisitor for DepthCheckingVisitor {
         Ok(true) // continue into fields
     }
 
-    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+    fn visit_closure(
+        &mut self,
+        depth: u64,
+        _fun: &(dyn AbstractFunction + 'static),
+        _len: usize,
+    ) -> PartialVMResult<bool> {
         self.check(depth)?;
         Ok(true) // continue into captured values
     }

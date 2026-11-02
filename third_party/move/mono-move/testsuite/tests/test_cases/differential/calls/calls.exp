@@ -14,7 +14,7 @@ fun caller(): u64 {
   code:
   L0:
     0: x0 := ld_u64 10 @0
-    1: [x0] := call identity, [x0] @1
+    1: [x0] := call_exempt identity, [x0] @1
     2: ret [x0] @2
 }
 === micro-ops ===
@@ -32,7 +32,7 @@ fun caller() {
   entry_gas: 92
   code:
     0: StoreImm8 [32] <- #10 @0
-    1: CallIndirect 0x66::test::identity @1
+    1: CallByNameExempt 0x66::test::identity @1
     2: Move8 [0] <- [32] @2
     3: Return @2
 }

@@ -2,15 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::collectors::common::NAMESPACE;
-use aptos_infallible::Mutex;
 use aptos_metrics_core::const_metric::ConstMetric;
 use prometheus::{
     core::{Collector, Desc, Describer},
     proto::MetricFamily,
     Opts,
 };
-use std::{collections::BTreeMap, sync::Arc};
-use sysinfo::{RefreshKind, System, SystemExt};
+use std::collections::BTreeMap;
+use sysinfo::System;
 
 const RELEASE_GIT_HASH_LABEL: &str = "release_git_hash";
 const RELEASE_VERSION_LABEL: &str = "release_version";
@@ -31,7 +30,6 @@ pub(crate) struct BasicNodeInfoCollector {
 
 impl BasicNodeInfoCollector {
     pub fn new(maybe_build_info: Option<&BTreeMap<String, String>>) -> Self {
-        let system = Arc::new(Mutex::new(System::new_with_specifics(RefreshKind::new())));
         let mut fallback_build_info = BTreeMap::new();
 
         let build_info = if let Some(build_info) = maybe_build_info {
@@ -80,10 +78,7 @@ impl BasicNodeInfoCollector {
         )
         .unwrap();
 
-        let hostname = system
-            .lock()
-            .host_name()
-            .unwrap_or_else(|| String::from(UNKNOW_LABEL));
+        let hostname = System::host_name().unwrap_or_else(|| String::from(UNKNOW_LABEL));
 
         let hostname_metric =
             ConstMetric::new_gauge(hostname_desc, 1.0, Some(&[hostname])).unwrap();

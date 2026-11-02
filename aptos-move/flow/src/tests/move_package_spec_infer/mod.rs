@@ -6,3 +6,4 @@ mod file_output_merge;
 mod filter_dependency_module;
 mod filter_function;
 mod qualified_filters;
+mod repeated_inference;

@@ -3,7 +3,7 @@
 
 //! This module provides ElGamal generic constructions and concrete schemes.
 
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
 
 /// This trait captures the group operations needed to implement ElGamal.
@@ -70,7 +70,7 @@ pub fn decrypt<G: ElGamalFriendlyGroup>(
 
 #[cfg(test)]
 fn test_keygen_enc_dec<G: ElGamalFriendlyGroup>() {
-    let mut rng = rand_core::OsRng;
+    let mut rng = rand::rngs::OsRng;
     let (sk, pk) = key_gen::<G, _>(&mut rng);
     let msg = G::rand_element(&mut rng);
     let (c0, c1) = encrypt::<G, _>(&mut rng, &pk, &msg);

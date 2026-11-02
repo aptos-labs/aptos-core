@@ -5,6 +5,7 @@ use crate::metrics::TIMER;
 use aptos_block_executor::counters::{
     self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
 };
+use aptos_db::metrics::OTHER_TIMERS_SECONDS as STORAGE_OTHER_TIMERS;
 use aptos_executor::metrics::{
     COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
     PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
@@ -116,6 +117,7 @@ static OTHER_LABELS: &[(&str, bool, &str)] = &[
     ("2.2.2.", false, "calculate_block_state_updates"),
     ("2.2.3.", false, "calculate_usage"),
     ("2.2.4.", false, "make_checkpoint"),
+    ("3.", true, "do_positions"),
 ];
 
 #[derive(Debug, Clone)]
@@ -131,6 +133,10 @@ struct ExecutionTimeMeasurement {
     by_other: HashMap<&'static str, f64>,
     ledger_update_total: f64,
     commit_total_time: f64,
+    /// Native-position base fold, inside the execution stage.
+    position_fold_total: f64,
+    /// Native-position KV + JMT commit, inside the commit stage.
+    position_commit_total: f64,
 }
 
 impl ExecutionTimeMeasurement {
@@ -161,6 +167,12 @@ impl ExecutionTimeMeasurement {
             .collect::<HashMap<_, _>>();
         let ledger_update_total = UPDATE_LEDGER.get_sample_sum();
         let commit_total = COMMIT_BLOCKS.get_sample_sum();
+        let position_fold_total = STORAGE_OTHER_TIMERS
+            .with_label_values(&["advance_position_base"])
+            .get_sample_sum();
+        let position_commit_total = STORAGE_OTHER_TIMERS
+            .with_label_values(&["commit_native_position"])
+            .get_sample_sum();
 
         Self {
             output_size,
@@ -173,6 +185,8 @@ impl ExecutionTimeMeasurement {
             by_other,
             ledger_update_total,
             commit_total_time: commit_total,
+            position_fold_total,
+            position_commit_total,
         }
     }
 
@@ -196,6 +210,8 @@ impl ExecutionTimeMeasurement {
                 .collect::<HashMap<_, _>>(),
             ledger_update_total: end.ledger_update_total - self.ledger_update_total,
             commit_total_time: end.commit_total_time - self.commit_total_time,
+            position_fold_total: end.position_fold_total - self.position_fold_total,
+            position_commit_total: end.position_commit_total - self.position_commit_total,
         }
     }
 }
@@ -417,6 +433,25 @@ impl OverallMeasurement {
             self.delta_execution.commit_total_time / self.elapsed,
             num_txns / self.delta_execution.commit_total_time
         );
+
+        // Native-position stages; absent when the storage is not attached.
+        if self.delta_execution.position_fold_total > 0.0 {
+            info!(
+                "{} fraction of execution {:.4} in advance_position_base (component TPS: {:.1})",
+                self.prefix,
+                self.delta_execution.position_fold_total
+                    / self.delta_execution.execution_total_time,
+                num_txns / self.delta_execution.position_fold_total
+            );
+        }
+        if self.delta_execution.position_commit_total > 0.0 {
+            info!(
+                "{} fraction of commit {:.4} in commit_native_position (component TPS: {:.1})",
+                self.prefix,
+                self.delta_execution.position_commit_total / self.delta_execution.commit_total_time,
+                num_txns / self.delta_execution.position_commit_total
+            );
+        }
     }
 
     pub fn format_end_table(stages: &[Self], overall: &Self) -> String {

@@ -48,6 +48,12 @@ module 0x1::type_info {
         string::utf8(info.struct_name)
     }
 
+    // Function types nested in vectors retain result parentheses and abilities.
+    public fun bar_vector_function_struct(): String {
+        let info = type_of<Bar<vector<|u8|u8 has copy + drop + store>>>();
+        string::utf8(info.struct_name)
+    }
+
     // Aborts on a non-struct type, matching the legacy VM's code and message.
     public fun non_struct_aborts(): address {
         let info = type_of<u64>();
@@ -72,6 +78,9 @@ module 0x1::type_info {
 
 // RUN: execute 0x1::type_info::bar_function_struct
 // CHECK: results: "Bar<|u8|(u8, u16) has copy + drop>"
+
+// RUN: execute 0x1::type_info::bar_vector_function_struct
+// CHECK: results: "Bar<vector<|u8|(u8) has copy + drop + store>>"
 
 // RUN: execute 0x1::type_info::non_struct_aborts
 // CHECK: aborted: code 1 (Expected a struct type, found: u64) in 0x1::type_info

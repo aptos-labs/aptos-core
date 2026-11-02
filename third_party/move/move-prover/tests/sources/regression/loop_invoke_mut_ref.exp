@@ -1,0 +1,46 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/loop_invoke_mut_ref.move:30:9
+   │
+30 │         ensures result == 0; // error: the loop body writes 1 through `x`
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:18: apply_in_loop
+   =         x = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:19: apply_in_loop
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:20: apply_in_loop
+   =         f = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:21: apply_in_loop
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:22: apply_in_loop
+   =     enter loop, variable(s) x, $t2 havocked and reassigned
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:26: apply_in_loop
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:18: apply_in_loop
+   =         result = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:30: apply_in_loop (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/loop_invoke_mut_ref.move:45:9
+   │
+45 │         ensures result == 0; // error: the loop body writes 2 through `x`
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:33: invoke_with_destination_in_loop
+   =         x = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:34: invoke_with_destination_in_loop
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:35: invoke_with_destination_in_loop
+   =         f = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:36: invoke_with_destination_in_loop
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:37: invoke_with_destination_in_loop
+   =     enter loop, variable(s) x, $t2 havocked and reassigned
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:41: invoke_with_destination_in_loop
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:33: invoke_with_destination_in_loop
+   =         result = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/regression/loop_invoke_mut_ref.move:45: invoke_with_destination_in_loop (spec)

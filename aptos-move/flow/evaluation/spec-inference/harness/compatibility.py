@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import sha256_file, tree_hash, write_json
-from .move_source import mask_comments_and_strings
+from .move_source import closing_brace, function_spec_blocks, mask_comments_and_strings
 from .clean_unused_aliases import clean_unused_aliases
 from .config import ExperimentConfig
 from .judge import render_command, run_command
@@ -238,6 +238,14 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
     Boogie and Z3 decided, and swapping either changes what "proved" meant.
     """
     result: dict[str, dict[str, Any]] = {}
+    digests: dict[Path, str] = {}
+
+    def digest(path: Path) -> str:
+        resolved = path.resolve()
+        if resolved not in digests:
+            digests[resolved] = sha256_file(resolved)
+        return digests[resolved]
+
     for name, command in (
         ("compile", config.compile_command),
         ("wp_inference", config.inference_command),
@@ -254,13 +262,13 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
         if resolved is None:
             continue
         path = Path(resolved).resolve()
-        entry: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path)}
+        entry: dict[str, Any] = {"path": str(path), "sha256": digest(path)}
         # Later arguments that name a file are part of what runs.
         arguments = {}
         for argument in command[1:]:
             candidate = Path(argument)
             if candidate.is_file():
-                arguments[argument] = sha256_file(candidate.resolve())
+                arguments[argument] = digest(candidate)
         if arguments:
             entry["arguments"] = arguments
         result[name] = entry
@@ -271,7 +279,7 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
         located = os.environ.get(variable) or shutil.which(fallback)
         if located and Path(located).is_file():
             path = Path(located).resolve()
-            result[name] = {"path": str(path), "sha256": sha256_file(path)}
+            result[name] = {"path": str(path), "sha256": digest(path)}
     return result
 
 
@@ -516,6 +524,83 @@ async def _prove_reference_target(
         "proved": outcome.succeeded and vacuity_checked,
         "vacuity_checked": vacuity_checked,
         "vacuous": vacuous,
+    }
+
+
+def strip_function_specs(package: Path, module: str, function: str) -> int:
+    """Remove the `spec <function>` blocks of `module` from the package's
+    sources, each with a `proof` block following it; the number removed.
+
+    Only files declaring `module` (as a module or a spec module) are
+    touched, so a function of the same name elsewhere keeps its contract.
+    """
+    declaration = re.compile(rf"\b(?:module|spec)\s+{re.escape(module)}\s*\{{")
+    removed = 0
+    for source in sorted((package / "sources").rglob("*.move")):
+        text = source.read_text()
+        masked = mask_comments_and_strings(text)
+        if not declaration.search(masked):
+            continue
+        for block in reversed(function_spec_blocks(masked, function)):
+            end = block.end
+            proof = re.match(r"\s*proof\s*\{", masked[end:])
+            if proof:
+                end = closing_brace(masked, end + proof.end() - 1)
+                if end is None:
+                    raise ValueError(f"unterminated proof block for {function}")
+            text = text[: block.start] + text[end:]
+            removed += 1
+        source.write_text(text)
+    return removed
+
+
+async def wp_model_gate(
+    config: ExperimentConfig,
+    reference: Path,
+    module: str,
+    function: str,
+    threshold: int,
+) -> dict[str, Any]:
+    """WP over the target's module in its reference package, with only the
+    target's own contract removed and abort characterizations strict.
+
+    The reference keeps its loop invariants and every dependency contract,
+    so an error here is a gap in WP's models -- a native, intrinsic or
+    write it cannot characterize exactly -- not work left to an arm. A task
+    with such a gap measures the tool rather than the arms; the gap has to
+    be fixed in WP before the task is admitted.
+    """
+    with tempfile.TemporaryDirectory(prefix="move-inference-wp-gate-") as temporary:
+        package = Path(temporary) / "package"
+        shutil.copytree(reference, package, ignore=shutil.ignore_patterns("build"))
+        stripped = strip_function_specs(package, module, function)
+        output = Path(temporary) / "infer.json"
+        result = await run_command(
+            render_command(
+                [*config.inference_command, "--aborts-if-is-strict"],
+                package=package,
+                baseline=package,
+                target=module,
+                timeout=threshold,
+                output=output,
+            ),
+            timeout_seconds=threshold,
+        )
+        report = _read_stage_report(output) or {}
+    # Headlines only: diagnostics carry source frames, which screening
+    # records do not publish.
+    errors = sorted(
+        {
+            line.strip()
+            for diagnostic in report.get("diagnostics", [])
+            for line in diagnostic.splitlines()[:1]
+            if line.startswith(("error", "bug"))
+        }
+    )
+    return {
+        "passed": stripped > 0 and result.succeeded and not errors,
+        "stripped_spec_blocks": stripped,
+        "errors": errors,
     }
 
 

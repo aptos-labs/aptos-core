@@ -29,7 +29,6 @@ error: post-condition does not hold
     =         <redacted> = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:192: contains (spec)
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:223: contains_test_found
-    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:192: contains (spec)
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
     =         v = <redacted>
     =         pred = <redacted>

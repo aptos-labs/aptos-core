@@ -6,7 +6,7 @@ use crate::{
     test_utils::KeyPair,
     Signature, SigningKey, Uniform,
 };
-use rand_core::OsRng;
+use rand::rngs::OsRng;
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.

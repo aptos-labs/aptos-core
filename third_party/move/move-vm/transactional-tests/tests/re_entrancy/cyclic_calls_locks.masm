@@ -1,0 +1,123 @@
+// A regular-call cycle (a -> b -> a) with no closure in between. Publishing
+// `a` as a stub first gives `b` a handle for `a::locked_noop` without the
+// `#[module_lock]` attribute that the republished definition has.
+
+//# publish --verbose
+module 0x66::a
+
+struct R has key
+    v: u64
+
+public fun entry_ok()
+    ret
+
+public fun locked_entry()
+    ret
+
+public fun entry_restore()
+    ret
+
+public fun noop()
+    ret
+
+public fun locked_noop()
+    ret
+
+public fun entry_lie()
+    ret
+
+public fun rec(l0: u64)
+    ret
+
+public fun entry_deep()
+    ret
+
+
+//# publish --verbose
+module 0x66::b
+
+public fun spin_ok()
+    call 0x66::a::noop
+    ret
+
+public fun bounce()
+    call 0x66::a::noop
+    ret
+
+public fun liar()
+    call 0x66::a::locked_noop
+    ret
+
+public fun spin_deep(l0: u64)
+    move_loc l0
+    call 0x66::a::rec
+    ret
+
+
+//# publish --verbose
+module 0x66::a
+
+struct R has key
+    v: u64
+
+// The cycle revisits `a` without touching `R`.
+public fun entry_ok()
+    call 0x66::b::spin_ok
+    ret
+
+// The cycle re-enters `a` while the root holds a module lock.
+#[module_lock] public fun locked_entry()
+    call 0x66::b::bounce
+    ret
+
+// After the cycle unwinds, the root can access `R` again.
+public fun entry_restore()
+    call 0x66::b::spin_ok
+    ld_const<address> 0x66
+    exists R
+    pop
+    ret
+
+public fun noop()
+    ret
+
+// `b`'s handle for this function claims no lock; the definition's applies.
+#[module_lock] public fun locked_noop()
+    ret
+
+public fun entry_lie()
+    call 0x66::b::liar
+    ret
+
+// Exempt same-module recursion inside the re-entered `a` still sees `R`
+// locked at the bottom.
+public fun rec(l0: u64)
+    copy_loc l0
+    ld_u64 0
+    eq
+    br_false l1
+    ld_const<address> 0x66
+    exists R
+    pop
+    ret
+l1: move_loc l0
+    ld_u64 1
+    sub
+    call rec
+    ret
+
+public fun entry_deep()
+    ld_u64 8
+    call 0x66::b::spin_deep
+    ret
+
+
+//# run 0x66::a::entry_ok --verbose
+
+//# run 0x66::a::locked_entry --verbose
+
+//# run 0x66::a::entry_restore --verbose
+
+//# run 0x66::a::entry_lie --verbose
+
+//# run 0x66::a::entry_deep --verbose

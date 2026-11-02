@@ -1,0 +1,85 @@
+Move prover returns: exiting with verification errors
+error: verification failed: this assertion could not be proved; this is usually a recursive call, direct or through function values, to a function that is not opaque (mark it `pragma opaque` and give it a specification)
+   ┌─ tests/sources/regression/recursion_inline_bound.move:11:38
+   │
+11 │         if (n == 0) 0 else count(n - 1) + 1
+   │                                      ^
+   │
+   =     at tests/sources/regression/recursion_inline_bound.move:10: count
+   =     at tests/sources/regression/recursion_inline_bound.move:11: count
+   =     at tests/sources/regression/recursion_inline_bound.move:10: count
+   =     at tests/sources/regression/recursion_inline_bound.move:11: count
+
+error: verification failed: this assertion could not be proved; this is usually a recursive call, direct or through function values, to a function that is not opaque (mark it `pragma opaque` and give it a specification)
+   ┌─ tests/sources/regression/recursion_inline_bound.move:16:49
+   │
+16 │         if (n == 0) 0 else count_unverified(n - 1) + 1
+   │                                                 ^
+   │
+   =     at tests/sources/regression/recursion_inline_bound.move:24: root
+   =     at tests/sources/regression/recursion_inline_bound.move:15: count_unverified
+   =     at tests/sources/regression/recursion_inline_bound.move:16: count_unverified
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/recursion_inline_bound.move:76:24
+   │
+76 │     spec twice_fails { ensures result == 3; }
+   │                        ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/recursion_inline_bound.move:75: twice_fails
+   =     at tests/sources/regression/recursion_inline_bound.move:69: top
+   =         x = <redacted>
+   =     at tests/sources/regression/recursion_inline_bound.move:69: top
+   =     at tests/sources/regression/recursion_inline_bound.move:57: step
+   =         f = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/regression/recursion_inline_bound.move:59: mid
+   =         x = <redacted>
+   =     at tests/sources/regression/recursion_inline_bound.move:59: mid
+   =     at tests/sources/regression/recursion_inline_bound.move:57: step
+   =         f = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/regression/recursion_inline_bound.move:51: leaf
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/regression/recursion_inline_bound.move:76: twice_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/recursion_inline_bound.move:101:24
+    │
+101 │     spec twice_fails { ensures result == 3; }
+    │                        ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/recursion_inline_bound.move:100: twice_fails
+    =     at tests/sources/regression/recursion_inline_bound.move:94: top
+    =         x = <redacted>
+    =     at tests/sources/regression/recursion_inline_bound.move:94: top
+    =     at tests/sources/regression/recursion_inline_bound.move:90: step
+    =         s = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =     at tests/sources/regression/recursion_inline_bound.move:92: mid
+    =         x = <redacted>
+    =     at tests/sources/regression/recursion_inline_bound.move:92: mid
+    =     at tests/sources/regression/recursion_inline_bound.move:90: step
+    =         s = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =     at tests/sources/regression/recursion_inline_bound.move:84: leaf
+    =         x = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/regression/recursion_inline_bound.move:101: twice_fails (spec)
+
+error: verification failed: this assertion could not be proved; this is usually a recursive call, direct or through function values, to a function that is not opaque (mark it `pragma opaque` and give it a specification)
+    ┌─ tests/sources/regression/recursion_inline_bound.move:107:5
+    │
+107 │     fun apply(f: |u64| u64 has copy + drop, x: u64): u64 { f(x) }
+    │     ^
+    │
+    =     at tests/sources/regression/recursion_inline_bound.move:110: root
+    =     at tests/sources/regression/recursion_inline_bound.move:111: root
+    =     at tests/sources/regression/recursion_inline_bound.move:112: root
+    =     at tests/sources/regression/recursion_inline_bound.move:113: root
+    =     at tests/sources/regression/recursion_inline_bound.move:114: root
+    =     at tests/sources/regression/recursion_inline_bound.move:115: root
+    =     at tests/sources/regression/recursion_inline_bound.move:107: apply

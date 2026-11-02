@@ -8,13 +8,10 @@ module 0x42::behavioral_predicate_no_callee_spec {
     }
 
     // `callee` has no specification of its own, so `aborts_of<callee>` and
-    // `result_of<callee>` are the only description of it available here. The
-    // resulting assumptions must stay satisfiable: a caller whose normal exit
-    // becomes unreachable proves every postcondition vacuously.
-    // error: `callee` publishes no contract, so the behavioral predicates over
-    // it are rejected. Before that, `aborts_of<callee>` was defined as `false`,
-    // which left this caller's normal exit unreachable and proved every
-    // postcondition vacuously.
+    // `result_of<callee>` are interpreted by its body: aborts exactly when
+    // `x == 0`, result `x - 1`. The resulting assumptions must stay
+    // satisfiable: a caller whose normal exit becomes unreachable proves every
+    // postcondition vacuously, which the inconsistency check would report.
     fun caller_without_callee_spec(x: u64): u64 {
         callee(x)
     }

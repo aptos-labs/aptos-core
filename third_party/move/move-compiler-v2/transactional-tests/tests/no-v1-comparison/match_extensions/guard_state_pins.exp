@@ -1,0 +1,55 @@
+processed 4 tasks
+task 0 lines 5-17:  publish [module 0xc0ffee::alias {]
+Error: compilation errors:
+ error: cannot transfer mutable local `w` since it is borrowed
+   ┌─ TEMPFILE:12:13
+   │
+10 │         let w2 = w;
+   │                  - previously mutably borrowed here
+11 │         match (w) {
+12 │             W::W1(_) if ({ *w2 = W::W2(10); false }) => 0,
+   │             ^^^^^^^^       --------------- conflicting reference `w2` used here
+   │             │               
+   │             transfer attempted here
+
+
+task 1 lines 19-32:  publish [module 0xc0ffee::derived {]
+Error: compilation errors:
+ error: cannot write local `w` since it is borrowed
+   ┌─ TEMPFILE1:27:21
+   │
+26 │         match (payload(w)) {
+   │                ----------
+   │                │
+   │                previously mutably borrowed here
+   │                conflicting reference `_$disc` used here
+27 │             1 if ({ *w = W::W2(2); false }) => 0,
+   │                     ^^^^^^^^^^^^^ write attempted here
+
+
+task 2 lines 34-46:  publish [module 0xc0ffee::global {]
+Error: compilation errors:
+ error: cannot mutably borrow `global::R` since it is already borrowed
+   ┌─ TEMPFILE2:41:28
+   │
+40 │         match (&mut borrow_global_mut<R>(a).w) {
+   │                ------------------------------ struct `global::R` previously mutably borrowed here
+41 │             W::W1(_) if ({ borrow_global_mut<R>(a).w = W::W2(1); false }) => 0,
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+42 │             W::W2(_) => 20,
+   │             -------- conflicting reference used here
+
+
+task 3 lines 48-61:  publish [module 0xc0ffee::field {]
+Error: compilation errors:
+ error: cannot write value since it is borrowed
+   ┌─ TEMPFILE3:56:28
+   │
+55 │         match (&mut s.f) {
+   │                -------- previously mutably borrowed here
+56 │             W::W1(_) if ({ s.f = W::W2(1); false }) => 0,
+   │                            ^^^^^^^^^^^^^^ write attempted here
+57 │             W::W2(_) => 20,
+   │             -------- conflicting reference used here
+
+

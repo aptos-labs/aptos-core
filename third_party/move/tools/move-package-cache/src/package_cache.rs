@@ -267,7 +267,7 @@ impl<L> PackageCache<L> {
         })?;
 
         remove_dir_if_exists(&checkout_path)?;
-        fs::rename(temp.into_path(), &checkout_path)?;
+        fs::rename(temp.keep(), &checkout_path)?;
 
         Ok(checkout_path)
     }
@@ -399,7 +399,7 @@ impl<L> PackageCache<L> {
         future::try_join_all(fetch_futures).await?;
 
         remove_dir_if_exists(&cached_package_path)?;
-        fs::rename(temp.into_path(), &cached_package_path)?;
+        fs::rename(temp.keep(), &cached_package_path)?;
 
         self.listener
             .on_bytecode_package_download_complete(address, package_name);

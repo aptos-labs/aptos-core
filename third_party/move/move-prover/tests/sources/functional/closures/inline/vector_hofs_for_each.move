@@ -37,6 +37,7 @@ module 0x42::vector_hofs_for_each {
         })
     }
     spec map_double {
+        pragma heartbeats = 50;
         requires forall i in 0..len(v): v[i] * 2 <= MAX_U64;
         aborts_if false;
         ensures len(result) == len(v);
@@ -51,6 +52,7 @@ module 0x42::vector_hofs_for_each {
         })
     }
     spec map_add {
+        pragma heartbeats = 50;
         requires forall i in 0..len(v): v[i] + c <= MAX_U64;
         aborts_if false;
         ensures len(result) == len(v);

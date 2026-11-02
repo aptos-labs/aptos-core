@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .identifiers import require_plain_name
+from .materialize import preparation_patch
 from .artifacts import load_object, write_json
 from .prepare import (
     _hardlink_tree,
@@ -66,7 +67,7 @@ def build_catalog(corpus_path: Path, output_path: Path) -> dict[str, Any]:
 
     for record in selected:
         prepared = (corpus_path.parent / record["prepared_path"]).resolve()
-        patch_path = (corpus_path.parent / record["preparation_patch"]).resolve()
+        patch_path = preparation_patch(corpus_path.parent, record)
         sample_dir = samples_root / require_plain_name(record["task_id"], "task_id")
         _write_sample_catalog(
             sample_dir,

@@ -1,0 +1,316 @@
+VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:17:43: error: incorrect final counter value
+case ensures_3
+executable✝ : Validation.ExecutableUnit unit
+nativesTyped : NativesTyped executable✝
+nativesShift : NativesShift executable✝
+runsAgree : Proofs.RunsAgree executable✝
+ownersRepresentable : Proofs.OwnersRepresentable unit
+verexAgree : Proofs.TypesAgree unit
+verexResources : Proofs.ResourcesTyped unit
+addr : Proofs.Denote.NTy.address.carrier
+initialState✝ : Proofs.Denote.Memory unit
+assumed permitted : True
+a✝⁶ :
+  ¬(initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          (StorageKey.address addr) =
+        none ∨
+      18446744073709551615 <
+        ((initialState✝
+                    {
+                      type :=
+                        Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                          (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                      arguments := Proofs.Denote.NRow.nil }
+                    (StorageKey.address addr)).getD
+                ({ val := 0, fits := ⋯ }, ())).fst.val +
+          1)
+a✝⁵ :
+  ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+      initialState✝
+a✝⁴ :
+  ∀ (key : StorageKey),
+    ¬key = StorageKey.address addr →
+      Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+          initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key =
+        initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key
+a✝³ :
+  ∀ (resource : Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil } →
+      Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+          initialState✝ resource =
+        initialState✝ resource
+a✝² :
+  Proofs.Denoted
+    (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ()) ()
+      initialState✝
+      (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+        initialState✝))
+x✝¹ :
+  (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+        initialState✝
+        {
+          type :=
+            Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+          arguments := Proofs.Denote.NRow.nil }
+        (StorageKey.address addr)).isSome =
+    true
+x✝ :
+  ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ()) (addr, ())
+      (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+        initialState✝)
+a✝¹ :
+  ∀ (key : StorageKey),
+    ¬key = StorageKey.address addr →
+      Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ()) (addr, ())
+          (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+            (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+            initialState✝)
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key =
+        Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+          initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key
+a✝ :
+  ∀ (resource : Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil } →
+      Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ()) (addr, ())
+          (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+            (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+            initialState✝)
+          resource =
+        Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+          initialState✝ resource
+x :
+  Proofs.Denoted
+    (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
+      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ()) (addr, ()) ()
+      (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+        initialState✝)
+      (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+        (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+        { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ()) (addr, ())
+        (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+          { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
+          initialState✝)))
+increment_ensures_1 :
+  ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+              (addr, ()) initialState✝
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val =
+    ((initialState✝
+                {
+                  type :=
+                    Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                      (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                  arguments := Proofs.Denote.NRow.nil }
+                (StorageKey.address addr)).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val +
+      1
+flip_flag_ensures_1 :
+  ¬(((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ())
+                (addr, ())
+                (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+                  (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+                  (addr, ()) initialState✝)
+                {
+                  type :=
+                    Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+                  arguments := Proofs.Denote.NRow.nil }
+                (StorageKey.address addr)).getD
+            (false, ())).fst =
+        true ↔
+      ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+                (addr, ()) initialState✝
+                {
+                  type :=
+                    Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                      (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+                  arguments := Proofs.Denote.NRow.nil }
+                (StorageKey.address addr)).getD
+            (false, ())).fst =
+        true)
+left✝² :
+  0 ≤
+    ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ())
+              (addr, ())
+              (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+                (addr, ()) initialState✝)
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val
+right✝² :
+  ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ())
+              (addr, ())
+              (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+                (addr, ()) initialState✝)
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val ≤
+    18446744073709551615
+left✝¹ :
+  0 ≤
+    ((initialState✝
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val
+right✝¹ :
+  ((initialState✝
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val ≤
+    18446744073709551615
+left✝ :
+  0 ≤
+    ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+              (addr, ()) initialState✝
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val
+right✝ :
+  ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+              (addr, ()) initialState✝
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val ≤
+    18446744073709551615
+⊢ ((Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+              { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ())
+              (addr, ())
+              (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
+                { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
+                (addr, ()) initialState✝)
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr)).getD
+          ({ val := 0, fits := ⋯ }, ())).fst.val =
+    ((initialState✝
+                {
+                  type :=
+                    Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                      (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                  arguments := Proofs.Denote.NRow.nil }
+                (StorageKey.address addr)).getD
+            ({ val := 0, fits := ⋯ }, ())).fst.val +
+      2
+VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:14:8: error: verex verification failed: the proof of `wrong_final_value` does not establish its specification

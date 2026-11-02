@@ -96,9 +96,11 @@ impl<S: TShare> ShareAggregator<S> {
         }
 
         let rand_config = rand_config.clone();
+        // Our own share is missing if it failed pre-aggregate verification. Regenerate it
+        // (deterministic) so we can still answer share requests from peers.
         let self_share = self
             .get_self_share()
-            .expect("Aggregated item should have self share");
+            .unwrap_or_else(|| S::generate(&rand_config, rand_metadata.metadata.clone()));
         tokio::spawn(async move {
             // Await the rand_check result if provided.
             // If the block has no randomness transactions, skip aggregation.

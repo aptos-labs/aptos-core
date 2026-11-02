@@ -180,6 +180,7 @@ pub enum FeatureFlag {
     LazyModuleInitialization,
     EnableMonoMove,
     CheckFunctionTypeAbilities,
+    DisableEagerModuleInitialization,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -469,6 +470,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CheckFunctionTypeAbilities => {
                 AptosFeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES
             },
+            FeatureFlag::DisableEagerModuleInitialization => {
+                AptosFeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION
+            },
         }
     }
 }
@@ -684,6 +688,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_MONO_MOVE => FeatureFlag::EnableMonoMove,
             AptosFeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES => {
                 FeatureFlag::CheckFunctionTypeAbilities
+            },
+            AptosFeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION => {
+                FeatureFlag::DisableEagerModuleInitialization
             },
         }
     }

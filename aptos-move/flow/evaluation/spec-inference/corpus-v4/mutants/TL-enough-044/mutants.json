@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 53,
+        "offset": 4454,
+        "sha256": "0aaac3d8da2406f6d06180008d80cee8766c51a7475dc9db936f7f988b4a550e"
+      },
+      "edit": {
+        "at": 29,
+        "kind": "substitute",
+        "length": 1,
+        "to": ">="
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-enough-044-one-times-execution",
+      "obligation_category": "abort",
+      "rationale": "An execution multiplier of exactly 1x is accepted.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 65,
+        "offset": 5086,
+        "sha256": "f900f763359d678a4ac9b40b03dd254e7e760c5641f847365bbf262a1e1109db"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 15,
+        "to": "config.execution_tiers"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-enough-044-io-against-execution-tiers",
+      "obligation_category": "abort",
+      "rationale": "The IO multiplier is looked up in the execution tiers.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 48,
+        "offset": 5170,
+        "sha256": "7d84c669dc3109e92e0df9c4c12e1a88b49f3175e5207e145a8e5363fe387e11"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-enough-044-execution-threshold-strict",
+      "obligation_category": "abort",
+      "rationale": "A stake equal to the execution threshold is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-enough-044"
+}

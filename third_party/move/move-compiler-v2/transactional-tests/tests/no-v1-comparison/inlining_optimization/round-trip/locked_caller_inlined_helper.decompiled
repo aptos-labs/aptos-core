@@ -1,0 +1,37 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/inlining_optimization/locked_caller_inlined_helper.move`
+
+//# publish
+module 0x42::m {
+    fun helper(p0: |u64|(u64)): u64 {
+        p0(1)
+    }
+    #[module_lock]
+    public fun locked(p0: |u64|(u64)): u64 {
+        helper(p0)
+    }
+    public fun touch(p0: u64): u64 {
+        p0
+    }
+}
+
+
+//# publish
+module 0x42::n {
+    use 0x42::m;
+    public fun reenter(p0: u64): u64 {
+        m::touch(p0)
+    }
+}
+
+
+//# publish
+module 0x42::e {
+    use 0x42::n;
+    use 0x42::m;
+    public fun go(): u64 {
+        m::locked(|x| n::reenter(x))
+    }
+}
+
+
+//# run 0x42::e::go

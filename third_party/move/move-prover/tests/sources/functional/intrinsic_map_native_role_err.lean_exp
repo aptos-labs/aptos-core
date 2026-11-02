@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_native_role_err.move:1:1: error: VIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_del`
+VIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_get`
+VIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_has_key`
+VIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_set`

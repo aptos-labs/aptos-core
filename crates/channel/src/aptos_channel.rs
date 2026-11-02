@@ -166,6 +166,30 @@ impl<K: Eq + Hash + Clone, M> Receiver<K, M> {
         let mut shared_state = self.shared_state.lock();
         shared_state.internal_queue.clear();
     }
+
+    /// Receives from the next eligible key without dequeuing messages from other
+    /// keys. If queued keys are all ineligible, returns Pending even after all
+    /// senders close; the caller must poll again when eligibility changes.
+    /// The predicate runs under the channel lock and must not access the channel.
+    pub fn poll_next_filtered(
+        &mut self,
+        cx: &mut Context<'_>,
+        eligible: impl FnMut(&K) -> bool,
+    ) -> Poll<Option<M>> {
+        let mut shared_state = self.shared_state.lock();
+        if let Some((val, status_ch)) = shared_state.internal_queue.pop_if(eligible) {
+            if let Some(status_ch) = status_ch {
+                let _err = status_ch.send(ElementStatus::Dequeued);
+            }
+            Poll::Ready(Some(val))
+        } else if shared_state.num_senders == 0 && shared_state.internal_queue.is_empty() {
+            shared_state.stream_terminated = true;
+            Poll::Ready(None)
+        } else {
+            shared_state.waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
 }
 
 impl<K: Eq + Hash + Clone, M> Drop for Receiver<K, M> {
@@ -183,20 +207,7 @@ impl<K: Eq + Hash + Clone, M> Stream for Receiver<K, M> {
     /// queue. If there is, then it returns immediately. If the internal_queue is empty,
     /// it sets the waker passed to it by the scheduler/executor and returns Pending
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut shared_state = self.shared_state.lock();
-        if let Some((val, status_ch)) = shared_state.internal_queue.pop() {
-            if let Some(status_ch) = status_ch {
-                let _err = status_ch.send(ElementStatus::Dequeued);
-            }
-            Poll::Ready(Some(val))
-        // all senders have been dropped (and so the stream is terminated)
-        } else if shared_state.num_senders == 0 {
-            shared_state.stream_terminated = true;
-            Poll::Ready(None)
-        } else {
-            shared_state.waker = Some(cx.waker().clone());
-            Poll::Pending
-        }
+        self.get_mut().poll_next_filtered(cx, |_| true)
     }
 }
 

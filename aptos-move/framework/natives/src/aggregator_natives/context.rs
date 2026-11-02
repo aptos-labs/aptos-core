@@ -100,6 +100,12 @@ impl<'a> NativeRuntimeRefCheckModelsCompleted for NativeAggregatorContext<'a> {
 }
 
 impl<'a> NativeAggregatorContext<'a> {
+    /// Whether aggregators and snapshots are delayed field identifiers in this
+    /// session rather than concrete values.
+    pub fn delayed_field_optimization_enabled(&self) -> bool {
+        self.delayed_field_optimization_enabled
+    }
+
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
     pub fn new(

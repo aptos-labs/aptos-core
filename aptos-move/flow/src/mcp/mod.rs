@@ -87,6 +87,12 @@ pub struct McpArgs {
     #[arg(long)]
     pub no_package_cache: bool,
 
+    /// Restrict every caller-supplied package path and its local dependencies
+    /// to this directory. Evaluation sessions use this to keep MCP tools from
+    /// reaching the pristine baseline or other controller-only material.
+    #[arg(long)]
+    pub package_root: Option<PathBuf>,
+
     /// Append structured experiment telemetry to this JSONL file.
     #[arg(long)]
     pub telemetry_jsonl: Option<PathBuf>,

@@ -20,7 +20,7 @@ use aptos_crypto::arkworks::{
 use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::fmt::Debug;
 

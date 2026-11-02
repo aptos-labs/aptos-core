@@ -8,7 +8,6 @@
 //! The consensus protocol implemented is AptosBFT (based on
 //! [DiemBFT](https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf)).
 
-#![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
 
 #[macro_use(defer)]

@@ -43,32 +43,30 @@ fun identity(l0: u64): u64
 // module 0x99::noncapturing
 
 fun call_double_twice(r0): u64 {
-  slots: params(1), locals(1), temps(3)
+  slots: params(1), locals(1), temps(2), transfer(1)
     r0: u64
     r1: |u64|(u64) has copy + drop
     r2: |u64|(u64) has copy + drop
     r3: u64
-    r4: u64
   code:
   L0:
     0: r1 := pack_closure double, 0, [] @0
     1: r2 := copy r1 @3
     2: [r3] := call_closure [|u64|(u64) has copy + drop], [r0, r2] @4
-    3: [r4] := call_closure [|u64|(u64) has copy + drop], [r0, r1] @7
-    4: r4 := add r3, r4 @8
-    5: ret [r4] @9
+    3: [x0] := call_closure [|u64|(u64) has copy + drop], [r0, r1] @7
+    4: r3 := add r3, x0 @8
+    5: ret [r3] @9
 }
 
 fun call_identity(r0): u64 {
-  slots: params(1), locals(1), temps(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: |u64|(u64) has drop
-    r2: u64
   code:
   L0:
     0: r1 := pack_closure identity, 0, [] @0
-    1: [r2] := call_closure [|u64|(u64) has drop], [r0, r1] @4
-    2: ret [r2] @5
+    1: [x0] := call_closure [|u64|(u64) has drop], [r0, r1] @4
+    2: ret [x0] @5
 }
 
 fun double(r0): u64 {
@@ -92,33 +90,31 @@ fun identity(r0): u64 {
 // module 0x99::noncapturing
 
 fun call_double_twice() {
-  frame_data_size: 40
-  entry_gas: 270
+  frame_data_size: 32
+  entry_gas: 244
   code:
     0: PackClosure [8] <- func_ref=Unresolved(double), mask=0, captured_desc=<none>, captured=[] @0
     1: Move8 [16] <- [8] @3
     2: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @3
     3: CallClosure closure=[16], provided_args=[[0](8)] @4
-    4: Move8 [24] <- [64] @4
+    4: Move8 [24] <- [56] @4
     5: CallClosure closure=[8], provided_args=[[0](8)] @7
-    6: Move8 [32] <- [64] @7
-    7: AddU64 [32] <- [24] + [32] @8
-    8: Move8 [0] <- [32] @9
-    9: Return @9
+    6: AddU64 [24] <- [24] + [56] @8
+    7: Move8 [0] <- [24] @9
+    8: Return @9
   safe_point_layouts:
     0: []
     2: []
 }
 
 fun call_identity() {
-  frame_data_size: 24
-  entry_gas: 151
+  frame_data_size: 16
+  entry_gas: 125
   code:
     0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[] @0
     1: CallClosure closure=[8], provided_args=[[0](8)] @4
-    2: Move8 [16] <- [48] @4
-    3: Move8 [0] <- [16] @5
-    4: Return @5
+    2: Move8 [0] <- [40] @5
+    3: Return @5
   safe_point_layouts:
     0: []
 }

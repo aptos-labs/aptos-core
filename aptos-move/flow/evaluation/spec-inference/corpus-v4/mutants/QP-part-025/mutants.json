@@ -1,0 +1,134 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 20,
+        "offset": 578,
+        "sha256": "ef3f4ba8cfd826e78da396fa68499d10e1aa3034fba3b8a529412401bca83bd3"
+      },
+      "edit": {
+        "at": 14,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/authored/lomuto_partition.move",
+      "mutant_id": "QP-part-025-loose-split",
+      "obligation_category": "normal-result",
+      "rationale": "Elements equal to the pivot move into the lower part.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 25,
+        "offset": 720,
+        "sha256": "3ed6137dc9a5cf0b994e9ffd64cff0c6d5e52b1ad4b968967120a9f466f4aff3"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 25,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/authored/lomuto_partition.move",
+      "mutant_id": "QP-part-025-pivot-left-at-end",
+      "obligation_category": "normal-result",
+      "rationale": "The pivot is never swapped into place.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 25,
+        "offset": 720,
+        "sha256": "3ed6137dc9a5cf0b994e9ffd64cff0c6d5e52b1ad4b968967120a9f466f4aff3"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 25,
+        "to": "values[store] = p;"
+      },
+      "essential": true,
+      "file": "sources/authored/lomuto_partition.move",
+      "mutant_id": "QP-part-025-lost-element",
+      "obligation_category": "normal-result",
+      "rationale": "The pivot overwrites the element at the split instead of exchanging with it.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 25,
+        "offset": 441,
+        "sha256": "e0de4896a87db1cc5a095273a6c69a18241706e259447bd9ca9088e7d250f64e"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 17,
+        "to": "if (pivot <= last) values.swap(pivot"
+      },
+      "essential": true,
+      "file": "sources/authored/lomuto_partition.move",
+      "mutant_id": "QP-part-025-tolerates-bad-pivot",
+      "obligation_category": "abort",
+      "rationale": "An out-of-range pivot is silently ignored instead of aborting.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "20d7d3ad9215a829e572068954a71c144a84985a7c0bf02ccaf98ab4728c6757",
+  "task_id": "QP-part-025"
+}

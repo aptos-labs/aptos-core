@@ -3,9 +3,9 @@
 This directory formalizes a substantial but deliberately limited fragment of
 Move stackless bytecode, its execution semantics, and selected stages of the
 Move Prover pipeline in Lean 4.  It is the target model that
-[Leaner Move](../../move/Move/README.md) compiles into, and it stands on its own as a
+[Verex Move](../../move/Move/README.md) compiles into, and it stands on its own as a
 logical account of Move bytecode: programs can be embedded from masm or Move
-source, executed, and verified without authoring anything in Leaner.
+source, executed, and verified without authoring anything in Verex.
 
 It is not a formalization of the full Move language or the complete production
 prover; notably, closures, recursive data, and several other language features

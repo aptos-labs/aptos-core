@@ -2,113 +2,128 @@
 \Section{Evaluation}
 \label{sec:evaluation}
 
-\Paragraph{Setup}
-The evaluation setup aims at testing the three different tactics (arms) mentioned above -- \textit{agent-only}, \textit{hybrid-flexible}, and \textit{hybrid-guided}, which are run under the same conditions, using Claude Code with GLM-5.3 as the underlying model.
+The evaluation addresses three research questions: does adding \WP to an agent change the completeness of the inferred contracts (RQ1), does it lower the cost of inference, and on which targets (RQ2), and with \WP, does a cheaper mid-tier model match the results of a frontier model (RQ3)?
+\S~\ref{sec:eval-arms} answers RQ1 and RQ2 by holding the model fixed and comparing the three tactics, \textit{agent-only}, \textit{hybrid-guided}, and \textit{hybrid-flexible}, under the same conditions.
+\S~\ref{sec:eval-models} answers RQ3 by repeating the comparison under a frontier model and a mid-tier model of the same family.
+Both comparisons share the corpus, the protocol, the scoring, and the cost accounting described next.
 
-The corpus is drawn from \Anon{Etna, the private Move code of the perpetual trading system Decibel}{the private Move code of a production perpetual trading system}, plus five targets that are not from it: three functions from a public Move library, and two written for the corpus. None of the five carries an upstream specification either.
-A private codebase matters here: the model cannot have seen these functions, or any specification of them, during training, so a contract has to be inferred rather than recalled.
+\SubSection{Setup}
+\label{sec:eval-setup}
 
-During selection, every candidate target is classified by the features (strata) its contract has to account for --- loops and accumulators, early returns and breaks, arithmetic overflow and underflow, casts and truncation, mutable references and in-place permutation, function values, quantifiers, composition through a callee's contract, and others, 34 such features in all.
-A target is admitted only if it proves in a few seconds against a hand-written reference specification.
-The result is \textbf{17 tasks} covering all 34 features across 12 modules, 9 of which contain loops.
-With 3 arms and 4 replicates this initially made 204 cells.
-After inspecting the run traces, we exclude |VS-shares-002| in all three arms
-and all four replicates because hybrid-flexible replicate 4 encountered WP
-filter-selection failures and generated specifications outside the target scope.
-All results below use the remaining \textbf{16 tasks and 192 cells}.
-This exclusion was made after observing the results; the original 17-task
-comparison gave about 28\% lower mean cost for both hybrids.
+\Paragraph{Corpus}
+The corpus has 26 targets from 12 modules.
+Twenty-four are extracted from public Move code of the Aptos framework at a pinned commit: ten from its experimental trading modules, thirteen from modules for accounts, authentication, and rate and stake limits, and one from the Move standard library.
+The other two are written for the corpus.
+Function bodies are copied unchanged except for a few reductions documented in the module headers, and the package includes everything the targets depend on.
+No target has a specification upstream.
+Thirteen targets have a loop that needs an invariant.
+Each target has a hand-written reference specification that verifies within 20 seconds, and six \emph{mutants}: patches to the implementation, each violating one obligation the contract must capture, and each shown to be killed by the reference.
+Each inference run starts from the package with the reference contracts of every function the target calls; the contracts of the target and of all other functions are withheld, since a caller's contract can restate what the target does.
+
+\Paragraph{Tactics, models, and cells}
+The three tactics of \S~\ref{sec:skills} differ only in the rendered plugin: the reference material is byte-identical, and in agent-only the \WP tool is absent rather than discouraged.
+We run them under two models of one family through the same runtime, the Codex CLI at high effort: Sol~5.6, the frontier model, and Terra~5.6, the mid-tier model, priced at about half of Sol's list price.
+A \emph{cell} is one run of one tactic on one target; a \emph{round} is the set of cells of one model.
+With 26 targets, 3 tactics, and 4 replicates, each round has 312 cells.
+Each session has a budget of 100k output tokens, one hour of wall time, and 40 seconds of solver time per verification condition.
 
 \Paragraph{Scoring}
-A cell reaches \emph{operational success} when its specification compiles, verifies, and passes a set of tests which check its \textit{completeness}. 
-Completeness is a significant problem for agent-based inference, since postconditions in particular can be weaker than the actual behavior of the function, and agents tend to select the shortest path to a solution. 
-The skills make it very clear that completeness is a requirement, but an agent may ignore this. 
-There is no deductive method for checking completeness in the general case.
-\WP guarantees completeness only in the presence of complete loop invariants and complete specs of callees; if completeness is not reached, it may be able to generate a warning.
-The agent-only tactic does not have this mechanism.
+A cell reaches \emph{operational success} when a fresh checker process outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present (|pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions), the bytecode is unchanged, edits stay within the allowed scope, and the required contract categories are present.
+The agent can run the same check on a candidate contract during the session (a \emph{candidate check}); a check is rejected when one of these criteria fails.
+The agent's own claim is never a score, and the agent receives only this acceptance feedback: the mutants are withheld until generation has ended, and a contract is never handed back for strengthening.
+Operational success is necessary but weak: a vaguer contract passes it more easily.
+Completeness, postconditions as strong as the behavior, has no deductive check in general; \WP guarantees it only given complete loop invariants and callee contracts.
+The second level is therefore \emph{mutation adequacy}: after the round, each withheld mutant is applied to the implementation, and the prover is rerun against the inferred specification.
+A cell is \emph{complete} when its specification kills all six mutants and \emph{failed} when one survives; a cell in which a mutant reached no verdict within the solver's time limit is \emph{unmeasured}.
+All 624 cells reached operational success, so the outcome of a cell is decided by the withheld mutants alone.
 
-The harness evaluates completeness using \textit{mutation testing} with a set of hand-generated mutants, changing the verified implementation. 
-To pass the test, each of the mutants needs to be killed --- that is, verification fails when the mutant is verified against the inferred spec.
+\Paragraph{Cost accounting}
+Costs are in US dollars at each model's published list prices, computed from the recorded token counters of every model request; startup requests that do no task work are excluded.
+Per million tokens, Sol~5.6 is \$4 uncached input, \$0.40 cached input, and \$20 output; Terra~5.6 is \$2, \$0.20, and \$12.
+Thinking counts as output for both.
+Means are taken first over the four replicates of a target and then over targets, and the 95\% intervals are percentile bootstraps over the 26 targets (10,000 resamples).
+Differences in completeness are tested for two preregistered contrasts, hybrid-flexible against agent-only and hybrid-guided against hybrid-flexible, with randomization tests blocked by target and replicate and Holm-adjusted across the two.
 
+\SubSection{Comparison of Tactics (RQ1, RQ2)}
+\label{sec:eval-arms}
 
-\Paragraph{Cost}
-Costs in US dollars use the GLM-5.3 prices recorded for the round: \$1.40 per million uncached input tokens, \$0.26 per million cached input tokens, and \$4.40 per million output tokens.
-For the corresponding token counts $I_u$, $I_c$, and $O$, the cost is
-$\mathit{cost}_{\mathrm{USD}} = (1.40 I_u + 0.26 I_c + 4.40 O) / 10^6$.
-Cache-creation tokens are currently uncharged and contribute zero; we recompute from the recorded token counters rather than use the SDK's cost estimate.
-Table~\ref{tab:costs} gives cost and input/output tokens per cell, by target.
-Both hybrid arms are about 31\% cheaper in the observed mean; the 12 agent-only cells above \$0.50 become six and five.
-The saving is uneven. The hybrids are cheaper on 12 and 11 of the 16 targets, and the round-level figure is carried by a few of them rather than spread evenly: |VS-contrib-003| costs agent-only 5.6$\times$ what it costs hybrid-guided and 6.6$\times$ what it costs hybrid-flexible, while |TL-lev-020| costs 1.5$\times$ as much under hybrid-guided as without \WP.
-We quantify precision with 95\% percentile bootstrap confidence intervals.
-For the aggregate estimates, we hold the 16 tasks fixed and resample four
-replicate blocks with replacement within each task, keeping all three arms of
-a block together (100,000 draws, seed 20260907).
-The hybrid/agent-only mean-cost ratios are 0.689 [0.559, 0.855] for guided and
-0.695 [0.538, 0.901] for flexible.
-Both intervals lie below 1, supporting lower expected cost on this fixed corpus;
-they do not quantify generalization to other tasks.
+Table~\ref{tab:summary} summarizes both rounds, Fig.~\ref{fig:cells} shows every cell, and Tables~\ref{tab:sol} and~\ref{tab:terra} in the appendix give every target.
 
 \begin{table}[t]
 \centering
-\caption{Cost in US dollars per cell by target: mean over the four replicates,
-mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only cost (vs. agent), and whether the specification killed every mutant
-(\Checkmark) or was defeated by one (\XSolidBrush, subscripted with
-the count where more than one replicate failed). $\circ$ marks a task-arm whose
-replicate was lost to an infrastructure fault. Summed over the retained tasks the arms
-cost \$24.91, \$17.16 and \$17.31, i.e.\ 0.69$\times$ and 0.69$\times$
-agent-only. Input counts include uncached, cache-read, and cache-creation tokens.}
-
-\label{tab:costs}
-\footnotesize
-\setlength{\tabcolsep}{2.7pt}
-\begin{tabular}{lrrcrrrcrrrc}
-\toprule
-& \multicolumn{3}{c}{agent-only} & \multicolumn{4}{c}{hybrid-guided} & \multicolumn{4}{c}{hybrid-flexible} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-8} \cmidrule(lr){9-12}
-target & cost & I/O k & ok & cost & vs. agent & I/O k & ok & cost & vs. agent & I/O k & ok \\
-\midrule
-|BA-base-012| & \$0.380 & 710/31.3 & \Checkmark & \$0.251 & 66\% & 476/19.4 & \Checkmark & \$0.311 & 82\% & 529/27.6 & \Checkmark \\
-|LP-price-021| & \$0.197 & 475/9.0 & \Checkmark & \$0.228 & 116\% & 514/12.7 & \Checkmark & \$0.207 & 105\% & 465/11.2 & \Checkmark \\
-|MM-min-013| & \$0.126 & 284/6.3 & \Checkmark & \$0.141 & 112\% & 336/6.2 & \Checkmark & \$0.134 & 106\% & 295/7.0 & \Checkmark \\
-|OV-order-006| & \$0.097 & 210/5.0 & \Checkmark & \$0.076 & 78\% & 165/3.3 & \Checkmark & \$0.080 & 83\% & 180/3.3 & \Checkmark \\
-|QP-part-025| & \$0.698 & 1593/46.0 & \XSolidBrush$_{2}$ & \$0.490 & 70\% & 1008/35.6 & \Checkmark & \$0.448 & 64\% & 877/35.2 & \XSolidBrush \\
-|SM-select-022| & \$0.406 & 879/27.9 & \Checkmark & \$0.434 & 107\% & 833/34.7 & \Checkmark & \$0.276 & 68\% & 547/20.0 & \Checkmark \\
-|TL-lev-020| & \$0.205 & 490/10.3 & \Checkmark & \$0.313 & 153\% & 628/22.6 & \Checkmark & \$0.206 & 100\% & 414/13.5 & \Checkmark \\
-|TR-cancel-026| & \$0.442 & 1010/27.0 & \Checkmark & \$0.335 & 76\% & 722/21.6 & \Checkmark & \$0.359 & 81\% & 833/21.1 & \Checkmark \\
-|TR-discard-011| & \$0.238 & 561/12.4 & \Checkmark & \$0.217 & 91\% & 491/12.1 & \Checkmark & \$0.292 & 122\% & 668/16.7 & \Checkmark \\
-|TR-order-010| & \$0.287 & 650/17.2 & \Checkmark & \$0.197 & 69\% & 428/11.6 & \Checkmark & \$0.245 & 85\% & 520/15.3 & \Checkmark \\
-|TS-trial-019| & \$0.407 & 821/31.1 & \Checkmark & \$0.371 & 91\% & 710/26.0 & $\circ$ & \$0.317 & 78\% & 642/22.8 & \Checkmark \\
-|UC-credits-008| & \$0.806 & 2322/31.0 & \XSolidBrush & \$0.215 & 27\% & 495/11.6 & \Checkmark & \$0.389 & 48\% & 1033/16.9 & \Checkmark \\
-|VS-contrib-003| & \$1.028 & 2800/45.9 & \XSolidBrush & \$0.182 & 18\% & 400/9.9 & \Checkmark & \$0.155 & 15\% & 317/9.3 & \Checkmark \\
-|VS-fees-001| & \$0.233 & 479/14.9 & \Checkmark & \$0.208 & 90\% & 430/13.0 & \Checkmark & \$0.200 & 86\% & 416/11.9 & \Checkmark \\
-|VS-redeem-004| & \$0.555 & 1290/33.5 & \Checkmark & \$0.516 & 93\% & 1167/32.1 & \Checkmark & \$0.603 & 109\% & 1340/38.2 & $\circ$ \\
-|WU-consume-023| & \$0.121 & 240/7.6 & \Checkmark & \$0.116 & 96\% & 236/6.7 & \Checkmark & \$0.106 & 87\% & 198/6.7 & \Checkmark \\
-\midrule
-\textbf{all 16} & \$0.389 & 926/22.3 & 60/64 & \$0.268 & 69\% & 565/17.4 & 63/63 & \$0.270 & 69\% & 580/17.3 & 62/63 \\
-\bottomrule
-\end{tabular}
+\caption{Both rounds, per tactic: mean cost in US dollars per cell, the hybrid/agent-only cost ratio with its 95\% bootstrap interval, complete, failed, and unmeasured cells, the share of cells whose first candidate check was accepted, mean input/output tokens in thousands, and mean wall time per cell in seconds.}
+\label{tab:summary}
+\scriptsize
+\setlength{\tabcolsep}{2.2pt}
+\input{tables/summary}
 \end{table}
 
-The mechanism is visible in the tool counts. The agent-only arm performs
-about 80\% more Edit calls (362 versus 201) and three times as many verify calls
-(127 versus 39) as hybrid-flexible.
-The self-reports describe the agent-only arm deriving contracts through
-counterexamples and self-designed mutation probes, while hybrid answers also
-describe using \WP output to identify missing loop invariants.
-The arms produce similar kinds of specifications --- opaque contracts, recursive
-spec helpers, and loop invariants --- but differ in how they arrive at them.
+\begin{figure}[t]
+\centering
+% scatter/classes must sit on the plot, not in an axis style: applied through a
+% style it accumulates per point and exhausts TeX's memory.
+\newcommand{\cellplot}[1]{%
+  \addplot[forget plot, only marks, scatter, scatter src=explicit symbolic, mark size=1.25pt,
+    scatter/classes={
+      ok0={mark=*, ModelSol}, fail0={mark=o, ModelSol, thick}, unm0={mark=x, CellMuted, thick, mark size=1.8pt},
+      ok1={mark=*, ModelTerra}, fail1={mark=o, ModelTerra, thick}, unm1={mark=x, CellMuted, thick, mark size=1.8pt}}]
+    table[x index=1, y expr={\thisrowno{0} + (\thisrowno{2} - 0.5) * 0.36}, meta index=3] {#1};
+  \draw[CellAxis] (axis cs:0.04,{\CellLoopFree - 0.5}) -- (axis cs:2.2,{\CellLoopFree - 0.5});}
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=3 by 1, horizontal sep=2.5mm, yticklabels at=edge left},
+  scale only axis, width=2.5cm, height=7.4cm,
+  xmode=log, xmin=0.04, xmax=2.2, log ticks with fixed point,
+  xtick={0.1,0.3,1}, xticklabels={0.1,0.3,1},
+  minor xtick={0.05,0.2,0.5,2}, minor tick style={draw=none},
+  ymin=-0.6, ymax=25.6, ytick={0,...,25}, y dir=reverse,
+  ymajorgrids, grid style={CellGrid, thin},
+  axis line style={CellAxis}, tick style={CellAxis},
+  tick label style={font=\scriptsize},
+  title style={font=\small, yshift=-1ex}]
+\nextgroupplot[title=agent-only, yticklabels/.expanded={\CellTaskLabels}, yticklabel style={font=\ttfamily\tiny}]
+\cellplot{tables/agent_only-cells.dat}
+\nextgroupplot[title=hybrid-guided, xlabel={cost per cell (US\$)}, xlabel style={font=\scriptsize},
+  legend style={at={(0.5,-0.09)}, anchor=north, font=\scriptsize, legend columns=-1, draw=none, /tikz/every even column/.append style={column sep=0.6em}},
+  legend image post style={mark size=1.4pt}]
+\cellplot{tables/hybrid_guided-cells.dat}
+\addlegendimage{only marks, mark=*, ModelSol} \addlegendentry{Sol~5.6}
+\addlegendimage{only marks, mark=*, ModelTerra} \addlegendentry{Terra~5.6}
+\addlegendimage{only marks, mark=o, black, thick} \addlegendentry{mutant survived}
+\addlegendimage{only marks, mark=x, CellMuted, thick, mark size=2pt} \addlegendentry{unmeasured}
+\nextgroupplot[title=hybrid-flexible]
+\cellplot{tables/hybrid_flexible-cells.dat}
+\end{groupplot}
+\end{tikzpicture}
+\caption{Every cell of both rounds: cost in US dollars on a log scale, one panel per tactic, one row per target, and within each row the four Sol~5.6 replicates above the four Terra~5.6 replicates. The 13 targets above the line have no loop that needs an invariant. A filled dot is a complete cell, a hollow one a cell a withheld mutant survived, a cross an unmeasured cell.}
+\label{fig:cells}
+\end{figure}
 
-\Paragraph{Failure points}
-Five of the 192 retained cells failed the mutation test, and 2 more were lost to infrastructure faults; Table~\ref{tab:costs} marks where.
-Every failure is an agent-only cell but one.
-Three are |weak_contract|: a mutant survived, in every case leaving |normal-result| unconstrained.
-Two of those are |QP-part-025|, the in-place permutation, where the surviving class was ``right partition point, wrong contents'' --- a contract that pins where the partition lands but not what it contains.
-The fourth agent-only failure is different in kind: on |UC-credits-008| the arm changed the implementation rather than specify it, which the edit policy forbids.
-The one hybrid failure is on the same target and of the same class as two of the agent-only ones.
-The two infrastructure faults are unrelated to inference (the MCP supervisor restarted the session) and fall one in each hybrid arm.
+\Paragraph{RQ1: Completeness}
+Measured completeness is about the same under all three tactics: agent-only completes 103 of 104 cells under Sol~5.6 and 97 under Terra~5.6, the hybrids 98 and 98, and 97 and 98, and under both models both preregistered contrasts have Holm $p = 1.00$.
+This is what one would expect: the loop invariants and specification helpers that decide the hard targets have to be found by the agent under every tactic.
+All failures but one Terra~5.6 agent-only cell occur on three loop targets.
+|partition|, an in-place partition, is the one target whose contract needs a permutation argument proved with lemmas; it fails under every tactic, and in every failure a mutant that overwrites an element instead of swapping it survives: the contract does not state that the result is a rearrangement of the input.
+On the two scans |upsert_provider_jwks| and |cancel_at_price_level|, which leave the loop early, only hybrid cells fail (5 under Sol~5.6, 6 under Terra~5.6): the agent added invariants for the scanned prefix, accepted the quantified contract that \WP derived from them once it verified, and a withheld mutant on the exit path survived.
+The hybrids do improve the first attempt: the share of cells whose first candidate check is accepted rises from 62\% to 68--71\% under Sol~5.6 and from 37\% to 63--65\% under Terra~5.6, and rejected checks drop from 66 to 40--60 and from 117 to 66--82.
 
-Pooling the two hybrid arms, agent-only left a mutant alive in 4 of its 64 cells against 1 of the hybrids' 126 --- 6.25\% against 0.79\% --- and a Fisher exact test gives $p = 0.045$, two-sided.
-The comparison rests on five events, so it is fragile: the test says the difference is unlikely to be chance, not how large it is, and a single cell moving either way would change that.
+\Paragraph{RQ2: Cost}
+Under both models the hybrids cost less than agent-only: 0.86$\times$ and 0.87$\times$ under Sol~5.6 and 0.79$\times$ and 0.89$\times$ under Terra~5.6 (hybrid-guided, hybrid-flexible).
+Over all targets, only the interval of Sol's hybrid-flexible excludes parity, but the targets split into two clear groups.
+On the 13 targets without a loop that needs an invariant, \WP derives the complete contract and the agent only has to check it: the hybrids cost 0.36--0.60$\times$ agent-only, and every interval lies below 0.75.
+On the 13 loop targets they cost 1.09--1.22$\times$: the agent still has to find the invariant, and the quantified \WP output adds to the context it re-reads on every turn --- on these targets the hybrids read 1.2--1.4$\times$ the input of agent-only (415--513k against 357--385k tokens per cell), on the loop-free ones 0.24--0.47$\times$.
+Overall the hybrids read less input than agent-only (288k and 280k against 333k tokens per cell under Sol~5.6, 289k and 335k against 367k under Terra~5.6) and write less output.
+
+\SubSection{Comparison of Models (RQ3)}
+\label{sec:eval-models}
+
+Terra~5.6 costs 0.57$\times$ Sol~5.6 under agent-only and 0.53$\times$ and 0.59$\times$ under the hybrids, with all intervals within [0.45, 0.65], and it is cheaper on 25 or 26 of the 26 targets under every tactic.
+These ratios are close to the price ratio of 0.5 for input and 0.6 for output: the two models spend about the same number of tokens per cell, Terra~5.6 up to a fifth more input, and Terra~5.6 is slower (143--153 against 115--126 seconds).
+Completeness differs on one target.
+Outside |partition|, Terra~5.6 fails one agent-only cell and, under the hybrids, the same two scans as Sol~5.6; on the partition it fails 10 of 12 cells, Sol~5.6 3 of 12.
+The frontier model's advantage therefore lies in the lemma-based permutation argument; on the loop invariants, compositions, and global state that make up the rest of the corpus the two models are even.
+The one target on which Terra~5.6 costs about as much as Sol~5.6 is |select|, whose contract needs a recursive specification function over a function value; there it writes 1.5--2.0$\times$ Sol's output.
+With \WP, Terra's first-check acceptance (63--65\%) approaches Sol's (68--71\%), and Terra~5.6 under hybrid-guided completes 97 of 104 cells at 46\% of the cost of Sol~5.6 under agent-only, which completes 103.
 
 %%% Local Variables:
 %%% mode: latex

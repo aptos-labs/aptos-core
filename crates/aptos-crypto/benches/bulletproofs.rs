@@ -8,8 +8,7 @@ use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use criterion::{measurement::Measurement, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use curve25519_dalek_ng::scalar::Scalar;
 use merlin::Transcript;
-use rand::{thread_rng, Rng};
-use rand_core::RngCore;
+use rand::{thread_rng, Rng, RngCore};
 
 const DST: &[u8] = b"dummy DST";
 

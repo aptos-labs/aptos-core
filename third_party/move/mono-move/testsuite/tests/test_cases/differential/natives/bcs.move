@@ -110,6 +110,14 @@ module 0x1::main {
     public fun const_size_is_some_box_vec(): bool {
         option::is_some(&bcs::constant_serialized_size<boxes::Box<vector<u8>>>())
     }
+
+    public fun const_size_is_some_signer(): bool {
+        option::is_some(&bcs::constant_serialized_size<signer>())
+    }
+
+    public fun const_size_is_some_box_signer(): bool {
+        option::is_some(&bcs::constant_serialized_size<boxes::Box<signer>>())
+    }
 }
 
 // RUN: execute 0x1::main::bytes_u64
@@ -181,4 +189,10 @@ module 0x1::main {
 // CHECK: results: true
 
 // RUN: execute 0x1::main::const_size_is_some_box_vec
+// CHECK: results: false
+
+// RUN: execute 0x1::main::const_size_is_some_signer
+// CHECK: results: false
+
+// RUN: execute 0x1::main::const_size_is_some_box_signer
 // CHECK: results: false

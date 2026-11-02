@@ -9,6 +9,7 @@ use aptos_block_executor::{
     check_resource_group_serialization,
     code_cache_global_manager::AptosModuleCacheManager,
     executor::BlockExecutor,
+    mono_move::MonoTransactionExecutor,
     single_transaction_executor::LegacyTransactionExecutor,
     task::{
         ExecutorTask, LegacyTxnOutput as BlockExecutorLegacyTxnOutput,
@@ -28,13 +29,14 @@ use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::{
+        native_collateral::collateral_layout,
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
-        BlockExecutionResult, BlockOutput, TransactionOutput, TransactionStatus,
+        BlockExecutionResult, BlockOutput, Transaction, TransactionOutput, TransactionStatus,
     },
     write_set::{TransactionWrite, WriteOp},
 };
@@ -366,10 +368,20 @@ impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
             .collect()
     }
 
+    fn native_writes_needing_exchange(&self) -> Vec<(StateKey, WriteOp, &'static MoveTypeLayout)> {
+        self.vm_output
+            .collateral_write_set()
+            .iter()
+            .filter(|(_, op)| !op.is_deletion())
+            .map(|(key, op)| (key.clone(), op.clone(), collateral_layout()))
+            .collect()
+    }
+
     fn incorporate_materialized_txn_output(
         self,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
+        materialized_native_writes: Vec<(StateKey, WriteOp)>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         // Before creating the output, extract the trace for replay.
         let mut vm_output = self.vm_output;
@@ -378,6 +390,7 @@ impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
         let committed_output = vm_output.into_transaction_output_with_materialized_write_set(
             materialized_resource_write_set,
             materialized_events,
+            materialized_native_writes,
         )?;
         Ok((committed_output, trace))
     }
@@ -418,27 +431,62 @@ impl<
             init_speculative_logs(num_txns);
         }
 
-        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
-
         let mut module_cache_manager_guard = module_cache_manager
             .try_lock(&state_view, transaction_slice_metadata)
             .map_err(|status| BlockError::new(status.to_string()))?;
 
-        let executor = BlockExecutor::<
-            SignatureVerifiedTransaction,
-            LegacyTransactionExecutor<E>,
-            S,
-            L,
-            TP,
-            AuxiliaryInfo,
-        >::new(config, transaction_commit_listener);
+        // MonoMove discards a genesis transaction, and a discard outside a block is
+        // a hard error. Genesis is always executed alone, at the start of a chunk.
+        // TODO(completeness): Support GenesisTransaction on MonoMove.
+        let is_genesis = num_txns > 0
+            && matches!(
+                signature_verified_block.get_txn(0).borrow_into_inner(),
+                Transaction::GenesisTransaction(_)
+            );
 
-        let ret = executor.execute_block(
-            signature_verified_block,
-            state_view,
-            &transaction_slice_metadata,
-            &mut module_cache_manager_guard,
-        );
+        // TODO(correctness): Remove when parallel execution is supported.
+        let mut config = config;
+        let is_mono_move = !is_genesis
+            && module_cache_manager_guard
+                .environment()
+                .features()
+                .is_mono_move_enabled();
+        if is_mono_move {
+            config.local.concurrency_level = 1;
+        }
+        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
+
+        let ret = if is_mono_move {
+            BlockExecutor::<
+                SignatureVerifiedTransaction,
+                MonoTransactionExecutor,
+                S,
+                L,
+                TP,
+                AuxiliaryInfo,
+            >::new(config, transaction_commit_listener)
+            .execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        } else {
+            BlockExecutor::<
+                SignatureVerifiedTransaction,
+                LegacyTransactionExecutor<E>,
+                S,
+                L,
+                TP,
+                AuxiliaryInfo,
+            >::new(config, transaction_commit_listener)
+            .execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        };
         match ret {
             Ok(block_output) => {
                 let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();

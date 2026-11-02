@@ -8,7 +8,14 @@ from unittest.mock import patch
 
 from harness.config import ExperimentConfig
 from harness.credentials import redact, redact_tree, require_provider_auth
-from harness.model_profile import PROFILES, select_model, subscription_environment
+from harness.model_profile import (
+    CODEX_CLI_VERSIONS,
+    CODEX_CODE_MODE_HOST_SHA256,
+    PROFILES,
+    codex_code_mode_host_sha256,
+    select_model,
+    subscription_environment,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,12 +64,101 @@ class ModelProfileTest(unittest.TestCase):
             select_model(opus, glm, "glm")
             self.assertEqual(ExperimentConfig.load(glm).effort, "max")
 
+    def test_select_sonnet_uses_subscription_and_xhigh_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sonnet.json"
+            select_model(ROOT / "config/default.json", output, "sonnet")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "claude-sonnet-5")
+            self.assertEqual(config.provider_base_url, "https://api.anthropic.com")
+            self.assertEqual(config.effort, "xhigh")
+            env = subscription_environment(config, {
+                "CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-secret",
+            })
+            self.assertEqual(env["ANTHROPIC_MODEL"], "claude-sonnet-5")
+            self.assertEqual(env["CLAUDE_CODE_EFFORT_LEVEL"], "xhigh")
+
+    def test_select_sol56_uses_codex_with_high_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sol56.json"
+            select_model(ROOT / "config/default.json", output, "sol56")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "gpt-5.6-sol")
+            self.assertEqual(config.provider_base_url, "https://chatgpt.com/backend-api")
+            self.assertEqual(config.effort, "high")
+            self.assertEqual(config.agent_runtime, "codex")
+            self.assertEqual(config.codex_cli_version, "0.153.2")
+            self.assertEqual(
+                config.codex_code_mode_host_sha256, codex_code_mode_host_sha256("0.153.2")
+            )
+
+    def test_select_sol61_uses_codex_with_high_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sol61.json"
+            select_model(ROOT / "config/default.json", output, "sol61")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "gpt-6.1-sol")
+            self.assertEqual(config.provider_base_url, "https://chatgpt.com/backend-api")
+            self.assertEqual(config.effort, "high")
+            self.assertEqual(config.agent_runtime, "codex")
+            self.assertEqual(config.codex_cli_version, "0.160.1")
+            self.assertEqual(
+                config.codex_code_mode_host_sha256, codex_code_mode_host_sha256("0.160.1")
+            )
+
+    def test_select_terra56_uses_codex_with_high_effort_and_no_retries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "terra56.json"
+            select_model(
+                ROOT / "config/default.json",
+                output,
+                "terra56",
+                infrastructure_retries=0,
+            )
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "gpt-5.6-terra")
+            self.assertEqual(config.provider_base_url, "https://chatgpt.com/backend-api")
+            self.assertEqual(config.effort, "high")
+            self.assertEqual(config.agent_runtime, "codex")
+            self.assertEqual(config.infrastructure_retries, 0)
+            self.assertEqual(config.codex_cli_version, "0.153.2")
+            self.assertEqual(
+                config.codex_code_mode_host_sha256, codex_code_mode_host_sha256("0.153.2")
+            )
+
+    def test_code_mode_host_is_pinned_per_release_and_linux_machine(self) -> None:
+        self.assertEqual(
+            set(CODEX_CODE_MODE_HOST_SHA256), set(CODEX_CLI_VERSIONS.values())
+        )
+        for version, digests in CODEX_CODE_MODE_HOST_SHA256.items():
+            self.assertEqual(set(digests), {"aarch64", "x86_64"})
+            for machine, digest in digests.items():
+                with patch("harness.model_profile.platform.machine", return_value=machine):
+                    self.assertEqual(codex_code_mode_host_sha256(version), digest)
+            with patch("harness.model_profile.platform.machine", return_value="riscv64"):
+                with self.assertRaisesRegex(ValueError, "no pinned Codex code-mode host"):
+                    codex_code_mode_host_sha256(version)
+
+    def test_select_rejects_negative_infrastructure_retries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "cannot be negative"):
+                select_model(
+                    ROOT / "config/default.json",
+                    Path(directory) / "config.json",
+                    "terra56",
+                    infrastructure_retries=-1,
+                )
+
     def test_effort_validation_preserves_history_and_rejects_glm_xhigh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
             path.write_text(json.dumps(asdict(replace(self.config, effort="max"))))
             self.assertEqual(ExperimentConfig.load(path).effort, "max")
-            for model, effort in (("glm-5.3[1m]", "xhigh"), ("claude-opus-5", "typo")):
+            for model, effort in (
+                ("glm-5.3[1m]", "xhigh"),
+                ("claude-opus-5", "typo"),
+                ("claude-sonnet-5", "typo"),
+            ):
                 path.write_text(json.dumps(asdict(replace(self.config, model=model, effort=effort))))
                 with self.assertRaisesRegex(ValueError, "effort must"):
                     ExperimentConfig.load(path)

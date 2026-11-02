@@ -1,0 +1,54 @@
+processed 27 tasks
+task 0 lines 3-278:  publish [module 0xc0ffee::m {]
+task 1 lines 281-281:  run 0xc0ffee::m::enum_reads --args 11u64
+return values: 1
+task 2 lines 283-283:  run 0xc0ffee::m::enum_reads --args 3u64
+return values: 3
+task 3 lines 285-285:  run 0xc0ffee::m::enum_reads --args 4u64
+return values: 40
+task 4 lines 287-287:  run 0xc0ffee::m::enum_reads --args 7u64
+return values: 5
+task 5 lines 289-289:  run 0xc0ffee::m::prim_reads --args 1u64
+return values: 1
+task 6 lines 291-291:  run 0xc0ffee::m::prim_reads --args 2u64
+return values: 20
+task 7 lines 293-293:  run 0xc0ffee::m::prim_reads --args 5u64
+return values: 50
+task 8 lines 295-295:  run 0xc0ffee::m::prim_reads --args 9u64
+return values: 0
+task 9 lines 297-297:  run 0xc0ffee::m::mixed_reads --args 11u64 1u64
+return values: 1
+task 10 lines 299-299:  run 0xc0ffee::m::mixed_reads --args 3u64 3u64
+return values: 2
+task 11 lines 301-301:  run 0xc0ffee::m::mixed_reads --args 3u64 1u64
+return values: 4
+task 12 lines 303-303:  run 0xc0ffee::m::frozen_reborrow --args 11u64
+return values: 1
+task 13 lines 305-305:  run 0xc0ffee::m::frozen_reborrow --args 1u64
+return values: 2
+task 14 lines 307-307:  run 0xc0ffee::m::frozen_reborrow --args 2u64
+return values: 0
+task 15 lines 309-309:  run 0xc0ffee::m::invoke_readonly --args 11u64
+return values: 1
+task 16 lines 311-311:  run 0xc0ffee::m::invoke_readonly --args 3u64
+return values: 0
+task 17 lines 313-313:  run 0xc0ffee::m::temporaries_and_captures --args 500u64 100u64
+return values: 500
+task 18 lines 315-315:  run 0xc0ffee::m::temporaries_and_captures --args 5u64 100u64
+return values: 6
+task 19 lines 317-317:  run 0xc0ffee::m::temporaries_and_captures --args 2u64 100u64
+return values: 0
+task 20 lines 319-319:  run 0xc0ffee::m::copy_reborrows --args 11u64
+return values: 107
+task 21 lines 321-321:  run 0xc0ffee::m::copy_reborrows --args 3u64
+return values: 307
+task 22 lines 323-323:  run 0xc0ffee::m::borrow_payload --args 5u64
+return values: 5
+task 23 lines 325-325:  run 0xc0ffee::m::borrow_payload --args 1u64
+return values: 0
+task 24 lines 327-327:  run 0xc0ffee::m::shadowing --args 900u64 100u64
+return values: 900
+task 25 lines 329-329:  run 0xc0ffee::m::unrelated_effects
+return values: 212
+task 26 lines 331-331:  run 0xc0ffee::m::disjoint_field
+return values: 1

@@ -490,11 +490,47 @@ mod test {
     }
 
     fn make_list_file(filename: &str, items: &[&str]) -> Result<()> {
-        let mut file = File::create(filename)?;
-        for item in items {
-            writeln!(file, "{}", item)?;
+        let temporary = format!("{}.{}", filename, HashValue::random());
+        let result = (|| -> Result<()> {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?;
+            for item in items {
+                writeln!(file, "{}", item)?;
+            }
+            drop(file);
+            // Concurrent server startups must never read a truncated fixture.
+            std::fs::rename(&temporary, filename)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
         }
-        Ok(())
+        result
+    }
+
+    #[test]
+    fn list_file_replacement_is_atomic() -> Result<()> {
+        let filename = format!("/tmp/faucet-list-{}.txt", HashValue::random());
+        let contents = ["fixture_token"; 64];
+        make_list_file(&filename, &contents)?;
+        let expected = "fixture_token\n".repeat(contents.len());
+        let result = std::thread::scope(|scope| -> Result<()> {
+            let writer = scope.spawn(|| -> Result<()> {
+                for _ in 0..100 {
+                    make_list_file(&filename, &contents)?;
+                }
+                Ok(())
+            });
+            for _ in 0..1000 {
+                assert_eq!(std::fs::read_to_string(&filename)?, expected);
+            }
+            writer.join().expect("fixture writer panicked")?;
+            Ok(())
+        });
+        std::fs::remove_file(filename)?;
+        result
     }
 
     fn make_auth_tokens_file(auth_tokens: &[&str]) -> Result<()> {

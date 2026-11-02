@@ -4,8 +4,9 @@
 use ark_bls12_381::{Fr, G1Projective as G};
 use ark_ec::scalar_mul::{BatchMulPreprocessing, ScalarMul};
 use ark_std::UniformRand;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rayon::prelude::*;
+use std::hint::black_box;
 
 fn bench_batch_mul(c: &mut Criterion) {
     let mut rng = ark_std::test_rng();

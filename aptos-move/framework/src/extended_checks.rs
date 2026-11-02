@@ -379,6 +379,7 @@ impl ExtendedChecker<'_> {
                         &struct_.get_loc(),
                         "resource_group_member must contain 1 parameters",
                     );
+                    continue;
                 }
 
                 let value = if let Attribute::Assign(_, name, value) = &attributes[0] {

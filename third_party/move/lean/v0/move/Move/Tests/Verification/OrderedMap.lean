@@ -6,7 +6,7 @@ import Move
 import MoveModel.Tests.Common
 
 /-!
-# Aptos `ordered_map` in Leaner Move
+# Aptos `ordered_map` in Verex Move
 
 The framework's public type is currently a single-variant
 `OrderedMap::SortedVectorMap` containing a vector of key/value entries in

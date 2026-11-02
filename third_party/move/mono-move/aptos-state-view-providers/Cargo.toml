@@ -27,4 +27,3 @@ move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 thiserror = { workspace = true }
-triomphe = { workspace = true }

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 35,
+        "offset": 1228,
+        "sha256": "7b34de7643c06ba9634c91eaedc401bb7a32584163d925b2db3fb9bd23ec61ac"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 15,
+        "to": "is_smaller_than"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_jwks.move",
+      "mutant_id": "JW-upsert-049-scans-while-smaller",
+      "obligation_category": "normal-result",
+      "rationale": "The scan advances past larger issuers instead of smaller ones.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 1329,
+        "sha256": "2c3caefd839cb90c740c22c9acaf9e7fd064d6b873f399c16fb648432416fb86"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 21,
+        "to": "true"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_jwks.move",
+      "mutant_id": "JW-upsert-049-always-replaces",
+      "obligation_category": "normal-result",
+      "rationale": "A larger issuer at the stop position is replaced instead of preceded.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 42,
+        "offset": 1784,
+        "sha256": "3d78777b3f8b31b5857f827caa1759832917cfd4737a023be3db68c4c8d9f032"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 5,
+        "to": "0"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_jwks.move",
+      "mutant_id": "JW-upsert-049-inserts-at-front",
+      "obligation_category": "normal-result",
+      "rationale": "A new issuer is always inserted first.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "27778ba39157783926c9892336f0134397464ba9299ced2a8e7f1692ec8330b0",
+  "task_id": "JW-upsert-049"
+}

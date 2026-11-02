@@ -12,7 +12,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
 use ark_std::io::Write;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain

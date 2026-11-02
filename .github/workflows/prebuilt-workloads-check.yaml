@@ -1,0 +1,101 @@
+name: "prebuilt-workloads-check"
+
+# Rebuilds crates/transaction-workloads-lib/prebuilt.mpb from source and fails if
+# the committed bundle differs. Nothing rebuilds it at `cargo build` time, so
+# without this check a stale bundle silently serves old bytecode to every
+# benchmark and workload test that loads it.
+#
+# Path-filtered, because a run costs a full Move compile of every package
+# testsuite/benchmark-workloads/generate.py builds: roughly seven minutes once
+# the Rust cache is warm.
+on:
+  pull_request:
+    paths:
+      # Packages the bundle is built from, mirroring generate.py's PACKAGES and
+      # EXPERIMENTAL_PACKAGES.
+      - "testsuite/benchmark-workloads/packages/**"
+      - "testsuite/benchmark-workloads/packages-experimental/experimental_usecases/**"
+      - "aptos-move/move-examples/token_objects/ambassador/**"
+      - "aptos-move/move-examples/aggregator_examples/**"
+      - "aptos-move/move-examples/bcs-stream/**"
+      - "third_party/move/mono-move/testsuite/benches-e2e/**"
+      # generate.py passes --use-local-std, so the packages above compile
+      # against the framework in this checkout rather than a released one.
+      - "aptos-move/framework/**"
+      # The generator itself.
+      - "testsuite/benchmark-workloads/generate.py"
+      - "testsuite/benchmark-workloads/package-generator/**"
+      - "crates/transaction-generator-lib/src/publishing/prebuild_packages.rs"
+      # The committed outputs.
+      - "crates/transaction-workloads-lib/prebuilt.mpb"
+      - "crates/transaction-workloads-lib/src/prebuilt_packages.rs"
+      - ".github/workflows/prebuilt-workloads-check.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: prebuilt-workloads-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  BUNDLE: crates/transaction-workloads-lib/prebuilt.mpb
+  GENERATED: crates/transaction-workloads-lib/src/prebuilt_packages.rs
+
+jobs:
+  regenerate:
+    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/rust-setup
+
+      - name: Regenerate the prebuilt bundle
+        run: ./testsuite/benchmark-workloads/generate.py
+
+      # The bundle is byte-reproducible: repeated local runs on an unchanged
+      # tree produce an identical file, so a diff here means the sources moved
+      # and the committed copy did not.
+      - name: Check the committed bundle matches
+        id: check
+        run: |
+          if git diff --quiet -- "$BUNDLE" "$GENERATED"; then
+            echo "Prebuilt bundle is up to date."
+            exit 0
+          fi
+          {
+            echo '## Prebuilt workload bundle is stale'
+            echo
+            echo 'This PR changes the compiled bundle, but the committed copy was'
+            echo 'not regenerated. Nothing rebuilds it at `cargo build` time, so'
+            echo 'benchmarks and workload tests would keep running old bytecode.'
+            echo
+            echo 'Run this and commit the result:'
+            echo
+            echo '```'
+            echo './testsuite/benchmark-workloads/generate.py'
+            echo '```'
+            echo
+            echo 'The regenerated files are attached to this run as an artifact if'
+            echo 'you would rather not rebuild them locally.'
+            echo
+            echo '```'
+            git diff --stat -- "$BUNDLE" "$GENERATED"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git diff --stat -- "$BUNDLE" "$GENERATED"
+          exit 1
+
+      - name: Upload the regenerated bundle
+        if: ${{ failure() && steps.check.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-workloads-bundle
+          path: |
+            crates/transaction-workloads-lib/prebuilt.mpb
+            crates/transaction-workloads-lib/src/prebuilt_packages.rs
+          retention-days: 14

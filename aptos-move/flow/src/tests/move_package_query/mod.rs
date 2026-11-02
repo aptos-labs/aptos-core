@@ -19,3 +19,4 @@ mod invalid_path;
 mod invalid_query;
 mod module_summary;
 mod module_summary_empty;
+mod scoped_module;

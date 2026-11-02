@@ -31,6 +31,9 @@ struct MovePackageQueryParams {
     query: QueryType,
     /// Function to query (required for "function_usage"), in the form "module_name::function_name".
     function: Option<String>,
+    /// Optional module scope for "module_summary" and "facts", in the form
+    /// "module_name" or "address::module_name". A simple name must be unambiguous.
+    module: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -78,6 +81,14 @@ impl FlowSession {
         let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let data = pkg.lock().map_err(|_| mcp_err("package lock poisoned"))?;
 
+        if params.module.is_some()
+            && !matches!(&params.query, QueryType::ModuleSummary | QueryType::Facts)
+        {
+            return Err(mcp_err(
+                "\"module\" parameter is supported only for module_summary and facts queries",
+            ));
+        }
+
         match params.query {
             QueryType::DepGraph => {
                 let result = build_dep_graph(data.env());
@@ -85,7 +96,8 @@ impl FlowSession {
                 Ok(into_call_tool_result(&result))
             },
             QueryType::ModuleSummary => {
-                let result = build_module_summary(data.env());
+                let modules = select_modules(data.env(), params.module.as_deref())?;
+                let result = build_module_summary(data.env(), &modules);
                 log::info!(
                     "move_package_query module_summary: {} module(s)",
                     result.len()
@@ -109,11 +121,38 @@ impl FlowSession {
                 Ok(into_call_tool_result(&result))
             },
             QueryType::Facts => {
-                let result = try_call("failed to build facts", || build_facts(data.env()))?;
+                let modules = select_modules(data.env(), params.module.as_deref())?;
+                let result = try_call("failed to build facts", || {
+                    build_facts(data.env(), &modules)
+                })?;
                 log::info!("move_package_query facts: {} module(s)", result.len());
                 Ok(into_call_tool_result(&result))
             },
         }
+    }
+}
+
+/// Select all primary modules, or one explicitly named primary module.
+fn select_modules<'env>(
+    env: &'env GlobalEnv,
+    selector: Option<&str>,
+) -> Result<Vec<ModuleEnv<'env>>, rmcp::ErrorData> {
+    let modules = env.get_primary_target_modules();
+    let Some(selector) = selector else {
+        return Ok(modules);
+    };
+    let matches: Vec<_> = modules
+        .into_iter()
+        .filter(|module| module.matches_name(selector))
+        .collect();
+    match matches.len() {
+        0 => Err(mcp_err(format!(
+            "module `{selector}` not found in target package"
+        ))),
+        1 => Ok(matches),
+        _ => Err(mcp_err(format!(
+            "module name `{selector}` is ambiguous; use address::module_name"
+        ))),
     }
 }
 
@@ -172,9 +211,12 @@ struct FunctionSummary {
     is_lambda_lifted: bool,
 }
 
-/// Build a summary of each target module's constants, structs, and functions.
-fn build_module_summary(env: &GlobalEnv) -> BTreeMap<String, ModuleSummary> {
-    env.get_primary_target_modules()
+/// Build a summary of the selected target modules' constants, structs, and functions.
+fn build_module_summary(
+    env: &GlobalEnv,
+    modules: &[ModuleEnv<'_>],
+) -> BTreeMap<String, ModuleSummary> {
+    modules
         .iter()
         .map(|module| {
             let name = module.get_full_name_str();
@@ -418,9 +460,9 @@ struct StructFacts {
     attributes: Vec<AttributeFacts>,
 }
 
-/// Build per-module facts for every primary target module in `env`.
-fn build_facts(env: &GlobalEnv) -> BTreeMap<String, ModuleFacts> {
-    env.get_primary_target_modules()
+/// Build per-module facts for the selected primary target modules.
+fn build_facts(env: &GlobalEnv, modules: &[ModuleEnv<'_>]) -> BTreeMap<String, ModuleFacts> {
+    modules
         .iter()
         .map(|module| {
             let name = module.get_full_name_str();

@@ -10,4 +10,5 @@ pub mod missing_transcript_fetcher;
 pub mod subtrx_cert_producer;
 #[cfg(test)]
 pub(crate) mod test_utils;
+mod transcript_cache;
 pub mod types;

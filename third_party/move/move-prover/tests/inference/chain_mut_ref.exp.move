@@ -85,6 +85,7 @@ module 0x42::chain_mut_ref {
     spec chain(self: &mut Pool, x: u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == result_of<update>(update_field(old(self), total, old(self).total + (x + old(self).total)), x + old(self).total);
+        ensures [inferred] ensures_of<update>(update_field(old(self), total, old(self).total + (x + old(self).total)), x + old(self).total, result_of<update>(update_field(old(self), total, old(self).total + (x + old(self).total)), x + old(self).total), self);
         aborts_if [inferred] aborts_of<compute>(self, x);
         aborts_if [inferred] self.total + (x + self.total) > MAX_U64;
     }

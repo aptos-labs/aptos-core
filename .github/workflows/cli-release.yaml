@@ -100,6 +100,9 @@ jobs:
           name: cli-builds-linux-arm
           path: aptos-cli-*.zip
 
+  # Last Intel (x86_64) macOS CLI build. This release prints a deprecation
+  # warning on startup. Remove this job after it ships; later macOS CLI
+  # releases are Apple Silicon (arm64) only.
   build-macos-x86_64-binary:
     name: "Build MacOS x86_64 binary"
     runs-on: macos-15-intel

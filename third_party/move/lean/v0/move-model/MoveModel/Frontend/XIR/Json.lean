@@ -277,6 +277,11 @@ private def attributeFields (attributes : List Attribute) :
   if attributes.isEmpty then [] else
     [("attributes", arr (attributes.map encodeAttribute))]
 
+private def encodeVisibility : Visibility → String
+  | .private_ => "private"
+  | .public_ => "public"
+  | .friend => "friend"
+
 private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"struct body `{decl.name}` does not match metadata `{info.name}`"
@@ -295,6 +300,7 @@ private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json 
     ]
   let fields := [
     ("name", .str decl.name),
+    ("visibility", .str (encodeVisibility info.visibility)),
     ("type_parameters", encodeTypeParams decl.typeParams),
     ("abilities", encodeAbilities info.abilities),
     ("fields", arr fields)
@@ -302,11 +308,6 @@ private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json 
   return Json.mkObj <| match variants with
     | none => fields
     | some variants => fields ++ [("variants", variants)]
-
-private def encodeVisibility : Visibility → String
-  | .private_ => "private"
-  | .public_ => "public"
-  | .friend => "friend"
 
 private def encodeSourceSpan (span : SourceSpan) : Json :=
   Json.mkObj [("start", nat span.start), ("end", nat span.end)]
@@ -392,7 +393,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 6),
+    ("version", nat 7),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -528,7 +529,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 || version = 5 || version = 6 do
+  unless version = 3 || version = 4 || version = 5 || version = 6 || version = 7 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -564,12 +565,18 @@ def decodeMModule (text : String) : JsonResult MModule := do
             pure (variantName, fields)
           pure (some variants)
       | .error _ => pure none
+    -- Absent means private, as in the Rust reader, so a document written
+    -- before version 7 still decodes.
+    let visibility ← match structJson.getObjVal? "visibility" with
+      | .ok value => decodeVisibility (← value.getStr?)
+      | .error _ => pure .private_
     return ({
       name := structName
       fieldNames := fieldNames
       variantNames := variantNames
       abilities := ← decodeAbilities (← structJson.getObjVal? "abilities")
       attributes := ← decodeAttributes structJson
+      visibility := visibility
     } : StructMeta)
   let funMeta ← functionsJson.toList.mapM fun functionJson => do
     return ({

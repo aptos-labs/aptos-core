@@ -12,7 +12,7 @@ fun mutate_vec_push() {
     4: StoreImm8 [128] <- #0 @6
     5: Move8 [144] <- [72] @8
     6: Move8 [136] <- [128] @8
-    7: HeapNew [208] desc=2 @9
+    7: HeapNew [208] desc=3 @9
     8: HeapMoveTo [208]+0 <- [136] (size=16) @9
     9: MoveTo<0x42::nested_globals::WithVec> signer=[112], src=[208] @9
     10: BorrowGlobalMut<0x42::nested_globals::WithVec> [152] <- addr=[32], ty= @11
@@ -53,7 +53,7 @@ fun publish_nested_read() {
     8: Move8 [136] <- [72] @15
     9: Move8 [152] <- [136] @16
     10: Move8 [144] <- [112] @16
-    11: HeapNew [200] desc=3 @17
+    11: HeapNew [200] desc=4 @17
     12: HeapMoveTo [200]+0 <- [144] (size=16) @17
     13: MoveTo<0x42::nested_globals::Outer> signer=[120], src=[200] @17
     14: BorrowGlobal<0x42::nested_globals::Outer> [80] <- addr=[32], ty= @19
@@ -85,7 +85,7 @@ fun publish_vec_read() {
     7: AddU64Imm [112] <- [64] + #7 @13
     8: Move8 [144] <- [72] @15
     9: Move8 [136] <- [112] @15
-    10: HeapNew [192] desc=2 @16
+    10: HeapNew [192] desc=3 @16
     11: HeapMoveTo [192]+0 <- [136] (size=16) @16
     12: MoveTo<0x42::nested_globals::WithVec> signer=[120], src=[192] @16
     13: BorrowGlobal<0x42::nested_globals::WithVec> [80] <- addr=[32], ty= @18
@@ -114,7 +114,7 @@ fun publish_vec_take() {
     4: AddU64Imm [120] <- [64] + #7 @8
     5: Move8 [136] <- [72] @10
     6: Move8 [128] <- [120] @10
-    7: HeapNew [184] desc=2 @11
+    7: HeapNew [184] desc=3 @11
     8: HeapMoveTo [184]+0 <- [128] (size=16) @11
     9: MoveTo<0x42::nested_globals::WithVec> signer=[104], src=[184] @11
     10: MoveFrom<0x42::nested_globals::WithVec> [184] <- addr=[32], ty= @13

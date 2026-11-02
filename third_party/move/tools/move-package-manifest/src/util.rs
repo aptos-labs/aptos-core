@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use annotate_snippets::{Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use std::fmt::Write;
 
 /// Renders a formatted error message for a toml deserialization failure, optionally with
@@ -21,7 +21,6 @@ use std::fmt::Write;
 /// 3 | version = "0.1.2"
 /// 4 | upgrade_policy = "invalid-policy"
 ///   |                  ^^^^^^^^^^^^^^^^ unknown variant `invalid-policy`, expected `compatible` or `immutable`
-///   |
 /// ```
 pub fn render_error(
     output: &mut impl Write,
@@ -31,16 +30,15 @@ pub fn render_error(
     match err.span() {
         Some(span) => {
             let snippet = Snippet::source(manifest_text)
-                .annotation(Level::Error.span(span).label(err.message()));
+                .fold(false)
+                .annotation(AnnotationKind::Primary.span(span).label(err.message()));
 
             writeln!(
                 output,
                 "{}",
-                Renderer::plain().render(
-                    Level::Error
-                        .title("failed to parse manifest")
-                        .snippet(snippet)
-                )
+                Renderer::plain().render(&[Level::ERROR
+                    .primary_title("failed to parse manifest")
+                    .element(snippet)])
             )?;
         },
         None => {

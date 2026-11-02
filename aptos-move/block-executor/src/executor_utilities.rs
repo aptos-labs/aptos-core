@@ -178,11 +178,12 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> Materializer<T>
 
 /// Materializes a (speculative) transaction output into its committed form:
 /// finalizes and serializes resource group updates, replaces delayed field
-/// identifiers with values in resource writes and events, and incorporates the
-/// results into the output.
+/// identifiers with values in resource writes, events and native-store writes,
+/// and incorporates the results into the output.
 pub(crate) fn materialize_output<T, O, M>(
     output: O,
     materializer: &M,
+    delayed_field_optimization_enabled: bool,
 ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
 where
     T: Transaction,
@@ -194,6 +195,7 @@ where
     let resource_write_set = output.resource_write_set();
     let reads_needing_exchange = output.reads_needing_delayed_field_exchange();
     let events = output.get_events();
+    let native_writes = output.native_writes_needing_exchange();
 
     let finalized_groups = group_metadata_ops
         .into_iter()
@@ -255,12 +257,31 @@ where
 
     let materialized_events = map_id_to_values_events(events, materializer)?;
 
+    // Native-store writes hold identifiers only under the delayed field
+    // optimization; the natives producing them require it.
+    if !delayed_field_optimization_enabled && !native_writes.is_empty() {
+        return Err(code_invariant_error(
+            "Native writes needing exchange without the delayed field optimization",
+        )
+        .into());
+    }
+    let materialized_native_writes = native_writes
+        .into_iter()
+        .map(|(key, value, layout)| {
+            Ok((
+                key,
+                replace_ids_with_values(&TriompheArc::new(value), layout, materializer)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, PanicError>>()?;
+
     Ok(output.incorporate_materialized_txn_output(
         materialized_resource_write_set
             .into_iter()
             .chain(serialized_groups)
             .collect(),
         materialized_events,
+        materialized_native_writes,
     )?)
 }
 

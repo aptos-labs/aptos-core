@@ -5,32 +5,34 @@ error: [boogie translator] unit type (empty tuple) not supported
 6 │     spec fun empty(): () { () }
   │                            ^^
 
-error: [boogie translator] tuple has 12 elements, maximum supported is 11
+error: [boogie translator] tuple has 21 elements, maximum supported is 20
    ┌─ tests/sources/functional/spec_fun_tuple_errors.move:12:10
    │
 12 │       spec fun too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
    │ ╭──────────^
 13 │ │                        f: u64, g: u64, h: u64, i: u64, j: u64,
-14 │ │                        k: u64, l: u64):
-15 │ │         (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-16 │ │         (a, b, c, d, e, f, g, h, i, j, k, l)
-17 │ │     }
+14 │ │                        k: u64, l: u64, m: u64, n: u64, o: u64,
+15 │ │                        p: u64, q: u64, r: u64, s: u64, t: u64,
+   · │
+18 │ │         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u)
+19 │ │     }
    │ ╰─────^
 
-error: [boogie translator] tuple has 13 elements, maximum supported is 11
-   ┌─ tests/sources/functional/spec_fun_tuple_errors.move:20:10
+error: [boogie translator] tuple has 22 elements, maximum supported is 20
+   ┌─ tests/sources/functional/spec_fun_tuple_errors.move:22:10
    │
-20 │       spec fun way_too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
+22 │       spec fun way_too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
    │ ╭──────────^
-21 │ │                            f: u64, g: u64, h: u64, i: u64, j: u64,
-22 │ │                            k: u64, l: u64, m: u64):
-23 │ │         (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-24 │ │         (a, b, c, d, e, f, g, h, i, j, k, l, m)
-25 │ │     }
+23 │ │                        f: u64, g: u64, h: u64, i: u64, j: u64,
+24 │ │                        k: u64, l: u64, m: u64, n: u64, o: u64,
+25 │ │                        p: u64, q: u64, r: u64, s: u64, t: u64,
+   · │
+28 │ │         (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+29 │ │     }
    │ ╰─────^
 
 error: [boogie translator] unit type (empty tuple) not supported
-   ┌─ tests/sources/functional/spec_fun_tuple_errors.move:31:28
+   ┌─ tests/sources/functional/spec_fun_tuple_errors.move:35:28
    │
-31 │         ensures empty() == ();
+35 │         ensures empty() == ();
    │                            ^^

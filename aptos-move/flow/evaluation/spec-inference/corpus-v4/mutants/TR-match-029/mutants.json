@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 58,
+        "offset": 6337,
+        "sha256": "72efbc3cb5107ca14d2c0939c9b5c9d31c369f9c90effb862af45d8a45edb4fa"
+      },
+      "edit": {
+        "at": 21,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-match-029-full-match-rejected",
+      "obligation_category": "abort",
+      "rationale": "Matching the whole first level aborts.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 58,
+        "offset": 6691,
+        "sha256": "5efd56cba1f543b3edc86887988ea9f3701aa1a9d7a1e4ea65e64b98f0d0e77c"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 30,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-match-029-price-kept-on-removal",
+      "obligation_category": "normal-result",
+      "rationale": "Only the size level is removed, so prices and sizes fall out of step.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 49,
+        "offset": 6902,
+        "sha256": "b5b1b65c92f461956e774036cb32f5582b5bc3463e12d8528825f7f70abe9ad6"
+      },
+      "edit": {
+        "at": 1,
+        "kind": "substitute",
+        "length": 23,
+        "to": "option::some(sizes[0])"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-match-029-returns-size-as-price",
+      "obligation_category": "normal-result",
+      "rationale": "The next active price reported is the next size.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "edfb877ee10f48c2bfdd8c3ff4036817d5fc8bcf682649caeca0d410cdef3b7e",
+  "task_id": "TR-match-029"
+}

@@ -155,6 +155,7 @@ fn run_benchmark(
                 )
                 .to_vec(),
                 module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+                provides_cmp_model: true,
             });
     }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
@@ -219,7 +220,7 @@ impl Runner {
 
         // Scope verification to the given function
         let env = fun.module_env.env;
-        self.options.prover.verify_scope = VerificationScope::Only(fun.get_full_name_str());
+        self.options.prover.verify_scope = VerificationScope::Only(vec![fun.get_full_name_str()]);
         ProverOptions::set(env, self.options.prover.clone());
         create_init_num_operation_state(env);
         // Run benchmark

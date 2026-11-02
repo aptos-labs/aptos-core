@@ -8,11 +8,17 @@ use aptos_aggregator::{bounded_math::SignedU128, types::DelayedFieldsSpeculative
 #[cfg(feature = "testing")]
 use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
+use aptos_collateral_natives::NativeCollateralContext;
+#[cfg(feature = "testing")]
 use aptos_framework_natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework_natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
+#[cfg(feature = "testing")]
+use aptos_order_natives::NativeOrderContext;
+#[cfg(feature = "testing")]
+use aptos_position_natives::NativePositionContext;
 #[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder};
@@ -219,6 +225,9 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
     exts.add(NativeObjectContext::default());
+    exts.add(NativeCollateralContext::new());
+    exts.add(NativeOrderContext::new());
+    exts.add(NativePositionContext::new());
 
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();

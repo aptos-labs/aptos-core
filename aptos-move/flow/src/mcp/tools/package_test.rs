@@ -293,7 +293,7 @@ impl FlowSession {
     async fn run_tests_async(&self, pkg_path: &Path) -> Result<(bool, String), rmcp::ErrorData> {
         // Tests build from disk with their own configuration, not through the
         // session cache, so the manifest is guarded here.
-        self.refuse_remote_dependencies(pkg_path)?;
+        self.refuse_untrusted_dependencies(pkg_path)?;
         let args = self.args().clone();
         let path = pkg_path.to_path_buf();
         let tool_timeout = self.tool_timeout();

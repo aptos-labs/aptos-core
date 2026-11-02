@@ -4,7 +4,7 @@
 import MoveModel.IR.Value
 
 /-!
-# Leaner source types
+# Verex source types
 
 Opaque source-level types recognized by the Lean-to-Move compiler.  Their Lean
 implementations are not the runtime representation used by MoveModel.
@@ -14,7 +14,7 @@ namespace Move
 
 export MoveModel.IR (IntWidth NumType)
 
-/-- Identity marker used by the `continue f args...` syntax.  The Leaner
+/-- Identity marker used by the `continue f args...` syntax.  The Verex
 normalizer consumes this call and requires the marked application to become a
 CFG back edge; it has no Move runtime representation. -/
 @[noinline] opaque continueMarker {α : Sort u} (value : α) : α := value

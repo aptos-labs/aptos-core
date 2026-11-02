@@ -16,7 +16,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
@@ -769,6 +769,11 @@ where
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
     pub fn finish_impl(mut self) -> Result<()> {
         self.wait_for_async_commit()?;
+        // The root of a completed restore was checked in `new`.
+        if self.finished {
+            return Ok(());
+        }
+
         // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
@@ -787,16 +792,14 @@ where
                     let node_key = NodeKey::new_empty_path(self.version);
                     assert!(self.frozen_nodes.is_empty());
                     self.frozen_nodes.insert(node_key, Node::Null);
-                    self.store.write_node_batch(&self.frozen_nodes)?;
-                    return Ok(());
+                    return self.write_frozen_nodes_with_root();
                 },
                 1 => {
                     if let Some(node) = leaf {
                         let node_key = NodeKey::new_empty_path(self.version);
                         assert!(self.frozen_nodes.is_empty());
                         self.frozen_nodes.insert(node_key, node.into());
-                        self.store.write_node_batch(&self.frozen_nodes)?;
-                        return Ok(());
+                        return self.write_frozen_nodes_with_root();
                     }
                 },
                 _ => (),
@@ -804,8 +807,24 @@ where
         }
 
         self.freeze(0);
-        self.store.write_node_batch(&self.frozen_nodes)?;
-        Ok(())
+        self.write_frozen_nodes_with_root()
+    }
+
+    /// Writes the frozen nodes once the root among them matches `expected_root_hash`. Chunks
+    /// skipped as overlaps are never verified, so the chunk proofs alone don't guarantee this.
+    fn write_frozen_nodes_with_root(&self) -> Result<()> {
+        let root_hash = self
+            .frozen_nodes
+            .get(&NodeKey::new_empty_path(self.version))
+            .expect("The root node must be frozen.")
+            .hash();
+        ensure!(
+            root_hash == self.expected_root_hash,
+            "Restored root hash {} does not match the expected root hash {}.",
+            root_hash,
+            self.expected_root_hash,
+        );
+        self.store.write_node_batch(&self.frozen_nodes)
     }
 }
 

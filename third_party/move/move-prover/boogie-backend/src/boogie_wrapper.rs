@@ -192,6 +192,14 @@ static TIMEOUT_PROCEDURE: Lazy<Regex> = Lazy::new(|| {
     .unwrap()
 });
 
+/// A located Boogie error without an `assert_failed` message.
+static UNTAGGED_ERROR: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\S+\(\d+,\d+\): Error: (?P<msg>.*)$").unwrap());
+
+static ERROR_COUNT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^Boogie program verifier finished with .*?(\d+) errors?").unwrap()
+});
+
 static INCONSISTENCY_DIAG_STARTS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^inconsistency_detected\((?P<args>[^)]*)\)").unwrap());
 
@@ -415,6 +423,7 @@ impl BoogieWrapper<'_> {
             ));
         }
         let mut errors = self.extract_verification_errors(&out);
+        errors.extend(self.extract_untagged_errors(&out));
         errors.extend(self.extract_inconclusive_errors(&out, &timeout_analysis, boogie_file));
         errors.extend(self.extract_inconsistency_errors(&out));
         if self.options.stable_test_output {
@@ -628,18 +637,14 @@ impl BoogieWrapper<'_> {
                     },
                     GlobalMem(node_id, ModelValue::List(elems)) => {
                         // The bytecode track_global_memory takes the form
-                        // "($Memory_107864 |T@[Int]Bool!val!2| |T@[Int]$1_DiemTimestamp_CurrentTimeMicroseconds!val!0|)"
+                        // "($Memory_107864 |T@[Int]Bool!val!2| |T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds!val!0|)"
                         // so the extracted list has three values where elems[2] is the reference to the model
                         // of the corresponding global memory array while elems[1] is the reference to the array to denote
                         // whether the memory exists
                         if elems.len() == 3 {
                             if let ModelValue::Literal(s) = &elems[2] {
-                                // Extract the struct name from elems[2]
-                                // e.g., $1_DiemTimestamp_CurrentTimeMicroseconds
-                                let struct_name_str =
-                                    &s[s.find('_').unwrap() + 1..s.find('!').unwrap()];
                                 global_mem_map.insert(
-                                    struct_name_str.to_string(),
+                                    global_memory_struct_name(s).to_string(),
                                     (*node_id, elems[1].clone(), elems[2].clone()),
                                 );
                             }
@@ -776,6 +781,7 @@ impl BoogieWrapper<'_> {
             if !inbetween.is_empty()
                 && !INCONCLUSIVE_DIAG_STARTS.is_match(inbetween)
                 && !INCONSISTENCY_DIAG_STARTS.is_match(inbetween)
+                && !UNTAGGED_ERROR.is_match(inbetween)
             {
                 // This is unexpected text and we report it as an internal error
                 errors.push(BoogieError {
@@ -817,6 +823,71 @@ impl BoogieWrapper<'_> {
                     model: if model.is_empty() { None } else { Some(model) },
                 });
             }
+        }
+        errors
+    }
+
+    /// Reports Boogie errors without an `assert_failed` message: a call past the inlining depth,
+    /// or a rejection of the generated code. Each is located at the last source position of its
+    /// trace.
+    /// Any error still unaccounted for in Boogie's summary is reported without a location.
+    fn extract_untagged_errors(&self, out: &str) -> Vec<BoogieError> {
+        const HINT: &str = "this is usually a recursive call, direct or through function \
+            values, to a function that is not opaque (mark it `pragma opaque` and give it a \
+            specification)";
+        let mut errors = vec![];
+        for untagged in UNTAGGED_ERROR.captures_iter(out) {
+            let boogie_msg = untagged["msg"].trim();
+            let mut at = untagged.get(0).unwrap().end();
+            self.extract_execution_trace(out, &mut at);
+            let execution_trace = self.extract_augmented_trace(out, &mut at);
+            let loc = execution_trace
+                .iter()
+                .rev()
+                .find_map(|entry| match entry {
+                    TraceEntry::AtLocation(loc) => Some(loc.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| self.env.unknown_loc());
+            // An assertion without a message is the inlining-depth check; any other untagged
+            // error means Boogie rejected the encoding.
+            let (kind, message) = if boogie_msg.contains("could not be proved") {
+                (
+                    BoogieErrorKind::Assertion,
+                    format!("verification failed: {}; {}", boogie_msg, HINT),
+                )
+            } else {
+                (
+                    BoogieErrorKind::Internal,
+                    format!("boogie rejected the generated code: {}", boogie_msg),
+                )
+            };
+            errors.push(BoogieError {
+                kind,
+                loc,
+                message,
+                notes: vec![],
+                execution_trace,
+                model: None,
+            });
+        }
+        let reported: usize = ERROR_COUNT
+            .captures(out)
+            .and_then(|cap| cap[1].parse().ok())
+            .unwrap_or(0);
+        let extracted = VERIFICATION_DIAG_STARTS.find_iter(out).count() + errors.len();
+        if reported > extracted {
+            errors.push(BoogieError {
+                kind: BoogieErrorKind::Internal,
+                loc: self.env.unknown_loc(),
+                message: format!(
+                    "boogie reported {} error(s) that could not be extracted",
+                    reported - extracted
+                ),
+                notes: vec![],
+                execution_trace: vec![],
+                model: None,
+            });
         }
         errors
     }
@@ -1133,6 +1204,19 @@ fn make_position(line_str: &str, col_str: &str) -> Location {
         line = u32::saturating_sub(line, 1);
     }
     Location::new(LineIndex(line), ColumnIndex(col))
+}
+
+/// Take the qualified struct name out of a global-memory model literal. It runs
+/// from the first name separator to the model-value marker, so
+/// `|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds!val!0|` yields
+/// `DiemTimestamp.CurrentTimeMicroseconds`, dropping the leading address
+/// component. This is display-only, so fall back to the whole literal rather
+/// than failing when either marker is absent or out of order.
+fn global_memory_struct_name(literal: &str) -> &str {
+    match (literal.find('.'), literal.find('!')) {
+        (Some(dot), Some(bang)) if dot < bang => &literal[dot + 1..bang],
+        _ => literal,
+    }
 }
 
 fn deduct_table_name(map_key: &str) -> Option<String> {
@@ -1500,8 +1584,8 @@ impl ModelValue {
         };
 
         // Each entry in value_array_map takes the form:
-        // key: |T@[Int]$1_Bug7_BallotCounter!val!0| 0
-        // value: ($1_Bug7_BallotCounter 18446744073709522257)
+        // key: |T@[Int]$1.Bug7.BallotCounter!val!0| 0
+        // value: ($1.Bug7.BallotCounter 18446744073709522257)
         // elems[1] is index to represent the instance of the memory
         for (key, value) in value_array_map {
             if let ModelValue::List(elems) = key {
@@ -2224,7 +2308,7 @@ mod tests {
         // Boogie quotes generated constructor names with `|`; the datatype
         // value the solver reports is `(<ctor> arg...)`.
         let value = ModelValue::List(vec![
-            ModelValue::literal("|$struct_field'$42_calculator_State$0'|"),
+            ModelValue::literal("|$struct_field'$42.calculator.State$0'|"),
             ModelValue::literal("2"),
         ]);
 
@@ -2232,8 +2316,29 @@ mod tests {
             .extract_ctor_name_and_list()
             .expect("is a datatype value");
 
-        assert_eq!("$struct_field'$42_calculator_State$0'", ctor);
+        assert_eq!("$struct_field'$42.calculator.State$0'", ctor);
         assert_eq!(vec![ModelValue::literal("2")], args.to_vec());
+    }
+
+    #[test]
+    fn a_global_memory_literal_yields_the_qualified_struct_name() {
+        assert_eq!(
+            "DiemTimestamp.CurrentTimeMicroseconds",
+            global_memory_struct_name("|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds!val!0|")
+        );
+    }
+
+    #[test]
+    fn a_global_memory_literal_without_both_markers_is_read_as_is() {
+        // Missing markers, or markers out of order, fall back without panicking.
+        for literal in [
+            "|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds|",
+            "|T@[Int]$1_DiemTimestamp_CurrentTimeMicroseconds!val!0|",
+            "no_markers_at_all",
+            "val!0$1.m.S",
+        ] {
+            assert_eq!(literal, global_memory_struct_name(literal));
+        }
     }
 
     #[test]

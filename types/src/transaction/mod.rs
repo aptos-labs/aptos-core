@@ -1590,6 +1590,30 @@ impl SignedTransaction {
         Ok(())
     }
 
+    /// Check the encrypted payload representation allowed at mempool admission
+    /// and batch creation. Internal Decrypted and FailedDecryption states are
+    /// never valid submissions, even when their signatures verify.
+    pub fn verify_encrypted_payload_for_submission(&self) -> Result<()> {
+        let Some(payload) = self.payload().as_encrypted_payload() else {
+            return Ok(());
+        };
+        ensure!(
+            payload.is_encrypted(),
+            "Encrypted transaction not in Encrypted state"
+        );
+        ensure!(
+            !payload.extra_config().is_multisig(),
+            "Encrypted transactions do not support multisig"
+        );
+        let signer_auth_keys = self
+            .authenticator_ref()
+            .all_signer_auth_keys(self.sender())
+            .context("Encrypted transactions are not supported with this authenticator type")?;
+        payload
+            .verify(self.sender(), signer_auth_keys)
+            .context("Encrypted transaction ciphertext verification failed")
+    }
+
     pub fn contains_duplicate_signers(&self) -> bool {
         let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
         all_signer_addresses.push(self.sender());
@@ -2215,12 +2239,10 @@ impl TransactionOutput {
             expected_events,
         );
 
-        // TODO(trading-native): this comparator ignores the checkpoint hashes
-        // (state/hot-state and `position_state_checkpoint_hash`), so replay-verify
-        // tooling (e.g. db-tool's `replay_on_archive`) can report a successful
-        // replay even when the authenticated position state root diverges from
-        // local execution. Validate the checkpoint hashes here before enabling
-        // COMPUTE_TRADING_NATIVE_STATE_ROOTS.
+        // Checkpoint hashes (state, hot state, position) are derived from many
+        // outputs and checked at ledger update, not here. The position ops
+        // themselves are covered above: `state_change_hash` hashes the V1 write
+        // set, extensions included.
         Ok(())
     }
 
@@ -2240,10 +2262,6 @@ impl TransactionOutput {
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
-    }
-
-    pub fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) {
-        self.write_set.add_hotness(hotness);
     }
 }
 
@@ -2290,6 +2308,7 @@ impl TransactionInfo {
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
         position_state_checkpoint_hash: Option<HashValue>,
+        collateral_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self::V1(TransactionInfoV1::new(
             transaction_hash,
@@ -2301,6 +2320,7 @@ impl TransactionInfo {
             status,
             auxiliary_info_hash,
             position_state_checkpoint_hash,
+            collateral_state_checkpoint_hash,
         ))
     }
 
@@ -2381,6 +2401,13 @@ impl TransactionInfo {
         match self {
             Self::V0(_) => None,
             Self::V1(v) => v.position_state_checkpoint_hash,
+        }
+    }
+
+    pub fn collateral_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.collateral_state_checkpoint_hash,
         }
     }
 
@@ -2473,7 +2500,8 @@ pub struct TransactionInfoV1 {
     /// Repurposed reserved field; `None` matches the prior BCS encoding.
     position_state_checkpoint_hash: Option<HashValue>,
     placeholder1: Option<HashValue>,
-    placeholder2: Option<HashValue>,
+    /// Repurposed reserved field; `None` matches the prior BCS encoding.
+    collateral_state_checkpoint_hash: Option<HashValue>,
     placeholder3: Option<HashValue>,
     placeholder4: Option<HashValue>,
     placeholder5: Option<HashValue>,
@@ -2492,6 +2520,7 @@ impl TransactionInfoV1 {
         status: ExecutionStatus,
         auxiliary_info_hash: Option<HashValue>,
         position_state_checkpoint_hash: Option<HashValue>,
+        collateral_state_checkpoint_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -2504,7 +2533,7 @@ impl TransactionInfoV1 {
             auxiliary_info_hash,
             position_state_checkpoint_hash,
             placeholder1: None,
-            placeholder2: None,
+            collateral_state_checkpoint_hash,
             placeholder3: None,
             placeholder4: None,
             placeholder5: None,

@@ -57,6 +57,13 @@ Capabilities, grouped by section:
 - **Natives never see `fp` directly.** The context exposes typed accessors over the calling frame.
 - **Restricted frame interaction.** Natives interact with the calling frame only through args (read) and returns (write). No locals on the VM stack — any Rust-side scratch / locals the native needs live on the Rust stack instead. To be revisited during implementation.
 
+Caller-sensitive natives can inspect the module that called the Move function invoking the
+native with `caller_module()`. `direct_caller_module()` additionally requires a statically named
+Move call (`CallDirect` or `CallIndirect`), rejecting `CallClosure` using the saved return PC.
+Lazy initialization uses this stricter API so old bytecode and previously stored function values
+cannot obtain another module's signer through a callback. This inspection reads existing frame
+metadata; it does not change the calling convention or stack layout.
+
 Context APIs (tentative):
 
 ```rust

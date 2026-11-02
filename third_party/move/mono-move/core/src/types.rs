@@ -43,11 +43,12 @@
 //! ## Generic structs
 
 use crate::{
-    interner::{InternedIdentifier, InternedModuleId},
+    interner::{view_module_id, InternedIdentifier, InternedModuleId},
+    prepared_module::FunctionSignature,
     Interner,
 };
 use mono_move_alloc::GlobalArenaPtr;
-use move_core_types::ability::AbilitySet;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use std::{cmp::PartialEq, fmt};
 
 // ================================================================================================
@@ -135,6 +136,12 @@ pub fn view_type(ptr: InternedType) -> &'static Type {
     unsafe { ptr.as_ref_unchecked() }
 }
 
+/// Whether `ty` can name a resource in global storage, i.e. it is a struct or
+/// an enum type.
+pub fn is_resource_type(ty: InternedType) -> bool {
+    matches!(view_type(ty), Type::Nominal { .. })
+}
+
 /// Returns a reference to the arena-interned list of [`InternedType`]s
 /// behind `ptr`.
 pub fn view_type_list(ptr: InternedTypeList) -> &'static [InternedType] {
@@ -171,6 +178,25 @@ pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
         return None;
     };
     Some(*inner)
+}
+
+/// Whether `ty` is the struct or enum `address::module::name`, whatever its
+/// type arguments.
+///
+/// Inherits safety contract of [`view_type`].
+pub fn is_nominal(ty: InternedType, address: &AccountAddress, module: &str, name: &str) -> bool {
+    let Type::Nominal {
+        module_id,
+        name: ty_name,
+        ..
+    } = view_type(ty)
+    else {
+        return false;
+    };
+    let module_id = view_module_id(*module_id);
+    module_id.address() == address
+        && view_name(module_id.name()) == module
+        && view_name(*ty_name) == name
 }
 
 /// Whether a value of type `actual` may be used where `expected` is required.
@@ -238,6 +264,174 @@ pub fn is_assignable(expected: InternedType, actual: InternedType) -> bool {
         | Type::Vector { .. }
         | Type::Nominal { .. }
         | Type::TypeParam { .. } => false,
+    }
+}
+
+/// Why a declared function signature cannot be used at an expected function
+/// type. Mirrors the distinctions the caller turns into reflection error codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionTypeMismatch {
+    /// The expected type is not a function type at all.
+    NotAFunction,
+    /// The two signatures cannot be matched.
+    Incompatible,
+    /// Matching succeeded but left a declared type parameter unbound.
+    NotInstantiated,
+}
+
+/// Matches a function's declared signature against the concrete function type
+/// it is expected to have, inferring one type argument per declared type
+/// parameter.
+///
+/// Every inferred argument is a pointer taken from `expected`, so nothing new
+/// is interned.
+///
+/// # Preconditions
+///
+/// `expected` is closed: it comes from a monomorphized call site, where every
+/// type is already concrete. Otherwise the pointer-equality fast paths below
+/// would silently accept a type parameter without binding it.
+///
+/// TODO(metering): unbounded recursion on nesting depth, same family as the
+/// `TODO(metering)` on [`is_closed_type`].
+pub fn infer_function_type_args(
+    declared: FunctionSignature,
+    expected: InternedType,
+    num_ty_params: usize,
+) -> Result<Vec<InternedType>, FunctionTypeMismatch> {
+    debug_assert!(is_closed_type(expected), "expected type must be closed");
+
+    let Type::Function { args, results, .. } = view_type(expected) else {
+        return Err(FunctionTypeMismatch::NotAFunction);
+    };
+
+    let mut bindings = vec![None; num_ty_params];
+    if !match_ty_list(declared.params, *args, &mut bindings)
+        || !match_ty_list(declared.returns, *results, &mut bindings)
+    {
+        return Err(FunctionTypeMismatch::Incompatible);
+    }
+
+    bindings
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(FunctionTypeMismatch::NotInstantiated)
+}
+
+/// Matches `declared` against `expected` positionally, recording any type
+/// parameter binding it discovers in `bindings`.
+fn match_ty_list(
+    declared: InternedTypeList,
+    expected: InternedTypeList,
+    bindings: &mut [Option<InternedType>],
+) -> bool {
+    if declared == expected {
+        return true;
+    }
+    let declared = view_type_list(declared);
+    let expected = view_type_list(expected);
+    declared.len() == expected.len()
+        && (declared.iter())
+            .zip(expected)
+            .all(|(&d, &e)| match_ty(d, e, bindings))
+}
+
+/// See [`match_ty_list`].
+fn match_ty(
+    declared: InternedType,
+    expected: InternedType,
+    bindings: &mut [Option<InternedType>],
+) -> bool {
+    // Interning makes pointer equality structural equality, so an identical
+    // subtree needs no walk. Since `expected` is closed, so is `declared` here,
+    // and there is no binding to record.
+    if declared == expected {
+        return true;
+    }
+    match view_type(declared) {
+        Type::TypeParam { idx } => {
+            // A reference is not a valid type argument, and every occurrence of
+            // the same parameter must agree.
+            if matches!(
+                view_type(expected),
+                Type::ImmutRef { .. } | Type::MutRef { .. }
+            ) {
+                return false;
+            }
+            match bindings.get_mut(*idx as usize) {
+                Some(slot) => *slot.get_or_insert(expected) == expected,
+                None => false,
+            }
+        },
+        Type::Vector { elem } => {
+            let Type::Vector { elem: expected } = view_type(expected) else {
+                return false;
+            };
+            match_ty(*elem, *expected, bindings)
+        },
+        Type::ImmutRef { inner } => {
+            let Type::ImmutRef { inner: expected } = view_type(expected) else {
+                return false;
+            };
+            match_ty(*inner, *expected, bindings)
+        },
+        Type::MutRef { inner } => {
+            let Type::MutRef { inner: expected } = view_type(expected) else {
+                return false;
+            };
+            match_ty(*inner, *expected, bindings)
+        },
+        Type::Nominal {
+            module_id,
+            name,
+            ty_args,
+        } => {
+            let Type::Nominal {
+                module_id: expected_module_id,
+                name: expected_name,
+                ty_args: expected_ty_args,
+            } = view_type(expected)
+            else {
+                return false;
+            };
+            module_id == expected_module_id
+                && name == expected_name
+                && match_ty_list(*ty_args, *expected_ty_args, bindings)
+        },
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => {
+            let Type::Function {
+                args: expected_args,
+                results: expected_results,
+                abilities: expected_abilities,
+            } = view_type(expected)
+            else {
+                return false;
+            };
+            abilities == expected_abilities
+                && match_ty_list(*args, *expected_args, bindings)
+                && match_ty_list(*results, *expected_results, bindings)
+        },
+        // Primitives: the pointer comparison above was the whole test. Listed
+        // explicitly so a new `Type` variant forces a decision here.
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer => false,
     }
 }
 

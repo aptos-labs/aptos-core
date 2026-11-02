@@ -9,6 +9,7 @@ use aptos_types::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, TStateView,
     },
+    transaction::Version,
     write_set::WriteOp,
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
@@ -60,5 +61,9 @@ impl TStateView for GenesisStateView {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::zero())
+    }
+
+    fn next_version(&self) -> Version {
+        0
     }
 }

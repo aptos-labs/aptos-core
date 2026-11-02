@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_insertion_keys.move:1:1: error: VIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_keys` requires `map_spec_key_at`

@@ -26,8 +26,8 @@ module std::reflect {
     ///
     /// A small set of framework functions are additionally forbidden from being resolved (the call
     /// returns `FunctionNotAccessible`), because their rules are enforced by the bytecode verifier at
-    /// the call site and cannot be upheld for a dynamically-resolved function value. Currently this
-    /// is only `0x1::event::emit`.
+    /// the call site and cannot be upheld for a dynamically-resolved function value. Currently these
+    /// are `0x1::event::emit` and `0x1::init::internal_maybe_initialize`.
     ///
     /// The resolved function can be generic, in which case the instantiation must be inferrible
     /// from the provided `FuncType`. For example, `public fun foo<T>(T)`, with `FunType = |u64|`,

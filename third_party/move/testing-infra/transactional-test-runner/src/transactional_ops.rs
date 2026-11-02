@@ -270,10 +270,7 @@ where
 
                 let resolved_args = adapter.compiled_state().resolve_args(args)?;
                 let resolved_type_args = adapter.compiled_state().resolve_type_args(type_args)?;
-                let resolved_signers: Vec<AccountAddress> = signers
-                    .into_iter()
-                    .map(|s| adapter.compiled_state().resolve_address(&s))
-                    .collect();
+                let resolved_signers = adapter.compiled_state().resolve_signers(signers);
                 let exec_group = exec_group.unwrap_or(0);
 
                 // Convert resolved args to MoveValue - they are already ConcreteValue
@@ -306,10 +303,7 @@ where
                 let module_id = ModuleId::new(addr, module_name.clone());
                 let resolved_type_args = adapter.compiled_state().resolve_type_args(type_args)?;
                 let resolved_args_concrete_values = adapter.compiled_state().resolve_args(args)?;
-                let resolved_signers: Vec<AccountAddress> = signers
-                    .into_iter()
-                    .map(|s| adapter.compiled_state().resolve_address(&s))
-                    .collect();
+                let resolved_signers = adapter.compiled_state().resolve_signers(signers);
                 let exec_group = exec_group.unwrap_or(0);
 
                 let target_compiled_module = published_modules

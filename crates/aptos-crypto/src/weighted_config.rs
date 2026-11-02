@@ -18,8 +18,7 @@ use crate::{
 use anyhow::{anyhow, ensure};
 use ark_ec::CurveGroup;
 use ark_ff::FftField;
-use rand::Rng;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

@@ -502,3 +502,160 @@ async fn test_signature_request_rate_limited_per_sender() {
     let result = manager.process_peer_rpc_msg(rpc_req).await;
     assert!(result.is_ok());
 }
+
+/// A late fetch survives expiry of its original signature RPC. A retry signs
+/// using the verified variant without replacing our original dealer transcript.
+#[tokio::test]
+async fn test_redealt_transcript_reused_after_signature_rpc_expires() {
+    use crate::{
+        chunky::{
+            test_utils::loopback_network,
+            types::{ChunkyTranscriptWithHash, MissingTranscriptResponse},
+        },
+        network::RealRpcResponseSender,
+        network_interface::RPC,
+    };
+    use aptos_crypto::{hash::CryptoHash, Signature};
+    use aptos_dkg::pvss::traits::transcript::{Aggregatable, HasAggregatableSubtranscript};
+    use aptos_types::dkg::chunky_dkg::{AggregatedSubtranscript, ChunkySubtranscript};
+    use futures_util::StreamExt;
+
+    let setup = ChunkyTestSetup::new_uniform(4);
+    let mut manager = create_test_manager(&setup);
+    advance_to_finished(&mut manager, &setup).await;
+
+    let transcripts: Vec<_> = (0..3).map(|i| setup.deal_transcript(i)).collect();
+    let (old_wire, old_transcript) = setup.deal_transcript(0);
+    let old_hash = HashValue::sha3_256_of(&old_wire.transcript_bytes);
+    let mut bitmask = BitVec::with_num_bits(4);
+    for (i, (wire, transcript)) in transcripts.iter().enumerate() {
+        let index = setup.epoch_state.verifier.address_to_validator_index()[&setup.addrs[i]];
+        bitmask.set(index as u16);
+        manager.received_transcripts.write().insert(
+            wire.metadata.author,
+            ChunkyTranscriptWithHash::new(
+                transcript.clone(),
+                HashValue::sha3_256_of(&wire.transcript_bytes),
+            ),
+        );
+    }
+    manager.received_transcripts.write().insert(
+        setup.addrs[0],
+        ChunkyTranscriptWithHash::new(old_transcript, old_hash),
+    );
+    let aggregate = AggregatedSubtranscript {
+        dealer_epoch: setup.epoch_state.epoch,
+        subtranscript: ChunkySubtranscript::aggregate(
+            &setup.dkg_config.threshold_config,
+            transcripts
+                .iter()
+                .map(|(_, t)| t.get_subtranscript())
+                .collect(),
+        )
+        .unwrap(),
+        dealer_bitmask: bitmask.clone(),
+    };
+    let ordered = setup.epoch_state.verifier.get_ordered_account_addresses();
+    let hashes = bitmask
+        .iter_ones()
+        .map(|i| {
+            let (wire, _) = transcripts
+                .iter()
+                .find(|(w, _)| w.metadata.author == ordered[i])
+                .unwrap();
+            HashValue::sha3_256_of(&wire.transcript_bytes)
+        })
+        .collect();
+    let request = ChunkyDKGSubtranscriptSignatureRequest::new(
+        setup.epoch_state.epoch,
+        aggregate.hash(),
+        bitmask,
+        hashes,
+    );
+
+    let source = setup.addrs[3];
+    let (network, mut incoming) = loopback_network(source);
+    manager.network_sender = network;
+    let (fetch_started_tx, fetch_started_rx) = oneshot::channel();
+    let (release_tx, release_rx) = oneshot::channel();
+    let fetched_wire = transcripts[0].0.clone();
+    let provider = tokio::spawn(async move {
+        let Event::RpcRequest(_, DKGMessage::MissingTranscriptRequest(req), protocol, response_tx) =
+            incoming.next().await.unwrap()
+        else {
+            panic!("expected missing-transcript request")
+        };
+        assert_eq!(req.missing_dealer, fetched_wire.metadata.author);
+        fetch_started_tx.send(()).unwrap();
+        release_rx.await.unwrap();
+        let response =
+            DKGMessage::MissingTranscriptResponse(MissingTranscriptResponse::new(fetched_wire));
+        response_tx
+            .send(Ok(protocol.to_bytes(&response).unwrap().into()))
+            .unwrap();
+        // Closing the transport makes any subsequent fetch fail.
+    });
+
+    let (response_tx, response_rx) = oneshot::channel();
+    manager
+        .process_peer_rpc_msg(IncomingRpcRequest {
+            sender: source,
+            msg: DKGMessage::SubtranscriptSignatureRequest(request.clone()),
+            response_sender: Box::new(RealRpcResponseSender::new(response_tx, RPC[0])),
+        })
+        .await
+        .unwrap();
+    // Fetching must begin immediately, without the former 10-15 second wait.
+    tokio::time::timeout(Duration::from_secs(2), fetch_started_rx)
+        .await
+        .unwrap()
+        .unwrap();
+    // Use a short transport deadline to exercise dropping the original receiver.
+    assert!(tokio::time::timeout(Duration::from_millis(10), response_rx)
+        .await
+        .is_err());
+    release_tx.send(()).unwrap();
+    provider.await.unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        &mut manager.rpc_handler_guards.get_mut(&source).unwrap().1 .0,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
+    let new_hash = HashValue::sha3_256_of(&transcripts[0].0.transcript_bytes);
+    assert!(manager
+        .fetched_transcripts
+        .read()
+        .get(setup.addrs[0], new_hash)
+        .is_some());
+    assert_eq!(
+        manager.received_transcripts.read()[&setup.addrs[0]].hash(),
+        old_hash
+    );
+
+    let (response_tx, response_rx) = oneshot::channel();
+    manager
+        .process_peer_rpc_msg(IncomingRpcRequest {
+            sender: source,
+            msg: DKGMessage::SubtranscriptSignatureRequest(request),
+            response_sender: Box::new(RealRpcResponseSender::new(response_tx, RPC[0])),
+        })
+        .await
+        .unwrap();
+    let bytes = tokio::time::timeout(Duration::from_secs(2), response_rx)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let DKGMessage::SubtranscriptSignatureResponse(response) = RPC[0].from_bytes(&bytes).unwrap()
+    else {
+        panic!("expected signature response")
+    };
+    assert_eq!(response.subtranscript_hash, aggregate.hash());
+    response
+        .signature
+        .verify(&aggregate, &setup.public_keys[0])
+        .unwrap();
+}

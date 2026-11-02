@@ -1,0 +1,17 @@
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/assume.move:21:9
+   │
+21 │         assume [trusted] x * x <= MAX_U64;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/assume.move:38:9
+   │
+38 │         assume [trusted] a * b <= MAX_U64 - a - b;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/assume.move:54:9
+   │
+54 │         assume [trusted] a / 2 + b / 2 + (a % 2 + b % 2) / 2 <= (a + b) / 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

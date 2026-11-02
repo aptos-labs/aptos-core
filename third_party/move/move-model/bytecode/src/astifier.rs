@@ -548,7 +548,7 @@ impl Generator {
                 if ctx.is_back_edge(blk_id, *succ) {
                     continue;
                 }
-                top_sort.add_dependency(blk_id, *succ)
+                top_sort.add_dependency(blk_id, *succ);
             }
         }
         // Add virtual edges to ensure that all blocks of a given loop are before
@@ -569,7 +569,7 @@ impl Generator {
                         top_sort.add_dependency(
                             ctx.block_of_label(*loop_block_label),
                             ctx.block_of_label(*after_loop_label),
-                        )
+                        );
                     }
                 }
             }
@@ -578,7 +578,7 @@ impl Generator {
         loop {
             // Peek the group of blocks which are available according to the partial order.
             // We select one of them below.
-            let group = top_sort.peek_all();
+            let group = top_sort.peek_batch().copied().collect_vec();
             if group.is_empty() {
                 break;
             }
@@ -622,7 +622,6 @@ impl Generator {
             let min = group
                 .iter()
                 .copied()
-                .copied()
                 .reduce(|b1, b2| {
                     match loop_priority(b1).cmp(&loop_priority(b2)).then_with(|| {
                         terminator_priority(b1)
@@ -645,9 +644,9 @@ impl Generator {
             // successors of the chosen one side-by-side with the non-chosen, allowing
             // to traverse deeper in neighbors of the former. (Like additional loop
             // blocks.) This allows to generate a tailored DFS order.
-            for other in group.into_iter().cloned().collect_vec() {
+            for other in group {
                 if other != min {
-                    top_sort.add_dependency(min, other)
+                    top_sort.add_dependency(min, other);
                 }
             }
             assert_eq!(min, top_sort.pop().expect("expected order consistent"));

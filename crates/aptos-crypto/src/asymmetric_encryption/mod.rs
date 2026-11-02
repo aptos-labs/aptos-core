@@ -4,7 +4,7 @@
 //! This module provides asymmetric encryption traits and instances.
 
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 
 /// Implement this to define an asymmetric encryption scheme.
 pub trait AsymmetricEncryption {

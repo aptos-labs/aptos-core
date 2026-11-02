@@ -15,7 +15,10 @@ use crate::{
     on_chain_config::OnChainConfig,
     state_store::{
         state_key::{
-            inner::{StateKeyDecodeErr, StateKeyTag, TradingNativeKey, TradingNativeKeyTag},
+            inner::{
+                CollateralScope, StateKeyDecodeErr, StateKeyTag, TradingNativeKey,
+                TradingNativeKeyTag,
+            },
             registry::{Entry, REGISTRY},
         },
         table::TableHandle,
@@ -123,6 +126,75 @@ impl StateKey {
                             .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
                         Self::position(exchange, account, market)
                     },
+                    TradingNativeKeyTag::Order => {
+                        // [tag:1][sub_tag:1][exchange:32][market:32][order_id:16 BE]
+                        const ADDR: usize = AccountAddress::LENGTH;
+                        const ORDER_LEN: usize = 2 + ADDR * 2 + 16;
+                        if val.len() != ORDER_LEN {
+                            return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                tag,
+                                num_bytes: val.len(),
+                            });
+                        }
+                        let exchange = AccountAddress::from_bytes(&val[2..2 + ADDR])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let market = AccountAddress::from_bytes(&val[2 + ADDR..2 + ADDR * 2])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let order_id = u128::from_be_bytes(
+                            val[2 + ADDR * 2..ORDER_LEN]
+                                .try_into()
+                                .expect("slice is exactly 16 bytes"),
+                        );
+                        Self::order(exchange, market, order_id)
+                    },
+                    TradingNativeKeyTag::BulkOrder => {
+                        // [tag:1][sub_tag:1][exchange:32][market:32][account:32]
+                        const ADDR: usize = AccountAddress::LENGTH;
+                        const BULK_LEN: usize = 2 + ADDR * 3;
+                        if val.len() != BULK_LEN {
+                            return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                tag,
+                                num_bytes: val.len(),
+                            });
+                        }
+                        let exchange = AccountAddress::from_bytes(&val[2..2 + ADDR])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let market = AccountAddress::from_bytes(&val[2 + ADDR..2 + ADDR * 2])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let account = AccountAddress::from_bytes(&val[2 + ADDR * 2..BULK_LEN])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        Self::bulk_order(exchange, market, account)
+                    },
+                    TradingNativeKeyTag::Collateral => {
+                        // [tag:1][sub_tag:1][exchange:32][account:32][scope:1][market:32 if Isolated]
+                        const ADDR: usize = AccountAddress::LENGTH;
+                        const FIXED_LEN: usize = 2 + ADDR * 2 + 1;
+                        if val.len() < FIXED_LEN {
+                            return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                tag,
+                                num_bytes: val.len(),
+                            });
+                        }
+                        let exchange = AccountAddress::from_bytes(&val[2..2 + ADDR])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let account = AccountAddress::from_bytes(&val[2 + ADDR..2 + ADDR * 2])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let scope = match val[FIXED_LEN - 1] {
+                            0 if val.len() == FIXED_LEN => CollateralScope::Cross,
+                            1 if val.len() == FIXED_LEN + ADDR => {
+                                let market = AccountAddress::from_bytes(&val[FIXED_LEN..])
+                                    .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                                CollateralScope::Isolated { market }
+                            },
+                            _ => {
+                                return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                    tag,
+                                    num_bytes: val.len(),
+                                })
+                            },
+                        };
+                        Self::collateral(exchange, account, scope)
+                    },
                 }
             },
         };
@@ -146,6 +218,15 @@ impl StateKey {
                     // size() impls); the sub-tag is payload-specific to
                     // TradingNative variants and counted here.
                     1 + AccountAddress::LENGTH * 3
+                },
+                // sub_tag (1) + exchange (32) + market (32) + order_id (16).
+                TradingNativeKey::Order { .. } => 1 + AccountAddress::LENGTH * 2 + 16,
+                // sub_tag (1) + exchange (32) + market (32) + account (32).
+                TradingNativeKey::BulkOrder { .. } => 1 + AccountAddress::LENGTH * 3,
+                // sub_tag (1) + exchange (32) + account (32) + scope tag (1) [+ market (32)].
+                TradingNativeKey::Collateral { scope, .. } => match scope {
+                    CollateralScope::Cross => 1 + AccountAddress::LENGTH * 2 + 1,
+                    CollateralScope::Isolated { .. } => 1 + AccountAddress::LENGTH * 3 + 1,
                 },
             },
         }
@@ -176,16 +257,36 @@ impl StateKey {
             },
             StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
             StateKeyInner::Raw(bytes) => Self::raw(&bytes),
-            StateKeyInner::TradingNative(key) => match key {
-                TradingNativeKey::Position {
-                    exchange,
-                    account,
-                    market,
-                } => Self::position(exchange, account, market),
-            },
+            StateKeyInner::TradingNative(key) => Self::trading_native(key),
         };
 
         Ok(myself)
+    }
+
+    /// Construct a persisted trading-native state key.
+    pub fn trading_native(key: TradingNativeKey) -> Self {
+        match key {
+            TradingNativeKey::Position {
+                exchange,
+                account,
+                market,
+            } => Self::position(exchange, account, market),
+            TradingNativeKey::Order {
+                exchange,
+                market,
+                order_id,
+            } => Self::order(exchange, market, order_id),
+            TradingNativeKey::BulkOrder {
+                exchange,
+                market,
+                account,
+            } => Self::bulk_order(exchange, market, account),
+            TradingNativeKey::Collateral {
+                exchange,
+                account,
+                scope,
+            } => Self::collateral(exchange, account, scope),
+        }
     }
 
     /// Construct a persisted Position state key.
@@ -205,6 +306,62 @@ impl StateKey {
                     }))
                 })
                 .expect("Position StateKey encode is infallible"),
+        )
+    }
+
+    /// Construct a persisted native single-order state key.
+    pub fn order(exchange: AccountAddress, market: AccountAddress, order_id: u128) -> Self {
+        Self(
+            REGISTRY
+                .order((exchange, market), &order_id)
+                .get_or_add(&(exchange, market), &order_id, || {
+                    Ok(StateKeyInner::TradingNative(TradingNativeKey::Order {
+                        exchange,
+                        market,
+                        order_id,
+                    }))
+                })
+                .expect("Order StateKey encode is infallible"),
+        )
+    }
+
+    /// Construct a persisted native bulk-order state key.
+    pub fn bulk_order(
+        exchange: AccountAddress,
+        market: AccountAddress,
+        account: AccountAddress,
+    ) -> Self {
+        Self(
+            REGISTRY
+                .bulk_order((exchange, market), &account)
+                .get_or_add(&(exchange, market), &account, || {
+                    Ok(StateKeyInner::TradingNative(TradingNativeKey::BulkOrder {
+                        exchange,
+                        market,
+                        account,
+                    }))
+                })
+                .expect("BulkOrder StateKey encode is infallible"),
+        )
+    }
+
+    /// Construct a persisted native collateral state key.
+    pub fn collateral(
+        exchange: AccountAddress,
+        account: AccountAddress,
+        scope: CollateralScope,
+    ) -> Self {
+        Self(
+            REGISTRY
+                .collateral((exchange, account), &scope)
+                .get_or_add(&(exchange, account), &scope, || {
+                    Ok(StateKeyInner::TradingNative(TradingNativeKey::Collateral {
+                        exchange,
+                        account,
+                        scope,
+                    }))
+                })
+                .expect("Collateral StateKey encode is infallible"),
         )
     }
 

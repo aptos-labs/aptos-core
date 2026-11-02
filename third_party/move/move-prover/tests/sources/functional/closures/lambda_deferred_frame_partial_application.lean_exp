@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: function argument accesses resource `lambda_deferred_frame_partial_application::R` which is not declared in `modifies_of`/`reads_of` for `k`
+   ┌─ tests/sources/functional/closures/lambda_deferred_frame_partial_application.move:43:9
+   │
+43 │         apply_k(k, before + 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^

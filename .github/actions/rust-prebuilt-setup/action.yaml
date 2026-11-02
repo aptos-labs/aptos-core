@@ -1,0 +1,43 @@
+name: Verify Prebuilt Rust Tools
+description: Verify the image contract and restore Cargo cache without installing tools.
+inputs:
+  cache-key:
+    description: Cargo cache suffix
+    required: true
+  save-cache:
+    description: Whether this job may update the Cargo build cache
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Verify image contract
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$HOME" = /home/runner
+        export PATH="$HOME/bin:$HOME/.cargo/bin:$HOME/.dotnet/tools:$PATH"
+        python3 - <<'PY'
+        import hashlib, json, pathlib
+        manifest = json.loads(pathlib.Path('/opt/aptos-rust-image.json').read_text())
+        for name, expected in manifest['files'].items():
+            actual = hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
+            if actual != expected:
+                raise SystemExit(f'Image tools are stale for {name}; rebuild the image')
+        print(json.dumps(manifest, indent=2))
+        PY
+        rustc --version
+        cargo nextest --version
+        cargo sort --version
+        clang --version
+        protoc --version
+        pre-commit --version
+        "$HOME/bin/z3" --version
+        "$HOME/bin/cvc5" --version
+        test -x "$HOME/.dotnet/tools/boogie"
+        docker info >/dev/null
+        printf '%s\n' "$HOME/bin" "$HOME/.cargo/bin" "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+        printf 'DOTNET_ROOT=%s\n' "$HOME/.dotnet" >> "$GITHUB_ENV"
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+      with:
+        key: ${{ inputs.cache-key }}
+        save-if: ${{ inputs.save-cache == 'true' }}

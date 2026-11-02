@@ -1,0 +1,27 @@
+diff --git a/sources/trading/extracted_bulk_order_utils.move b/sources/trading/extracted_bulk_order_utils.move
+index 0c7a6f44d6..1479fd5bd6 100644
+--- a/sources/trading/extracted_bulk_order_utils.move
++++ b/sources/trading/extracted_bulk_order_utils.move
+@@ -26,10 +26,22 @@ module aptos_experimental::extracted_bulk_order_utils {
+         self.price
+     }
+ 
++    spec get_price_from_match_details {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.price;
++    }
++
+     fun get_remaining_size_from_match_details(self: &OrderMatchDetails): u64 {
+         self.remaining_size
+     }
+ 
++    spec get_remaining_size_from_match_details {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.remaining_size;
++    }
++
+     // Error codes for various failure scenarios
+     const EPRICE_CROSSING: u64 = 1;
+     const E_BID_LENGTH_MISMATCH: u64 = 2;

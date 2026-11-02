@@ -1131,13 +1131,23 @@ impl StorageReaderInterface for StorageReader {
             None // We haven't seen an epoch change yet
         };
 
-        // Fetch the transaction and transaction output ranges
-        let latest_version = latest_ledger_info.version();
-        let transactions = self.fetch_transaction_range(latest_version)?;
-        let transaction_outputs = self.fetch_transaction_output_range(latest_version)?;
-
-        // Fetch the state values range
-        let states = self.fetch_state_values_range(latest_version, &transactions)?;
+        // Fetch the transaction, transaction output and state value ranges.
+        //
+        // A node that hasn't committed anything yet holds a ledger info without
+        // the data behind it: fast syncing nodes are given the genesis ledger
+        // info up front so they can establish provenance, but the transactions
+        // and states only land once the snapshot is finalized. Advertising
+        // ranges before then would have peers request data we cannot serve.
+        let (transactions, transaction_outputs, states) =
+            if self.storage.get_synced_version()?.is_some() {
+                let latest_version = latest_ledger_info.version();
+                let transactions = self.fetch_transaction_range(latest_version)?;
+                let transaction_outputs = self.fetch_transaction_output_range(latest_version)?;
+                let states = self.fetch_state_values_range(latest_version, &transactions)?;
+                (transactions, transaction_outputs, states)
+            } else {
+                (None, None, None)
+            };
 
         // Return the relevant data summary
         let data_summary = DataSummary {
@@ -1362,6 +1372,8 @@ impl DbReader for TimedStorageReader {
         fn get_first_write_set_version(&self) -> StorageResult<Option<Version>>;
 
         fn get_latest_ledger_info(&self) -> StorageResult<LedgerInfoWithSignatures>;
+
+        fn get_synced_version(&self) -> StorageResult<Option<Version>>;
 
         fn get_transactions(
             &self,

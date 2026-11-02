@@ -1,0 +1,11 @@
+warning: cannot derive `folds_of` exactly for this lambda argument: the enclosing function has no specification which requires the fold summary; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/specialize_generic_caller.move:30:23
+   │
+30 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+73 │         each_ref(v, |_e| { c1 = c1 + 1; c2 = c2 + 2; });
+   │         -----------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite

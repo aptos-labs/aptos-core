@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Wrapper around `ChunkyTranscript` with a precomputed transcript hash.
+#[derive(Clone)]
 pub struct ChunkyTranscriptWithHash {
     pub transcript: Arc<ChunkyTranscript>,
     hash: HashValue,

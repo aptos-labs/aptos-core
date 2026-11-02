@@ -9,7 +9,6 @@
 //! simulate its governance proposal against a network, and verify on-chain state
 //! after deployment.
 
-pub mod bundle;
 pub mod commands;
 pub mod config;
 pub mod network;
@@ -185,7 +184,7 @@ pub async fn run(args: Argument) -> Result<()> {
         Commands::VerifyBundle {
             bundle,
             require_signoff,
-        } => commands::verify::run(&bundle, require_signoff),
+        } => commands::verify_bundle::run(&bundle, require_signoff),
         Commands::DeployTestnet {
             bundle,
             network,

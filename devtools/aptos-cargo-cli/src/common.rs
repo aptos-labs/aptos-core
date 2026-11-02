@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use anyhow::anyhow;
+use anyhow::{anyhow, ensure};
+use camino::Utf8Path;
 use chrono::DateTime;
 use clap::Args;
 use determinator::{
@@ -75,39 +76,57 @@ fn workspace_dir() -> String {
 pub struct SelectedPackageArgs {
     #[arg(short, long, global = true)]
     pub package: Vec<String>,
-    // TODO: add changed_since
+    /// Test selection mode (does not change build or lint selection).
+    #[arg(
+        long,
+        global = true,
+        env = "APTOS_TEST_DETERMINATOR",
+        default_value = "legacy"
+    )]
+    pub determinator: crate::test_selection::Mode,
+    /// Branch or commit whose merge base with HEAD is used for change detection.
+    #[arg(long, global = true, default_value = "origin/main")]
+    pub base: String,
+    /// Repository-relative subsystem configuration file.
+    #[arg(long, global = true, default_value = ".config/test-subsystems.toml")]
+    pub subsystem_config: String,
 }
 
 impl SelectedPackageArgs {
-    fn compute_changed_files(&self, merge_base: &str) -> anyhow::Result<Utf8Paths0> {
+    pub(crate) fn compute_changed_files(&self, merge_base: &str) -> anyhow::Result<Utf8Paths0> {
         let mut command = Command::new("git");
-        command.args(["diff", "-z", "--name-only"]);
-        command.arg(merge_base);
+        // Disabling rename detection exposes both endpoints, including moves out
+        // of a subsystem. Run at the root even when invoked from a member crate.
+        command.current_dir(workspace_dir());
+        command.args(["diff", "-z", "--name-only", "--no-renames"]);
+        command.arg(merge_base).arg("--");
 
         let output = command.output().map_err(|err| anyhow!("error: {}", err))?;
-        if !output.status.success() {
-            return Err(anyhow!("error"));
-        }
+        ensure!(
+            output.status.success(),
+            "git diff failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
 
         Utf8Paths0::from_bytes(output.stdout).map_err(|(_path, err)| anyhow!("{}", err))
     }
 
-    fn git_rev_parse(&self, merge_base: &str) -> String {
+    pub(crate) fn git_rev_parse(&self, revision: &str) -> anyhow::Result<String> {
         let output = Command::new("git")
             .arg("rev-parse")
-            .arg(merge_base)
-            .output()
-            .expect("failed to execute git rev-parse");
-
-        String::from_utf8(output.stdout)
-            .expect("invalid UTF-8")
-            .trim()
-            .to_owned()
+            .arg(revision)
+            .output()?;
+        ensure!(
+            output.status.success(),
+            "git rev-parse failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(parse_string_from_output(output))
     }
 
-    fn fetch_remote_metadata(&self, merge_base: &str) -> anyhow::Result<CargoMetadata> {
+    pub(crate) fn fetch_remote_metadata(&self, merge_base: &str) -> anyhow::Result<CargoMetadata> {
         // Get the local metadata file path
-        let base_sha = self.git_rev_parse(merge_base);
+        let base_sha = self.git_rev_parse(merge_base)?;
         let file_name = format!("metadata-{}.json", base_sha);
         let dir_path = format!("{}/{}", workspace_dir(), DEVTOOL_TARGET_DIRECTORY);
         let local_metadata_file_path = format!("{}/{}", dir_path, file_name);
@@ -201,38 +220,31 @@ impl SelectedPackageArgs {
     pub fn identify_changed_files(
         &self,
     ) -> anyhow::Result<(PackageGraph, PackageGraph, Utf8Paths0)> {
-        // Determine the merge base
         let merge_base = self.identify_merge_base()?;
-
-        // Download the merge base metadata
-        let base_metadata = self.fetch_remote_metadata(&merge_base)?;
-        let base_package_graph = base_metadata.build_graph().unwrap();
-
-        // Compute head metadata
-        let head_metadata = MetadataCommand::new()
-            .exec()
-            .map_err(|e| anyhow!("{}", e))?;
-        let head_package_graph = head_metadata.build_graph().unwrap();
-
-        // Compute changed files
+        let base_package_graph = self.base_package_graph(&merge_base)?;
+        let head_package_graph = head_package_graph()?;
         let changed_files = self.compute_changed_files(&merge_base)?;
-
-        // Return the package graphs and the changed files
         Ok((base_package_graph, head_package_graph, changed_files))
     }
 
-    /// Identifies the merge base to compare against. This is done by identifying
-    /// the commit at which the current branch forked off origin/main.
-    ///
-    /// Note: if the merge-base is too old, an error will be returned.
-    fn identify_merge_base(&self) -> anyhow::Result<String> {
+    /// Builds the package graph of the merge base from downloaded metadata.
+    pub(crate) fn base_package_graph(&self, merge_base: &str) -> anyhow::Result<PackageGraph> {
+        Ok(self.fetch_remote_metadata(merge_base)?.build_graph()?)
+    }
+
+    /// Identifies the comparison merge base. Freshness is checked separately.
+    pub(crate) fn identify_merge_base(&self) -> anyhow::Result<String> {
         // Run the git merge-base command
         let merge_base_output = Command::new("git")
             .arg("merge-base")
             .arg("HEAD")
-            .arg("origin/main")
-            .output()
-            .expect("failed to execute git merge-base");
+            .arg(&self.base)
+            .output()?;
+        ensure!(
+            merge_base_output.status.success(),
+            "git merge-base failed: {}",
+            String::from_utf8_lossy(&merge_base_output.stderr)
+        );
         let merge_base = parse_string_from_output(merge_base_output);
 
         // Log and return the merge base
@@ -251,54 +263,77 @@ impl SelectedPackageArgs {
         let (base_package_graph, head_package_graph, changed_files) =
             self.identify_changed_files()?;
 
-        // Create the determinator using the package graphs
-        let mut determinator = Determinator::new(&base_package_graph, &head_package_graph);
-
-        // Add the changed files to the determinator
-        determinator.add_changed_paths(&changed_files);
-
-        // Set the cargo options for the determinator
-        let mut cargo_options = CargoOptions::new();
-        cargo_options.set_resolver(CargoResolverVersion::V2);
-        cargo_options.set_include_dev(true); // Include dev-dependencies to ensure test-only packages are handled correctly
-        determinator.set_cargo_options(&cargo_options);
-
-        // Set the ignore rules for the determinator
-        let mut rules = DeterminatorRules::default();
-        for globs in [
-            IGNORED_DETERMINATOR_FILE_TYPES.to_vec(),
-            IGNORED_DETERMINATOR_PATHS.to_vec(),
-        ] {
-            rules.path_rules.push(PathRule {
-                globs: globs.iter().map(|string| string.to_string()).collect(),
-                mark_changed: DeterminatorMarkChanged::Packages(vec![]),
-                post_rule: DeterminatorPostRule::Skip,
-            });
-        }
-        determinator.set_rules(&rules).unwrap();
-
-        // Run the target determinator
-        let determinator_set = determinator.compute();
-
-        // Collect the affected packages
-        let package_set = determinator_set
-            .affected_set
-            .packages(DependencyDirection::Forward)
-            .map(|package| {
-                let manifest_path = package.manifest_path();
-                let parent_path = manifest_path.parent().expect("must exist");
-                let mut url = Url::from_directory_path(parent_path)
-                    .expect("must be a valid directory path")
-                    .to_string();
-                if url.ends_with('/') {
-                    url.pop();
-                }
-                format!("{}{}{}", url, PACKAGE_NAME_DELIMITER, package.name())
-            })
-            .collect();
-
-        Ok(package_set)
+        legacy_packages(&base_package_graph, &head_package_graph, &changed_files)
     }
+}
+
+/// Builds the package graph of the current working tree.
+pub(crate) fn head_package_graph() -> anyhow::Result<PackageGraph> {
+    Ok(MetadataCommand::new().exec()?.build_graph()?)
+}
+
+/// Returns the package name of a `url#name` spec or a bare package name.
+pub(crate) fn package_name(spec: &str) -> &str {
+    spec.rsplit(PACKAGE_NAME_DELIMITER).next().unwrap_or(spec)
+}
+
+/// Shared by the unchanged legacy selector and the subsystem fallback.
+pub(crate) fn legacy_packages(
+    base_package_graph: &PackageGraph,
+    head_package_graph: &PackageGraph,
+    changed_files: impl IntoIterator<Item = impl AsRef<Utf8Path>>,
+) -> anyhow::Result<Vec<String>> {
+    // Create the determinator using the package graphs
+    let mut determinator = Determinator::new(base_package_graph, head_package_graph);
+
+    // Add the changed files to the determinator
+    let changed_files: Vec<_> = changed_files
+        .into_iter()
+        .map(|path| path.as_ref().to_owned())
+        .collect();
+    determinator.add_changed_paths(&changed_files);
+
+    // Set the cargo options for the determinator
+    let mut cargo_options = CargoOptions::new();
+    cargo_options.set_resolver(CargoResolverVersion::V2);
+    cargo_options.set_include_dev(true); // Include dev-dependencies to ensure test-only packages are handled correctly
+    determinator.set_cargo_options(&cargo_options);
+
+    // Set the ignore rules for the determinator
+    let mut rules = DeterminatorRules::default();
+    for globs in [
+        IGNORED_DETERMINATOR_FILE_TYPES.to_vec(),
+        IGNORED_DETERMINATOR_PATHS.to_vec(),
+    ] {
+        rules.path_rules.push(PathRule {
+            globs: globs.iter().map(|string| string.to_string()).collect(),
+            mark_changed: DeterminatorMarkChanged::Packages(vec![]),
+            post_rule: DeterminatorPostRule::Skip,
+        });
+    }
+    determinator.set_rules(&rules).unwrap();
+
+    // Run the target determinator
+    let determinator_set = determinator.compute();
+
+    // Collect the affected packages
+    let package_set = determinator_set
+        .affected_set
+        .packages(DependencyDirection::Forward)
+        .map(|package| {
+            let manifest_path = package.manifest_path();
+            let parent_path = manifest_path.parent().expect("must exist");
+            let mut url = Url::from_directory_path(parent_path)
+                .expect("must be a valid directory path")
+                .to_string();
+            if url.ends_with('/') {
+                url.pop();
+            }
+            format!("{}{}{}", url, PACKAGE_NAME_DELIMITER, package.name())
+        })
+        .collect();
+
+    Ok(package_set)
 }
 
 /// Parses the cargo metadata from the given contents

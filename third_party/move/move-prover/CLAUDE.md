@@ -9,6 +9,7 @@ Code is at `third_party/move/move-prover`.
 move-prover/
 ├── src/                          # Main prover driver
 │   ├── cli.rs                   # CLI argument parsing
+│   ├── verex.rs                 # Verex (Lean) backend, `--lean`
 │   ├── lib.rs                   # Main entry points and orchestration
 │   └── main.rs                  # CLI binary entry point
 ├── boogie-backend/              # Boogie translation
@@ -353,7 +354,10 @@ whatever you need.
 cargo test -p move-prover                    # Run all tests
 UB=1 cargo test -p move-prover              # Update baselines
 MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
+MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite  # Verex verifier, `.lean_exp` baselines
 ```
+
+The `lean` feature runs only on request; CI requests it in the Lean workflow. See `tests/README.md`.
 
 ## Test Organization
 

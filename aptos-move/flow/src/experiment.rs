@@ -15,7 +15,7 @@ use crate::{
         CandidateVerdict, ImplementationOutcome, PolicyReport, StageOutcome,
     },
     conditions::ConditionStatus,
-    evaluation::sha256_hex,
+    evaluation::{sha256_hex, EvaluationConfig},
     mcp::{
         package_data::{
             collect_diagnostics, inspect_diagnostics, render_diagnostics, DiagnosticRecord,
@@ -23,6 +23,7 @@ use crate::{
         register_move_flow_package_hooks,
         tools::load_sanitized_prover_options,
     },
+    GlobalOpts,
 };
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -459,7 +460,7 @@ struct SpecFunctionContract {
     move_function_companion: bool,
 }
 
-pub fn run(args: &ExperimentArgs) -> Result<()> {
+pub fn run(args: &ExperimentArgs, global: &GlobalOpts) -> Result<()> {
     register_move_flow_package_hooks();
     move_compiler_v2::logging::setup_logging(None);
     match &args.command {
@@ -468,7 +469,7 @@ pub fn run(args: &ExperimentArgs) -> Result<()> {
         ExperimentCommand::CompareImplementation(args) => compare_implementation(args),
         ExperimentCommand::CheckPackage(args) => check_package(args),
         ExperimentCommand::ContractReport(args) => contract_report(args),
-        ExperimentCommand::Infer(args) => infer_package(args),
+        ExperimentCommand::Infer(args) => infer_package(args, &global.evaluation_config()?),
         ExperimentCommand::Prove(args) => prove_package(args),
         ExperimentCommand::CheckCandidate(args) => check_candidate(args),
     }
@@ -1492,7 +1493,7 @@ fn is_untrusted_inferred_contract_condition(
         })
 }
 
-fn infer_package(args: &PackageTargetArgs) -> Result<()> {
+fn infer_package(args: &PackageTargetArgs, evaluation: &EvaluationConfig) -> Result<()> {
     let filter = prover_filter(&args.target)?;
     let mut env = build_model(&args.package)
         .with_context(|| format!("failed to build `{}`", args.package.display()))?;
@@ -1530,6 +1531,7 @@ fn infer_package(args: &PackageTargetArgs) -> Result<()> {
     // reads as a target WP handled, when WP in fact declined. The screen is the
     // one consumer that must not be able to miss it.
     options.prover.uninvariant_loop_is_error = true;
+    options.prover.aborts_if_is_strict = evaluation.aborts_if_is_strict;
     options.output_path = if args.dump_bytecode {
         dump_dir.join("output.bpl")
     } else {
@@ -2112,10 +2114,49 @@ fn same_address(wanted: &str, actual: &str) -> bool {
 /// them too: a root that names only a local dependency could otherwise reach
 /// a `git` dependency one manifest down.
 pub(crate) fn reject_remote_dependencies(package: &Path) -> Result<(), String> {
+    reject_untrusted_dependencies(package, None)
+}
+
+/// Refuse dependencies that would let an evaluation MCP server leave its
+/// caller-visible package tree.
+pub(crate) fn reject_untrusted_dependencies(
+    package: &Path,
+    allowed_root: Option<&Path>,
+) -> Result<(), String> {
+    let allowed_root = allowed_root
+        .map(|root| {
+            root.canonicalize().map_err(|error| {
+                format!("cannot resolve package root `{}`: {error}", root.display())
+            })
+        })
+        .transpose()?;
+    if let Some(root) = &allowed_root {
+        for entry in walkdir::WalkDir::new(root).follow_links(false) {
+            let entry = entry.map_err(|error| {
+                format!("cannot inspect package root `{}`: {error}", root.display())
+            })?;
+            if entry.file_type().is_symlink() {
+                return Err(format!(
+                    "an evaluation package cannot contain symlink `{}`",
+                    entry.path().display()
+                ));
+            }
+        }
+    }
     let mut pending = vec![package.to_path_buf()];
     let mut seen = std::collections::BTreeSet::new();
     while let Some(dir) = pending.pop() {
         let dir = dir.canonicalize().unwrap_or(dir);
+        if allowed_root
+            .as_ref()
+            .is_some_and(|root| !dir.starts_with(root))
+        {
+            return Err(format!(
+                "an evaluation session cannot access package or local dependency `{}` outside `{}`",
+                dir.display(),
+                allowed_root.as_ref().expect("checked above").display()
+            ));
+        }
         if !seen.insert(dir.clone()) {
             continue;
         }
@@ -2566,7 +2607,7 @@ fn verification_scope(filter: Option<&str>) -> VerificationScope {
         return VerificationScope::All;
     };
     if filter.contains("::") {
-        VerificationScope::Only(filter.to_string())
+        VerificationScope::Only(vec![filter.to_string()])
     } else {
         VerificationScope::OnlyModule(filter.to_string())
     }

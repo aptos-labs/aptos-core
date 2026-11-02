@@ -2,17 +2,26 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup::backup_handler::BackupHandler, db::aptosdb_native_position::PositionBundle,
-    event_store::EventStore, ledger_db::LedgerDb, position_db::PositionDb,
-    position_merkle_db::PositionMerkleDb, pruner::LedgerPrunerManager,
-    rocksdb_property_reporter::RocksdbPropertyReporter, state_kv_db::StateKvDb,
-    state_merkle_db::StateMerkleDb, state_store::StateStore, transaction_store::TransactionStore,
+    backup::backup_handler::BackupHandler,
+    event_store::EventStore,
+    ledger_db::LedgerDb,
+    native_store::{
+        kv_db::{NativeKvDb, PositionDb},
+        merkle_db::{NativeMerkleDb, PositionMerkleDb},
+        CollateralStore, OrderStore,
+    },
+    pruner::LedgerPrunerManager,
+    rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
+    transaction_store::TransactionStore,
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use std::{path::Path, sync::Arc, time::Instant};
 use tokio::sync::watch::Sender;
@@ -39,6 +48,8 @@ pub struct AptosDB {
     commit_lock: std::sync::Mutex<()>,
     update_subscriber: Option<Sender<(Instant, Version)>>,
     pub(crate) position: Option<Arc<PositionBundle>>,
+    pub(crate) order: Option<Arc<OrderBundle>>,
+    pub(crate) collateral: Option<Arc<CollateralBundle>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -48,8 +59,15 @@ mod aptosdb_writer;
 // Other private methods.
 mod aptosdb_internal;
 // Native-position subsystem: `PositionBundle` + `impl AptosDB` for
-// `position()` / `native_state_committer()` / `init_native_position()`.
+// `position()` / `init_native_position()`.
 mod aptosdb_native_position;
+pub(crate) use aptosdb_native_position::PositionBundle;
+// Native-order store: `OrderBundle` + `init_native_order()`.
+mod aptosdb_native_order;
+pub(crate) use aptosdb_native_order::OrderBundle;
+// Native-collateral store: `CollateralBundle` + `init_native_collateral()`.
+mod aptosdb_native_collateral;
+pub(crate) use aptosdb_native_collateral::CollateralBundle;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 mod aptosdb_testonly;
@@ -202,7 +220,11 @@ impl AptosDB {
 
     /// Gets an instance of `BackupHandler` for data backup purpose.
     pub fn get_backup_handler(&self) -> BackupHandler {
-        BackupHandler::new(Arc::clone(&self.state_store), Arc::clone(&self.ledger_db))
+        BackupHandler::new(
+            Arc::clone(&self.state_store),
+            Arc::clone(&self.ledger_db),
+            self.position.clone(),
+        )
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
@@ -235,6 +257,10 @@ impl AptosDB {
         // matches state's always-create behavior.
         PositionDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         PositionMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeKvDb::<OrderStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeMerkleDb::<OrderStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeKvDb::<CollateralStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeMerkleDb::<CollateralStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
 
         info!(
             db_path = db_path.as_ref(),
@@ -256,6 +282,13 @@ impl AptosDB {
         );
         let mut ledger_batch = SchemaBatch::new();
         ledger_metadata_db.put_ledger_info(genesis_li, &mut ledger_batch)?;
-        ledger_metadata_db.write_schemas(ledger_batch)
+        ledger_metadata_db.write_schemas(ledger_batch)?;
+
+        // The cached latest ledger info is otherwise only populated when the DB
+        // is opened, so without this the DB reports no ledger info at all until
+        // the next restart.
+        ledger_metadata_db.set_latest_ledger_info(genesis_li.clone());
+
+        Ok(())
     }
 }

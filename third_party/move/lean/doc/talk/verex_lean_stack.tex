@@ -1,0 +1,519 @@
+% Move Summit 2026, internal: architecture overview of the Verex Lean Stack.
+% Build: latexmk verex_lean_stack.tex
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme[progressbar=frametitle,numbering=fraction,block=fill]{metropolis}
+\input{prelude-talk.tex}
+
+\setbeamercolor{frametitle}{bg=mNavy, fg=white}
+\setbeamercolor{progress bar}{fg=mBlue!70!white, bg=mBlue!15}
+\makeatletter\setlength{\metropolis@progressinheadfoot@linewidth}{2.5pt}\makeatother
+\setbeamercolor{palette primary}{bg=mNavy, fg=white}
+\setbeamercolor{normal text}{fg=mBlue!25!black}
+\setbeamercolor{alerted text}{fg=mBlue}
+\setbeamerfont{frametitle}{size=\large}
+% Metropolis sizes the title page to \paperheight, which overfills the frame by
+% a fixed amount; use \textheight instead.
+\makeatletter
+\setbeamertemplate{title page}{
+  \begin{minipage}[b][\dimexpr\textheight-12pt\relax]{\textwidth}
+    \vfill%
+    \ifx\inserttitle\@empty\else\usebeamertemplate*{title}\fi
+    \ifx\insertsubtitle\@empty\else\usebeamertemplate*{subtitle}\fi
+    \usebeamertemplate*{title separator}
+    \ifx\beamer@shortauthor\@empty\else\usebeamertemplate*{author}\fi
+    \ifx\insertdate\@empty\else\usebeamertemplate*{date}\fi
+    \ifx\insertinstitute\@empty\else\usebeamertemplate*{institute}\fi
+    \vfill
+  \end{minipage}
+}
+\makeatother
+\setbeamertemplate{title}{\centering\linespread{1.0}\inserttitle\par\vspace*{0.5em}}
+\setbeamertemplate{subtitle}{\centering\insertsubtitle\par\vspace*{0.5em}}
+\setbeamertemplate{author}{\vspace*{2em}\centering\insertauthor\par\vspace*{0.25em}}
+\setbeamertemplate{institute}{\vspace*{3mm}\centering\insertinstitute\par}
+\setbeamersize{text margin left=1.5em,text margin right=1.5em}
+% No footline; the frame number sits right-aligned in the title bar.
+\setbeamertemplate{footline}{}
+\setbeamertemplate{navigation symbols}{}
+\usepackage{appendixnumberbeamer}
+\makeatletter
+% Metropolis resets the frametitle template at \appendix, so the template is
+% wrapped in a macro and re-applied there.
+\newcommand{\talkframetitle}{%
+  \setbeamertemplate{frametitle}{%
+    \nointerlineskip%
+  \begin{beamercolorbox}[wd=\paperwidth, sep=0pt,
+      leftskip=\metropolis@frametitle@padding, rightskip=\metropolis@frametitle@padding]{frametitle}%
+  \metropolis@frametitlestrut@start%
+  \insertframetitle%
+  \nolinebreak%
+  \hfill{\normalfont\small\insertframenumber/\inserttotalframenumber}%
+  \metropolis@frametitlestrut@end%
+  \end{beamercolorbox}%
+  }%
+  \addtobeamertemplate{frametitle}{}{\usebeamertemplate*{progress bar in head/foot}}%
+}
+\makeatother
+\talkframetitle
+
+% Package or module name under a component in a diagram.
+\newcommand{\pkg}[1]{{\tiny\color{black!60}\texttt{#1}}}
+
+\title{Verex Lean Stack}
+\subtitle{\small Architecture overview\quad$\cdot$\quad Move Summit 2026 (internal)}
+\author{Wolfgang Grieskamp}
+\institute{Aptos Labs}
+\date{}
+
+\begin{document}
+
+{
+  \setbeamercolor{background canvas}{bg=mNavy}
+  \setbeamercolor{normal text}{fg=white}
+  \setbeamercolor{title separator}{fg=mNavy!40!white}
+  \usebeamercolor[fg]{normal text}
+  \maketitle
+}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Architecture}
+  \begin{columns}[c]
+    %\begin{column}{0.64\textwidth}
+    %  \begin{itemize}
+    %    \item Unified framework for language processing of Move, Rust, and related languages
+     %   \item Based on a common intermediate representation called VIR, with references and without goto (only loops and break)
+    %    \item Lowering from VIR to Lean for verification
+    %    \item Lowering from VIR to Stackless Bytecode for compilation to Move bytecode
+    %    \item Eventually all lowerings are verified within Lean
+    %  \end{itemize}
+   % \end{column}
+    \begin{column}{1.0\textwidth}
+      \centering
+      \resizebox{\textwidth}{!}{%
+      \begin{tikzpicture}[font=\scriptsize, x=1.15cm, y=1.2cm,
+          src/.style={art, draw=black!60, minimum width=1.25cm, minimum height=5mm, inner sep=1pt, font=\scriptsize}]
+        \node[src] (mv) at (-0.85,1.55) {Move};
+        \node[src] (ml) at (0.9,1.55)   {VSL};
+        \node[above=1pt, font=\tiny] at (ml.north) {Lean DSL};
+        \node[src] (rs) at (2.65,1.55)  {Rust};
+        \node[src, very thick, minimum width=1.4cm, minimum height=8mm] (lir) at (0.9,-0.4)
+          {\textbf{\LIR}};
+        \node[src] (omv) at (-0.85,-2.55) {Move};
+        \node[src] (oml) at (0.9,-2.55)   {VSL};
+        \node[src] (ors) at (2.65,-2.55)  {Rust};
+        \draw[arr] (mv) -- node[pos=0.17, left=3pt, font=\tiny] {via move-model AST} (lir);
+        \draw[arr] (ml) -- (lir);
+        \draw[arr] (rs) -- node[pos=0.17, right=3pt, font=\tiny] {via Rust MIR} (lir);
+        \draw[arr] (lir) -- (omv);
+        \draw[arr] (lir) -- (oml);
+        \draw[arr] (lir) -- (ors);
+        % semantics and execution
+        \node[proc, minimum width=2.1cm, minimum height=5mm, inner sep=2pt] (bss) at (-1.45,0.45) {VIR Semantics};
+        \node[src, minimum width=2.35cm, anchor=east] (lsb) at ([xshift=-2.8cm, yshift=-1.5mm]lir.west) {Stackless};
+        \node[src, minimum width=2.35cm] (bc) at (lsb |- 0,-2.55) {Bytecode};
+        \draw[arr, dotted] (bss.east) -- ([yshift=2mm]lir.west);
+        \draw[arr] ([yshift=-1.5mm]lir.west) -- node[pos=0.25, below, font=\tiny] {compile} (lsb.east);
+        \draw[arr] (lsb) -- node[pos=0.84, right=2pt, font=\tiny] {via compiler-v2} (bc);
+        \node[proc, minimum width=2.1cm, minimum height=5mm, inner sep=2pt] (sbss) at (-1.45,-1.25) {SL Semantics};
+        \draw[arr, dotted] (sbss) -- (lsb);
+        \draw[{Latex[length=2mm]}-{Latex[length=2mm]}, thick, mRed, dashed] (sbss.north) to[bend right=45]
+          node[pos=0.75, left=4pt, font=\tiny] (eqlbl) {$\approx$ agreement} (bss.south);
+        \draw[arr] ([yshift=3mm]lir.east) to[out=0, in=0, looseness=9]
+          node[right, yshift=3mm, font=\tiny] (tclbl) {type check / borrow check} ([yshift=0.5mm]lir.east);
+        \node[src, minimum width=1.75cm, anchor=west] (term) at ([xshift=2.8cm, yshift=-1.5mm]lir.east) {Native Lean};
+        \draw[arr] ([yshift=-1.5mm]lir.east) -- node[below, font=\tiny] (cmplbl) {compile+RefElim} (term.west);
+        \node[src, minimum width=1.75cm] (thm) at (term |- 0,-1.45) {Proof};
+        \draw[arr] (term) -- node[left, font=\tiny] (wplbl) {wp + solver} (thm);
+        \draw[{Latex[length=2mm]}-{Latex[length=2mm]}, thick, mRed, dashed] ([xshift=4mm]term.north) .. controls +(0,0.6) and +(1.6,0.1) ..
+          node[pos=0.3, above=3pt, font=\tiny] (aglbl) {$\approx$ agreement} (bss.north east);
+        % the parts in Lean
+        \begin{scope}[on background layer]
+          \node[group, fill=mBlue!6, inner sep=6pt, fit=(lir)(bss)(lsb)(sbss)(eqlbl)(tclbl)(term)(cmplbl)(thm)(wplbl)] (lean) {};
+        \end{scope}
+        \node[gtitle, anchor=south west] at (lean.north west) {Lean};
+      \end{tikzpicture}%
+      }
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Move sources are verified as VSL}
+  \begin{columns}[T]
+    \begin{column}{0.47\textwidth}
+      \textbf{Move} \hfill {\scriptsize\texttt{account.move}}
+\begin{MoveSmall}
+public entry fun deposit(addr: address,
+                         amount: u64) {
+  let value = &mut Balance[addr].balance.value;
+  *value = *value + amount;
+}
+spec deposit {
+  requires exists<Balance>(addr);
+  modifies global<Balance>(addr);
+  ensures Balance[addr].balance.value
+    == old(Balance[addr].balance.value) + amount;
+  aborts_if Balance[addr].balance.value
+    + amount > MAX_U64;
+}
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.53\textwidth}
+      \textbf{VSL}, rendered from Move
+\begin{LeanSmall}
+module 0x42::account where
+  public entry fun deposit(addr : Address,
+      amount : u64) -> Unit := do
+    let value := &mut Balance[addr].balance.value
+    *value := *value + amount
+
+  spec deposit where
+    requires exists<Balance>(addr)
+    ensures global<Balance>(addr).balance.value
+      == old(global<Balance>(addr).balance.value)
+         + amount
+    aborts_if global<Balance>(addr).balance.value
+      + amount > MAX_U64
+    modifies global<Balance>(addr)
+\end{LeanSmall}
+    \end{column}
+  \end{columns}
+  \takeaway{One verifier for every source language: Move and Rust are rendered as VSL, and messages are mapped back to the original files.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Rust sources are verified as VSL}
+  \begin{columns}[T]
+    \begin{column}{0.47\textwidth}
+      \textbf{Rust} \hfill {\scriptsize\texttt{bounds.rs}}
+\begin{RustSmall}
+pub fn max(left: u32, right: u32) -> u32 {
+    if left >= right { left } else { right }
+}
+
+pub fn raise(slot: &mut u32, floor: u32) {
+    if *slot < floor {
+        *slot = floor;
+    }
+}
+\end{RustSmall}
+      \textbf{VSL specifications} \hfill {\scriptsize\texttt{bounds.spec.lean}}
+\begin{LeanSmall}
+spec max where
+  ensures result >= left && result >= right
+  ensures result == left || result == right
+
+spec raise where
+  ensures slot >= floor
+  ensures slot == old(slot) || slot == floor
+\end{LeanSmall}
+    \end{column}
+    \begin{column}{0.53\textwidth}
+      \textbf{VSL}, rendered from Rust
+\begin{LeanSmall}
+namespace bounds where
+  fun max(left : u32, right : u32) -> u32 :=
+    if left >= right then left else right
+
+  spec max where
+    ensures result >= left && result >= right
+    ensures result == left || result == right
+
+  fun raise(slot : &mut u32,
+      floor : u32) -> Unit := do
+    if *slot < floor then *slot := floor
+
+  spec raise where
+    ensures slot >= floor
+    ensures slot == old(slot) || slot == floor
+\end{LeanSmall}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{From the Move developer's view}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+\begin{ShellSmall}
+$ move prove --lean --package-dir vault
+\end{ShellSmall}
+{\scriptsize Messages at their Move source positions:}
+\begin{ShellSmall}
+vault.move:38:9: error: the specification
+  clause `ensures result == ...` is not
+  established
+vault.move:61:13: error: the loop invariant
+  `i < periods` is not preserved by an
+  iteration
+\end{ShellSmall}
+      \begin{itemize}\small
+        \item Also |aptos move prove --lean| and the Move Prover unit tests (|MVP_TEST_FEATURE=lean|).
+        \item Budget per function in heartbeats: |pragma heartbeats|.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      When automation does not finish, the proof goes in a file beside the source:
+\begin{MoveSmall}
+spec square_of_sum {
+  pragma verify = manual; // in proofs.proof.lean
+  ensures result == a * a + 2 * a * b + b * b;
+}
+\end{MoveSmall}
+\begin{LeanSmall}
+-- proofs.proof.lean
+verify square_of_sum by
+  verex_obligations
+  all_goals (first | verex_decide
+    | (verex_prepare; all_goals try verex_decide))
+  case ensures_1 =>
+    rw [Int.add_mul, Int.mul_add, ...]
+    omega
+\end{LeanSmall}
+      {\scriptsize |verify f by verex_obligations| lists the obligations, one |case| per clause.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Lean and Move Stack Interplay}
+  \begingroup\centering
+  \begin{tikzpicture}[font=\scriptsize, x=1cm, y=1cm,
+      file/.style={art, draw=black!60},
+      wire/.style={lbl, font=\tiny}]
+    % user-facing inputs and outputs
+    \node[file] (movesrc) at (2.45,3.0) {\texttt{foo.move} + specs};
+    \node[file] (leansrc) at (6.8,3.0)  {\texttt{foo.lean}};
+    \node[file] (bc)      at (9.0,3.0)  {Move bytecode};
+    \node[file] (rssrc)   at (12.6,3.0) {\texttt{foo.rs} + \texttt{foo.spec.lean}};
+    % Rust row
+    \node[rproc] (prove) at (1.0,1.65)  {\textbf{move-prover}\\\texttt{-{}-lean} backend};
+    \node[rproc] (exch)  at (3.9,1.65)  {\textbf{Move CLI}\\\texttt{exchange}};
+    \node[rproc] (cv2)   at (6.8,1.65)  {\textbf{compiler-v2}\\\texttt{.lean} sources};
+    \node[rproc] (mono)  at (9.7,1.65)  {\textbf{MonoVM}\\lean-link (FFI)};
+    \node[rproc] (rexp)  at (12.6,1.65) {\textbf{rust-exporter}\\rustc\_public};
+    % Lean row
+    \node[proc] (verify) at (1.0,-0.35)  {\textbf{verex-move}\\\texttt{verify}};
+    \node[proc] (front)  at (3.9,-0.35)  {\textbf{verex-move}\\Move frontend};
+    \node[proc] (xir)    at (6.8,-0.35)  {\textbf{verex-move}\\XIR backend};
+    \node[proc] (e2e)    at (9.7,-0.35)  {\textbf{verex-e2e-tests}\\differential};
+    \node[proc] (lrust)  at (12.6,-0.35) {\textbf{verex-rust}\\import, \texttt{verify}};
+    \node[proc, fill=mBlue!30, minimum width=13.55cm, minimum height=6mm] (ir) at (6.8,-1.45)
+      {\textbf{verex-ir}:\quad \LIR\ $\cdot$ validation $\cdot$ semantics $\cdot$ interpreter $\cdot$ verifier $\cdot$ VSL};
+    % inputs
+    \draw[arr] (movesrc) -- (prove);
+    \draw[arr] (movesrc) -- (exch);
+    \draw[arr] (leansrc) -- (cv2);
+    \draw[arr] (cv2) -- (bc);
+    \draw[arr] (rssrc) -- (rexp);
+    % crossings: Rust -> Lean on the left, Lean -> Rust on the right
+    \draw[rarr] ([xshift=-4mm]prove.south) -- node[wire, pos=0.35] {AST} ([xshift=-4mm]verify.north);
+    \draw[arr]  ([xshift=4mm]verify.north) -- node[wire, pos=0.65] {messages} ([xshift=4mm]prove.south);
+    \draw[rarr] ([xshift=-4mm]exch.south)  -- node[wire, pos=0.35] {AST} ([xshift=-4mm]front.north);
+    \draw[arr]  ([xshift=4mm]front.north)  -- node[wire, pos=0.65] {spawn} ([xshift=4mm]exch.south);
+    \draw[rarr] ([xshift=-4mm]cv2.south)   -- node[wire, pos=0.35] {\texttt{lean -{}-json}} ([xshift=-4mm]xir.north);
+    \draw[arr]  ([xshift=4mm]xir.north)    -- node[wire, pos=0.65] {XIR} ([xshift=4mm]cv2.south);
+    \draw[rarr] ([xshift=-4mm]mono.south)  -- node[wire, pos=0.35] {outcomes} ([xshift=-4mm]e2e.north);
+    \draw[arr]  ([xshift=4mm]e2e.north)    -- node[wire, pos=0.65] {C ABI} ([xshift=4mm]mono.south);
+    \draw[rarr] ([xshift=-4mm]rexp.south)  -- node[wire, pos=0.35] {RawUnit} ([xshift=-4mm]lrust.north);
+    \draw[arr]  ([xshift=4mm]lrust.north)  -- node[wire, pos=0.65] {spawn} ([xshift=4mm]rexp.south);
+    \draw[arr] (verify) -- (front);
+    % bands
+    \begin{scope}[on background layer]
+      \node[fill=mRust!6, rounded corners=4pt, inner sep=4pt, fit=(prove)(rexp)] (rband) {};
+      \node[fill=mBlue!6, rounded corners=4pt, inner sep=4pt, fit=(verify)(lrust)(ir)] (lband) {};
+    \end{scope}
+    \node[rotate=90, font=\scriptsize\bfseries, text=mRust, anchor=south] at (rband.west) {Rust};
+    \node[rotate=90, font=\scriptsize\bfseries, text=mNavy, anchor=south] at (lband.west) {Lean 4};
+  \end{tikzpicture}
+  \par\endgroup
+  \medskip
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}\setlength{\itemsep}{1pt}\small
+        \item Verify Move: checked AST out, messages back.
+        \item Compile VSL: Lean emits XIR, compiler-v2 makes bytecode.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}\setlength{\itemsep}{1pt}\small
+        \item Test: MonoVM linked into Lean test executables.
+        \item Rust: borrow-checked MIR from rustc.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{The Solver Tactics}
+  \begin{columns}[c]
+    \begin{column}{0.44\textwidth}
+      \centering
+      \resizebox{\linewidth}{!}{%
+      \begin{tikzpicture}[font=\scriptsize, x=1cm, y=1cm,
+          sstep/.style={proc, minimum width=4.4cm, minimum height=5.5mm, inner sep=2pt},
+          split/.style={proc, fill=white, minimum width=1.35cm, minimum height=9mm, inner sep=2pt}]
+        \node[art, minimum width=4.4cm] (g) at (0,3.3) {wp goal, split by \texttt{verex\_obligations}};
+        \node[split] (lp) at (-1.5,2.2) {loops\\invariants};
+        \node[split] (cl) at (0,2.2) {calls\\theorems};
+        \node[split] (lf) at (1.5,2.2) {leaves};
+        \node[sstep] (s1) at (0,1.05) {assumptions, memory and stored reads};
+        \node[sstep] (s2) at (0,0.35) {frames, data and module invariants};
+        \node[sstep] (s3) at (0,-0.35) {instances and witnesses};
+        \node[sstep] (s4) at (0,-1.05) {\texttt{omega}, \texttt{decide}, \texttt{bv\_decide}};
+        \node[sstep] (s5) at (0,-1.75) {\texttt{grind}, under a heartbeat budget};
+        \node[art, draw=black!60, minimum width=4.4cm] (left) at (0,-2.75) {residual leaves (\texttt{ensures\_2}, \ldots): message, authored proof};
+        \draw[arr] (g) -- (lp); \draw[arr] (g) -- (cl); \draw[arr] (g) -- (lf);
+        \draw[arr] (lp) -- (lp |- s1.north);
+        \draw[arr] (cl) -- (s1);
+        \draw[arr] (lf) -- (lf |- s1.north);
+        \draw[arr] (s1) -- (s2); \draw[arr] (s2) -- (s3); \draw[arr] (s3) -- (s4); \draw[arr] (s4) -- (s5);
+        \draw[arr] (s5) -- (left);
+        \begin{scope}[on background layer]
+          \node[group, inner sep=2pt, fit=(s1)(s2)(s3)] (prep) {};
+          \node[group, inner sep=2pt, fit=(s4)] (dec) {};
+          \node[group, inner sep=2pt, fit=(s1)(s5), inner xsep=5pt] (solve) {};
+        \end{scope}
+        \node[font=\tiny\ttfamily, mNavy, anchor=east] at (prep.west) {verex\_prepare};
+        \node[font=\tiny\ttfamily, mNavy, anchor=east] at (dec.west) {verex\_decide};
+        \node[font=\tiny\ttfamily, mNavy, anchor=south east] at (solve.north west) {verex\_solve};
+      \end{tikzpicture}%
+      }
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \begin{itemize}\setlength{\itemsep}{2pt}\small
+        \item \textbf{Loops}: invariant at entry, preserved by an iteration, then the exit.
+        \item \textbf{Calls}, as in the Move Prover: inlined unless native, opaque, or on a cycle; those go through contracts and theorems.
+        \item \textbf{Leaves}, one per clause and path: |verex_prepare| normalizes, |verex_decide| runs the bounded deciders, |verex_solve| the full cascade, each under a budget.
+        \item \textbf{Authored proofs}: Move |spec lemma| and |proof| blocks, or |verify f by| with the same tactics per clause (|case ensures_1 => ...|), then any Lean tactic.
+        \item The solver is Lean meta code and \emph{untrusted}; only its proof terms are checked.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{What is proved, and what is trusted}
+  \begin{columns}[T]
+    \begin{column}{0.56\textwidth}
+\begin{LeanSmall}
+theorem deposit.verified
+    (prepared : prepareExecution registry unit
+                  = .ok executable)
+    (globalsPreserved : GlobalsPreserved executable) :
+    SatisfiesFunction executable deposit
+      deposit.contract
+\end{LeanSmall}
+      \scriptsize
+      |SatisfiesFunction| reads the function's meaning off the big-step judgment.
+      For every input meeting |requires|:
+      \begin{itemize}\setlength{\itemsep}{0pt}
+        \item every return meets |ensures| and the frame,
+        \item every abort is one of |aborts_if|,
+        \item no run is undefined.
+      \end{itemize}
+      Also:
+      \begin{itemize}\setlength{\itemsep}{0pt}
+        \item partial correctness. 
+        \item generic functions: proved once at a fresh type (monomorphization as in the Move Prover), valid at every instantiation.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \textbf{Trusted}
+      \begin{itemize}\setlength{\itemsep}{1pt}\scriptsize
+        \item Lean kernel, plus native |bv_decide| certificates.
+        \item Big-step semantics of \LIR as the meaning of Move/Rust.
+        \item Frontend (AST $\to$ \LIR) and contract translation.
+      \end{itemize}
+      \textbf{Not claimed}
+      \begin{itemize}\scriptsize
+        \item Anything about emitted bytecode; only up to stackless BC
+      \end{itemize}
+      \textbf{Proofs TBD}
+      \begin{itemize}\scriptsize
+        \item General agreement theorem, stated once over the compiler for every function.
+        \item GlobalsPreserved: hypothesis, to be derived from type preservation.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{The Verex Prover and the Move Prover}
+  \small
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.37\textwidth}>{\raggedright\arraybackslash}p{0.4\textwidth}@{}}
+    & \textbf{Move Prover} & \textbf{Verex Prover} \\
+    \hline
+    Input & bytecode after the compiler & checked AST $\to$ validated \LIR \\
+    Engine & Boogie, Z3 / CVC5 & Lean tactics, Lean kernel \\
+    Result & verdict, counterexample & theorem \\
+    Semantics & implicit in the encoding & explicit big-step semantics, interpreter proved sound and complete \\
+    References & reference elimination & prophecies (RustHorn) \\
+    When stuck & timeout; restate the spec & message per clause; proof in |foo.proof.lean| \\
+    Specifications & MSL & the same MSL, plus |pragma heartbeats| and |verify = manual| \\
+  \end{tabular}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Status and next steps}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Works today}
+      \begin{itemize}\setlength{\itemsep}{1pt}\small
+        \item |move prove --lean| on packages; Move Prover unit tests run with the Verex Prover.
+        \item Nightly benchmark of 32 problems from |move-stdlib|, |aptos-stdlib|, the framework, Rust: 24 verify completely.
+        \item Generics, storage, loops, vectors, function values, invariants, lemmas, state labels (in part).
+        \item compiler-v2 compiles VSL; MonoVM differential tests.
+        \item Rust, early: safe code from MIR, |verex-rust verify| with specifications in |foo.spec.lean|.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{Open}
+      \begin{itemize}\setlength{\itemsep}{1pt}\small
+        \item Prove the agreement theorem; remove the last project axioms.
+        \item Speed: the standard libraries in minutes.
+        \item Coverage: intrinsic maps, remaining state labels, natives.
+        \item Compiler correctness, VSL to bytecode.
+        \item Rust: regions, drops and panics, unsafe code, library models.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[standout]
+  Questions?
+  \vspace{0.8em}
+
+  \small
+  \texttt{third\_party/move/lean}: \texttt{README.md}, \texttt{designs/}
+\end{frame}
+
+% ===========================================================================
+\appendix
+\talkframetitle
+
+\begin{frame}[fragile]{Backup: \LIR and semantic profiles}
+  \begin{itemize}
+    \item \LIR is language-neutral: functions carry a profile (Move, Rust).
+    \item Profiles plug in twice:
+      \begin{itemize}
+        \item validation: which types, operations, intrinsics, and storage a profile admits;
+        \item execution: how operations evaluate, what aborts or panics (Move abort codes, Rust |panic=abort|).
+      \end{itemize}
+    \item The same semantics is run by the interpreter, defined by the big-step relation, and used by the verifier.
+    \item Validated namespaces are relocatable: modules link into units without re-validation.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Backup: references as prophecies}
+  \begin{itemize}
+    \item A mutable reference denotes a pair: the current value and a \emph{prophecy} of its final value (RustHorn).
+    \item When the loan ends, the prophecy is resolved to the value then held.
+    \item Validation computes where loans die; the interpreter, big-step relation, and verifier share this model.
+    \item No heap or separation logic: Move's alias-free references and per-resource memory make this enough, also for Rust's safe subset.
+  \end{itemize}
+\end{frame}
+
+\end{document}

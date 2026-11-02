@@ -1,0 +1,57 @@
+//# publish
+// Variants may be listed in any order, and the generic form needs only equal declared types.
+module 0x42::uniform
+enum E<T> has drop
+  B
+    x: T
+  A
+    x: T
+
+public fun get(e: &E<u64>): u64
+    move_loc e
+    borrow_variant_field E<u64>, A::x, B::x
+    read_ref
+    ret
+
+public fun get_generic<T: copy>(e: &E<T>): T
+    move_loc e
+    borrow_variant_field E<T>, A::x, B::x
+    read_ref
+    ret
+
+public fun make_a(x: u64): E<u64>
+    move_loc x
+    pack_variant E<u64>, A
+    ret
+
+public fun make_b(x: u64): E<u64>
+    move_loc x
+    pack_variant E<u64>, B
+    ret
+
+//# run
+script
+use 0x42::uniform
+fun main()
+    local a: uniform::E<u64>
+    local b: uniform::E<u64>
+    ld_u64 1
+    call uniform::make_a
+    st_loc a
+    ld_u64 2
+    call uniform::make_b
+    st_loc b
+    borrow_loc a
+    call uniform::get
+    ld_u64 1
+    eq
+    br_false fail
+    borrow_loc b
+    call uniform::get_generic<u64>
+    ld_u64 2
+    eq
+    br_false fail
+    ret
+fail:
+    ld_u64 1
+    abort

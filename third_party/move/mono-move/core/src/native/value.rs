@@ -149,7 +149,7 @@ impl<'a> VMValue<'a> for AccountAddress {
 
 /// A table's storage handle.
 #[repr(transparent)]
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct TableHandle(AccountAddress);
 
 impl TableHandle {
@@ -177,11 +177,20 @@ impl<'a> VMValue<'a> for TableHandle {
 }
 
 impl Ref<'_, TableHandle> {
-    /// Borrows the referenced table handle.
-    pub fn get(&self) -> &TableHandle {
+    /// Reads the referenced table handle out by value.
+    pub fn get(&self) -> TableHandle {
         // SAFETY: `TableHandle` is `repr(transparent)` over the address bytes the
-        // reference points at, so the referent reinterprets as `&TableHandle`.
-        unsafe { &*(self.ptr() as *const TableHandle) }
+        // reference points at, and a frame slot is not guaranteed to be aligned.
+        TableHandle(unsafe { core::ptr::read_unaligned(self.ptr() as *const AccountAddress) })
+    }
+}
+
+impl Ref<'_, AccountAddress> {
+    /// Reads the referenced address out by value.
+    pub fn get(&self) -> AccountAddress {
+        // SAFETY: the reference points at a live `address`, and a frame slot is
+        // not guaranteed to be aligned.
+        unsafe { core::ptr::read_unaligned(self.ptr() as *const AccountAddress) }
     }
 }
 
@@ -292,11 +301,8 @@ impl<'a, V> Vector<'a, V> {
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
     /// manner.
-    ///
-    /// Note: currently private, but could be made public if needed. In that case, external
-    /// callers need to follow the same rule above.
     #[inline]
-    fn ptr(&self) -> *mut u8 {
+    pub fn ptr(&self) -> *mut u8 {
         self.handle.ptr()
     }
 
@@ -452,8 +458,7 @@ mod tests {
     // backing to get `MAX_ALIGN`.
     //
     // TODO(cleanup, testing): allocate through `MemoryRegion`, which is
-    // `MAX_ALIGN`-aligned by construction; it lives in `mono-move-runtime`,
-    // which this crate cannot depend on.
+    // `MAX_ALIGN`-aligned by construction.
     const _: () = assert!(
         core::mem::align_of::<u64>() >= MAX_ALIGN,
         "u64 no longer covers MAX_ALIGN"
@@ -507,6 +512,20 @@ mod tests {
         buf
     }
 
+    /// Builds a `vector<vector<u8>>` object with layout `[len: u64][inner_ptr...]`.
+    /// The inner buffers must outlive all uses of the returned object.
+    fn nested_byte_vec_object_for_test(inners: &[Vec<u64>]) -> Vec<u64> {
+        let mut outer = vec![0u64; 1 + inners.len()];
+        outer[0] = inners.len() as u64;
+        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
+        for (slot, inner) in inners.iter().enumerate() {
+            // SAFETY: `outer` has an aligned pointer slot for each inner vector.
+            // `write_ptr` preserves each inner buffer's pointer provenance.
+            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + slot * 8, inner.as_ptr().cast()) };
+        }
+        outer
+    }
+
     /// `Vector::<Vector<u8>>::get_element` reads each inner byte vector back by
     /// value, including an empty inner vector.
     #[test]
@@ -520,16 +539,8 @@ mod tests {
             byte_vec_object_for_test(b"world!!"),
         ];
 
-        // Outer object: `[len: u64][inner_ptr0][inner_ptr1][inner_ptr2]`.
-        let mut outer = vec![0u64; 1 + inners.len()];
-        outer[0] = inners.len() as u64;
+        let mut outer = nested_byte_vec_object_for_test(&inners);
         let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
-        for (i, inner) in inners.iter().enumerate() {
-            // SAFETY: slot `i` is within `outer`. The pointers are stored with
-            // `write_ptr` rather than as `u64`, which would discard provenance
-            // and leave `get` reading through an address it cannot dereference.
-            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + i * 8, inner.as_ptr().cast()) };
-        }
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
         // buffers outlive the reads.
@@ -556,15 +567,11 @@ mod tests {
             byte_vec_object_for_test(b"a"),
             byte_vec_object_for_test(b"b"),
         ];
-        let mut outer = vec![0u64; 1 + inners.len()];
-        outer[0] = inners.len() as u64;
-        for (i, inner) in inners.iter().enumerate() {
-            outer[1 + i] = inner.as_ptr() as u64;
-        }
+        let mut outer = nested_byte_vec_object_for_test(&inners);
+        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object.
-        let vec: Vector<Vector<u8>> =
-            Vector::from_handle(unsafe { pool.root_object(outer.as_ptr() as *mut u8) });
+        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_ptr) });
 
         assert_eq!(vec.len(), 2);
         assert!(vec.get_element(0).is_ok());

@@ -19,6 +19,7 @@ bytes = { workspace = true }
 fxhash = { workspace = true }
 mono-move-alloc = { workspace = true }
 move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
 smallvec = { workspace = true }

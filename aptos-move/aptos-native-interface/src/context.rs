@@ -3,8 +3,7 @@
 
 use crate::errors::{LimitExceededError, SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
-    AbstractValueSize, DynamicExpression, GasExpression, GasQuantity,
-    InternalGasPerAbstractValueUnit, InternalGasUnit,
+    AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
 };
 use aptos_gas_schedule::{
     gas_feature_versions::RELEASE_V1_32, AbstractValueSizeGasParameters, MiscGasParameters,
@@ -170,14 +169,11 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
 
     /// Charges gas proportional to the number of value nodes.
     pub fn charge_value_traversal(&mut self, val_size: AbstractValueSize) -> SafeNativeResult<()> {
-        // Set to 3x `cmp::compare`'s base and per-abstract-value-unit costs
-        // (3670 and 140).
-        // TODO: add these to 1.50 schedule.
-        const PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
-        const PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
-            InternalGasPerAbstractValueUnit::new(420);
-
-        self.charge(PER_VALUE_TRAVERSAL_BASE + PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * val_size)?;
+        let cost = self
+            .misc_gas_params
+            .value_traversal
+            .cost(self.gas_feature_version, val_size);
+        self.charge(cost)?;
         Ok(())
     }
 

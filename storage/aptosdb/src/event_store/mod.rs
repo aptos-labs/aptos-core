@@ -121,16 +121,16 @@ impl EventStore {
         iter.seek(&(*event_key, start_seq_num))?;
 
         let mut result = Vec::new();
-        let mut cur_seq = start_seq_num;
-        for res in iter.take(limit as usize) {
+        for (i, res) in iter.take(limit as usize).enumerate() {
             let ((path, seq), (ver, idx)) = res?;
             if path != *event_key || ver > ledger_version {
                 break;
             }
+            let cur_seq = start_seq_num + i as u64;
             if seq != cur_seq {
                 // Sequence numbers are contiguous per key, so a gap at the first
                 // requested entry means the range was pruned.
-                if cur_seq == start_seq_num {
+                if i == 0 {
                     return Err(AptosDbError::EventPruned {
                         requested_seq_num: start_seq_num,
                         min_available_seq_num: seq,
@@ -143,7 +143,6 @@ impl EventStore {
                 );
             }
             result.push((seq, ver, idx));
-            cur_seq += 1;
         }
 
         Ok(result)

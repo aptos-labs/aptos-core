@@ -13,8 +13,11 @@ mod logging;
 pub mod metadata_storage;
 pub mod metrics;
 mod notification_handlers;
+mod snapshot_chunk;
 mod storage_synchronizer;
 mod utils;
+
+pub use driver::{GenesisCommitter, LocalGenesis};
 
 #[cfg(test)]
 mod tests;

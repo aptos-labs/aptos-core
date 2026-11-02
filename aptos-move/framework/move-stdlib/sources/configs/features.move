@@ -995,6 +995,15 @@ module std::features {
         is_enabled(LAZY_MODULE_INITIALIZATION)
     }
 
+    /// Rejects publishing new modules that would run eager `init_module`. Modules must
+    /// use a newer compiler with lazy initialization support instead.
+    /// Lifetime: permanent
+    const DISABLE_EAGER_MODULE_INITIALIZATION: u64 = 130;
+
+    public fun is_eager_module_initialization_disabled(): bool {
+        is_enabled(DISABLE_EAGER_MODULE_INITIALIZATION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

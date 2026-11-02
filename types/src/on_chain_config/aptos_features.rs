@@ -11,6 +11,7 @@ use move_core_types::{
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use strum_macros::{EnumString, FromRepr};
 
 /// The feature flags defined in the Move source. This must stay aligned with the constants there.
@@ -232,11 +233,31 @@ pub enum FeatureFlag {
     /// are verified on every load, so a previously published module with such a signature
     /// stops loading once this is enabled.
     CHECK_FUNCTION_TYPE_ABILITIES = 129,
+    /// Rejects publishing new modules that would run eager `init_module`. Modules must
+    /// use a newer compiler with lazy initialization support instead. Off by default.
+    DISABLE_EAGER_MODULE_INITIALIZATION = 130,
+}
+
+/// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default
+/// feature set.
+///
+/// Set for tests only to run testsuites as if MonoMove is enabled. Must never be
+/// set outside tests.
+pub const MONO_MOVE_ENV_VAR: &str = "MONO_MOVE_ENABLED";
+
+/// Returns true if [`MONO_MOVE_ENV_VAR`] is set to `1` or `true`. Anything else,
+/// including an unset variable, is off. Should be only used for testing.
+pub fn mono_move_env_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| match std::env::var(MONO_MOVE_ENV_VAR) {
+        Ok(value) => matches!(value.to_lowercase().as_str(), "1" | "true"),
+        Err(_) => false,
+    })
 }
 
 impl FeatureFlag {
     pub fn default_features() -> Vec<Self> {
-        vec![
+        let mut features = vec![
             Self::CODE_DEPENDENCY_CHECK,
             Self::TREAT_FRIEND_AS_PRIVATE,
             Self::SHA_512_AND_RIPEMD_160_NATIVES,
@@ -347,7 +368,11 @@ impl FeatureFlag {
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
             Self::CHECK_FUNCTION_TYPE_ABILITIES,
-        ]
+        ];
+        if mono_move_env_enabled() {
+            features.push(Self::ENABLE_MONO_MOVE);
+        }
+        features
     }
 }
 

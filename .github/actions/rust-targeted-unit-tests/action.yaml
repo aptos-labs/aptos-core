@@ -4,6 +4,12 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  DETERMINATOR_MODE:
+    description: "Test selection: legacy, subsystem, or compare"
+    default: legacy
+  BASE_REF:
+    description: "Comparison branch or commit (merge base with HEAD)"
+    default: origin/main
 
 runs:
   using: composite
@@ -17,20 +23,19 @@ runs:
 
     # Output the changed files
     - name: Output the changed files
-      run: cargo x changed-files -vvv
+      run: cargo x --base "$TEST_BASE_REF" changed-files -vvv
       shell: bash
-
-    # Output the affected packages
-    - name: Output the affected packages
-      run: cargo x affected-packages -vvv
-      shell: bash
+      env:
+        TEST_BASE_REF: ${{ inputs.BASE_REF }}
 
     # Run only the targeted rust unit tests
     - name: Run only the targeted unit tests
       run: |
-        cargo x targeted-unit-tests -vvv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+        cargo x --base "$TEST_BASE_REF" targeted-unit-tests -vvv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
       shell: bash
       env:
+        APTOS_TEST_DETERMINATOR: ${{ inputs.DETERMINATOR_MODE }}
+        TEST_BASE_REF: ${{ inputs.BASE_REF }}
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: "4297152"
         MVP_TEST_ON_CI: "true"

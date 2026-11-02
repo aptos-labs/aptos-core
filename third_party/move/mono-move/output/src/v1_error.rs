@@ -5,10 +5,9 @@
 //!
 //! V1 is the MoveVM in `move-vm-runtime` that MonoMove (V2) replaces.
 //!
-//! [`describe`] maps a type-erased [`VMInternalError`] to the [`V1ErrorInfo`]
-//! V1 would have produced for the same fault: its status code, sub-status, and
-//! message. Consumers needing V1-shaped errors share this one mapping instead
-//! of keeping their own.
+//! [`describe`] maps a type-erased [`VMInternalError`] to V1's status code,
+//! sub-status, and message, or preserves a complete error from a shared
+//! component. Consumers needing V1-shaped errors share this mapping.
 //!
 //! Not every message can be reproduced. Most match V1's byte for byte, some
 //! faults carry no message at all, and a few keep MonoMove's own text because
@@ -28,10 +27,16 @@
 //! replay benchmark, which compares the two VMs by exact `TransactionStatus`
 //! equality and would report the divergence as a mismatch.
 
-use mono_move_core::{BytecodeOffset, ErrorLocation, GasExhaustedError, IntTy, VMInternalError};
+use mono_move_core::{
+    BytecodeOffset, CallFrame, ErrorLocation, ExecutionErrorKind, GasExhaustedError, IntTy,
+    VMInternalError,
+};
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
-use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex};
+use move_binary_format::{
+    errors::{ExecutionState, Location, VMError},
+    file_format::FunctionDefinitionIndex,
+};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::values::{INDEX_OUT_OF_BOUNDS, POP_EMPTY_VEC, VEC_UNPACK_PARITY_MISMATCH};
 
@@ -145,11 +150,25 @@ impl V1ErrorInfo {
             message: V1Message::MonoText(err.to_string()),
         }
     }
+
+    /// Extracts a V1 error's status, sub-status, and message. The sub-status and
+    /// message remain comparable, including when absent.
+    pub fn verbatim(error: VMError) -> Self {
+        let (status, sub_status, message, ..) = error.all_data();
+        Self {
+            status,
+            sub_status: sub_status.map_or(V1SubStatus::Absent, V1SubStatus::Known),
+            message: message.map_or(V1Message::Absent, V1Message::Verbatim),
+        }
+    }
 }
 
 /// The result of mapping a MonoMove error to V1.
 pub enum V1Equivalent {
     Described(V1ErrorInfo),
+    /// An unchanged error from the bytecode verifier shared with V1, including
+    /// its location, indices, and offsets.
+    Verbatim(VMError),
     /// V1 does not fail here: it either runs the input successfully or does not
     /// check for this at all.
     NoV1Failure,
@@ -179,6 +198,31 @@ pub fn v1_location(
     }
 }
 
+/// Converts caller frames to V1's execution state, preserving their order.
+/// Both formats represent a script frame with no module and definition index 0.
+pub fn v1_execution_state(stack_trace: &[CallFrame]) -> ExecutionState {
+    ExecutionState::new(
+        stack_trace
+            .iter()
+            .map(|frame| (frame.module.clone(), frame.function, frame.offset))
+            .collect(),
+    )
+}
+
+/// Whether to attach a stack trace when mapping `err` to V1.
+/// Returns false for stack overflow and loader errors, and true otherwise.
+///
+/// V1 also omits traces for other call setup failures, such as closure argument
+/// mismatches and gas exhaustion. This check cannot identify those cases.
+pub fn v1_records_execution_state(err: &VMInternalError) -> bool {
+    let stack_overflow = matches!(
+        err.downcast_ref::<RuntimeError>(),
+        Some(RuntimeError::StackOverflow)
+    );
+    let code_loading = err.downcast_ref::<LoaderError>().is_some();
+    !(stack_overflow || code_loading)
+}
+
 /// Maps `err` to its V1 equivalent.
 ///
 /// Only the three types matched below have one. That is intentional: the loader
@@ -201,6 +245,40 @@ pub fn describe(err: &VMInternalError) -> V1Equivalent {
         return V1Equivalent::Described(V1ErrorInfo::with_no_message(StatusCode::OUT_OF_GAS));
     }
     V1Equivalent::V1StatusUnknown
+}
+
+/// [`describe`] with a fallback when no V1 equivalent is available.
+/// Callers comparing with V1 must treat the fallback as a divergence.
+pub fn describe_or_fallback(err: &VMInternalError) -> V1ErrorInfo {
+    fallback_info(err, describe(err))
+}
+
+/// Returns details from `equivalent`, using a fallback if no V1 equivalent
+/// exists. `equivalent` must be the result of [`describe`] for `err`.
+/// Callers comparing with V1 must treat the fallback as a divergence.
+pub fn fallback_info(err: &VMInternalError, equivalent: V1Equivalent) -> V1ErrorInfo {
+    let status = match equivalent {
+        V1Equivalent::Described(info) => return info,
+        V1Equivalent::Verbatim(error) => return V1ErrorInfo::verbatim(error),
+        // Execution-range codes throughout, so the executor keeps the
+        // transaction and the fee it already charged.
+        V1Equivalent::NoV1Failure => StatusCode::UNKNOWN_RUNTIME_STATUS,
+        // TODO(correctness): multiple error kinds share `UNKNOWN_RUNTIME_STATUS`;
+        // distinct codes would change committed transaction statuses.
+        V1Equivalent::V1StatusUnknown => match err.kind() {
+            ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
+            ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
+            ExecutionErrorKind::InvariantViolation
+            | ExecutionErrorKind::RuntimeLimitExceeded
+            | ExecutionErrorKind::InvalidOperation
+            | ExecutionErrorKind::Placeholder => StatusCode::UNKNOWN_RUNTIME_STATUS,
+        },
+    };
+    V1ErrorInfo {
+        status,
+        sub_status: V1SubStatus::Unmodelled,
+        message: V1Message::MonoText(err.to_string()),
+    }
 }
 
 /// Describes a runtime fault.
@@ -259,6 +337,24 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
             format!("Failed to move resource into {addr:?}"),
         ),
 
+        // V1 names the module in long form.
+        E::ReentrancyUnderModuleLock { module, function } => V1ErrorInfo::with_message(
+            StatusCode::RUNTIME_DISPATCH_ERROR,
+            format!(
+                "Reentrancy disallowed: reentering `{module}` via function `{function}` \
+                 (module lock is active)"
+            ),
+        ),
+        // V1 names the struct in short form, without type arguments.
+        E::ResourceAccessDuringReentrancy { module, name } => V1ErrorInfo::with_message(
+            StatusCode::RUNTIME_DISPATCH_ERROR,
+            format!(
+                "Resource `{}::{name}` cannot be accessed because of active reentrancy of \
+                 defining module.",
+                module.short_str_lossless()
+            ),
+        ),
+
         // V1 names both variants ("expected enum variant Circle, found
         // Square"), which needs variant names at the fault site; mono carries
         // only the found tag. Reported with mono text rather than reproduced.
@@ -294,7 +390,13 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSSequenceTooLong { .. }
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
+        | E::BCSInvalidEnumTag { .. }
         | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
+
+        E::MalformedStringArgument
+        | E::ObjectArgumentDoesNotExist
+        | E::ObjectArgumentLacksResource => return V1Equivalent::V1StatusUnknown,
+        E::ArgumentStorageRead(inner) => return describe(inner),
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,
@@ -325,8 +427,7 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::ScriptDeserializationFailed { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::CODE_DESERIALIZATION_ERROR, err)
         },
-        // The verifier's own status, as V1 reports it.
-        L::ScriptVerificationFailed { status } => V1ErrorInfo::with_mono_message(*status, err),
+        L::ScriptVerificationFailed { error } => return V1Equivalent::Verbatim(error.clone()),
         // MonoMove-only loading or lowering gaps have no corresponding V1
         // failure and therefore map to `NoV1Failure`.
         //
@@ -335,10 +436,10 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         // it, V1 reports `MISSING_DEPENDENCY` at the call instead; that takes a
         // framework release declaring an unregistered native, so this mapping
         // does not distinguish it.
-        L::NativeFunctionNotLoadable { .. } | L::LoweringSkipped { .. } => {
-            return V1Equivalent::NoV1Failure
-        },
-        L::GlobalContext(_) | L::InvariantViolation(_) => {
+        L::NativeFunctionNotLoadable { .. }
+        | L::LoweringSkipped { .. }
+        | L::ResourceLayoutNotDerivable => return V1Equivalent::NoV1Failure,
+        L::GlobalContext(_) | L::NativeShadowsMoveFunction { .. } | L::InvariantViolation(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
         },
     };
@@ -419,7 +520,10 @@ fn primitive_name(ty: IntTy) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_core_types::{account_address::AccountAddress, int256::I256};
+    use move_binary_format::errors::PartialVMError;
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, int256::I256, language_storage::ModuleId,
+    };
 
     /// The mapping for an error V1 has a counterpart for.
     fn described(err: &RuntimeError) -> V1ErrorInfo {
@@ -601,6 +705,44 @@ mod tests {
         );
     }
 
+    /// Both reentrancy errors reproduce V1's text: the module in long form for
+    /// the lock error, the struct in short form for the resource error.
+    #[test]
+    fn reentrancy_messages_match_v1() {
+        let module = || {
+            Box::new(ModuleId::new(
+                AccountAddress::from_hex_literal("0x42").unwrap(),
+                ident_str!("caller").to_owned(),
+            ))
+        };
+        let lock = described(&RuntimeError::ReentrancyUnderModuleLock {
+            module: module(),
+            function: ident_str!("do_something").to_owned(),
+        });
+        assert_eq!(lock.status, StatusCode::RUNTIME_DISPATCH_ERROR);
+        assert_eq!(
+            lock.message.text(),
+            Some(
+                "Reentrancy disallowed: reentering \
+                 `0000000000000000000000000000000000000000000000000000000000000042::caller` \
+                 via function `do_something` (module lock is active)"
+            )
+        );
+
+        let resource = described(&RuntimeError::ResourceAccessDuringReentrancy {
+            module: module(),
+            name: ident_str!("R").to_owned(),
+        });
+        assert_eq!(resource.status, StatusCode::RUNTIME_DISPATCH_ERROR);
+        assert_eq!(
+            resource.message.text(),
+            Some(
+                "Resource `0x42::caller::R` cannot be accessed because of active reentrancy \
+                 of defining module."
+            )
+        );
+    }
+
     /// Vector faults report through the sub-status and carry no message.
     #[test]
     fn vector_errors_describe_by_sub_status() {
@@ -650,6 +792,24 @@ mod tests {
         };
         assert_eq!(info.status, StatusCode::OUT_OF_GAS);
         assert_eq!(info.message, V1Message::Absent);
+    }
+
+    /// Stack overflow and loader errors omit execution state; heap exhaustion
+    /// includes it.
+    #[test]
+    fn call_setup_failures_have_no_execution_state() {
+        assert!(!v1_records_execution_state(&VMInternalError::new(
+            RuntimeError::StackOverflow
+        )));
+        assert!(!v1_records_execution_state(&VMInternalError::new(
+            LoaderError::ModuleNotFound {
+                address: AccountAddress::ONE,
+                name: "gone".to_string(),
+            }
+        )));
+        assert!(v1_records_execution_state(&VMInternalError::new(
+            RuntimeError::OutOfHeapMemory { requested: 64 }
+        )));
     }
 
     #[test]
@@ -726,14 +886,27 @@ mod tests {
                 name: "f".to_string(),
             },
             LoaderError::LoweringSkipped { reason: "nominal" },
+            LoaderError::ResourceLayoutNotDerivable,
             LoaderError::ScriptDeserializationFailed {
                 message: "truncated".to_string(),
             },
             LoaderError::ScriptVerificationFailed {
-                status: StatusCode::MISSING_DEPENDENCY,
+                error: PartialVMError::new(StatusCode::MISSING_DEPENDENCY).finish(Location::Script),
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
+            LoaderError::NativeShadowsMoveFunction {
+                address: AccountAddress::ONE,
+                module: "m".to_string(),
+                name: "f".to_string(),
+            },
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
+            LoaderError::InvariantViolation(LoaderInvariantViolation::MicroOpVerificationFailed {
+                errors: vec![mono_move_core::VerificationError {
+                    func_name: "f".to_string(),
+                    pc: Some(0),
+                    message: "frame access out of bounds".to_string(),
+                }],
+            }),
         ];
         for err in &cases {
             // Exhaustive, so a new variant must be added to `cases`.
@@ -742,13 +915,16 @@ mod tests {
                 | LoaderError::FunctionNotFound { .. }
                 | LoaderError::NativeFunctionNotLoadable { .. }
                 | LoaderError::LoweringSkipped { .. }
+                | LoaderError::ResourceLayoutNotDerivable
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
+                | LoaderError::NativeShadowsMoveFunction { .. }
                 | LoaderError::InvariantViolation(_) => {},
             }
             let status = match describe_loader_error(err) {
                 V1Equivalent::Described(info) => info.status,
+                V1Equivalent::Verbatim(error) => error.major_status(),
                 // V1 does not fail here, so there is no V1 status to persist
                 // differently from.
                 V1Equivalent::NoV1Failure | V1Equivalent::V1StatusUnknown => continue,

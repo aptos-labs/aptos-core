@@ -19,6 +19,11 @@ Outline in `plan.md`.
 - `biblio.bib` — bibliography; style is `IEEEtran` via `fmcad.cls`.
 - `fmcad.cls`, `esz.sty` — vendored conference template and Z-style
   notation. Do not edit unless the upstream needs fixing.
+- `talk/` — beamer slide deck for the FMCAD'26 presentation
+  (`talk.tex`, `prelude-talk.tex`). Build with `latexmk talk.tex` in
+  that directory; `esz.sty` is picked up from `..`. `prelude-talk.tex`
+  mirrors the Move listing and IVL definitions of `prelude.tex` and
+  must be kept in sync with it.
 - `examples/` — self-contained Move package used as source of truth
   for the paper listings (`amm_example.move`, `find.move`,
   `vault.move`). Edit the Move source first, then re-copy snippets

@@ -10,7 +10,7 @@ use libtest_mimic::{Arguments, Trial};
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
 use move_model::metadata::LanguageVersion;
-use move_prover::{cli::Options, run_move_prover_v2};
+use move_prover::{cli::Options, run_move_prover_v2, verex};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use once_cell::sync::OnceCell;
 use std::{
@@ -25,6 +25,8 @@ const ENV_FLAGS: &str = "MVP_TEST_FLAGS";
 const ENV_TEST_EXTENDED: &str = "MVP_TEST_X";
 const ENV_TEST_FEATURE: &str = "MVP_TEST_FEATURE";
 const ENV_TEST_ON_CI: &str = "MVP_TEST_ON_CI";
+/// The Verex verifier the tests run, when set by the caller (see `verex`).
+const ENV_VEREX_MOVE_EXE: &str = "VEREX_MOVE_EXE";
 
 static NOT_CONFIGURED_WARNED: AtomicBool = AtomicBool::new(false);
 
@@ -88,6 +90,19 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
             },
+            // Tests with the Lean-based Verex verifier, whose messages differ
+            // from Boogie's. A function's verification gets the verifier's
+            // default heartbeat budget, as on the command line.
+            Feature {
+                name: "lean",
+                flags: &["--lean"],
+                inclusion_mode: InclusionMode::Implicit,
+                enable_in_ci: false,
+                only_if_requested: true,
+                separate_baseline: true,
+                runner: |p| test_runner_for_feature(p, get_feature_by_name("lean")),
+                enabling_condition: |group, _| group == "unit",
+            },
         ]
     })
 }
@@ -129,32 +144,56 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
 
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
-    let no_tools = read_env_var("BOOGIE_EXE").is_empty()
-        || !options.backend.use_cvc5 && read_env_var("Z3_EXE").is_empty()
-        || options.backend.use_cvc5 && read_env_var("CVC5_EXE").is_empty();
-    let baseline_valid =
-        !no_tools || !extract_test_directives(path, "// no-boogie-test")?.is_empty();
-
-    if no_tools {
-        options.prover.generate_only = true;
-        if NOT_CONFIGURED_WARNED
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .is_ok()
-        {
-            warn!(
-                "Prover tools are not configured, verification tests will be skipped. \
-        See https://github.com/move-language/move/tree/main/language/move-prover/doc/user/install.md \
-        for instructions."
-            );
+    let baseline_valid = if options.lean {
+        if !verex::verifier_available() {
+            if NOT_CONFIGURED_WARNED
+                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                warn!(
+                    "The Verex Move verifier is not built, its tests will be skipped. Build it \
+            with `cd third_party/move/lean/verex-move && lake build verex-move`."
+                );
+            }
+            return Ok(());
         }
-    }
-    options.backend.check_tool_versions()?;
+        true
+    } else {
+        let no_tools = read_env_var("BOOGIE_EXE").is_empty()
+            || !options.backend.use_cvc5 && read_env_var("Z3_EXE").is_empty()
+            || options.backend.use_cvc5 && read_env_var("CVC5_EXE").is_empty();
+        if no_tools {
+            options.prover.generate_only = true;
+            if NOT_CONFIGURED_WARNED
+                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                warn!(
+                    "Prover tools are not configured, verification tests will be skipped. \
+            See https://github.com/move-language/move/tree/main/language/move-prover/doc/user/install.md \
+            for instructions."
+                );
+            }
+        }
+        options.backend.check_tool_versions()?;
+        !no_tools || !extract_test_directives(path, "// no-boogie-test")?.is_empty()
+    };
     options.prover.stable_test_output = true;
     options.backend.stable_test_output = true;
 
     let mut error_writer = Buffer::no_color();
     options.language_version = Some(LanguageVersion::latest());
     let result = run_move_prover_v2(&mut error_writer, options, vec![]);
+    // A failure of the verifier's harness is no verification result and
+    // never a baseline.
+    if let Err(err) = &result {
+        if err.downcast_ref::<verex::HarnessFailure>().is_some() {
+            return Err(anyhow!(
+                "Verex harness failure, baseline not updated: {}",
+                err
+            ));
+        }
+    }
     let mut diags = match result {
         Ok(()) => "".to_string(),
         Err(err) => format!("Move prover returns: {}\n", err),
@@ -296,12 +335,44 @@ fn collect_enabled_tests(tests: &mut Vec<Trial>, group: &str, feature: &Feature,
     }
 }
 
+/// Takes the private copy of the Verex verifier the `lean` tests run, into
+/// a directory under `target/tmp` that lives as long as the returned guard:
+/// a concurrent build of the live Lean packages cannot change what the tests
+/// load. The user's own `VEREX_MOVE_EXE` is run as is, and without the
+/// verifier's package the tests skip as they would anyway.
+fn snapshot_verifier() -> anyhow::Result<Option<TempDir>> {
+    if std::env::var_os(ENV_VEREX_MOVE_EXE).is_some() {
+        return Ok(None);
+    }
+    let Some(package) = verex::package(Path::new(".")) else {
+        return Ok(None);
+    };
+    let dir = tempfile::Builder::new()
+        .prefix("verex-gate-")
+        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))?;
+    // Return through the guard on every failure so partial snapshots are removed.
+    let snapshot = verex::snapshot(&package, dir.path())?;
+    // SAFETY: no other thread exists yet.
+    unsafe {
+        for (name, value) in &snapshot.env {
+            std::env::set_var(name, value);
+        }
+        std::env::set_var(ENV_VEREX_MOVE_EXE, &snapshot.program);
+    }
+    Ok(Some(dir))
+}
+
 // Test entry point based on lbtest-mimic.
 fn main() {
+    // A panic in the Verex verifier reaches its messages with Lean's
+    // backtrace, whose addresses differ between runs.
+    // SAFETY: no other thread exists yet.
+    unsafe { std::env::set_var("LEAN_BACKTRACE", "0") };
+    let args = Arguments::from_args();
+    let feature_narrow = read_env_var(ENV_TEST_FEATURE);
     let mut tests = vec![];
     for feature in get_features() {
         // Evaluate whether the user narrowed which feature to test.
-        let feature_narrow = read_env_var(ENV_TEST_FEATURE);
         if !feature_narrow.is_empty() && feature.name != feature_narrow {
             continue;
         }
@@ -315,7 +386,45 @@ fn main() {
             collect_enabled_tests(&mut tests, "unit", feature, "tests/sources");
         }
     }
+    // Several focused fixtures can share one build and snapshot (the smoke
+    // suite uses this), while libtest's ordinary filter and --skip still apply.
+    let filters = read_env_var("MVP_TEST_FILTERS");
+    if !filters.is_empty() {
+        tests.retain(|test| {
+            filters
+                .split(',')
+                .any(|filter| test.name().contains(filter))
+        });
+    }
     tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
-    let args = Arguments::from_args();
-    libtest_mimic::run(&args, tests).exit()
+    let selected = |name: &str, filter: &str| {
+        if args.exact {
+            name == filter
+        } else {
+            name.contains(filter)
+        }
+    };
+    let will_run = !args.list
+        && !args.ignored
+        && !args.bench
+        && tests.iter().any(|test| {
+            args.filter
+                .as_ref()
+                .is_none_or(|filter| selected(test.name(), filter))
+                && !args.skip.iter().any(|filter| selected(test.name(), filter))
+        });
+    let snapshot = if feature_narrow == "lean" && will_run {
+        match snapshot_verifier() {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                eprintln!("cannot snapshot the Verex Move verifier: {:#}", err);
+                std::process::exit(1);
+            },
+        }
+    } else {
+        None
+    };
+    let conclusion = libtest_mimic::run(&args, tests);
+    drop(snapshot);
+    conclusion.exit()
 }

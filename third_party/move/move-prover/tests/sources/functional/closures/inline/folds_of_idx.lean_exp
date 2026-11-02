@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/.verex/folds_of_idx.move.lean:296:15: error: VEREX-CALL-NAME: unknown function `spec_fold$gen$0`

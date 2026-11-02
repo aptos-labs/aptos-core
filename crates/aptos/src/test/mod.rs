@@ -23,8 +23,10 @@ use crate::{
         utils::write_to_file,
     },
     governance::{
-        CompileScriptFunction, ProposalSubmissionSummary, SubmitProposal, SubmitProposalArgs,
-        SubmitVote, SubmitVoteArgs, VerifyProposal, VerifyProposalResponse,
+        bundle::{BundleArgs, ExecuteBundle, ExecutedStep, ProposeBundle},
+        CompileScriptFunction, ExecuteProposal, GenerateExecutionHash, ProposalSubmissionSummary,
+        SubmitProposal, SubmitProposalArgs, SubmitVote, SubmitVoteArgs, VerifyProposal,
+        VerifyProposalResponse,
     },
     node::{
         AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator,
@@ -44,7 +46,7 @@ use aptos_config::config::Peer;
 use aptos_crypto::{
     bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    x25519, PrivateKey,
+    x25519, HashValue, PrivateKey,
 };
 use aptos_framework::chunked_publish::CHUNK_SIZE_IN_BYTES;
 use aptos_genesis::config::HostAndPort;
@@ -71,13 +73,12 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     mem,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
     time::Duration,
 };
 use tempfile::TempDir;
-use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -469,7 +470,7 @@ impl CliTestFramework {
         let source_path = self.move_dir().join(rel_path);
         write_to_file(
             source_path.as_path(),
-            &source_path.as_display().to_string(),
+            &source_path.display().to_string(),
             content.as_bytes(),
         )
         .unwrap();
@@ -1029,18 +1030,7 @@ impl CliTestFramework {
         framework_package_args: FrameworkPackageArgs,
         gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
-        // Make a temporary directory for compilation
-        let temp_dir = TempDir::new().map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to create temporary directory {}", err))
-        })?;
-
-        let source_path = temp_dir.path().join("script.move");
-        write_to_file(
-            source_path.as_path(),
-            &source_path.display().to_string(),
-            script_contents.as_bytes(),
-        )
-        .unwrap();
+        let (_temp_dir, source_path) = Self::write_temp_script(script_contents)?;
 
         RunScript {
             txn_options: self.transaction_options(index, gas_options),
@@ -1221,6 +1211,89 @@ impl CliTestFramework {
                     ..CompileScriptFunction::default()
                 },
             },
+        }
+        .execute()
+        .await
+    }
+
+    /// Write a script to `script.move` in a fresh temporary directory, which the
+    /// caller keeps alive for as long as the file is needed.
+    fn write_temp_script(script_contents: &str) -> CliTypedResult<(TempDir, PathBuf)> {
+        let temp_dir = TempDir::new().map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to create temporary directory {}", err))
+        })?;
+        let source_path = temp_dir.path().join("script.move");
+        write_to_file(
+            source_path.as_path(),
+            &source_path.display().to_string(),
+            script_contents.as_bytes(),
+        )?;
+        Ok((temp_dir, source_path))
+    }
+
+    /// Compile a script against the local framework, returning its bytecode and
+    /// execution hash.
+    pub fn compile_script(&self, script_contents: &str) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        let (_temp_dir, source_path) = Self::write_temp_script(script_contents)?;
+        GenerateExecutionHash {
+            script_path: Some(source_path),
+            framework_local_dir: Some(Self::aptos_framework_dir()),
+        }
+        .generate_hash()
+    }
+
+    pub async fn execute_proposal_compiled(
+        &self,
+        index: usize,
+        proposal_id: u64,
+        compiled_script_path: &Path,
+    ) -> CliTypedResult<TransactionSummary> {
+        ExecuteProposal {
+            proposal_id,
+            txn_options: self.transaction_options(index, None),
+            compile_proposal_args: CompileScriptFunction {
+                compiled_script_path: Some(compiled_script_path.to_path_buf()),
+                ..CompileScriptFunction::default()
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn propose_bundle(
+        &self,
+        index: usize,
+        bundle: &Path,
+        pool_address: AccountAddress,
+        metadata_url: &str,
+    ) -> CliTypedResult<ProposalSubmissionSummary> {
+        ProposeBundle {
+            bundle_args: BundleArgs {
+                bundle: bundle.to_path_buf(),
+                skip_signoff: false,
+            },
+            pool_address_args: PoolAddressArgs { pool_address },
+            metadata_url: Url::parse(metadata_url).unwrap(),
+            skip_metadata_url_check: true,
+            txn_options: self.transaction_options(index, None),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn execute_bundle(
+        &self,
+        index: usize,
+        bundle: &Path,
+        proposal_id: u64,
+    ) -> CliTypedResult<Vec<ExecutedStep>> {
+        ExecuteBundle {
+            bundle_args: BundleArgs {
+                bundle: bundle.to_path_buf(),
+                skip_signoff: false,
+            },
+            proposal_id,
+            txn_options: self.transaction_options(index, None),
         }
         .execute()
         .await

@@ -105,16 +105,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
-            name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
-            description: "Turns on or off inlining across package boundaries".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
-        },
-        Experiment {
-            name: Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS.to_string(),
-            description: "Turns on or off restricting inlining optimization to primary target modules".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
-        },
-        Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
             description: "Turns on or off specification checks".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
@@ -127,6 +117,14 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::SPEC_REWRITE_PURE_FUNS.to_string(),
             description: "Derive spec functions for all pure Move functions (prover only)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::DEFERRED_CLOSURE_FRAMES.to_string(),
+            description: "Let an unverified, memory-free opaque function leave an undeclared \
+                closure parameter's frame to its call sites (prover only; requires a backend \
+                that accounts for the deferred closure's effects)"
                 .to_string(),
             default: Given(false),
         },
@@ -303,11 +301,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
-        Experiment {
-            name: Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string(),
-            description: "Set of optimizations that are safe to perform on the framework, but are disabled otherwise".to_string(),
-            default: Given(false),
-        },
     ];
     experiments
         .into_iter()
@@ -320,7 +313,6 @@ impl Experiment {
     pub const ABILITY_CHECK: &'static str = "ability-check";
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
-    pub const ACROSS_PACKAGE_INLINING: &'static str = "across-package-inlining";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
@@ -329,14 +321,12 @@ impl Experiment {
     pub const CMP_REWRITE: &'static str = "cmp-rewrite";
     pub const COMPILE_FOR_TESTING: &'static str = "compile-for-testing";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
+    pub const DEFERRED_CLOSURE_FRAMES: &'static str = "deferred-closure-frames";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
-    pub const EXTENDED_FRAMEWORK_OPTIMIZATIONS: &'static str = "extended-framework-optimizations";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
     pub const INLINING: &'static str = "inlining";
     pub const INLINING_OPTIMIZATION: &'static str = "inlining-optimization";
-    pub const INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS: &'static str =
-        "inlining-optimization-to-non-primary-targets";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";

@@ -490,7 +490,7 @@ pub fn derive_sigma_protocol_witness(input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+            fn rand<R: rand::RngCore + rand::CryptoRng>(&self, rng: &mut R) -> Self {
                 Self {
                     #(
                         #field_names: self.#field_names.rand(rng),

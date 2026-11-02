@@ -33,7 +33,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
 use num_integer::Roots;
-use rand_core::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
 // With feature `range_proof_timing_univariate_v2`, timing is printed for setup/prove/verify/commit.
 // To see it: run the integration test with stdout shown, e.g.

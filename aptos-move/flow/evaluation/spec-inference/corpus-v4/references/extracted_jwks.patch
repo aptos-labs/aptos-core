@@ -1,0 +1,49 @@
+--- a/sources/framework/extracted_jwks.move
++++ b/sources/framework/extracted_jwks.move
+@@ -35,0 +36,5 @@
++        } spec {
++            invariant num_entries == len(jwks.entries);
++            invariant index <= num_entries;
++            invariant !found;
++            invariant forall j in 0..index: after(provider_jwks.issuer, jwks.entries[j].issuer);
+@@ -50,0 +56,40 @@
++    }
++
++    spec module {
++        /// Whether `issuer` sorts after `other` under the comparator.
++        fun after(issuer: vector<u8>, other: vector<u8>): bool {
++            aptos_std::comparator::is_greater_than(aptos_std::comparator::spec_compare_u8_vector(issuer, other))
++        }
++
++        fun same(issuer: vector<u8>, other: vector<u8>): bool {
++            aptos_std::comparator::is_equal(aptos_std::comparator::spec_compare_u8_vector(issuer, other))
++        }
++
++        /// Where the scan stops: the first entry `issuer` does not sort after,
++        /// or the end.
++        fun position(entries: vector<ProviderJWKs>, issuer: vector<u8>): num {
++            if (exists j in 0..len(entries): !after(issuer, entries[j].issuer)) {
++                choose min j in 0..len(entries) where !after(issuer, entries[j].issuer)
++            } else {
++                len(entries)
++            }
++        }
++
++        fun replaces(entries: vector<ProviderJWKs>, issuer: vector<u8>): bool {
++            position(entries, issuer) < len(entries) && same(issuer, entries[position(entries, issuer)].issuer)
++        }
++    }
++
++    spec upsert_provider_jwks {
++        pragma opaque;
++        aborts_if false;
++        let k = position(jwks.entries, provider_jwks.issuer);
++        ensures replaces(old(jwks).entries, provider_jwks.issuer) ==> (
++            jwks.entries == update(old(jwks).entries, k, provider_jwks)
++                && result == std::option::spec_some(old(jwks).entries[k])
++        );
++        // Otherwise the entry goes in at the stop position, which may be the end.
++        ensures !replaces(old(jwks).entries, provider_jwks.issuer) ==> (
++            jwks.entries == concat(concat(old(jwks).entries[0..k], vec(provider_jwks)), old(jwks).entries[k..len(old(jwks).entries)])
++                && result == std::option::spec_none()
++        );

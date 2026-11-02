@@ -6,26 +6,26 @@ Schema v3, the compiler-v2 exporter, Lean decoder, and reduced six-type source
 fixtures preserve the resolved intrinsic declarations and all 158 bindings.
 No semantic intrinsic implementation is enabled. The transpiler returns a
 fatal error for a module containing an intrinsic declaration, and authored
-Leaner intrinsic attributes are rejected during module expansion. This is
+Verex intrinsic attributes are rejected during module expansion. This is
 deliberate: partial map semantics must not elaborate as ordinary structures or
 unconstrained specification functions.
 
 > **Target-architecture note.** The generic map carrier and role
 > interpretations below remain design input, but the former attribute-driven
 > prototype has been removed. The independent
-> [unified LIR project](../../designs/lir-design.md) moves intrinsic declarations,
+> [unified VIR project](../../designs/vir-design.md) moves intrinsic declarations,
 > graph construction, required/optional-role checks, duplicate checks, target
 > signature checks, diagnostics, and reporting into the Move semantic profile
-> of `LeanerIR`. That validation boundary now exists and is exercised by the
+> of `VerexIR`. That validation boundary now exists and is exercised by the
 > six-owner corpus; E16 stays explicitly rejected until the generic semantic
-> interpretation exists. The LIR project is not itself an E16 deliverable.
+> interpretation exists. The VIR project is not itself an E16 deliverable.
 
 ## Work required before resuming E16
 
 The rejection may be removed only after all of these are implemented:
 
 1. First-class intrinsic owner/binding/location nodes in raw and validated
-   LIR, populated identically by Move and Leaner frontends.
+   VIR, populated identically by Move and Verex frontends.
 2. One Move-profile role schema covering required and optional roles,
    dependencies, duplicates/shared targets, target kind/module, cycles, and
    exact physical signatures, with located diagnostics.
@@ -38,8 +38,8 @@ The rejection may be removed only after all of these are implemented:
    mutation, deletion, borrowing, bulk operations, and destruction.
 6. Ordered-map and iterator observations, rank/key relationships, version
    validity, and their source axioms.
-7. Verification lowering, Move/Leaner source emission, and capability reports
-   driven solely by validated LIR rather than frontend attributes.
+7. Verification lowering, Move/Verex source emission, and capability reports
+   driven solely by validated VIR rather than frontend attributes.
 8. Six-type corpus gates proving frontend agreement, exact rejection of
    unknown roles, source round trips, and preservation of executable and
    specification semantics.
@@ -67,21 +67,21 @@ E16 must therefore add one generic model and instantiate it from the XAST
 mapping.  It must not generate a hand-written model or a new collection of
 axioms for each concrete map type.
 
-The model and interpretation belong to the Move profile of `LeanerIR`, not to
-the Move-to-Leaner transpiler or Leaner attribute elaboration. During the
+The model and interpretation belong to the Move profile of `VerexIR`, not to
+the Move-to-Verex transpiler or Verex attribute elaboration. During the
 suspension, the transpiler only decodes the transported declaration and then
 rejects its owning module.
 
 ## Constraints
 
 1. The physical Move structure and executable bodies remain unchanged.  The
-   generated Leaner source must still compile to the original Move layout and
+   generated Verex source must still compile to the original Move layout and
    code.
 2. Specification expressions see an abstract map, not the structure's
    physical fields.  This matches the Move Prover, which erases intrinsic-map
    fields from the verification representation.
 3. The semantic laws and role interpretations are declared once in the Move
-   LIR profile, independently of Aptos module names and of the transpiler.
+   VIR profile, independently of Aptos module names and of the transpiler.
 4. The XAST role mapping is authoritative.  The consumer must not rediscover
    mappings from source text or assume that `new`, `add`, or `spec_get` have
    conventional names.
@@ -89,20 +89,20 @@ rejects its owning module.
    validated XAST mapping is sufficient to instantiate the generic model.
 6. Unknown future roles fail with a precise diagnostic.  They are not silently
    rendered as opaque functions.
-7. Validated first-class LIR is the stable semantic interface. Surface
-   attributes are only a possible Leaner source encoding emitted after the
+7. Validated first-class VIR is the stable semantic interface. Surface
+   attributes are only a possible Verex source encoding emitted after the
    graph has been checked; the transpiler does not own a parallel role table.
 
 ## Architecture
 
 ```text
-Move/XAST or Leaner intrinsic declaration
+Move/XAST or Verex intrinsic declaration
                |
                v
-     raw first-class LIR owner/bindings
+     raw first-class VIR owner/bindings
                |
                v
-       Move-profile LIR validation
+       Move-profile VIR validation
                |
        +-------+--------+
        |                |
@@ -162,7 +162,7 @@ models for `OrderedMap` and `BigOrderedMap`.
 
 ### 2. Mechanical physical-to-logical adapter
 
-After LIR validation, the Leaner source backend may keep the ordinary physical
+After VIR validation, the Verex source backend may keep the ordinary physical
 declaration for each intrinsic structure `M<K, V>` and encode the validated
 owner metadata as a source attribute:
 
@@ -172,8 +172,8 @@ struct M (K V) where
   -- unchanged physical fields
 ```
 
-When the generated source is read again, the Leaner frontend reconstructs the
-same LIR declaration.  The Lean verification backend then supplies one
+When the generated source is read again, the Verex frontend reconstructs the
+same VIR declaration.  The Lean verification backend then supplies one
 Lean-only projection:
 
 ```lean
@@ -183,7 +183,7 @@ instance : ModelDomain (M K V) (Move.Intrinsic.Map K V) where
   project := M.intrinsicView
 ```
 
-This adapter is generated uniformly from validated LIR; it contains no
+This adapter is generated uniformly from validated VIR; it contains no
 operation semantics and no per-type laws.  Move source export keeps the
 physical `struct M` as the exported type.
 
@@ -193,7 +193,7 @@ of the generic map axioms.
 
 ### 3. Declaration attributes and role interpretation
 
-After validation, the Leaner source backend may invert the role-to-target
+After validation, the Verex source backend may invert the role-to-target
 lists and decorate each target declaration.  The owning intrinsic type is an
 explicit attribute argument because the function name alone is not the
 semantic identity:
@@ -210,7 +210,7 @@ spec opaque spec_get {K V} (m : M K V) (k : K) : V
 ```
 
 The executable `new` role is `map_new`; `map_spec_new` belongs on the mapped
-specification function.  The LIR validator must reject assigning incompatible
+specification function.  The VIR validator must reject assigning incompatible
 roles to one target, sharing one target across different intrinsic types, or
 binding a target outside the type's own module, regardless of which frontend
 produced the declaration.
@@ -218,10 +218,10 @@ produced the declaration.
 `spec fun` and `spec opaque` now accept the same leading source-attribute
 grammar as `struct` and `fun`.  While E16 is suspended, `intrinsic_map` and
 `map_*` attributes are rejected rather than interpreted.  Once enabled, a
-Leaner frontend must reconstruct first-class LIR bindings from them; they are
+Verex frontend must reconstruct first-class VIR bindings from them; they are
 semantic metadata, not ordinary Move bytecode attributes.
 
-The Move-profile LIR validator normalizes role names to one closed `MapRole`
+The Move-profile VIR validator normalizes role names to one closed `MapRole`
 vocabulary.  This is the language-level role registry, not a table of Aptos
 special cases. A binding is represented conceptually as:
 
@@ -262,9 +262,9 @@ the executable role's generic source spec.
 ## Specification lowering
 
 Mapped specification functions are aliases for generic operations, not new
-uninterpreted functions.  After E16 resumes, the Leaner source backend may
+uninterpreted functions.  After E16 resumes, the Verex source backend may
 print their source-shaped declarations and role attributes.  Re-import
-reconstructs LIR, whose verification backend interprets the declarations with
+reconstructs VIR, whose verification backend interprets the declarations with
 logical signatures and bodies. Conceptually:
 
 ```text
@@ -277,7 +277,7 @@ spec opaque spec_set (m : M K V) (k : K) (v : V) : M K V
     => Move.Intrinsic.Map.set (m↑) k v
 ```
 
-This requires a small generalization of Leaner Move's specification-function
+This requires a small generalization of Verex Move's specification-function
 registry.  It currently records only direct integer argument/result
 projection.  Intrinsic spec functions additionally record which arguments
 are projected with `ModelDomain` and whether their logical result is the
@@ -286,7 +286,7 @@ those projections at every call.  No intrinsic-aware typed-expression mode
 is added to `Transpiler.Print`.
 
 Other occurrences of an intrinsic value in specifications are projected at
-the logical boundary by the same Leaner Move machinery:
+the logical boundary by the same Verex Move machinery:
 
 - parameters and function results use `value↑`;
 - `old(value)` projects the anchored value;
@@ -306,7 +306,7 @@ not verified against the physical implementation; that is the same trust
 boundary as the Move Prover's native intrinsic backend.
 
 The implementation defines the source specifications in `Move` as generic
-combinators.  Leaner Move's source-spec derivation consults the function's role
+combinators.  Verex Move's source-spec derivation consults the function's role
 attributes and instantiates the appropriate combinator.  It does not inspect
 the physical body for an intrinsic summary, and the transpiler does not
 construct 37 ad-hoc contract strings.  A small declarative role schema in
@@ -324,7 +324,7 @@ Today the `module` expander registers a function's open-ended attributes after
 it runs `#derive_move_source_spec` and `#derive_move_spec_function`.  The
 registration must move before those derivations so the generic derivation
 commands can see intrinsic roles.  This ordering fix benefits any future
-attribute-driven source semantics and belongs entirely in Leaner Move.
+attribute-driven source semantics and belongs entirely in Verex Move.
 
 ## Ordered and iterator operations
 
@@ -346,7 +346,7 @@ own axioms.  It does not require a `BigOrderedMap`-specific model.
 ## Validation and diagnostics
 
 Compiler-v2 currently resolves mappings for XAST transport, but its result is
-only an import hint. The target Move-profile LIR validator rechecks:
+only an import hint. The target Move-profile VIR validator rechecks:
 
 - the intrinsic kind is `map`;
 - the structure has the generic key/value shape required by the map model;
@@ -358,7 +358,7 @@ only an import hint. The target Move-profile LIR validator rechecks:
 
 A missing optional role merely leaves that operation unavailable. A missing
 semantic dependency or unknown role makes the affected module unsupported
-with an exact LIR diagnostic. Falling back to an opaque uninterpreted function
+with an exact VIR diagnostic. Falling back to an opaque uninterpreted function
 would silently lose the intrinsic contract and is not allowed. Until that
 semantic interpretation exists, the owning module is rejected before
 printing even after validation succeeds.
@@ -368,9 +368,9 @@ printing even after validation succeeds.
 1. **Done and retained.** XAST schema/export/decoding transports validated
    owner and binding data for all six source fixtures.
 2. **Done and retained.** Leading attributes on `spec fun`/`spec opaque` are a
-   general Leaner syntax capability; intrinsic attributes themselves are
+   general Verex syntax capability; intrinsic attributes themselves are
    rejected while suspended.
-3. **Done.** First-class LIR intrinsic declarations, shared graph
+3. **Done.** First-class VIR intrinsic declarations, shared graph
    integrity, and the closed 62-role Move registry with owner-shape,
    required-role, dependency, and exact physical-signature validation are
    implemented and pass the six-type, 158-binding source corpus.
@@ -379,7 +379,7 @@ printing even after validation succeeds.
 5. **Open.** Bind core executable summaries (`new`, length/empty/membership,
    add/upsert/delete, borrow/borrow_mut, destroy-empty) and abort roles.
 6. **Open.** Add bulk, ordered, and iterator role families.
-7. **Open.** Enable the full six-type LIR/frontend/source-round-trip gate.
+7. **Open.** Enable the full six-type VIR/frontend/source-round-trip gate.
 
 Each step must leave unknown or not-yet-implemented roles explicitly reported;
 partial implementation must not claim E16 complete.
@@ -388,17 +388,17 @@ partial implementation must not claim E16 complete.
 
 - The existing source-fixture test verifies all six types and all 158 binding
   occurrences, then verifies that every owning module fails with the explicit
-  suspension error and emits no Leaner source.
+  suspension error and emits no Verex source.
 - Authored `intrinsic_map` and `map_*` attributes fail with the same suspension
   policy instead of becoming bytecode metadata.
 - After resumption, generated output may use `@[intrinsic_map]` and
   owner-qualified role attributes only as an encoding of already validated
-  LIR.
-- A Leaner Move vocabulary test verifies that all 62 distinct role attributes
+  VIR.
+- A Verex Move vocabulary test verifies that all 62 distinct role attributes
   in those fixtures normalize successfully and that dependency errors are
   deterministic.
 - Generic carrier laws are tested once, outside any Aptos namespace.
-- Leaner expansion contains exactly one view adapter per intrinsic type and no
+- Verex expansion contains exactly one view adapter per intrinsic type and no
   copied map-law axiom blocks.
 - Calls through differently named bindings (`SimpleMap::create` versus
   `Table::new`) lower to the same generic operation.
@@ -408,7 +408,7 @@ partial implementation must not claim E16 complete.
 - Ordered and iterator fixtures exercise `keyAt`/`rank` and version validity
   without referring to the concrete representation.
 - After resumption, the transpilation report identifies the validated generic
-  model and reports unsupported roles from LIR capability data. During
+  model and reports unsupported roles from VIR capability data. During
   suspension, the module-level fatal error is the only report.
 - No mapped specification function remains as an unconstrained `spec opaque`
   declaration.

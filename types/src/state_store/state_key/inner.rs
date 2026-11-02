@@ -20,7 +20,7 @@ pub enum StateKeyTag {
     AccessPath,
     TableItem,
     /// Umbrella for the trading-native subsystem. Sub-entities
-    /// (Position, future Collateral / Order / ...) are distinguished
+    /// (Position, Order, BulkOrder, ...) are distinguished
     /// by [`TradingNativeKeyTag`] inside the payload, not by a
     /// top-level tag. This keeps the top-level tag space focused on
     /// subsystem-level categories.
@@ -37,6 +37,9 @@ pub enum StateKeyTag {
 #[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
 pub enum TradingNativeKeyTag {
     Position = 0,
+    Order = 1,
+    BulkOrder = 2,
+    Collateral = 3,
 }
 
 /// Error thrown when a [`StateKey`] fails to be deserialized out of a byte sequence stored in physical
@@ -97,6 +100,33 @@ pub enum TradingNativeKey {
         account: AccountAddress,
         market: AccountAddress,
     },
+    /// Native single order, by `order_id` within an (exchange, market).
+    Order {
+        exchange: AccountAddress,
+        market: AccountAddress,
+        order_id: u128,
+    },
+    /// Native bulk order: at most one per account within an (exchange, market).
+    BulkOrder {
+        exchange: AccountAddress,
+        market: AccountAddress,
+        account: AccountAddress,
+    },
+    /// Native collateral entry: per-(exchange, account, scope) collateral.
+    Collateral {
+        exchange: AccountAddress,
+        account: AccountAddress,
+        scope: CollateralScope,
+    },
+}
+
+/// Which balance domain a collateral entry belongs to. `Cross` is the
+/// account's shared cross-margin pool; `Isolated` is dedicated to one market.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub enum CollateralScope {
+    Cross,
+    Isolated { market: AccountAddress },
 }
 
 impl StateKeyInner {
@@ -130,6 +160,42 @@ impl StateKeyInner {
                         writer.write_all(exchange.as_ref())?;
                         writer.write_all(account.as_ref())?;
                         writer.write_all(market.as_ref())?;
+                    },
+                    TradingNativeKey::Order {
+                        exchange,
+                        market,
+                        order_id,
+                    } => {
+                        writer.write_all(&[TradingNativeKeyTag::Order as u8])?;
+                        writer.write_all(exchange.as_ref())?;
+                        writer.write_all(market.as_ref())?;
+                        writer.write_all(&order_id.to_be_bytes())?;
+                    },
+                    TradingNativeKey::BulkOrder {
+                        exchange,
+                        market,
+                        account,
+                    } => {
+                        writer.write_all(&[TradingNativeKeyTag::BulkOrder as u8])?;
+                        writer.write_all(exchange.as_ref())?;
+                        writer.write_all(market.as_ref())?;
+                        writer.write_all(account.as_ref())?;
+                    },
+                    TradingNativeKey::Collateral {
+                        exchange,
+                        account,
+                        scope,
+                    } => {
+                        writer.write_all(&[TradingNativeKeyTag::Collateral as u8])?;
+                        writer.write_all(exchange.as_ref())?;
+                        writer.write_all(account.as_ref())?;
+                        match scope {
+                            CollateralScope::Cross => writer.write_all(&[0])?,
+                            CollateralScope::Isolated { market } => {
+                                writer.write_all(&[1])?;
+                                writer.write_all(market.as_ref())?;
+                            },
+                        }
                     },
                 }
             },
@@ -165,6 +231,33 @@ impl Debug for StateKeyInner {
                     f,
                     "StateKey::TradingNative::Position {{ exchange: {}, account: {}, market: {} }}",
                     exchange, account, market,
+                ),
+                TradingNativeKey::Order {
+                    exchange,
+                    market,
+                    order_id,
+                } => write!(
+                    f,
+                    "StateKey::TradingNative::Order {{ exchange: {}, market: {}, order_id: {} }}",
+                    exchange, market, order_id,
+                ),
+                TradingNativeKey::BulkOrder {
+                    exchange,
+                    market,
+                    account,
+                } => write!(
+                    f,
+                    "StateKey::TradingNative::BulkOrder {{ exchange: {}, market: {}, account: {} }}",
+                    exchange, market, account,
+                ),
+                TradingNativeKey::Collateral {
+                    exchange,
+                    account,
+                    scope,
+                } => write!(
+                    f,
+                    "StateKey::TradingNative::Collateral {{ exchange: {}, account: {}, scope: {:?} }}",
+                    exchange, account, scope,
                 ),
             },
         }

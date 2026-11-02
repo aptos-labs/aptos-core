@@ -1,0 +1,124 @@
+--- a/sources/framework/extracted_transaction_limits.move
++++ b/sources/framework/extracted_transaction_limits.move
+@@ -63,0 +64,5 @@
++        } spec {
++            invariant len == std::vector::length(tiers);
++            invariant 1 <= i;
++            invariant len > 0 ==> i <= len;
++            invariant forall k: u64 where 1 <= k && k < i && k < len: ordered_at(tiers, k);
+@@ -79,0 +85,9 @@
++        } spec {
++            invariant len == std::vector::length(min_stakes);
++            invariant len == std::vector::length(multipliers_percent);
++            invariant i <= len;
++            invariant std::vector::length(tiers) == i;
++            invariant forall j in 0..i:
++                tiers[j].min_stake == min_stakes[j]
++                    && tiers[j].multiplier_percent == multipliers_percent[j];
++            invariant forall j in 0..i: valid_multiplier(multipliers_percent[j]);
+@@ -152,0 +167,105 @@
++        );
++    }
++
++    spec module {
++        /// Whether a multiplier lies in `(MIN_MULTIPLIER_PERCENT, MAX_MULTIPLIER_PERCENT]`.
++        fun valid_multiplier(multiplier_percent: u64): bool {
++            multiplier_percent > MIN_MULTIPLIER_PERCENT && multiplier_percent <= MAX_MULTIPLIER_PERCENT
++        }
++
++        /// Tier `k` against its predecessor: the stake may repeat, the
++        /// multiplier must grow.
++        fun ordered_at(tiers: vector<TxnLimitTier>, k: num): bool {
++            tiers[k].min_stake >= tiers[k - 1].min_stake
++                && tiers[k].multiplier_percent > tiers[k - 1].multiplier_percent
++        }
++
++        /// Every tier against its predecessor. Vacuous for fewer than two tiers.
++        fun ordered(tiers: vector<TxnLimitTier>): bool {
++            forall k: u64 where 1 <= k && k < len(tiers): ordered_at(tiers, k)
++        }
++
++        /// The first tier whose multiplier covers the request.
++        fun covers(tiers: vector<TxnLimitTier>, multiplier_percent: u64, j: num): bool {
++            tiers[j].multiplier_percent >= multiplier_percent
++        }
++
++        /// Whether some tier covers the request.
++        fun covered(tiers: vector<TxnLimitTier>, multiplier_percent: u64): bool {
++            exists j in 0..len(tiers): covers(tiers, multiplier_percent, j)
++        }
++
++        /// Whether `new_tiers` rejects these inputs: mismatched lengths, a
++        /// multiplier out of range, or inputs out of order.
++        fun tiers_rejected(min_stakes: vector<u64>, multipliers_percent: vector<u64>): bool {
++            len(min_stakes) != len(multipliers_percent)
++                || (exists j in 0..len(multipliers_percent): !valid_multiplier(multipliers_percent[j]))
++                || !(forall k: u64 where 1 <= k && k < len(min_stakes):
++                    min_stakes[k] >= min_stakes[k - 1] && multipliers_percent[k] > multipliers_percent[k - 1])
++        }
++
++        /// Whether `tiers` pairs the stakes with the multipliers, in order.
++        fun built_from(tiers: vector<TxnLimitTier>, min_stakes: vector<u64>, multipliers_percent: vector<u64>): bool {
++            len(tiers) == len(min_stakes)
++                && (forall j in 0..len(tiers):
++                    tiers[j] == TxnLimitTier { min_stake: min_stakes[j], multiplier_percent: multipliers_percent[j] })
++        }
++
++        /// The stake of the least covering tier.
++        fun min_stake_for(tiers: vector<TxnLimitTier>, multiplier_percent: u64): num {
++            tiers[choose min j in 0..len(tiers) where covers(tiers, multiplier_percent, j)].min_stake
++        }
++    }
++
++    spec new_tier {
++        pragma opaque;
++        aborts_if !valid_multiplier(multiplier_percent);
++        ensures result == TxnLimitTier { min_stake, multiplier_percent };
++    }
++
++    spec validate_tiers {
++        pragma opaque;
++        aborts_if !ordered(tiers);
++    }
++
++    spec new_tiers {
++        pragma opaque;
++        aborts_if tiers_rejected(min_stakes, multipliers_percent);
++        ensures built_from(result, min_stakes, multipliers_percent);
++    }
++
++    spec find_min_stake_required {
++        pragma opaque;
++        aborts_if !(exists j in 0..len(tiers): covers(tiers, multiplier_percent, j));
++        // The least covering tier, not the cheapest one.
++        ensures result == tiers[choose min j in 0..len(tiers) where covers(tiers, multiplier_percent, j)].min_stake;
++    }
++
++    spec validate_enough_stake {
++        pragma opaque;
++        let execution = multipliers.execution_multiplier_percent;
++        let io = multipliers.io_multiplier_percent;
++        let config = global<TxnLimitsConfig>(@aptos_framework);
++        aborts_if !valid_multiplier(execution) || !valid_multiplier(io);
++        aborts_if !exists<TxnLimitsConfig>(@aptos_framework);
++        aborts_if !covered(config.execution_tiers, execution) || !covered(config.io_tiers, io);
++        // Both thresholds are inclusive.
++        aborts_if stake_amount < min_stake_for(config.execution_tiers, execution);
++        aborts_if stake_amount < min_stake_for(config.io_tiers, io);
++    }
++
++    spec update_config {
++        pragma opaque;
++        modifies global<TxnLimitsConfig>(@aptos_framework);
++        aborts_if std::signer::address_of(aptos_framework) != @aptos_framework;
++        aborts_if tiers_rejected(execution_min_stakes, execution_multipliers_percent);
++        aborts_if tiers_rejected(io_min_stakes, io_multipliers_percent);
++        // Created when absent, replaced when present.
++        ensures exists<TxnLimitsConfig>(@aptos_framework);
++        ensures built_from(
++            global<TxnLimitsConfig>(@aptos_framework).execution_tiers,
++            execution_min_stakes,
++            execution_multipliers_percent
++        );
++        ensures built_from(
++            global<TxnLimitsConfig>(@aptos_framework).io_tiers, io_min_stakes, io_multipliers_percent

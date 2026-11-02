@@ -96,7 +96,7 @@ The implementation has two deliberately separate paths:
 Lean-authored Move module ---+   -> kernel-checked Lean theorem
                              |
                              +-> typed base LCNF
-                                 -> named LIR
+                                 -> named VIR
                                  -> MoveModel.IR
                                  -> versioned XIR
                                  -> compiler-v2 stackless model
@@ -105,18 +105,18 @@ Lean-authored Move module ---+   -> kernel-checked Lean theorem
 ```
 
 The example-based developer reference is in the [Move README](README.md),
-the language definition in [`leaner-move.md`](leaner-move.md), and the
+the language definition in [`verex-move.md`](verex-move.md), and the
 detailed architecture in [`design-plan.md`](design-plan.md).
 
 Lean's compiler exposes typed base LCNF, which gives us a stable, explicit
 representation of the selected declarations. We normalize the supported
-first-order fragment into a named low-level IR (LIR), lower it into the
+first-order fragment into a named low-level IR (VIR), lower it into the
 existing `MoveModel.IR`, and serialize a versioned XIR exchange format. The
 Move compiler reads XIR into its model with stackless bytecode, then runs the
 normal compiler-v2 transformation, optimization, bytecode generation, and
 bytecode-verification pipeline. This preserves important compiler features
 instead of bypassing them with a custom bytecode assembler. The
-[ordered-map transactional test](../../../../move-compiler-v2/transactional-tests/tests/leaner/ordered_map.lean)
+[ordered-map transactional test](../../../../move-compiler-v2/transactional-tests/tests/verex/ordered_map.lean)
 exercises this complete path on the MoveVM.
 
 Verification does not go through XIR. It operates directly on relational
@@ -142,7 +142,7 @@ Its current boundary is intentional:
 - source-level proofs cannot yet import modules authored in Move;
 - higher-order functions, closures, recursive data types, and several complex
   nested-loan shapes remain outside the accepted compiler fragment;
-- the compiler-preservation proof from verified Lean source through LIR,
+- the compiler-preservation proof from verified Lean source through VIR,
   Move IR, XIR, compiler v2, and final bytecode remains future work.
 
 Even with these restrictions, the prototype is sufficient to test the core

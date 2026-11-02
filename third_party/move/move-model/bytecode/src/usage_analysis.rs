@@ -15,12 +15,17 @@ use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{ConditionKind, Spec},
-    model::{FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
+    ast::{ConditionKind, Spec, TempIndex},
+    model::{FunId, FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
+    pragmas::VERIFY_PRAGMA,
     ty::Type,
 };
 use paste::paste;
-use std::{collections::BTreeSet, fmt, fmt::Formatter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    fmt::Formatter,
+};
 
 pub fn get_memory_usage<'env>(target: &FunctionTarget<'env>) -> &'env UsageState {
     target
@@ -62,6 +67,21 @@ pub struct UsageState {
     /// so callers must resolve the wildcard against *their* accessed
     /// footprint at each use site (loop-header havoc, Invoke, etc.).
     pub invoke_frame_wildcard: bool,
+    /// True if this function's code, or the code of any function it calls, invokes a
+    /// function value whose effects nothing bounds. An invocation is bounded only when it
+    /// invokes the function's own, never reassigned parameter and every call site checks the
+    /// argument against a bound: the function declares `modifies_of`/`reads_of` for the
+    /// parameter, or it is opaque (an undeclared frame is then empty and enforced, or left to
+    /// the call site, which must supply a closure with known effects). A summary with this
+    /// flag set does not account for everything a call to the function does.
+    pub unbounded_invoke: bool,
+    /// `invoke_frame` without the enclosing function's own parameter frames: the
+    /// struct-field frames and the callees' `invoke_frame`s. At a call site, the
+    /// parameter frames can be replaced by what the arguments actually modify.
+    pub invoke_frame_other: SetDomain<QualifiedInstId<StructId>>,
+    /// The memory read or written by the code of this function or its callees, excluding
+    /// memory only mentioned by specifications.
+    pub code_accessed: SetDomain<QualifiedInstId<StructId>>,
     /// The memory mentioned by the assume expressions in this function.
     pub assumed: MemoryUsage,
     /// The memory mentioned by the assert expressions in this function.
@@ -202,8 +222,18 @@ impl UsageState {
         self.add_transitive_modified_iter(callee.modified.get_all_inst(inst).into_iter());
         self.add_transitive_assumed_iter(callee.assumed.get_all_inst(inst).into_iter());
         self.add_transitive_asserted_iter(callee.asserted.get_all_inst(inst).into_iter());
-        self.add_transitive_invoke_frame_iter(callee.invoke_frame.get_all_inst(inst).into_iter());
+        self.code_accessed.extend(
+            callee
+                .code_accessed
+                .iter()
+                .map(|mem| mem.instantiate_ref(inst)),
+        );
+        let callee_invoke_frame = callee.invoke_frame.get_all_inst(inst);
+        self.invoke_frame_other
+            .extend(callee_invoke_frame.iter().cloned());
+        self.add_transitive_invoke_frame_iter(callee_invoke_frame.into_iter());
         self.invoke_frame_wildcard |= callee.invoke_frame_wildcard;
+        self.unbounded_invoke |= callee.unbounded_invoke;
     }
 }
 
@@ -247,13 +277,16 @@ impl TransferFunctions for MemoryUsageAnalysis<'_> {
                 | MoveFrom(mid, sid, inst)
                 | BorrowGlobal(mid, sid, inst) => {
                     let mem = mid.qualified_inst(*sid, inst.to_owned());
+                    state.code_accessed.insert(mem.clone());
                     state.add_direct_modified(mem);
                 },
                 WriteBack(BorrowNode::GlobalRoot(mem), _) => {
+                    state.code_accessed.insert(mem.clone());
                     state.add_direct_modified(mem.clone());
                 },
                 Exists(mid, sid, inst) | GetGlobal(mid, sid, inst) => {
                     let mem = mid.qualified_inst(*sid, inst.to_owned());
+                    state.code_accessed.insert(mem.clone());
                     state.add_direct_accessed(mem);
                 },
                 _ => {},
@@ -352,6 +385,9 @@ impl MemoryUsageAnalysis<'_> {
         if !has_invoke {
             return;
         }
+        if has_unbounded_invoke(target) {
+            state.unbounded_invoke = true;
+        }
         let mem_is_closed =
             |mem: &QualifiedInstId<StructId>| mem.inst.iter().all(|ty| !ty.is_open());
         let mut wildcard = false;
@@ -390,6 +426,7 @@ impl MemoryUsageAnalysis<'_> {
                     for mem in &access.old_memory {
                         if mem_is_closed(mem) {
                             state.add_direct_invoke_frame(mem.clone());
+                            state.invoke_frame_other.insert(mem.clone());
                         } else {
                             wildcard = true;
                         }
@@ -407,6 +444,249 @@ impl MemoryUsageAnalysis<'_> {
             state.invoke_frame_wildcard = true;
         }
     }
+
+    /// Accounts for closures handed to a callee that leaves their frame to the call site.
+    ///
+    /// See [`deferred_closure_targets`]: the callee's own summary records none of what such
+    /// a closure does, so the function making the call carries it, exactly as if it had
+    /// invoked the closure itself.
+    fn compute_deferred_closure_usage(&self, target: &FunctionTarget, state: &mut UsageState) {
+        let env = self.cache.global_env();
+        let code = target.get_bytecode();
+        let summaries = |id: QualifiedId<FunId>| {
+            self.cache
+                .get::<UsageState>(id, &FunctionVariant::Baseline)
+                .cloned()
+        };
+        let closures = closures_with_known_footprint(
+            env,
+            target.func_env.get_qualified_id(),
+            code,
+            &summaries,
+        );
+        for bc in code {
+            let Bytecode::Call(_, _, Operation::Function(mid, fid, _), srcs, _) = bc else {
+                continue;
+            };
+            let callee = env.get_function(mid.qualified(*fid));
+            for closure in deferred_closure_targets(&callee, srcs, &closures) {
+                state.add_transitive_modified_iter(closure.writes.iter().cloned());
+                state.add_transitive_accessed_iter(closure.accessed.iter().cloned());
+            }
+        }
+    }
+}
+
+/// What a closure built in some function writes and accesses, as the prover sees a call to
+/// its target.
+#[derive(Clone, Debug)]
+pub struct ClosureEffects {
+    /// Every resource a call to the target can write, instantiated.
+    pub writes: BTreeSet<QualifiedInstId<StructId>>,
+    /// Every resource a call to the target can read or write, instantiated.
+    pub accessed: BTreeSet<QualifiedInstId<StructId>>,
+}
+
+/// What a call to `fun_id` at `inst` writes and accesses, as the prover encodes the call:
+/// `None` when that is not known.
+///
+/// - A native, or an opaque function under `pragma verify = false`, is encoded from its
+///   contract, so its declared `modifies` frame is what it writes; for the opaque function,
+///   a call also havocs what its body writes outside that frame, which is added from its
+///   usage summary. A frame that is a wildcard, or that names memory through a bare type
+///   parameter, is not a known set.
+/// - Any other function is described by its usage summary, which `summary_of` supplies. It
+///   is not known when there is no summary (a member of a recursive cycle whose summary is
+///   still being computed), or when the summary has `unbounded_invoke` or a wildcard invoke
+///   frame: some function value it runs has effects nothing records.
+pub fn call_effects(
+    env: &GlobalEnv,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> Option<ClosureEffects> {
+    let fun = env.get_function(fun_id);
+    if fun.is_native() || (fun.is_opaque() && fun.is_pragma_false(VERIFY_PRAGMA)) {
+        let mut writes = BTreeSet::new();
+        if let Some(frame) = fun.get_frame_spec() {
+            if frame.modifies_all {
+                return None;
+            }
+            for target in &frame.modifies_targets {
+                let Type::Struct(mid, sid, targs) =
+                    env.get_node_type(target.node_id()).skip_reference().clone()
+                else {
+                    return None;
+                };
+                let mem = mid.qualified_inst(sid, targs).instantiate(inst);
+                if mem.inst.iter().any(|ty| ty.is_open()) {
+                    return None;
+                }
+                writes.insert(mem);
+            }
+        }
+        let mut accessed = writes.clone();
+        accessed.extend(fun.get_spec_used_memory_instantiated(inst));
+        // A direct call also havocs what the body writes outside the frame, so a closure
+        // over this target must be charged with the same.
+        if !fun.is_native() {
+            let summary = summary_of(fun_id)?;
+            if summary.unbounded_invoke || summary.invoke_frame_wildcard {
+                return None;
+            }
+            writes.extend(summary.modified.get_all_inst(inst));
+            writes.extend(summary.invoke_frame.get_all_inst(inst));
+            accessed.extend(summary.accessed.get_all_inst(inst));
+            accessed.extend(writes.iter().cloned());
+        }
+        return Some(ClosureEffects { writes, accessed });
+    }
+    let summary = summary_of(fun_id)?;
+    if summary.unbounded_invoke || summary.invoke_frame_wildcard {
+        return None;
+    }
+    let mut writes = summary.modified.get_all_inst(inst);
+    writes.extend(summary.invoke_frame.get_all_inst(inst));
+    let mut accessed = summary.accessed.get_all_inst(inst);
+    accessed.extend(writes.iter().cloned());
+    Some(ClosureEffects { writes, accessed })
+}
+
+/// Whether `target` invokes a function value whose effects nothing bounds (see
+/// `UsageState::unbounded_invoke`).
+///
+/// An invocation is bounded only when its operand is one of the function's own parameters,
+/// never reassigned in the body, whose argument is checked against a bound at every call
+/// site. The frame checks enforce that exactly when the function declares
+/// `modifies_of`/`reads_of` for the parameter (the argument must stay within it; the writes
+/// are in `invoke_frame`), or when the function is opaque: an undeclared frame is then
+/// empty and enforced, or left to the call site, which must supply a closure with known
+/// effects. Any other operand -- a parameter of a transparent function without a
+/// declaration, a value read from storage or a struct field, a local of any other origin --
+/// is unbounded.
+fn has_unbounded_invoke(target: &FunctionTarget) -> bool {
+    let fun = target.func_env;
+    let params = fun.get_parameters();
+    let code = target.get_bytecode();
+    let reassigned: BTreeSet<TempIndex> = code.iter().flat_map(|bc| bc.dests()).collect();
+    let bounded_param = |idx: TempIndex| {
+        idx < params.len()
+            && !reassigned.contains(&idx)
+            && params[idx].1.skip_reference().is_function()
+            && (fun.is_opaque()
+                || fun
+                    .get_fun_param_access_of()
+                    .iter()
+                    .any(|access| access.fun_param == params[idx].0))
+    };
+    code.iter().any(|bc| match bc {
+        Bytecode::Call(_, _, Operation::Invoke, srcs, _) => {
+            srcs.last().is_none_or(|operand| !bounded_param(*operand))
+        },
+        _ => false,
+    })
+}
+
+/// The closures built in `code` whose effects the prover can state, by the temporary each is
+/// bound to.
+///
+/// A closure qualifies when:
+///
+/// - its temporary is defined exactly once, by the `Closure` operation (a closure rebuilt in
+///   a loop, or overwritten, has no single target);
+/// - its target is not `enclosing`, the function being analysed, whose summary is still
+///   being computed;
+/// - its target leaves none of its own function-typed parameters' frames to its call sites:
+///   such a target's effects omit the closure it runs, so a closure that partially applies it
+///   (`|y| apply(h, y)`, lowered to `Closure(apply, [h])`) would hide the captured `h`;
+/// - its target has no function-typed parameter: the target's summary bounds what invoking
+///   such a parameter writes by the check a direct call makes on its argument (against the
+///   declared frame, or the empty one), and a closure's target is not called directly -- the
+///   value comes from the closure's captures or from whoever invokes the closure, and neither
+///   is checked;
+/// - a call to its target has known effects ([`call_effects`]): for a native or an
+///   unverified opaque function, its declared frame; otherwise its usage summary;
+/// - those effects write no spec variable (ghost memory): a call-site havoc never covers
+///   one, so deferring would drop the write.
+///
+/// Every analysis that needs a closure's effects, and every check that decides whether a
+/// callee may leave a closure's frame to its call site, must use this one set, so that a
+/// closure is deferred exactly when its effects are accounted for. Any other closure has no
+/// footprint, and an undeclared frame stays empty for it.
+pub fn closures_with_known_footprint(
+    env: &GlobalEnv,
+    enclosing: QualifiedId<FunId>,
+    code: &[Bytecode],
+    summary_of: &dyn Fn(QualifiedId<FunId>) -> Option<UsageState>,
+) -> BTreeMap<TempIndex, ClosureEffects> {
+    let mut def_counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
+    for bc in code {
+        for dest in bc.dests() {
+            *def_counts.entry(dest).or_default() += 1;
+        }
+    }
+    let effects_of = |target_id: QualifiedId<FunId>, targs: &[Type]| {
+        let target = env.get_function(target_id);
+        let defers_itself = target
+            .get_parameters()
+            .iter()
+            .any(|param| target.leaves_fun_param_frame_to_call_site(param.0));
+        if target_id == enclosing || defers_itself {
+            return None;
+        }
+        call_effects(env, target_id, targs, summary_of).filter(|effects| {
+            !effects
+                .writes
+                .iter()
+                .any(|mem| env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory())
+        })
+    };
+    let takes_fun_value = |target_id: QualifiedId<FunId>| {
+        env.get_function(target_id)
+            .get_parameters()
+            .iter()
+            .any(|param| param.1.skip_reference().is_function())
+    };
+    code.iter()
+        .filter_map(|bc| match bc {
+            Bytecode::Call(_, dests, Operation::Closure(mid, fid, targs, _), _, _)
+                if dests.len() == 1
+                    && def_counts[&dests[0]] == 1
+                    && !takes_fun_value(mid.qualified(*fid)) =>
+            {
+                effects_of(mid.qualified(*fid), targs).map(|effects| (dests[0], effects))
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// The effects of the closures a call to `callee` with arguments `srcs` runs on the callee's
+/// behalf without the callee's own summary accounting for them.
+///
+/// A callee that leaves a function-typed parameter's frame to its call sites
+/// (`FunctionEnv::leaves_fun_param_frame_to_call_site`) records nothing for that parameter.
+/// Whatever the closure passed for it does is therefore part of what *this call* does, and
+/// every analysis that asks what a call modifies -- the summary of the function making it,
+/// the havoc at a loop head that contains it -- must add the effects returned here.
+/// `closures` is [`closures_with_known_footprint`] of the calling function; an argument of
+/// any other origin has no footprint and is rejected by the frame check, so it never reaches
+/// the prover.
+pub fn deferred_closure_targets<'a>(
+    callee: &FunctionEnv,
+    srcs: &[TempIndex],
+    closures: &'a BTreeMap<TempIndex, ClosureEffects>,
+) -> Vec<&'a ClosureEffects> {
+    if !callee.is_opaque() {
+        return vec![];
+    }
+    callee
+        .get_parameters()
+        .iter()
+        .zip(srcs)
+        .filter(|(param, _)| callee.leaves_fun_param_frame_to_call_site(param.0))
+        .filter_map(|(_, src)| closures.get(src))
+        .collect()
 }
 
 pub struct UsageProcessor();
@@ -427,6 +707,7 @@ impl UsageProcessor {
         let mut summary = analysis.summarize(&func_target, UsageState::default());
         analysis.compute_spec_usage(&func_env.get_spec(), &mut summary);
         analysis.compute_invoke_usage(&func_target, &mut summary);
+        analysis.compute_deferred_closure_usage(&func_target, &mut summary);
         summary
     }
 }

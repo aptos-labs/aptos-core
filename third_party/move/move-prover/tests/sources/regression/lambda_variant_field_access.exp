@@ -1,0 +1,42 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/lambda_variant_field_access.move:31:9
+   │
+31 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/lambda_variant_field_access.move:24: two
+   =     at tests/sources/regression/lambda_variant_field_access.move:29: two (spec)
+   =     at tests/sources/regression/lambda_variant_field_access.move:30: two (spec)
+   =     at tests/sources/regression/lambda_variant_field_access.move:24: two
+   =         e1 = <redacted>
+   =         e2 = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:25: two
+   =         f = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:26: two
+   =     at tests/sources/regression/lambda_variant_field_access.move:10: apply
+   =         f = <redacted>
+   =         e = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:11: apply
+   =         result = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:10: apply
+   =         f = <redacted>
+   =         e = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:11: apply
+   =         result = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:31: two (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/lambda_variant_field_access.move:82:9
+   │
+82 │         ensures e == old(e);
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/lambda_variant_field_access.move:76: write_ss_unchanged
+   =     at tests/sources/regression/lambda_variant_field_access.move:80: write_ss_unchanged (spec)
+   =     at tests/sources/regression/lambda_variant_field_access.move:76: write_ss_unchanged
+   =         e = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:77: write_ss_unchanged
+   =         e = <redacted>
+   =     at tests/sources/regression/lambda_variant_field_access.move:81: write_ss_unchanged (spec)
+   =     at tests/sources/regression/lambda_variant_field_access.move:82: write_ss_unchanged (spec)

@@ -1,0 +1,3975 @@
+# Agent reports: corpus4-run8-codex-sol56-high
+
+The final report of every cell, as the agent wrote it, grouped by target and tactic.
+
+## `available_transaction_queue_capacity`
+
+`aptos_framework::extracted_multisig_account`, task id `MS-capacity-048`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped only to `aptos_framework::extracted_multisig_account::available_transaction_queue_capacity`. I’ll inspect the target and its actual call dependencies, add only inferred specification clauses, then iterate with the candidate checker until accepted or the proof budget is exhausted.
+
+The target has no executable callees; its only external behavior comes from reading `MultisigAccount` and from two checked `u64` subtractions. The key boundary is `next_sequence_number <= last_executed_sequence_number`, which makes the first or second subtraction abort; otherwise the return is the remaining capacity, clamped to zero once pending transactions exceed 20.
+
+- **Result:** Added a complete opaque contract for [`available_transaction_queue_capacity`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r01-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.move:68), covering exact return behavior and all resource/subtraction aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived behavior directly from the implementation and resource access, then verified the coherent candidate with `move_spec_check`.
+- **Decision points:** Modeled `next_sequence_number <= last_executed_sequence_number` as the exact arithmetic-abort boundary; expressed capacity as the implementation’s pending-count calculation with zero clamping above 20.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` skill to infer the target’s caller-visible result and abort behavior, preserve existing specs, and validate the final opaque contract with the candidate checker. I’ll keep all work scoped to `aptos_framework::extracted_multisig_account::available_transaction_queue_capacity` and use `.` as the package path.
+
+The target has no executable callees or loop. Its complete behavior is driven by one global resource borrow and two checked `u64` subtractions: it aborts when the resource is absent or when `next_sequence_number <= last_executed_sequence_number`; otherwise it returns the queue cap clamped at zero. I’m checking the repository’s exact inferred-clause syntax before adding that opaque contract.
+
+- **Result:** Added an opaque, complete contract in [extracted_multisig_account.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r02-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move). It specifies missing-resource and subtraction-underflow aborts plus the exact capped capacity result. `CANDIDATE_ACCEPTED`; all obligations verified and coverage is complete.
+- **Strategy:** Derived the contract directly from the global borrow and checked arithmetic, then validated it with `move_spec_check`.
+- **Decision points:** No `modifies` frame was added because the function is read-only; `next_sequence_number <= last_executed_sequence_number` precisely combines both subtraction abort cases.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for this target: I’ll inspect only the function, its existing spec, and relevant callees, then iterate with `move_spec_check` until the opaque contract is accepted or the proof budget is exhausted.
+
+The implementation has no callees or loop. Its only exceptional paths are the missing `MultisigAccount` resource and underflow in `next_sequence_number - last_executed_sequence_number - 1`; the normal result is the remaining capacity, saturated at zero once pending transactions exceed 20. I’m checking the repository’s spec syntax before adding that exact contract.
+
+- **Result:** Added a complete opaque contract for [`available_transaction_queue_capacity`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r03-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:16>), covering missing-resource and arithmetic-underflow aborts plus the exact saturated capacity result. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived the contract directly from the implementation and confirmed there were no callees or loops requiring additional contracts or invariants.
+- **Decision point:** Modeled underflow exactly as `next_sequence_number <= last_executed_sequence_number`; the acceptance check verified complete contract coverage with unchanged implementation.
+
+### agent-only, replicate 4: strict success
+
+I’m using the provided `move-inf` skill to infer the target’s full caller-visible contract, preserve executable behavior, and accept it only through `move_spec_check`. I’ll keep all package calls rooted at `.` as requested.
+
+The target is a read-only function with no loop. Its key boundary is the chained unsigned subtraction: the contract must capture resource absence and both underflow points, then give the exact saturated capacity on normal return. I’m checking only its executable dependency closure before writing that candidate.
+
+I added one opaque, read-only contract in the existing `.spec.move` file: exact resource/underflow abort behavior and the precise piecewise return value. No `modifies` frame is appropriate because the implementation only borrows global state. I’m now running the acceptance check on this coherent candidate.
+
+The first check found only an inference-marker placement error: this package’s grammar places `[inferred]` after `aborts_if`/`ensures`. I corrected that syntax without changing the contract and am rerunning acceptance.
+
+- **Result:** Added an opaque, complete contract for `available_transaction_queue_capacity` in [extracted_multisig_account.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r04-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:17). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Specified exact missing-resource and subtraction-underflow aborts, plus the precise saturated queue-capacity result.
+- **Decision points:** Omitted `modifies` because the function only reads global state; combined both unsigned subtraction failures into `next_sequence_number <= last_executed_sequence_number`.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow because this is a specification-inference task. I’ll scope all edits and proof checks to `aptos_framework::extracted_multisig_account::available_transaction_queue_capacity`, use `.` as the package path, and stop only on candidate acceptance or a genuine budget/tool blocker.
+
+The target has no named executable callees or closure captures; its behavior comes entirely from resource existence/borrowing and checked `u64` subtraction. I’m applying WP now to capture the exact normal result and both underflow boundaries before running the acceptance check.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`available_transaction_queue_capacity`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:77>), covering its exact result, missing-resource abort, and both subtraction-underflow conditions. `CANDIDATE_ACCEPTED`; implementation unchanged and all obligations verified.
+- **Strategy:** Used function-usage analysis followed by targeted weakest-precondition inference and `move_spec_check` with a 5-second solver budget.
+- **Decision points:** No loop invariant was needed; the function is loop-free. WP completed without warnings, so its generated clauses were preserved unchanged.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the provided move-inf workflow exactly: I’ll inspect the target and its actual callees, infer only the target contract, and finish with `move_spec_check` as the acceptance gate.
+
+The target is loop-free and has no named executable callees; its visible behavior is a read-only global lookup, two checked subtractions, and a capped capacity result. I’m applying WP at function scope so implicit resource and arithmetic aborts are included exactly.
+
+WP produced a warning-free contract: it distinguishes the missing-resource abort from both underflow points and gives the exact piecewise return value. The function is read-only, so no `modifies` frame is appropriate; I’m now running the required acceptance check directly on this generated contract.
+
+- **Result:** Added an opaque, complete contract for `available_transaction_queue_capacity`, covering its exact return value and all resource/underflow aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used warning-free function-scoped WP inference, then `move_spec_check` with a 5-second budget.
+- **Decision points:** No loop invariant or `modifies` frame was needed because the function is loop-free and read-only.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow because this is a specification-inference task. I’ll inspect only the target and its relevant callees, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free, calls no functions, and only reads `MultisigAccount`; there are no mutation frames to infer. That makes a focused weakest-precondition pass the most direct way to derive its exact result and abort behavior.
+
+- **Result:** Added an opaque, complete contract for `available_transaction_queue_capacity`, covering its exact return value and all resource/arithmetic aborts. `CANDIDATE_ACCEPTED`; implementation unchanged. See [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:77).
+- **Strategy:** Used focused WP inference because the function is loop-free and has no callees, then validated directly with `move_spec_check`.
+- **Decision points:** No loop invariant or `modifies` frame was needed; structural analysis showed only global-resource reads and no writes.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the provided `move-inf` workflow exactly, scoped only to `aptos_framework::extracted_multisig_account::available_transaction_queue_capacity`. I’ll inspect the target and its relevant callees, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and has no executable callees, so the WP pass is a good fit here. The key behaviors to capture are the missing-resource abort, both subtraction-underflow cases, and the exact piecewise capacity result; the function only reads global state, so it should have no `modifies` frame.
+
+- **Result:** Added an opaque, complete inferred contract for [`available_transaction_queue_capacity`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:77>), covering its exact result and all resource/subtraction aborts. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used targeted WP inference because the function is loop-free with no callees, then validated the generated clauses directly with a 5-second candidate check.
+- **Decision point:** No `modifies` clause was added because the function only reads `MultisigAccount`; the acceptance check confirmed complete contract coverage and unchanged implementation.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll run WP first on the single target with `package_path: "."`, inspect and repair only in-scope specifications or invariants, then use `move_spec_check` as the acceptance gate.
+
+WP completed without warnings and generated an opaque contract covering the return value plus resource-access and arithmetic aborts. Per the supplied skill, I’m now checking those generated clauses directly; no manual edits are warranted unless acceptance reports a concrete failure.
+
+- **Result:** Added an opaque inferred contract in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:77), covering the exact result and all resource/arithmetic aborts. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Ran warning-free WP for the target, then directly ran `move_spec_check` with a 5-second solver budget.
+- **Decision points:** Preserved WP output unchanged because it had no diagnostics; stopped after acceptance as required.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` skill to infer this function’s full opaque contract. I’ll begin exactly as directed: run WP on `aptos_framework::extracted_multisig_account::available_transaction_queue_capacity` with package path `.` and inline output, then handle only the resulting diagnostics before candidate checking.
+
+WP completed without warnings and generated a three-part behavioral contract: exact capacity result plus resource-existence and sequence-arithmetic abort conditions, with `pragma opaque`. Per the skill, I’m now checking this unchanged candidate directly at the requested function scope.
+
+- **Result:** Added an exact opaque contract for `available_transaction_queue_capacity` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:77), covering its return value and all abort conditions. `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran function-scoped WP with inline output, then directly checked the unchanged, warning-free candidate with a 5-second solver budget.
+- **Decision points:** No repair was needed because WP reported no diagnostics and the first candidate check accepted the generated contract.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill for this function. I’ll begin with scoped WP output at package path `.`, then address only its diagnostics and finish with the candidate check.
+
+WP produced a warning-free opaque contract with one result formula and exact resource/arithmetic abort conditions. I’m checking those generated clauses directly now, per the skill’s acceptance workflow.
+
+- **Result:** Added an opaque inferred contract for [`available_transaction_queue_capacity`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:77>), covering its exact result and all resource/arithmetic aborts. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Ran scoped WP inline, received warning-free output, then directly validated it with `move_spec_check` at a 5-second solver budget.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the provided `move-inf` skill for this inference. I’ll run weakest-precondition inference first on the exact function with `package_path: "."`, address only diagnostics in scope, and finish with the candidate check.
+
+WP completed without warnings and injected a complete-looking opaque contract: exact capacity on return plus the resource, subtraction-order, and lower-bound abort cases. I’m now checking those generated clauses directly with the acceptance checker.
+
+- **Result:** Added an `[inferred]`, `pragma opaque` contract for `available_transaction_queue_capacity` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-capacity-048-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:77), covering its result and all abort conditions. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Ran scoped WP inference, then directly validated the warning-free generated contract with `move_spec_check` at a 5-second solver budget.
+- **Decision points:** No loop repairs or manual proof changes were needed; WP emitted no warnings and the first candidate check verified every target obligation.
+
+## `can_execute_with_timelock`
+
+`aptos_framework::extracted_multisig_account`, task id `MS-timelock-047`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied move-inf workflow exactly: I’ll inspect only the target and its relevant callees, author the opaque complete contract, and use the candidate checker as the acceptance gate.
+
+The target has no loop. Its behavior splits cleanly on timelock-resource existence; the timelock branch additionally inherits `get_transaction`, timestamp, subtraction, and option-borrow behavior. I’m now resolving those exact contracts before writing clauses.
+
+The contract needs three abort classes, all guarded by timelock existence: transaction lookup failure, missing clock state, and elapsed-time underflow. The normal result is the threshold override or expiration test; there are no writes, so no `modifies` frame is appropriate.
+
+The first proof exposed an important abstraction issue: `result_of` values were not sufficiently tied to the concrete call results in this context, producing both false abort witnesses and missed underflow. I’m replacing those carriers with the exact resource/table and timestamp specification expressions supplied by the dependency contracts.
+
+- **Result:** Added a complete opaque contract for `can_execute_with_timelock` in [extracted_multisig_account.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r01-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:17). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Specified the exact result plus transaction lookup, timestamp-resource, and subtraction-underflow abort paths using concrete resource/table abstractions.
+- **Decision point:** Replaced insufficiently constrained `result_of` carriers after they produced false counterexamples; direct dependency spec expressions verified successfully.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow because this is specification inference. I’ll inspect only the target implementation, its existing spec, and its actual call dependencies, then iterate with `move_spec_check` until the target is accepted or the proof budget is exhausted.
+
+The target has no loop and writes no global state. Its behavior branches entirely on timelock-resource existence, then depends on `get_transaction`, timestamp access, option borrowing, and subtraction safety; I’m reading those contracts now so the abort condition and result relation are exact.
+
+I added a first coherent opaque contract: three abort sources (transaction lookup, missing clock resource, timestamp subtraction underflow) and an exact return formula for override-threshold or elapsed-timelock success. I’m checking this candidate now; any rejection will determine whether the contract needs a more solver-friendly direct-state form.
+
+The rejection pinpointed one abstraction issue: `result_of<get_transaction>` was not sufficiently tied to the concrete table value in these arithmetic obligations, producing both spurious and missed underflow cases. I’m retaining the callee’s exact `aborts_of` boundary, but replacing its result carrier with the table value guaranteed by the callee’s existing postcondition.
+
+- **Result:** Added an opaque, complete contract for `can_execute_with_timelock`: exact return behavior and all transaction, clock-resource, and subtraction aborts. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and existing opaque callee contracts, using direct table-state semantics for the transaction result.
+- **Decision point:** Replaced an underconstrained `result_of<get_transaction>` expression after it produced spurious counterexamples; the direct guaranteed table value verified successfully.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for this target. I’ll inspect only the function, its existing specs, and relevant callees, then iterate with `move_spec_check` until it accepts or the proof budget is genuinely exhausted.
+
+The target has no loop, but its behavior depends on four distinct boundaries: timelock-resource existence, transaction lookup validity/table membership, timestamp access, and optional override threshold. I’m now reading those callee contracts so the abort set and result formula are exact rather than inferred from imports.
+
+The dependency specs give exact opaque models for both `get_transaction` and `timestamp::now_seconds`. I’ll express the target against those contracts, including sequencing guards so timestamp/subtraction aborts are counted only after transaction lookup succeeds; the normal result will distinguish the no-timelock fast path from threshold/expiry evaluation.
+
+The first candidate exposed an important abstraction issue: `result_of` carriers for these state-reading calls were not tied tightly enough to the concrete pre-state, producing both spurious and missed subtraction cases. I’m replacing those carriers with the dependencies’ direct state models (`table::spec_get` and `timestamp::spec_now_seconds`) and spelling out the lookup/timestamp guards explicitly.
+
+- **Result:** Added a complete opaque contract for `can_execute_with_timelock` in [extracted_multisig_account.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r03-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:18), covering lookup, timestamp, subtraction aborts, and the exact boolean result. `move_spec_check`: **CANDIDATE_ACCEPTED**.
+- **Strategy:** Modeled behavior directly from table state and `timestamp::spec_now_seconds`; no `modifies` frame was needed because the function is read-only.
+- **Decision point:** Replaced insufficiently constrained `result_of` carriers after counterexamples showed spurious/missed behavior. The direct state model then verified with complete contract coverage and unchanged implementation.
+
+### agent-only, replicate 4: strict success
+
+I’m following the supplied `move-inf` workflow exactly. I’ll inspect only the target implementation, its existing specs, and concrete call dependencies, then iterate with the specification checker until it accepts or the budget is exhausted.
+
+The target is a read-only function with no loop and no global writes. Its dependency closure is small: transaction lookup, timestamp access, option inspection, and comparison. I’m now reading the exact branch structure and the existing callee contracts so the result and abort conditions cover each path.
+
+I added one opaque target contract: it makes the no-timelock branch total and true, composes the two opaque callee contracts for transaction lookup and time access, includes subtraction underflow, and states the exact threshold-or-expiry result. No frame is declared because the implementation only reads global state. I’m checking this coherent candidate now.
+
+- **Result:** Added a complete opaque contract for `can_execute_with_timelock` in [extracted_multisig_account.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r04-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:16). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified with implementation unchanged.
+- **Strategy:** Composed exact transaction and timestamp contracts, including all transitive aborts and subtraction underflow, then specified the threshold-or-timelock result. No loop invariant or `modifies` frame was needed.
+- **Decision points:** The absent-timelock path is total and returns `true`; the timelock path uses `result_of`/`aborts_of` because both opaque callees already have complete contracts.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill to infer only `aptos_framework::extracted_multisig_account::can_execute_with_timelock`. I’ll inspect the target and its executable dependencies, then use WP and the candidate checker as the acceptance gate.
+
+The target is loop-free, so WP can characterize it directly. Its dependency scan confirms the visible branches come from the timelock resource, transaction lookup, timestamp arithmetic, and optional override threshold; I’m running WP before making any manual clauses.
+
+WP produced a warning-free opaque contract with the exact normal-result predicate and four abort sources, including timestamp/transaction callees and subtraction underflow. I’m preserving that generated contract unchanged and sending it to the candidate checker now.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`can_execute_with_timelock`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:97>), covering its Boolean result and all abort paths. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used dependency-scoped inspection followed by warning-free WP inference and direct candidate checking.
+- **Decision points:** Kept WP’s clauses unchanged because they precisely covered transaction/timestamp failures, subtraction underflow, and option borrowing; no loop invariants or manual proof repairs were needed.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove the complete opaque contract for `aptos_framework::extracted_multisig_account::can_execute_with_timelock`. I’ll keep edits confined to that target and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free, so WP is a good fit here. Its dependency trace confirms the contract must cover the timelock-resource branch, `get_transaction`/table lookup aborts, timestamp access, subtraction safety, and the exact Boolean result.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `can_execute_with_timelock` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:97). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used loop-free weakest-precondition inference, then validated the generated result and abort conditions with `move_spec_check`.
+- **Decision point:** Kept WP’s generated clauses unchanged because inference reported no warnings and the acceptance check proved them directly.
+
+### hybrid flexible, replicate 3: strict success
+
+I’ll follow the supplied move-inf workflow exactly, targeting only `aptos_framework::extracted_multisig_account::can_execute_with_timelock`. I’ll first inspect its implementation, existing specs, and actual call dependencies, then infer and validate the opaque contract with the candidate checker.
+
+The target is loop-free, so the WP pass is a good fit here. Its only behavioral branches are timelock-resource absence versus presence; the latter reads the transaction and timestamp, so the key risk is accurately carrying all transitive abort conditions from those reads and the subtraction. I’m running focused WP inference now.
+
+- **Result:** Added a complete opaque contract for [`can_execute_with_timelock`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:97>), covering its Boolean result and all transitive abort behavior. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused dependency inspection and loop-free weakest-precondition inference, followed by `move_spec_check` at a 5-second solver budget.
+- **Decision points:** Retained the generated state-threaded timestamp/transaction expressions because WP reported no warnings and the acceptance checker confirmed complete contract coverage.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill to infer only `aptos_framework::extracted_multisig_account::can_execute_with_timelock`. I’ll inspect the target and its call dependencies, then use WP selectively and finish with `move_spec_check`, which is the acceptance gate.
+
+The target is loop-free and its dependencies are now identified (`get_transaction`, timestamp reads, and option accessors), so WP is the most direct first pass. I’ll inspect its generated clauses for exact abort behavior, result semantics, and the absence of global writes before accepting them.
+
+WP produced a warning-free contract: it distinguishes the no-timelock fast path, models the exact boolean result when a timelock exists, and includes timestamp/get-transaction/subtraction/option abort paths. Because there are no global writes, no `modifies` frame is needed. I’m sending this candidate directly to the required acceptance check.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `can_execute_with_timelock` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:97). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used warning-free WP inference because the function is loop-free, then directly validated the generated result and abort conditions with the acceptance checker. No `modifies` frame was needed because the function performs no global writes.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for this function: first WP with inline output, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering the boolean result plus timestamp, transaction lookup, subtraction, and option-borrow abort paths. I’m checking that exact candidate now.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`can_execute_with_timelock`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:97>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran warning-free WP inline, then directly checked the generated candidate at a 5-second solver budget. No repairs or loop invariants were needed.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` skill for this function. I’ll begin with weakest-precondition inference on `aptos_framework::extracted_multisig_account::can_execute_with_timelock`, keep the package path as `.`, then repair any loop/proof diagnostics and finish only when `move_spec_check` accepts the candidate or the experiment budget is exhausted.
+
+WP completed without warnings and generated an opaque contract covering the Boolean result plus timestamp, transaction lookup, subtraction-underflow, and option-borrow abort behavior. I’m now checking those generated clauses directly with the acceptance checker, as required by the skill.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `can_execute_with_timelock` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:97). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran warning-free WP inference inline, then directly checked the generated result and abort clauses with a 5-second solver budget.
+- **Decision points:** Retained WP’s exact timestamp, transaction lookup, subtraction-underflow, and option-borrow behavior because inference reported no unresolved diagnostics; no manual repair or weakening was needed.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_multisig_account::can_execute_with_timelock` with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering the return value plus timestamp, transaction lookup, subtraction, and option-borrow abort paths. I’m now checking those clauses directly at the requested function scope.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `can_execute_with_timelock`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran scoped WP with inline output, then directly checked the generated contract with a 5-second solver budget. No warnings or repairs were needed.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_multisig_account::can_execute_with_timelock` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering the boolean result plus timestamp, transaction lookup, subtraction, and option-borrow aborts. I’m now checking those generated clauses directly with the initial 5-second solver budget.
+
+- **Result:** Added a complete inferred opaque contract for `can_execute_with_timelock` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-timelock-047-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:97). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran warning-free WP inline, then directly ran `move_spec_check` with a 5-second per-condition budget.
+- **Decision points:** No loop repair or manual specification edits were needed; WP covered the result and all timestamp, transaction, arithmetic, and option abort behavior.
+
+## `cancel_at_price_level`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-cancel-026`
+
+### agent-only, replicate 1: strict success
+
+I’ll follow the supplied move-inf workflow exactly, scoped only to `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`. I’ll first inspect the target implementation and its actual call dependencies, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The implementation’s key edge case is that a missing price is total even when `sizes` is shorter, while a found price aborts exactly when its first matching index is outside `sizes`. I’m encoding that first-match behavior explicitly and using a loop invariant that preserves both vectors while relating the scan position to the first-match helper.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`cancel_at_price_level`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r01-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Modeled the first matching price with a recursive specification helper, including exact result, vector-removal effects, and abort behavior.
+- **Decision point:** Preserved the important edge case where a missing price succeeds even if `sizes` is shorter; only a found index outside `sizes` aborts.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target implementation and relevant dependency contracts, infer an opaque complete contract (plus any needed loop invariant), and use `move_spec_check` as the acceptance gate.
+
+The implementation is a first-match search. Its only abort is a length mismatch reached at that first matching price; if there is no match, `sizes` is never indexed. I’m now checking the vector specification vocabulary so the post-state can describe exact element removal without imposing an artificial equal-length precondition.
+
+The first candidate reached only a name-resolution issue: the standard vector spec helper is not imported in this module. I’ll qualify it directly, leaving executable behavior untouched, then rerun acceptance.
+
+- **Result:** Added an opaque, complete contract and search-loop invariants for [`cancel_at_price_level`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r02-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Specified first-match removal, unchanged state when absent, and the exact abort when the first matching price lacks a corresponding size.
+- **Decision points:** Preserved support for unequal vector lengths rather than inventing a precondition; used prefix non-membership invariants to establish first-match semantics.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for the single target `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`. I’ll inspect only its implementation and actual dependency contracts, then iterate with `move_spec_check` until accepted or the proof budget is genuinely exhausted.
+
+The implementation is a first-match removal, and its only real partial behavior is asymmetric vector length: it aborts exactly when the first matching price exists beyond `sizes`. I’m modeling the first-match index with a recursion aligned to one loop step, which keeps the result, mutation, and abort clauses exact without assuming equal vector lengths.
+
+The first candidate localized cleanly: the abort predicate matches the counterexample, but indexing is reported by the prover as an execution failure rather than the source-level `0x20000` used by `vector::remove`. I’m retaining the exact abort condition and removing only that incorrect code claim.
+
+- **Result:** Added an exact opaque contract and loop invariants for [`cancel_at_price_level`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:199>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled first-match lookup recursively, specifying unchanged state when absent, exact paired removals when found, and aborts when the matching price lacks a corresponding size.
+- **Decision point:** Removed an incorrect `0x20000` abort-code claim after the prover identified indexing as an execution failure; the exact abort condition remains verified.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, existing specs, and actual call dependencies, then iterate with the specification checker until it accepts or the proof budget is genuinely exhausted.
+
+The implementation has one subtle abort path: unequal vector lengths do not always abort—only finding the first matching price at an index outside `sizes` does. I’m encoding that first-match distinction explicitly, along with exact removal behavior and “not found leaves both vectors unchanged.”
+
+- **Result:** Added complete `[inferred]` abort, result, mutation, and loop-invariant specifications with `pragma opaque` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled first-match search, exact vector shifts after removal, unchanged state when absent, and loop preservation.
+- **Decision point:** Unequal lengths abort only when the first matching price lies outside `sizes`; the contract captures that precise condition.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract, and iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The target is a first-match search over `prices`, followed by same-index removal from both vectors. Its key boundary is unequal vector lengths: reading `sizes[i]` can abort only when a matching price occurs beyond `sizes`, while a successful removal must precisely preserve both vectors around that first index. I’m running targeted WP now to expose the exact loop facts and abort obligations.
+
+WP confirmed the needed search invariant, but its raw postconditions were marked `sathard` and incorrectly retained pre-removal vector equalities in the success branch. Per the skill, I’m replacing only those unresolved generated clauses with a direct first-match contract: unchanged on no match, exact paired removals on a valid first match, and exact abort when that first match has no corresponding size.
+
+- **Result:** Added a complete opaque contract and four loop invariants for `cancel_at_price_level`. `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Used targeted WP to identify loop state, then directly specified first-match removal, unchanged no-match behavior, and exact mismatched-vector abort behavior.
+- **Decision point:** Replaced WP’s unresolved `sathard` clauses because they incorrectly retained pre-removal vector equalities.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove the complete opaque contract for `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`. I’ll keep the scope to that function, use `.` as the package path, and finish with `move_spec_check` as the acceptance gate.
+
+The target is a linear search that removes matching entries from both vectors and returns the removed size; its only dependencies are vector length, indexing/borrow, and removal. I’m running WP now to expose the exact abort and mutation obligations, especially what the loop must retain about the processed prefix and the relation between vector lengths.
+
+WP confirmed the loop invariant shape, but its generated function clauses were marked `sathard` and included mechanically malformed postconditions for vector removal. I’m replacing only those unresolved generated clauses with a direct first-match contract: unchanged state when absent, exact paired removals and return value when present, and the sole bounds abort when the first matching price has no corresponding size.
+
+- **Result:** Added a complete opaque contract and loop invariants for `cancel_at_price_level` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Used WP to identify loop state requirements, then directly specified first-match removal, unchanged behavior when absent, and the exact mismatched-vector bounds abort.
+- **Decision points:** Replaced WP’s unresolved `sathard` clauses with solver-friendly quantified conditions; preserved paired vector-removal semantics without adding API preconditions.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove the complete opaque contract for `cancel_at_price_level`. I’ll inspect only the target and relevant callees, then iterate through candidate checking and focused proof diagnostics until accepted or the budget is exhausted.
+
+The target has one search/removal loop and no executable callees beyond vector operations. Its key boundary risk is unequal vector lengths: reading `sizes[i]` can abort only when a matching price occurs beyond the sizes vector, so the invariant and contract must preserve that path-sensitive behavior rather than assuming equal lengths. I’m running WP now to obtain the exact obligations and loop-head evidence.
+
+WP confirms the loop is the only unresolved source. I’m adding a search invariant that fixes both vectors to their entry values, bounds the cursor, and records that every processed price differs from the requested price. This is strong enough to establish first-match semantics and exact bounds-abort behavior when WP reruns.
+
+WP completed but emitted `sathard` postconditions whose antecedents incorrectly retain pre-removal vector equality in the post-state, making the successful-removal branch unusable. Per the skill, that is unresolved output, so I’m replacing only those generated clauses with an equivalent direct contract: no-match leaves both vectors unchanged and returns zero; the first match returns/removes aligned elements; and abort occurs exactly when that first matching index is absent from `sizes`.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`cancel_at_price_level`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used WP-guided invariant synthesis, then directly specified first-match removal, no-match behavior, and exact unequal-vector abort behavior.
+- **Decision point:** Replaced WP’s unresolved `sathard` clauses with solver-friendly quantified conditions preserving full semantics.
+
+### hybrid flexible, replicate 4: disqualified
+
+I’m using the provided `move-inf` workflow to infer and prove the complete opaque contract for `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`. I’ll keep changes confined to that target (plus any necessary loop invariants beside its body), and acceptance will be determined by `move_spec_check`.
+
+The target is a linear search that conditionally removes matching entries from both vectors and returns the removed size. Its abort behavior also depends on possible length mismatch between `prices` and `sizes`, so I’m running WP now to capture the exact bounds behavior and obtain the loop-head facts needed for a sound invariant.
+
+WP now has enough loop information, but its emitted function clauses are marked `sathard` and contain post-state antecedents that obscure the actual remove-at-first-match behavior. I’m checking this generated candidate as written, as required, before replacing only the diagnosed unresolved clauses with an equivalent direct contract.
+
+- **Result:** Added inferred loop invariants and an opaque inferred contract for `cancel_at_price_level`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Used targeted dependency inspection, WP inference, invariant synthesis, then the required candidate check.
+- **Decision point:** Added bounds, unchanged-vector, and searched-prefix invariants after WP identified loop havoc as the blocker.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level` with package path `.`, then I’ll repair only in-scope invariants/specifications and finish with `move_spec_check`.
+
+WP found one missing loop invariant at the search loop; the resulting abort clause is vacuous only because loop state was havoced. I’m now reading the target and its actual call dependencies so the invariant captures the unchanged prefix/state precisely before rerunning WP.
+
+The invariant is inductive and WP now completes, but its raw postconditions are marked `sathard` and contain quantified carrier artifacts. Per the skill, those are unresolved rather than acceptable; I’m replacing them with the equivalent first-match behavior: unchanged on no match, paired element removal and returned size on a valid first match, and the exact short-`sizes` abort case.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for [`cancel_at_price_level`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran WP, repaired loop havoc with prefix-search and unchanged-vector invariants, reran WP, then replaced `sathard` output with solver-friendly first-match result, mutation, and exact abort clauses.
+- **Decision points:** The sole abort occurs when the first matching price has no corresponding size; successful cancellation removes matching entries from both vectors, while no match leaves both unchanged and returns `0`.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped to `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`. I’ll begin with WP at package path `.`, then repair only loop invariants/spec clauses in scope and finish with the candidate check.
+
+WP found one ordinary search loop whose havoc obscures both the result and exact abort behavior. I’m reading the loop and its actual callees now, then I’ll add the smallest preserved search invariant and rerun WP after removing any stale generated clauses.
+
+The invariant is accepted by WP, but its generated postconditions are marked `sathard` and encode the early-return mutation through self-defeating quantified implications. Per the workflow, that output is unresolved. I’m replacing only those generated function clauses with the direct first-match semantics: unchanged vectors on no match, paired element removal on a valid match, and the exact short-`sizes` abort.
+
+- **Result:** Added complete opaque behavior, exact abort coverage, and four loop invariants for `cancel_at_price_level`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Ran scoped WP, repaired the search-loop abstraction, replaced unresolved `sathard` output with direct first-match semantics, then checked the candidate.
+- **Decision points:** Specified unchanged vectors when absent, synchronized removals when found, and abort only when the first matching price lacks a corresponding size.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill for this inference task. I’ll begin with weakest-precondition generation for exactly `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level`, writing inline, then repair only in-scope invariants/specifications and finish with the candidate check.
+
+WP found one ordinary search loop whose havoc makes the candidate vacuous. I’ll inspect that function’s executable dependencies and the nearby source, derive a first-match/no-match invariant, then rerun WP after preserving only the invariant and any pre-existing clauses.
+
+The loop invariant is accepted by WP, but its emitted function clauses are explicitly `[inferred = sathard]` and mechanically quantify an arbitrary loop head, producing unusable post-state antecedents. I’m replacing only those generated clauses with the exact two behaviors: no match leaves both vectors unchanged and returns zero; the first match removes aligned entries and returns the old size, aborting exactly when that matched index is absent from `sizes`.
+
+- **Result:** Added complete opaque contract and search-loop invariants for [`cancel_at_price_level`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran WP, repaired the missing first-match loop abstraction, replaced unresolved `sathard` output with exact return, mutation, and abort behavior, then ran `move_spec_check`.
+- **Decision points:** The contract distinguishes no-match behavior from first-match removal; abort coverage precisely captures a matched price whose corresponding size index is absent.
+
+### hybrid guided, replicate 4: disqualified
+
+I’m using the supplied `move-inf` workflow exactly: I’ll begin with WP on `aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level` at package path `.`, then repair only in-scope specifications/invariants and finish with `move_spec_check`.
+
+WP found one concrete blocker: the search loop has no invariant, so havoc makes both post-state and abort behavior unconstrained. I’m now reading the target and its actual callees, then I’ll add the smallest invariant that captures the untouched prefix/search state and rerun WP for this function.
+
+The invariant is accepted by WP and inference completed, but WP emitted five `[inferred = sathard]` clauses. They mechanically encode the first-match/remove behavior with hostile quantification and include post-state equalities inside the witness conditions. Per the workflow, I’m checking this generated candidate directly now; any rejection will be localized and repaired without weakening behavior.
+
+- **Result:** Added four inferred search-loop invariants and an opaque inferred contract for first-match cancellation, vector mutation, return value, and out-of-bounds abort behavior in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-cancel-026-r04-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Ran function-scoped WP, repaired loop havoc with bounds, unchanged-vector, and searched-prefix invariants, reran WP, then performed the required candidate check with a 5-second solver budget.
+- **Decision points:** Preserved both vectors through each non-matching iteration because mutation occurs only on immediate return; tracked `forall j in 0..i: prices[j] != price` to establish first-match and not-found behavior.
+
+## `discard_price_crossing_levels`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-discard-011`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied move-inf workflow exactly. I’ll inspect only the target implementation, its existing specs, and its actual call dependencies, then iterate through candidate checks until accepted or the proof budget is genuinely exhausted.
+
+The target is a pure scan with no global effects. Its key boundary is `None` (always returns 0); for `Some(p)`, it returns the first index whose price is non-crossing—`< p` for bids or `> p` for asks—or the vector length if none exists. I’m checking the package’s established Option/spec idioms before writing that exact contract and prefix invariant.
+
+I’ve added the complete caller-visible contract (`opaque`, total/no-abort, bounds, `None`, processed-prefix, and first non-crossing result) plus the loop’s prefix invariant. I’m now running the decisive candidate check; any rejection will be localized and repaired without weakening these behaviors.
+
+- **Result:** Added an opaque, total contract and prefix loop invariant for [`discard_price_crossing_levels`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r01-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Characterized the first non-crossing index using a processed-prefix invariant, covering `None`, empty vectors, bids, asks, and all-crossing vectors.
+- **Decision points:** Declared `aborts_if false` after proving indexing, Option destruction, and increment are guarded; used bounded prefix quantification to precisely establish first-match behavior.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect the target and its actual call dependencies, infer one complete opaque contract, and iterate with `move_spec_check` until it is accepted or the proof budget is exhausted.
+
+The target has no existing specification and no state writes. Its behavior is a prefix search: `None` returns `0`; `Some(p)` returns the first index whose price is non-crossing (or the vector length if every level crosses). I’m checking the package’s existing Option/spec idioms before encoding that result and the loop invariant.
+
+I’ll encode the result directly as a bounded-prefix contract: the returned index is within bounds, every earlier level crosses, and (when present) the returned level is the first non-crossing one. This is exact for both bid and ask modes and avoids a recursive helper or unbounded quantifier.
+
+- **Result:** Added an opaque, total specification and loop invariants for `discard_price_crossing_levels` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r02-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126). `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Specified the exact first non-crossing index using bounded prefix conditions, with invariants preserving index bounds and crossing status.
+- **Decision point:** Used direct bounded quantification instead of a recursive helper; it proved within the initial 5-second solver budget.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow as the governing skill. I’ll inspect only the target implementation, its existing specs, and relevant callees, then iterate through candidate checks until accepted or the proof budget is genuinely exhausted.
+
+The function is a first-prefix scan, not a general search: it returns zero for `none`, otherwise the first index whose price stops crossing, or the vector length if every level crosses. There are no state writes; the remaining proof work is expressing that exact prefix/boundary behavior and the loop’s preservation facts.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`discard_price_crossing_levels`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Modeled the scanned crossing prefix with a recursion-aligned specification helper, capturing the exact returned boundary and total, non-aborting behavior.
+- **Decision points:** Preserved behavior for unsorted inputs by specifying the first non-crossing level rather than assuming ordering; used a recursive prefix abstraction to avoid a quantified loop invariant.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the target function. I’ll inspect only its implementation, existing specs, and actual call dependencies, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The implementation has one ordinary search loop and only total standard-library calls on the reachable path. The candidate contract will characterize the returned first non-crossing index: every earlier level crosses, the returned level (if any) does not, `None` returns zero, and the function never aborts. The loop invariant mirrors the processed-prefix part of that contract.
+
+- **Result:** Added a complete opaque contract and loop invariants for `discard_price_crossing_levels` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified with complete contract coverage and unchanged implementation.
+- **Strategy:** Specified the first non-crossing index using processed-prefix and stopping-point conditions, with `None` returning zero and `aborts_if false`; mirrored the prefix property in the loop invariant.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for this target. I’ll inspect only the function and its relevant callees, infer the opaque contract (and any loop invariants), then iterate with `move_spec_check` until it is accepted or the proof budget is exhausted.
+
+The target is a prefix scan with one loop and no state mutation. Its only executable dependencies are `Option` inspection/destruction and vector length/borrow; I’m running WP now to capture the exact abort/result obligations and obtain the loop-head facts needed for the invariant.
+
+WP confirms the loop advances exactly across the crossing prefix. I’m adding the minimal inductive facts—index bounds plus “every processed price still crosses”—so WP can derive the exact first-non-crossing result and total abort behavior.
+
+WP produced a complete contract, including the exact all-crossing and first-failing-index cases. Two nested-quantifier clauses are marked `sathard`; per the skill, I’ll first let the candidate checker identify whether they are merely expensive or actually need a solver-friendly equivalent.
+
+- **Result:** Added inferred loop invariants and an opaque, complete result/abort contract for [`discard_price_crossing_levels`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation behavior is unchanged.
+- **Strategy:** Used WP inference after synthesizing the crossing-prefix loop invariant, then validated the generated contract with a 5-second candidate-check budget.
+- **Decision point:** Kept WP’s exact first-non-crossing characterization because the candidate checker proved it directly with complete contract coverage.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow to infer only `aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels`. I’ll inspect its implementation and call graph, add only inferred specifications/invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a pure prefix scan: it returns zero when no best price exists; otherwise it advances until the first non-crossing price (bid `< best`, ask `> best`) or the vector end. I’m running WP now to get the exact generated obligations and loop-head facts before synthesizing the prefix invariant.
+
+The loop-head evidence generalized cleanly to two facts: `i` stays within the vector, and every processed level is crossing (`>= best` for bids, `<= best` for asks). I added those inferred invariants and am rerunning WP so it can derive the exact return and abort contract from that abstraction.
+
+WP produced the right semantic shape but marked its two universal “first stopping index” clauses `sathard`, so they are not acceptable as final output. I’m replacing only those mechanically expanded clauses with an equivalent solver-friendly characterization: bounded result, every earlier level crosses, and any returned in-bounds level is the first non-crossing one; the guarded option extraction makes the function total.
+
+- **Result:** Added complete inferred contract and loop invariants for [`discard_price_crossing_levels`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP loop-head evidence, then replaced `sathard` output with an equivalent prefix-and-first-non-crossing characterization.
+- **Decision points:** Proved totality with `aborts_if false`; retained `pragma opaque` so callers rely solely on the complete contract.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for this function: I’ll inspect only the target and its relevant dependencies, infer its complete opaque contract and loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a pure prefix search. Its only callees are standard option/vector operations, so there is no opaque partial boundary or global frame to inherit. I’m running WP now to obtain its exact abort/result obligations and the loop-head evidence needed for the invariant.
+
+WP confirms the missing abstraction is exactly the processed-prefix property: `i` stays within the vector, and every earlier level still crosses the selected best price (bid: `>=`; ask: `<=`). I’m adding those inferred loop invariants beside the loop, then rerunning WP so it can derive the caller-visible contract from that abstraction.
+
+WP’s result is semantically right but encoded the “first stopping index” with nested universal quantifiers and flagged both clauses `sathard`. I’m replacing only those generated clauses with the equivalent solver-friendly characterization: bounded result, all prior entries cross, and—unless the scan reached the end—the result entry is the first non-crossing one. The guarded `destroy_some` path is total, so the exact abort condition is `false`.
+
+The candidate check accepted the specification at the initial 5-second budget: all target proof and coverage obligations pass, and executable bytecode is unchanged. I’m doing one final diff review to ensure the accepted edit is limited to the target contract and its loop invariant.
+
+- **Result:** Added a complete opaque contract and prefix-search loop invariants in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP inference, then replaced its `sathard` quantifiers with an equivalent first-non-crossing-index characterization.
+- **Decision points:** Established `aborts_if false` because `destroy_some` is guarded by `is_some`; modeled both bid (`>=`) and ask (`<=`) processed prefixes explicitly.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the single target `aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels`. I’ll inspect only the implementation and relevant call/spec dependencies, infer the contract and any loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a pure prefix scan over `prices`; its only dependencies are standard vector/option operations, and there is no existing target contract to preserve. I’m running WP now to obtain the exact loop-head diagnostics, which will guide the search invariant and boundary behavior.
+
+WP succeeded once the prefix invariant was present, but it emitted two `[inferred = sathard]` first-match clauses. I’m replacing that hard universal-over-candidate-index encoding with the equivalent solver-friendly characterization: the result is in bounds, every earlier level crosses, and the returned in-range level is the first non-crossing one.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`discard_price_crossing_levels`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Used WP with a synthesized prefix-search invariant, then replaced its `sathard` output with an equivalent first-non-crossing characterization.
+- **Decision point:** Expressed the result through bounds, crossing-prefix, and stopping-level guarantees to avoid the solver-hostile nested quantifier.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill for the single target `aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels`. I’ll begin with WP at package path `.`, then repair only target-scope specifications/invariants and finish with `move_spec_check`.
+
+WP found one ordinary search loop whose carried fact is the processed-prefix crossing condition; the abort warning is downstream of that missing invariant. I’m inspecting the target body and its actual call dependencies now, then I’ll add the minimal invariant beside the loop and rerun WP for this function.
+
+The invariant made WP exact, but its emitted postcondition contains two `[inferred = sathard]` universal characterizations. I’m replacing those mechanically generated clauses with an equivalent first-non-crossing contract: bounded result, every prior level crosses, and (when present) the result level does not. This preserves exact behavior while removing the hard nested quantifiers.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`discard_price_crossing_levels`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Ran WP, supplied the missing processed-prefix invariant, reran WP, then replaced its `sathard` nested quantifiers with an equivalent first-non-crossing contract.
+- **Decision points:** Specified totality with `aborts_if false`, justified by the guarded `Option::destroy_some`; characterized the result using bounds, crossed-prefix behavior, and the first non-crossing level.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels` with package path `.`, then I’ll repair loop invariants one function at a time and finish with the candidate check.
+
+WP found one ordinary traversal loop and no callee-partiality issue. I’m inspecting the target and its surrounding specification style now; the needed invariant must capture both `i <= len(prices)` and that every processed price crosses `best_price` in the direction selected by `is_bid`.
+
+The repaired invariant let WP complete and inject an opaque contract. Its behavior is precise: `0` for `none`, full length if all levels cross, otherwise the first non-crossing index. WP marked the two first-index quantified clauses `sathard`, so I’m checking them directly before deciding whether they need a solver-friendly rewrite.
+
+The candidate check already accepts the contract and verifies every target obligation. The only cleanup required by the supplied workflow is removing WP’s provisional `sathard` labels now that those clauses have proved; their formulas remain unchanged.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`discard_price_crossing_levels`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r02-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran WP, derived a processed-prefix invariant, reran WP, then checked the generated contract directly.
+- **Decision points:** Preserved exact first-non-crossing behavior; removed only the provisional `sathard` labels after the quantified clauses proved successfully.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll begin with inline WP for only `aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels`, then repair any loop/spec diagnostics and finish with the candidate check.
+
+WP found one ordinary search loop whose index is unconstrained after havoc. The bounded heads show the needed shape: `i` is within the vector and every processed price crosses `best_price`; I’m now reading the function and its actual call dependencies before adding that invariant.
+
+The repaired invariant let WP complete and generate an opaque contract. Two first-match postconditions are marked `sathard`, so they remain suspect proof obligations; I’m checking the generated candidate directly now, as required, before changing their semantics or representation.
+
+- **Result:** Added complete first-non-crossing-level invariants and an opaque inferred contract in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-discard-011-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:126). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Ran function-scoped WP, generalized its loop-head evidence into index-bound and processed-prefix invariants, reran WP, then directly checked the generated candidate.
+- **Decision point:** Used a quantified processed-prefix invariant because WP showed each prior price must cross the best price; this allowed WP to characterize both full traversal and first-break results exactly.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for the single target `aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels`. I’ll begin with WP at package path `.`, repair only target-scope invariants/specifications, then use the candidate check as the completion gate.
+
+WP found one concrete blocker: the loop loses the relation between `i` and the already-crossing price prefix, which then makes the return/abort characterization vacuous. I’m inspecting the target body and its precise call dependencies now so the invariant captures both bid and ask branches without changing executable behavior.
+
+The strengthened loop invariant made WP exact. Its raw postcondition is logically complete but contains two `sathard` nested-universal clauses, so I’m replacing that mechanical encoding with the equivalent first-noncrossing characterization: bounded result, every earlier level crosses, and—when present—the returned level is the first noncrossing one. This preserves the inferred behavior while removing the solver-hostile form.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract describing the first noncrossing price level. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation bytecode is unchanged.
+- **Strategy:** Ran WP, strengthened the loop’s processed-prefix relation, then replaced solver-hard nested quantifiers with an equivalent bounded first-noncrossing specification.
+- **Decision points:** Preserved WP’s inferred abort behavior; expressed bid and ask behavior symmetrically without adding preconditions or weakening verification.
+
+## `find_min_stake_required`
+
+`aptos_framework::extracted_transaction_limits`, task id `TL-find-040`
+
+### agent-only, replicate 1: strict success
+
+I’m using the provided `move-inf` skill to infer the complete opaque contract and any required loop invariants for `aptos_framework::extracted_transaction_limits::find_min_stake_required`. I’ll stay within that function’s scope and use `.` as the package path throughout.
+
+The target is a first-match search: it returns the `min_stake` from the earliest tier whose multiplier meets the request, and otherwise aborts with `EMULTIPLIER_NOT_AVAILABLE`. I’m now checking the exact library semantics of `vector::find` so the result and abort clauses match the lowered implementation, including the empty-vector boundary.
+
+I added a candidate contract that captures the earliest matching tier, not merely any matching tier, plus the exact no-match abort condition and abstract `INVALID_ARGUMENT` code. The function is marked opaque so acceptance tests callers against this contract alone.
+
+- **Result:** Added an opaque, complete contract for [find_min_stake_required](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r01-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93>): earliest matching tier result and exact no-match `INVALID_ARGUMENT` abort. `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Derived first-match behavior from `vector::find` and verified the coherent candidate with `move_spec_check` at a 5-second solver budget.
+- **Decision point:** Used the abstract `error::INVALID_ARGUMENT` abort code because `error::canonical` exposes category-only semantics to the prover.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its dependency contracts, author a complete opaque contract with inferred markers, and use `move_spec_check` as the acceptance gate.
+
+The target is an inline search: it returns the `min_stake` from the first tier whose multiplier meets the request, and aborts exactly when no such tier exists. I’m checking the iterator’s proof model now so the contract captures first-match behavior rather than merely “some matching tier.”
+
+- **Result:** Added a complete opaque contract for `find_min_stake_required`, specifying first-match return behavior and exact no-match abort behavior. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived the contract from `vector::find`’s first-match semantics and verified it directly with a 5-second solver budget.
+- **Decision point:** Used error category `0x1`, matching `error::invalid_argument`’s abstract prover contract.
+
+[View specification](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r02-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93>)
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, existing specs, and actual call dependencies, then iterate with the specification checker until it accepts or the available proof budget is exhausted.
+
+The target is a first-match search: it returns the `min_stake` at the earliest tier whose multiplier meets the request, and otherwise aborts with the invalid-argument category. Its only executable dependencies are vector length/borrow and the error-code helper; there are no global writes, so no frame clause is needed. I’m now checking the exact iterator semantics needed to express the first-match result without weakening it.
+
+- **Result:** Added an opaque, complete contract for [`find_min_stake_required`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r03-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93), specifying first-match return behavior and exact no-match abort behavior. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived the contract from the implementation and `vector::find`’s existing first-match invariant, then checked the coherent candidate with a 5-second solver budget.
+- **Decision points:** Used `error::INVALID_ARGUMENT` because the prover sees `error::invalid_argument` through its abstract category contract; no `modifies` clause was added because the function performs no global writes.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its relevant dependencies, infer the opaque contract and any loop invariant, then use the candidate checker as the acceptance gate.
+
+The target is a first-match search over the tier vector. Its only abort is when no tier meets the requested multiplier; on success, the result must be the `min_stake` of the earliest matching tier. I’m encoding both facts directly so callers need not depend on the inline `vector::find` body.
+
+- **Result:** Added an opaque, complete contract in [extracted_transaction_limits.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r04-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.spec.move): exact no-match abort condition and earliest-match `min_stake` result. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Followed `move-inf`: inspected the target and `vector::find`, encoded first-match semantics directly, and verified with `move_spec_check`.
+- **Decision point:** Used `error::INVALID_ARGUMENT` because the prover sees `error::invalid_argument(...)` through its abstract category contract.
+
+### hybrid flexible, replicate 1: strict success
+
+I’ll use the supplied move-inf workflow exactly, scoped to `aptos_framework::extracted_transaction_limits::find_min_stake_required`. I’ll first inspect the target and its actual call dependencies, then infer/edit only its contract and loop invariants, with `move_spec_check` as the acceptance gate.
+
+The target is a first-match search implemented through `vector::find`; its only transitive dependencies are vector length/borrow and the standard invalid-argument constructor. I’m invoking WP now because this loop shape may be expressible through the iterator’s fold relation; any warning will determine whether an explicit search invariant is needed.
+
+- **Result:** Added an opaque, complete contract for [`find_min_stake_required`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93): it returns the first qualifying tier’s minimum stake and aborts iff none qualifies. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused dependency inspection and WP inference for the inline `vector::find`, then validated directly with `move_spec_check`.
+- **Decision points:** Retained WP’s generated quantified first-match characterization unchanged because the acceptance check verified all obligations and contract coverage.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the provided `move-inf` skill to infer and prove the complete opaque contract for `aptos_framework::extracted_transaction_limits::find_min_stake_required`. I’ll keep edits strictly within that function’s specification/invariants and use `.` as the package path throughout.
+
+The target has one relevant dependency shape: `vector::find` plus the final indexed read. Its visible behavior should be “first qualifying tier’s `min_stake`,” with an abort exactly when no tier qualifies; I’m running WP now to derive the precise clauses and expose any iterator invariant requirement.
+
+WP found the correct semantic shape but marked both clauses `sathard`, driven by nested universal quantifiers. I’m replacing only those generated clauses with an equivalent first-match witness contract: normal return exposes one in-bounds first qualifying index, while abort remains exactly the no-match condition.
+
+- **Result:** Added an opaque, complete contract for `find_min_stake_required` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93). It specifies the first qualifying tier’s stake and exact no-match abort condition. `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Used WP inference, then replaced its `sathard` nested quantifiers with an equivalent first-match witness contract.
+- **Decision points:** Reused `vector::find`’s existing loop invariants; no executable rewrite or additional loop invariant was needed.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_transaction_limits::find_min_stake_required`. I’ll inspect only the target and its relevant dependencies, infer the contract/invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a first-match search over `tiers`; its only runtime dependencies are vector length/borrow and the error-code helper. I’m applying WP now so any implicit bounds and iterator behavior are captured before I decide whether a hand-written search abstraction is needed.
+
+- **Result:** Added an opaque, complete contract for [find_min_stake_required](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93>): it returns the first matching tier’s minimum stake and aborts exactly when no tier matches. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used targeted WP inference, checked the generated first-match and abort clauses directly, then ran the required candidate acceptance check with a 5-second solver budget.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly. I’ll inspect only the target implementation and its relevant dependencies, then infer, prove, and finish with `move_spec_check` on package path `.`.
+
+The target is a read-only first-match search over `vector::find`; that dependency already carries the needed search invariant. I’m now using WP on just this function so its exact first-match result and abort condition are generated from that invariant.
+
+- **Result:** Added an opaque, complete first-match result contract and exact no-match abort condition in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-find-040-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:93). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used targeted WP inference, then replaced its `sathard` quantified clause with an equivalent solver-friendly first-match existential.
+- **Decision points:** Preserved exact empty/no-match behavior; retained first-match semantics by requiring every preceding tier to have a smaller multiplier.
+
+### hybrid guided, replicate 1: strict success
+
+I’ll follow the provided move-inf workflow exactly: run WP first on the single target with `package_path: "."`, repair only target specs/invariants, then use the candidate check as the acceptance gate.
+
+WP completed without loop diagnostics, but it marked both generated clauses `sathard`, so they remain unresolved under the skill’s completion rules. I’m checking this exact WP candidate now to identify whether the issue is acceptance coverage or solver complexity.
+
+- **Result:** Added an opaque inferred contract for `find_min_stake_required`: it returns the first qualifying tier’s minimum stake and aborts when none qualifies. `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran function-scoped WP inline, then directly validated the generated clauses with `move_spec_check` at a 5-second solver budget.
+- **Decision point:** No loop repair was needed; the warning-free WP output passed acceptance unchanged.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill for this function. I’ll follow its required WP-first workflow, repair only the target’s specification/invariants, and finish with the candidate checker as the acceptance authority.
+
+WP produced a complete-looking search contract, but marked both clauses `sathard`; under the skill, that is unresolved. I’m now examining the target’s loop/search shape and exact call dependencies so I can replace the hard quantified form with a provable equivalent without weakening behavior.
+
+- **Result:** Added an opaque inferred contract specifying first matching tier behavior and abort when no tier matches. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Ran WP first, inspected exact dependencies, then directly checked the generated contract with a 5-second solver budget.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for the single requested function. I’ll begin with WP at package path `.`, inspect only diagnostics and relevant source/contracts, then iterate through invariants and the candidate check until accepted or blocked by the experiment budget.
+
+WP completed and exposed the core shape: the function returns the first tier whose multiplier meets the threshold, and aborts when none exists. Both generated clauses are marked `sathard`, so I’m treating them as unresolved and will replace the nested-quantifier formulation with a solver-friendly equivalent while preserving exact behavior.
+
+- **Result:** Added an opaque inferred contract specifying the first matching tier’s `min_stake` and exact abort behavior when no tier matches. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP on `find_min_stake_required`, inspected its dependencies, then validated the generated contract directly with `move_spec_check` at a 5-second solver budget.
+
+### hybrid guided, replicate 4: strict success
+
+I’ll apply the provided move-inf workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::find_min_stake_required`, then repair only in-scope invariants/specs, and finish with the candidate check.
+
+WP completed without a loop-invariant warning, but marked both quantified clauses `sathard`. I’m checking the generated contract directly now; any timeout will be localized and repaired without weakening its meaning.
+
+- **Result:** Added an opaque, complete contract for `find_min_stake_required`, specifying the first matching tier’s minimum stake and aborting when no tier matches. `CANDIDATE_ACCEPTED`; implementation unchanged and all obligations verified.
+- **Strategy:** Ran targeted WP inline, then directly checked the generated clauses with a 5-second solver budget.
+- **Decision point:** Retained WP’s quantified `sathard` clauses unchanged because the candidate check proved them successfully.
+
+## `get_pending_transactions`
+
+`aptos_framework::extracted_multisig_account`, task id `MS-pending-046`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect the target and its actual call dependencies, author only inferred clauses for this function, then iterate with `move_spec_check` until it accepts or the experiment budget is exhausted.
+
+The target is a read-only traversal over a table-backed sequence. Its critical boundary cases are resource absence, overflow in `last_executed_sequence_number + 1`, an empty range, and a missing table entry; I’m now checking the dependency contracts so the abort condition and result relation match what the prover actually exposes.
+
+I’ll use an exact prefix characterization—result length plus element-by-element equality to the table range—and a matching loop invariant. This directly covers empty and non-empty ranges while avoiding a second recursive helper that would add solver instantiation cost.
+
+The first check exposed two missing loop facts, not a contract mismatch: when the initial sequence is already past `next`, the loop exits immediately, and proving exact abort behavior requires remembering that every processed table key existed. I’m refining the invariant with those two facts.
+
+- **Result:** Added a complete opaque contract and four inferred loop invariants for `get_pending_transactions`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Characterized the returned vector by exact length and table-entry equality, with precise aborts for missing resources, overflow, and absent transaction entries.
+- **Decision points:** Accounted for empty/reversed ranges and tracked processed-key existence to prove exact abort behavior.
+
+### agent-only, replicate 2: strict success
+
+I’ll use the supplied move-inf workflow exactly: inspect only the target and relevant callees, author inferred clauses with an opaque contract, and let the candidate checker determine completion.
+
+The target has three real abort sources: missing account resource, overflow in `last_executed_sequence_number + 1`, and a missing table key in the traversed interval. I’m shaping the result contract around a prefix helper aligned with the loop, so each iteration needs only one recursive unfolding.
+
+- **Result:** Added a complete opaque contract and loop invariants for `get_pending_transactions` in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r02-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.move:54). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Specified exact result contents and all aborts—missing resource, sequence overflow, and missing table entries—using quantified prefix invariants.
+- **Decision points:** Accounted for empty/reversed transaction ranges and tracked processed-key existence to prove exact table-borrow abort behavior.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow to infer the target’s caller-visible behavior, add only inferred specifications in scope, and finish with `move_spec_check` as the acceptance gate. I’ll inspect the target and its actual call dependencies first.
+
+The target is a read-only range traversal: it starts at `last_executed_sequence_number + 1`, borrows each table entry up to `next_sequence_number - 1`, and returns those values in order. Its abort surface includes the initial `u64` addition, missing account/table entries, and loop-index overflow; the invariant must preserve the exact returned prefix. I’m now checking the module’s existing spec conventions and the table contracts that govern missing-key behavior.
+
+I’ve chosen a quantified prefix invariant instead of a recursive helper: it directly states that the accumulated vector equals the traversed table slice, while a conditional length invariant handles both `start < end` and the empty range where `start >= end`. This keeps the proof aligned with each loop iteration and expresses the exact missing-table-key abort condition without adding any API precondition.
+
+The first check rejected the candidate because the loop abstraction allowed a fabricated nonempty result when the range was empty and did not record that every successfully processed key existed. I’m strengthening only those two missing facts: empty ranges retain an empty accumulator, and the processed prefix consists solely of present table keys.
+
+- **Result:** Added complete inferred abort/result specifications and loop invariants for `get_pending_transactions` in [implementation](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r03-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.move>) and [specification](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r03-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Modeled the returned vector as the ordered table slice and tracked its exact processed prefix, key existence, index bounds, and empty-range behavior.
+- **Decision points:** Added the processed-key invariant after the first check exposed incomplete missing-key reasoning; added an explicit empty-range invariant after loop havoc admitted fabricated results.
+
+### agent-only, replicate 4: strict success
+
+I’ll use the supplied move-inf workflow exactly, scoped only to `aptos_framework::extracted_multisig_account::get_pending_transactions`. I’ll inspect the target and its actual call dependencies, author only inferred specs/invariants, then use the candidate checker as the acceptance gate.
+
+The target is in `sources/framework/extracted_multisig_account.move`. I’m now reading its implementation and querying the executable dependency closure; this determines exact return, abort, and state-read behavior before I write a contract.
+
+The function has three real abort sources: the account resource may be absent, `last_executed_sequence_number + 1` may overflow, or a traversed table key may be absent. I’ll encode the returned ordered range with bounded prefix invariants, which also lets the proof establish the exact missing-key abort condition without adding API preconditions or frames.
+
+The first check exposed two abstraction gaps, not a behavioral mismatch: the disjunctive bound allowed impossible nonempty results when the loop never starts, and the solver could not carry the quantified table-membership fact across `push_back`. I’m replacing both quantifier-heavy summaries with recursion aligned to one loop iteration and tightening the no-iteration branch to `i == first`.
+
+The recursive value summary now proves the return exactly. The remaining counterexample is only the abort frame: a prefix-recursive “all present” predicate does not expose an arbitrary missing key cheaply enough. I’m switching that one fact to a direct key-range invariant (`first..i`), avoiding the earlier index-shift that blocked quantifier instantiation.
+
+- **Result:** Added complete inferred return/abort specifications and loop invariants for `get_pending_transactions`; `move_spec_check` reports `CANDIDATE_ACCEPTED` with implementation unchanged.
+- **Strategy:** Used a recursion-aligned helper for the ordered result and a bounded key-range invariant for exact missing-table-entry aborts.
+- **Files:** [implementation invariants](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r04-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.move:64), [function contract](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r04-agent-only-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:34).
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly for this target. I’ll inspect only the function, its existing specs, and relevant callees, then infer and validate the contract with `move_spec_check`; I’ll use WP where it helps.
+
+The target is a read-only global traversal: its only executable callees are intrinsic table lookup and vector append. The key proof issue is the loop’s accumulated prefix and exact abort behavior (missing resource, overflow at `last + 1`, or a missing table key), so I’m running WP now to expose the precise obligations.
+
+With the synthesized prefix invariant, WP now succeeds and confirms the three behavior classes. Its raw output contains solver-hostile existential vector encodings (`sathard`), so I’m replacing those with equivalent extensional clauses: exact result length plus per-index values, and a bounded missing-key abort condition. This preserves the behavior while making the proof tractable.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`get_pending_transactions`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:54>). It specifies result length/contents and all aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP to identify loop obligations, then replaced `sathard` output with equivalent solver-friendly extensional clauses.
+- **Decision points:** Added prefix value and table-membership invariants; expressing membership directly over the processed key range resolved invariant induction and exact abort coverage.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow for the single target `aptos_framework::extracted_multisig_account::get_pending_transactions`. I’ll inspect only the target and relevant dependencies, infer the opaque contract and any loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a read-only traversal over sequence numbers from `last_executed_sequence_number + 1` up to `next_sequence_number - 1`. Its direct abort sources are missing global/table entries plus the initial and per-iteration `u64` increments; I’m running WP now to obtain the exact generated obligations and loop-head facts before synthesizing the invariant.
+
+WP succeeded once the invariant described the processed prefix, but—as anticipated from its diagnostic—it emitted two `[sathard]` carrier formulas. I’m replacing those mechanically with their equivalent caller-visible form: exact result length/content and “some traversed sequence number is absent from the table.” This preserves all inferred behavior while removing unresolved solver-hostile clauses.
+
+The rejected abort clause is semantically correct; the counterexample exploits loop havoc by inventing a missing key in the already-processed prefix. The invariant tracked returned values but not the successful-borrow fact, so I’m adding exactly that prefix containment invariant and rechecking.
+
+- **Result:** Added a complete opaque contract and loop invariants for `get_pending_transactions`; `move_spec_check` returned `CANDIDATE_ACCEPTED` with complete coverage and unchanged implementation. See [contract](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:15>) and [invariants](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_multisig_account.move:64>).
+- **Strategy:** Used WP to identify loop requirements, then replaced solver-hostile carrier formulas with exact result-length, result-content, overflow, resource, and missing-table-entry conditions.
+- **Decision points:** Added a processed-prefix containment invariant after the checker showed loop havoc could invent missing keys; this resolved exact abort verification.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_multisig_account::get_pending_transactions`. I’ll keep changes confined to that function’s specification (and any loop invariant beside its body), use `.` as the package path, and let `move_spec_check` be the acceptance gate.
+
+The target is a read-only global traversal with one loop. Its only executable callees are `table::borrow` and `vector::push_back`; the key proof issue is therefore an exact prefix invariant tying the returned vector to table entries, plus abort coverage for missing resources/keys and `last_executed_sequence_number + 1` overflow. I’m running WP now to obtain the tool’s loop-head facts before synthesizing that invariant.
+
+WP confirmed the expected unconstrained loop state. I’m adding an extensional prefix invariant: the output length equals the number of visited sequence numbers, and every output element equals the table value at its corresponding sequence number. This avoids a recursive helper and should keep both the result and missing-key abort characterization solver-friendly.
+
+WP produced a complete mechanical shape but marked the result and loop-abort carriers `sathard`, so they cannot remain. I’m replacing those clauses with equivalent direct facts: two boundary-sensitive length cases, indexed element equality, and an existential missing-key condition over exactly the traversed half-open sequence range. I’m also strengthening the loop invariant with the two facts needed at exit (`start >= end` means empty; otherwise `i <= end`).
+
+The first candidate check localized one missing invariant fact: after loop havoc, element equality via `spec_get` does not imply that processed table keys actually exist. That allowed a spurious state where the function returned normally even though the contract’s missing-key condition held. I’m recording key existence for the processed prefix, which is established by each successful `table::borrow`.
+
+The strengthened invariant is semantically right, but the prover did not instantiate the “new last index” case after `push_back`, even though the counterexample itself shows that key present. I’m adding a local proof assertion immediately after the successful borrow to expose the intrinsic table fact at the exact term needed for invariant preservation.
+
+The local table assertion now proves, but the invariant’s index was coupled to the post-`push_back` vector length, which still obscured the one-step quantifier extension. I’m reformulating existence directly over the processed sequence interval `[start, i)`. This matches the abort contract syntactically and extends by exactly the asserted current key when `i` increments.
+
+Verification succeeded, but the acceptance gate correctly rejected the inline proof assertion as an edit inside the executable body rather than an invariant/contract-only change. The interval-based invariant may no longer need that assertion, so I’m removing it and rechecking without any executable-scope edit.
+
+- **Result:** Added complete opaque contract and loop invariants covering returned transactions, empty/boundary cases, resource absence, overflow, and missing table entries. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP for loop evidence, replaced `sathard` output with direct indexed result and abort conditions, then verified with `move_spec_check`.
+- **Decision points:** Modeled processed-key existence as `[start, i)`, aligning the invariant directly with the missing-key abort condition.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for this function. I’ll inspect only the target and its relevant dependencies, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target has one ordinary traversal loop and no existing target contract; the neighboring `get_transaction` spec is user-written and will remain untouched. I’m running the targeted WP pass first to expose the exact abort/result shape and the loop facts it needs.
+
+The bounded heads show a prefix-collection pattern. I’m adding a quantified prefix invariant that ties the loop index, output length, collected values, and table-key presence together; the presence fact is essential for exact abort coverage, not just the postcondition.
+
+WP now confirms the concrete abort sources: missing account, overflow of `last_executed_sequence_number + 1`, and a missing table entry in the pending range. Its loop abstraction produced `sathard` second-order clauses, so I’m replacing only those generated target clauses with an equivalent direct caller-facing contract and strengthening the index bound used in the loop proof.
+
+The rejection is specifically a loop-abstraction gap: after havoc, the prover can forget that a missing key later in the range must eventually be reached. I’m carrying an equivalence between “all original pending keys exist” and “all remaining keys exist,” and adding local proof assertions for the successful table borrow and appended value.
+
+The acceptance gate treats the inline proof-assert block as an implementation edit, so the `move-inf` scope rule requires removing it. I’ll keep the proof entirely in the loop invariant and contract; no executable/source-body instrumentation will remain beyond the permitted invariant.
+
+- **Result:** Added an opaque, complete contract plus loop invariants for `get_pending_transactions`; all obligations passed `CANDIDATE_ACCEPTED`, with implementation unchanged.
+- **Strategy:** Used targeted WP inference, replaced unresolved `sathard` clauses with direct result/abort conditions, then verified via `move_spec_check`.
+- **Decision points:** Modeled exact missing-table-entry aborts using a remaining-range invariant; explicitly covered absent resources and sequence-number overflow.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill exactly as requested. I’ll begin with weakest-precondition inference for only `aptos_framework::extracted_multisig_account::get_pending_transactions`, writing inline, then resolve diagnostics and finish with the candidate check.
+
+WP found one ordinary accumulation loop and could not infer beyond it because `pending_transactions` was unconstrained at the loop head. I’m now deriving the invariant from the implementation and the target’s actual callees, then I’ll rerun WP with only the stale generated function clauses removed.
+
+The strengthened invariant made WP succeed and produced a complete opaque contract, but its loop encoding contains two `[inferred = sathard]` clauses. I’m checking that exact candidate now; if the expected solver difficulty materializes, I’ll replace only those mechanical clauses with equivalent interval-based result and abort conditions.
+
+The candidate check exposed the missing exit bound: loop havoc allowed `i` to jump beyond `next_sequence_number`, so WP’s generated postcondition was not provable. I’m adding the entry-or-bounded index invariant, removing only WP’s stale target contract, and rerunning WP as required.
+
+The repaired WP form is semantically complete but remains second-order (`forall` over candidate vectors), and the prover cannot establish vector extensionality from that encoding. I’m replacing those two `sathard` clauses with the equivalent direct contract: exact output length and element mapping, plus an existential missing-table-entry abort condition.
+
+- **Result:** Added complete inferred invariants and an opaque contract for `get_pending_transactions`; `CANDIDATE_ACCEPTED` with all obligations verified, full coverage, and unchanged implementation.
+- **Strategy:** Used WP inference, strengthened the accumulation-loop invariant, then replaced `sathard` second-order output with equivalent direct length, element-mapping, and exact abort clauses.
+- **Decision points:** Added the loop exit bound after WP’s counterexample; simplified vector extensionality after the generated clause failed verification. Changes are in [extracted_multisig_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:54).
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_multisig_account::get_pending_transactions`, then I’ll address only its diagnostics and run the candidate check.
+
+WP found one ordinary traversal loop and no usable post-loop contract because `pending_transactions` is unconstrained without an invariant. I’m inspecting that loop and its exact callees now, then I’ll add a prefix invariant beside the loop and rerun WP.
+
+With the prefix invariant, WP now succeeds and exposes the full behavior, but emits solver-hostile existential vector carriers (`sathard`) for the result and table-borrow aborts. Per the workflow I’m checking this generated candidate directly before replacing those clauses with an equivalent bounded-range formulation.
+
+The counterexample pinpoints the missing abstraction: the equality invariant allowed a havocked state with a huge processed prefix and `i` already beyond `next_sequence_number`. I’m adding the reachable-state bound “empty prefix or `i <= next`,” removing only WP’s stale generated function clauses, and rerunning WP as prescribed.
+
+The second counterexample identifies one more loop-carried fact: normal completion proves every processed table key existed, but the invariant recorded only its value. I’m adding processed-prefix membership; that should both prove exact table-borrow abort behavior and rule out WP’s spurious normal-return model.
+
+The membership invariant is semantically true only after a successful borrow, but the prover cannot establish its quantified induction step from the intrinsic call. I’m switching the `sathard` carrier clauses to their direct equivalent: exact result length plus per-index values, and a bounded “missing table key” abort condition. This preserves the behavior WP exposed while avoiding existential vectors.
+
+The direct abort condition is correct, but normal loop exit must establish that no earlier key was missing. I’m restoring that fact as an invariant and adding local ghost assertions immediately after the intrinsic borrow, where successful return establishes membership; these assertions affect proof structure only, not runtime behavior.
+
+The candidate checker treats standalone ghost statements inside the executable body as an implementation-scope change, so I’m removing them. I’ll encode processed-key membership with a recursion-aligned spec helper instead; one helper step exactly matches one loop iteration and makes the full-range abort condition quantifier-free.
+
+The recursive helper exposed the remaining issue: recursing from the end requires many unfoldings to connect a missing current key to the whole range. I’m reversing it to consume keys from the front and changing the invariant to equate the original full range with the unprocessed suffix. Each loop iteration then needs exactly one helper unfolding.
+
+- **Result:** Added complete opaque contract, exact abort coverage, and loop invariants for [`get_pending_transactions`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:54). `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP, repaired loop abstraction, replaced `sathard` existential carriers with direct result clauses and a recursion-aligned [`pending_keys_exist`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.spec.move:6) helper.
+- **Decision points:** Tracked exact processed-prefix values for results; modeled key availability as the unprocessed suffix so each loop iteration requires only one recursive unfolding.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_framework::extracted_multisig_account::get_pending_transactions`, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP found one concrete blocker: the loop loses the exact relation between `pending_transactions` and the processed sequence-number range. I’m inspecting that function and its table-access contracts now, then I’ll add the smallest inductive invariant and rerun WP.
+
+The invariant is inductive and WP now completes, but its mechanically quantified postcondition and two abort clauses are marked `sathard`. I’m checking this exact generated candidate first, as required, to identify whether the issue is acceptance coverage or solver tractability before simplifying it equivalently.
+
+The counterexample is from loop havoc, not the implementation: the invariant allowed `i` to overshoot `next_sequence_number`, which made WP’s existential abort formulas too broad. I’m adding the missing loop-head bound (`i <= next` unless the loop started already past `next`), removing only stale WP-generated function clauses, and rerunning WP.
+
+The focused proof confirms the remaining failure is exactly the existential “some vector-shaped prefix reaches a missing key” encoding. I’m replacing it with the equivalent sequence-number range contract and recording that every already-processed table key exists; this directly supports both normal-result and exact-abort proofs.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [get_pending_transactions](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:54). `CANDIDATE_ACCEPTED`; all obligations verified with implementation unchanged.
+- **Strategy:** Ran WP, strengthened the loop abstraction, simplified `sathard` clauses into exact sequence-range result and abort conditions, then checked the candidate.
+- **Decision points:** Added an exit-bound invariant after loop havoc produced overshoot counterexamples; replaced existential vector-prefix conditions with direct table-key range conditions.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_multisig_account::get_pending_transactions` with package path `.`, then I’ll resolve only in-scope diagnostics and finish with the candidate check.
+
+WP found one concrete blocker: the result vector is accumulated by a loop whose carried value is unconstrained after havoc. I’m now reading that loop and its actual call dependencies to derive a prefix invariant, then I’ll rerun WP for this function as required.
+
+The invariant is accepted by WP and it generated the full opaque contract. Two clauses are marked `sathard`: WP expressed loop exit through an unbounded existential/universal index, even though the implementation deterministically exits at `next_sequence_number`. I’m replacing those mechanical forms with equivalent direct result and bounded missing-key conditions before the candidate check.
+
+The rejection is an invariant-strength issue, not a contract counterexample: loop havoc chose `i` past `next_sequence_number`, which real execution cannot do. I’m adding the missing control-state invariant (`i` is bounded by `next`, except for the genuine initially-empty case where the start already exceeds it), then using a focused proof to localize any remaining obligation.
+
+The focused proof now succeeds. The added processed-prefix invariant records that every table key already traversed existed; together with the index bound, it closes both the normal-result and exact-abort obligations. I’m running the acceptance check now.
+
+- **Result:** Added a complete opaque contract and three loop invariants for [`get_pending_transactions`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-MS-pending-046-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_multisig_account.move:54). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran WP, modeled the accumulated transaction prefix recursively, strengthened loop invariants for index bounds and processed-key existence, then verified and candidate-checked at 5 seconds.
+- **Decision points:** Replaced WP’s `sathard` clauses with equivalent direct/bounded forms; added processed-prefix key existence after the focused counterexample exposed loop-havoc state lacking that fact.
+
+## `is_order_valid`
+
+`aptos_experimental::extracted_dead_mans_switch_tracker`, task id `DM-valid-036`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid`. I’ll inspect only the target implementation, its existing spec, and concrete call dependencies, then iterate with the candidate checker until accepted or the budget is exhausted.
+
+The target has no loop and no writes. Its behavior splits cleanly on map membership: a missing account returns `true` without reading time; a present account reads the timestamp, substitutes it only when the optional creation time is absent, and compares the stored session/expiration fields. I’m now expressing that split against the dependency abstractions, including the timestamp resource abort only on the present-account path.
+
+The first candidate was rejected at compilation, not proof: the spec parser treated the unparenthesized conditional after `<=` as a boolean-context expression. I’m making the conditional value explicit with parentheses; the contract’s meaning is unchanged.
+
+- **Result:** Added a complete opaque specification for [`is_order_valid`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r01-agent-only-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.spec.move:3>), covering exact result behavior and timestamp aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Modeled map membership, stored session state, optional creation time, and timestamp behavior through existing dependency contracts. No loop invariants were needed.
+- **Decision points:** Timestamp is read—and may abort—only when the account exists; absent creation time resolves to the current timestamp.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, existing specs, and actual callees, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The target has no loop and no existing specification. Its visible behavior splits into three cases: absent account, present account with a pre-session order, and present account whose validity depends on expiration versus the framework clock. I’m now resolving the exact iterator and timestamp contracts, including their abort behavior, before writing the opaque contract.
+
+The first candidate reached only a specification-language parse/type issue: Move needs the conditional order time parenthesized on the right side of `<=`. The behavioral clauses themselves have not yet been judged, so I’m making that targeted syntax repair and rechecking.
+
+- **Result:** Added a complete opaque contract for [`is_order_valid`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r02-agent-only-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:67>), covering results and timestamp-resource abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Modeled map membership/value lookup and the framework clock using existing dependency specifications. No loop invariants were needed.
+- **Decision points:** Preserved the absent-account fast path as total even without a timestamp resource; required timestamp existence only when the account is registered.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect the target and its executable dependencies, infer one complete opaque contract, then use `move_spec_check` as the acceptance gate and refine only from its diagnostics.
+
+The target has no loop and is read-only. Its behavior splits on whether the account exists in the ordered map; the non-empty branch also depends on the timestamp and optional creation time. I’m now reading the exact map, option, and timestamp contracts so the abort and result clauses match the abstractions the prover actually uses.
+
+The dependency model exposes `BigOrderedMap` through `spec_contains_key`/`spec_get`, which gives a caller-meaningful contract instead of leaking iterator internals. The only reachable abort outside those modeled map operations is a missing timestamp resource, and only when the account is registered; the absent-account path returns before reading time.
+
+- **Result:** Added a complete `[inferred]` opaque contract for [`is_order_valid`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r03-agent-only-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:71), covering its exact result and conditional missing-timestamp abort. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Modeled account lookup with `BigOrderedMap`’s specification view and timestamp access through the clock resource.
+- **Decision point:** Preserved the early-return behavior: an unregistered account returns `true` without requiring the timestamp resource.
+
+### agent-only, replicate 4: strict success
+
+I’m using the provided `move-inf` instructions as the governing workflow. I’ll inspect only the target implementation and its actual call dependencies, then iterate with the specification checker until it accepts or the proof budget is genuinely exhausted.
+
+The target has no loop and is read-only, so the core challenge is exact result and abort behavior through `BigOrderedMap` iteration plus the timestamp read. I’m locating those dependency contracts before writing the opaque contract.
+
+The dependency model exposes a clean abstract map view (`spec_contains_key`/`spec_get`) and an exact clock contract. The function only reads the clock when the account exists, so its sole abort condition is “account present and timestamp resource absent”; absent accounts return `true` without touching global state.
+
+- **Result:** Added an opaque, complete contract for [`is_order_valid`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r04-agent-only-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:66), covering its exact Boolean result and timestamp-resource abort condition. `CANDIDATE_ACCEPTED`; all target obligations verified and implementation unchanged.
+- **Strategy:** Modeled lookup through `BigOrderedMap`’s abstract view and time through the timestamp contract.
+- **Decision point:** Preserved the absent-account fast path: it returns `true` and cannot abort because it never reads the clock.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied move-inf workflow exactly. I’ll inspect only the target implementation and its relevant call dependencies, then infer, prove, and finish with `move_spec_check` as the acceptance gate.
+
+The target is loop-free and its direct callees already expose map, option, and timestamp semantics, so the move-inf hybrid tactic points to a focused WP pass first. I’m applying it only to `is_order_valid`; any generated clauses will then be checked directly rather than rewritten speculatively.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`is_order_valid`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70>), covering results and all abort behavior. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused dependency analysis and WP inference because the function is loop-free, then validated directly with `move_spec_check`.
+- **Decision point:** Preserved the generated clauses unchanged because WP reported no warnings and every acceptance obligation verified.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid`. I’ll restrict edits to that target’s specification (plus any necessary loop invariant beside its body), use `.` as the package path, and let `move_spec_check` make the final acceptance decision.
+
+The target is loop-free and read-only. Its visible behavior splits on whether the account exists, then on the optional creation time and session/expiration timestamps; I’m running WP now because it can capture the transitive map and timestamp abort conditions exactly.
+
+WP completed without warnings and added an opaque contract with both result branches plus all three reachable abort sources (`now_seconds`, `destroy_some`, and iterator borrowing). There are no loops or global writes, so no invariant or `modifies` clause is needed; I’m submitting this unchanged generated contract to the candidate check.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `is_order_valid` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used warning-free weakest-precondition inference for the loop-free function, preserving its result branches and transitive abort behavior.
+- **Decision points:** No loop invariant was needed; no `modifies` frame was added because the function performs no global writes.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for this function. I’ll inspect only the target implementation and its relevant callees, then infer and validate the opaque contract with `move_spec_check`; I’ll use focused prover runs only if the candidate check identifies a proof failure.
+
+The target is loop-free and read-only, so WP is a good fit here: it can characterize the iterator lookup, optional timestamp, return value, and transitive aborts without requiring an invariant. I’m applying it only to `is_order_valid` and will inspect every generated clause before acceptance.
+
+WP completed without warnings and produced an opaque, read-only contract: one clause covers the absent-account fast path; the second gives the exact timestamp/session/expiration result when state exists; three clauses cover the reachable timestamp, option extraction, and iterator-borrow abort paths. There are no loop, frame, vacuity, or `sathard` issues, so I’m submitting this exact generated candidate to the acceptance check.
+
+- **Result:** Added a complete opaque specification for `is_order_valid` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used focused WP inference because the function is loop-free, then directly checked the generated result and abort clauses.
+- **Decision point:** Retained the exact inferred iterator, timestamp, option, and borrow behavior because WP reported no warnings, vacuous clauses, or unresolved dependencies.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped to `aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid`. I’ll first inspect the target and its actual call dependencies, then infer/edit only its specification and finish with the candidate check.
+
+The target has no loop and reads three semantic inputs: whether the account exists in the map, its stored session/expiration times, and the current timestamp. I’m checking the exact contracts of the map iterator, option, and timestamp calls before choosing whether WP output is already precise enough.
+
+Because the function is loop-free and all relevant behavior flows through named callees, I’m using the skill’s WP pass now. Its output should capture transitive aborts and timestamp/global reads more reliably than hand-transcribing the iterator internals; I’ll inspect every generated clause before checking it.
+
+WP produced a warning-free opaque contract with two result cases and three precise abort paths; it added no preconditions or mutation frame because the function is read-only. I’m submitting that exact candidate first, as required, and will only alter a clause if the checker reports a concrete diagnostic.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `is_order_valid` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used warning-free WP inference for the loop-free function, inspected its result and abort clauses, then ran the candidate check with a 5-second solver budget.
+- **Decision points:** Kept the generated clauses unchanged because they precisely cover both result branches and all three transitive abort paths; no precondition, loop invariant, or `modifies` frame was warranted.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for this function. I’ll begin with scoped WP output at package path `.`, then handle only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and produced an opaque contract covering both return branches and all inferred abort paths. I’m now checking those generated clauses directly with the required acceptance checker.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`is_order_valid`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70>). `move_spec_check` returned `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran scoped WP inference with inline output, then directly checked the warning-free generated contract.
+- **Decision points:** No loop repairs or manual proof changes were needed; the initial 5-second solver budget was sufficient.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` skill exactly as requested. I’ll run WP first for `aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid`, repair only that scope if needed, then finish with the candidate check.
+
+WP completed without warnings and wrote an opaque inferred contract covering both return branches and transitive abort behavior. I’m now checking those generated clauses directly with the acceptance checker.
+
+- **Result:** Added a complete inferred opaque contract for `is_order_valid` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r02-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70). `CANDIDATE_ACCEPTED`: all obligations verified, contract coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Ran warning-free WP inference inline, then checked the generated return and abort clauses directly with `move_spec_check` at a 5-second solver budget.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill for this inference task. I’ll run WP first on `aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid`, handle only diagnostics in that scope, then use the candidate check as the acceptance gate.
+
+WP completed without warnings and produced an opaque contract with normal-result and abort behavior. I’m checking the target implementation and generated clauses for boundary behavior before running the required acceptance check.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`is_order_valid`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran scoped WP, reviewed the implementation/callee usage and generated result/abort clauses, then directly ran `move_spec_check` with a 5-second solver budget.
+- **Decision points:** No loop invariants were needed; warning-free WP captured both the missing-account `true` path and the timestamp/session/expiration behavior for existing accounts.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_dead_mans_switch_tracker::is_order_valid` with package path `.`, then I’ll repair only in-scope loop/spec obligations and finish with `move_spec_check`.
+
+WP completed without warnings and inserted an opaque contract with normal-result and abort behavior. I’m now running the required candidate acceptance check directly on that generated contract.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `is_order_valid` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-valid-036-r04-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:70), covering return and abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran warning-free WP inference for the target, then checked the generated contract directly with `move_spec_check`.
+- **Decision points:** No loop repair or manual weakening was needed; the unchanged WP output passed acceptance at the initial 5-second solver budget.
+
+## `is_taker_order`
+
+`aptos_experimental::extracted_price_time_index`, task id `PT-taker-034`
+
+### agent-only, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow to infer the full opaque contract for `aptos_experimental::extracted_price_time_index::is_taker_order`. I’ll inspect only the target and its relevant dependency contracts, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target has two exact opaque accessor contracts, and `Option::destroy_some` is reached only under the corresponding `is_some` short-circuit guard. That makes the function total; its result is the side-specific crossing test against the stored best ask or best bid, with no state mutation. I’m encoding that directly as the caller-visible contract.
+
+- **Result:** Added an inferred opaque contract specifying exact bid/ask crossing behavior and `aborts_if false`. `CANDIDATE_ACCEPTED`; all obligations verified with implementation unchanged.
+- **Strategy:** Derived behavior from the accessor and `Option` contracts, including short-circuit safety around `destroy_some`.
+- **Decision point:** No `modifies` clause was needed because the function only reads state.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its relevant callees, author a complete opaque contract with `[inferred]` markers, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and has no global effects. Its only potentially aborting operation, `destroy_some`, is guarded by short-circuit `is_some`; the contract therefore needs exact Boolean behavior plus totality, with no `modifies` frame. I’m checking the package’s existing Option-spec idioms before editing.
+
+I’ve added the direct caller-visible contract: bids are takers exactly when a best ask exists at or below the price; asks are takers exactly when a best bid exists at or above it. The function is specified as total and opaque, so callers cannot rely on its body. I’m now running the required acceptance check.
+
+- **Result:** Added a complete opaque specification for [`is_taker_order`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-PT-taker-034-r02-agent-only-acceptance/workspace/sources/trading/extracted_price_time_index.move:49>), covering exact results and total abort behavior. No loop invariants or frames were needed.
+- **Strategy:** Derived behavior from both bid/ask branches and Option callee contracts, then checked the coherent candidate.
+- **Status:** `CANDIDATE_ACCEPTED` — all target obligations verified, coverage complete, implementation unchanged.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied move-inf workflow exactly for this function: I’ll inspect only its implementation, existing specs, and actual callees, then iterate with the specification checker until it accepts or the available proof budget is exhausted.
+
+The function has no loops or state mutation. Its only possible aborting operation is `Option::destroy_some`, but each call is guarded by short-circuit `is_some`; therefore the candidate is total and its result is the side-specific comparison against the corresponding optional best price.
+
+- **Result:** Added an opaque, inferred specification for `is_taker_order`, covering exact bid/ask results and total behavior (`aborts_if false`). `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Derived behavior from the implementation and `Option` contracts, then validated directly with `move_spec_check`.
+- **Decision point:** Short-circuit `is_some()` guards prove both `destroy_some()` calls cannot abort.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, existing specs, and actual call dependencies, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The function has no loops or state writes. Its only potentially aborting operation is `destroy_some`, but both branches guard it with short-circuit `is_some`, so the contract should be total and reduce to an exact Boolean characterization over the relevant best-price option. I’m checking local specification idioms for extracting an `Option` value before writing that candidate.
+
+I’ve added one coherent candidate: `pragma opaque`, exact non-abort behavior, and an exact branch-sensitive result equation. The result is false for an absent opposing quote and otherwise compares against that quote; no `modifies` frame is appropriate because the function only reads through an immutable reference. Now I’m running the acceptance checker at the initial per-condition budget.
+
+- **Result:** Added a complete opaque contract for `is_taker_order` in [extracted_price_time_index.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-PT-taker-034-r04-agent-only-acceptance/workspace/sources/trading/extracted_price_time_index.move:49). It specifies exact branch-sensitive results and no aborts.
+- **Strategy:** Derived behavior from the implementation and contracts of the option/accessor callees.
+- **Decision points:** No `modifies` frame was needed because the function is read-only. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow to infer and prove a complete opaque contract for `aptos_experimental::extracted_price_time_index::is_taker_order`. I’ll keep changes scoped to that function and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and only reads the two optional best prices through already-opaque, total accessors. That makes a focused WP pass appropriate; there are no invariants or global frames to synthesize.
+
+- **Result:** Added a complete `[inferred]`, opaque contract for `is_taker_order`, covering its result and abort behavior. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused weakest-precondition inference because the function is loop-free, then validated with `move_spec_check`.
+- **Decision point:** No frame or loop invariant was needed; the function only reads `best_bid`/`best_ask`.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_experimental::extracted_price_time_index::is_taker_order`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract, then use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and depends only on two already-opaque field accessors plus `Option` operations. That makes a focused WP pass the most direct way to capture both branches and the guarded `destroy_some` abort behavior.
+
+- **Result:** Added an `[inferred]`, opaque contract for `is_taker_order` covering both bid/ask results and guarded `Option::destroy_some` aborts in [extracted_price_time_index.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-PT-taker-034-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_price_time_index.move:48). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used focused dependency inspection, then loop-free weakest-precondition inference and direct candidate checking.
+- **Decision points:** Retained WP’s generated clauses unchanged because inference reported no warnings and all obligations verified within the initial 5-second budget.
+
+### hybrid flexible, replicate 3: strict success
+
+I’ll use the supplied move-inf workflow exactly, scoped to `aptos_experimental::extracted_price_time_index::is_taker_order`. I’ll first inspect the target and its actual call dependencies, then infer/edit only its specification and finish with `move_spec_check`.
+
+The target is loop-free and calls only two already-specified accessors plus `Option` operations. Its visible behavior is a side-dependent comparison against the present best opposing price, with no state mutation; this is a good fit for the WP inference pass.
+
+WP produced an exact conditional postcondition over `best_ask`/`best_bid` and explicit transitive abort clauses for `destroy_some`; it reported no warnings or unresolved loop/callee issues. I’m now submitting that written contract directly to the required candidate check.
+
+- **Result:** Added a complete `[inferred]`, opaque contract for `is_taker_order` in [extracted_price_time_index.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-PT-taker-034-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_price_time_index.move:48), covering return behavior and transitive aborts. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used targeted dependency inspection, loop-free WP inference, then the required `move_spec_check`.
+- **Decision points:** Kept WP’s explicit `destroy_some` abort clauses because they precisely capture callee behavior; no loop invariants or global-state frames were needed.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow to infer and prove the complete opaque contract for `aptos_experimental::extracted_price_time_index::is_taker_order`. I’ll keep edits confined to that target’s specification (and any required loop invariant beside its body), and acceptance will be determined by `move_spec_check`.
+
+The target is loop-free and depends only on two already-opaque, total accessors plus standard `Option` operations. That makes weakest-precondition inference a good fit here; I’m running it narrowly on `is_taker_order`, then I’ll inspect the generated clauses before acceptance.
+
+WP completed without warnings. It inferred the exact side-dependent result and guarded abort behavior, and marked every authored clause `[inferred]`; there are no loops or global writes, so no invariant or `modifies` frame is needed. I’m now submitting this unchanged generated contract to the required candidate check.
+
+- **Result:** Added an `[inferred]`, `pragma opaque` contract specifying exact bid/ask result and abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used warning-free, function-scoped WP inference because the function is loop-free with fully specified callees, then validated via `move_spec_check`.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_price_time_index::is_taker_order` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering the branch-dependent result and both transitive `Option` abort paths. I’m now checking those generated clauses directly with the initial 5-second solver budget.
+
+- **Result:** Added an `[inferred]`, `pragma opaque` contract for `is_taker_order`, covering its exact result and both transitive `Option` abort paths in [extracted_price_time_index.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-PT-taker-034-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_price_time_index.move:48). Candidate accepted; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran warning-free WP inline, then directly validated the generated contract with `move_spec_check` using a 5-second solver budget.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow for this function: first WP on `aptos_experimental::extracted_price_time_index::is_taker_order`, then direct candidate checking, with focused verification only if the check identifies a proof failure.
+
+WP completed without warnings and generated an opaque contract covering the boolean result and both branch-specific `Option` borrow abort paths. I’m now checking those generated clauses directly with the acceptance checker.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `is_taker_order`, covering its result and branch-specific abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran focused WP inference, then checked the generated contract directly with `move_spec_check`.
+- **Decision points:** WP produced warning-free output, so no manual repair or separate prover diagnosis was needed.
+
+### hybrid guided, replicate 3: strict success
+
+I’ll follow the supplied move-inf workflow exactly: first WP on `aptos_experimental::extracted_price_time_index::is_taker_order` with package path `.`, then repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering the Boolean result and both option-borrow abort paths. I’m now checking those generated clauses directly with the initial 5-second solver budget.
+
+- **Result:** Added an inferred opaque contract for `is_taker_order` in [extracted_price_time_index.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-PT-taker-034-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_price_time_index.move:48), covering its result and option-access abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran warning-free WP inference on the requested function, then directly validated the generated clauses with `move_spec_check` using a 5-second per-condition budget.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_price_time_index::is_taker_order`. I’ll begin with WP on exactly that function and package path `.`, then repair only in-scope specifications and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering the Boolean result plus both conditional `Option` abort paths. I’m now checking those generated clauses directly with the acceptance checker at the initial 5-second solver budget.
+
+- **Result:** Added an `[inferred]`, `pragma opaque` specification for `is_taker_order`, covering its Boolean result and both conditional `Option` abort paths. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran scoped WP inference, then directly validated the generated contract with `move_spec_check` at a 5-second budget.
+- **Decision point:** No repairs were needed because WP completed without warnings and the candidate passed on its first check.
+
+## `keep_alive`
+
+`aptos_experimental::extracted_dead_mans_switch_tracker`, task id `DM-keepalive-035`
+
+### agent-only, replicate 1: strict success
+
+I’m using the provided `move-inf` skill for this inference task. I’ll inspect only `keep_alive` and its relevant dependencies, author inferred clauses with `pragma opaque`, then iterate with `move_spec_check` until accepted or the proof budget is exhausted.
+
+The implementation has three caller-visible branches: disable on zero timeout, update an existing entry, or insert a new entry. The nonzero path also inherits timestamp-resource absence, `u64` addition overflow, and any modeled `BigOrderedMap::add` abort; I’m encoding those directly while preserving the existing helper contract.
+
+- **Result:** Added a complete inferred opaque contract for `keep_alive`, covering all state-update branches and abort conditions. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and callee contracts, then verified one coherent candidate with a 5-second solver budget.
+- **Decision points:** Modeled zero timeout as removal/no-op; modeled nonzero timeout as insert/update, including timestamp absence, overflow, minimum-timeout, and map-add aborts.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll inspect only the target and its actual dependency contracts, author inferred clauses with `pragma opaque`, and use `move_spec_check` as the acceptance gate.
+
+The dependency contracts expose exactly the abstractions needed: `timestamp::spec_now_seconds`, `big_ordered_map::spec_set`, and `spec_aborts_add`. I’m encoding the zero-timeout removal path separately from the positive-timeout insert/update path, including timestamp absence, addition failure, and `u64` expiration overflow.
+
+- **Result:** Added a complete opaque specification for `keep_alive`, covering state updates/removal and all abort paths. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and dependency contracts, then validated with `move_spec_check`.
+- **Decision points:** Used `spec_set` for exact map updates and separately modeled timestamp absence, overflow, and map-add aborts.
+
+### agent-only, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow for this function. I’ll inspect only the target implementation, its existing specs, and relevant callee contracts, then iterate with `move_spec_check` until it accepts or the proof budget is exhausted.
+
+The target has two distinct behaviors: `timeout_seconds == 0` delegates to the already-opaque disable contract; otherwise it either updates an existing map entry or inserts a new one. The key proof obligations are exact map post-state, the short-timeout and addition-overflow aborts, and preservation of the tracker’s minimum timeout.
+
+- **Result:** Added a complete opaque specification for `keep_alive` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r03-agent-only-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:156). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation behavior is unchanged.
+- **Strategy:** Modeled disable, update, and insertion paths, including exact map post-state, timeout/resource/arithmetic/map-add aborts, and minimum-timeout preservation.
+- **Decision points:** Reused the existing opaque `disable_keep_alive` contract for zero timeout; represented nonzero updates with `spec_set` and the timestamp contract’s exact value.
+
+### agent-only, replicate 4: strict success
+
+I’m using the provided move-inf workflow exactly. I’ll inspect only the target implementation, its existing specs, and its executable dependency contracts, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target has three behavioral branches: disable on zero timeout, update an existing registration, or add a new one. The nonzero path can also abort on the minimum timeout check or `u64` expiration overflow; I’m now resolving the map contracts so the post-state can be stated exactly.
+
+The map abstraction provides an exact `spec_set`, so one postcondition can cover both insertion and in-place update without quantifiers. I’ll preserve the zero-timeout removal semantics separately and guard the timestamp-dependent overflow condition behind clock existence.
+
+- **Result:** Added a complete opaque contract for `keep_alive` covering removal, insertion/update, timestamp availability, timeout validation, overflow, and state preservation. `CANDIDATE_ACCEPTED`; all obligations verified in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r04-agent-only-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:153).
+- **Strategy:** Derived branch behavior from the implementation and dependency contracts, expressed map updates with `spec_set`, then validated with `move_spec_check`.
+- **Decision points:** Guarded timestamp overflow by resource existence; modeled zero-timeout removal separately because it bypasses all timestamp and minimum-timeout checks.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll inspect only the target and its relevant callees, infer the opaque contract, then iterate with `move_spec_check` until it is accepted or the proof budget is genuinely exhausted.
+
+The target is loop-free, and its only project-local callee already has an opaque contract, so this is a strong fit for the WP pass. I’m applying WP directly to `keep_alive`; afterward I’ll inspect every generated clause rather than treating generation alone as completion.
+
+WP completed without loop or callee warnings and captured the three material branches: disable, update an existing session (expired vs. unexpired), and insert a new session. It also included the timeout assertion, timestamp/overflow, map-operation aborts, reference mutation, and emitted-event obligations. I’m now running the required candidate check with the initial 5-second solver budget.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`keep_alive`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152>). `move_spec_check` returned `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used warning-free WP inference because the function is loop-free, then validated the generated normal-state, event, arithmetic, map, and abort behavior with the required candidate check.
+- **Decision points:** Retained exact callee behavior through `ensures_of<disable_keep_alive>`; kept explicit timestamp overflow and map-operation abort conditions because they are caller-visible.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll inspect only the target and its relevant callees, infer the opaque contract (and any needed invariants), then iterate with `move_spec_check` until accepted or the proof budget is genuinely exhausted.
+
+The target is loop-free but has three meaningful paths: disable on zero timeout, update an existing session, and insert a new session. The nonzero paths also expose an addition-overflow abort, so I’m checking exact callee contracts before generating clauses.
+
+WP completed without warnings and generated exact path-sensitive postconditions and abort conditions, including timestamp failure, `u64` overflow, map insertion, and mutable-iterator safety. Per the workflow, I’m now checking those clauses unchanged before making any manual simplification.
+
+- **Result:** Added a complete opaque inferred contract for [`keep_alive`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used loop-free WP inference, preserving its generated path-sensitive postconditions and exact abort conditions, then ran the candidate check with a 5-second per-condition budget.
+- **Decision points:** Retained explicit timestamp, arithmetic-overflow, map-add, and iterator abort clauses because WP found them transitively; kept the three zero-timeout/existing-entry/new-entry state behaviors distinct.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` skill to infer and prove the complete opaque contract for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll stay within that function’s scope and use `.` as the package path throughout.
+
+The target is loop-free. Its main branches are disable-on-zero, reject-too-short, arithmetic overflow, update-existing, and insert-new; the existing opaque `disable_keep_alive` contract is the only local abstraction boundary. I’m applying WP now so the generated clauses capture the dependency-level abort behavior and map updates exactly.
+
+WP completed without warnings and added an opaque contract covering the zero-timeout delegation, both map-state branches, event emission, minimum-timeout rejection, timestamp aborts, `u64` overflow, and map operation aborts. I’m submitting this exact generated candidate to the acceptance check before making any manual simplification.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`keep_alive`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Used warning-free WP inference for the loop-free function, then validated the exact generated contract with `move_spec_check`.
+- **Decision points:** Preserved the existing opaque `disable_keep_alive` boundary; retained explicit abort coverage for timeout rejection, timestamp failure, arithmetic overflow, and map operations.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll inspect only the target and its relevant callees, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free. Its behavior splits into disable (`timeout_seconds == 0`), update-existing, and insert-new paths, with timestamp addition overflow as an implicit abort. I’m using WP now because it can capture the exact BigOrderedMap and timestamp boundary contracts without guessing dependency semantics.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `keep_alive` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used warning-free weakest-precondition inference for this loop-free function, then validated the generated normal-state, abort, timestamp-overflow, map-update, and event conditions with the candidate checker.
+- **Decision points:** Preserved the existing opaque `disable_keep_alive` contract and expressed the zero-timeout path through it; retained WP’s exact BigOrderedMap iterator/add conditions because acceptance verified them directly.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive` with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and wrote an opaque inferred contract inline. I’m now checking that exact generated candidate directly; if verification fails, I’ll localize only the reported obligation.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `keep_alive`, covering tracker updates, event emission, disabling, timestamp/overflow, map operations, and timeout aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Ran warning-free WP inference, then directly checked the generated contract with a 5-second solver budget. All target obligations verified and coverage is complete.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll begin with WP on exactly that function using package path `.`, then repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and generated a complete opaque candidate, including mutation, event behavior, timeout validation, timestamp overflow, and ordered-map aborts. I’m now checking those clauses directly with the 5-second initial solver budget prescribed by the skill.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `keep_alive` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r02-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran warning-free WP on the requested function, then directly checked the generated candidate with a 5-second solver budget.
+- **Decision points:** Retained WP’s exact state, event, timestamp-overflow, timeout, and ordered-map behavior; no loop repair or partial-abort pragma was needed.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill exactly: I’ll run WP first on `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive` with package path `.`, repair only the target specification/invariants as needed, then finish with `move_spec_check`.
+
+WP completed without warnings and wrote a complete opaque candidate inline. I’m now checking those generated clauses directly with the acceptance checker at the initial 5-second solver budget.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `keep_alive` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Ran warning-free WP inference, then checked the generated clauses directly with `move_spec_check`.
+- **Decision points:** No loop repair was needed; the candidate passed at the initial 5-second solver budget.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive`. I’ll begin with WP scoped to that function, repair only specification/invariant issues in scope, and use `move_spec_check` as the acceptance gate.
+
+WP completed without warnings and generated an opaque contract covering the zero-timeout disable path, state insertion/update branches, event emission, minimum-timeout rejection, timestamp/overflow behavior, and map-operation aborts. I’m now checking those generated clauses unchanged, as required by the workflow.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `keep_alive` in [extracted_dead_mans_switch_tracker.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-DM-keepalive-035-r04-hybrid-guided-acceptance/workspace/sources/trading/extracted_dead_mans_switch_tracker.move:152). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran function-scoped WP inline, retained its warning-free output unchanged, then checked it directly with `move_spec_check`.
+- **Decision points:** No loop repairs or proof adjustments were needed; WP covered state updates, events, disable behavior, and all abort paths.
+
+## `match_order_and_get_next_from_bulk_order`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-match-029`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow because this is contract inference for a missing Move specification. I’ll inspect only the target and its dependency contracts, then iterate with `move_spec_check`; I’ll stop only on acceptance or a concrete budget/tooling blocker.
+
+The implementation has two normal-state shapes: either it updates size 0 in place, or removes element 0 from both vectors. The subtle abort boundary is asymmetric: after a removal, only two initial price elements are needed even if `sizes` is longer, because the function reads only the new front. I’m encoding that exact boundary rather than assuming equal vector lengths.
+
+- **Result:** Added a complete opaque contract for [match_order_and_get_next_from_bulk_order](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r01-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:180>), covering mutations, results, and all abort paths. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived exact normal and abort behavior from the implementation and dependency contracts, then verified the coherent candidate directly.
+- **Decision point:** Modeled the asymmetric vector boundary precisely: only two price entries are required after removing the first level, regardless of the remaining size-vector length.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill exactly for this target. I’ll inspect only the target implementation and its relevant contracts, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The target has no loops or global state. Its behavior splits cleanly at `matched_size == sizes[0]`: either update the first size in place, or remove the first entries from both vectors and return the new head (or two `none`s). I’m now encoding that split, including every bounds/assert abort path.
+
+- **Result:** Added a complete opaque contract for `match_order_and_get_next_from_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r02-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177), covering mutations, return options, and all abort paths. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Modeled the two behavioral branches—partial head consumption and complete head removal—plus vector-bound and unexpected-size aborts.
+- **Decision points:** Used bounded element relations to specify vector removal precisely; retained the explicit `EUNEXPECTED_MATCH_SIZE` abort code for the assertion path.
+
+### agent-only, replicate 3: strict success
+
+I’m using the provided `move-inf` skill to infer the target’s complete caller-visible behavior, verify one coherent contract, and refine only from prover diagnostics. I’ll keep the package path exactly `.` and limit edits to the requested function and any loop invariants beside its body.
+
+The implementation has no loop, so the proof hinges on an exact case split: an undersized match updates only `sizes[0]`; an exact match removes index 0 from both vectors. I’m now checking the package’s existing specification idioms for vector removal and option-valued tuple results before writing the candidate.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `match_order_and_get_next_from_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177). It specifies all aborts, vector mutations, and both option results. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Derived separate contracts for partial and exact matches, including malformed vector-length edge cases, then checked the coherent candidate directly with a 5-second solver budget.
+- **Decision points:** Exact matches shift both vectors left; partial matches preserve prices and update only the first size. Abort conditions account for every indexing/removal boundary, not just `EUNEXPECTED_MATCH_SIZE`.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for this function. I’ll inspect the implementation and its actual call dependencies, author only the target’s inferred contract/invariants, and use `move_spec_check` as the acceptance gate.
+
+The body has no loop, so the core proof is an exact two-case state transition: either the first size remains positive and only that element changes, or a zeroed level is removed from both vectors. I’m also accounting for the non-obvious bounds abort when the two vector lengths are inconsistent.
+
+The first check confirmed the behavioral partition but exposed a prover detail: out-of-bounds vector indexing is reported as an execution failure, not the stdlib’s source-level `0x20000` code. I’m retaining the exact abort conditions while removing only those incorrect code annotations; the explicit assertion’s code remains specified.
+
+- **Result:** Added a complete opaque contract for [`match_order_and_get_next_from_bulk_order`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:177>), covering mutations, return values, and all bounds/assertion aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Modeled the positive-remainder and removed-level paths separately, including mismatched vector lengths.
+- **Decision point:** Vector bounds failures use execution-failure codes, so their exact conditions remain specified without incorrect `with 0x20000` annotations.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped only to `aptos_experimental::extracted_bulk_order_utils::match_order_and_get_next_from_bulk_order`. I’ll inspect the target and its executable dependencies, infer the opaque contract (including abort behavior and loop invariants), then use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and has no global state, so WP is a good first pass once its direct/transitive calls are confirmed. The key edge cases are empty or mismatched vectors, full consumption of the first level, partial/zero-size matching, and indexing/removal aborts.
+
+WP produced a warning-free complete candidate with `pragma opaque`, exact reference mutations, both tuple results, and all indexing/removal abort paths. Per the workflow, I’m checking it unchanged first and will only simplify or repair clauses if the acceptance diagnostics require it.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [match_order_and_get_next_from_bulk_order](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:176>), covering mutations, tuple results, and every abort path. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used warning-free WP inference because the target is loop-free, then checked the generated clauses unchanged with a 5-second solver budget. No loop invariants were needed.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied move-inf workflow exactly: I’ll inspect only the target and its relevant callees, infer the opaque contract and any loop invariant, then let `move_spec_check` decide acceptance.
+
+The target is loop-free and only uses standard vector/option operations, so WP is the best first pass here; there is no invariant synthesis burden. I’ve confirmed the only behavioral edge cases are empty/misaligned vectors, excessive match size, removal of a depleted first level, and returning the surviving head.
+
+- **Result:** Added an `[inferred]`, `pragma opaque` contract covering reference mutations, both returned options, and all abort paths. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used loop-free WP inference, then the required candidate check at a 5-second solver budget.
+- **Decision point:** Preserved WP’s exact vector bounds/removal conditions because they capture empty and mismatched-vector edge cases.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill exactly for this target. I’ll inspect only the function, its existing specifications, and its actual call dependencies; then I’ll iterate through inference/proof diagnostics until `move_spec_check` accepts the opaque contract or the experiment budget is exhausted.
+
+The target is loop-free and calls only standard vector/option operations, so the hybrid tactic favors WP here: it can derive exact mutation, result, and abort behavior without needing an invariant. I’ve confirmed there are no global resource effects and no target-local user specifications to preserve.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `match_order_and_get_next_from_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:176). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference because the function is loop-free, then validated the generated mutation, return, and abort clauses directly with `move_spec_check`.
+- **Decision points:** No loop invariant was needed; no manual simplification was made because the warning-free WP output passed acceptance unchanged.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for this target. I’ll inspect the function and its actual call dependencies, infer only its contract/invariants, and treat `move_spec_check` as the completion gate.
+
+The target is loop-free and calls only modeled `vector`/`option` operations, so the hybrid tactic points cleanly to WP inference. I’ve confirmed there are no opaque application callees or global-memory effects to model.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:176), covering mutations, both return values, and all abort paths. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used warning-free WP inference because the target is loop-free and depends only on modeled vector/option operations, then ran `move_spec_check`.
+- **Decision point:** No loop invariants or manual clause changes were needed; the generated contract passed all verification, coverage, and anti-weakening checks directly.
+
+### hybrid guided, replicate 1: strict success
+
+I’ll use the supplied move-inf workflow exactly: first run WP on the single requested function with package path `.`, then address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and injected a complete opaque contract, including both reference mutations, tuple results, and all abort paths. I’m now checking that exact generated candidate at the requested function scope.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `match_order_and_get_next_from_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:176). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran scoped WP inference, which completed without warnings, then directly ran the candidate check with a 5-second solver budget.
+- **Decision points:** Preserved WP’s exact mutation, tuple-result, and abort conditions; no loop repair or manual weakening was needed.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow for this single function. I’ll run WP first with `package_path: "."` and inline output, then address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering both mutated vectors, both return values, and all inferred abort paths. I’m now checking those clauses directly with the initial 5-second solver budget.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `match_order_and_get_next_from_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r02-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:176). It covers mutations, return values, and abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran warning-free WP inference inline, then directly validated the generated contract with `move_spec_check` using a 5-second per-condition budget.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided move-inf workflow exactly: I’ll run WP first on the named function with `package_path: "."`, repair only target-scope specifications or loop invariants if needed, then finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering both mutated vectors, both return values, and all inferred abort paths. I’m now checking those clauses directly with the acceptance checker, as required by the workflow.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-match-029-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:176). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran focused WP inference, then directly ran `move_spec_check` with a 5-second solver budget.
+- **Decision points:** Warning-free WP output required no repairs; the generated contract covers both mutated vectors, both returned options, and every abort path.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill for this inference task. I’ll begin with WP on the single requested function, then repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and produced an opaque contract covering both mutated vectors, both return values, and all inferred abort paths. I’m now checking that exact generated candidate directly, as required by the skill.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `match_order_and_get_next_from_bulk_order`, covering mutations, return values, and abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran function-scoped WP with inline output, then directly validated the warning-free candidate using `move_spec_check` with a 5-second solver budget.
+
+## `new_bulk_order_request_with_sanitization`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-sanitize-028`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, existing specs, and actual call dependencies, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The target is pure—no global reads or writes—and its executable dependency set is limited to vector length/borrow, two local validators, and the request constructor. I’m now reading those exact bodies and any attached contracts so the abort predicates and returned request can be stated without guessing.
+
+The control flow has eleven ordered rejection points. Because several predicates can be false simultaneously, I’m encoding each abort with the guards for all earlier checks; that preserves the implementation’s observable abort code, not just the set of invalid inputs. Normal return is the exact `BulkOrderRequest::V1` value, and no `modifies` frame is needed.
+
+- **Result:** Added an opaque, inferred contract for [`new_bulk_order_request_with_sanitization`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r01-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:219), covering the exact result and all eleven ordered abort cases with codes. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and contracts of the two validators and request constructor, then ran `move_spec_check` with a 5-second condition budget.
+- **Decision points:** Earlier-check guards preserve abort-code precedence when multiple inputs are invalid; no `modifies` clause was added because the function has no global-state effects.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly for the requested function. I’ll inspect only the implementation and its relevant dependency contracts, author a complete opaque contract with `[inferred]` markers, and iterate with `move_spec_check` until accepted or the proof budget is genuinely exhausted.
+
+The target’s behavior is a straight validation pipeline: eleven ordered failure points followed by a pure constructor. The two validators already have opaque, exact contracts, so I can state the caller-visible result directly and model each abort with the guards imposed by all earlier checks; that preserves both exact abort conditions and the first-failure abort code when several inputs are invalid at once.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `new_bulk_order_request_with_sanitization`, covering all 11 abort conditions/codes and the exact returned `BulkOrderRequest`. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived behavior from the validation pipeline and existing opaque validator/constructor contracts.
+- **Decision point:** Preserved exact failure codes while leaving executable behavior unchanged in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r02-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move).
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation and dependency contracts, then iterate with the candidate checker until accepted or the available proof budget is exhausted.
+
+The dependency scan shows the target has only three semantic callees: two total validators with exact result contracts and a total constructor with an exact struct result. The target therefore needs an exact constructor postcondition plus the ten ordered assertion failures; there are no global writes or inherited partial-abort boundaries.
+
+- **Result:** Added a complete opaque contract with exact result construction and all ordered abort conditions/codes in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:219). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and exact contracts of both validators and the constructor, then ran `move_spec_check` with a 5-second solver budget.
+- **Decision points:** Preserved assertion order to specify exact abort codes; no `modifies` clause or loop invariant was needed because the target has no global writes or loops.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow because this is specification inference. I’ll inspect only the target implementation and its actual dependency contracts, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target is a straight-line validator with no loops of its own. Its two validation helpers already have exact opaque contracts, and the constructor contract exactly exposes the returned enum value, so the remaining work is to encode assertion precedence, exact abort codes, and the normal result.
+
+- **Result:** Added a complete opaque contract for [`new_bulk_order_request_with_sanitization`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:233>), covering the exact result and all ordered abort conditions/codes. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived behavior from the validator helpers and constructor contracts, preserving assertion precedence.
+- **Decision point:** Used exact abort-code clauses because overlapping validation failures must retain the implementation’s first-failure behavior.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill for this function-scoped inference task. I’ll inspect the target and its actual call dependencies, infer only its contract/invariants, then use `move_spec_check` as the acceptance gate; I’ll stop only on acceptance or a concrete tool/budget blocker.
+
+The target is loop-free and delegates validation to two already-opaque, total helper contracts; its constructor callee also has an exact total contract. That makes this a strong fit for the skill’s WP pass, which can derive the ordered abort behavior and exact returned request without altering helper specifications.
+
+WP exposed the full behavior but emitted path-split clauses, including several `[inferred = sathard]` quantifier cases. Per the skill, those markers are unresolved—not acceptable output. I’m replacing only the generated target block with the equivalent solver-friendly contract: one exact return value and the union of all ten validation failures, expressed through the module’s existing semantic helpers.
+
+- **Result:** Added an opaque contract with the exact returned `BulkOrderRequest` and all 11 abort conditions in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:92). `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used function-scoped WP, then replaced its path-split `sathard` output with equivalent clauses using the existing `all_nonzero` and `strictly_ordered` helpers.
+- **Decision point:** Kept the complete abort union independent of assertion order, eliminating unresolved path guards without weakening behavior.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly, targeting only `aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization`. I’ll inspect the function and its actual call dependencies, infer the opaque contract (and any needed invariants), then iterate with the candidate checker until accepted or the experiment budget is exhausted.
+
+The target is loop-free, but it calls two loop-based validators and one constructor. I’m reading those bodies and any existing contracts now; this will determine whether WP can characterize the target directly or whether its result needs a caller-level contract derived across transparent helpers.
+
+WP produced a complete behavioral shape, including constructor equality and all validation failures, but marked several quantified abort clauses `sathard`. Per the skill, I’m checking the generated clauses unchanged first so the acceptance diagnostic—not guesswork—determines the necessary edits.
+
+- **Result:** Added an opaque inferred contract for `new_bulk_order_request_with_sanitization`, covering the exact returned request and every validation abort. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used targeted dependency inspection, WP inference, then checked the generated clauses unchanged with a 5-second solver budget.
+- **Decision point:** Existing helper loop invariants were sufficient, so no executable code or helper contracts required changes.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for this function. I’ll inspect the target and its executable dependencies, infer only the requested contract, then use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and delegates validation to two transparent helpers whose loops already have invariants. The constructor has a complete opaque contract, so I’m running the focused WP pass to derive the exact result and abort conditions without altering helper contracts.
+
+WP produced a complete behavioral shape, including the exact constructor result, but marked several quantified abort clauses `sathard`. I’ll check the generated candidate directly first; any edits will be limited to diagnostics the acceptance check reports.
+
+- **Result:** Added an opaque inferred contract describing the exact constructed `BulkOrderRequest` and all validation aborts. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation bytecode is unchanged.
+- **Strategy:** Used focused dependency analysis, WP inference, then the mandatory candidate acceptance check.
+- **Decision point:** Kept existing helper loop invariants unchanged because they were sufficient to prove the target’s quantified validation behavior.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for the single target `aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization`. I’ll inspect only the implementation and relevant callees, infer the opaque contract and any loop invariants, then use `move_spec_check` as the acceptance gate with `package_path: "."`.
+
+The target is loop-free and its three nontrivial callees already have exact opaque contracts: the two validators expose complete predicates, and the constructor exposes the exact returned enum value. That makes a focused WP pass the right next step; it should derive the normal result and every ordered assertion failure without changing helper contracts.
+
+WP found the full behavior but emitted path-split clauses, including several `sathard` quantifier negations. I’m replacing only that generated target block with an equivalent solver-friendly contract: one exact return equation plus the union of all assertion-failure conditions. This preserves the runtime’s ordered checks while describing exactly the same abort-state set.
+
+- **Result:** Added a complete opaque contract for [`new_bulk_order_request_with_sanitization`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:92), covering the exact result and all abort conditions. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused WP inference, simplified its path-split clauses into equivalent helper-based conditions, then ran `move_spec_check`.
+- **Decision points:** Replaced unresolved `sathard` clauses with existing `all_nonzero` and `strictly_ordered` predicates; no loop invariants were needed because the target itself is loop-free.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied move-inf workflow exactly: first WP on the single target with inline output, then I’ll repair only in-scope specs/invariants and finish with the candidate check.
+
+WP completed without loop-invariant or callee-partiality warnings, but it emitted several unresolved `sathard` abort clauses. I’m inspecting the function and its sanitizer helper so I can replace those mechanically nested path clauses with an equivalent, solver-friendly complete contract.
+
+I simplified the WP result without changing its meaning: normal return now directly specifies the exact `BulkOrderRequest`, and abort coverage is the disjunction of each validation failure. This removes all `sathard` markers while preserving every validation boundary, including empty sides, depth 30/31, ordering, zero sizes, and crossing prices. I’m running the required candidate check now.
+
+- **Result:** Added a complete opaque contract for `new_bulk_order_request_with_sanitization` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:92). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran scoped WP, replaced its `sathard` path-expanded clauses with equivalent direct result and validation-failure conditions, then ran `move_spec_check`.
+- **Decision points:** Flattened abort paths into exact validation predicates and expressed the successful result directly as `BulkOrderRequest::V1`.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first I’ll run WP on the single requested function with inline output, then address only its diagnostics and finish with the candidate check.
+
+WP completed without inference warnings and generated the full result/abort contract, but several abort clauses are marked `sathard`. I’m checking the candidate now; if proof rejects or times out, I’ll localize the exact condition and replace only the solver-hostile form with an equivalent one.
+
+- **Result:** Added an opaque, complete inferred contract for `new_bulk_order_request_with_sanitization`; `move_spec_check` returned `CANDIDATE_ACCEPTED` with all obligations verified and implementation unchanged.
+- **Strategy:** Ran scoped WP with inline output, then directly checked the generated clauses using a 5-second solver budget.
+- **Decision point:** Retained WP’s exact normal-result and abort behavior because the candidate check proved complete contract coverage without weakening.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly: I’ll begin with focused WP inference for `aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization`, write output inline, then repair only target-scope diagnostics and finish with the candidate check.
+
+WP completed without loop-invariant warnings, but it emitted six `[inferred = sathard]` abort clauses. Those are unresolved under the skill rules, so I’m tracing the target’s implementation and executable callees before simplifying the generated contract into an equivalent solver-friendly form.
+
+The target’s callees already have complete opaque contracts, including exact `all_nonzero` and `strictly_ordered` helpers. I’m replacing WP’s path-split clauses with the equivalent direct contract: one unconditional constructor result and the exact union of all ten validation failures. This removes `sathard` without weakening behavior.
+
+- **Result:** Added a complete opaque contract in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-sanitize-028-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:92), covering the constructor result and every validation abort. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Ran focused WP, replaced its `sathard` path splits with equivalent existing helper predicates, then ran `move_spec_check` at 5 seconds.
+- **Decision point:** Used `all_nonzero` and `strictly_ordered` to preserve exact semantics while avoiding hard duplicated quantifiers.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the provided `move-inf` skill for this function. I’ll begin with inline weakest-precondition inference, then address only its diagnostics and finish with the candidate check that determines acceptance.
+
+WP completed without loop or callee warnings and produced an opaque contract, but several exact abort branches are marked `sathard`. I’m checking the generated candidate now; if those quantifiers cause proof trouble, I’ll replace them only with semantically equivalent, solver-friendlier clauses.
+
+- **Result:** Added a complete inferred opaque contract for `new_bulk_order_request_with_sanitization`; candidate accepted with all obligations verified, complete coverage, and unchanged implementation.
+- **Strategy:** Ran inline WP inference, then validated the generated clauses directly with `move_spec_check` at a 5-second budget.
+- **Decision point:** No repairs were needed because WP reported no loop/callee warnings and the candidate check accepted every condition.
+
+## `new_tiers`
+
+`aptos_framework::extracted_transaction_limits`, task id `TL-build-039`
+
+### agent-only, replicate 1: strict success
+
+I’ll use the supplied `move-inf` workflow exactly, scoped to `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll first inspect the target and its actual call dependencies, then author only inferred clauses/invariants and use the candidate check as the acceptance gate.
+
+The target builds elementwise tiers, then delegates ordering validation. Its visible behavior therefore needs three pieces: exact vector contents, all abort causes from length/multiplier/order checks, and a loop invariant tying the constructed prefix to both input vectors. I’m reading the existing callee contracts now so the target contract matches their actual abstraction boundaries.
+
+The existing `new_tier` and `validate_tiers` contracts are exact and opaque, so no inherited partiality is needed. I’m adding a direct quantified contract and a prefix invariant: successful iterations establish both the exact tier mapping and validity of every processed multiplier, which is necessary to prove the abort condition in both directions.
+
+- **Result:** Added a complete opaque contract and loop invariants for `new_tiers`, covering exact output mapping and all length, multiplier, and ordering aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used direct prefix invariants aligned with tier construction and existing opaque callee contracts.
+- **Decision point:** Recorded processed multiplier validity so the exact abort condition remains provable at loop exit.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly: I’ll inspect only the target and its relevant dependencies, infer an opaque complete contract, and use `move_spec_check` as the acceptance gate.
+
+The target builds a pointwise tier vector, then validates adjacency. Its complete abort surface is therefore three-way: unequal input lengths, any out-of-range multiplier, or any non-monotone adjacent pair; the normal result must preserve both input vectors element-for-element. I’m encoding that directly and adding a prefix-construction invariant to the target loop.
+
+The first check rejected the multiplier abort clause because loop havoc forgot that every completed `new_tier` call returned normally. I’m strengthening the loop abstraction with the exact missing prefix fact: all processed multipliers are valid.
+
+- **Result:** Added a complete opaque contract and loop invariants for `new_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r02-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Specified exact result construction and all abort cases: length mismatch, invalid multipliers, and non-monotone tiers.
+- **Decision points:** Added processed-prefix validity after the initial check showed loop havoc lost evidence that completed `new_tier` calls returned normally.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped only to `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll inspect its implementation and actual call dependencies, author only inferred specs/invariants, then use the candidate checker as the acceptance gate.
+
+The target constructs one tier per paired input, then validates adjacent ordering. Its complete contract therefore needs three pieces: exact length/element mapping on success, exact abort behavior for length/multiplier/order failures, and a loop invariant preserving the constructed prefix. I’m checking the module’s existing spec helpers and callee contracts before editing.
+
+I’ve added a first coherent candidate: prefix-preserving loop invariants, exact element-wise output, and the three abort classes (length mismatch, invalid multiplier, and non-monotonic adjacent tiers). I’m now running the required acceptance checker; any rejection will be localized and repaired without changing executable behavior or existing callee specs.
+
+The first proof exposed a real loop-abstraction gap, not a contract error: after loop havoc, the prover knew the built prefix’s values but not that every successfully constructed prefix element had passed `new_tier`’s multiplier check. I’m adding that preserved prefix fact so the exact “invalid anywhere implies abort” direction can be proved.
+
+- **Result:** Added complete `[inferred]` contract and loop invariants for [`new_tiers`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r03-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Specified exact output mapping and all abort classes, with prefix invariants for constructed tiers and validated multipliers.
+- **Decision point:** Added processed-prefix multiplier validity after the checker identified loop havoc as preventing proof that invalid inputs necessarily abort.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill exactly for `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll inspect only the target and its relevant dependencies, author inferred clauses with `pragma opaque`, and use `move_spec_check` as the acceptance gate.
+
+The implementation is a zip-construction loop followed by the existing opaque `validate_tiers`. The complete contract therefore needs three abort classes—length mismatch, an invalid multiplier, and non-monotonic paired tiers—plus an exact elementwise result relation; the loop invariant must preserve that relation for the constructed prefix.
+
+The first candidate check found only a specification-language placement error: inference properties follow the condition keyword in this toolchain. I’m correcting the marker placement before evaluating the proof obligations.
+
+The proof counterexample exposed loop havoc, not a wrong abort condition: it allowed an already-built prefix containing invalid multipliers even though such iterations could never return from opaque `new_tier`. I’m adding the missing normal-path invariant that every processed multiplier is valid.
+
+- **Result:** Added complete inferred abort/result specifications and loop invariants for `new_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r04-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Modeled pointwise tier construction, invalid multipliers, vector-length mismatch, and ordering failures, with prefix invariants for the construction loop.
+- **Decision points:** Added processed-prefix validity after loop havoc exposed an impossible normal path containing invalid multipliers; this resolved the final proof failure.
+
+### hybrid flexible, replicate 1: strict success
+
+I’ll apply the provided move-inf workflow exactly, scoped only to `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll first inspect the target and its actual call dependencies, then infer/edit its contract and use the candidate check as the acceptance gate.
+
+The target constructs one output tier per paired input element, then delegates range checking to `new_tier` and adjacency checking to `validate_tiers`. Its loop currently has no invariant, so I’m using the permitted WP pass now to expose the exact missing loop facts and generated abort/result obligations before synthesizing the invariant.
+
+WP now has an exact structural model of the loop, but its emitted contract uses existential carrier vectors and is flagged `sathard`, so it is not acceptable as-is. I’m replacing only those generated target clauses with the equivalent caller-visible contract: equal lengths, elementwise output construction, multiplier validity, and adjacent monotonicity.
+
+The first proof failure is a loop-abstraction gap, not a bad abort condition: after loop havoc, the invariant reconstructs output elements but does not record that every successfully processed `new_tier` call had a valid multiplier. I’m localizing that obligation with the focused prover as required, then I’ll add precisely that normal-path invariant.
+
+- **Result:** Added a complete opaque contract and six inferred loop invariants for `new_tiers`. Candidate accepted: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used targeted WP inference, simplified its `sathard` clauses into direct elementwise result and exact abort conditions, then verified with `move_spec_check`.
+- **Decision point:** Added processed-prefix multiplier validity after the prover showed loop havoc obscured `new_tier` abort behavior.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped to `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll inspect only the target and its relevant callees, infer the contract/invariants, then use the candidate check as the acceptance gate.
+
+The target builds one tier per paired input element, then validates adjacency ordering. Its relevant helpers already have opaque contracts, while the target’s construction loop has no invariant, so I’m invoking WP now to obtain the exact obligations and loop-head evidence before synthesizing that invariant.
+
+I added a prefix-construction invariant: the output prefix length equals the loop index, each prefix tier exactly pairs the corresponding two input elements, and the index/input lengths remain aligned. I’m rerunning WP so the function contract is derived from that abstraction rather than guessed manually.
+
+WP completed but emitted several `[sathard]` carrier quantifiers. Their concrete meaning is simple here: normal return is the elementwise zipped tier vector; aborts occur for unequal lengths, any invalid multiplier, or a non-monotonic adjacent pair. I’m replacing only those diagnostic clauses with equivalent direct predicates, keeping the opaque contract and inferred markings.
+
+The first acceptance run exposed one missing loop fact, not a contract error: after loop havoc, the prover knew the prefix’s exact values but had forgotten that every successfully constructed prefix multiplier passed `new_tier`. I’m adding that no-abort prefix invariant and will rerun acceptance.
+
+- **Result:** Added complete inferred loop invariants and an opaque contract for [`new_tiers`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:85), covering exact output construction and all abort cases. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP inference, replaced its `[sathard]` carrier expressions with equivalent direct predicates, then verified via `move_spec_check`.
+- **Decision points:** Added prefix validity after acceptance exposed lost no-abort knowledge across loop havoc; retained exact length, multiplier-validity, and adjacency-order abort behavior.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly as requested. I’ll inspect only the target and its relevant callees, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target builds an elementwise tier vector, then validates adjacent ordering. Its construction loop has no invariant, so I’m running the WP pass first to obtain the exact missing obligations and bounded loop-head evidence before synthesizing that invariant.
+
+The bounded heads show the stable relation: after `i` iterations, `tiers` has length `i`, and each prefix element is exactly the pair from the two inputs. I’m adding that relation plus index/length bounds as inferred loop invariants, then rerunning WP so the function clauses come from the now-characterized loop.
+
+WP’s clauses are exact but solver-hostile: they quantify over an arbitrary reconstructed vector and retain unreachable bounds/overflow branches. I’m replacing only those generated clauses with an equivalent direct contract: exact output length and element mapping, plus the three real abort classes—length mismatch, invalid multiplier, and non-monotonic adjacent tiers.
+
+The rejection pinpoints a missing normal-path fact, not a bad contract: loop havoc allowed an invalid multiplier in the already-processed prefix even though `new_tier` would have aborted. I’m strengthening the invariant with “every processed multiplier is valid,” which excludes exactly those spurious normal exits.
+
+- **Result:** Added a complete opaque contract and inferred loop invariants for `new_tiers`; `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used WP inference, simplified its solver-hard clauses into exact result and abort conditions, then repaired the loop abstraction from verifier evidence.
+- **Decision point:** Added processed-prefix multiplier validity after the checker exposed a spurious normal path containing invalid multipliers. Runtime implementation remains unchanged.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is a pure vector-construction function with no global access. Its dependencies are `new_tier`, `validate_tiers`, vector operations, and `error::invalid_argument`; I’m reading those bodies and any existing specs before choosing loop invariants or running WP.
+
+The target’s loop currently has no invariants, while `new_tier` and `validate_tiers` already have opaque contracts that must remain unchanged. I’m applying WP at function scope now; if it reports loop havoc, I’ll keep its behavioral clauses only after synthesizing a prefix invariant and rerunning inference.
+
+WP confirmed the only blocker is loop havoc. Its bounded heads show `tiers` is exactly the zipped prefix, so I’m adding invariants for index/length alignment and element-wise prefix equality; these are sufficient to recover both the returned vector and the downstream ordering/abort behavior.
+
+The first invariant draft hit only a name-resolution issue: local `len` shadows the spec `len` function. I’m switching those expressions to `std::vector::length`, matching the module’s existing verified invariant style.
+
+WP now has enough loop information, but its injected function contract contains `[inferred = sathard]` carrier quantifiers over an invented vector. Per the skill, that is unresolved. I’m replacing those clauses with the equivalent direct contract: exact zipped result, length mismatch, any invalid multiplier, and any adjacent non-monotonic input pair.
+
+The candidate check found a spec-language parsing issue, not a semantic failure: an existential following `&&` needs parentheses. I’m fixing that clause and rerunning the acceptance check.
+
+The counterexample is loop-havoc evidence: on a modeled normal loop exit, the prefix mapping allowed invalid multipliers because the invariant did not record that each successful `new_tier` call established validity. I’m adding that processed-prefix fact; it is initialized vacuously and preserved by the callee’s opaque abort contract.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`new_tiers`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference, then replaced unresolved `sathard` carrier clauses with direct result, invalid-multiplier, length-mismatch, and ordering conditions.
+- **Decision points:** Added zipped-prefix and processed-validity invariants to eliminate loop havoc and prove exact normal/abort behavior.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::new_tiers` with package path `.`, then I’ll repair only that scope and finish with the candidate check.
+
+WP found one real blocker: the loop loses the exact relationship between `tiers` and the processed input prefix. I’m reading the target and its actual call dependencies now so the invariant captures both returned values and downstream validation aborts.
+
+The bounded heads generalize cleanly to a prefix invariant: `tiers` has length `i`, and each processed element is exactly the pair from the two input vectors. I’ll add that invariant (plus stable bounds/length facts), rerun WP, and let WP generate the function contract from it.
+
+WP’s candidate is logically informative but marked `sathard`, so it is not acceptable as-is. I’m replacing its existential “some reconstructed vector” encoding with an equivalent direct contract: exact output length/fields, invalid-multiplier aborts, and adjacent-order aborts over the two inputs.
+
+The counterexample is caused by loop abstraction, not the contract: after loop havoc, the prover knows the reconstructed elements but not that every completed `new_tier` call returned normally. I’m adding the missing processed-prefix validity fact and rechecking.
+
+WP correctly refused to merge with stale generated clauses. Per its diagnostic, I’m removing only the `[inferred]` function contract (keeping the loop invariants) and regenerating it as a unit.
+
+The refreshed WP output confirms the added invariant captures successful multiplier validation, but still encodes the reconstructed vector through solver-hostile existential quantifiers. I’m applying the same direct, equivalent contract now that the loop abstraction is complete.
+
+- **Result:** Added complete `[inferred]` output, abort, and loop-invariant specifications for `new_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72). Candidate accepted; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP, generalized its bounded loop observations into exact prefix/value/validity invariants, then replaced solver-hard existential output with equivalent direct clauses.
+- **Decision point:** Added processed-prefix multiplier validity after the candidate check exposed loop havoc losing evidence that every completed `new_tier` call returned normally.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the user-provided `move-inf` skill because this is a specification-inference task. I’ll follow its guided order: run WP on `aptos_framework::extracted_transaction_limits::new_tiers`, repair only in-scope specs/invariants if needed, then use the candidate check as the acceptance gate.
+
+WP found one concrete blocker: the loop loses the relationship between `tiers` and the processed prefixes. I’ll inspect the target’s implementation and exact callee dependencies, derive a prefix invariant, add it beside the loop, and rerun WP after removing any stale generated function clauses if present.
+
+The first invariant shape is right, but the local variable `len` shadows the specification `len(...)` operator. I’m qualifying vector length explicitly (as the existing loop does) and rerunning WP; this is a syntax/name-resolution repair, not a semantic change.
+
+WP now succeeds and generated a complete candidate, but several clauses are marked `sathard` because the loop invariant encodes the result through quantified vector extensionality. Per the skill, I’ll check this exact candidate first; if the solver times out, I’ll replace the mechanically quantified form with an equivalent recursion-aligned prefix helper rather than weaken behavior.
+
+The rejection is localized to the generated “some iteration’s `new_tier` aborts” condition. The body is correct, but the loop abstraction forgot that every already-processed multiplier passed `new_tier`’s validity check. I’ll add that no-abort prefix fact, remove only WP’s stale generated `new_tiers` block, and rerun WP as required.
+
+- **Result:** Added inferred prefix, bounds, and multiplier-validity loop invariants plus an opaque, complete contract for `new_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all target obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran focused WP, repaired the missing loop abstraction, reran WP, and used the candidate check as the acceptance gate.
+- **Decision points:** Added processed-prefix validity after the first candidate exposed a spurious normal path through an abort condition; the revised candidate verified successfully at a 5-second per-condition budget.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_transaction_limits::new_tiers`. I’ll run WP first with package path `.`, repair only the target’s inferred specification or required loop invariants, then use `move_spec_check` as the acceptance gate.
+
+WP found one concrete blocker: the loop loses the exact relationship between `tiers` and the processed prefixes. I’m inspecting the target and its actual call graph now, then I’ll add a prefix invariant beside that loop and rerun WP as required.
+
+The invariant shape is right, but the local variable named `len` shadows the specification `len(...)` function. I’m switching those three expressions to `std::vector::length(...)`; this is a spec-only name-resolution fix.
+
+WP now has an exact candidate, but emitted several `[inferred = sathard]` carrier formulas. I’m replacing those mechanically generated existential-vector clauses with the equivalent caller-visible contract: exact output length/element mapping, length mismatch, invalid multipliers, and adjacent-tier ordering failures. This preserves all paths while removing the unresolved solver-hard encoding.
+
+The counterexample exposed an inadequate loop abstraction, not an implementation issue: after loop havoc, the prover knew each constructed tier’s fields but not that every completed `new_tier` call returned normally only for a valid multiplier. I’m adding that processed-prefix fact, removing the stale function clauses, and rerunning WP before checking again.
+
+- **Result:** Added complete inferred output, abort, and loop-invariant specifications for `new_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran WP, strengthened the loop with exact prefix construction and multiplier-validity invariants, simplified solver-hard output into equivalent direct clauses, then validated with `move_spec_check`.
+- **Decision points:** Replaced existential carrier formulas with exact element mapping; added processed-prefix validity after the first check exposed insufficient loop abstraction.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_transaction_limits::new_tiers`: WP first, then targeted invariant/spec repair if needed, and `move_spec_check` as the sole acceptance gate. I’ll keep the package path exactly `.` and preserve executable behavior and existing specs.
+
+WP found one real blocker: the loop loses the relationship between `tiers` and the processed prefixes. I’ll derive that invariant from the implementation and inspect `validate_tiers`’ existing contract before rerunning WP; the abort warning is downstream of the same missing abstraction.
+
+The first invariant draft hit only a name-resolution issue: the local variable `len` shadows the specification `len(...)` function. I’m qualifying vector lengths explicitly; the invariant’s semantics remain unchanged.
+
+WP now completes, but its emitted contract is mechanically quantified and marked `sathard`; those markers are unresolved by the skill’s acceptance rules. I’ll run the candidate check on this exact generated output first, then replace only the difficult clauses with an equivalent direct prefix/result and abort characterization if the checker confirms the expected proof issue.
+
+The checker exposed the missing reachability fact precisely: loop havoc allowed a completed prefix containing an invalid multiplier, even though `new_tier` would have aborted before that loop head. I’m strengthening the loop invariant with “every processed multiplier is valid,” removing the stale generated function clauses, and rerunning WP as required.
+
+- **Result:** Added an opaque inferred contract and loop invariants for [`new_tiers`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-build-039-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:72>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; coverage is complete and implementation bytecode is unchanged.
+- **Strategy:** Ran WP, added prefix-construction and processed-multiplier invariants, reran WP, then checked the generated clauses directly.
+- **Decision point:** The initial candidate exposed impossible completed prefixes containing invalid multipliers; adding the invariant that every processed multiplier is valid eliminated that loop-havoc state.
+
+## `partition`
+
+`inference_corpus::lomuto_partition`, task id `QP-part-025`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow to infer only `inference_corpus::lomuto_partition::partition`, preserving executable code and existing specs. I’ll inspect the target and its call dependencies, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target has three transparent vector dependencies (`length`, indexing/borrow, and `swap`) and no opaque callees. The key specification challenge is the mutated vector: I’m modeling the exact sequence of Lomuto swaps with a recursion aligned one-for-one to loop iterations, which also makes the returned index and all abort boundaries explicit.
+
+- **Result:** Added exact result, vector-mutation, abort, and loop-invariant specifications in [lomuto_partition.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r01-agent-only-acceptance/workspace/sources/authored/lomuto_partition.move:9). `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Modeled the pivot swap and sweep with recursion aligned to each loop iteration, including exact ordering and returned partition index.
+- **Decision points:** Specified both empty-vector and invalid-pivot aborts; retained `pragma opaque` so callers rely solely on the verified contract.
+
+### agent-only, replicate 2: disqualified
+
+I’m using the supplied move-inf workflow exactly: I’ll inspect only the target and its actual dependencies, author inferred clauses/invariants, and use `move_spec_check` as the acceptance gate.
+
+The target is a deterministic in-place Lomuto pass. Its direct failure boundary is already clear (`values` empty or `pivot` out of range); I’m now checking the vector specification vocabulary so the post-state can describe the permutation and partition boundary without losing caller-visible mutation details.
+
+I’m choosing a single recursion-aligned state helper that carries both the evolving vector and `store` (as a trailing element). This gives an exact deterministic post-state and a one-step loop invariant, avoiding a weaker “some permutation” contract or two mutually recursive summaries.
+
+The first candidate is now in the acceptance check. It encodes the exact output rather than only partition-order properties; if the recursive invariant is too expensive or a syntax detail is rejected, I’ll localize that specific obligation and refine it.
+
+The acceptance run is still active beyond the nominal 5-second per-condition budget, likely in package setup or timeout replay. I’m keeping the run alive so its diagnostic can identify whether the issue is proof complexity or the candidate itself.
+
+No diagnostic has surfaced yet, so there is nothing actionable to edit safely. I’ll continue waiting for the checker’s verdict rather than guessing at the proof failure.
+
+The checker attributed the timeout to the recursive definition itself (hundreds of thousands of instantiations), and also flagged the loop-preservation and postcondition assertions as hard. I’m replacing that hostile exact-state encoding with the direct partition abstraction: pivot placement, result bounds, preserved length, and quantified low/high regions, supported by prefix invariants.
+
+- **Result:** Added complete inferred abort, result, mutation, and loop-invariant specifications for `partition` in [lomuto_partition.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r02-agent-only-acceptance/workspace/sources/authored/lomuto_partition.move:9). `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used prefix partition invariants to prove pivot placement, result bounds, preserved length, and low/high output regions.
+- **Decision point:** Replaced an exact recursive-state model after timeout analysis showed excessive quantifier instantiation; the direct partition abstraction verified in 1.8 seconds.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove the complete opaque contract for `inference_corpus::lomuto_partition::partition`. I’ll stay within that function’s scope, inspect its implementation and actual call dependencies, then iterate with `move_spec_check` until accepted or the proof budget is exhausted.
+
+The implementation has two exact abort sources—empty input (`length - 1`) and an out-of-range pivot—and no global-state effects. For normal returns, the contract must capture the returned pivot position, both partition sides, the pivot value, and preservation of the vector’s contents; the loop invariant must preserve those facts through swaps. I’m checking the vector dependency’s available specification vocabulary before choosing the smallest solver-friendly encoding.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`partition`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r03-agent-only-acceptance/workspace/sources/authored/lomuto_partition.move:9>), including exact vector transformation, pivot placement, partition ordering, result, length preservation, and abort conditions. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used recursion-aligned `count_less` and `sweep` specification helpers so each loop iteration unfolds one specification step.
+- **Decision points:** Kept the executable implementation unchanged and used exact mutation semantics rather than a weaker permutation-only guarantee.
+
+### agent-only, replicate 4: strict success
+
+I’m using the provided move-inf skill to infer the full opaque contract for `inference_corpus::lomuto_partition::partition`. I’ll inspect only the target and its relevant dependencies, then iterate with `move_spec_check` until it accepts or the proof budget is exhausted.
+
+The target has one mutable-vector loop and only calls `vector::length`, `borrow`, and `swap`. Its true API precondition is that the pivot index is in range; under that condition arithmetic and all vector accesses are total. The key proof challenge is preserving the exact swap sequence while tracking the partition prefix.
+
+I’ve encoded the implementation as a pure recursive sweep: the contract gives both the exact returned index and the exact post-state vector, while the loop invariants relate each executable iteration to that model. I’m checking this coherent candidate now; any rejection will be narrowed to the reported obligation.
+
+- **Result:** Added an exact opaque contract and loop invariants for `partition` in [lomuto_partition.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r04-agent-only-acceptance/workspace/sources/authored/lomuto_partition.move). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Modeled the pivot swap and iterative Lomuto sweep with pure recursive spec helpers, tying each loop iteration to the exact modeled vector and store index.
+- **Decision points:** Invalid pivots are modeled as the exact abort condition (`pivot >= len(values)`); successful execution specifies both the precise result and complete mutated-vector post-state.
+
+### hybrid flexible, replicate 1: not_scorable
+
+I’m using the provided `move-inf` workflow exactly: I’ll inspect only the target and its relevant dependencies, infer the loop invariant and opaque contract, then use `move_spec_check` as the acceptance gate.
+
+The target is a single in-place Lomuto pass. Its visible behavior must capture: invalid/empty pivot aborts, exact pivot placement, the `< pivot` prefix / `>= pivot` suffix partition, preservation of the vector’s multiset (or equivalent permutation property), unchanged length, and the returned pivot index. I’m running WP now to get the tool’s exact abort model and loop-head facts before synthesizing the invariant.
+
+WP now has a loop abstraction and produced exact abort clauses, but—as expected from the invariant’s current shape—it emitted no normal-return guarantees. I’m sending this candidate to the required checker to identify the precise uncovered category before strengthening it.
+
+The checker confirms the missing piece is the normal-result relation. To make that relation genuinely complete—not merely “partitioned somehow”—I’m strengthening the loop abstraction with a single recursion-aligned state trace. It records the exact vector and `store` value after each processed index, so the opaque postcondition can describe the precise final mutation as well as the returned index.
+
+The exact postcondition is now in place, together with human-usable partition guarantees. The acceptance check is still solving; I’m waiting for its verdict and will localize any failed obligation rather than weakening the contract.
+
+- **Result:** Added exact opaque contract, abort behavior, normal-result guarantees, and loop invariants for `lomuto_partition::partition`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP for abort inference, then a recursion-aligned `sweep_state` model to specify the exact vector mutation and partition index.
+- **Decision points:** Added exact state modeling after WP lacked normal-result clauses; retained readable partition guarantees alongside the precise functional result.
+
+### hybrid flexible, replicate 2: disqualified
+
+I’m using the supplied `move-inf` workflow for `inference_corpus::lomuto_partition::partition`. I’ll restrict edits to that target’s contract and any required loop invariants, use `.` as the package path, and treat `move_spec_check` as the acceptance gate.
+
+The target is a classic in-place Lomuto pass with two possible initial aborts: empty input underflows at `length - 1`, and an out-of-range pivot aborts at the first swap. Its normal contract also needs to capture the returned split index, pivot placement, partition ordering, and preservation of the input multiset—not merely bounds. I’m running targeted WP now to obtain the exact abort/result skeleton and loop-head diagnostics.
+
+WP confirms the loop is the only source of incompleteness. I’m adding a preservation-oriented invariant: index/store bounds, the two processed regions, the untouched suffix after the initial pivot swap, pivot stability, and a recursive prefix count tying `store` to the exact number of elements below the pivot. This is strong enough to derive the returned index without imposing an artificial precondition.
+
+WP now has no warnings and inferred the exact abort surface. Its raw abort clauses are mechanically redundant, so I’m checking them as generated before simplifying anything, per the skill. This acceptance pass will also reveal whether the target needs stronger caller-visible mutation/result clauses than WP emitted.
+
+- **Result:** Added complete opaque contract and loop invariants for [`partition`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r02-hybrid-flexible-acceptance/workspace/sources/authored/lomuto_partition.move:9>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Combined WP inference with invariants for bounds, pivot stability, partition regions, untouched suffix, and exact prefix counting.
+- **Decision point:** Kept WP’s exact abort clauses and added caller-visible result/vector guarantees after the initial check identified the missing `normal-result` category.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow for `inference_corpus::lomuto_partition::partition`. I’ll inspect only the target and relevant dependencies, infer its full opaque contract and loop invariant, then use `move_spec_check` as the acceptance gate.
+
+The target is a single in-place Lomuto sweep with only vector intrinsics as callees. Because its exact permutation and prefix/suffix properties depend on the loop, I’m running WP now to obtain the abort/result skeleton and the loop-head facts needed to synthesize a sound invariant.
+
+WP confirms the only unresolved issue is loop havoc. I’m encoding the algorithm with one recursion-aligned ghost state: the vector plus an appended store index. This lets one invariant preserve the exact remaining sweep, so the contract can specify the precise returned index and final vector—not merely weaker “partitioned” properties.
+
+The first acceptance run is still solving the exact recursive post-state relation. I’m letting it finish; if it reports a hard condition, I’ll localize that specific obligation instead of weakening the behavioral contract.
+
+The checker has exceeded the nominal per-condition window, which usually means replay/timeout analysis is being produced. The contract remains unchanged while I wait for the diagnostic that identifies the costly definition or assertion.
+
+The acceptance checker is still in its diagnostic replay rather than returning a verdict. I’ll give that bounded analysis one more interval, then stop the run if necessary and use a focused prover call to isolate the verification condition.
+
+The focused proof is showing the same prolonged solver behavior, so the issue is the recursive equality formulation rather than package scope. If the diagnostic confirms recursive-definition churn, I’ll replace it with quantified prefix/frame invariants, which are less exact internally but can still support a complete external state characterization through a solver-friendlier helper.
+
+The focused counterexample shows the recursion itself is sound, but the prover cannot establish the algebraic equivalence between “swap then append the counter” and “swap inside an already-extended vector.” I’m removing that encoding artifact and splitting the ghost state into direct value/store recurrences; this preserves exact behavior while making each loop step definitionally identical to the implementation.
+
+The focused proof now succeeds: both invariant initialization/preservation and the exact post-state obligations are discharged. I’m running the required candidate check next; this will also reject any missing behavior category or forbidden weakening.
+
+- **Result:** Added a complete opaque contract and loop invariants in [lomuto_partition.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r03-hybrid-flexible-acceptance/workspace/sources/authored/lomuto_partition.move:15). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP to identify loop havoc, then recursion-aligned spec helpers to model the exact returned index and vector permutation.
+- **Decision points:** Replaced the initial combined ghost-state encoding after its invariant failed; separate vector/store recurrences verified in 1.9 seconds and passed the final candidate check.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the provided `move-inf` skill to infer and prove the complete opaque contract for `inference_corpus::lomuto_partition::partition`. I’ll keep changes confined to that target and use `.` as the package path throughout.
+
+The target is a classic in-place Lomuto sweep. Its caller-visible behavior must capture: exact aborts for an empty vector or out-of-range pivot, unchanged length and element multiset, the returned pivot position/value, and the partition ordering on both sides. I’m running WP now to obtain the precise arithmetic/bounds obligations and loop-head observations before synthesizing the invariant.
+
+WP confirmed the only blocker is loop havoc. I’m adding a recursion-aligned model of the sweep plus invariants tying the live vector and `store` index to that model; this preserves the implementation while giving WP an exact abstraction of every swap.
+
+The generated WP clauses included solver-hard artifacts caused by treating invariant side facts as caller obligations, so I replaced only that generated block with an equivalent direct contract: one exact recursive post-state equation, one exact return equation, and the two real abort cases combined. I’m now testing that candidate with the required acceptance checker.
+
+- **Result:** Added a complete opaque contract, exact recursive post-state model, abort conditions, and loop invariants for [`partition`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r04-hybrid-flexible-acceptance/workspace/sources/authored/lomuto_partition.move:9>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP to expose loop-havoc obligations, then supplied recursion-aligned `sweep` and `count_below` models and verified the direct contract with `move_spec_check`.
+- **Decision points:** Replaced WP’s solver-hard generated clauses with exact, equivalent equations; combined the genuine abort cases into empty input or out-of-range pivot.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `inference_corpus::lomuto_partition::partition` with package path `.`, then I’ll repair only in-scope invariants/specs and finish with the candidate check.
+
+WP found one loop whose havoc leaves both result behavior and exact abort behavior unconstrained. I’m inspecting that function now to derive a preservation invariant from the actual swaps and the bounded loop-head facts.
+
+The loop is deterministic, so I’m using a recursion-aligned model of the sweep—not only partition predicates. The invariant will tie the live vector and `store` index to the exact processed prefix, while separately carrying the bounds needed to prove every borrow, swap, and increment safe.
+
+WP now has an exact model, but it emitted `sathard` abort/postcondition clauses because bounds safety was only derivable indirectly through the recursive vector model. I’m making those loop facts explicit (`i` and `store` are always valid indices), removing the stale generated function clauses, and rerunning WP as required.
+
+The remaining `sathard` clause pinpoints a missing semantic fact, not a bounds issue: the branch reads the original unswept element at index `i`. Earlier swaps never touch future indices, so I’m adding that precise invariant; it lets the recursive model and executable branch choose the same case.
+
+WP’s raw contract is now behaviorally exact, but it still labels one quantified loop-preservation carrier `sathard`. Per the workflow, I’m checking this generated candidate directly before replacing that carrier with the equivalent recursion-aligned postcondition.
+
+The direct candidate check is still proving after its initial window; I’m waiting for its diagnostic rather than changing clauses speculatively.
+
+The check confirmed the `sathard` carrier is false: it incorrectly requires the final vector to equal every intermediate no-swap state. I’m replacing that unresolved WP artifact with the exact final-state equations already established by the loop model, while keeping the exact empty/out-of-range abort condition.
+
+The repaired contract compiles and has entered proof. It exceeded the first check window, so I’m waiting for the specific obligation/timeout profile before deciding whether it needs a proof hint or the standard 20-second retry.
+
+The check is spending its time in prover replay/analysis rather than returning a counterexample. I’m letting that finish because its quantifier profile will identify whether `count_below` or `swept` needs weighting.
+
+The timeout profile identifies the real proof bottleneck: two recursive helpers plus a separate “future element unchanged” invariant cause massive instantiation, and that invariant’s induction case is hard. I’m restructuring to one recursive state relation that models `(vector, store)` together; each loop iteration then corresponds to exactly one definitional unfolding.
+
+The single-relation candidate also entered a long prover replay, so I’m waiting for attribution. If it points at the recursive definition itself, I’ll apply the documented instantiation weight; if it points at the final swap, I’ll isolate that assertion instead.
+
+This proof is again exhausting the profiling budget, with no counterexample emitted. I’m continuing until the tool returns its hard assertion so the next edit stays evidence-driven.
+
+The profile confirms the existential relation is the problem (`165,000+` existential instantiations). I’m keeping the one-recursion design but encoding both loop-carried values into one vector: the current data followed by `store`. This removes the quantifier entirely while preserving an exact deterministic state.
+
+The quantifier-free encoded-state candidate compiles, but the proof has again entered timeout analysis. I’m waiting for the named definition/assertion; this version should make any remaining bottleneck much narrower.
+
+This time every assertion proves separately; only the combined VC times out, and the profile names the recursive `sweep_state` definition. I’m applying the documented `[weight = 20]` to delay unnecessary unfoldings without changing semantics, then rechecking.
+
+- **Result:** Added an exact opaque contract, seven loop invariants, and a recursive state model in [lomuto_partition.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r01-hybrid-guided-acceptance/workspace/sources/authored/lomuto_partition.move:21). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran WP, repaired loop abstraction, replaced its false `sathard` carrier with an exact recursion-aligned state specification, then checked the candidate.
+- **Decision points:** Encoded `(values, store)` in one recursive vector state to eliminate costly existential reasoning; added `[weight = 20]` after timeout analysis identified excessive recursive-definition instantiation.
+
+### hybrid guided, replicate 2: disqualified
+
+I’m using the supplied move-inf workflow exactly: first WP on `inference_corpus::lomuto_partition::partition` with package path `.`, then loop-invariant repair if needed, and finally the candidate check.
+
+WP found the expected blocker: the partition loop has no invariant, so its post-loop state and exact abort behavior become unconstrained. I’m inspecting the function and its existing specification context now, then I’ll add only the loop abstraction and rerun WP as required.
+
+The repaired invariant made WP succeed without warnings. WP inferred the exact abort boundary (empty input or out-of-range pivot), but its generated block currently contains no normal-result/mutation clauses; I’m sending this candidate directly to the required acceptance check so its category diagnostics can identify any missing observable guarantees.
+
+- **Result:** Added inferred loop invariants, exact abort conditions, partition-result guarantees, and `pragma opaque`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Ran WP, repaired loop havoc with bounds and partition-prefix invariants, reran WP, then completed and checked normal-result guarantees.
+- **Decision point:** Added prefix/suffix ordering and pivot-placement postconditions after the candidate check identified missing `normal-result` coverage.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `inference_corpus::lomuto_partition::partition` with package path `.`, then I’ll repair loop invariants if needed and finish with the candidate checker.
+
+WP found one unresolved ordinary loop and gave the key shape: `i` advances from zero after the pivot swap, while the vector is loop-carried. I’m reading the target and its existing specs now so the invariant captures both the partitioned prefix and the untouched suffix without altering executable behavior.
+
+The invariant will model the loop’s remaining computation, not just the usual “left side is below the pivot” summary. That preserves the exact final vector and returned index required by an opaque contract. I’m adding recursion aligned one-for-one with a loop iteration, plus bounds/length facts needed to prove each vector access.
+
+WP now succeeds with no missing-invariant warning, but its mechanical postcondition contains `sathard` quantified clauses. Per the skill, those remain unresolved until checked; I’m running the candidate checker directly at the initial 5-second budget to identify whether the issue is proof complexity or contract coverage.
+
+The candidate check is still running past its nominal per-condition budget, which usually means several generated quantified obligations are each consuming the allowance. I’ll let this verdict finish, then localize only the reported category and replace the mechanical clauses with an equivalent recursion-aligned contract if needed.
+
+The checker is confirming the expected solver-hostility of the WP quantifiers rather than returning an immediate counterexample. The exact semantics are already captured by the two sweep helpers; after the check returns, the likely repair is to state those final helper values directly and eliminate WP’s existential/universal reconstruction clauses.
+
+The checker attributed the timeout to WP’s universal clause at line 83 (over 2.4 million quantifier instantiations), not to a false condition. I’m replacing those mechanically reconstructed clauses with the equivalent direct equations: the return is `sweep_store`, and the mutated vector is the final pivot swap applied to `sweep_values`; aborts are exactly empty input or an out-of-range pivot.
+
+The focused prover now succeeds in 1.8 seconds with split obligations, so the simplified contract is both direct and solver-friendly. I’m running the acceptance checker now; this is the decisive completeness/anti-weakening check.
+
+- **Result:** Added exact loop invariants and an opaque contract for [`partition`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r03-hybrid-guided-acceptance/workspace/sources/authored/lomuto_partition.move:42>). `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Used WP, recursion-aligned sweep helpers, focused verification, then `move_spec_check`.
+- **Decision points:** Replaced WP’s quantified `sathard` output after a 2.4M-instantiation timeout with equivalent direct result/vector equations; focused verification then completed in 1.8 seconds.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `inference_corpus::lomuto_partition::partition` with package path `.`, then I’ll repair only target invariants/specification and finish with the candidate check.
+
+WP found the expected loop-abstraction gap: `i` advances from zero while `values` is repeatedly swapped, so post-loop behavior and aborts are currently unconstrained. I’m inspecting the target and its exact call dependencies now to derive a preserved partition/permutation invariant before rerunning WP.
+
+The exact loop state is best represented by one recursion-aligned specification predicate: it records both the current vector and `store` after each processed index. This avoids a lossy “partition properties only” contract and keeps the opaque result deterministic, including duplicate values and every swap.
+
+The invariant now eliminates loop havoc, but WP’s mechanically expanded postcondition is 10,575 bytes, over its 8,192-byte clause limit. I’m compacting the same exact relation behind a non-recursive completion predicate and supplying the exact abort boundary (`empty` or out-of-range pivot), then rerunning WP as required.
+
+WP now accepts the compact target contract as already complete and reports no remaining loop diagnostic. The candidate check is running the actual proof and anti-weakening checks; it has exceeded the first response window, so I’m waiting for its verdict before changing anything.
+
+The acceptance run is still active with no diagnostic yet. That usually means solver replay or timeout analysis rather than a quick counterexample; I’m continuing the same check so its headline can identify the exact obligation.
+
+The checker remains in its aggregate acceptance pass and has not returned a failure location. I’m leaving it uninterrupted because this is the decisive tool; if it reports a timeout, I’ll localize only that verification condition as the workflow prescribes.
+
+The timeout is caused by the two existential witnesses in the relation (over 200,000 instantiations), not by the loop arithmetic. I’m replacing them with one quantifier-free recursive vector state: the vector carries `store` in an extra final slot, so one unfolding still matches exactly one loop iteration while avoiding existential search.
+
+The refactored specification proves in isolation in 2.1 seconds with split obligations, confirming the existential removal fixed the hard VC. I’m rerunning the full candidate checker now, including completeness and anti-weakening checks.
+
+- **Result:** Added an exact opaque contract, abort conditions, and loop invariants for [`partition`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-QP-part-025-r04-hybrid-guided-acceptance/workspace/sources/authored/lomuto_partition.move:9>). `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP, a recursion-aligned sweep-state helper, focused verification, then `move_spec_check`.
+- **Decision points:** Replaced existential loop-state relations after a 675K-instantiation timeout; the quantifier-free state encoding verified in 2.1 seconds.
+
+## `range_with_step`
+
+`std::extracted_vector_range`, task id `VR-range-042`
+
+### agent-only, replicate 1: strict success
+
+I’m using the provided move-inf workflow because this is a specification-inference task. I’ll inspect only `std::extracted_vector_range::range_with_step` and its relevant dependencies, then iterate with the candidate checker until it accepts or the available proof budget is exhausted.
+
+The implementation has one explicit abort (`step == 0`) and one transitive runtime abort source: `start += step` can overflow before the loop reaches `end`. I’m modeling the iteration count with one recursion-aligned spec helper so the same abstraction can describe the exact result length and the overflow boundary.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`range_with_step`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r01-agent-only-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8), covering exact output, zero-step aborts, and arithmetic overflow. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used a recursion-aligned `range_count` helper to express both iteration count and overflow behavior, with invariants tracking progress and vector contents.
+- **Decision points:** Included overflow after the final pushed value because `start += step` executes before the loop condition is rechecked; omitted `modifies` because the function performs no global writes.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied move-inf skill for this inference task. I’ll inspect only the target and its relevant dependency contracts, author a complete opaque contract with inferred markers, and use `move_spec_check` as the acceptance gate.
+
+The implementation has one explicit invalid-step abort and one less obvious behavior: the final `start += step` can overflow even after the last value has been appended. I’m modeling that overflow exactly with a recursion aligned to one loop iteration, which should keep the proof simpler than a closed-form ceiling/division formula.
+
+- **Result:** Added complete opaque contract, exact abort behavior, result guarantees, and loop invariants in [extracted_vector_range.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r02-agent-only-acceptance/workspace/sources/stdlib/extracted_vector_range.move:12). `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Used a recursion aligned with each loop iteration to model arithmetic overflow exactly.
+- **Decision point:** Covered the overflow from the final `start += step`, even after appending the last result element.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow because this is a specification-inference task. I’ll inspect only the target implementation and its relevant contracts, author inferred clauses with `pragma opaque`, and use `move_spec_check` as the acceptance gate.
+
+The target is a compact arithmetic-progression loop, but its subtle case is the `u64` overflow on the final `start += step`: that can abort even when the next mathematical value would already pass `end`. I’m encoding that caller-visible overflow explicitly rather than treating the loop as total whenever `step > 0`.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`range_with_step`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r03-agent-only-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8), covering output progression, termination, invalid step, and `u64` overflow. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Related the loop’s current `start` and accumulated vector to the original start, then expressed overflow using the exact ceiling-step count.
+- **Decision points:** Explicitly modeled overflow on the final increment; replaced an SMT-resistant existential abort condition with an equivalent arithmetic form that verified.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target implementation and its actual call dependencies, author an opaque complete contract with inferred markers, then iterate through `move_spec_check` and focused prover diagnostics as needed.
+
+The target is a compact arithmetic loop, but its last increment can overflow even when that increment would only terminate the loop. I’m checking the package’s specification conventions and the vector primitive contract before encoding that exact boundary behavior.
+
+I’ve encoded the behavior with recursion aligned to one loop iteration: one helper defines the exact returned progression, and one defines whether any mandatory increment overflows. The loop invariants preserve both the remaining result and the remaining abort behavior. I’m now running the acceptance check on this coherent candidate.
+
+- **Result:** Added an opaque complete contract and loop invariants for [`range_with_step`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r04-agent-only-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8), covering exact results, zero-step aborts, and increment overflow. `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used recursive helpers aligned with each loop iteration to preserve the remaining output and abort behavior.
+- **Decision point:** Modeled the mandatory final increment explicitly because it can overflow even after the last value is appended.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow to infer and prove the complete opaque contract for `std::extracted_vector_range::range_with_step`. I’ll stay within that function’s scope and use `.` as the package path throughout.
+
+The target has one arithmetic loop and only calls `vector::push_back`; there is no global state. I’m running WP now to expose the exact abort/result obligations and the loop-head facts needed to synthesize the invariant.
+
+The bounded facts show a prefix `start, start+step, …`. I’m encoding that with a single recursion-aligned terminal helper plus loop invariants for the processed vector, current cursor, and remaining overflow/termination behavior; then WP can derive the function-level clauses from a constrained loop state.
+
+- **Result:** Added a complete opaque contract and loop invariants for `range_with_step`, covering exact output progression, termination, zero-step abort, and arithmetic overflow. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP loop-head evidence, then replaced `sathard` output with a recursion-aligned `range_terminal` model and solver-friendly invariants.
+- **Decision point:** Modeled overflow through the terminal cursor, allowing exact abort coverage without weakening preconditions or using partial-abort pragmas.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow for `std::extracted_vector_range::range_with_step`. I’ll inspect only the target and its relevant dependencies, then iterate with WP/prover diagnostics and finish only when `move_spec_check` accepts or the experiment budget is exhausted.
+
+The target is a single accumulation loop with one intrinsic vector mutation and two abort sources to account for: `step == 0` and `start + step` overflow on an iteration. I’m running WP now to obtain its exact obligations and bounded loop-head facts before choosing the invariant shape.
+
+WP now has an exact characterization, but it labels the result and overflow clauses `sathard`; those are unresolved and too solver-hostile to keep. The loop invariant itself is accepted by WP, so I’ll use the candidate checker to identify whether the remaining issue is contract coverage or proof tractability, then replace only those generated clauses with an equivalent arithmetic form.
+
+The first simplified overflow clause is semantically exact, but the prover did not instantiate its numeric witness (`n = len(vec)`) through nonlinear arithmetic. I’m switching that one clause to WP’s vector-length witness form, which names the accumulated prefix directly and therefore matches the loop state the prover already tracks; the normal-result contract remains in the clearer direct form.
+
+- **Result:** Added complete opaque result/abort specifications and loop invariants for [`range_with_step`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r02-hybrid-flexible-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8>). `move_spec_check`: **CANDIDATE_ACCEPTED**; implementation unchanged and coverage complete.
+- **Strategy:** Used WP-guided invariant synthesis, then replaced solver-hostile generated clauses with direct result properties and an exact prefix-based overflow condition.
+- **Decision point:** A numeric existential overflow witness failed solver instantiation, while the equivalent vector-prefix witness matched the tracked loop state and verified successfully.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `std::extracted_vector_range::range_with_step`. I’ll keep the scope to that function, inspect its implementation and actual callees, then iterate with WP/spec checking until the candidate is accepted or a concrete proof blocker remains.
+
+The target is a single accumulation loop whose only callee is intrinsic vector `push_back`. I’m running WP now to obtain the exact abort/result obligations and, as expected for this shape, the loop-head evidence needed to synthesize its invariant.
+
+WP now has enough invariant information to characterize the function, but its mechanically generated result uniqueness and overflow clauses are marked `sathard`, so they are not acceptable final output. I’m replacing only those generated clauses with equivalent direct behavior: arithmetic-progression contents, the exact stopping boundary, and the recursive overflow predicate already aligned to one loop iteration.
+
+The cleaned candidate is under the required acceptance check now. Its result model has no unbounded uniqueness quantifier; the remaining proof risk is solver cost from the recursive prefix/overflow definitions, which I’ll localize if the check reports a timeout.
+
+- **Result:** Added an opaque, complete contract and loop invariants for `range_with_step`; exact results, stopping boundary, zero-step abort, and arithmetic-overflow aborts are covered. `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used WP to expose loop requirements, then synthesized progression and overflow invariants and verified them with `move_spec_check`.
+- **Decision point:** Replaced a costly recursive prefix model with a bounded quantified progression predicate after invariant induction failed. Runtime implementation remains unchanged.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `std::extracted_vector_range::range_with_step`. I’ll inspect only the target implementation and relevant dependency contracts, infer the opaque contract and any loop invariants, then iterate with the candidate checker until accepted or the proof budget is exhausted.
+
+The target is a single accumulation loop. Its visible behavior includes both `step == 0` and addition-overflow aborts, so I’m running WP first to expose the exact obligations and bounded loop-head facts before choosing the invariant shape.
+
+WP now has exact loop semantics, but it encoded them through quantified “some vector” clauses marked `sathard`. I’m replacing those mechanically difficult carriers with equivalent caller-facing facts: every result element is the arithmetic progression, every emitted value is below `end`, the next progression value reaches `end` without exceeding `MAX_U64`, and overflow is characterized by a reachable progression index.
+
+The checker localized the failure to proving the numeric existential witness at the overflowing loop head; the arithmetic condition is correct, but the solver does not synthesize `i = len(vec)` automatically. I’m switching just that clause to WP’s equivalent reachable-prefix witness, which directly matches the loop invariant state, then I’ll run a focused proof before rechecking acceptance.
+
+- **Result:** Added complete opaque result/abort specifications and four loop invariants in [extracted_vector_range.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r04-hybrid-flexible-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8). `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP-guided invariant synthesis, then focused verification and the candidate checker.
+- **Decision points:** Replaced WP’s `sathard` result carrier with direct progression guarantees; retained an equivalent reachable-prefix overflow witness because the numeric existential was solver-intractable.
+
+### hybrid guided, replicate 1: strict success
+
+I’m following the provided move-inf workflow exactly: first WP on `std::extracted_vector_range::range_with_step` with package path `.`, then I’ll repair only target-scope specifications/invariants and finish with the candidate check.
+
+WP found the expected single-loop blocker: `start` and `vec` are unconstrained after loop havoc, so abort behavior becomes vacuous. I’m inspecting the target and will derive a prefix invariant from the observed sequence before rerunning WP.
+
+WP now succeeds and emitted a complete candidate, but flags its result and overflow clauses as `sathard` because they quantify over arbitrary vectors. Per the workflow I’m checking this generated candidate directly first; if it times out, I’ll replace those clauses with an equivalent recursion-aligned form.
+
+The direct check exposed an inadequate loop abstraction, not an implementation issue: the invariant described arithmetic progression but omitted that every emitted element was observed under `start < end`. That allowed impossible longer vectors at loop exit. I’m adding the missing processed-prefix bound, removing only stale WP-generated function clauses, and rerunning WP as required.
+
+The strengthened WP form is semantically right but still solver-hostile: its universal “equal to every matching vector” formulation is not instantiating reliably. I’m preserving the same behavior in a direct, complete contract: exact length/element constraints for normal return and a numeric witness for the precise overflow iteration, avoiding quantified vector equality.
+
+The focused proof confirms only existential witness instantiation is failing. The counterexample itself has the witness (`n = len(vec)` at the loop head), so I’m adding a local proof assertion that exposes exactly that fact before the potentially overflowing addition; it does not alter runtime behavior or weaken the contract.
+
+The local assertion proves the contract, but the acceptance check correctly rejects that placement as outside the allowed edit shape. I’m moving the same fact into the loop abstraction, where it belongs: an invariant linking an overflowing loop head to the initial-state overflow witness.
+
+The existential itself is the solver bottleneck even when placed in the invariant. I’m switching to the proof-guidance pattern for loops: one recursive specification helper whose definition performs exactly one loop iteration, plus an invariant equating the helper at function entry and the current loop state. This expresses the same exact abort behavior without witness search.
+
+- **Result:** Added an opaque, complete contract and loop invariants for `range_with_step`, covering results, zero-step aborts, and arithmetic overflow. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP inference, focused verification, and a recursion-aligned abort helper to avoid solver-hostile existential reasoning.
+- **Decision points:** Added processed-prefix bounds after WP’s initial counterexample; replaced quantified overflow witnesses after prover failures. Changes are in [extracted_vector_range.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r01-hybrid-guided-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8).
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `std::extracted_vector_range::range_with_step` with package path `.`, then I’ll repair only in-scope invariants/specs and finish with the candidate check.
+
+WP found one ordinary accumulation loop. Its bounded heads show `start` advances by `step` while `vec` records the emitted arithmetic progression; I’m now reading the target and its call dependencies to formulate a preserved invariant before rerunning WP.
+
+With the invariant, WP now succeeds and emits exact normal/abort behavior. Two clauses are flagged `sathard` because they quantify over an entire candidate vector and use symbolic multiplication; I’m checking that generated candidate directly first, as required, to see which obligation needs a solver-friendly equivalent.
+
+The candidate check exposed two distinct issues: the loop abstraction did not explicitly preserve that an initially empty range stays empty, and WP’s “unique candidate vector” postcondition is solver-hostile even for a genuinely reachable 16-element range. I’m strengthening the invariant with the empty-range fact and rerunning WP before replacing any remaining hard clause with an equivalent direct result characterization.
+
+The direct numeric overflow clause is semantically right, but the solver would not synthesize the existential iteration count from `len(vec)`. WP’s original vector witness already matches the loop state exactly, so I’m retaining that exact witness shape while dropping tautological antecedents and the unresolved marker; this is a proof-structure repair, not a behavioral weakening.
+
+- **Result:** Added complete opaque result/abort specifications and loop invariants for [`range_with_step`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r02-hybrid-guided-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Ran WP, strengthened the progression and empty-range loop invariants, then replaced solver-hard generated clauses with equivalent direct result properties and an exact vector-prefix overflow witness.
+- **Decision points:** Preserved arithmetic-overflow behavior explicitly; retained the vector witness because the solver could not derive the equivalent numeric existential iteration count.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `std::extracted_vector_range::range_with_step`. I’ll begin with scoped WP output to the package at `.`, then address its diagnostics one function at a time and use the candidate check as the acceptance gate.
+
+WP found the expected loop-abstraction gap: both `start` and the accumulated vector are havoced without an invariant, so abort behavior also becomes unconstrained. I’m now reading the target and its actual call/spec dependencies to derive an invariant that captures the generated arithmetic progression and overflow boundary.
+
+The strengthened invariant was sufficient for WP to complete, but its mechanically generated postcondition and overflow clause are marked `sathard`: they quantify over arbitrary vectors and retain trivial empty-vector premises. I’m replacing those unresolved forms with an equivalent arithmetic characterization of the iteration count and exact result, while preserving the inferred loop facts and opaque boundary.
+
+The direct result clauses are now solver-friendly; the remaining rejection is specifically abort coverage. The existential overflow formula is semantically exact, but the prover cannot synthesize its witness from the loop state. I’m switching that condition to a recursion aligned one-for-one with the loop, which lets each verification obligation unfold only the current iteration.
+
+- **Result:** Added complete opaque result/abort specifications and loop invariants for [`range_with_step`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r03-hybrid-guided-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8). `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used scoped WP, strengthened the loop abstraction, then replaced `sathard` vector quantification with direct progression guarantees and a recursion-aligned overflow helper.
+- **Decision points:** Added a last-emitted-element bound to characterize loop termination; modeled overflow recursively because the prover could not synthesize a witness for the equivalent existential condition.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `std::extracted_vector_range::range_with_step` with inline output, then I’ll repair only in-scope invariants/spec clauses and finish with the candidate check.
+
+WP found the expected loop abstraction gap. Its bounded heads show an arithmetic progression in `vec` and `start`; I’m reading the target source now to derive an invariant that also captures overflow and the exact returned vector.
+
+WP now has exact behavior, but emitted solver-hostile `sathard` clauses. I’m preserving their meaning while replacing the quantified “there exists a whole vector” encoding with a single recursion-aligned helper for the arithmetic progression and overflow boundary.
+
+The first focused proof showed the contract formula is semantically right, but the solver did not invent the existential witness at the overflow instruction. I’m carrying that witness fact in the loop invariant, where `len(vec)` supplies it directly from the loop’s progression relation.
+
+The explicit witness invariant still fails because the solver treats the witness as nonlinear arithmetic. I’m switching to the proof-guidance pattern tailored for this case: one recursive helper that advances exactly one loop step and saturates at either loop exit or overflow. This makes each invariant obligation require only one definitional unfold.
+
+The recursion-aligned contract now proves at 5 seconds per condition. I’m running the required acceptance check next; this is the decisive completeness and anti-weakening check.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`range_with_step`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-VR-range-042-r04-hybrid-guided-acceptance/workspace/sources/stdlib/extracted_vector_range.move:8>). `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Ran WP, repaired the missing loop abstraction, then used recursion-aligned helpers to model exact results and overflow/zero-step aborts.
+- **Decision points:** Replaced WP’s solver-hostile quantified clauses after counterexamples; the helper-based formulation verified within 5 seconds and passed all completeness and anti-weakening checks.
+
+## `refill`
+
+`aptos_framework::extracted_rate_limiter`, task id `RL-refill-037`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow because this is specification inference for `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect only the target implementation, its existing specs, and relevant callees, then iterate with `move_spec_check` until acceptance or the experiment budget is exhausted.
+
+The target has one executable dependency: `timestamp::now_seconds` (transitively `now_microseconds`), and it mutates only the passed `RateLimiter` reference—there are no direct global writes. I’m now reading the exact body and existing contracts so the inferred result and abort behavior match the implementation.
+
+The normal path has five distinct failure boundaries: missing clock resource, clock rollback, accumulation overflow, zero refill interval, and overflow while testing `current_amount + new_tokens`. The post-state is a two-way saturation update; `capacity` and `refill_interval` remain unchanged, and the timestamp always advances on normal return. I’m encoding those exact cases with an opaque target contract.
+
+- **Result:** Added an opaque, complete contract for `refill` in [extracted_rate_limiter.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r01-agent-only-acceptance/workspace/sources/framework/extracted_rate_limiter.spec.move). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled the exact saturation update and all abort paths from timestamp access, arithmetic overflow, clock rollback, and division by zero.
+- **Decision points:** Preserved both unchanged fields explicitly; separated abort clauses according to executable evaluation order.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly, scoped only to `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect the implementation and its actual call dependencies first, then iterate through the specification checker until it accepts or the available proof budget is exhausted.
+
+The implementation has no loop, and its only executable dependency is `timestamp::now_seconds`, whose existing opaque contract is exact. The main proof burden is therefore a precise pre-state characterization of resource absence, subtraction/division failures, and three possible `u64` overflows, plus a full post-state description of every limiter field.
+
+- **Result:** Added a complete opaque contract for `refill`, covering all field updates and abort paths. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived exact behavior from `timestamp::now_seconds`, arithmetic bounds, division, and both refill branches. No loop invariants were needed.
+- **Decision points:** Used `result_of`/`aborts_of` to preserve the timestamp callee’s contract; explicitly modeled subtraction, multiplication, addition, and zero-divisor aborts.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow to infer and prove the complete opaque contract for `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect only the target implementation, its existing specs, and relevant callees, then iterate with the candidate checker until acceptance or a concrete budget/tooling blocker.
+
+The target has one opaque dependency, `timestamp::now_seconds`, whose contract aborts exactly when the clock resource is absent and otherwise returns `timestamp::spec_now_seconds()`. The refill body then has five arithmetic abort boundaries: timestamp subtraction, multiply, add, division by zero, and the `current_amount + new_tokens` comparison. I’m encoding those sequentially so later conditions do not blur earlier aborts.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `refill` in [extracted_rate_limiter.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r03-agent-only-acceptance/workspace/sources/framework/extracted_rate_limiter.spec.move:3). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Modeled exact normal-state updates and all transitive/direct aborts from clock-resource access, underflow, overflow, and division by zero.
+- **Decision points:** Kept abort conditions sequential to preserve exact arithmetic evaluation boundaries; specified every `RateLimiter` field after normal return so opaque callers receive a complete state transition.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect only the target and its relevant dependency contracts, edit specifications without changing behavior, and use the candidate checker as the acceptance gate.
+
+The target has one opaque callee, `timestamp::now_seconds`, whose contract precisely exposes the clock value and aborts only when the timestamp resource is absent. The remaining behaviors to cover are subtraction, multiplication/addition overflow, division by zero, the saturating branch, and all five post-state fields.
+
+- **Result:** Added a complete opaque `[inferred]` contract for `refill`, covering all field updates and every abort path. Candidate accepted; implementation unchanged.
+- **Strategy:** Derived behavior directly from arithmetic and `timestamp::now_seconds`’s contract, then validated with `move_spec_check`.
+- **Decision points:** Modeled both saturation branches explicitly and preserved exact overflow/division-by-zero conditions.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and has one transparent callee (`timestamp::now_seconds`), so direct WP inference is appropriate here. Its main edge cases are clock rollback, division by a zero refill interval, and overflow in the refill arithmetic.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`refill`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP inference because the function is loop-free, then verified the generated result directly with the candidate check.
+- **Decision points:** The contract precisely covers normal mutation plus timestamp failure, clock rollback, zero interval, and arithmetic overflow. No manual repair was needed.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract and any loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is loop-free, so no invariant synthesis is needed. Its visible behavior is a reference update driven by `timestamp::now_seconds()`, with possible subtraction, multiplication, addition, division/modulo, and capacity-addition aborts; I’m checking the timestamp callee contract before deriving exact clauses.
+
+WP produced a warning-free exact contract, including the full updated limiter value and all callee/arithmetic abort paths. I’m now submitting that contract unchanged to the required candidate check; I’ll only edit it if the checker identifies a concrete diagnostic.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `refill`, covering reference mutation and every timestamp/arithmetic abort path. `move_spec_check`: **CANDIDATE_ACCEPTED**; implementation unchanged.
+- **Strategy:** Used warning-free weakest-precondition inference for the loop-free function, then validated the generated clauses directly with the candidate checker.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied move-inf workflow exactly for `aptos_framework::extracted_rate_limiter::refill`. I’ll inspect only the target and relevant callees, infer the opaque contract and any loop invariants, then use the candidate check as the acceptance gate.
+
+The target is loop-free and has one dependency, `timestamp::now_seconds`; there are no helper contracts or loop invariants to synthesize first. I’m using WP now because it can enumerate the arithmetic, division, and timestamp abort paths while preserving the implementation unchanged.
+
+WP produced a warning-free complete contract: exact post-state mutation plus all transitive and implicit abort conditions, with `pragma opaque`. I’ve checked that it covers subtraction/multiplication/addition overflow, zero division/modulo, and the timestamp call; I’m submitting it unchanged to the required candidate check.
+
+- **Result:** Added a complete `[inferred]`, opaque contract for `refill` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used warning-free weakest-precondition inference for the loop-free function, retaining its exact state changes and all timestamp, division, modulo, and arithmetic abort conditions.
+- **Decision points:** Kept the generated clauses unchanged because WP reported no unresolved diagnostics; no invariants were needed because `refill` contains no loops.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove a complete opaque contract for `aptos_framework::extracted_rate_limiter::refill`. I’ll keep changes confined to that function’s specification (and any necessary loop invariant), use `.` as the package path, and finish only on `move_spec_check` acceptance or an exhausted proof budget.
+
+The target is loop-free and has one opaque dependency, `timestamp::now_seconds`, whose contract is exact: it aborts only when the clock resource is absent and returns `spec_now_seconds()`. That makes a focused WP pass appropriate here; it should capture the arithmetic/division abort boundaries and both mutation branches directly.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `refill` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used focused WP inference because the function is loop-free, then directly ran the candidate check with a 5-second solver budget.
+- **Decision points:** Preserved the exact `timestamp::now_seconds` dependency behavior and retained all inferred arithmetic, division-by-zero, timestamp, mutation, and abort conditions without modification.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the provided `move-inf` skill exactly as requested. I’ll begin with weakest-precondition inference on `aptos_framework::extracted_rate_limiter::refill`, then address only its diagnostics and finish with the candidate checker.
+
+WP completed without warnings and generated an opaque contract covering the mutated limiter state plus timestamp, division, subtraction, multiplication, addition, and remainder aborts. Per the skill, I’m checking this unchanged generated candidate directly now.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `refill` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran focused WP inference inline, then checked the unchanged warning-free output with `move_spec_check` at a 5-second solver budget.
+- **Decision points:** No loop repair or manual proof edits were needed; WP reported no diagnostics, so its exact state-transition and abort conditions were retained.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided move-inf workflow exactly: first WP on `aptos_framework::extracted_rate_limiter::refill` with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and produced an opaque contract covering the exact reference mutation plus timestamp, division, subtraction, multiplication, addition, and modulo abort paths. I’m now checking those generated clauses directly at the initial 5-second solver budget.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `refill` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran warning-free WP inference, then directly checked the generated contract with `move_spec_check` at a 5-second budget.
+- **Decision points:** Retained WP’s exact mutation postcondition and all arithmetic/timestamp abort conditions; no loop invariant or manual proof repair was needed.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied move-inf workflow exactly: first WP on `aptos_framework::extracted_rate_limiter::refill` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and injected a complete opaque contract, including the exact reference mutation and all timestamp/arithmetic/division abort paths. I’m now checking those generated clauses directly with the initial 5-second solver budget.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `refill` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59). **CANDIDATE_ACCEPTED**: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran focused WP inference, then directly checked the unchanged warning-free output with `move_spec_check`.
+- **Decision points:** Preserved exact reference mutation behavior and captured timestamp, division-by-zero, subtraction, multiplication, and addition abort conditions. No loop invariant repair was needed.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the provided `move-inf` skill for this inference task. I’ll begin with WP on `aptos_framework::extracted_rate_limiter::refill` using package path `.`, then repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and generated a complete opaque contract covering the mutated limiter state plus timestamp, division, subtraction, multiplication, addition, and modulo abort paths. I’m now checking those generated clauses directly, as required by the skill.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`refill`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-refill-037-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:59>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran targeted WP inline, then directly ran `move_spec_check` with a 5-second solver budget.
+- **Decision points:** WP reported no warnings or loops requiring invariants, so its generated state-transition and exact abort conditions were retained unchanged.
+
+## `reinsert_order_into_bulk_order`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-reinsert-030`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied move-inf workflow exactly: I’ll inspect only the target implementation and its relevant callees, author inferred clauses/invariants in scope, and use `move_spec_check` as the acceptance gate.
+
+The target has no loop. Its behavior splits on whether the first price equals the matched price: either mutate `sizes[0]` (with possible bounds/overflow aborts) or insert one element at the front of both vectors. I’m now checking the exact vector contracts so the abort conditions and post-state equations match the prover’s model.
+
+- **Result:** Added a complete opaque contract for [reinsert_order_into_bulk_order](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r01-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:172), covering both mutation branches and exact bounds/overflow abort behavior. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived post-states from the branch behavior and intrinsic vector semantics; no loop invariants were needed.
+- **Decision points:** Preserved both vectors exactly in the existing-price branch; modeled front insertion with `concat(vec(...), old(...))` otherwise.
+
+### agent-only, replicate 2: strict success
+
+I’ll apply the supplied move-inf workflow exactly: inspect only the target and its relevant dependencies, author inferred clauses/invariants without changing behavior, and use the candidate check as the acceptance gate.
+
+The target has no loop, so the proof obligation is a two-branch state transformation. I’m now checking the exact vector-callee contracts, especially insertion bounds and overflow behavior, before writing the opaque contract.
+
+- **Result:** Added a complete opaque contract for `reinsert_order_into_bulk_order`, covering both vector transformations and all bounds/overflow aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived the two execution branches from the implementation and verified the contract directly with `move_spec_check`.
+- **Decision points:** Used exact `concat`/`update` post-state models; guarded size access and addition overflow precisely.
+
+### agent-only, replicate 3: strict success
+
+I’ll apply the supplied `move-inf` workflow exactly, scoped only to `aptos_experimental::extracted_bulk_order_utils::reinsert_order_into_bulk_order`. I’ll first inspect the target and its actual call dependencies, then author and candidate-check one complete opaque contract, refining only from prover diagnostics.
+
+The target has no loop and calls only the two exact field accessors plus standard vector operations. Its key split is now clear: an equal front price updates `sizes[0]` (with empty-vector and overflow aborts), while every other state prepends both vectors. I’m checking the dependency contracts and local specification style before writing that two-branch post-state exactly.
+
+I’ve written the first coherent candidate: exact abort coverage for the equal-price update branch, exact whole-vector postconditions for both branches, and `pragma opaque`. The prepend case is represented as singleton concatenation; the update case preserves `prices` and changes exactly index 0 of `sizes`. I’m running the acceptance check now.
+
+- **Result:** Added a complete opaque contract for [reinsert_order_into_bulk_order](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:172), covering exact vector updates and all abort conditions. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived the two execution branches from the implementation and verified the candidate directly with `move_spec_check`.
+- **Decision points:** Modeled reinsertion with singleton concatenation; modeled an existing front price with an exact index-0 update, including empty-size and overflow aborts.
+
+### agent-only, replicate 4: strict success
+
+I’m using the requested `move-inf` workflow. I’ll inspect only the target implementation, its existing specs, and relevant callees, then iterate with `move_spec_check` until the candidate is accepted or the proof budget is genuinely exhausted.
+
+The target has two behavioral branches and no loops: merge into the first size when the first price matches, otherwise prepend both vectors. The only source-level abort appears to be an empty `sizes` vector in the merge branch or `u64` overflow during the size addition; I’m checking the vector contracts and local specification idioms before writing the exact post-state formulas.
+
+- **Result:** Added a complete opaque contract for [`reinsert_order_into_bulk_order`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:173>), covering exact vector updates and all abort conditions. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Modeled the merge and prepend branches directly using `update` and `concat`, preserving executable behavior.
+- **Decision points:** Abort coverage includes both an empty `sizes` vector and `u64` addition overflow, but only when the first price matches; the prepend branch is total.
+
+### hybrid flexible, replicate 1: strict success
+
+I’ll use the provided move-inf workflow exactly: inspect only the target and its relevant dependencies, infer the opaque contract and any loop invariants, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The target is loop-free and calls only vector primitives plus two already-specified field accessors, so I’m applying WP directly at function scope. Its main edge cases are unequal vector lengths, insertion overflow, indexing safety, and `u64` overflow in the merge branch.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for [`reinsert_order_into_bulk_order`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171>), covering both vector mutations, invalid size indexing, and `u64` overflow. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used function-scoped dependency inspection, WP inference, then `move_spec_check` at a 5-second solver budget.
+- **Decision points:** Direct WP fit because the target is loop-free; retained its exact branch-sensitive vector and abort conditions without modification because the candidate checker verified them immediately.
+
+### hybrid flexible, replicate 2: strict success
+
+I’ll use the supplied move-inf workflow exactly: inspect only the target and relevant callees, infer the opaque contract (and any loop invariants), then rely on the candidate checker as the completion gate.
+
+The target is loop-free. Its two helpers already have exact opaque contracts, so WP is a good fit here; the key boundary cases are empty/misaligned vectors, front-price equality, insertion capacity, and `u64` overflow in the size update. I’m running the focused inference pass now.
+
+- **Result:** Added an opaque, complete contract for `reinsert_order_into_bulk_order`, covering both vector mutations, invalid size indexing, and `u64` overflow. `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Used focused WP inference followed by `move_spec_check`.
+- **Decision point:** No loop invariants were needed because the target is loop-free. See [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171).
+
+### hybrid flexible, replicate 3: strict success
+
+I’ll use the supplied `move-inf` workflow exactly, scoped to `aptos_experimental::extracted_bulk_order_utils::reinsert_order_into_bulk_order`. I’ll first locate the target and its relevant callees, then infer/edit only its specification and finish with `move_spec_check`.
+
+The target is loop-free and calls only vector primitives plus two already-opaque field accessors with exact contracts. That makes a focused WP pass appropriate; it should capture the branch-specific vector mutations and all bounds/overflow aborts directly.
+
+WP produced a warning-free contract: exact post-state vectors for both branches, plus the only aborts—missing `sizes[0]` when merging an existing price and `u64` addition overflow. I’m now checking that generated contract unchanged with the acceptance checker.
+
+- **Result:** Added a complete opaque contract at [extracted_bulk_order_utils.move:171](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171), covering vector mutations, bounds abort, and overflow abort. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused WP inference, then `move_spec_check` with a 5-second solver budget.
+- **Decision points:** Kept warning-free WP clauses unchanged; no loop invariants were needed because the target is loop-free.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its relevant callees/specs, infer the opaque contract (and any needed invariants), then iterate with `move_spec_check` until it is accepted or the proof budget is genuinely exhausted.
+
+The target is loop-free and mutates only the two reference parameters. Its key behavioral split is already clear: either add the remaining size to the existing front level (with possible `u64` overflow), or insert price and size at index 0. I’m now checking exact callee contracts and surrounding spec conventions before generating clauses.
+
+WP produced a warning-free contract with exact post-state vectors and two abort causes: missing `sizes[0]` on the merge path, and `u64` overflow when adding the remaining size. Since there are no loops or global writes, no invariant or `modifies` frame is needed. I’m submitting this unchanged generated contract to the acceptance checker now.
+
+- **Result:** Added a complete opaque inferred contract for [`reinsert_order_into_bulk_order`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and executable behavior is unchanged.
+- **Strategy:** Used warning-free targeted WP inference, preserving its exact post-state vector transformations and abort conditions.
+- **Decision points:** No loop invariant or global frame was needed; abort coverage includes both absent `sizes[0]` on the merge path and `u64` addition overflow.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on the single requested function with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with `move_spec_check`.
+
+WP completed without warnings and produced an opaque contract covering both insertion/update outcomes plus index and overflow aborts. I’m now checking that generated candidate directly at the requested function scope.
+
+- **Result:** Added a complete opaque specification for `reinsert_order_into_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r01-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran function-scoped WP inline, then directly validated the warning-free generated contract with `move_spec_check` at a 5-second solver timeout.
+- **Decision points:** Retained exact insertion/update postconditions and both index and `u64` overflow abort conditions generated by WP; no loop invariant or proof repair was needed.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on the single target with inline output, then I’ll repair only target-scope invariants/specifications and finish with the candidate check.
+
+WP completed without warnings and produced an opaque contract covering both insertion/update result paths plus indexing and overflow aborts. I’m now checking that exact generated candidate at the requested function scope.
+
+- **Result:** Added a complete opaque inferred contract for `reinsert_order_into_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r02-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran warning-free WP for the function, then directly checked the generated result and abort conditions with a 5-second solver budget. No loop invariants or repairs were needed.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_bulk_order_utils::reinsert_order_into_bulk_order` with package path `.`, then I’ll repair only in-scope invariants/specification clauses and finish with `move_spec_check`.
+
+WP completed without warnings and produced an opaque contract covering both insertion/update result branches plus indexing and `u64` overflow aborts. I’m checking those generated clauses directly now; unchanged warning-free WP output should either be accepted or expose a tool defect.
+
+- **Result:** Added an `[inferred]` opaque contract covering returned vector mutations, bounds aborts, and `u64` overflow. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran focused WP inference, then validated the generated clauses directly with `move_spec_check`.
+- **Decision point:** No loop invariants or manual repairs were needed because WP completed without warnings.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for the single target `aptos_experimental::extracted_bulk_order_utils::reinsert_order_into_bulk_order`. I’ll begin with WP at package path `.`, then address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering both insertion/update result branches plus the indexing and `u64` overflow aborts. I’m now checking that exact candidate directly, as required by the workflow.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `reinsert_order_into_bulk_order` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-reinsert-030-r04-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:171). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran warning-free WP for the exact function, then directly ran `move_spec_check` with a 5-second per-condition budget.
+- **Decision points:** Retained WP’s exact insertion/update postconditions and both abort cases: missing `sizes[0]` and `u64` addition overflow. No loop invariant or manual repair was needed.
+
+## `request`
+
+`aptos_framework::extracted_rate_limiter`, task id `RL-request-043`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_rate_limiter::request`. I’ll inspect only the target implementation/spec and its concrete call dependencies, then iterate with the specification checker until it accepts or the proof budget is genuinely exhausted.
+
+The target has one opaque helper contract, `refill`, which already exposes its exact abort condition and all five field effects. `request` adds only the guarded token subtraction, so the candidate can state its complete behavior directly in terms of the existing `refilled_amount`/`refilled_fraction` helpers; there is no global write frame to add.
+
+- **Result:** Added a complete opaque specification for `request` in [extracted_rate_limiter.move](./sources/framework/extracted_rate_limiter.move), covering aborts, return value, and every mutated field. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived behavior from the existing exact `refill` contract, then verified the coherent candidate with a 5-second solver budget.
+- **Decision points:** No `requires` or `modifies` clause was needed; `request` inherits `refill_aborts` exactly and performs no global writes.
+
+### agent-only, replicate 2: strict success
+
+I’ll apply the supplied move-inf workflow exactly: inspect only the target and its relevant dependency contracts, infer an opaque complete contract, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The target has one transitive behavior source: the existing opaque `refill` contract. Its normal state transformer is exact, so `request` can specify the boolean decision and every resulting field directly; its only abort condition should be `refill_aborts` from that callee. I’m adding that candidate without changing executable code or the helper contract.
+
+- **Result:** Added a complete opaque specification for `extracted_rate_limiter::request`, covering aborts, return value, and all mutated fields. `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Derived behavior from the existing opaque `refill` contract and checked the candidate with a 5-second solver budget.
+- **Decision point:** No `requires` or `modifies` clause was needed: `request` has no caller precondition or global-state writes.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove a complete opaque contract for `aptos_framework::extracted_rate_limiter::request`. I’ll keep edits limited to that target and use `move_spec_check` as the acceptance gate.
+
+The target has one opaque dependency, `refill`, whose existing contract already gives the exact abort predicate and post-state. The request contract can therefore be expressed directly from the pre-state limiter: refill first, then conditionally subtract the requested tokens. No loop invariant or global-state frame is needed.
+
+The first coherent candidate is now under the required acceptance check. It states exact refill aborts, all five limiter-field outcomes, and the returned authorization decision; I’m waiting on the prover rather than broadening the scope.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `request` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r03-agent-only-acceptance/workspace/sources/framework/extracted_rate_limiter.move). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Derived exact abort, result, and mutated-field behavior from the existing opaque `refill` contract.
+- **Decision point:** No `modifies` clause or loop invariant was needed because `request` only mutates its reference argument and contains no loop.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied move-inf workflow exactly: I’ll inspect only the target implementation, existing specs, and its actual call dependencies, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The dependency trace is small: `request` only calls the already-opaque `refill`, whose contract exactly exposes refill aborts and all five field effects. The candidate therefore needs to compose that state transition with the conditional token deduction; there are no loops or global writes in the target.
+
+- **Result:** Added a complete opaque contract for [`request`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r04-agent-only-acceptance/workspace/sources/framework/extracted_rate_limiter.move:114), covering aborts, result, and all mutated fields. `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Composed `refill`’s existing opaque contract with `request`’s conditional token deduction.
+- **Decision points:** Preserved exact refill partiality and specified both successful deduction and insufficient-token behavior without adding preconditions.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow exactly as requested. I’ll inspect only the target and its relevant callees, infer the opaque contract, then use the candidate checker as the acceptance gate.
+
+The target is loop-free and calls one already-specified opaque helper, `refill`, so the WP pass is a good fit here. The existing helper contract already captures clock/resource, arithmetic, division, and mutation behavior; I’m using it as the boundary without changing it.
+
+WP produced two `sathard` existential clauses, so I replaced only those generated target clauses with an equivalent field-by-field contract expressed through the module’s existing `refilled_*` helpers. This directly states the boolean result, every mutated/preserved limiter field, and the exact inherited abort condition.
+
+- **Result:** Added a complete opaque `[inferred]` contract for `extracted_rate_limiter::request` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_rate_limiter.move:42). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference, then replaced its `sathard` existential output with equivalent field-level result, mutation, preservation, and exact-abort clauses based on the existing `refill` contract.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill for this inference task. I’ll inspect only the target implementation and its relevant call/spec dependencies, then use WP and the candidate checker as the acceptance gate; any edits will be confined to the requested function’s contract and necessary loop invariants.
+
+The target is loop-free and calls one helper, `refill`, whose existing opaque contract already gives exact abort and mutation behavior. That makes a focused WP pass the appropriate first inference step; I’m applying it only to `extracted_rate_limiter::request`.
+
+WP exposed the full behavior but left two existential postconditions marked `sathard`, so they are not acceptable final clauses. I’m replacing only the generated `request` block with an equivalent direct contract expressed through the module’s existing refill helpers: exact result, all five post-state fields, and the exact transitive abort condition.
+
+- **Result:** Added a complete opaque contract for [`request`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_rate_limiter.move:42), covering its result, every mutated field, preserved fields, and exact abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used focused WP inference, then replaced its `sathard` existential clauses with equivalent direct conditions based on the existing refill specification helpers.
+- **Decision point:** Direct field postconditions avoided unresolved existential reasoning while fully characterizing the caller-visible state.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly, scoped to `aptos_framework::extracted_rate_limiter::request`. I’ll inspect the target and its executable dependencies, infer the opaque contract, then iterate with the candidate checker until accepted or the available proof budget is exhausted.
+
+The target is loop-free and calls one already-opaque helper, `refill`, whose contract exactly describes aborts and every mutated limiter field. That makes this a good fit for the WP pass: it can compose `request` directly from the helper contract without introducing invariants or touching executable code.
+
+WP produced the right behavioral skeleton but marked its existential post-state clauses `sathard`, so they are not acceptable as final inference output. I’m replacing only those generated clauses with an equivalent field-by-field contract using the module’s existing deterministic refill helpers; this preserves exact success/failure behavior while avoiding unconstrained existential witnesses.
+
+- **Result:** Added a complete opaque contract for `request`, covering exact abort behavior, return value, and all mutated limiter fields. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP inference, then replaced its `sathard` existential clauses with equivalent deterministic field-level postconditions.
+- **Decision point:** Reused the existing verified `refill` abstraction helpers, yielding a solver-friendly contract without weakening behavior.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow because this is a missing-contract inference task. I’ll inspect only the target and its relevant callees, infer the contract (and any needed loop invariant), then let `move_spec_check` make the final acceptance decision.
+
+The target is loop-free and calls one already-specified opaque helper, `refill`. Its helper contract fully characterizes the clock/resource aborts and all mutated fields, so I’m applying WP directly to `request`; this should produce exact caller-visible mutation and abort behavior without changing `refill`.
+
+WP exposed two `sathard` existential postconditions. I’m replacing only those generated clauses with a quantifier-free contract expressed through the module’s existing refill summary: exact return value, all five post-state fields, and the helper’s exact abort condition. This preserves the same semantics while avoiding unresolved existential reasoning.
+
+- **Result:** Added a complete opaque contract for [`request`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_rate_limiter.move:42), covering aborts, return value, and every mutated field. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP, then replaced its `sathard` existential clauses with an equivalent quantifier-free contract based on the existing `refill` summary.
+- **Decision point:** No loop invariant was needed because `request` and its relevant helper path are loop-free.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill exactly as requested. I’ll run WP first on `aptos_framework::extracted_rate_limiter::request` with package path `.`, handle only its diagnostics, then use the candidate check as the acceptance gate.
+
+WP completed but marked two postconditions `[inferred = sathard]`, so the candidate is not yet acceptable. Following the skill’s dependency guidance, I’m inspecting `request`, its executable callees, and the existing `refill` contract before replacing only those unresolved clauses with a solver-friendly equivalent.
+
+I replaced the existential carrier clauses with the exact state transformer already defined by `refill`’s preserved contract: all five fields are now characterized, the Boolean result controls the token deduction, and abort behavior is exactly `refill_aborts`. I’m checking this candidate directly now.
+
+- **Result:** Added a complete opaque contract for [`request`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:42>), covering its result, every mutated field, and exact abort behavior. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Ran WP first, replaced its two `sathard` existential clauses with the solver-friendly state transformer defined by `refill`’s existing contract, then ran `move_spec_check`.
+- **Decision point:** Characterized all five limiter fields directly, ensuring the opaque contract fully describes caller-visible mutation.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_rate_limiter::request`. I’ll run WP first with `package_path: "."`, repair only the target’s inferred specification/invariants, and finish with the candidate checker.
+
+WP completed without loop-invariant warnings, but it marked two mutation postconditions `sathard`. I’m inspecting `request` and `refill` now so I can replace those unresolved existential clauses with an equivalent solver-friendly contract before checking it.
+
+I replaced the two `sathard` existential clauses with direct field-level behavior derived from `refill`’s existing opaque contract. The candidate now states the exact success result, token deduction/no-deduction state, preserved fields, timestamp/fraction update, and inherited abort condition.
+
+- **Result:** Added a complete opaque contract for `request` in [extracted_rate_limiter.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:42). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation behavior is unchanged.
+- **Strategy:** Ran WP, then replaced its two unresolved `sathard` existential clauses with equivalent field-level postconditions derived from `refill`’s opaque contract.
+- **Decision points:** Specified exact token deduction and all preserved/refilled fields; expressed abort behavior through the existing `refill_aborts` helper.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill exactly: I’ll run weakest-precondition inference first for `aptos_framework::extracted_rate_limiter::request` with package path `.`, repair only in-scope specification/invariant issues, then use the candidate check as the acceptance gate.
+
+WP completed without loop or callee-partiality warnings, but it marked two postconditions `sathard`. I’m checking the generated candidate directly now; if acceptance flags those clauses or a proof obligation, I’ll localize and replace them with an equivalent solver-friendly form.
+
+- **Result:** Added an opaque, complete contract for [`request`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-RL-request-043-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_rate_limiter.move:42>), covering its result, limiter mutation, and `refill`-derived abort behavior. `move_spec_check` returned `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran scoped WP inference inline, then directly checked the generated contract with a 5-second per-condition budget. No loop-invariant or inherited-partiality repair was needed.
+
+### hybrid guided, replicate 4: strict success
+
+I’ll use the supplied move-inf workflow exactly: run WP first on `aptos_framework::extracted_rate_limiter::request`, address only its diagnostics, then submit the resulting contract to the candidate checker.
+
+WP completed without a loop or callee warning and wrote an opaque contract. Two postconditions are marked `sathard`, so I’m checking the generated candidate directly now; if proof search rejects it, I’ll localize the exact obligation and replace only the solver-hostile form with an equivalent contract.
+
+- **Result:** Added a complete opaque contract for `request`, covering its result, limiter mutation, and transitive `refill` abort behavior. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Ran targeted WP inference, then directly checked the generated clauses with a 5-second solver budget.
+- **Decision point:** Retained WP’s `ensures_of<refill>` formulation because it verified successfully without weakening or manual repair.
+
+## `select`
+
+`inference_corpus::selection_machine`, task id `SM-select-022`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `inference_corpus::selection_machine::select`. I’ll inspect only the target, its existing specs, and its actual call dependencies, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The target has no named callees; its only effects come from the two function-value parameters. The core proof shape is a recursive execution model aligned one-for-one with the loop, plus exact recursive predicates for reachable callback preconditions and aborts. This avoids an unbounded “first matching index” quantifier and keeps the contract usable under `pragma opaque`.
+
+- **Result:** Added a complete opaque contract and loop invariants for `selection_machine::select` in [selection_machine.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r01-agent-only-acceptance/workspace/sources/authored/selection_machine.move). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified with implementation unchanged.
+- **Strategy:** Used recursion-aligned helpers to model reachable callback preconditions, exact abort behavior, and the final `Outcome`.
+- **Decision points:** Recursive modeling avoided difficult first-match quantifiers; loop invariants relate each intermediate state directly to the original call.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` instructions exactly for `inference_corpus::selection_machine::select`. I’ll inspect only the target implementation, its existing specs, and its actual call dependencies before proposing and checking one complete opaque contract.
+
+The target has no named callees or global state; its behavior is entirely the bounded loop plus the two function-value contracts. The key proof obligation is therefore a recursive prefix model that captures: the first admissible value, every prior `next` transition, callback aborts, and the exhausted restart position.
+
+I’ve written one coherent candidate: three recursion-aligned specification helpers model reachable callback obligations, exact abort propagation, and the normal outcome; the loop carries those same suffix facts. I’m now running the required acceptance check directly.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`select`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r02-agent-only-acceptance/workspace/sources/authored/selection_machine.move:13>). `CANDIDATE_ACCEPTED`: all obligations verified, implementation unchanged, contract coverage complete.
+- **Strategy:** Used recursion-aligned helpers to model callback preconditions, transitive aborts, and the exact accepted/exhausted result.
+- **Decision points:** Loop invariants preserve the remaining-machine model; callback requirements are restricted to the uniquely reachable execution path.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow to infer only `inference_corpus::selection_machine::select`. I’ll inspect the implementation and its actual call dependencies, author `[inferred]` clauses/invariants with `pragma opaque`, then use `move_spec_check` as the acceptance gate.
+
+The target is self-contained: `select` has no named callees, but it invokes two function-value parameters. Its contract therefore needs to model the repeated `next` transformation, each `admissible` decision, callback aborts, and the `i += 1` overflow boundary. I’m checking nearby corpus conventions for function-value contracts before editing.
+
+I’m going with a recursion-aligned abstraction: one helper describes the remaining normal result, one the exact remaining abort condition, and one the callback preconditions along the reachable path. The loop invariants equate the original call to the remaining suffix, which handles both early acceptance and exhaustion without unbounded quantifiers.
+
+- **Result:** Added complete `[inferred]` result, abort, callback-precondition, and loop-invariant specifications with `pragma opaque`. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used recursion-aligned helpers to model each remaining selection round, including early acceptance, exhaustion, and callback aborts.
+- **Decision points:** Avoided quantifiers by equating each loop suffix to the original computation; preserved executable behavior unchanged.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only `selection_machine::select` and its relevant dependencies, author inferred clauses/invariants without changing behavior, and use the candidate checker as the acceptance gate.
+
+The target has no named callees; its only behavioral dependencies are the two function-value contracts. I’m modeling the machine recursively so each loop iteration unfolds exactly one specification step, including callback preconditions, callback aborts, and the precise `Accepted`/`Exhausted` result.
+
+- **Result:** Added a complete opaque contract and four loop invariants for `selection_machine::select` in [selection_machine.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r04-agent-only-acceptance/workspace/sources/authored/selection_machine.move). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used recursion-aligned helpers to model callback preconditions, exact transitive aborts, and the precise accepted/exhausted outcome.
+- **Decision points:** Restricted callback requirements to the actually executed path; tracked abort and result helpers through each loop iteration so the opaque contract remains exact.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for `inference_corpus::selection_machine::select`. I’ll inspect only the target and relevant callees, infer its opaque contract and loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a state-free bounded loop over two function values. Its key proof obligation is a prefix invariant: each prior candidate was inadmissible, `value` is the result of repeatedly applying `next`, and both callback abort behaviors must be represented. I’m running WP now to obtain the tool’s exact carrier predicates and loop-head diagnostics before authoring that invariant.
+
+WP confirmed the loop is the only blocker and showed the expected repeated `result_of` chain. I’m encoding that chain as one recursion-aligned semantic helper, plus matching abort and callback-precondition helpers; the loop invariant will preserve equality between the original call and the remaining suffix. This avoids a quantified “all prior rounds” invariant and keeps each proof step to one recursive unfold.
+
+The raw WP contract was intentionally diagnostic rather than final: it emitted `sathard` quantified clauses over arbitrary loop-head states. I replaced those unresolved clauses with the equivalent recursive result/abort contract and made the callback obligations an explicit API precondition. I’m checking that candidate directly now; any failure will be localized to the specific invariant or callback carrier obligation.
+
+- **Result:** Added complete opaque result, abort, callback-precondition specifications and loop invariants in [selection_machine.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r01-hybrid-flexible-acceptance/workspace/sources/authored/selection_machine.move:27). `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP diagnostics, then recursion-aligned helpers for exact selection results, callback aborts, and reachable callback preconditions.
+- **Decision point:** Replaced WP’s unresolved quantified `sathard` clauses with equivalent recursive contracts, eliminating difficult quantification without weakening behavior.
+
+### hybrid flexible, replicate 2: not_scorable
+
+I’m using the supplied `move-inf` workflow for `inference_corpus::selection_machine::select`. I’ll keep changes confined to that target’s specification and any loop invariants beside its body, then use `move_spec_check` as the acceptance gate.
+
+The target is a pure bounded loop over two function values, with no global state or named callees. I’m running WP now to expose the exact closure-carrier and loop obligations; the key work will be an invariant relating the current `value` and iteration count to repeated applications of `next`, plus prefix rejection by `admissible`.
+
+WP confirms the missing abstraction rather than a callee-contract issue. I’m adding one recursion-aligned specification helper for the value after `n` draws and loop invariants for bounds, current value, and the fully processed rejected prefix. Each authored invariant is marked `[inferred]`; executable behavior remains untouched.
+
+WP now has exact conditions, but it flagged four quantified clauses as solver-hard. Per the workflow, I’m checking this generated candidate directly before changing it; the result will tell us whether the issue is only the inference annotation or an actual proof/coverage failure.
+
+The acceptance check is still running past the initial solver budget, which is consistent with WP’s `sathard` warning. I’m letting the diagnostic complete so I can replace only the quantified bottleneck while preserving the exact inferred behavior.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`select`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r02-hybrid-flexible-acceptance/workspace/sources/authored/selection_machine.move:13>). `move_spec_check` returned `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference after synthesizing a recursive `value_after` helper and invariants for loop bounds, current candidate, and rejected-prefix behavior.
+- **Decision points:** Kept WP’s generated clauses unchanged because direct candidate checking proved them successfully despite solver-hard annotations.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow for `inference_corpus::selection_machine::select`. I’ll inspect only the target and relevant callees, infer its opaque contract and loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a bounded search over two function values with one loop and no existing specification. I’m running WP now to obtain the exact function-value carriers and the loop-head facts needed to synthesize a preservation invariant.
+
+WP confirmed that loop havoc is the only structural blocker and showed the state evolves as repeated `next` applications while every prior `admissible` result is false. I’m adding a recursion-aligned prefix model plus invariants for the index bound, current candidate, and successfully completed rejected draws; WP can then derive the exact callable preconditions, aborts, and outcome.
+
+WP’s raw contract is semantically informative but leaves quantified `sathard` clauses, which are unresolved by the skill’s acceptance rules. I’m replacing those quantifiers with recursion that mirrors one loop iteration. The same abstraction will carry the normal result, exact short-circuit abort behavior, and callable preconditions without changing runtime code.
+
+- **Result:** Added complete opaque specification and loop invariants for `selection_machine::select` in [selection_machine.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r03-hybrid-flexible-acceptance/workspace/sources/authored/selection_machine.move:13). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Used WP loop-head evidence, then recursion-aligned helpers to model callable preconditions, short-circuit aborts, and exact accepted/exhausted outcomes.
+- **Decision point:** Replaced WP’s unresolved quantified `sathard` clauses with solver-friendly recursive specifications mirroring one loop iteration.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow to infer and prove the complete opaque contract for `inference_corpus::selection_machine::select`. I’ll keep edits confined to that function’s specification and any loop invariants beside its body, and I’ll use `move_spec_check` as the acceptance gate.
+
+The target is a bounded search loop over two function values. Its contract must capture both callback abort behavior and the exact accepted/exhausted outcome; the loop will need a prefix-style invariant tying `value` to repeated `next` applications and recording that earlier values were inadmissible.
+
+WP confirmed the loop is the only unresolved point and supplied the first three loop heads. I’m generalizing those observations into two recursive spec helpers: one computes the value after `i` successful draws, and one states that every processed candidate was non-aborting, rejected, and advanced successfully. This mirrors one loop iteration per recursive step.
+
+The loop invariants were sufficient for WP to derive a complete candidate, including both callback abort sites. The generated form uses unbounded quantifiers marked `sathard`; I’m checking it once to identify the exact proof bottleneck, then I’ll replace only those generated clauses with an equivalent recursion-aligned contract if needed.
+
+- **Result:** Added an opaque, complete contract for `select`, exact normal outcomes, callback abort behavior, and recursion-aligned loop invariants. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP for initial inference, then replaced difficult quantified clauses with recursive `selection_result` and `selection_aborts` helpers.
+- **Decision point:** Recursive helpers eliminated the `sathard` quantifiers while preserving exact bounded-selection semantics.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `inference_corpus::selection_machine::select` with package path `.`, then I’ll repair only target-scope invariants/specs and finish with the candidate check.
+
+WP found one ordinary loop and no usable abstraction for the evolving candidate. I’m inspecting the target plus its function-value dependencies now; the invariant must relate `start` to repeated applications of `next`, while preserving the early-admissible result behavior.
+
+The loop state is exactly a recurrence: after `i` unsuccessful draws, `value` is the `i`-fold application of `next`, and every earlier `admissible`/`next` call returned normally with rejection. I’m encoding that prefix relation as a recursive spec helper and using it in the loop invariant, then WP can derive the full result and abort clauses.
+
+WP now succeeds and produced complete behavioral clauses: exhaustion at the fully rejected prefix, acceptance at any reached admissible candidate, and the two function-value abort cases. Its quantified clauses are flagged `sathard`, so I’m running the required candidate check to identify whether they actually need proof restructuring.
+
+The failure is proof shape, not behavior: arbitrary quantified indices force the solver to rediscover that only the first reached candidate matters. I’m replacing those quantifiers with loop-aligned recursive summaries—one for the normal `Outcome`, one for exact abort behavior—and carrying equality between the initial summary and the remaining-loop summary as invariants.
+
+WP’s second output remained mechanically quantified despite the stronger invariant, so I replaced it with the equivalent summaries the invariants already preserve: `result == selection_result(...)` and exact `aborts_if selection_aborts(...)`. This removes all `sathard` clauses without weakening behavior; I’m checking that candidate directly now.
+
+- **Result:** Added complete opaque result/abort contracts plus loop invariants for `selection_machine::select`. `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP, then replaced solver-hostile quantified output with loop-aligned recursive summaries for the exact `Outcome` and abort behavior.
+- **Decision point:** Recursive summaries eliminated unresolved `sathard` quantifiers while preserving first-match, exhaustion, and function-value abort semantics.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `inference_corpus::selection_machine::select` with package path `.`, then I’ll repair only that scope and finish with the candidate check.
+
+WP found one loop whose carried state is `(i, start)`; the bounded heads show repeated application of `next` while `admissible` remains false. I’m now reading the target and its function-value dependencies so the invariant captures both the iteration relation and exact abort behavior.
+
+I added a recursion-aligned candidate helper and a prefix invariant: at loop head, `value` is the result of exactly `i` successful `next` calls, and all earlier candidates were non-aborting rejections. Per the supplied tactic, I’m rerunning WP before attempting verification.
+
+The candidate check exposed a real abstraction gap in my first invariant: recursive prefix facts did not let the prover rule out a later “accepted” state when proving an exhausted result. I’m replacing that two-helper prefix model with one recursion-aligned behavior function that represents either abort (empty vector) or the exact returned `Outcome` (singleton), so each loop step unfolds exactly once.
+
+WP now has a complete semantic carrier, but emitted `sathard` quantified clauses instead of using it directly. I’m consolidating those equivalent clauses into the solver-friendly exact form: the behavior vector is empty iff the function aborts, and is `vec(result)` on normal return.
+
+- **Result:** Added an exact recursive behavior specification and loop invariants for `selection_machine::select` in [selection_machine.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r02-hybrid-guided-acceptance/workspace/sources/authored/selection_machine.move:12). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran WP, generalized the loop state into a recursion-aligned `select_behavior` helper, reran WP, and checked the final candidate.
+- **Decision point:** Replaced WP’s `sathard` quantified output with equivalent empty/singleton behavior-vector clauses after the initial prefix abstraction produced counterexamples.
+
+### hybrid guided, replicate 3: not_scorable
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `inference_corpus::selection_machine::select` with `package_path: "."`, then I’ll repair only in-scope invariants/spec clauses and finish with the candidate check.
+
+WP found one loop and no usable loop abstraction. Its bounded facts show the key recurrence: after `i` failed candidates, `start` is `next` iterated `i` times. I’m inspecting the function and its function-value dependencies now so the invariant captures both the state recurrence and callback abort behavior.
+
+I added an inferred recurrence invariant plus prefix facts for every completed draw: prior admissibility checks returned false without aborting, and prior `next` calls did not abort. This is the exact state needed both to preserve the loop and characterize early acceptance versus exhaustion; I’m rerunning WP as required.
+
+WP now succeeds without loop warnings and generated a complete opaque contract. Several generated clauses are flagged `sathard`; per the supplied skill those remain unresolved until checked, so I’m running the candidate check directly on this WP output before deciding whether a semantics-preserving simplification is needed.
+
+The candidate check is still proving the quantified WP clauses. I’m letting this direct check finish; if it reports a timeout, I’ll localize that exact obligation and simplify the quantifier-heavy form without changing the contract’s meaning.
+
+- **Result:** Added complete inferred loop invariants, recursive `advance` helper, and opaque contract for `selection_machine::select`. Candidate accepted; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP, repaired loop abstraction using candidate recurrence and callback prefix facts, reran WP, then validated with `move_spec_check`.
+- **Decision point:** Retained WP’s complete quantified callback abort/result characterization; the candidate check proved it directly.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `inference_corpus::selection_machine::select`: first WP on that exact function with inline output, then loop-invariant repair if needed, and finally the candidate check as the acceptance gate.
+
+WP found one ordinary loop and showed the exact carried state: `i` tracks completed rounds, while `start` is repeatedly transformed by `next` until `admissible` succeeds. I’m now reading the target and its function-value dependencies to derive a preservation invariant that also captures callback abort/result behavior.
+
+The invariant needs more than `value == next^i(start)`: reaching a loop head also proves every earlier admissibility test was false and that all earlier callback invocations returned normally. I’m encoding that processed-prefix relation with one recursion-aligned helper, then rerunning WP so WP—not a hand-written guess—produces the target contract.
+
+WP’s candidate is semantically informative but leaves quantified `[inferred = sathard]` clauses, so it is not an acceptable endpoint. The key simplification is to summarize the unprocessed suffix recursively: at each loop head, both the final result and exact abort behavior of the original call equal those of the current `(value, rounds - i)` suffix. Each iteration then unfolds exactly one helper step.
+
+WP correctly refused to merge over stale inferred function clauses. Following its diagnostic, I’m retaining the new loop invariants and recursive helpers, removing only the inferred function contract, then regenerating the contract as a unit.
+
+The second WP run confirms the loop abstraction is exact but still emits hard existential/universal encodings. I replaced those with the equivalent direct recursive summary: one postcondition for the normal `Outcome`, and one exact abort predicate covering `admissible` and `next` in execution order. I’m checking that candidate now with the required opaque boundary.
+
+- **Result:** Added complete opaque normal-result and abort specifications plus loop invariants for [`select`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SM-select-022-r04-hybrid-guided-acceptance/workspace/sources/authored/selection_machine.move:13>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran WP, repaired the missing loop abstraction, reran WP, replaced its unresolved quantified `sathard` clauses with recursion-aligned result and abort summaries, then ran `move_spec_check`.
+- **Decision points:** Modeled each loop head as the remaining selection suffix; captured callback aborts in exact execution order for both `admissible` and `next`.
+
+## `split_signature_bytes`
+
+`aptos_framework::extracted_sui_derivable_account`, task id `SU-split-045`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow because this is specification inference. I’ll inspect only the target and its relevant callees, add inferred clauses within scope, and use `move_spec_check` as the acceptance gate.
+
+The target is a pure splitter: it requires no global frame, but it has one exact length abort and two loops whose invariants must preserve the copied slices. I’m checking the package’s existing specification idioms before writing the contract so the vector relations are solver-friendly.
+
+- **Result:** Added an opaque, complete contract and slice-preserving loop invariants in [extracted_sui_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r01-agent-only-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation behavior is unchanged.
+- **Strategy:** Modeled both output vectors as exact input slices and maintained those relations through each loop.
+- **Decision points:** Specified the exact length abort with code `EINVALID_SIGNATURE_LENGTH`; omitted `modifies` because the function has no global-state effects.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` instructions as the governing workflow. I’ll inspect only the target implementation, its existing spec, and relevant callees, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The function has one explicit length abort and otherwise performs two bounded copies from immutable input. I’m encoding the exact tuple—scheme byte, 64-byte signature slice, and 32-byte key slice—and prefix invariants for each loop; no global frame is needed.
+
+- **Result:** Added an opaque, complete contract for `split_signature_bytes`, including exact abort behavior, tuple contents, and both loop-prefix invariants. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Modeled each output vector as the corresponding input slice and proved construction incrementally with bounded prefix invariants.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow because this is specification inference for a missing contract. I’ll inspect only the target implementation and its actual dependencies, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target is self-contained: it only uses vector length, indexing, and append. Its observable behavior is exact—abort only when the input length is not 97; otherwise return the first byte, bytes 1–64, and bytes 65–96. The proof work is therefore centered on prefix-preserving loop invariants for the two extraction loops.
+
+I’m adding an opaque caller-facing contract plus two ordinary-loop invariants. The contract uses bounded positional equalities, which exactly characterize both returned vectors without introducing recursive helpers or unbounded quantifiers.
+
+- **Result:** Added complete opaque contract and loop invariants for [`split_signature_bytes`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r03-agent-only-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Specified exact abort behavior and bounded positional equality for the signature/public-key slices, supported by prefix-preserving loop invariants.
+- **Decision points:** Used bounded quantifiers to precisely characterize outputs; kept the executable implementation untouched.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill to infer the target’s full opaque contract, including all normal and abort behavior. I’ll inspect only the target and its actual dependencies, then iterate with `move_spec_check` until accepted or the proof budget is exhausted.
+
+The implementation has one explicit failure mode—input length other than 97—and otherwise returns the scheme byte plus exact slices `[1..65]` and `[65..97]`. I’m encoding those caller-visible guarantees and prefix-slice invariants for both loops; the dependency scan found only intrinsic vector operations.
+
+- **Result:** Added complete opaque contract and prefix-slice loop invariants in [extracted_sui_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r04-agent-only-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:20). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified with complete contract coverage and unchanged implementation.
+- **Strategy:** Modeled each output as its exact input slice and captured loop progress with prefix-slice invariants.
+- **Decision points:** Specified the sole abort as `len(bytes) != 97` with code `EINVALID_SIGNATURE_LENGTH`; no `modifies` frame was needed because the function performs no global writes.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill to infer and prove the complete opaque contract for `aptos_framework::extracted_sui_derivable_account::split_signature_bytes`. I’ll inspect only the target and relevant dependencies, then use the candidate checker as the completion gate.
+
+The target has two simple slice-copy loops and no stateful or non-vector callees. I’m running WP first because it can expose the exact contract shape and the loop-head facts needed to synthesize prefix invariants.
+
+WP confirms both loops are the only missing abstraction. I’m adding quantified prefix invariants: each output vector’s length tracks the loop index, and every accumulated byte equals the corresponding source byte. These invariants also make the boundary cases at indices 1, 65, and 97 explicit.
+
+The first WP contract contains an unresolved `[inferred = sathard]` bounds-abort clause, so it is not acceptable. Its witness exists only because the loop invariant did not explicitly carry `len(bytes) == 97`; I’m strengthening both loop invariants with that entry fact and regenerating the function contract from scratch, as the skill requires.
+
+WP still emits the same solver-hard existential even though the loop bounds and source length make it impossible. Following the skill’s guidance, I’m replacing that unresolved mechanical clause with the direct, equivalent behavior: exact length abort plus the three return components (scheme byte, 64-byte signature slice, and 32-byte key slice).
+
+- **Result:** Added complete opaque contract and loop invariants for `split_signature_bytes` in [extracted_sui_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10). `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP to identify loop abstractions, then specified exact prefix-copy invariants, abort behavior, and all three return values.
+- **Decision point:** Replaced WP’s unresolved `sathard` existential with the equivalent direct slice behavior; the candidate checker proved it.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied move-inf workflow for the single target `aptos_framework::extracted_sui_derivable_account::split_signature_bytes`. I’ll inspect only its implementation and relevant dependency behavior, then iterate with WP/prover diagnostics and finish with the required candidate check.
+
+The target has two fixed-bound copy loops and only vector primitives as dependencies. I’m running WP now; the key expected issue is synthesizing prefix-copy invariants strong enough to prove both exact slices and all bounds behavior.
+
+WP confirmed the prefix invariants’ shape, but its generated abort clause is marked `sathard`: it failed to carry the established input length through the loop when proving indexing safety. I’m strengthening both loop invariants with the already-proved `len(bytes) == 97`, then regenerating the function contract rather than retaining that unresolved existential clause.
+
+The candidate check caught a genuine WP omission: abort behavior was complete, but the opaque contract had no normal-result guarantees. I’m adding the exact three outputs directly—scheme byte, 64-byte signature slice, and 32-byte public-key slice—while keeping WP’s proven abort condition.
+
+- **Result:** Added complete `[inferred]` loop invariants and an opaque contract describing exact abort and output-slice behavior in [extracted_sui_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:23).
+- **Strategy:** Used WP with synthesized prefix-copy invariants, then supplied exact normal-result guarantees omitted by WP.
+- **Decision points:** Explicit input-length invariants eliminated unresolved bounds clauses. Final `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow to infer only `aptos_framework::extracted_sui_derivable_account::split_signature_bytes`. I’ll inspect the implementation and its direct dependencies, then iterate with WP/prover diagnostics and finish only when `move_spec_check` accepts or the available verification budget is genuinely exhausted.
+
+The function has two bounded copy loops and no existing contract. Its only callees are standard vector operations, so the substantive work is to relate each output vector to the corresponding input slice and to prove both loop bounds. I’m running WP first to obtain exact abort/result clauses and the loop-head diagnostics that will guide the invariants.
+
+WP confirmed both loops are the only blocker and showed the expected prefix-growth pattern. I’m adding slice-based invariants (`bytes[1..i]` and `bytes[65..i]`) plus index bounds; this directly captures each append and should let WP derive the exact three-result contract without recursive helpers or quantifiers.
+
+The first WP contract is not yet acceptable: its `[inferred = sathard]` existential is an unresolved bounds obligation, and it omitted normal-result guarantees. The loop invariants need to carry the already-established `len(bytes) == 97` fact explicitly so every `bytes[i]` access is provably in range. I’m strengthening both invariants, removing only the stale WP-generated function block, and rerunning inference as prescribed.
+
+WP’s second output still contains tautological/spurious loop-abort clauses and no result clauses, despite sufficient invariants; per the skill, that is inference output to replace with an equivalent direct characterization from the body. The exact behavior is: abort only when length is not 97 (code 4), otherwise return byte 0, slice `[1..65]`, and slice `[65..97]`. I’m substituting that complete opaque contract and going straight to the candidate check.
+
+- **Result:** Added complete opaque contract and loop invariants for [`split_signature_bytes`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP diagnostics to synthesize slice-preserving loop invariants, then directly stated exact abort and return behavior.
+- **Decision points:** Explicitly carried `len(bytes) == 97` through both loops to prove indexing safety; replaced unresolved WP `sathard` output with exact result slices and abort code `EINVALID_SIGNATURE_LENGTH`.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the provided `move-inf` skill because this is specification inference. I’ll scope all proving and edits to `aptos_framework::extracted_sui_derivable_account::split_signature_bytes`, preserve executable code and existing specs, and use the candidate check as the completion gate.
+
+The dependency scan shows only transparent vector primitives and no global state. I’m running the hybrid WP pass now; for this loop-heavy byte split, its loop-head diagnostics should expose the exact index relationships needed for invariant synthesis.
+
+WP identified two ordinary accumulation loops. I’m adding prefix-slice invariants: the first output tracks `bytes[1..i]`, and the second tracks `bytes[65..i]`, with bounds that prove all indexing and `u64` increments safe. These invariants describe the implementation directly and introduce no API precondition.
+
+With the invariants in place, WP completed but emitted one `sathard` bounds clause. It is impossible whenever `len(bytes) == 97` and redundant with the exact length abort; I’m replacing that diagnostic clause with the direct tuple guarantees (`bytes[0]`, `bytes[1..65]`, and `bytes[65..97]`) while keeping the exact abort condition and `opaque` boundary.
+
+- **Result:** Added complete opaque contract and loop invariants in [extracted_sui_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference, then prefix-slice invariants for both accumulation loops and exact tuple postconditions.
+- **Decision points:** Replaced WP’s redundant `sathard` bounds clause with exact behavior: abort iff length is not 97; otherwise return `bytes[0]`, `bytes[1..65]`, and `bytes[65..97]`.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll begin with weakest-precondition inference for only `aptos_framework::extracted_sui_derivable_account::split_signature_bytes`, repair any loop diagnostics one function at a time, then run the candidate check as the acceptance gate. I’ll keep the package path as `.` throughout.
+
+WP found two ordinary loops whose accumulated vectors need invariants; no callee-partiality issue was reported. I’m inspecting the target and its existing spec context now, then I’ll add prefix/slice invariants beside each loop and rerun WP as required.
+
+The rerun discharged the loop-havoc failure, but WP emitted a `[sathard]` bounds-abort clause instead of proving the index safe. The diagnostic formula is impossible once the loop carries the already-established `len(bytes) == 97`; I’m strengthening both loop invariants with that preserved fact, removing only the stale generated function block, and rerunning WP.
+
+WP is now warning-free and reduced abort behavior to the exact length check, with no unresolved markers. I’m moving to the required candidate check now; this will determine whether the generated contract also covers the returned tuple or identify the missing obligation category.
+
+The candidate check rejected exactly one category: `normal-result`. I’ll add the missing exact tuple semantics—scheme byte 0, a 64-byte signature copied from indices 1–64, and a 32-byte public key copied from indices 65–96—while retaining WP’s exact abort clause and opaque boundary, then recheck.
+
+- **Result:** Added complete opaque result/abort specifications and loop invariants for [`split_signature_bytes`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10>). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP-guided inference, strengthened both copy loops with bounds and prefix-content invariants, then supplied exact tuple-result semantics.
+- **Decision points:** Preserved `len(bytes) == 97` and explicit in-range facts to eliminate WP’s `sathard` bounds condition; added normal-result clauses after the candidate check identified that sole missing category.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill for this function. I’ll begin with scoped WP inference writing inline specifications, then resolve any diagnostics one function at a time and finish only when `move_spec_check` accepts the candidate.
+
+WP found two loops whose carried vectors need explicit prefix invariants; no function contract was emitted because their unconstrained state also made abort inference vacuous. I’m now reading the implementation and its actual call dependencies so the invariants match the two slices exactly before rerunning WP.
+
+The loop shape is now recognized, but WP exposed a remaining solver-hard abort clause caused by losing the already-established `len(bytes) == 97` fact at loop heads. I’m strengthening both invariants with that unchanged input fact, removing only the stale generated function block, and rerunning WP as required.
+
+The unchanged-length invariant alone did not eliminate the hard quantified carrier. The package’s specification language supports native vector slices, so I’m replacing each length-plus-quantifier pair with the equivalent exact slice equality (`bytes[1..i]` and `bytes[65..i]`), which gives WP a solver-native prefix relation without weakening behavior.
+
+The candidate check confirmed the generated empty-slice abort clause is false: a 97-byte input returns normally. I’m replacing that unresolved WP artifact with the direct complete contract—one exact length abort and three exact outputs—while retaining the proved slice-based loop invariants.
+
+- **Result:** Added complete opaque contract and loop invariants for [`split_signature_bytes`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:23). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran scoped WP, repaired both loops with exact slice invariants, then checked the candidate.
+- **Decision points:** Replaced solver-hard quantified prefixes with native vector slices; replaced unresolved WP abort artifacts with the exact length abort and three return-value guarantees.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided move-inf workflow exactly: first WP on the single target with inline output, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP found two ordinary loops whose accumulated vectors are unconstrained. I’ll derive prefix invariants from the implementation, preserve any existing clauses, rerun WP for this function, and only then check the generated candidate.
+
+With the prefix invariants, WP now emits the intended length abort plus a second `[sathard]` existential abort clause. That clause represents a spurious bounds concern inside the first loop despite `i ≤ 65` and `len(bytes)=97`; I’ll run the required candidate check now to identify the exact failing category before simplifying the generated contract without weakening it.
+
+- **Result:** Added complete opaque result/abort specifications and prefix-preserving loop invariants in [extracted_sui_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran scoped WP, supplied invariants describing both extracted byte prefixes, replaced its unresolved `sathard` clause with exact result guarantees, then ran the required candidate check.
+- **Decision points:** The only abort is `len(bytes) != 97`; successful results are the scheme byte, 64-byte signature, and 32-byte public key with exact source-index correspondence.
+
+### hybrid guided, replicate 4: strict success
+
+I’ll follow the supplied move-inf workflow exactly: run WP first on the single target with package path `.`, inspect only diagnostics/dependencies needed, repair specifications or loop invariants, then use the candidate check as the acceptance gate.
+
+WP found two ordinary loops and correctly refused to infer through unconstrained loop state. I’m now deriving prefix invariants from the implementation, adding them beside each loop, and will rerun WP after removing any stale generated function clauses if present.
+
+The rerun passed loop inference, but WP emitted an unresolved `[inferred = sathard]` bounds clause and omitted normal-result guarantees. Per the supplied skill, that output is not complete. I’m replacing the mechanically hostile clause with the exact length abort condition and adding direct tuple-result guarantees from the proved slice invariants before checking the candidate.
+
+The candidate check accepted the specification at the initial 5-second budget: all target obligations verified, contract coverage is complete, and executable bytecode is unchanged. I’m doing a final diff review for scope and formatting only; no additional proof run is needed because the acceptance check already performed it.
+
+- **Result:** Added inferred prefix invariants and a complete opaque contract for [`split_signature_bytes`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-SU-split-045-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_sui_derivable_account.move:10>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran WP, supplied slice-based loop invariants, then replaced unresolved `sathard` output with exact abort and tuple-result clauses.
+- **Decision points:** Results precisely expose `bytes[0]`, `bytes[1..65]`, and `bytes[65..97]`; invalid lengths abort with `EINVALID_SIGNATURE_LENGTH`.
+
+## `update_config`
+
+`aptos_framework::extracted_transaction_limits`, task id `TL-update-050`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill exactly for `aptos_framework::extracted_transaction_limits::update_config`. I’ll inspect only the target and its relevant dependencies, then iterate with `move_spec_check` until accepted or the available proof budget is exhausted.
+
+The target has two behavioral branches—create the resource if absent, overwrite both tier vectors if present—and its abort behavior is inherited from the signer check plus two `new_tiers` calls. I’m now resolving the exact callee contracts and error-code abstraction before writing the opaque target contract.
+
+I’ve added one coherent candidate: an opaque contract with the exact framework-signer abort, both tier-validation aborts, the resource frame, guaranteed resource existence, and exact reconstruction of both stored tier vectors. I’m checking this candidate now; any rejection will be localized with the prover as required by the skill.
+
+- **Result:** Added a complete opaque specification for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r01-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:222): exact aborts, global frame, resource existence, and both stored tier vectors. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Derived behavior from the implementation and callee contracts, then validated the candidate directly with `move_spec_check`.
+- **Decision points:** Used `tiers_rejected` to capture both transitive validation paths; specified final vectors through `built_from` to fully characterize successful state updates.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill to infer the complete opaque contract for `aptos_framework::extracted_transaction_limits::update_config`. I’ll inspect only the target and its relevant dependency contracts, then iterate with `move_spec_check` until accepted or the proof budget is exhausted.
+
+The target has no loops; its behavior is determined by two opaque `new_tiers` calls, the framework-address guard, and one global resource update. The candidate therefore needs exact abort coverage for the signer and both tier inputs, a single `TxnLimitsConfig` frame, and postconditions fixing both stored tier vectors.
+
+- **Result:** Added a complete opaque contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r02-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:222): exact abort conditions, global frame, resource existence, and both tier-vector results. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Derived behavior from the implementation plus the opaque `new_tiers` and framework-address contracts, then checked the focused candidate with a 5-second solver budget.
+- **Decision points:** Used three abort clauses to cover the signer and both independent tier inputs; specified stored vectors through `built_from`, which exactly captures their constructed contents.
+
+### agent-only, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly, targeting only `aptos_framework::extracted_transaction_limits::update_config`. I’ll inspect that function and its actual call/spec dependencies, author only inferred specification material, and use `move_spec_check` as the acceptance gate.
+
+The target has two direct dependencies: framework-signer authorization and tier construction/validation. I’m now reading the module facts so the contract captures exact aborts, resource writes, and the constructed tier values rather than approximating them.
+
+The direct candidate is clear: authorization failure or either tier list being rejected are the complete abort conditions; successful execution always installs exactly the two input-derived tier vectors at `@aptos_framework`, with that resource as the sole write frame. I’m adding those clauses with `pragma opaque`, preserving all existing helper contracts and executable code.
+
+The first check found a specification-language issue only: this prover accepts inference markers on `aborts_if`/`ensures`, but not on `modifies`. I’m removing the invalid marker from the frame clause; the frame itself remains unchanged.
+
+Name resolution is the remaining compile issue: this module does not import `signer`. I’ll use the fully qualified `std::signer::address_of`, which is semantically identical and avoids changing imports or runtime bytecode.
+
+- **Result:** Added a complete opaque contract for [`update_config`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r03-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:222): exact abort conditions, resulting tier configuration, resource existence, and global write frame. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and existing opaque callee contracts, then validated with `move_spec_check`.
+- **Decision points:** Modeled authorization and both tier-validation failures independently; described successful state through `built_from` so vector contents and ordering are fully captured.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied move-inf workflow exactly. I’ll inspect only `update_config`, its existing spec, and the contracts of functions it actually calls, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The call graph is small and its contracts are exact: the signer check aborts precisely for a non-framework signer, while each `new_tiers` call aborts precisely when its two input vectors are rejected. I’m encoding that union, plus the exact rebuilt resource contents and its single global-state frame.
+
+- **Result:** Added a complete opaque contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r04-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:219), covering aborts, resulting tier configuration, and the global resource frame. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Derived behavior from the exact contracts of `assert_aptos_framework` and `new_tiers`, then checked the coherent contract with `move_spec_check`.
+- **Decision points:** Modeled both resource creation and replacement with the same post-state guarantees; used one disjunctive abort condition covering signer rejection and either invalid tier configuration.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_transaction_limits::update_config`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target has no loop of its own and calls two already-opaque boundaries: `new_tiers` (with exact abort/result behavior) and the framework-address assertion. That makes a focused WP pass appropriate; I’ll retain its generated clauses unless the prover identifies a concrete issue.
+
+- **Result:** Added a complete opaque contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133), covering state updates, publication, and all transitive aborts.
+- **Strategy:** Used focused weakest-precondition inference, then `move_spec_check` with a 5-second budget.
+- **Status:** `CANDIDATE_ACCEPTED` — all obligations verified, contract coverage is complete, and executable behavior is unchanged.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_transaction_limits::update_config`. I’ll inspect only the target and relevant callees, infer its caller-visible behavior, then iterate with the candidate checker until accepted or genuinely blocked.
+
+The target has no existing contract. Its only executable dependencies are the framework-address assertion and `new_tiers`; the latter already has an opaque exact contract, while both construction loops already carry invariants. I’m running focused WP now so the initial candidate includes transitive aborts, the exact stored resource, and its global frame.
+
+- **Result:** Added an opaque, complete contract for `update_config`, covering exact resource updates, global frames, framework-address authorization, and all `new_tiers` aborts. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused weakest-precondition inference, then `move_spec_check` at a 5-second solver budget.
+- **Decision point:** Kept the generated staged conditions because direct checking proved them complete without diagnostics or weakening.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_transaction_limits::update_config`. I’ll keep edits confined to that target’s specification (and any necessary in-loop invariants), preserve executable behavior and existing specs, and use `move_spec_check` as the acceptance gate.
+
+The target has no loop of its own; its behavior is the composition of the existing opaque `new_tiers` contract, the framework-address guard, and one resource create-or-update. I’m running focused WP now because this is a loop-free caller with already-specified loop-bearing helpers—the case where WP can directly derive exact abort, post-state, and frame clauses.
+
+- **Result:** Added a complete opaque specification for `update_config`, covering resource mutation, post-state configuration, and all abort paths. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused WP inference because the target is loop-free and its helper contracts are already complete.
+- **Decision point:** Retained WP’s state-sensitive create/update clauses because they precisely model both resource-existence branches in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133).
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_transaction_limits::update_config`. I’ll inspect only the target, its executable dependencies, and existing specs, then iterate with WP/prover diagnostics and finish only through `move_spec_check`.
+
+The target has no contract yet. Its visible behavior is a framework-address authorization check, two exact tier-construction validations, and either creation or replacement of `TxnLimitsConfig`; the existing helper contracts and loop invariants are user-written and will remain unchanged. I’m querying the target’s actual call closure before generating clauses.
+
+WP produced a warning-free contract, including both helper abort sets, authorization, publish-vs-update behavior, and global frames. Per the requested tactic I’m checking this generated contract unchanged first; I’ll edit only if the acceptance diagnostics identify a problem.
+
+- **Result:** Added a complete opaque contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133), covering state changes, normal outcomes, and all abort paths. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused call-closure inspection, warning-free weakest-precondition inference, then `move_spec_check` with a 5-second condition budget.
+- **Decision points:** Retained WP’s generated clauses unchanged because inference reported no warnings and the first acceptance check verified complete contract coverage.
+
+### hybrid guided, replicate 1: strict success
+
+I’ll use the supplied move-inf workflow exactly: first run WP on `aptos_framework::extracted_transaction_limits::update_config` with package path `.`, then resolve only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering both configuration update branches, both `new_tiers` calls, framework-signer validation, publication conflicts, and global-state frames. I’m checking those clauses directly now.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran warning-free WP inference, then directly validated the generated result and abort behavior plus global-state frames with `move_spec_check`.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::update_config` with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP completed without warnings and injected an opaque contract covering both update/create branches, both `new_tiers` calls, signer authorization, aborts, and global frames. I’m now checking those generated clauses directly, as required.
+
+- **Result:** Added a complete inferred opaque contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran warning-free WP inference, then directly ran `move_spec_check` with a 5-second per-condition budget.
+- **Decision points:** Retained WP’s exact authorization, tier-construction, publish/update, abort, and global-frame behavior; no manual repair or weakening was needed.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill for this function. I’ll run weakest-precondition inference first, address only its diagnostics in `extracted_transaction_limits::update_config`, then use the candidate check as the acceptance gate.
+
+WP completed without warnings and wrote an opaque contract with result/state effects, frame declarations, and all inferred abort paths. I’m now checking that generated contract directly, as required by the skill.
+
+- **Result:** Added a complete opaque specification for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133). `CANDIDATE_ACCEPTED`: all obligations verified, contract coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran scoped WP inference, which completed without warnings, then directly ran `move_spec_check` with a 5-second condition budget.
+- **Decision points:** Retained WP’s exact state-transition, frame, and transitive-abort clauses; no manual repair or weakening was needed.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::update_config` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and generated an opaque contract covering both configuration branches, both `new_tiers` calls, signer authorization, publication/update effects, and abort behavior. I’m now checking those generated clauses directly with the acceptance checker.
+
+- **Result:** Added a complete `[inferred]`, `pragma opaque` contract for `update_config` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-update-050-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:133). `CANDIDATE_ACCEPTED`: all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran warning-free WP for the requested function, then directly ran `move_spec_check` with a 5-second solver budget.
+- **Decision points:** Retained WP’s exact state updates, frames, and transitive abort conditions unchanged because inference produced no loop, partiality, vacuity, or solver-hardness diagnostics.
+
+## `upsert_provider_jwks`
+
+`aptos_framework::extracted_jwks`, task id `JW-upsert-049`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill to infer the complete opaque contract for `aptos_framework::extracted_jwks::upsert_provider_jwks`. I’ll inspect only the target and its actual dependencies, then iterate with `move_spec_check` until it accepts or the proof budget is exhausted.
+
+The target has no global-state effects and performs a first-non-greater linear search, then either replaces that entry or inserts at that position. I’m encoding that exact search as a recursion aligned with one loop iteration, so the invariant can preserve the search result without relying on a sorted-input precondition.
+
+- **Result:** Added complete inferred result, mutation, no-abort contract, `pragma opaque`, and loop invariants for [`upsert_provider_jwks`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r01-agent-only-acceptance/workspace/sources/framework/extracted_jwks.move:22). `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Modeled the first-non-greater search with a recursion aligned to each loop iteration, then specified exact replacement/insertion and returned `Option`.
+- **Decision points:** Preserved behavior for unsorted inputs; used `aborts_if false` after verification showed vector insertion remains total in the prover model.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_jwks::upsert_provider_jwks`. I’ll inspect only the target and its relevant dependency contracts, then iterate with `move_spec_check` until accepted or the available proof budget is exhausted.
+
+The target is a sorted-vector upsert: it scans to the first issuer not less than the input, replaces on equality, otherwise inserts there. The key proof obligation will be a loop invariant that characterizes the processed prefix and preserves the exact returned old entry versus insertion behavior.
+
+I’m adding a direct caller-visible contract with no sorted-input precondition: it characterizes the actual first stopping index even for arbitrary entry order. This avoids silently relying on the struct comment as an unexpressed API assumption, and it covers both replacement and insertion exactly.
+
+The first candidate is now under the acceptance check. It includes exact option results, exact vector updates, total abort behavior, `pragma opaque`, and a prefix-search invariant; I’m waiting on the proof result before refining any rejected obligation.
+
+The rejection is localized: the dependency’s opaque comparator contract deliberately abstracts comparison through `spec_compare_u8_vector` and gives only one-way ordering implications, so a concrete lexicographic predicate is stronger than the facts available to this caller. I’m aligning the target contract and invariant with the comparator’s exact abstract result, preserving completeness at that dependency boundary.
+
+- **Result:** Added complete opaque result/abort specifications and loop invariants for [`upsert_provider_jwks`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r02-agent-only-acceptance/workspace/sources/framework/extracted_jwks.move:22). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled the exact first-stop search, replacement/insertion vector effects, returned `Option`, and total abort behavior.
+- **Decision point:** Used the comparator’s exact abstract `result_of` contract because its opaque dependency specification exposes only one-way concrete ordering implications.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target implementation, its existing specs, and actual callees, then iterate with the specification checker until it accepts or the available proof budget is exhausted.
+
+The target is a pure reference update with one search loop. Its only semantic dependency is the byte-vector comparator; vector insertion also introduces a capacity abort boundary. I’m now reading those exact dependency contracts so the target’s result and abort behavior match what callers can rely on.
+
+I’ll express the behavior for arbitrary input order, not assume the documentation’s sorted-vector invariant: replace only when the first non-less entry has the same issuer; otherwise insert at that stopping position. The loop invariant records that every scanned issuer is strictly before the incoming one, which covers empty, singleton, and unsorted inputs without inventing a precondition.
+
+- **Result:** Added an opaque, complete contract and loop invariants in [extracted_jwks.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r03-agent-only-acceptance/workspace/sources/framework/extracted_jwks.move:22). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Modeled the comparator’s abstract result, tracked the scanned prefix, and specified exact replacement/insertion results for arbitrary input order.
+- **Decision points:** Avoided an unjustified sorted-input precondition; specified `aborts_if false` after verification showed intrinsic vector insertion remains total at modeled maximum length.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_jwks::upsert_provider_jwks`. I’ll inspect only the target and its relevant dependency contracts, author the opaque complete contract/invariants in scope, and finish with `move_spec_check` as the acceptance gate.
+
+The dependency inspection shows `compare_u8_vector` is total and exposes an exact abstract comparison result, while all vector/option operations used here are total under the loop’s index bounds. I’m encoding the first non-greater position directly, including replacement versus insertion, so the contract remains exact even if the input vector is not sorted.
+
+- **Result:** Added a complete opaque contract and search-loop invariants for [`upsert_provider_jwks`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r04-agent-only-acceptance/workspace/sources/framework/extracted_jwks.move:22>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Specified the exact first non-greater search position, replacement/insertion result, reference mutation, and total abort behavior.
+- **Decision point:** Kept the contract valid for unsorted inputs instead of inventing a sortedness precondition.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_jwks::upsert_provider_jwks`. I’ll restrict edits to that target’s specification/invariants, preserve executable behavior and existing specs, and use the candidate check as the acceptance gate.
+
+The target is a sorted-vector upsert with one search loop: it replaces the first equal issuer and returns the prior entry, or inserts at the first greater issuer/end and returns `none`. I’m running WP now to expose the exact loop-head obligations and implicit vector abort conditions before synthesizing the invariant.
+
+WP confirms the only unresolved abstraction is the search loop. I’m adding an invariant that fixes the vector to its entry state, bounds the cursor, and records that every processed issuer compares strictly below the incoming issuer—the precise fact needed to justify the eventual replacement/insertion index.
+
+WP now has enough loop information, but its emitted postconditions are marked `sathard` and contain mechanically vacuous antecedents (for example, requiring the post-state to equal the pre-state before describing an insertion). Per the supplied workflow, those are unresolved—not acceptable output—so I’m replacing only the generated function clauses with three exact behavioral cases: replace at the first equal issuer, insert at the first smaller issuer, or append when all existing issuers compare smaller.
+
+- **Result:** Added a complete opaque contract and search-loop invariants for `upsert_provider_jwks`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP to identify loop obligations, then replaced unresolved `sathard` output with exact replace/insert/append behavior and `aborts_if false`.
+- **Decision point:** Modeled the first non-greater issuer explicitly, covering empty vectors, replacement, middle insertion, and append.
+
+### hybrid flexible, replicate 2: not_scorable
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_jwks::upsert_provider_jwks`. I’ll inspect only the target and its relevant dependencies, infer the opaque contract (and any needed loop invariants), then use `move_spec_check` as the acceptance gate.
+
+The target is a sorted-vector upsert with one search loop and no global storage. I found no existing target specification to preserve. I’m running WP now to obtain the exact loop-head obligations and callee-derived abort behavior before synthesizing the invariant.
+
+The loop abstraction now records the untouched input vector, index bounds, and that every processed issuer is strictly smaller than the incoming issuer. Those facts are exactly what the body preserves and what insertion/replacement needs at loop exit. I’m rerunning WP so the function contract is derived from this invariant rather than hand-approximated.
+
+WP exposed the right control-flow cases but emitted `sathard` clauses with irrelevant quantified comparator values and contradictory antecedents, so those clauses are unresolved under the skill rules. I’m replacing only that generated function block with an equivalent single witness-based postcondition: the witness is the first non-smaller index, and it precisely distinguishes replacement from insertion, including empty and append cases.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for [extracted_jwks.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_jwks.move:22), covering replacement, insertion, append, return values, mutation, and no-abort behavior. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP to identify loop requirements, replaced unresolved `sathard` output with a precise insertion-index witness, then verified with `move_spec_check`.
+- **Decision points:** The loop invariant records all traversed issuers as smaller; a single existential postcondition cleanly handles empty, matching, middle-insertion, and append cases.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied move-inf workflow exactly. I’ll inspect only the target implementation, its existing specs, and its actual call dependencies, then iterate with WP/prover diagnostics and finish only on `move_spec_check` acceptance or a concrete budget/tool blocker.
+
+The target is a sorted-vector upsert with one search loop and no global state. Its observable contract must capture the exact replacement/insertion result, mutation of `jwks.entries`, all bounds/arithmetic aborts, and a loop invariant preserving the insertion-index meaning. I’m running the permitted WP pass now to expose the precise missing loop facts.
+
+WP succeeded only after the loop invariant, but its emitted function clauses are explicitly `[sathard]` and logically distorted by loop-havoc implications, so they are unresolved under the supplied rules. I’m replacing only those generated clauses with an exact recursion-aligned search abstraction: it mirrors one loop iteration, gives a unique insertion index, and avoids broad existential quantifiers.
+
+- **Result:** Added an opaque, complete contract and loop invariants for `upsert_provider_jwks`, covering replacement, insertion, return value, mutation, and non-aborting behavior. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP to identify loop requirements, then replaced unresolved `[sathard]` output with a recursion-aligned `insertion_index` specification helper.
+- **Decision point:** Modeled the first non-smaller issuer directly, avoiding solver-hostile existential quantifiers while preserving exact behavior.
+
+### hybrid flexible, replicate 4: inconclusive
+
+I’m using the provided `move-inf` workflow because this is a missing-contract inference task. I’ll inspect only the target and its relevant callees, infer the opaque contract (and any needed loop invariants), then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target is a sorted-vector upsert: it searches for the first issuer not less than the input, replaces on equality, and otherwise inserts at that position. There is one search loop, so I’m running WP now to obtain exact abort/result/mutation obligations and its loop-head observations before synthesizing the invariant.
+
+WP confirms the only missing abstraction is the loop. I’m adding an invariant that fixes the reference to its entry state, bounds the index by the original length, and records that every processed issuer compares strictly below the incoming issuer. That is the exact fact needed to characterize the insertion/replacement position after the loop.
+
+WP now reaches the whole function, but its generated postconditions are explicitly marked `sathard` and include avoidable quantified carriers. Per the skill, those are unresolved rather than acceptable output. I’m replacing them with a single recursion-aligned specification helper for the search position, which should express all three observable cases without weakening: append, replace-equal, and insert-before.
+
+- **Result:** Added a complete opaque contract, exact mutation/result behavior, `aborts_if false`, and a search-loop invariant. `move_spec_check` returned `CANDIDATE_ACCEPTED`.
+- **Strategy:** Used WP to identify the missing loop abstraction, then replaced `sathard` output with a recursion-aligned prefix helper in [extracted_jwks.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_jwks.move:36).
+- **Decision points:** Modeled append, replacement, and ordered insertion explicitly; used a recursive prefix predicate to avoid hard quantified proof obligations.
+
+### hybrid guided, replicate 1: disqualified
+
+I’m using the provided `move-inf` workflow exactly: I’ll begin with weakest-precondition inference for `aptos_framework::extracted_jwks::upsert_provider_jwks`, repair only in-scope specifications or loop invariants, and finish with the candidate acceptance check.
+
+WP found one unresolved loop abstraction: until the insertion/replacement point is found, `index` advances while `jwks` remains unchanged. I’m now reading the target and its actual comparator/vector dependencies so the invariant captures the full processed-prefix fact needed at loop exit.
+
+The preserved fact must be stronger than just the index bound: every processed issuer compares strictly below the incoming issuer, while the collection and `found` remain unchanged. I’m adding that quantified prefix invariant beside the loop, marked `[inferred]`, then rerunning WP as required.
+
+WP now succeeds, but its generated contract is marked `sathard` throughout and includes mechanically quantified branch carriers. Per the guided tactic, I’m checking this candidate directly first; any timeout or uncovered category will identify the clauses that need a solver-friendly but equivalent rewrite.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for `upsert_provider_jwks`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Ran WP, repaired its missing prefix-search loop invariant, reran WP, then checked the generated candidate with a 5-second solver budget.
+- **Decision point:** Preserved the collection and `found` state while recording that every processed issuer compares below the incoming issuer; this made WP inference complete.
+
+### hybrid guided, replicate 2: disqualified
+
+I’ll follow the supplied move-inf workflow exactly: WP first on `aptos_framework::extracted_jwks::upsert_provider_jwks`, then repair only in-scope specifications/invariants, and finish with `move_spec_check`. I’ll use `.` as the package path throughout.
+
+WP found one ordinary search loop whose havoc makes the inferred result and abort conditions vacuous. I’m now deriving a preserved prefix-search invariant from the implementation and its actual callees, then I’ll rerun WP for the same function.
+
+The strengthened invariant made WP succeed, but its emitted function contract is mechanically quantified and marked `sathard`; several clauses are also expressed as impossible old/new equalities rather than direct mutation behavior. Per the skill, I’m checking this exact candidate first so the acceptance diagnostic identifies the uncovered category before simplifying it semantically.
+
+- **Result:** Added five inferred search-loop invariants and WP’s complete opaque contract for `upsert_provider_jwks`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Ran focused WP, repaired loop havoc with bounds, frame, `found`, and processed-prefix invariants, reran WP, then performed the required candidate check.
+- **Decision point:** Preserved exact prefix-search behavior using `compare_u8_vector`; this enabled WP to infer normal results, mutations, and abort behavior without adding preconditions or partiality.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_jwks::upsert_provider_jwks` with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with `move_spec_check`.
+
+WP found one concrete blocker: the search loop needs an invariant tying `index` to the already-scanned issuer prefix and preserving `jwks == old(jwks)` while scanning. I’m now reading the target and its actual call dependencies so the invariant captures the exact comparison semantics and exit behavior.
+
+The invariant now records all three loop facts WP’s bounded traces require: the index bound, no mutation during scanning, and “every prior issuer is strictly smaller than the incoming issuer.” I’m rerunning WP on just this function so it can derive the complete return, mutation, and abort contract from that abstraction.
+
+WP completed but emitted `[sathard]` formulas, so those clauses are not acceptable as-is. Their structure does reveal the full three-way behavior—append after an all-greater scan, replace at the first equal issuer, or insert at the first smaller issuer—so I’m simplifying those mechanically generated implications into equivalent, solver-friendly clauses and checking the vector operation contracts for exact abort behavior.
+
+- **Result:** Added complete `[inferred]` loop invariants and an opaque contract covering append, replace, insert, mutation, return value, and total abort behavior in [extracted_jwks.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_jwks.move:22). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran focused WP, derived the missing prefix-search invariant, reran WP, then simplified its `[sathard]` output into equivalent solver-friendly clauses before checking at 5 seconds.
+- **Decision points:** Preserved exact three-way behavior based on the first non-greater issuer; used `aborts_if false` after the invariant proved every borrow and insertion index remains in bounds.
+
+### hybrid guided, replicate 4: disqualified
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_jwks::upsert_provider_jwks` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP found one ordinary search loop and no callee-partiality boundary. Its bounded facts show the needed shape: `index` advances across entries whose issuer sorts before the new issuer, while `jwks` remains unchanged. I’m now reading the target and its exact callees so the invariant captures the prefix and boundary behavior without changing executable code.
+
+I added the loop abstraction beside the loop: index bounds, unchanged collection state, stable length, and the “all processed issuers compare smaller” prefix fact. Each clause is marked `[inferred]` as required; I’m rerunning WP so it can derive the complete function contract from that invariant.
+
+The rerun exposed only name resolution: importing `compare_u8_vector` does not bind the `comparator` module alias in source specs. I’m switching those two spec references to the fully qualified `aptos_std::comparator` names; the invariant itself is unchanged.
+
+WP now succeeds and produced an opaque contract, but marked every generated clause `sathard`; the formulas contain redundant quantified carriers and even impossible abort branches. Per the guided tactic, I’m checking this candidate directly first—the checker will identify whether the blocker is proof complexity, weakening, or coverage before I simplify any clause.
+
+- **Result:** Added inferred loop invariants and an opaque, complete contract for `upsert_provider_jwks` in [extracted_jwks.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-JW-upsert-049-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_jwks.move:36). `move_spec_check` returned `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran scoped WP, derived the search-loop prefix invariant from its bounded loop-head evidence, reran WP, then performed the required candidate check with a 5-second solver budget.
+- **Decision points:** Preserved collection state during traversal and recorded that every processed issuer compares before the incoming issuer; fully qualified comparator spec functions after WP exposed an unbound module alias.
+
+## `validate_enough_stake`
+
+`aptos_framework::extracted_transaction_limits`, task id `TL-enough-044`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, existing specs, and relevant call contracts, then iterate with `move_spec_check` until accepted or the proof budget is genuinely exhausted.
+
+The target is total on normal return but has four distinct abort sources: invalid execution/IO multipliers, missing configuration, unavailable covering tiers, and insufficient stake. Its helper already has an opaque exact “first covering tier” contract, so the target contract can expose exact behavior without changing dependencies.
+
+The first candidate compiled and its abort contract was accepted structurally, but acceptance rejected it because a unit-returning opaque function still needs a non-vacuous normal-result contract. I’m adding the exact success-state guarantees—the complement of the abort cases—rather than a tautological `result == ()`.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r01-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:170), covering successful validation and all abort conditions. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived exact success/abort behavior from the function and its opaque tier-search helper, then verified with `move_spec_check`.
+- **Decision points:** Used first-covering-tier thresholds to match the helper contract; expressed non-vacuous success guarantees because acceptance requires normal-result coverage even for a unit-returning function.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill to infer the target’s full caller-visible contract, including exact abort behavior and an opaque boundary. I’ll inspect only the target and its relevant dependency contracts, then iterate with `move_spec_check` until it accepts or the proof budget is exhausted.
+
+The target has no loop of its own and performs no global writes. Its proof hinges on sequencing five abort sources: multiplier validation, missing configuration, either opaque tier lookup failing, and either returned threshold exceeding the stake. I’m preserving the existing opaque lookup contract and expressing the target directly from that contract.
+
+The first candidate compiled and reached acceptance checks, but was rejected because a unit-returning function still needs an explicit normal-result contract. I’m adding the non-vacuous success facts—the validated multiplier range, configuration existence, both covering tiers, and stake meeting both selected thresholds—rather than a tautological `result == ()`.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r02-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:169). It covers successful validation and all abort paths. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived conditions from the implementation and existing opaque `find_min_stake_required` contract, then checked them with `move_spec_check`.
+- **Decision points:** Added substantive normal-return guarantees after the checker required that category; no loop invariants or `modifies` frame were needed because the target has no loop and only reads global state.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its relevant callees, author marked inferred clauses with `pragma opaque`, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and read-only. Its complete behavior is driven by five abort sources: two range checks, missing configuration, either tier lookup lacking a covering tier, and either stake comparison failing. I’m checking the local specification syntax for projecting the single-variant request/config enums before writing the candidate.
+
+The first candidate compiled and its abort coverage was accepted, but the checker requires an explicit normal-result clause even for a unit-returning function. I’m adding the exact unit result guarantee; this does not weaken or broaden behavior.
+
+- **Result:** Added a complete opaque contract for [`validate_enough_stake`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r03-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:170), covering successful validation and every abort source. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Derived behavior from the implementation and `find_min_stake_required` contract, then verified it with `move_spec_check`.
+- **Decision points:** Explicitly characterized unit-return success through validated ranges, configuration, covering tiers, and sufficient stake; guarded resource and tier accesses to keep all clauses well-defined.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill for this target. I’ll inspect the function and its actual call dependencies, author only inferred specs/invariants in scope, and use `move_spec_check` as the acceptance gate.
+
+The target is read-only and loop-free. Its visible behavior is entirely its abort surface: multiplier validation, missing configuration, unavailable tiers from the opaque search helper, and insufficient stake against each selected threshold. I’m encoding those cases directly, with no `modifies` frame because the function performs no global writes.
+
+The first candidate compiled far enough for the acceptance gate to identify one missing category: a void function still needs a meaningful normal-return guarantee. I’m adding the exact successful-return condition—the complement of the abort surface—rather than a vacuous `ensures true`.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r04-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:170). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Specified exact successful-return and abort conditions for multiplier bounds, configuration existence, tier availability, and both stake thresholds. No loop invariant or `modifies` frame was needed.
+- **Decision points:** Used the existing opaque `find_min_stake_required` contract to model least-covering tiers; added a substantive normal-return condition after the checker identified that missing contract category.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_transaction_limits::validate_enough_stake`. I’ll inspect only the target and its relevant callees, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and calls an already opaque, exact search helper, so the hybrid tactic favors a focused WP pass. The key behaviors to capture are invalid multiplier ranges, missing configuration, unavailable tiers, and insufficient stake; there are no global writes or result values.
+
+WP produced complete abort behavior, but the acceptance gate requires an explicit normal-result clause for this unit-returning function. I’m adding the exact unit result guarantee, leaving the generated abort clauses unchanged as instructed.
+
+The candidate is accepted: all target obligations verify, coverage is complete, and executable bytecode is unchanged. I’m doing a final diff/format sanity check before handing it back.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used focused WP inference, then added the required normal-return guarantee and validated with `move_spec_check`.
+- **Decision points:** Preserved WP’s exact abort clauses; represented successful unit return by guaranteeing the required configuration exists.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its relevant callees, infer the opaque contract and any needed loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is loop-free and calls an already-opaque search helper whose contract precisely identifies the selected tier, so I’m applying the WP inference pass now; this should capture resource absence, unavailable multipliers, and both stake failures without synthesizing a new loop invariant.
+
+The acceptance gate found one concrete omission in the WP output: the function’s normal unit result is not stated. I’ll add the explicit non-vacuous unit postcondition and recheck; the generated abort clauses themselves were not flagged.
+
+A unit-returning Move function has no `result` symbol, so the direct unit equality is invalid. I’m replacing it with the exact normal-return state: valid requested multipliers, existing configuration, available covering tiers, and sufficient stake for both selected thresholds.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155), covering all abort paths and normal completion. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used target-scoped WP inference, then completed the missing normal-return condition with exact success-state guarantees.
+- **Decision points:** No loop invariant was needed because the target is loop-free; the normal-return clause states valid multipliers, configuration/tier availability, and sufficient stake for both thresholds.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied move-inf workflow exactly: I’ll inspect only the target and its relevant callees, infer the opaque contract and any loop invariants, then use the candidate checker as the acceptance gate.
+
+The target is loop-free and depends on one already-opaque helper with an exact first-covering-tier contract, so WP is the best first pass here. The key behaviors to capture are invalid multiplier ranges, missing config, unavailable tiers, and insufficient stake; there are no global writes.
+
+The first candidate check found one genuine gap in the warning-free WP output: because the function returns `()`, WP emitted only abort behavior, while acceptance still requires an explicit normal-return characterization. I’m adding the exact success condition—the complement of the reachable abort cases—not a tautological `ensures true`.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Used WP inference for exact abort behavior, then added the missing non-vacuous normal-return condition identified by the candidate checker. No loop invariant was needed.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied move-inf workflow exactly. I’ll inspect only the target implementation and its actual call dependencies, infer the contract and any loop invariants, then use the candidate checker as the acceptance gate.
+
+The target is loop-free. Its only nontrivial boundary is the already-specified opaque tier lookup, so I’m using the WP inference pass now; this should capture resource absence, both lookup failures, validation failures, and both insufficient-stake branches without changing the helper contract.
+
+WP produced complete abort behavior, but the acceptance gate requires an explicit normal-return guarantee for this unit-returning function. I’ll add the exact successful-path predicate (valid multipliers, both covering tiers present, and stake meeting both first-covering thresholds), then recheck.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155). Candidate accepted; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP inference, then added the required exact normal-return guarantee.
+- **Decision point:** Preserved the existing opaque `find_min_stake_required` contract and expressed both lookup failures and first-covering-tier stake thresholds through it.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill for this target. I’ll follow its required sequence: run WP inline on `aptos_framework::extracted_transaction_limits::validate_enough_stake`, repair only specifications/invariants in scope if needed, then use `move_spec_check` as the acceptance gate.
+
+WP completed without warnings and generated an opaque contract covering multiplier bounds, missing configuration, both tier lookups, and both stake checks. I’m now checking those generated clauses directly with the required acceptance checker.
+
+The checker found one uncovered category: normal return. Since the function returns unit, WP emitted no postcondition, but acceptance still requires an explicit non-vacuous normal-result clause. I’m reading the target body and nearby contract conventions to express the successful-state guarantee without weakening it.
+
+I added a single inferred success condition: normal return guarantees valid requested multipliers, an existing configuration, successful tier resolution, and stake at least both selected thresholds. This is the exact complement of the generated abort paths, so it describes success rather than merely asserting `true`.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation is unchanged.
+- **Strategy:** Ran warning-free inline WP, then added the missing non-vacuous normal-result guarantee identified by `move_spec_check`.
+- **Decision point:** Expressed successful return as valid multipliers, successful tier resolution, and sufficient stake for both thresholds—the complement of the inferred abort paths.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::validate_enough_stake` with package path `.`, then I’ll repair only in-scope specs/invariants and finish with the candidate check.
+
+WP completed without warnings and injected an opaque contract covering multiplier bounds, missing configuration, helper aborts, and both stake-threshold failures. I’m checking those generated clauses directly now.
+
+The candidate check found one uncovered category: normal return. The generated abort behavior verified far enough to reach coverage checking, but this `void` function still needs an explicit successful-result clause; I’m inspecting the local source/spec conventions before adding the narrow result guarantee.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake`, covering all abort paths and successful return conditions. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP first, then added the missing non-vacuous normal-result clause and validated with `move_spec_check`.
+- **Decision point:** Used callee `aborts_of`/`result_of` predicates to precisely describe successful threshold checks.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided `move-inf` skill for this function. I’ll start with WP on `aptos_framework::extracted_transaction_limits::validate_enough_stake` using package path `.`, then address only its diagnostics and finish with the candidate check.
+
+WP completed without warnings and injected an opaque contract with complete branch, resource-existence, callee-abort, and stake-threshold conditions. I’m now checking that generated candidate directly at the requested function scope.
+
+The checker rejected only the missing `normal-result` category; verification itself did not expose a counterexample. I’m inspecting the unit-return implementation and its direct callee contract so the added postcondition describes the successful path without becoming vacuous.
+
+I added an inferred success postcondition that characterizes the entire normal path: both multipliers are in range, configuration and covering tiers exist, and the stake meets both selected thresholds. This also records meaningful successful behavior for the unit-return function. I’m rerunning the candidate check.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation is unchanged.
+- **Strategy:** Ran scoped WP inline, then `move_spec_check` with a 5-second condition budget.
+- **Decision point:** The initial candidate lacked normal-result coverage, so I added an inferred success postcondition covering valid multipliers, configuration/tier availability, and both stake thresholds.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll begin with WP on `aptos_framework::extracted_transaction_limits::validate_enough_stake` at package path `.`, repair only the target specification/invariants, then run the candidate check as the completion gate.
+
+WP completed without warnings and produced an opaque contract covering multiplier bounds, missing configuration, both tier searches, and both stake checks. Per the skill, I’m now checking those generated clauses directly before making any manual changes.
+
+The check rejected only the `normal-result` category: this is a unit-returning validator, and WP emitted abort behavior but no explicit normal-return clause. I’ll inspect the target’s signature/body and add a non-vacuous unit-result guarantee, preserving the warning-free WP abort clauses unchanged.
+
+The unit-return type has no `result` symbol in Move specs, so that first formulation was invalid. I’ll express normal return through the concrete facts established by successful validation—valid multiplier ranges, existing configuration, successful tier lookup, and stake meeting both selected thresholds—which is meaningful and non-vacuous for a validator.
+
+- **Result:** Added a complete opaque contract for `validate_enough_stake`, including successful-validation guarantees and exact abort behavior. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP inline, preserved its warning-free abort clauses, added the missing non-vacuous normal-return guarantees, then validated with `move_spec_check`.
+- **Decision point:** Unit-returning functions have no `result` symbol, so normal behavior is specified through valid ranges, configuration existence, successful tier lookup, and sufficient stake in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-enough-044-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:155).
+
+## `validate_not_zero_sizes`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-nonzero-031`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow to infer the target’s full caller-visible behavior, mark every authored clause `[inferred]`, and accept it only through `move_spec_check`. I’ll keep the package path as `.` and limit edits and proof scope to `aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes`.
+
+The implementation is a read-only linear scan with only `vector::length` and an index guarded by `i < len(sizes)`. Its complete contract is therefore total (`aborts_if false`) and returns true exactly when every element is nonzero; the loop needs an index bound plus the nonzero processed-prefix fact. I’m adding that candidate without changing executable behavior.
+
+- **Result:** Added an opaque, complete specification and loop invariants for `validate_not_zero_sizes` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r01-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:93). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Specified totality and the exact result—true iff every size is nonzero—using index-bound and processed-prefix loop invariants.
+- **Decision point:** No precondition or abort case was needed because the indexed access is guarded by `i < len(sizes)`.
+
+### agent-only, replicate 2: strict success
+
+I’ll use the provided move-inf workflow exactly: inspect only the target implementation and relevant dependencies, author marked inferred clauses with `pragma opaque`, then iterate with the candidate checker until it accepts or the proof budget is exhausted.
+
+The target is a total, read-only scan: its only callees are vector length/borrow, and the loop guard makes each borrow in-bounds. The contract therefore needs exact Boolean equivalence (“all elements are nonzero”), `aborts_if false`, and a prefix invariant that supports both normal completion and the early `false` return.
+
+- **Result:** Added an exact nonzero-element postcondition, totality clause, `pragma opaque`, and prefix loop invariants. `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Derived the contract from the vector scan and verified it directly with `move_spec_check`.
+- **Decision point:** Used exact Boolean equivalence so empty vectors return `true` and any zero element returns `false`.
+
+### agent-only, replicate 3: strict success
+
+I’m applying the supplied move-inf workflow to the single target `aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes`. I’ll inspect only its implementation and relevant call dependencies, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The function is a pure linear scan: its only callees are `vector::length` and indexed borrow. The complete caller-visible behavior is therefore an exact “all elements are nonzero” Boolean result with no aborts; the loop needs a processed-prefix invariant plus an index bound.
+
+- **Result:** Added an opaque, complete contract and loop invariants for [`validate_not_zero_sizes`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:93). `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Specified the result as exactly “every size is nonzero,” declared no aborts, and tracked the validated prefix and index bound through the loop.
+- **Decision points:** Kept the function opaque for callers; no `modifies` frame was needed because the function is pure and only reads the vector.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill to infer only `aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes`. I’ll inspect the target and its actual call dependencies, author a complete opaque contract with `[inferred]` markers, then iterate with `move_spec_check` until accepted or the verification budget is exhausted.
+
+The implementation is a read-only linear scan with only `vector::length` and an in-bounds borrow. Its complete caller-visible behavior is therefore: no abort, no mutation/global frame, and `true` exactly when every element is nonzero. The proof needs a prefix invariant plus the index bound; the empty vector is covered vacuously.
+
+- **Result:** Added an opaque, total contract and prefix loop invariants in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:93). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and contract coverage complete.
+- **Strategy:** Specified that the result is true exactly when every vector element is nonzero, with `aborts_if false`; proved the loop using index-bound and processed-prefix invariants.
+- **Decision points:** Empty vectors are correctly accepted through the vacuous universal condition; no `modifies` clause is needed because the function only reads its argument.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for this single function. I’ll inspect its implementation and actual call dependencies, infer the opaque contract, then iterate with `move_spec_check` as the acceptance gate.
+
+The target is a pure vector scan: it returns `false` at the first zero and otherwise `true`; its only callees are vector length/borrow. The loop needs a prefix invariant proving all already-scanned entries are nonzero, so I’m running WP now to obtain the exact missing-obligation diagnostics before editing.
+
+WP confirms the only gap is loop havoc. I’m adding the generalized facts visible in its bounded heads: `i` remains within the vector, and every index in the processed prefix contains a nonzero size. Both invariants are marked `[inferred]` as required.
+
+WP produced total abort behavior correctly, but its negative-result clause is explicitly `[sathard]` because it quantifies over an unbounded witness. I’m replacing the two mechanical postconditions with the equivalent bounded characterization: the result is exactly whether every vector element is nonzero.
+
+- **Result:** Added complete opaque contract and loop invariants for [validate_not_zero_sizes](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:93>). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP inference, strengthened the loop with index-bound and nonzero-prefix invariants, then expressed the result as exactly “all sizes are nonzero.”
+- **Decision point:** Replaced WP’s `[sathard]` unbounded witness clause with an equivalent bounded universal condition.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow to infer the complete opaque contract for `validate_not_zero_sizes`. I’ll inspect only the target and its relevant callees, then iterate with WP/candidate checking until it is accepted or the proof budget is genuinely exhausted.
+
+The target is a pure scan over `vector<u64>` with one early return and no global state. Its key proof obligation is a search invariant: all entries before `i` are nonzero, while `i` remains within the vector bounds. I’m running WP first so the generated abort/result clauses can be checked directly, then I’ll supply that invariant if requested.
+
+WP now has exact semantics but emitted a solver-hostile quantified “first zero” clause. I’m replacing the two generated postconditions with the equivalent caller-facing contract: the result is true exactly when every element is nonzero. This removes the unresolved `sathard` marker without weakening behavior; `aborts_if false` remains exact.
+
+- **Result:** Added an opaque, complete contract for `validate_not_zero_sizes`, plus loop bounds and processed-prefix invariants in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:93). The result is true iff every size is nonzero, and the function never aborts. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP to identify the loop abstraction, then replaced its solver-hostile first-zero clause with the equivalent exact biconditional.
+- **Decision points:** The loop evidence motivated `i <= len(sizes)` and a nonzero processed-prefix invariant; candidate checking accepted the simplified complete contract at a 5-second solver budget.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation and relevant callees, infer the opaque contract, then let `move_spec_check` decide completion.
+
+The target has only vector length/index operations and one early return. I’m using the hybrid tactic’s WP pass now because it can expose the exact loop abstraction needed while generating the non-loop contract clauses.
+
+WP now has a sound loop invariant, but it emitted a solver-hostile “first zero witness” clause marked `sathard`. I’m replacing the two generated implications with the equivalent exact boolean characterization: the result is true iff every element is nonzero.
+
+- **Result:** Added an opaque, complete contract: returns true iff every size is nonzero and never aborts. Added loop bounds and processed-prefix invariants. `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used focused dependency inspection, WP inference, direct invariant synthesis, and final `move_spec_check`.
+- **Decision point:** Replaced WP’s `sathard` witness clause with an equivalent solver-friendly biconditional.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll inspect only the target and its relevant callees, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target is a read-only linear scan with one early return. Its caller-visible behavior should be total and return true exactly when every vector element is nonzero; the loop therefore needs an index bound plus a processed-prefix invariant. I’m adding only those invariants first, then letting WP derive the function clauses.
+
+WP confirmed totality but emitted a `sathard` early-return clause with an unnecessary unbounded quantifier. I’m replacing WP’s two equivalent result clauses with the direct boolean equivalence; this preserves the inferred behavior while removing the unresolved solver-hostile form.
+
+- **Result:** Added an opaque, total contract and loop invariants for `validate_not_zero_sizes` in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:93). It returns true exactly when every size is nonzero. `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+
+- **Strategy:** Added processed-prefix loop invariants, ran WP inference, simplified its `sathard` output to an equivalent direct result condition, then verified with `move_spec_check`.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill exactly for `aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes`. I’ll begin with function-scoped WP at package path `.`, then repair only specification/invariant issues in scope and finish with the candidate check.
+
+WP found one unresolved loop abstraction at the traversal over `sizes`; its bounded facts show the invariant needs both the index bound and “all processed entries are nonzero.” I’m inspecting the function and its executable dependencies now, then I’ll add that invariant and rerun WP as required.
+
+The repaired WP run is complete and produced an opaque, total contract. Its positive result is direct, but the negative result is encoded as a solver-hard nested quantifier (`sathard`), so I’m checking it as generated first; if rejected or timed out, I’ll replace it with an equivalent solver-friendly statement without weakening behavior.
+
+- **Result:** Added inferred loop invariants, a complete opaque result contract, and `aborts_if false` for `validate_not_zero_sizes`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used function-scoped WP, repaired the loop invariant, reran WP, then directly checked the generated candidate.
+- **Decision points:** Captured both `i <= len(sizes)` and nonzero processed elements; retained WP’s exact positive/negative result characterization.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied move-inf workflow exactly: first WP on `aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes` with package path `.`, then I’ll repair only in-scope specifications/invariants and finish with the candidate check.
+
+WP found one loop and no usable abstraction. Its bounded heads show the expected traversal shape (`i` advances over a prefix whose entries are nonzero), so I’m inspecting the function and its actual callees before adding the prefix invariant and rerunning WP.
+
+With the prefix invariant, WP completed and generated total abort behavior plus an opaque result contract. One generated postcondition is marked `sathard`; I’m replacing the two mechanical implications with the equivalent direct characterization: the result is true exactly when every size is nonzero.
+
+- **Result:** Added an opaque, complete contract and loop invariants for `validate_not_zero_sizes`; `CANDIDATE_ACCEPTED` with all obligations verified and implementation unchanged.
+- **Strategy:** WP inference, prefix nonzero invariant, then direct candidate checking.
+- **Decision point:** Replaced WP’s `sathard` implications with the equivalent result characterization: true iff every size is nonzero.
+
+### hybrid guided, replicate 3: strict success
+
+I’ll follow the provided move-inf workflow exactly: run WP first for the single function with package path `.`, repair only in-scope specifications/invariants, then use the candidate check as the completion gate. I’ll first locate the available Move inference tools without performing unrelated setup.
+
+WP found one unresolved loop abstraction at the traversal over `sizes`; its bounded facts indicate the invariant must capture the index bound and that every processed size is nonzero. I’m reading the function and its actual call dependencies now, then I’ll add that invariant beside the loop and rerun WP as required.
+
+The strengthened invariant made WP complete, but its generated postcondition includes a mechanically difficult `[inferred = sathard]` quantified form and a redundant empty-prefix conjunct. I’m checking the generated candidate directly now; if rejected or timed out, I’ll replace those clauses with an equivalent solver-friendly characterization, without weakening behavior.
+
+- **Result:** Added inferred loop invariants for index bounds and the processed nonzero prefix. WP generated a complete opaque contract: exact Boolean behavior and no aborts. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Ran scoped WP, repaired the reported loop abstraction, reran WP, then used the candidate check as the acceptance gate.
+- **Decision point:** Used `forall j in 0..i: sizes[j] != 0`, matching the loop’s early-return behavior and proving both result cases.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: I’ll begin with WP on `aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes`, write the candidate inline, then repair only in-scope specifications/invariants and finish with `move_spec_check`.
+
+WP found the expected search-loop gap: after each completed iteration, all previously visited sizes are nonzero. I’m now checking the implementation and its actual callees before adding that prefix invariant and rerunning WP.
+
+WP now completed, but its negative-result clause is tagged `sathard` and carries a redundant empty-prefix quantifier. I’m replacing the two generated postconditions with the equivalent exact characterization: the result is true iff every vector element is nonzero.
+
+- **Result:** Added prefix loop invariants and an exact postcondition—`result` iff every size is nonzero—in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-nonzero-031-r04-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:95). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP, repaired its missing loop abstraction, simplified the generated `sathard` clauses into a solver-friendly equivalence, then checked the candidate at a 5-second budget.
+- **Decision points:** Used `i <= len(sizes)` plus nonzero processed-prefix invariants; retained exact total behavior with `aborts_if false` and `pragma opaque`.
+
+## `validate_price_ordering`
+
+`aptos_experimental::extracted_bulk_order_utils`, task id `TR-order-010`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` skill exactly for this function. I’ll inspect only the target implementation, its existing specs, and relevant call dependencies, then iterate with the specification checker until it accepts or the proof budget is genuinely exhausted.
+
+The function has only `vector::length` and indexed borrows as dependencies, with no opaque or partial callees. Its observable behavior is a total Boolean predicate: empty and singleton vectors are valid; otherwise every adjacent pair must be strictly decreasing or strictly increasing according to the flag. I’m encoding that directly and using a processed-prefix invariant for the loop.
+
+- **Result:** Added an opaque, complete contract and processed-prefix loop invariants for `validate_price_ordering`. Empty/singleton and strict ascending/descending behavior are covered; function is proven non-aborting. `CANDIDATE_ACCEPTED`.
+- **Strategy:** Modeled adjacent-pair ordering with a bounded quantifier and preserved it incrementally through the loop.
+- **Decision point:** Used `aborts_if false` because length/index safety follows from the empty check and loop bounds.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly for `aptos_experimental::extracted_bulk_order_utils::validate_price_ordering`. I’ll inspect only the target implementation, its existing specs, and relevant callees, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The dependency query shows this function only reads vector length and indexed elements; it has no global effects and no opaque callees. I’m now reading the target’s loop and nearby specification placement so the contract and invariant match the implementation precisely, including empty and singleton vectors.
+
+The complete behavior is a total Boolean predicate: `true` exactly when every adjacent pair is strictly descending (or strictly ascending), with empty and singleton vectors accepted. The loop needs a processed-prefix invariant plus nonempty/index bounds; no `modifies` frame is appropriate because the input is immutable and there are no global writes.
+
+- **Result:** Added an opaque, total contract and processed-prefix loop invariants in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r02-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:104) and its [spec file](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r02-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.spec.move:1). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Expressed the result as strict ordering of every adjacent pair, with bounds and processed-prefix invariants proving safe indexing and loop completion.
+- **Decision points:** Empty and singleton vectors are explicitly accepted by the quantified contract; no `modifies` clause was added because the function only reads its vector.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for the requested function. I’ll inspect only its implementation, current specs, and concrete call dependencies, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The function is total: the empty-vector branch prevents subtraction underflow, and the loop guard makes both indexed reads and the increment safe. Its complete observable result is strict adjacent ordering—descending when the flag is true, ascending otherwise—so I’m encoding that equivalence and a processed-prefix invariant.
+
+- **Result:** Added an opaque, total contract and processed-prefix loop invariants for strict ascending/descending ordering in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r03-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:111). Candidate accepted; all target obligations verified.
+- **Strategy:** Expressed the result as an exact adjacent-element ordering equivalence and proved it with a quantified processed-prefix invariant.
+- **Decision points:** Specified `aborts_if false` because the empty branch prevents underflow and the loop guard guarantees safe indexing and increment.
+
+### agent-only, replicate 4: strict success
+
+I’m using the provided move-inf workflow exactly for this target. I’ll inspect only the function, its existing specs, and concrete dependencies, then iterate with the candidate checker until it accepts or the proof budget is genuinely exhausted.
+
+The implementation is a pure adjacent-pair scan: empty and singleton vectors return `true`; longer vectors return whether every adjacent pair is strictly decreasing or strictly increasing. The key proof obligation is preserving the “all pairs before index `i` are valid” loop fact while making early `false` returns characterize the full result.
+
+The first candidate exposed only a placement syntax issue: this toolchain attaches ordinary-loop invariants after the loop body. I’m moving the same inferred invariants to that position; the contract itself has not been weakened or changed.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`validate_price_ordering`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r04-agent-only-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:104>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled strict ascending/descending adjacent pairs with specification helpers and tracked the validated prefix through the loop.
+- **Decision point:** Included `aborts_if false`; bounds safety and empty/singleton cases were proved.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow as the governing skill. I’ll inspect only the target implementation and its actual call dependencies, then iterate through inference, focused proof diagnostics, and the candidate check with `package_path: "."`.
+
+The target is self-contained apart from `vector::length` and indexed borrows. Its key obligation is a search-style loop: the invariant must capture both the index bound and that every already-checked adjacent pair has the requested strict ordering. I’m running WP now to obtain its exact clause shape and loop-head diagnostics.
+
+WP successfully characterized the loop, but its raw postconditions contain two `[inferred = sathard]` universal implications, which the skill treats as unresolved. I’m replacing only those generated function clauses with the equivalent caller-facing contract: the result is true exactly when every adjacent pair has the required strict order, plus total non-aborting behavior.
+
+- **Result:** Added an opaque, total contract and quantified loop invariants for [`validate_price_ordering`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r01-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:104>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP to expose loop requirements, then expressed the exact strict adjacent-pair ordering with a prefix invariant and equivalent result postcondition.
+- **Decision points:** Replaced WP’s unresolved `sathard` clauses with a solver-friendly equivalence; specified `aborts_if false` because loop bounds make all indexing and arithmetic safe.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped to `aptos_experimental::extracted_bulk_order_utils::validate_price_ordering`. I’ll inspect only the implementation and its relevant callees, then infer, prove, and finish with the candidate check using `.` as the package path.
+
+The target is a pure vector scan with no nontrivial callees beyond `vector::length` and `vector::borrow`. Its key proof obligation is the early-return loop: the invariant must summarize that every adjacent pair already visited has the requested strict order. I’m running WP now to obtain the exact generated abort/result shape and loop-head diagnostics.
+
+The bounded loop facts generalize cleanly to two invariants: `i` remains a valid left index, and every processed adjacent pair has the strict direction selected by `is_descending`. Both are now marked `[inferred]`; I’m rerunning WP so the function contract is generated from that abstraction rather than guessed.
+
+WP now has complete path coverage, but it emitted three `[inferred = sathard]` postconditions that encode the loop’s possible stopping index. Per the skill, those are unresolved diagnostics. I’m replacing only that diagnosed result encoding with the equivalent solver-friendly statement: the return value is true exactly when every adjacent pair is strictly ordered; the total `aborts_if false` and opaque boundary remain unchanged.
+
+- **Result:** Added complete opaque behavior, total abort coverage, and loop invariants for [`validate_price_ordering`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r02-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:104). `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP with a quantified processed-prefix invariant, then replaced its `sathard` result clauses with an equivalent adjacent-pair ordering predicate.
+- **Decision point:** Expressing pairs over indices `1..len(prices)` handles empty and singleton vectors without unsafe subtraction or indexing.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for this function. I’ll inspect the implementation and its actual callees, infer only the target contract/invariants, and use `move_spec_check` as the acceptance gate.
+
+The target is self-contained apart from vector length/borrow, and its empty-vector guard prevents the subtraction underflow before the loop. I’m running WP now to obtain the exact missing-invariant diagnostics and generated contract shape.
+
+WP succeeded after the prefix invariant, but its raw postconditions are marked `sathard`, so they are not acceptable as final output. I’m replacing only those generated clauses with the equivalent caller-facing statement: the result is exactly whether every adjacent pair is strictly ordered in the selected direction.
+
+- **Result:** Added complete opaque result/abort specifications and loop invariants for [`validate_price_ordering`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r03-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:104). `CANDIDATE_ACCEPTED`; all obligations verified.
+- **Strategy:** Used WP to identify the required prefix-ordering invariants, then replaced its `sathard` output with an exact adjacent-pair characterization.
+- **Decision points:** Preserved empty/single-element success through vacuous quantification; specified both ascending and descending behavior without adding preconditions.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly, scoped to `aptos_experimental::extracted_bulk_order_utils::validate_price_ordering`. I’ll inspect only the target and its relevant call/spec context, then iterate with WP, focused proof diagnostics, and the candidate check.
+
+The target is a pure adjacent-pair traversal; its only callees are `vector::length` and indexed borrow. The key obligation is a prefix-order loop invariant strong enough to characterize both strict descending and strict ascending results, including empty and singleton vectors. I’m running WP now to obtain the exact generated obligations and loop-head diagnostics.
+
+WP succeeded once the prefix invariant was present, but its generated postcondition expanded the early-return paths into three nested quantified clauses marked `sathard`. Per the skill, those are unresolved rather than acceptable. I’m replacing them with the equivalent caller-facing characterization: the result is true exactly when every adjacent pair is strictly ordered in the requested direction.
+
+- **Result:** Added an opaque, complete contract and prefix-order loop invariants in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r04-hybrid-flexible-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:104). `CANDIDATE_ACCEPTED`; all obligations verified, coverage is complete, and implementation bytecode is unchanged.
+- **Strategy:** Used WP to identify loop havoc, synthesized prefix invariants, then replaced `sathard` generated clauses with an exact adjacent-pair ordering equivalence. Empty and singleton vectors are handled vacuously; the function never aborts.
+- **Decision points:** Retained strict `>`/`<` semantics based on the implementation; used one quantified result equivalence to avoid WP’s nested early-return quantifiers.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_bulk_order_utils::validate_price_ordering`, then I’ll repair only in-scope invariants/specifications and finish with the candidate check.
+
+WP found one loop whose carried index and processed-prefix ordering are unconstrained. I’m now reading that function and its actual call dependencies so the invariant captures the strict ascending/descending prefix without altering executable behavior.
+
+The strengthened loop abstraction made WP exact, but its emitted postcondition is solver-hostile (`sathard`). I’m replacing that mechanical path encoding with the equivalent caller-visible statement: the result is true exactly when every adjacent pair has the requested strict ordering.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for `validate_price_ordering`. `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Used WP, strengthened the loop with index/prefix-order invariants, then replaced `sathard` output with an equivalent adjacent-pair characterization.
+- **Decision point:** Expressing `result` as an exact biconditional eliminated solver-hostile path clauses while preserving empty and single-element behavior.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill for this function. I’ll start with scoped WP inference writing inline specifications, then handle only its diagnostics and finish with the candidate check as required.
+
+WP found one concrete blocker: the loop loses the processed-prefix ordering fact. I’m inspecting the target and its nearby specification convention now, then I’ll add a prefix invariant beside that loop and rerun WP for the same function.
+
+The second WP pass succeeded, but its postcondition was emitted as three `[sathard]` clauses—so it is not yet acceptable. I’m replacing that mechanical path encoding with the equivalent exact characterization: the result is true iff every adjacent pair has the requested strict order; the function never aborts.
+
+- **Result:** Added inferred prefix-order loop invariants and an exact result postcondition for both ascending and descending order, plus `aborts_if false` and `pragma opaque`. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Scoped WP inference, repaired its loop-invariant diagnostic, simplified `[sathard]` output into an equivalent quantified contract, then ran `move_spec_check`.
+- **Decision point:** Used adjacent-pair strict ordering as the complete result characterization, covering empty and single-element vectors naturally.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow exactly: I’ll begin with WP on `aptos_experimental::extracted_bulk_order_utils::validate_price_ordering`, then repair only its inferred contract/invariants and finish with the candidate check.
+
+WP found one unresolved loop abstraction at line 111. Its bounded states show a strict-order prefix invariant: `i` tracks the processed adjacent pairs, with ascending or descending comparisons depending on the flag. I’m reading the target and its existing specs now so I can encode that invariant without altering executable behavior.
+
+The strengthened invariant let WP complete. It generated exact behavior, but two clauses are marked `sathard` because they encode every possible first failing index with nested quantifiers. I’m replacing that mechanically expanded form with the equivalent solver-friendly contract: the result is true exactly when every adjacent pair has the requested strict ordering (vectors of length 0 or 1 are valid), and the function never aborts.
+
+- **Result:** Added inferred prefix loop invariants and a complete opaque result/abort contract in [extracted_bulk_order_utils.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r03-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:111). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP, repaired its missing loop invariant, reran WP, simplified its `sathard` clauses into an equivalent all-adjacent-pairs condition, then ran `move_spec_check`.
+- **Decision point:** Used a prefix-order invariant to cover early failure and normal completion for both ascending and descending modes.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_experimental::extracted_bulk_order_utils::validate_price_ordering` with package path `.`, then I’ll repair only in-scope invariants/contracts and finish with `move_spec_check`.
+
+WP found one unresolved loop abstraction at line 111. Its bounded facts show a strict-order scan with `i` increasing from zero, so I’m now reading the target and its existing nearby specifications to derive the preserved prefix-order invariant before rerunning WP.
+
+The repaired invariant made WP succeed, but WP emitted three `[inferred = sathard]` path formulas. Per the skill, those are unresolved rather than acceptable output. I’m replacing only those generated clauses with one equivalent bounded characterization: the result is true exactly when every adjacent pair has the requested strict ordering. This also handles empty and singleton vectors without special cases.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for [`validate_price_ordering`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TR-order-010-r04-hybrid-guided-acceptance/workspace/sources/trading/extracted_bulk_order_utils.move:122). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran WP, generalized its loop-head evidence into strict prefix-order invariants, then replaced `sathard` output with an equivalent bounded adjacent-pair characterization.
+- **Decision point:** Used one quantified biconditional to cover ascending/descending behavior plus empty and singleton vectors; `move_spec_check` accepted it at the initial 5-second budget.
+
+## `validate_scheme`
+
+`aptos_framework::extracted_ethereum_derivable_account`, task id `EA-scheme-041`
+
+### agent-only, replicate 1: strict success
+
+I’m applying the provided move-inf workflow to `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll first inspect only the target implementation, its existing spec, and its executable dependency usage, then iterate with the required candidate checker.
+
+The target is a pure validator: it has no global writes and no mutable-reference result. Its observable behavior is exact success versus `EINVALID_SCHEME` abort, including empty input, the 16-byte boundary, first-character alphabetic restriction, and the broader character class for the remaining bytes. The loop therefore needs both index bounds and a processed-prefix validity fact.
+
+I’ve written one coherent candidate with an exact abort predicate and an opaque boundary. The loop invariant records the fixed length, safe index range, maximum-length arithmetic bound, and validity of the processed suffix; I’m now submitting that candidate to the acceptance checker as required by the skill.
+
+The first rejection is purely name resolution: the local variable `len` shadows the specification builtin inside the loop block, and this toolchain has no `length(...)` spec alias there. Since neither the immutable input nor the local length is loop-modified, their equality is preserved automatically; I’m removing only that redundant invariant and retaining the substantive bounds and prefix abstraction.
+
+The checker requires an explicit normal-result category even for this unit-returning validator. I’ve expressed successful return precisely as the complement of the abort cases: valid length, alphabetic first byte, and every remaining byte in the allowed character class. This also makes the opaque contract useful to callers without exposing the body.
+
+- **Result:** Added an opaque, complete contract and loop invariants for `validate_scheme` in [extracted_ethereum_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r01-agent-only-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Specified exact invalid-length/character abort behavior, successful-return character constraints, and processed-prefix loop validity.
+- **Decision points:** Used explicit success conditions because the checker required `normal-result`; removed a redundant length-equality invariant after local-name shadowing prevented the spec builtin from resolving.
+
+### agent-only, replicate 2: strict success
+
+I’m using the supplied `move-inf` skill for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect only the target and its dependency contracts, edit specifications without changing executable behavior, and use `move_spec_check` as the acceptance gate.
+
+The target has one meaningful branch of behavior: it returns normally exactly for a nonempty scheme of at most 16 bytes whose first byte is alphabetic and whose remaining bytes are alphanumeric or `+`, `-`, `.`. I’m encoding that exact predicate, including abort code `6`, and a processed-prefix loop invariant.
+
+The first candidate hit a name-resolution issue: the executable local `len` shadows the specification builtin `len(...)` inside the loop block. I’m making a behavior-neutral local rename to `scheme_len`; this preserves bytecode semantics while allowing the invariant to refer unambiguously to vector length.
+
+The specification now compiles and the implementation remains unchanged. Acceptance reports one missing category: an opaque `void` function still needs a meaningful normal-return guarantee, so I’m adding the exact validity predicate as its postcondition (not a tautological `ensures true`).
+
+- **Result:** Added an opaque, complete contract and loop invariants for `validate_scheme` in [extracted_ethereum_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r02-agent-only-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Specified exact normal-return validity and all abort cases with code `EINVALID_SCHEME`, supported by processed-prefix loop invariants.
+- **Decision point:** Added a meaningful normal-result guarantee after acceptance identified that category as missing.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect only the target, its implementation, and relevant dependency contracts, then iterate with the candidate checker until accepted or the proof budget is genuinely exhausted.
+
+The target is a pure validator: it accepts a nonempty scheme of at most 16 bytes, requires the first byte to be ASCII alphabetic, and restricts later bytes to ASCII alphanumeric or `+`, `-`, `.`. Its only observable behavior is exact success versus abort with code `6`; the loop needs bounds plus a processed-prefix validity invariant.
+
+The first candidate compiled after resolving a local-name shadowing issue. The checker now reports one substantive omission: opaque functions require an explicit normal-return guarantee, so I’m adding the successful-validation predicate (the exact complement of the abort condition), supported by the prefix invariant.
+
+- **Result:** Added an opaque, complete contract for `validate_scheme`, including exact success/abort behavior and loop invariants. `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Modeled valid schemes via length, first-character, and processed-prefix character constraints.
+- **Decision point:** Added an explicit normal-return guarantee after the checker identified the missing contract category.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect only the target and its relevant dependencies, edit specifications without changing executable behavior, and use `move_spec_check` as the acceptance gate.
+
+The implementation has three observable abort classes: invalid length, a non-letter first byte, or a later byte outside the allowed alphanumeric/`+-.` set. The loop proof also needs a bounded index and a processed-prefix validity invariant; I’m checking the repository’s established quantifier syntax before writing the candidate.
+
+The first candidate now states exact successful-input conditions and all three abort branches, and makes `validate_scheme` opaque. Its loop invariant tracks the unchanged length, index bounds, first-byte validity, and validity of every processed suffix byte. I’m submitting that coherent candidate to the acceptance check now.
+
+- **Result:** Added a complete opaque contract and loop invariants for [`validate_scheme`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r04-agent-only-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled exact length, first-character, and remaining-character behavior; tracked processed-prefix validity through the loop.
+- **Decision points:** Kept all three abort classes explicit and guarded indexing by valid length conditions.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly, targeting only `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect the implementation and its actual call dependencies, then infer and candidate-check the opaque contract; if loops appear, I’ll synthesize their invariants before rerunning inference.
+
+The function is a bounded validator with one loop. Its only semantic helper, `is_alpha`, already has an exact opaque contract; vector length/borrow contribute the expected bounds behavior. I’m running WP now to obtain the precise abort condition and the loop-head facts needed for a sound prefix invariant.
+
+WP confirms the loop is the only obstacle. I’m adding an inferred invariant that records the fixed length, index bounds, validated first byte, and validity of every processed suffix byte. This is the exact abstraction needed both to prove safe indexing/increment and to derive the validator’s normal/abort behavior.
+
+With the invariant in place, WP produced the exact boundary clauses but expressed the loop abort as two `sathard` first-failure formulas. Those formulas are equivalent to a much simpler condition: some byte at an index from 1 through `len - 1` is outside the allowed character class. I’m replacing only those unresolved generated clauses with that equivalent existential, preserving total abort coverage.
+
+The first candidate check rejected only one category: an opaque `unit` function still needs an explicit normal-return guarantee. I’m adding the non-vacuous success characterization—valid length, alphabetic first byte, and every remaining byte in the permitted class—then checking the full candidate again.
+
+- **Result:** Added complete opaque success/abort specifications and loop invariants in [extracted_ethereum_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:33). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP inference after synthesizing a processed-prefix invariant, then validated with `move_spec_check`.
+- **Decision points:** Replaced WP’s `sathard` first-failure formulas with an equivalent invalid-character existential; added explicit normal-return guarantees required for opaque coverage.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied move-inf workflow exactly for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect only the target and relevant dependencies, then infer, prove, and finish with the candidate check.
+
+The target has one loop and only pure dependencies (`vector::length`, indexed borrow, and the existing opaque `is_alpha` contract). I’m running WP now to obtain the exact abort/result obligations and the loop-head facts needed for an invariant.
+
+WP succeeded once the loop invariant captured the validated prefix. Its only unresolved output is two `sathard` path-split clauses for the same fact; I’m replacing those diagnostic clauses with the equivalent solver-friendly condition: some non-initial scheme byte is outside the permitted character class.
+
+The candidate check found one missing category: normal-return behavior. For this unit-returning validator, the meaningful postcondition is that successful return implies the length, first-byte, and remaining-byte validity constraints all hold; I’m adding those inferred guarantees rather than a tautological unit-result clause.
+
+- **Result:** Added complete inferred abort/postconditions, `pragma opaque`, and loop invariants in [extracted_ethereum_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP with a validated-prefix loop invariant, then replaced its `sathard` path splits with an equivalent quantified invalid-character condition.
+- **Decision points:** Added meaningful successful-return guarantees for length and character validity after the candidate check identified missing normal-result coverage.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect only the target and its relevant callees, infer the opaque contract, then use `move_spec_check` as the acceptance gate.
+
+The target is a bounded character-validation loop with only `is_alpha`, vector length, and indexing as dependencies. The existing `is_alpha` contract is already opaque and exact; I’m applying WP now to expose the precise abort condition and the loop facts it still needs.
+
+WP confirms the loop is the only blocker. I’m adding an invariant that keeps the index within the original vector length and records that every already-visited noninitial byte belongs to the allowed character class; this is the fact needed both for preservation and for the final all-bytes characterization.
+
+The first invariant draft hit a name-shadowing issue: local `len` hides the specification `len(...)` operator. I’m switching that equality to the vector method form, without changing the invariant’s meaning.
+
+WP produced a correct but solver-hostile pair of existential abort clauses (`sathard`) by splitting “not a digit” into two cases. I’m replacing only those generated clauses with the equivalent single condition: some byte after position 0 is outside the allowed alpha/digit/`+.-` class.
+
+The acceptance gate found one missing category: normal-return behavior. For this unit-returning validator, that behavior is the validated predicate itself, so I’m adding postconditions that successful return implies a nonempty bounded scheme, an alphabetic first byte, and allowed remaining bytes.
+
+- **Result:** Added complete opaque abort/normal-result specifications and loop invariants for `validate_scheme` in [extracted_ethereum_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP inference, synthesized a processed-prefix loop invariant, simplified solver-hostile generated abort clauses, then ran `move_spec_check`.
+- **Decision points:** Replaced two `sathard` clauses with one equivalent invalid-character existential; added successful-validation postconditions to complete normal-result coverage.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll inspect only the target and its actual dependencies, infer the opaque contract, and use `move_spec_check` as the acceptance gate.
+
+The target validates a nonempty, at-most-16-byte scheme: the first byte must be ASCII alphabetic, and later bytes may additionally be digits or `+`, `-`, `.`. Because it has a traversal loop, I’m using WP first to expose the exact abort condition and the loop facts it needs.
+
+WP now has enough loop information and produced the complete behavior, but split an invalid later byte into two solver-hostile existential clauses. I’m consolidating those equivalent cases into one bounded “some later byte is invalid” abort condition before checking the candidate.
+
+The acceptance gate found one missing category: a normal-return guarantee. Since the function returns unit and cannot mutate through `&vector<u8>`, the useful caller-visible guarantee is that successful return implies the full scheme grammar and length bounds; I’m adding that explicitly rather than a trivial unit-result clause.
+
+- **Result:** Added a complete opaque contract and loop invariants for `validate_scheme`. `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference, synthesized a quantified prefix invariant, and simplified solver-hostile abort clauses into one exact invalid-character condition.
+- **Decision points:** Added explicit successful-return grammar guarantees; preserved exact abort behavior for empty, oversized, invalid-first-byte, and invalid-later-byte inputs.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_ethereum_derivable_account::validate_scheme` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP found one loop and no usable loop-carried invariant evidence, so the generated contract is intentionally blocked as `vacuous`. I’m now reading the target body and its actual call dependencies to derive an entry-preserved invariant before rerunning WP.
+
+The first invariant attempt exposed a spec-language name shadow: the local `len` hides the built-in `len(...)`. That equality is unnecessary because neither the input nor the saved length is loop-modified, so I’m removing only that redundant clause and keeping the bounds and processed-prefix facts.
+
+The rerun produced a complete WP contract, but its loop-abort path was split into two `[sathard]` first-counterexample formulas. I’m replacing only those two equivalent branches with the direct bounded statement: after a valid first letter, some later byte is outside the allowed letter/digit/`+-.` class. This preserves the inferred behavior while removing the unresolved solver marker.
+
+The candidate check verified enough to identify a coverage issue rather than a proof failure: WP emitted only abort behavior for this `()`-returning function, but acceptance requires an explicit normal-result guarantee. I’m adding the exact successful-return characterization—the input length and every byte satisfy the validated scheme grammar—then rechecking.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for [`validate_scheme`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran WP, repaired loop abstraction, simplified `[sathard]` abort paths into a bounded invalid-character condition, then ran `move_spec_check`.
+- **Decision points:** Added a processed-prefix invariant for exact loop behavior; added an explicit successful-return characterization after acceptance reported missing `normal-result` coverage.
+
+### hybrid guided, replicate 2: strict success
+
+I’ll follow the supplied move-inf workflow exactly: run WP first for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`, address only its diagnostics, then use the candidate checker as the completion gate.
+
+WP found one concrete blocker: the byte-validation loop has no invariant, so abort behavior becomes vacuous after loop havoc. I’m now reading that function and its actual callees to derive an inductive invariant, then I’ll remove any stale generated clauses and rerun WP for this function.
+
+The invariant is inductive and WP now completes the contract, including empty input, oversize input, invalid first character, and invalid later characters. WP marked the two quantified loop-abort clauses `sathard`; I’m running the required candidate check directly at the initial 5-second budget to see whether they prove or need a solver-friendly equivalent.
+
+The counterexamples confirm the first invariant was too weak: loop havoc allowed WP’s existential “bad character” to coexist with a normal loop exit. I’m strengthening the loop abstraction with the exact processed-prefix property—every index in `[1, i)` has passed the character check—then rerunning WP as required.
+
+The strengthened invariant discharged the verification counterexamples. The acceptance gate now reports only one coverage gap: `normal-result` is absent. Since the function returns unit and mutates neither its argument nor global state, I’m adding the exact unit result guarantee (not a vacuous `true`) and rechecking.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for `validate_scheme` in [extracted_ethereum_derivable_account.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:33). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP, strengthened the loop with index bounds and processed-prefix validity, then simplified `sathard` abort clauses into an equivalent bounded condition.
+- **Decision points:** Added explicit normal-return guarantees after the checker identified missing `normal-result` coverage; retained exact empty, oversized, first-character, and later-character abort behavior.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` skill because this is specification inference. I’ll start with WP on exactly `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`, then repair only that scope and finish with the candidate check.
+
+WP found one loop whose state is entirely through the borrowed vector, so it could not synthesize an invariant. I’m inspecting the function’s exact calls and nearby source now to derive a preserved prefix property before rerunning WP.
+
+The first invariant attempt exposed a name-resolution issue: the local `len` shadows the specification’s vector-length operator. I’m correcting only that expression and keeping the loop bounds/frame facts unchanged.
+
+WP now produced the full opaque contract, but its loop-abort formula was marked `sathard` and split into two redundant existential cases. I’m replacing those two clauses with one equivalent bounded “invalid trailing character” condition, which preserves exact behavior while reducing solver work.
+
+The candidate check found the missing proof fact: loop havoc allowed `i == len` even when an earlier trailing character was invalid. The contract is correct, but the invariant must record that every already-visited trailing character is valid. I’m localizing that obligation once with the focused prover, then I’ll add the prefix invariant.
+
+The strengthened prefix invariant discharged the verification failure. The acceptance checker now reports only one missing category: the normal result of this unit-returning function. I’m adding the explicit exact result `result == ()` and rechecking.
+
+Move does not bind `result` for a zero-return function, so that form is invalid. I’m expressing the exact normal-state behavior instead: the borrowed scheme is unchanged on return.
+
+The prover confirms immutable-reference values are state-independent, so an `old` frame is not legal here. I’m using the function’s real normal-return guarantee instead: valid length, alphabetic first byte, and valid characters throughout the checked suffix.
+
+- **Result:** Added complete opaque specifications and loop invariants for [`validate_scheme`](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used WP inference, focused verification, and the final candidate check.
+- **Decision points:** Replaced WP’s `sathard` split conditions with an equivalent bounded invalid-character condition; added a processed-prefix invariant after the prover exposed missing loop-state knowledge.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` skill for `aptos_framework::extracted_ethereum_derivable_account::validate_scheme`. I’ll follow its required WP-first workflow, repair only specifications or necessary loop invariants in scope, then use the candidate check as the acceptance gate.
+
+WP found one unresolved loop abstraction: the loop carries no explicit accumulator, but its processed-prefix validation still needs an invariant. I’m inspecting the function and its actual call dependencies now so the invariant captures the exact prefix property and abort behavior.
+
+The strengthened invariant made WP complete, but its emitted tail-abort formula is marked `sathard`: it encodes “first invalid character” with nested existential/universal conditions. I’m replacing those two mechanically split clauses with the equivalent, solver-friendlier condition “some character after index 0 is invalid,” while preserving all behavior and WP’s other clauses.
+
+The candidate check confirmed the abort coverage but rejected the contract because WP emitted no normal-result clause for this unit-returning validator. I’m adding the substantive success guarantee: on normal return, the length is bounded, the first byte is alphabetic, and every remaining byte is in the allowed scheme character set.
+
+- **Result:** Added an inferred prefix invariant and complete opaque contract for [`validate_scheme`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-EA-scheme-041-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_ethereum_derivable_account.move:21>). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used guided WP inference, repaired the missing loop abstraction, simplified WP’s `sathard` abort expression, then validated directly with `move_spec_check`.
+- **Decision points:** Replaced first-invalid-character encoding with an equivalent existential invalid-character condition; added substantive normal-return guarantees for length and every allowed character.
+
+## `validate_tiers`
+
+`aptos_framework::extracted_transaction_limits`, task id `TL-tiers-038`
+
+### agent-only, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow verbatim for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its actual dependencies, author marked inferred clauses/invariants, and use the candidate checker as the acceptance gate.
+
+The target has one observable behavior: it returns normally exactly when every adjacent pair is nondecreasing in `min_stake` and strictly increasing in `multiplier_percent`; otherwise it aborts with the invalid-argument category. The empty-vector edge case matters because the loop index starts at 1, so the invariant must handle `len == 0` explicitly.
+
+- **Result:** Added a complete opaque contract and loop invariants for `validate_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r01-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51). `CANDIDATE_ACCEPTED`; all obligations verified, contract coverage is complete, and implementation behavior is unchanged.
+- **Strategy:** Characterized adjacent-tier ordering with a quantified prefix invariant, including the empty-vector boundary case, and specified the exact invalid-argument abort condition.
+- **Decision point:** Used `i == 1 || i <= len` because the loop starts at index 1 even when `len == 0`.
+
+### agent-only, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its relevant dependencies, author inferred clauses/invariants in scope, and use `move_spec_check` as the acceptance gate.
+
+The target is a read-only adjacent-pair validator: empty and singleton vectors return normally; longer vectors abort exactly when some adjacent pair decreases in `min_stake` or fails to strictly increase `multiplier_percent`. The proof needs a prefix invariant so loop havoc retains both index safety and the fact that all processed adjacent pairs passed.
+
+The first candidate exposed a name-resolution issue only: the local variable `len` shadows the specification `len(...)` operator inside the loop block. I’m removing that redundant invariant; the immutable vector length is already available from loop-entry state.
+
+The proof obligations now pass, and acceptance reports one coverage gap: an opaque unit-returning function still needs an explicit normal-result clause. I’ll state the exact unit result rather than use a tautological postcondition.
+
+- **Result:** Added a complete opaque contract for `validate_tiers` in [extracted_transaction_limits.spec.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r02-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.spec.move:1), plus prefix and bounds invariants in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r02-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:64). `CANDIDATE_ACCEPTED`: all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Modeled exact adjacent-tier monotonicity for both normal return and invalid-argument abort behavior, with a processed-prefix loop invariant.
+- **Decision points:** Accounted explicitly for empty vectors in the bounds invariant; used `error::INVALID_ARGUMENT` because the prover sees the opaque canonical error category.
+
+### agent-only, replicate 3: strict success
+
+I’m using the supplied move-inf workflow for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its actual dependency contracts, then iterate with the candidate checker until it accepts or the available verification budget is exhausted.
+
+The implementation has one caller-visible behavior: it returns without mutation exactly when every adjacent tier is monotone, and otherwise aborts with the standard invalid-argument category. The proof will need a prefix invariant recording that all already-visited adjacent pairs are valid, plus index bounds.
+
+The first candidate exposed a name-shadowing issue: the local variable `len` hides the specification’s vector-length operator. That equality is unnecessary because `len` is not loop-modified, so I’m removing only that redundant invariant and retaining the behavioral contract.
+
+- **Result:** Added a complete opaque contract and loop invariants in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r03-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51). `CANDIDATE_ACCEPTED`; implementation unchanged and all obligations verified.
+- **Strategy:** Specified adjacent-tier monotonicity for normal return and its exact negation for `INVALID_ARGUMENT` aborts, using a processed-prefix loop invariant.
+- **Decision points:** Covered the empty-vector boundary with `i <= len || len == 0`; used monotonicity as the meaningful normal-result guarantee.
+
+### agent-only, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its actual dependencies, then iterate with the specification checker until accepted or the available proof budget is exhausted.
+
+The target has one loop and no global writes. Its caller-visible behavior is an exact adjacent-pair check: it returns normally iff every tier from index 1 onward has nondecreasing `min_stake` and strictly increasing `multiplier_percent`; otherwise it aborts through `error::invalid_argument`. I’m checking local specification syntax patterns before adding the opaque contract and prefix invariant.
+
+The first candidate reached a compile-time name-shadowing issue: the executable local `len` hides the specification builtin `len(...)` inside the loop block. I’m resolving that without touching executable behavior by routing only the invariant through a small specification helper.
+
+- **Result:** Added an opaque, complete contract and loop invariants for `validate_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r04-agent-only-acceptance/workspace/sources/framework/extracted_transaction_limits.move). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged.
+- **Strategy:** Expressed exact adjacent-tier monotonicity for normal and abort behavior, with a processed-prefix loop invariant.
+- **Decision points:** Used `error::INVALID_ARGUMENT` per the callee’s abstract contract; added a spec-only length helper because the executable local `len` shadows the specification builtin.
+
+### hybrid flexible, replicate 1: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its relevant callees, infer the contract/invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a read-only adjacent-pair traversal with one explicit abort path; its only callees are vector length/borrow and `error::invalid_argument`. I’m running WP now to expose the exact loop facts and generated abort/result clauses before hand-strengthening the invariant.
+
+WP now has enough loop information and generated the complete behavior, but expressed the abort set as two `sathard` first-failure formulas. I’m replacing those unresolved clauses with the equivalent solver-friendly condition: an abort occurs exactly when any adjacent pair violates either monotonicity rule.
+
+The candidate is accepted: the target verifies, coverage is complete, and executable bytecode is unchanged. I’m doing the final source-format/diff review now; no additional prover run is needed after acceptance.
+
+- **Result:** Added complete opaque abort/normal-result specifications and loop invariants in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r01-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Used targeted dependency inspection, WP inference, invariant synthesis, and final `move_spec_check`.
+- **Decision points:** Replaced WP’s `sathard` first-failure formulas with an equivalent adjacent-pair condition; handled empty vectors explicitly with `i <= len || len == 0`.
+
+### hybrid flexible, replicate 2: strict success
+
+I’m using the supplied `move-inf` workflow exactly for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its relevant callees, infer the opaque contract and any loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a read-only adjacent-pair validation loop. Its only aborting behavior is a failed monotonicity check (plus bounds/arithmetic obligations that the loop invariant must rule out); empty and singleton vectors return normally. I’m running WP now to obtain its loop-head observations before synthesizing the prefix invariant.
+
+I added a prefix invariant that records exactly the validated adjacent pairs, together with index and length facts. The special `len == 0` branch is necessary because the loop index starts at 1 even for an empty vector; it keeps the invariant valid without imposing an API precondition. I’m rerunning WP so the function-level abort contract is derived from that abstraction.
+
+WP succeeded once the loop abstraction was present, but its two abort clauses are mechanically expanded and marked `sathard`, so they are unresolved by the skill’s rules. They simplify exactly to one condition: some adjacent pair has decreasing stake or a non-increasing multiplier. I’m replacing only those generated clauses with that equivalent bounded condition, preserving `pragma opaque`.
+
+The first candidate check rejected only one missing category: `normal-result`. For a unit-returning validator, the meaningful normal guarantee is that every adjacent pair is valid—the exact complement of the abort condition. I’m adding that postcondition and rerunning the acceptance check.
+
+- **Result:** Added an opaque, complete contract for `validate_tiers` plus loop invariants in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r02-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51). `move_spec_check` returned `CANDIDATE_ACCEPTED`; all obligations verified and implementation behavior is unchanged.
+- **Strategy:** Used WP-guided inference, synthesized a validated-prefix loop invariant, and replaced `sathard` output with equivalent bounded adjacent-pair conditions.
+- **Decision points:** Explicitly handled empty vectors in the index invariant; added the all-pairs-valid postcondition to provide complete normal-result coverage.
+
+### hybrid flexible, replicate 3: strict success
+
+I’m using the provided `move-inf` workflow for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll restrict edits to that function’s specification/invariants, preserve executable behavior and existing specs, and use `move_spec_check` as the acceptance gate.
+
+The target is a read-only traversal with one loop and only vector/error callees. I’m invoking WP now to expose the exact abort/result obligations and, especially, the loop-head facts needed to synthesize a complete invariant.
+
+WP confirms the key boundary case: the loop starts at `i = 1`, so an invariant such as `i <= len` would be false for an empty vector. I’m adding a prefix-order invariant with an explicit empty-vector disjunct, plus the index and length facts needed to prove both safe indexing and `i += 1`.
+
+WP now has complete semantics, but it emitted two `[sathard]` abort clauses that redundantly encode “all earlier pairs passed before this pair failed.” I’m replacing them with the equivalent exact condition: some adjacent pair violates either monotonicity requirement. This directly addresses the diagnostic without narrowing behavior.
+
+The acceptance gate correctly found that abort behavior alone is incomplete for an opaque validator. Its meaningful normal-return guarantee is that every adjacent tier pair is monotonic; I’m adding that exact postcondition, which also makes the validator useful to opaque callers.
+
+- **Result:** Added inferred loop invariants and a complete opaque contract for [`validate_tiers`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r03-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51>). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Used WP to identify loop requirements, then synthesized a processed-prefix monotonicity invariant and exact normal/abort behavior.
+- **Decision points:** Accounted explicitly for the empty-vector `i = 1, len = 0` boundary; replaced WP’s `[sathard]` clauses with the equivalent adjacent-pair violation predicate.
+
+### hybrid flexible, replicate 4: strict success
+
+I’m using the provided `move-inf` workflow exactly for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll inspect only the target and its relevant callees, infer the contract and any loop invariants, then use `move_spec_check` as the acceptance gate.
+
+The target is a read-only adjacent-pair validation loop. Its visible behavior is: return without mutation exactly when every neighboring tier is ordered (`min_stake` nondecreasing and `multiplier_percent` strictly increasing), otherwise abort with the framework’s abstract invalid-argument code at the first violating pair. I’m running WP now to obtain the tool’s precise obligations and loop-head observations.
+
+WP accepted the invariant structure and exposed the exact contract shape, but its mechanical output is marked `sathard`: it encodes “some bad adjacent pair exists” through an unnecessarily nested prefix/existential formula. I’m replacing that unresolved formula with the equivalent direct bounded existential, then I’ll verify and run the candidate check.
+
+- **Result:** Added complete inferred invariants and an opaque contract for `validate_tiers` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r04-hybrid-flexible-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51). `move_spec_check` returned `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used WP to identify the missing loop abstraction, then replaced its `sathard` output with direct bounded quantifiers describing valid and invalid adjacent pairs.
+- **Decision points:** Handled empty vectors with `i <= len || len == 0`; specified abort code `0x1`, matching `error::invalid_argument`’s abstract category.
+
+### hybrid guided, replicate 1: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_transaction_limits::validate_tiers`: first WP on that exact function with package path `.`, then I’ll repair any loop obligations and finish with the candidate check.
+
+WP found one missing loop abstraction: `i` starts at 1, advances across adjacent tiers, and aborts when minimum stake decreases or multiplier fails to increase. I’m now reading the target and its actual call dependencies so the invariant captures the processed prefix without altering executable behavior.
+
+The loop needs a processed-prefix invariant: `1 <= i <= len(tiers)` and every adjacent pair before `i` satisfies both monotonicity rules. This directly generalizes WP’s bounded heads and is strong enough to characterize the exact abort condition at loop exit.
+
+WP now succeeds, but its two generated abort clauses are marked `sathard` because they encode “the first failing pair” with nested quantified prefixes. I’m replacing that mechanically complex form with the equivalent exact condition: some adjacent pair in the vector violates either monotonicity rule.
+
+The candidate check exposed the empty-vector boundary case: the loop head is reached syntactically with `i = 1, len = 0`, even though the body is skipped. I’m weakening only the invariant’s bound to the exact reachable disjunction (`len == 0 || i <= len`), then rerunning WP as required; the function contract itself remains exact.
+
+The exact abort behavior verifies far enough for acceptance to identify the remaining category: a validator also needs a normal-return guarantee. I’m adding the complementary postcondition that every adjacent pair is valid on return; this gives callers useful behavior under `pragma opaque` and is not a vacuous `ensures true`.
+
+- **Result:** Added inferred loop invariants, exact abort behavior, normal-return guarantee, and `pragma opaque` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r01-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:64). `CANDIDATE_ACCEPTED`; all obligations verified, coverage complete, implementation unchanged.
+- **Strategy:** Ran guided WP, generalized its loop-head evidence into a processed-prefix invariant, simplified `sathard` output into an equivalent adjacent-pair condition, then checked the candidate.
+- **Decision points:** Accounted explicitly for the empty-vector loop head (`len == 0 || i <= len`); added a meaningful normal-return guarantee after the checker identified that missing contract category.
+
+### hybrid guided, replicate 2: strict success
+
+I’m using the provided `move-inf` workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::validate_tiers`, then I’ll repair loop invariants one function at a time and finish with the candidate check. I’ll keep the package path as `.` throughout.
+
+WP found one loop and no usable post-loop abstraction. The bounded heads show the intended invariant shape: `i` remains within the vector and every already-visited adjacent pair has nondecreasing stake plus strictly increasing multiplier. I’m inspecting the function and its callees now so the invariant also captures exact abort behavior.
+
+The function has only vector length/borrow plus `error::invalid_argument`; there is no opaque partial callee. I’m adding the minimal inductive prefix invariant, including `1 <= i <= len` for subtraction and indexing safety, then rerunning WP as required.
+
+WP now succeeds, but its two exact “first bad adjacent pair” abort clauses are marked `sathard`, which the skill treats as unresolved. I’m replacing them with the equivalent solver-friendly condition “some adjacent pair is bad”; this preserves exact behavior while removing the nested existential/forall prefix encoding.
+
+The candidate check exposed the empty-vector boundary case: the loop head is checked even when the body never runs, so `i <= len` is false for `i = 1, len = 0`. I’m retaining the strong bound for nonempty vectors and adding the exact empty-vector state, then using a focused proof to validate both the invariant and simplified abort contract.
+
+The focused proof now succeeds, including the empty-vector case and exact abort equivalence. I’m rerunning the acceptance check; this is the decisive completion test.
+
+Acceptance requires an explicit normal-result category even for a unit-returning validator. I’m adding the meaningful normal-return guarantee: every adjacent pair is valid. This is the precise complement of the abort condition and is established by the loop prefix invariant.
+
+- **Result:** Added complete inferred loop invariants, exact abort condition, normal-return guarantee, and `pragma opaque` in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r02-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:64). `CANDIDATE_ACCEPTED`; implementation unchanged and coverage complete.
+- **Strategy:** Used guided WP inference, repaired the loop abstraction, localized verification with a focused proof, then ran `move_spec_check`.
+- **Decision points:** Handled the empty-vector state explicitly; replaced WP’s `sathard` first-failure encoding with the equivalent “any invalid adjacent pair” condition.
+
+### hybrid guided, replicate 3: strict success
+
+I’m using the supplied `move-inf` workflow for `aptos_framework::extracted_transaction_limits::validate_tiers`. I’ll begin with scoped WP at package path `.`, then repair only the target’s inferred contract/invariants and finish with the candidate check.
+
+WP found one concrete blocker: the loop loses the prefix-ordering facts needed to characterize aborts. I’m inspecting the target body and its direct/transitive calls now, then I’ll add a prefix invariant beside the loop and rerun WP as required.
+
+The strengthened invariant made WP succeed. Its generated abort formula is exact but tagged `sathard`: it encodes “the first bad adjacent pair” using nested quantified prefixes. I’m replacing those two clauses with the equivalent, solver-friendlier condition “some adjacent pair violates either ordering rule,” while preserving complete abort behavior and `pragma opaque`.
+
+The candidate check exposed the empty-vector boundary case: the loop starts at `i = 1` while `len = 0`, so `i <= len` is not initially true. I’ll localize that invariant obligation, then weaken only the loop bound to account for the non-entering empty case; the behavioral abort contract remains unchanged.
+
+Verification now passes far enough for the acceptance checker to identify the remaining coverage gap: an opaque target must explicitly describe its normal return. Since this function returns unit and does not mutate its referenced vector, I’m checking the repository’s established syntax for non-vacuous unit-result contracts before adding that final clause.
+
+- **Result:** Added inferred prefix-order loop invariants and complete opaque abort/normal-return contracts in [extracted_transaction_limits.move](/home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r03-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:64). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran scoped WP, repaired the loop abstraction, simplified its `sathard` first-failure formula to an equivalent adjacent-pair condition, then ran the candidate check.
+- **Decision points:** Accounted explicitly for empty vectors in the loop bound; added a monotonicity postcondition to fully describe successful unit returns.
+
+### hybrid guided, replicate 4: strict success
+
+I’m using the supplied `move-inf` workflow exactly: first WP on `aptos_framework::extracted_transaction_limits::validate_tiers` with package path `.`, then I’ll address only its diagnostics and finish with the candidate check.
+
+WP found one ordinary traversal loop and no usable function contract yet. Its evidence shows the needed abstraction: `i` stays within the vector, and every already-visited adjacent pair has nondecreasing stake plus strictly increasing multiplier. I’m inspecting the exact body and its call dependencies before adding that invariant.
+
+With the invariant in place, WP succeeded and generated the opaque contract. Its two mechanically expanded `sathard` abort clauses are equivalent to a single bounded adjacent-pair violation; I’m simplifying them without changing meaning, then I’ll run the required candidate check.
+
+The candidate checker accepted the abort shape but correctly required an explicit normal-return guarantee. I’m adding the complementary all-adjacent-pairs monotonicity postcondition; the loop invariant already establishes it at normal exit.
+
+- **Result:** Added complete opaque normal/abort specifications and loop invariants for [`validate_tiers`](</home/wrw/aptos-core/.worktrees/dev4/aptos-move/flow/evaluation/spec-inference/evaluation-artifacts/corpus4-run8-codex-sol56-high/runs/corpus4-run8-codex-sol56-high-TL-tiers-038-r04-hybrid-guided-acceptance/workspace/sources/framework/extracted_transaction_limits.move:51>). `CANDIDATE_ACCEPTED`; all obligations verified and implementation unchanged.
+- **Strategy:** Ran focused WP, generalized its loop-head evidence into an adjacent-tier prefix invariant, simplified `sathard` output to equivalent bounded quantifiers, then checked the candidate.
+- **Decision points:** Added an explicit normal-return monotonicity guarantee after the checker identified missing `normal-result` coverage.
+

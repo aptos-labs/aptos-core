@@ -122,11 +122,12 @@ pub struct Options {
     #[arg(long, value_parser = ["public", "all", "none"], value_name = "SCOPE")]
     #[serde(skip)]
     pub verify: Option<String>,
-    /// Only generate verification condition for one function.
-    /// This overrides verification scope and can be overridden by the pragma verify=false.
+    /// Only generate verification conditions for the given functions; repeat the
+    /// option to verify several. This overrides verification scope and can be
+    /// overridden by the pragma verify=false.
     #[arg(long, value_name = "FUNCTION_NAME")]
     #[serde(skip)]
-    pub verify_only: Option<String>,
+    pub verify_only: Vec<String>,
     /// Only generate verification condition for given function,
     /// and generate a z3 trace file for analysis. The file will be stored
     /// at FUNCTION_NAME.z3log.
@@ -137,6 +138,24 @@ pub struct Options {
     #[command(flatten)]
     #[serde(skip)]
     pub inference: InferenceOptions,
+    /// Verifies the one Move source file with the Lean-based Verex verifier
+    /// instead of Boogie (see `verex`); the rendering in Lean is written
+    /// where the source's proof file finds it.
+    #[arg(long)]
+    #[serde(skip)]
+    pub lean: bool,
+    /// The default heartbeat budget of a function's verification with
+    /// `--lean`, in thousands of Lean `maxHeartbeats` units; `pragma
+    /// heartbeats` overrides it. The last occurrence counts.
+    #[arg(long, value_name = "THOUSANDS", overrides_with = "heartbeats")]
+    #[serde(skip)]
+    pub heartbeats: Option<u64>,
+    /// With `--lean`, verifies every function automatically, ignoring its
+    /// authored proof (`foo.proof.lean`) and `pragma verify = manual`:
+    /// whether a proof is still needed.
+    #[arg(long)]
+    #[serde(skip)]
+    pub ignore_proofs: bool,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the prover.
@@ -166,9 +185,12 @@ impl Default for Options {
             trace: false,
             severity: None,
             verify: None,
-            verify_only: None,
+            verify_only: vec![],
             z3_trace: None,
             inference: InferenceOptions::default(),
+            lean: false,
+            heartbeats: None,
+            ignore_proofs: false,
         }
     }
 }
@@ -233,11 +255,11 @@ impl Options {
                 _ => unreachable!("clap validates verify values"),
             };
         }
-        if let Some(ref name) = self.verify_only {
-            self.prover.verify_scope = VerificationScope::Only(name.clone());
+        if !self.verify_only.is_empty() {
+            self.prover.verify_scope = VerificationScope::Only(self.verify_only.clone());
         }
         if let Some(ref fun_name) = self.z3_trace {
-            self.prover.verify_scope = VerificationScope::Only(fun_name.clone());
+            self.prover.verify_scope = VerificationScope::Only(vec![fun_name.clone()]);
             let short_name = if let Some(i) = fun_name.find("::") {
                 &fun_name[i + 2..]
             } else {
@@ -252,6 +274,7 @@ impl Options {
                 )
                 .to_vec(),
                 module_instance_names: options::custom_native_options(),
+                provides_cmp_model: true,
             });
             self.move_named_address_values
                 .push("Extensions=0x1".to_string());

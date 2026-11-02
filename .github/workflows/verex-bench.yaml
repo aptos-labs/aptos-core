@@ -1,0 +1,233 @@
+# The Verex verification benchmark (third_party/move/lean/designs/verification-benchmarks.md):
+# measures the standard problems of third_party/move/lean/bench/problems.toml,
+# keeps the results as an artifact, and reports them against the recent runs.
+name: Verex verification benchmark
+
+on:
+  # PIES dispatches this workflow nightly on main. GitHub cron is prohibited by
+  # repository policy. See devtools/aptos-cargo-cli/README.md.
+  workflow_dispatch:
+    inputs:
+      PROBLEMS:
+        description: Comma-separated problem names to measure (all when empty)
+        required: false
+        type: string
+        default: ""
+      WINDOW:
+        description: Number of recent runs the report plots
+        required: false
+        type: choice
+        options: ["10", "30", "60", "90"]
+        default: "30"
+  # A pull request of this repository runs it on request, with the
+  # `CICD:run-verex-bench` label, and is compared with main's nightlies.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+env:
+  REPORT_PATH: ${{ github.event_name == 'pull_request' && format('verex-bench/{0}', github.event.pull_request.number) || 'verex-bench' }}
+
+# Every nightly produces a point; never cancel one for another.
+concurrency:
+  group: verex-bench-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    # Untrusted pull request code runs on a self-hosted runner: forks are
+    # excluded.
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-verex-bench') &&
+        (github.event.action != 'labeled' || github.event.label.name == 'CICD:run-verex-bench') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    # The dedicated runner of the execution performance test, in its queue,
+    # so no other benchmark shares the machine.
+    runs-on: benchmark-c3d-60
+    concurrency:
+      group: execution-benchmark-benchmark-c3d-60
+      cancel-in-progress: false
+      queue: max
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The pull request's head, not its merge with the base.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Lean toolchain
+        run: |
+          scripts/dev_setup.sh -b -p -l -k
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Build the standalone exchange frontend
+        run: cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
+
+      - name: Install the Rust exporter's pinned toolchain
+        working-directory: third_party/move/lean/verex-rust/rust-exporter
+        run: cargo --version
+
+      - name: Build the benchmark executable
+        working-directory: third_party/move/lean/verex-e2e-tests
+        run: |
+          source "$HOME/.profile"
+          lake build verex-bench
+
+      - name: Measure the problems
+        env:
+          RUNNER_NAME: benchmark-c3d-60
+          PROBLEMS: ${{ inputs.PROBLEMS }}
+        run: |
+          source "$HOME/.profile"
+          python3 third_party/move/lean/scripts/verex-bench.py run \
+            --out "$RUNNER_TEMP/verex-bench/results.json" ${PROBLEMS:+--only "$PROBLEMS"}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verex-bench-results
+          path: ${{ runner.temp }}/verex-bench/results.json
+          if-no-files-found: error
+          retention-days: 90
+
+  report:
+    needs: bench
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      page_url: ${{ steps.render.outputs.page_url }}
+    permissions:
+      contents: read
+      actions: read # the results of earlier runs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: third_party/move/lean/scripts
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: verex-bench-results
+          path: ${{ runner.temp }}/current
+
+      - name: Render the report
+        id: render
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VEREX_BENCH_CACHE: ${{ runner.temp }}/cache
+          WINDOW: ${{ inputs.WINDOW || '30' }}
+          PAGE_URL: ${{ (github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) && format('https://{0}.github.io/{1}/{2}/', github.repository_owner, github.event.repository.name, env.REPORT_PATH) || '' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          python3 third_party/move/lean/scripts/verex-bench.py report \
+            --current "$RUNNER_TEMP/current/results.json" --window "$WINDOW" \
+            --branch main --page-url "$PAGE_URL" \
+            --html "$RUNNER_TEMP/report/index.html" \
+            --markdown "$RUNNER_TEMP/summary.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          printf 'page_url=%s\n' "$PAGE_URL" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verex-bench-report
+          path: ${{ runner.temp }}/report
+          retention-days: 90
+
+  publish:
+    # Main and each PR have separate pages; update only this run's destination.
+    needs: report
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: write # the gh-pages branch
+      pages: read # the site build of the pushed report
+      pull-requests: write # the completed report's link
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages
+          fetch-depth: 1
+          sparse-checkout: verex-bench
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: verex-bench-report
+          path: ${{ runner.temp }}/report
+
+      - name: Publish the report
+        env:
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cd pages
+          mkdir -p "$REPORT_PATH"
+          cp "$RUNNER_TEMP/report/index.html" "$REPORT_PATH/index.html"
+          git add -- "$REPORT_PATH/index.html"
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qm "verex-bench: run $GITHUB_RUN_ID of $COMMIT"
+          # A concurrent deploy to gh-pages moves the branch: rebase and retry.
+          for attempt in 1 2 3; do
+            git push -q origin HEAD:gh-pages && exit 0
+            git pull -q --rebase origin gh-pages
+          done
+          exit 1
+
+      - name: Wait for the Pages site
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The gh-pages push starts a Pages build. A later push cancels a
+          # running build, which the API then reports as errored, so judge
+          # the newest build that includes our commit.
+          published_commit="$(git -C pages rev-parse HEAD)"
+          for attempt in {1..60}; do
+            while IFS=$'\t' read -r status build_commit message; do
+              relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$published_commit...$build_commit" --jq '.status' || true)"
+              [[ "$relation" == identical || "$relation" == ahead ]] || continue
+              case "$status" in
+                built) exit 0 ;;
+                errored)
+                  echo "::error::GitHub Pages build failed: ${message:-unknown error}"
+                  exit 1 ;;
+              esac
+              break
+            done < <(gh api "repos/$GITHUB_REPOSITORY/pages/builds?per_page=10" \
+              --jq 'sort_by(.created_at) | reverse | .[] | [.status, .commit, (.error.message // "")] | @tsv')
+            sleep 10
+          done
+          echo "::error::Timed out waiting for GitHub Pages to publish the report."
+          exit 1
+
+      - name: Comment on the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PAGE_URL: ${{ needs.report.outputs.page_url }}
+          RUN_URL: ${{ format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+        run: |
+          printf 'Verex benchmark finished: [Charts](%s) · [Workflow run](%s)\n' \
+            "$PAGE_URL" "$RUN_URL" > "$RUNNER_TEMP/benchmark-comment.md"
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --body-file "$RUNNER_TEMP/benchmark-comment.md"

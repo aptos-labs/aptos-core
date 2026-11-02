@@ -7,16 +7,11 @@
 //! (`(HashValue, Version)`) are shared by every implementor; only the
 //! column families and progress keys differ.
 
-use crate::{
-    position_db::PositionDb,
-    pruner::state_kv_pruner::state_kv_pruner_manager::StateKvPrunerManager,
-    schema::{
-        db_metadata::DbMetadataKey, hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
-        position_value::PositionValueSchema,
-        stale_position_value_index::StalePositionValueIndexSchema,
-        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
-        state_value_by_key_hash::StateValueByKeyHashSchema,
-    },
+use crate::schema::{
+    db_metadata::DbMetadataKey, hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
+    native_stale_value_index::NativeStaleValueIndexSchema, native_value::NativeValueSchema,
+    stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+    state_value_by_key_hash::StateValueByKeyHashSchema,
 };
 use aptos_crypto::HashValue;
 use aptos_schemadb::schema::Schema;
@@ -84,8 +79,8 @@ impl StateValuePrunerSchema for HotStateKv {
 /// Native-position value pruner.
 pub(crate) enum PositionValue {}
 impl StateValuePrunerSchema for PositionValue {
-    type StaleIndexSchema = StalePositionValueIndexSchema;
-    type ValueSchema = PositionValueSchema;
+    type StaleIndexSchema = NativeStaleValueIndexSchema;
+    type ValueSchema = NativeValueSchema;
 
     fn name() -> &'static str {
         "position_value_pruner"
@@ -104,5 +99,50 @@ impl StateValuePrunerSchema for PositionValue {
     }
 }
 
-/// The native-position value pruner manager.
-pub(crate) type PositionValuePrunerManager = StateKvPrunerManager<PositionValue, PositionDb>;
+/// Native-order value pruner.
+// Used once the order store is opened by the write path (PR 6).
+#[allow(dead_code)]
+pub(crate) enum OrderValue {}
+impl StateValuePrunerSchema for OrderValue {
+    type StaleIndexSchema = NativeStaleValueIndexSchema;
+    type ValueSchema = NativeValueSchema;
+
+    fn name() -> &'static str {
+        "order_value_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "order_value"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::OrderValueShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::OrderValuePrunerProgress
+    }
+}
+
+/// Native-collateral value pruner.
+pub(crate) enum CollateralValue {}
+impl StateValuePrunerSchema for CollateralValue {
+    type StaleIndexSchema = NativeStaleValueIndexSchema;
+    type ValueSchema = NativeValueSchema;
+
+    fn name() -> &'static str {
+        "collateral_value_pruner"
+    }
+
+    fn worker_name() -> &'static str {
+        "collateral_value"
+    }
+
+    fn shard_progress_key(shard_id: usize) -> DbMetadataKey {
+        DbMetadataKey::CollateralValueShardPrunerProgress(shard_id)
+    }
+
+    fn pruner_progress_key() -> DbMetadataKey {
+        DbMetadataKey::CollateralValuePrunerProgress
+    }
+}

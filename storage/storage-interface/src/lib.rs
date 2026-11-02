@@ -45,7 +45,11 @@ pub mod state_store;
 use crate::{
     chunk_to_commit::ChunkToCommit,
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary, state::State, state_summary::StateSummary,
+        orders::{OrderOverlay, ShardedOrderLayers},
+        positions::{PositionOverlay, ShardedPositionLayers},
+        sharded_jmt_state::PositionStateWithSummary,
+        state::State,
+        state_summary::StateSummary,
         state_with_summary::LedgerWithSummary,
     },
 };
@@ -386,7 +390,7 @@ pub trait DbReader: Send + Sync {
         /// merklized position summary, used by execution as the freeze base and
         /// proof source for computing the position state root. Errors when the
         /// feature is on but native-position storage is absent (i.e.
-        /// `ENABLE_TRADING_NATIVE` is off).
+        /// `enable_trading_native` is off).
         fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary>;
 
         /// The pre-committed position tip (latest + last_checkpoint), including
@@ -397,6 +401,10 @@ pub trait DbReader: Send + Sync {
         fn get_pre_committed_position_state_summary(
             &self,
         ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
+
+        /// Pre-committed position overlay. Errors when the feature is on
+        /// but native-position storage is absent.
+        fn get_pre_committed_positions(&self) -> Result<PositionOverlay>;
 
         /// Native-position analog of `get_state_proof_by_version_ext`: a
         /// cold-key proof from the persisted position JMT at `version`.
@@ -675,6 +683,32 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Fold `target` into the in-memory position base if given, and return
+    /// the base's layers: the floor every overlay built this stage extends
+    /// from. `None` when native position is off.
+    ///
+    /// Callers must ensure the base doesn't move while a block executes,
+    /// or that block's reads straddle two versions: the block executor
+    /// advances under its execution lock, state sync on a linear chain.
+    ///
+    /// Unimplemented rather than a silent no-op, so a delegating wrapper
+    /// that forgets to forward it fails loudly instead of never folding.
+    fn advance_position_base(
+        &self,
+        _target: Option<&PositionOverlay>,
+    ) -> Result<Option<ShardedPositionLayers>> {
+        unimplemented!()
+    }
+
+    /// The order analog of [`Self::advance_position_base`], under the same
+    /// lock discipline. `None` when trading-native storage is off.
+    fn advance_order_base(
+        &self,
+        _target: Option<&OrderOverlay>,
+    ) -> Result<Option<ShardedOrderLayers>> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]
@@ -759,21 +793,21 @@ pub fn jmt_update_refs<K>(
 #[macro_export]
 macro_rules! db_anyhow {
     ($($arg:tt)*) => {
-        AptosDbError::Other(format!($($arg)*))
+        $crate::AptosDbError::Other(format!($($arg)*))
     };
 }
 
 #[macro_export]
 macro_rules! db_not_found_bail {
     ($($arg:tt)*) => {
-        return Err(AptosDbError::NotFound(format!($($arg)*)))
+        return Err($crate::AptosDbError::NotFound(format!($($arg)*)))
     };
 }
 
 #[macro_export]
 macro_rules! db_other_bail {
     ($($arg:tt)*) => {
-        return Err(AptosDbError::Other(format!($($arg)*)))
+        return Err($crate::AptosDbError::Other(format!($($arg)*)))
     };
 }
 
@@ -781,7 +815,7 @@ macro_rules! db_other_bail {
 macro_rules! db_ensure {
     ($cond:expr, $($arg:tt)*) => {
         if !$cond {
-            return Err(AptosDbError::Other(format!($($arg)*)));
+            return Err($crate::AptosDbError::Other(format!($($arg)*)));
         }
     };
 }

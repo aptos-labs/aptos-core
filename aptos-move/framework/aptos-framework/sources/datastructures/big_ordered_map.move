@@ -776,9 +776,12 @@ module aptos_framework::big_ordered_map {
     /// Apply the function to a mutable reference of each key-value pair in the map.
     public inline fun for_each_mut<K: copy + drop + store, V: store>(self: &mut BigOrderedMap<K, V>, f: |&K, &mut V|) {
         let iter = self.internal_new_begin_iter();
+        // A value write moves no keys, so the walk stays on map entries.
         while ({
             spec {
                 invariant spec_iter_valid(iter, self);
+                invariant spec_len(self) == spec_len(old(self));
+                invariant !(iter is IteratorPtr::End<K>) ==> spec_contains_key(self, iter.key);
             };
             !iter.iter_is_end(self)
         }) {
@@ -2246,6 +2249,7 @@ module aptos_framework::big_ordered_map {
 
     spec ground_enum_123 {
         pragma verify = true;
+        pragma opaque;
         requires spec_len(map) == 3;
         requires spec_contains_key(map, 1);
         requires spec_contains_key(map, 2);
@@ -3045,6 +3049,34 @@ module aptos_framework::big_ordered_map {
         pragma verify = true;
         // Aborts unspecified: the running u64 addition can overflow.
         ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_for_each_mut_empty_symbolic(m: &mut BigOrderedMap<u64, u64>) {
+        // A walk over an empty map never reaches the closure, so a closure that
+        // aborts on every entry leaves the walk abort-free.
+        let zero = 0;
+        m.for_each_mut(|_k, v| { *v = *v / zero; });
+    }
+
+    spec test_verify_for_each_mut_empty_symbolic {
+        pragma verify = true;
+        requires spec_len(m) == 0;
+        aborts_if false;
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_for_each_mut_total_symbolic(m: &mut BigOrderedMap<u64, u64>) {
+        // With a closure that cannot abort, the walk itself cannot either: every
+        // entry it borrows is in the map.
+        m.for_each_mut(|_k, v| { *v = 0; });
+    }
+
+    spec test_verify_for_each_mut_total_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m));
     }
 
 }

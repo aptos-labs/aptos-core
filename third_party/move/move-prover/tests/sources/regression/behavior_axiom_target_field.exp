@@ -1,0 +1,48 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_target_field.move:41:9
+   │
+41 │         ensures result >= 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_target_field.move:37: g_lower
+   =         s = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:38: g_lower
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:41: g_lower (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_target_field.move:49:9
+   │
+49 │         ensures result <= 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_target_field.move:45: f_upper
+   =         s = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:46: f_upper
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:49: f_upper (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_target_field.move:67:9
+   │
+67 │         ensures result >= 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_target_field.move:63: other_instantiation
+   =         g = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:64: other_instantiation
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:67: other_instantiation (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/behavior_axiom_target_field.move:117:9
+    │
+117 │         ensures result == 0;
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/behavior_axiom_target_field.move:113: fixed_value
+    =         p = <redacted>
+    =     at tests/sources/regression/behavior_axiom_target_field.move:114: fixed_value
+    =         result = <redacted>
+    =     at tests/sources/regression/behavior_axiom_target_field.move:117: fixed_value (spec)

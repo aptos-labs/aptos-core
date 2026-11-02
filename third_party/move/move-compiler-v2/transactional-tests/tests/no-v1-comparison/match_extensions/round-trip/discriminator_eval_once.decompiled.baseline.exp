@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-119:  publish [module 0xc0ffee::m {]
+task 1 lines 122-122:  run 0xc0ffee::m::scalar
+return values: 3
+task 2 lines 124-124:  run 0xc0ffee::m::prim_tuple
+return values: 3
+task 3 lines 126-126:  run 0xc0ffee::m::mixed_tuple
+return values: 3
+task 4 lines 128-128:  run 0xc0ffee::m::tuple_call
+return values: 3

@@ -27,6 +27,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent))
+
+from harness.artifacts import tree_hash  # noqa: E402
+from harness.identifiers import require_plain_name  # noqa: E402
+
 PACKAGE = ROOT / "package"
 PATCHES = ROOT / "references"
 BUILD = PATCHES / "build"
@@ -197,6 +202,8 @@ def _require_specification_only(patch: Path) -> None:
 
 def assemble(module: str) -> Path:
     """Copy the package and apply this module's specification patch."""
+    # A module name becomes a patch filename and a reference directory.
+    module = require_plain_name(module, "module")
     if not (PACKAGE / "Move.toml").is_file():
         raise SystemExit(
             f"the corpus package is not built: {PACKAGE}\n"
@@ -233,9 +240,6 @@ def main() -> None:
     )
     parser.add_argument("--module", help="assemble only this module")
     args = parser.parse_args()
-
-    sys.path.insert(0, str(ROOT.parent))
-    from harness.artifacts import tree_hash
 
     modules = [args.module] if args.module else module_names()
     if not modules:

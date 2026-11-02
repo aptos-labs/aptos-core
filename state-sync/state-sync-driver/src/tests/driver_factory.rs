@@ -92,6 +92,7 @@ fn test_new_initialized_configs() {
         Some(runtime.handle().clone()),
         &node_config,
         node_config.base.waypoint.waypoint(),
+        None, // The node bootstraps from a real snapshot, not from local genesis
         db_rw,
         chunk_executor,
         mempool_notifier,

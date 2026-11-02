@@ -1,0 +1,765 @@
+{
+ "DM-keepalive-035": [
+  {
+   "mutant_id": "DM-keepalive-035-minimum-exclusive",
+   "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+   "anchor": "timeout_seconds >= tracker.min_keep_alive_time_secs,",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "abort",
+   "rationale": "A timeout equal to the minimum is rejected."
+  },
+  {
+   "mutant_id": "DM-keepalive-035-expiry-inclusive",
+   "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+   "anchor": "if (current_time > state.expiration_time_secs) {",
+   "replace": ">",
+   "with": ">=",
+   "obligation_category": "normal-result",
+   "rationale": "Renewing exactly at expiry starts a new session."
+  },
+  {
+   "mutant_id": "DM-keepalive-035-first-session-starts-now",
+   "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+   "anchor": "            let new_state = KeepAliveState {\n                session_start_time_secs: 0,",
+   "replace": "session_start_time_secs: 0",
+   "with": "session_start_time_secs: current_time",
+   "obligation_category": "normal-result",
+   "rationale": "A first keep-alive invalidates the account's existing orders."
+  }
+ ],
+ "DM-valid-036": [
+  {
+   "mutant_id": "DM-valid-036-session-start-exclusive",
+   "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+   "anchor": "if (state.session_start_time_secs > order_creation_time_secs) {",
+   "replace": ">",
+   "with": ">=",
+   "obligation_category": "normal-result",
+   "rationale": "An order created at the session start is invalid."
+  },
+  {
+   "mutant_id": "DM-valid-036-expiry-exclusive",
+   "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+   "anchor": "state.expiration_time_secs >= current_time",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "A session is expired already at its expiration time."
+  },
+  {
+   "mutant_id": "DM-valid-036-unregistered-invalid",
+   "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+   "anchor": "            return true;\n        };\n        let current_time",
+   "replace": "return true",
+   "with": "return false",
+   "obligation_category": "normal-result",
+   "rationale": "Orders of accounts without a keep-alive are invalid."
+  }
+ ],
+ "EA-scheme-041": [
+  {
+   "mutant_id": "EA-scheme-041-max-length-exclusive",
+   "file": "sources/framework/extracted_ethereum_derivable_account.move",
+   "anchor": "len > 0 && len <= MAX_SCHEME_LEN",
+   "replace": "<=",
+   "with": "<",
+   "obligation_category": "abort",
+   "rationale": "A scheme of the maximum length is rejected."
+  },
+  {
+   "mutant_id": "EA-scheme-041-nine-rejected",
+   "file": "sources/framework/extracted_ethereum_derivable_account.move",
+   "anchor": "(c >= 0x30 && c <= 0x39)",
+   "replace": "0x39",
+   "with": "0x38",
+   "obligation_category": "abort",
+   "rationale": "The digit nine is rejected."
+  },
+  {
+   "mutant_id": "EA-scheme-041-minus-becomes-slash",
+   "file": "sources/framework/extracted_ethereum_derivable_account.move",
+   "anchor": "c == 0x2d",
+   "replace": "0x2d",
+   "with": "0x2f",
+   "obligation_category": "abort",
+   "rationale": "A slash is accepted in place of a minus."
+  }
+ ],
+ "JW-upsert-049": [
+  {
+   "mutant_id": "JW-upsert-049-scans-while-smaller",
+   "file": "sources/framework/extracted_jwks.move",
+   "anchor": "if (comparison.is_greater_than()) {",
+   "replace": "is_greater_than",
+   "with": "is_smaller_than",
+   "obligation_category": "normal-result",
+   "rationale": "The scan advances past larger issuers instead of smaller ones."
+  },
+  {
+   "mutant_id": "JW-upsert-049-always-replaces",
+   "file": "sources/framework/extracted_jwks.move",
+   "anchor": "found = comparison.is_equal();",
+   "replace": "comparison.is_equal()",
+   "with": "true",
+   "obligation_category": "normal-result",
+   "rationale": "A larger issuer at the stop position is replaced instead of preceded."
+  },
+  {
+   "mutant_id": "JW-upsert-049-inserts-at-front",
+   "file": "sources/framework/extracted_jwks.move",
+   "anchor": "jwks.entries.insert(index, provider_jwks);",
+   "replace": "index",
+   "with": "0",
+   "obligation_category": "normal-result",
+   "rationale": "A new issuer is always inserted first."
+  }
+ ],
+ "MS-capacity-048": [
+  {
+   "mutant_id": "MS-capacity-048-clamp-inverted",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "if (num_pending_transactions > MAX_PENDING_TRANSACTIONS) {",
+   "replace": ">",
+   "with": "<",
+   "obligation_category": "normal-result",
+   "rationale": "The capacity is zero whenever the queue is not over full."
+  },
+  {
+   "mutant_id": "MS-capacity-048-pending-off-by-one",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "multisig_account_resource.last_executed_sequence_number - 1;",
+   "replace": " - 1",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "The pending count includes one transaction too many."
+  },
+  {
+   "mutant_id": "MS-capacity-048-returns-pending",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "            MAX_PENDING_TRANSACTIONS - num_pending_transactions\n",
+   "replace": "MAX_PENDING_TRANSACTIONS - num_pending_transactions",
+   "with": "num_pending_transactions",
+   "obligation_category": "normal-result",
+   "rationale": "The pending count is returned instead of the remaining capacity."
+  }
+ ],
+ "MS-pending-046": [
+  {
+   "mutant_id": "MS-pending-046-includes-last-executed",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "let i = multisig_account.last_executed_sequence_number + 1;",
+   "replace": " + 1",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "The last executed transaction is listed as pending."
+  },
+  {
+   "mutant_id": "MS-pending-046-reads-next",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "while (i < next_sequence_number) {",
+   "replace": "<",
+   "with": "<=",
+   "obligation_category": "abort",
+   "rationale": "The unassigned next sequence number is read."
+  },
+  {
+   "mutant_id": "MS-pending-046-reads-successor",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "pending_transactions.push_back(*multisig_account.transactions.borrow(i));",
+   "replace": "borrow(i)",
+   "with": "borrow(i + 1)",
+   "obligation_category": "normal-result",
+   "rationale": "Each entry is the following transaction."
+  }
+ ],
+ "MS-timelock-047": [
+  {
+   "mutant_id": "MS-timelock-047-threshold-strict",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "&num_approvals >= override_threshold.borrow()",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "Approvals equal to the override threshold do not override."
+  },
+  {
+   "mutant_id": "MS-timelock-047-expiry-strict",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "|| elapsed >= timelock",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "A timelock is not expired at exactly its period."
+  },
+  {
+   "mutant_id": "MS-timelock-047-no-timelock-blocks",
+   "file": "sources/framework/extracted_multisig_account.move",
+   "anchor": "        } else {\n            true\n        }\n    }\n}",
+   "replace": "true",
+   "with": "false",
+   "obligation_category": "normal-result",
+   "rationale": "An account without a timelock can never execute."
+  }
+ ],
+ "PT-taker-034": [
+  {
+   "mutant_id": "PT-taker-034-ask-touch-not-taker",
+   "file": "sources/trading/extracted_price_time_index.move",
+   "anchor": "price >= best_ask_price.destroy_some()",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "A bid at the best ask is not treated as a taker."
+  },
+  {
+   "mutant_id": "PT-taker-034-ask-test-inverted",
+   "file": "sources/trading/extracted_price_time_index.move",
+   "anchor": "price <= best_bid_price.destroy_some()",
+   "replace": "<=",
+   "with": ">=",
+   "obligation_category": "normal-result",
+   "rationale": "An ask takes when it is above the best bid."
+  },
+  {
+   "mutant_id": "PT-taker-034-bid-checks-bids",
+   "file": "sources/trading/extracted_price_time_index.move",
+   "anchor": "let best_ask_price = self.best_ask_price();",
+   "replace": "self.best_ask_price()",
+   "with": "self.best_bid_price()",
+   "obligation_category": "normal-result",
+   "rationale": "A bid is compared against the best bid."
+  }
+ ],
+ "QP-part-025": [
+  {
+   "mutant_id": "QP-part-025-loose-split",
+   "file": "sources/authored/lomuto_partition.move",
+   "anchor": "if (values[i] < p) {",
+   "replace": "<",
+   "with": "<=",
+   "obligation_category": "normal-result",
+   "rationale": "Elements equal to the pivot move into the lower part."
+  },
+  {
+   "mutant_id": "QP-part-025-pivot-left-at-end",
+   "file": "sources/authored/lomuto_partition.move",
+   "anchor": "values.swap(store, last);",
+   "replace": "values.swap(store, last);",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "The pivot is never swapped into place."
+  },
+  {
+   "mutant_id": "QP-part-025-lost-element",
+   "file": "sources/authored/lomuto_partition.move",
+   "anchor": "values.swap(store, last);",
+   "replace": "values.swap(store, last);",
+   "with": "values[store] = p;",
+   "obligation_category": "normal-result",
+   "rationale": "The pivot overwrites the element at the split instead of exchanging with it."
+  },
+  {
+   "mutant_id": "QP-part-025-tolerates-bad-pivot",
+   "file": "sources/authored/lomuto_partition.move",
+   "anchor": "values.swap(pivot, last);",
+   "replace": "values.swap(pivot",
+   "with": "if (pivot <= last) values.swap(pivot",
+   "obligation_category": "abort",
+   "rationale": "An out-of-range pivot is silently ignored instead of aborting."
+  }
+ ],
+ "RL-refill-037": [
+  {
+   "mutant_id": "RL-refill-037-full-exclusive",
+   "file": "sources/framework/extracted_rate_limiter.move",
+   "anchor": "if (limiter.current_amount + new_tokens >= limiter.capacity) {",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "Reaching capacity exactly keeps the fraction."
+  },
+  {
+   "mutant_id": "RL-refill-037-fraction-kept-when-full",
+   "file": "sources/framework/extracted_rate_limiter.move",
+   "anchor": "limiter.fractional_accumulated = 0;",
+   "replace": "= 0;",
+   "with": "= limiter.fractional_accumulated;",
+   "obligation_category": "normal-result",
+   "rationale": "A full bucket keeps its old fraction."
+  },
+  {
+   "mutant_id": "RL-refill-037-timestamp-not-advanced",
+   "file": "sources/framework/extracted_rate_limiter.move",
+   "anchor": "limiter.last_refill_timestamp = current_time;",
+   "replace": "current_time",
+   "with": "limiter.last_refill_timestamp",
+   "obligation_category": "normal-result",
+   "rationale": "The refill time is never advanced."
+  }
+ ],
+ "RL-request-043": [
+  {
+   "mutant_id": "RL-request-043-exact-amount-refused",
+   "file": "sources/framework/extracted_rate_limiter.move",
+   "anchor": "if (limiter.current_amount >= num_token_requested) {",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "A request for exactly the available tokens is refused."
+  },
+  {
+   "mutant_id": "RL-request-043-no-refill",
+   "file": "sources/framework/extracted_rate_limiter.move",
+   "anchor": "        refill(limiter);\n",
+   "replace": "        refill(limiter);\n",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "The bucket is never refilled before the request."
+  },
+  {
+   "mutant_id": "RL-request-043-sets-instead-of-takes",
+   "file": "sources/framework/extracted_rate_limiter.move",
+   "anchor": "limiter.current_amount -= num_token_requested;",
+   "replace": "-=",
+   "with": "=",
+   "obligation_category": "normal-result",
+   "rationale": "The bucket is set to the request instead of reduced by it."
+  }
+ ],
+ "SM-select-022": [
+  {
+   "mutant_id": "SM-select-022-draw-count-off-by-one",
+   "file": "sources/authored/selection_machine.move",
+   "anchor": "Outcome::Accepted { value, draws: i }",
+   "replace": "draws: i",
+   "with": "draws: i + 1",
+   "obligation_category": "normal-result",
+   "rationale": "The reported draw count is one too high."
+  },
+  {
+   "mutant_id": "SM-select-022-restarts-at-origin",
+   "file": "sources/authored/selection_machine.move",
+   "anchor": "Outcome::Exhausted { restart_from: value }",
+   "replace": "restart_from: value",
+   "with": "restart_from: start",
+   "obligation_category": "normal-result",
+   "rationale": "An exhausted search hands back the seed rather than the last candidate."
+  },
+  {
+   "mutant_id": "SM-select-022-one-draw-too-many",
+   "file": "sources/authored/selection_machine.move",
+   "anchor": "while (i < rounds) {",
+   "replace": "i < rounds",
+   "with": "i <= rounds",
+   "obligation_category": "abort",
+   "rationale": "One more draw than the round count is tested."
+  }
+ ],
+ "SU-split-045": [
+  {
+   "mutant_id": "SU-split-045-scheme-from-second-byte",
+   "file": "sources/framework/extracted_sui_derivable_account.move",
+   "anchor": "let signing_scheme = bytes[0];",
+   "replace": "0",
+   "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "The scheme is read from the second byte."
+  },
+  {
+   "mutant_id": "SU-split-045-signature-one-short",
+   "file": "sources/framework/extracted_sui_derivable_account.move",
+   "anchor": "while (i < 65) {",
+   "replace": "65",
+   "with": "64",
+   "obligation_category": "normal-result",
+   "rationale": "The signature ends one byte early and the key starts one early."
+  },
+  {
+   "mutant_id": "SU-split-045-key-shifted-back",
+   "file": "sources/framework/extracted_sui_derivable_account.move",
+   "anchor": "abstract_signature_public_key.push_back(bytes[i]);",
+   "replace": "bytes[i]",
+   "with": "bytes[i - 1]",
+   "obligation_category": "normal-result",
+   "rationale": "Each key byte is taken one position early."
+  }
+ ],
+ "TL-build-039": [
+  {
+   "mutant_id": "TL-build-039-arguments-swapped",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "tiers.push_back(new_tier(min_stakes[i], multipliers_percent[i]));",
+   "replace": "min_stakes[i], multipliers_percent[i]",
+   "with": "multipliers_percent[i], min_stakes[i]",
+   "obligation_category": "normal-result",
+   "rationale": "Each tier takes its stake from the multipliers and vice versa."
+  },
+  {
+   "mutant_id": "TL-build-039-order-unchecked",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "        validate_tiers(&tiers);\n",
+   "replace": "        validate_tiers(&tiers);\n",
+   "with": "",
+   "obligation_category": "abort",
+   "rationale": "Tiers that are not ordered are accepted."
+  },
+  {
+   "mutant_id": "TL-build-039-length-from-multipliers",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "let len = min_stakes.length();",
+   "replace": "min_stakes",
+   "with": "multipliers_percent",
+   "obligation_category": "abort",
+   "rationale": "The length check compares the multipliers with themselves, so surplus stakes are silently dropped."
+  }
+ ],
+ "TL-enough-044": [
+  {
+   "mutant_id": "TL-enough-044-one-times-execution",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "execution_multiplier_percent > MIN_MULTIPLIER_PERCENT",
+   "replace": ">",
+   "with": ">=",
+   "obligation_category": "abort",
+   "rationale": "An execution multiplier of exactly 1x is accepted."
+  },
+  {
+   "mutant_id": "TL-enough-044-io-against-execution-tiers",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "find_min_stake_required(&config.io_tiers, io_multiplier_percent);",
+   "replace": "config.io_tiers",
+   "with": "config.execution_tiers",
+   "obligation_category": "abort",
+   "rationale": "The IO multiplier is looked up in the execution tiers."
+  },
+  {
+   "mutant_id": "TL-enough-044-execution-threshold-strict",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "            stake_amount >= execution_threshold,",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "abort",
+   "rationale": "A stake equal to the execution threshold is rejected."
+  }
+ ],
+ "TL-find-040": [
+  {
+   "mutant_id": "TL-find-040-covering-strict",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "|t| t.multiplier_percent >= multiplier_percent",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "A tier with exactly the requested multiplier does not cover it."
+  },
+  {
+   "mutant_id": "TL-find-040-abort-inverted",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "assert!(found, error::invalid_argument(EMULTIPLIER_NOT_AVAILABLE));",
+   "replace": "found",
+   "with": "!found",
+   "obligation_category": "abort",
+   "rationale": "The lookup aborts when a covering tier exists."
+  },
+  {
+   "mutant_id": "TL-find-040-returns-multiplier",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "        tiers[i].min_stake\n",
+   "replace": "min_stake",
+   "with": "multiplier_percent",
+   "obligation_category": "normal-result",
+   "rationale": "The covering tier's multiplier is returned instead of its stake."
+  }
+ ],
+ "TL-tiers-038": [
+  {
+   "mutant_id": "TL-tiers-038-stake-strict",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "curr.min_stake >= prev.min_stake",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "abort",
+   "rationale": "Two tiers with the same stake are rejected."
+  },
+  {
+   "mutant_id": "TL-tiers-038-multiplier-nonstrict",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "&& curr.multiplier_percent > prev.multiplier_percent,",
+   "replace": ">",
+   "with": ">=",
+   "obligation_category": "abort",
+   "rationale": "Two tiers with the same multiplier are accepted."
+  },
+  {
+   "mutant_id": "TL-tiers-038-first-pair-skipped",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "let i = 1;\n        let len = tiers.length();",
+   "replace": "let i = 1",
+   "with": "let i = 2",
+   "obligation_category": "abort",
+   "rationale": "The first two tiers are never compared."
+  }
+ ],
+ "TL-update-050": [
+  {
+   "mutant_id": "TL-update-050-no-signer-check",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "        system_addresses::assert_aptos_framework(aptos_framework);\n",
+   "replace": "        system_addresses::assert_aptos_framework(aptos_framework);\n",
+   "with": "",
+   "obligation_category": "abort",
+   "rationale": "Any signer may update the configuration."
+  },
+  {
+   "mutant_id": "TL-update-050-io-from-execution-stakes",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "let io_tiers = new_tiers(io_min_stakes, io_multipliers_percent);",
+   "replace": "io_min_stakes",
+   "with": "execution_min_stakes",
+   "obligation_category": "normal-result",
+   "rationale": "The IO tiers take the execution stakes."
+  },
+  {
+   "mutant_id": "TL-update-050-io-not-updated",
+   "file": "sources/framework/extracted_transaction_limits.move",
+   "anchor": "            config.io_tiers = io_tiers;\n",
+   "replace": "            config.io_tiers = io_tiers;\n",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "An existing configuration keeps its old IO tiers."
+  }
+ ],
+ "TR-cancel-026": [
+  {
+   "mutant_id": "TR-cancel-026-price-removed-alone",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "                prices.remove(i);\n                sizes.remove(i);",
+   "replace": "\n                sizes.remove(i);",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "Only the price level is removed, so the two vectors fall out of step and every later size belongs to the wrong price."
+  },
+  {
+   "mutant_id": "TR-cancel-026-returns-the-price",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "let cancelled_size = sizes[i];",
+   "replace": "sizes[i]",
+   "with": "prices[i]",
+   "obligation_category": "normal-result",
+   "rationale": "Returns the price of the cancelled level rather than its size."
+  },
+  {
+   "mutant_id": "TR-cancel-026-scans-past-end",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "while (i < prices.length()) {\n            if (prices[i] == price) {",
+   "replace": "i < prices.length()",
+   "with": "i <= prices.length()",
+   "obligation_category": "abort",
+   "rationale": "One iteration too many indexes past the end when no level matches."
+  }
+ ],
+ "TR-discard-011": [
+  {
+   "mutant_id": "TR-discard-011-flip-bid-test",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (is_bid && prices[i] < best_price) {",
+   "replace": "<",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "Bids stop at the first level above the best price instead of below it."
+  },
+  {
+   "mutant_id": "TR-discard-011-ask-test-inclusive",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "} else if (!is_bid && prices[i] > best_price) {",
+   "replace": ">",
+   "with": ">=",
+   "obligation_category": "normal-result",
+   "rationale": "An ask level equal to the best price stops the scan instead of being discarded."
+  },
+  {
+   "mutant_id": "TR-discard-011-scan-past-end",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "            while (i < prices.length()) {\n                if (is_bid && prices[i] < best_price) {",
+   "replace": "i < prices",
+   "with": "i <= prices",
+   "obligation_category": "abort",
+   "rationale": "The scan reads one past the end when every level crosses."
+  }
+ ],
+ "TR-match-029": [
+  {
+   "mutant_id": "TR-match-029-full-match-rejected",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "assert!(matched_size <= sizes[0], EUNEXPECTED_MATCH_SIZE);",
+   "replace": "<=",
+   "with": "<",
+   "obligation_category": "abort",
+   "rationale": "Matching the whole first level aborts."
+  },
+  {
+   "mutant_id": "TR-match-029-price-kept-on-removal",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "            prices.remove(0);\n            sizes.remove(0);",
+   "replace": "            prices.remove(0);\n",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "Only the size level is removed, so prices and sizes fall out of step."
+  },
+  {
+   "mutant_id": "TR-match-029-returns-size-as-price",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "(option::some(prices[0]), option::some(sizes[0]))",
+   "replace": "option::some(prices[0])",
+   "with": "option::some(sizes[0])",
+   "obligation_category": "normal-result",
+   "rationale": "The next active price reported is the next size."
+  }
+ ],
+ "TR-nonzero-031": [
+  {
+   "mutant_id": "TR-nonzero-031-rejects-ones",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (sizes[i] == 0) {",
+   "replace": "== 0",
+   "with": "== 1",
+   "obligation_category": "normal-result",
+   "rationale": "Size one is rejected and size zero accepted."
+  },
+  {
+   "mutant_id": "TR-nonzero-031-scans-past-end",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "while (i < sizes.length()) {",
+   "replace": "<",
+   "with": "<=",
+   "obligation_category": "abort",
+   "rationale": "The scan reads one past the end of an all-nonzero vector."
+  },
+  {
+   "mutant_id": "TR-nonzero-031-zero-accepted",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (sizes[i] == 0) {\n                return false;",
+   "replace": "return false",
+   "with": "return true",
+   "obligation_category": "normal-result",
+   "rationale": "A zero size makes the check succeed."
+  }
+ ],
+ "TR-order-010": [
+  {
+   "mutant_id": "TR-order-010-descending-not-strict",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (prices[i] <= prices[i + 1]) {",
+   "replace": "=",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "The descending check accepts equal neighbours."
+  },
+  {
+   "mutant_id": "TR-order-010-ascending-not-strict",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (prices[i] >= prices[i + 1]) {",
+   "replace": "=",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "The ascending check accepts equal neighbours."
+  },
+  {
+   "mutant_id": "TR-order-010-drop-empty-guard",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (prices.length() == 0) {",
+   "replace": "prices.length() == 0",
+   "with": "false",
+   "obligation_category": "abort",
+   "rationale": "Without the early return an empty vector underflows `length() - 1`."
+  }
+ ],
+ "TR-reinsert-030": [
+  {
+   "mutant_id": "TR-reinsert-030-empty-side-indexed",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (prices.length() > 0 && prices[0] == other_price) {",
+   "replace": "&&",
+   "with": "||",
+   "obligation_category": "abort",
+   "rationale": "An empty side is indexed instead of receiving a first level."
+  },
+  {
+   "mutant_id": "TR-reinsert-030-merge-overwrites",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "sizes[0] += other.get_remaining_size_from_match_details();",
+   "replace": "+=",
+   "with": "=",
+   "obligation_category": "normal-result",
+   "rationale": "Merging replaces the first size instead of adding to it."
+  },
+  {
+   "mutant_id": "TR-reinsert-030-price-appended",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "prices.insert(0, other_price);",
+   "replace": "insert(0, other_price)",
+   "with": "push_back(other_price)",
+   "obligation_category": "normal-result",
+   "rationale": "The new price goes to the back while its size goes to the front."
+  }
+ ],
+ "TR-sanitize-028": [
+  {
+   "mutant_id": "TR-sanitize-028-sequence-zero-allowed",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "assert!(sequence_number > 0, E_INVALID_SEQUENCE_NUMBER);",
+   "replace": "> 0",
+   "with": ">= 0",
+   "obligation_category": "abort",
+   "rationale": "The reserved sequence number zero is accepted."
+  },
+  {
+   "mutant_id": "TR-sanitize-028-bid-depth-exclusive",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "assert!(num_bids <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);",
+   "replace": "<=",
+   "with": "<",
+   "obligation_category": "abort",
+   "rationale": "A bid side of exactly the maximum depth is rejected."
+  },
+  {
+   "mutant_id": "TR-sanitize-028-touching-sides-allowed",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "assert!(bid_prices[0] < ask_prices[0], EPRICE_CROSSING);",
+   "replace": "<",
+   "with": "<=",
+   "obligation_category": "abort",
+   "rationale": "A best bid equal to the best ask is accepted."
+  }
+ ],
+ "VR-range-042": [
+  {
+   "mutant_id": "VR-range-042-end-inclusive",
+   "file": "sources/stdlib/extracted_vector_range.move",
+   "anchor": "while (start < end) {",
+   "replace": "<",
+   "with": "<=",
+   "obligation_category": "normal-result",
+   "rationale": "The end of the range is included."
+  },
+  {
+   "mutant_id": "VR-range-042-shifted-by-step",
+   "file": "sources/stdlib/extracted_vector_range.move",
+   "anchor": "vec.push_back(start);",
+   "replace": "start",
+   "with": "start + step",
+   "obligation_category": "normal-result",
+   "rationale": "Every element is one step too far."
+  },
+  {
+   "mutant_id": "VR-range-042-unit-step",
+   "file": "sources/stdlib/extracted_vector_range.move",
+   "anchor": "            start += step;",
+   "replace": "step",
+   "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "The range advances by one regardless of the step."
+  }
+ ]
+}

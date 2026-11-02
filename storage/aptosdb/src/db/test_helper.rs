@@ -16,12 +16,12 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{native_position::NativePosition, state_key::StateKey, state_value::StateValue},
     transaction::{
         AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionInfo, TransactionToCommit, Version,
     },
-    write_set::TransactionWrite,
+    write_set::{NativePositionOp, TransactionWrite, WriteOp},
 };
 use itertools::Itertools;
 use proptest::{
@@ -30,7 +30,7 @@ use proptest::{
     sample::Index,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
 };
 
@@ -142,6 +142,7 @@ prop_compose! {
         min_blocks: usize,
         max_blocks: usize,
         make_hot_in_epilogue: bool,
+        with_positions: bool,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
         block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
@@ -149,14 +150,23 @@ prop_compose! {
         let mut txn_accumulator = InMemoryTransactionAccumulator::new_empty();
         let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);
         let mut smt = root_smt.clone();
+        let mut position_smt = root_smt.clone();
 
         let mut result = Vec::new();
 
-        for block_gen in block_gens {
+        for (block_idx, block_gen) in block_gens.into_iter().enumerate() {
             let (mut txns_to_commit, mut ledger_info) =
                 block_gen.materialize(&mut universe, make_hot_in_epilogue);
             smt = update_in_memory_state(&smt, &root_smt, &txns_to_commit);
             let state_checkpoint_root_hash = smt.root_hash();
+            let position_root_hash = with_positions.then(|| {
+                let checkpoint = txns_to_commit
+                    .last_mut()
+                    .expect("a block ends with its checkpoint");
+                add_block_positions(checkpoint, block_idx);
+                position_smt = update_in_memory_positions(&position_smt, &root_smt, checkpoint);
+                position_smt.root_hash()
+            });
 
             // make real txn_info's
             for (idx, txn) in txns_to_commit.iter_mut().enumerate() {
@@ -175,15 +185,30 @@ prop_compose! {
 
                 let auxiliary_info = AuxiliaryInfo::new(PersistedAuxiliaryInfo::V1 { transaction_index: idx as u32 }, None);
 
-                let txn_info = TransactionInfo::builder_v0()
-                    .transaction_hash(txn.transaction().committed_hash())
-                    .state_change_hash(txn.write_set().hash())
-                    .event_root_hash(event_root_hash)
-                    .maybe_state_checkpoint_hash(state_checkpoint_hash)
-                    .gas_used(placeholder_txn_info.gas_used())
-                    .status(placeholder_txn_info.status().clone())
-                    .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
-                    .build();
+                let txn_info = match position_root_hash {
+                    None => TransactionInfo::builder_v0()
+                        .transaction_hash(txn.transaction().committed_hash())
+                        .state_change_hash(txn.write_set().hash())
+                        .event_root_hash(event_root_hash)
+                        .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                        .gas_used(placeholder_txn_info.gas_used())
+                        .status(placeholder_txn_info.status().clone())
+                        .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
+                        .build(),
+                    // The position root rides with the state checkpoint, as in execution.
+                    Some(position_root_hash) => TransactionInfo::builder_v1()
+                        .transaction_hash(txn.transaction().committed_hash())
+                        .state_change_hash(txn.write_set().hash())
+                        .event_root_hash(event_root_hash)
+                        .maybe_state_checkpoint_hash(state_checkpoint_hash)
+                        .gas_used(placeholder_txn_info.gas_used())
+                        .status(placeholder_txn_info.status().clone())
+                        .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
+                        .maybe_position_state_checkpoint_hash(
+                            state_checkpoint_hash.map(|_| position_root_hash),
+                        )
+                        .build(),
+                };
                 txn_accumulator = txn_accumulator.append(&[txn_info.hash()]);
                 txn.set_transaction_info(txn_info);
             }
@@ -228,7 +253,86 @@ pub fn arb_blocks_to_commit_with_params(
         min_blocks,
         max_blocks,
         make_hot_in_epilogue,
+        false, /* with_positions */
     )
+}
+
+/// Like [`arb_blocks_to_commit`], but every block's checkpoint also writes
+/// native positions, and checkpoint transaction infos commit the position
+/// root (as with `COMPUTE_TRADING_NATIVE_STATE_ROOTS` on).
+pub fn arb_blocks_to_commit_with_positions(
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        5,     /* num_accounts */
+        2,     /* max_user_txns_per_block */
+        1,     /* min_blocks */
+        10,    /* max_blocks */
+        false, /* make_hot_in_epilogue */
+        true,  /* with_positions */
+    )
+}
+
+fn test_position_key(account: u8) -> StateKey {
+    let address = |byte: u8| {
+        let mut bytes = [0u8; AccountAddress::LENGTH];
+        bytes[AccountAddress::LENGTH - 1] = byte;
+        AccountAddress::new(bytes)
+    };
+    StateKey::position(address(1), address(account), address(1))
+}
+
+/// Block `block_idx` sets accounts `0..=max(1, block_idx % 7)` and deletes account 3 on every
+/// fourth block, so positions accumulate, get overwritten, and get deleted.
+fn add_block_positions(checkpoint: &mut TransactionToCommit, block_idx: usize) {
+    let mut positions = BTreeMap::new();
+    for account in 0..=(block_idx % 7).max(1) as u8 {
+        let position = NativePosition::PerpV1 {
+            size: block_idx as u64 * 100 + account as u64,
+            is_long: true,
+            entry_px_times_size_sum: 0,
+            avg_acquire_entry_px: 0,
+            user_leverage: 1,
+            is_isolated: false,
+            funding_index_at_last_update: 0,
+            unrealized_funding_amount_before_last_update: 0,
+            timestamp: 0,
+        };
+        let bytes = position.serialize().expect("NativePosition serialize");
+        positions.insert(
+            test_position_key(account),
+            NativePositionOp::from_write_op(WriteOp::legacy_modification(bytes.into())),
+        );
+    }
+    if block_idx % 4 == 3 {
+        positions.insert(
+            test_position_key(3),
+            NativePositionOp::from_write_op(WriteOp::legacy_deletion()),
+        );
+    }
+    let mut write_set = std::mem::take(&mut checkpoint.write_set).into_v1();
+    write_set.add_native_positions(positions);
+    checkpoint.write_set = write_set;
+}
+
+fn update_in_memory_positions(
+    smt: &SparseMerkleTree,
+    root_smt: &SparseMerkleTree,
+    checkpoint: &TransactionToCommit,
+) -> SparseMerkleTree {
+    let updates = checkpoint
+        .write_set
+        .native_position_iter()
+        .map(|(k, op)| {
+            (
+                k.hash(),
+                op.as_write_op().as_state_value_opt().map(CryptoHash::hash),
+            )
+        })
+        .collect_vec();
+    smt.freeze(root_smt)
+        .batch_update(updates.iter(), &())
+        .unwrap()
+        .unfreeze()
 }
 
 fn verify_epochs(db: &AptosDB, ledger_infos_with_sigs: &[LedgerInfoWithSignatures]) {
@@ -371,7 +475,12 @@ pub fn test_save_blocks_impl(
 
         cur_ver += txns_to_commit.len() as u64;
     }
-    db.state_store.buffered_state().lock().sync_commit();
+    db.state_store
+        .live()
+        .unwrap()
+        .buffered_state()
+        .lock()
+        .sync_commit();
 
     let first_batch = input.first().unwrap().0.clone();
     let first_batch_ledger_info = input.first().unwrap().1.clone();
@@ -396,7 +505,12 @@ pub fn test_save_blocks_impl(
     verify_epochs(&db, &ledger_infos_with_sigs);
 
     // sync the commits and verify the states
-    db.state_store.buffered_state().lock().sync_commit();
+    db.state_store
+        .live()
+        .unwrap()
+        .buffered_state()
+        .lock()
+        .sync_commit();
     verify_snapshots(
         &db,
         0, /* first_version */
@@ -581,9 +695,8 @@ pub fn verify_committed_transactions(
         ledger_info.transaction_accumulator_hash()
     );
 
-    let mut cur_ver = first_version;
     let mut updates = HashMap::new();
-    for txn_to_commit in txns_to_commit {
+    for (cur_ver, txn_to_commit) in (first_version..).zip(txns_to_commit) {
         let txn_info = db
             .ledger_db
             .transaction_info_db()
@@ -647,7 +760,6 @@ pub fn verify_committed_transactions(
                 .unwrap();
             assert_eq!(txn_output_list_with_proof.get_num_outputs(), 1);
         }
-        cur_ver += 1;
     }
 
     // Fetch and verify batch transactions by account
@@ -754,7 +866,12 @@ pub fn test_sync_transactions_impl(
     }
 
     // sync the commits and verify the states
-    db.state_store.buffered_state().lock().sync_commit();
+    db.state_store
+        .live()
+        .unwrap()
+        .buffered_state()
+        .lock()
+        .sync_commit();
     verify_snapshots(
         &db,
         0, /* first_version */

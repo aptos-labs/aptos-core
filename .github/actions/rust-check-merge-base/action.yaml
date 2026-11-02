@@ -4,16 +4,25 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  PREBUILT_TOOLS:
+    description: Skip tool installation after the caller verifies the prebuilt image
+    default: "false"
+  BASE_REF:
+    description: "Comparison branch or commit (merge base with HEAD)"
+    default: origin/main
 
 runs:
   using: composite
   steps:
     # The source code must be checked out by the workflow that invokes this action.
     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      if: ${{ inputs.PREBUILT_TOOLS != 'true' }}
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
 
     # Check the freshness of the merge base
     - name: Check the freshness of the merge base
-      run: cargo x check-merge-base -vvv
+      run: cargo x --base "$TEST_BASE_REF" check-merge-base -vvv
       shell: bash
+      env:
+        TEST_BASE_REF: ${{ inputs.BASE_REF }}

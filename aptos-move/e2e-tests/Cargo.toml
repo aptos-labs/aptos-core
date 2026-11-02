@@ -29,6 +29,7 @@ aptos-gas-meter = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
+aptos-memory-usage-tracker = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }
@@ -54,7 +55,7 @@ move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
-petgraph = "0.5.1"
+petgraph = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }

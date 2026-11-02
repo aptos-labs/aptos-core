@@ -1,0 +1,10 @@
+name = "VerexTransactionalTests"
+defaultTargets = ["VerexTransactionalTests"]
+
+[[require]]
+name = "verex-move"
+path = "../../../../lean/verex-move"
+
+[[lean_lib]]
+name = "VerexTransactionalTests"
+roots = ["arithmetic", "basic", "calls", "control_flow", "references"]

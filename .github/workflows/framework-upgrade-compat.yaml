@@ -1,0 +1,160 @@
+# Framework upgrade compatibility test.
+#
+# Asserts that a node running the previous release's binary can execute the
+# framework on this branch. On mainnet, validators take a new binary first and
+# the framework upgrade follows, so a fullnode still on the old binary has to
+# execute that upgrade or it stops there.
+#
+# One localnet, no consensus, no Forge cluster. See
+# scripts/test_framework_upgrade_compat.sh for the mechanics.
+#
+# Opt-in: label a PR `framework-upgrade-test`, or dispatch it manually.
+name: Framework Upgrade Compatibility
+
+# Nothing here authenticates to a cloud or a registry: both binaries are built
+# from source and the localnet is reached over loopback. Read access is enough.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      OLD_BRANCH:
+        required: false
+        type: string
+        description: >-
+          Release branch supplying the old binary. Defaults to the newest
+          aptos-release-vX.Y branch.
+
+  # `pull_request`, never `pull_request_target`: this builds and runs PR code on a
+  # self-hosted runner, and `pull_request_target` would hand that code a writable
+  # token in the base-repo context.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+  # schedule: # NOTE: the schedule is dictated by PIES
+
+concurrency:
+  group: framework-upgrade-compat-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  framework-upgrade-compat:
+    # Dispatch, or a same-repo (non-fork) PR carrying the label.
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'framework-upgrade-test') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    # Two debug cargo builds plus a localnet. disk=large is required: a debug
+    # aptos binary alone is ~775MB, and this builds two trees.
+    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 40
+    env:
+      # This is the one dev-profile build in the repo's CI, so it is the one that
+      # pays for incremental: multiple GB of incr-comp dirs for a single-shot
+      # build, which then bloat the cache too. Full DWARF is most of the ~775MB
+      # binary; line-tables-only keeps file:line in backtraces.
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+      # Picks the release branch that supplies the old binary, in precedence
+      # order: the explicit OLD_BRANCH input, else the predecessor of the
+      # release branch this was dispatched from, else the newest release.
+      #
+      # Resolved here rather than via the shared composite action, which also
+      # resolves a docker image tag and so drags in crane and registry
+      # credentials. This job has no use for a registry -- it builds both
+      # binaries from source and talks only to loopback -- so keeping it out
+      # means no cloud credentials are in scope at all.
+      - name: Resolve and validate the old branch
+        id: old
+        env:
+          OLD_BRANCH: ${{ inputs.OLD_BRANCH }}
+          # The branch whose predecessor we want. On pull_request, GITHUB_REF_NAME
+          # is "<pr>/merge" and would never match a release branch, so use the
+          # branch the PR would land on.
+          TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Every aptos-release-vX.Y branch on the remote, oldest to newest.
+          releases() {
+            git ls-remote --heads origin 'refs/heads/aptos-release-v*' \
+              | sed 's|.*refs/heads/||' \
+              | grep -E '^aptos-release-v[0-9]+\.[0-9]+$' \
+              | sort -V
+          }
+          if [[ -z "${OLD_BRANCH}" ]]; then
+            if [[ "${TARGET_BRANCH}" =~ ^aptos-release-v ]]; then
+              # Targeting a release branch: the baseline is its predecessor.
+              # Taking the newest instead would pair an older framework with a
+              # newer binary, which is the upgrade running backwards. Mirrors
+              # determine_target_branch() in
+              # testsuite/determine_target_branch_to_fetch_last_released_image.py.
+              OLD_BRANCH="$(releases | grep -B1 -x "${TARGET_BRANCH}" | head -1)"
+              [[ "${OLD_BRANCH}" != "${TARGET_BRANCH}" ]] \
+                || { echo "::error::${TARGET_BRANCH} is the oldest release branch; pass OLD_BRANCH"; exit 1; }
+            else
+              OLD_BRANCH="$(releases | tail -1)"
+            fi
+          fi
+          [[ -n "${OLD_BRANCH}" ]] || { echo "::error::could not resolve a release branch"; exit 1; }
+          # Read via env, never expression-substituted into this script, and
+          # constrain the charset: this value becomes a git ref below.
+          if ! [[ "${OLD_BRANCH}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+            echo "::error::Refusing branch name with unexpected characters"
+            exit 1
+          fi
+          echo "OLD_BRANCH=${OLD_BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "Old binary will be built from ${OLD_BRANCH}"
+
+      # The CLI embeds aptos-node, so the CLI *is* the VM under test. It has to be
+      # built from the release branch: CLI releases are versioned independently of
+      # node releases (CLI 9.x vs node 1.4x), so a downloaded CLI has no defined
+      # relationship to a given release branch.
+      - name: Check out the old release branch
+        env:
+          OLD_BRANCH: ${{ steps.old.outputs.OLD_BRANCH }}
+        run: git worktree add --detach ../aptos-old "origin/${OLD_BRANCH}"
+
+      # rust-setup's rust-cache only covers this workspace's ./target, so without
+      # a second cache the old CLI -- the dominant build in the job -- is cold
+      # every run. The release branch is frozen, so its Cargo.lock never moves
+      # and the hit rate is ~100% after the first run.
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+        with:
+          workspaces: ../aptos-old -> target
+          key: ${{ steps.old.outputs.OLD_BRANCH }}
+
+      - name: Build the old CLI
+        run: cargo build --locked -p aptos --bin aptos
+        working-directory: ../aptos-old
+
+      - name: Build aptos-release-tool from this branch
+        run: cargo build --locked -p aptos-release-tool
+
+      # TMPDIR is pinned so the work directory lands somewhere the upload step can
+      # find: the script uses ${TMPDIR:-/tmp}, and a runner may set TMPDIR anywhere.
+      - name: Run the compatibility test
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: ./scripts/test_framework_upgrade_compat.sh --old-cli ../aptos-old/target/debug/aptos
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: framework-upgrade-compat-logs
+          # Don't ship the localnet's private keys.
+          path: |
+            ${{ runner.temp }}/fwup-compat.*/
+            !${{ runner.temp }}/fwup-compat.*/**/mint.key
+            !${{ runner.temp }}/fwup-compat.*/**/*identity.yaml
+          retention-days: 7

@@ -1,0 +1,22 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_transaction_limits",
+  "reference_proved": true,
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_transaction_limits::update_config",
+  "task_id": "TL-update-050",
+  "task_tree_sha256": "2fe8e5353e19459cdb8271f15d6b3ce5288cd79ec0cddebe60c1c11e6c42a067",
+  "threshold_seconds": 20,
+  "wall_seconds": 6.2,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

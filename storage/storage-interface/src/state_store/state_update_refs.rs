@@ -1,9 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{metrics::TIMER, state_store::versioned_state_value::StateUpdateRef};
-use aptos_logger::{sample, sample::SampleRate, warn};
-use aptos_metrics_core::TimerHelper;
+use crate::{
+    metrics::{COUNTER, TIMER},
+    state_store::versioned_state_value::StateUpdateRef,
+};
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
@@ -12,10 +14,7 @@ use aptos_types::{
 use arr_macro::arr;
 use itertools::Itertools;
 use rayon::prelude::*;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    time::Duration,
-};
+use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Clone, Debug)]
 pub struct PerVersionStateUpdateRefs<'kv> {
@@ -281,25 +280,16 @@ impl<'kv> StateUpdateRefs<'kv> {
                         continue;
                     }
 
-                    // If we see a hotness op, we check if there is a value write op with the same
-                    // key before. This is unlikely, but if it does happen (e.g. if the write
-                    // summary used to compute MakeHot is missing keys), we must discard the
-                    // hotness op to avoid overwriting the value write op.
+                    // A hotness op must not overwrite an earlier value write to the same key, which
+                    // already makes it hot. This is expected: the block epilogue promotes keys it
+                    // reads, even if written earlier in the block (e.g. `CurrentTimeMicroseconds`).
                     // TODO(HotState): also double check this logic for state sync later. For now
                     // we do not output hotness ops for state sync.
                     match dedupped.entry(k) {
                         Entry::Occupied(mut entry) => {
-                            let prev_op = &entry.get().state_op;
-                            sample!(
-                                SampleRate::Duration(Duration::from_secs(10)),
-                                warn!(
-                                    "Key: {:?}. Previous write op: {}. Current write op: {}",
-                                    k,
-                                    prev_op.as_ref(),
-                                    u.state_op.as_ref()
-                                )
-                            );
-                            if !prev_op.is_value_write_op() {
+                            if entry.get().state_op.is_value_write_op() {
+                                COUNTER.inc_with(&["make_hot_after_write_dropped"]);
+                            } else {
                                 entry.insert(u);
                             }
                         },
@@ -416,6 +406,21 @@ mod tests {
         verify_batching(for_latest, "A", 11, "A1");
         verify_batching(for_latest, "B", 10, "B0");
         verify_batching(for_latest, "C", 12, "C2");
+    }
+
+    #[test]
+    fn test_make_hot_after_write() {
+        let v0 = write_set(&[("A", "A0")]);
+        let mut v1 = write_set(&[]);
+        v1.add_hotness(["A", "B"].map(|k| StateKey::raw(k.as_bytes())).into());
+        let ret = StateUpdateRefs::index_write_sets(0, vec![&v0, &v1], 2, vec![1]);
+
+        let batched = ret.for_last_checkpoint_batched().unwrap();
+        // The write to "A" is kept, and only "B" is made hot.
+        verify_batching(batched, "A", 0, "A0");
+        let b = batched.get("B").unwrap();
+        assert_eq!(b.version, 1);
+        assert!(!b.state_op.is_value_write_op());
     }
 
     /// Each shard's per-version vec must be ordered by `(version, key_hash)`.

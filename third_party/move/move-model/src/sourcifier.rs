@@ -5,7 +5,7 @@ use crate::{
     ast::{
         AbortKind, AccessSpecifierKind, AddressSpecifier, Condition, ConditionKind, Exp, ExpData,
         FrameSpec, LambdaCaptureKind, MemoryRange, Operation, Pattern, PropertyBag, PropertyValue,
-        QuantKind, ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
+        QuantKind, ResourceSpecifier, Spec, SpecBlockTarget, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -355,7 +355,7 @@ impl<'a> Sourcifier<'a> {
     pub fn print_exp_for_fun_spec(&self, fun_env: &FunctionEnv, exp: &Exp) {
         let exp_sourcifier =
             ExpSourcifier::for_fun_spec(self, fun_env, fun_env.get_type_display_ctx(), self.amend);
-        exp_sourcifier.print_exp(Prio::General, false, exp);
+        exp_sourcifier.print_exp(Prio::General, false, &exp.restore_lambda_calls(self.env()));
     }
 
     /// Destructs and returns the result
@@ -1468,7 +1468,10 @@ impl<'a> Sourcifier<'a> {
         fun_env: &FunctionEnv,
         signature_tctx: TypeDisplayContext<'_>,
     ) {
-        let spec = fun_env.get_spec();
+        let spec = fun_env.get_spec().restore_lambda_calls(
+            self.env(),
+            &SpecBlockTarget::Function(fun_env.module_env.get_id(), fun_env.get_id()),
+        );
         let has_frame = spec
             .frame_spec
             .as_ref()
@@ -2310,20 +2313,23 @@ impl<'a> ExpSourcifier<'a> {
             },
             Quant(_, kind, ranges, triggers, where_clause, body) => {
                 self.parenthesize(context_prio, Prio::General, || {
-                    self.print_quant_header(kind, ranges, triggers, where_clause);
-                    self.print_exp(Prio::General, false, body);
+                    self.print_quant(kind, ranges, triggers, where_clause, || {
+                        self.print_exp(Prio::General, false, body)
+                    });
                 })
             },
         }
     }
 
-    /// Print quantifier header (keyword, ranges, triggers, where clause, and trailing `: `).
-    fn print_quant_header(
+    /// Print a quantifier: keyword, ranges, triggers, where clause, and the body
+    /// `print_body` prints.
+    fn print_quant(
         &self,
         kind: &QuantKind,
         ranges: &[(Pattern, Exp)],
         triggers: &[Vec<Exp>],
         where_clause: &Option<Exp>,
+        print_body: impl Fn(),
     ) {
         let keyword = match kind {
             QuantKind::Forall => "forall",
@@ -2357,21 +2363,39 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, range);
             }
         }
-        for trigger in triggers {
-            emit!(self.wr(), " {");
-            for (i, t) in trigger.iter().enumerate() {
-                if i > 0 {
-                    emit!(self.wr(), ", ");
+        match kind {
+            QuantKind::Forall | QuantKind::Exists => {
+                for trigger in triggers {
+                    emit!(self.wr(), " {");
+                    for (i, t) in trigger.iter().enumerate() {
+                        if i > 0 {
+                            emit!(self.wr(), ", ");
+                        }
+                        self.print_exp(Prio::General, false, t);
+                    }
+                    emit!(self.wr(), "}");
                 }
-                self.print_exp(Prio::General, false, t);
-            }
-            emit!(self.wr(), "}");
+                if let Some(where_exp) = where_clause {
+                    emit!(self.wr(), " where ");
+                    self.print_exp(Prio::General, false, where_exp);
+                }
+                emit!(self.wr(), ": ");
+                print_body();
+            },
+            QuantKind::Choose | QuantKind::ChooseMin => {
+                // `choose` has no separate condition: `where` introduces the
+                // body it chooses by.
+                emit!(self.wr(), " where ");
+                if let Some(where_exp) = where_clause {
+                    self.print_exp(Prio::LogicalAnd, false, where_exp);
+                    emit!(self.wr(), " && (");
+                    print_body();
+                    emit!(self.wr(), ")");
+                } else {
+                    print_body();
+                }
+            },
         }
-        if let Some(where_exp) = where_clause {
-            emit!(self.wr(), " where ");
-            self.print_exp(Prio::General, false, where_exp);
-        }
-        emit!(self.wr(), ": ");
     }
 
     /// Print a memory label with its name (from GlobalEnv) or fallback to numeric ID.
@@ -3584,8 +3608,9 @@ impl<'a> ExpSourcifier<'a> {
                 if is_simple_quant(ranges, triggers, where_clause) =>
             {
                 self.parenthesize(prio, Prio::General, || {
-                    self.print_quant_header(kind, ranges, triggers, where_clause);
-                    self.print_exp_without_label(Prio::General, body);
+                    self.print_quant(kind, ranges, triggers, where_clause, || {
+                        self.print_exp_without_label(Prio::General, body)
+                    });
                 })
             },
             _ => self.print_exp(prio, false, exp),

@@ -3,4 +3,3 @@ error: failed to parse manifest
 1 | / [package]
 2 | | name = "some_package_name"
   | |__________________________^ missing field `version`
-  |

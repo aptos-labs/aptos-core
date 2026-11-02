@@ -3,7 +3,10 @@
 
 use crate::{
     backup_types::{
-        epoch_ending::restore::EpochHistory, state_snapshot::manifest::StateSnapshotBackup,
+        epoch_ending::restore::EpochHistory,
+        state_snapshot::manifest::{
+            PositionSnapshotBackup, SnapshotKind, StateSnapshotBackup, StateSnapshotChunk,
+        },
     },
     metrics::{
         restore::{
@@ -22,7 +25,8 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_db::state_restore::StateSnapshotRestoreMode;
+use aptos_crypto::HashValue;
+use aptos_db::state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
@@ -138,11 +142,80 @@ impl StateSnapshotRestoreController {
             epoch_history.verify_ledger_info(&li)?;
         }
 
-        let receiver = Arc::new(Mutex::new(Some(self.run_mode.get_state_restore_receiver(
+        let receiver = self.run_mode.get_state_restore_receiver(
             self.version,
             manifest.root_hash,
             self.restore_mode,
-        )?)));
+        )?;
+        let receiver = self
+            .add_chunks(receiver, manifest.chunks, SnapshotKind::State)
+            .await?;
+
+        // Positions land before the main tree is finished: a resumed run skips
+        // the snapshot once its tree root exists, so the tree root must be the
+        // last thing written.
+        let positions = self.restore_positions(&txn_info_with_proof, manifest.positions)?;
+        if let Some((root_hash, chunks)) = positions {
+            let receiver = self
+                .run_mode
+                .get_position_restore_receiver(self.version, root_hash)?;
+            let receiver = self
+                .add_chunks(receiver, chunks, SnapshotKind::Position)
+                .await?;
+            tokio::task::spawn_blocking(move || receiver.finish()).await??;
+            self.run_mode
+                .reset_position_store(self.version, root_hash)?;
+        }
+
+        tokio::task::spawn_blocking(move || receiver.finish()).await??;
+        Ok(self.run_mode.finish()?)
+    }
+
+    /// The position chunks to restore with this snapshot, if any. Positions
+    /// come along only with a usable tree, so a KV-only restore skips them.
+    fn restore_positions(
+        &self,
+        txn_info_with_proof: &TransactionInfoWithProof,
+        positions: Option<PositionSnapshotBackup>,
+    ) -> Result<Option<(HashValue, Vec<StateSnapshotChunk>)>> {
+        if !self.run_mode.has_position_store() {
+            return Ok(None);
+        }
+        match self.restore_mode {
+            StateSnapshotRestoreMode::KvOnly => return Ok(None),
+            StateSnapshotRestoreMode::Default | StateSnapshotRestoreMode::TreeOnly => (),
+        }
+        let Some(committed_root) = txn_info_with_proof
+            .transaction_info()
+            .position_state_checkpoint_hash()
+        else {
+            return Ok(None);
+        };
+        let positions = positions.ok_or_else(|| {
+            anyhow!(
+                "Transaction info at version {} commits position state root {}, but the backup \
+                 carries no position snapshot. It predates position backups; restore from a \
+                 newer state snapshot.",
+                self.version,
+                committed_root,
+            )
+        })?;
+        ensure!(
+            positions.root_hash == committed_root,
+            "Position root hash mismatch with that in proof. root hash: {}, expected: {}",
+            positions.root_hash,
+            committed_root,
+        );
+        Ok(Some((committed_root, positions.chunks)))
+    }
+
+    async fn add_chunks(
+        &self,
+        receiver: StateSnapshotRestore<StateKey, StateValue>,
+        chunks: Vec<StateSnapshotChunk>,
+        kind: SnapshotKind,
+    ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
+        let receiver = Arc::new(Mutex::new(Some(receiver)));
 
         let (ver_gauge, tgt_leaf_idx, leaf_idx) = if self.run_mode.is_verify() {
             (
@@ -159,21 +232,21 @@ impl StateSnapshotRestoreController {
         };
 
         ver_gauge.set(self.version as i64);
-        tgt_leaf_idx.set(manifest.chunks.last().map_or(0, |c| c.last_idx as i64));
-        let total_chunks = manifest.chunks.len();
+        tgt_leaf_idx.set(chunks.last().map_or(0, |c| c.last_idx as i64));
+        let total_chunks = chunks.len();
 
         let resume_point_opt = receiver.lock().as_mut().unwrap().previous_key_hash()?;
         let chunks = if let Some(resume_point) = resume_point_opt {
-            manifest
-                .chunks
+            chunks
                 .into_iter()
                 .skip_while(|chunk| chunk.last_key <= resume_point)
                 .collect()
         } else {
-            manifest.chunks
+            chunks
         };
         if chunks.len() < total_chunks {
             info!(
+                kind = ?kind,
                 chunks_to_add = chunks.len(),
                 total_chunks = total_chunks,
                 "Resumed state snapshot restore."
@@ -202,7 +275,7 @@ impl StateSnapshotRestoreController {
             start = start.or_else(|| Some(Instant::now()));
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["add_state_chunk"]);
             let receiver = receiver.clone();
-            if self.validate_modules {
+            if self.validate_modules && kind == SnapshotKind::State {
                 blobs = tokio::task::spawn_blocking(move || {
                     Self::validate_modules(&blobs);
                     blobs
@@ -215,6 +288,7 @@ impl StateSnapshotRestoreController {
             .await??;
             leaf_idx.set(chunk.last_idx as i64);
             info!(
+                kind = ?kind,
                 chunk = chunk_idx,
                 chunks_to_add = chunks_to_add,
                 last_idx = chunk.last_idx,
@@ -225,9 +299,8 @@ impl StateSnapshotRestoreController {
             );
         }
 
-        tokio::task::spawn_blocking(move || receiver.lock().take().unwrap().finish()).await??;
-        self.run_mode.finish();
-        Ok(())
+        let receiver = receiver.lock().take().unwrap();
+        Ok(receiver)
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {

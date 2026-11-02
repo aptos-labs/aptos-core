@@ -7,6 +7,7 @@ use crate::{
     render::{Render, TableKey},
 };
 use aptos_gas_algebra::{GasQuantity, InternalGas, InternalGasUnit};
+use aptos_types::state_store::state_key::inner::{CollateralScope, TradingNativeKey};
 use std::collections::{btree_map, BTreeMap};
 
 /// Represents an aggregation of execution gas events, including the count and total gas costs for each type of event.
@@ -117,7 +118,35 @@ impl ExecutionAndIOCosts {
                     format!("table_item<{},{}>", Render(handle), TableKey { bytes: key },)
                 },
                 Raw(..) => panic!("not supported"),
-                TradingNative(..) => panic!("not supported"),
+                TradingNative(key) => match key {
+                    TradingNativeKey::Position {
+                        exchange,
+                        account,
+                        market,
+                    } => format!("position<{},{},{}>", exchange, account, market),
+                    TradingNativeKey::Order {
+                        exchange,
+                        market,
+                        order_id,
+                    } => format!("order<{},{},{}>", exchange, market, order_id),
+                    TradingNativeKey::BulkOrder {
+                        exchange,
+                        market,
+                        account,
+                    } => format!("bulk_order<{},{},{}>", exchange, market, account),
+                    TradingNativeKey::Collateral {
+                        exchange,
+                        account,
+                        scope,
+                    } => match scope {
+                        CollateralScope::Cross => {
+                            format!("collateral<{},{},cross>", exchange, account)
+                        },
+                        CollateralScope::Isolated { market } => {
+                            format!("collateral<{},{},isolated,{}>", exchange, account, market)
+                        },
+                    },
+                },
             };
 
             insert_or_add(&mut storage_writes, key, write.cost);

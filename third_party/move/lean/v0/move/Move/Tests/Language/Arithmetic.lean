@@ -5,7 +5,7 @@
 import Move
 import MoveModel.Tests.Common
 
-/-! Arithmetic abort behavior after lowering a Leaner resource program. -/
+/-! Arithmetic abort behavior after lowering a Verex resource program. -/
 
 namespace Tests.MovePrograms
 

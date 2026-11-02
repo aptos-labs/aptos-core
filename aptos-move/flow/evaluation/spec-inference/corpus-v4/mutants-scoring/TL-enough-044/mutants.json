@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 4743,
+        "sha256": "41ae28f5fc7a2400cdfb74833604bf20bbcd0893746ddae4e53aade4fa2c4cb6"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-enough-044-ten-times-io-rejected",
+      "obligation_category": "abort",
+      "rationale": "An IO multiplier of exactly 100x is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 79,
+        "offset": 4967,
+        "sha256": "677aafeea2f51184456409227a5c082325a76ad06302b5f0fb2f629d0892fb27"
+      },
+      "edit": {
+        "at": 49,
+        "kind": "substitute",
+        "length": 28,
+        "to": "io_multiplier_percent"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-enough-044-execution-uses-io-multiplier",
+      "obligation_category": "abort",
+      "rationale": "The execution tiers are searched for the IO multiplier.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 28,
+        "offset": 5317,
+        "sha256": "ae8b72a4224542cca5c18cbb7179a23028d7e5ab3a0bde173ecfd1faf85882f1"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 12,
+        "to": "execution_threshold"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-enough-044-io-checked-against-execution",
+      "obligation_category": "abort",
+      "rationale": "The IO threshold is never checked.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-enough-044"
+}

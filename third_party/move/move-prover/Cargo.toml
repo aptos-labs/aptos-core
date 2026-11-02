@@ -8,7 +8,6 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-atty = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 colored = { workspace = true }
@@ -18,12 +17,14 @@ log = { workspace = true, features = ["serde"] }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-model = { workspace = true }
+move-model-exchange = { workspace = true }
 move-package = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+sha2 = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
 

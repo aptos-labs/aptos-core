@@ -982,6 +982,42 @@ class ScoringApparatusTest(unittest.TestCase):
         # they stay runnable on the controller side.
         self.assertEqual("", self._score({}))
 
+    def test_live_apparatus_is_hashed_once_for_the_round(self) -> None:
+        from harness.score_round import score_round
+
+        tools = {"compile": {"sha256": "c" * 64}}
+        for run_id in ("r1", "r2"):
+            run = self.root / "runs" / run_id
+            run.mkdir(parents=True, exist_ok=True)
+            (run / "run.json").write_text(
+                json.dumps({
+                    "run_id": run_id,
+                    "task_id": "T",
+                    "target": "m::f",
+                    "package_relpath": "pkg",
+                    "mutant_manifest_sha256": NO_MUTANTS,
+                    "controller_harness_sha256": "h" * 64,
+                    "stage_executables": tools,
+                    "result": {"eventual_judge": {"state": "operational_success"}},
+                }),
+                encoding="utf-8",
+            )
+
+        with mock.patch(
+            "harness.score_round.tree_hash", return_value="h" * 64
+        ) as hash_harness, mock.patch(
+            "harness.score_round.tool_executables", return_value=tools
+        ) as hash_tools:
+            asyncio.run(score_round(
+                config=self._config(),
+                round_dir=self.root,
+                mutants_root=self.root / "mutants",
+                timeout_seconds=1,
+            ))
+
+        hash_harness.assert_called_once()
+        hash_tools.assert_called_once()
+
 
 class CorrectedScoringManifestTest(unittest.TestCase):
     """Replacing the scored set replaces one side of the disjointness check.
@@ -1139,6 +1175,31 @@ class ToolchainDigestTest(unittest.TestCase):
                 recorded = tool_executables(config)
         self.assertIn("boogie", recorded)
         self.assertEqual(64, len(recorded["boogie"]["sha256"]))
+
+    def test_a_shared_stage_executable_is_hashed_once(self) -> None:
+        from harness.compatibility import tool_executables
+
+        config = mock.Mock(
+            compile_command=["true"],
+            inference_command=["true"],
+            prove_command=["true"],
+            check_candidate_command=["true"],
+        )
+        with mock.patch(
+            "harness.compatibility.sha256_file", return_value="d" * 64
+        ) as sha256, mock.patch(
+            "harness.compatibility.shutil.which",
+            side_effect=lambda name: "/usr/bin/true" if name == "true" else None,
+        ), mock.patch.dict(
+            "os.environ", {"BOOGIE_EXE": "", "Z3_EXE": ""}
+        ):
+            recorded = tool_executables(config)
+
+        self.assertEqual(
+            {"compile", "wp_inference", "enriched_compile", "prover", "check_candidate"},
+            set(recorded),
+        )
+        sha256.assert_called_once()
 
 
 class VacuousReferenceTest(unittest.TestCase):

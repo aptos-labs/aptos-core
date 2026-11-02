@@ -1,0 +1,27 @@
+[package]
+name = "aptos-order-natives"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-native-interface = { workspace = true }
+aptos-types = { workspace = true }
+better_any = { workspace = true }
+bytes = { workspace = true }
+
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+smallvec = { workspace = true }
+
+[dev-dependencies]
+bcs = { workspace = true }

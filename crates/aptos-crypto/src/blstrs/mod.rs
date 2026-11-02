@@ -166,7 +166,7 @@ where
 /// Pretty fast: 623 nanosecond / call.
 pub fn random_scalar<R>(rng: &mut R) -> Scalar
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     random_scalar_internal(rng, false)
 }
@@ -174,7 +174,7 @@ where
 /// Returns a random `blstrs::Scalar`, optionally restricted to be non-zero.
 pub fn random_scalar_internal<R>(rng: &mut R, exclude_zero: bool) -> Scalar
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand::Rng + rand::CryptoRng,
 {
     let mut big_uint;
 

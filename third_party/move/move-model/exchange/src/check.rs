@@ -31,6 +31,7 @@ pub enum SpecSort {
     Enum(usize),
     EnumInst(usize, Vec<SpecSort>),
     Vector(Box<SpecSort>),
+    Function(Vec<SpecSort>, Vec<SpecSort>),
 }
 
 impl fmt::Display for SpecSort {
@@ -45,6 +46,7 @@ impl fmt::Display for SpecSort {
             SpecSort::Enum(r) => write!(f, "enum {}", r),
             SpecSort::EnumInst(r, args) => write!(f, "enum {}<{:?}>", r, args),
             SpecSort::Vector(t) => write!(f, "vector<{}>", t),
+            SpecSort::Function(params, results) => write!(f, "|{:?}| {:?}", params, results),
         }
     }
 }
@@ -78,6 +80,10 @@ impl SpecSort {
             },
             Type::Vector(t) => SpecSort::Vector(Box::new(SpecSort::of(t))),
             Type::Ref(t) | Type::MutRef(t) => SpecSort::of(t),
+            Type::Function(params, results, _) => SpecSort::Function(
+                params.iter().map(SpecSort::of).collect(),
+                results.iter().map(SpecSort::of).collect(),
+            ),
         }
     }
 
@@ -95,6 +101,10 @@ impl SpecSort {
                 inner.into_iter().map(|ty| ty.instantiate(args)).collect(),
             ),
             SpecSort::Vector(inner) => SpecSort::Vector(Box::new(inner.instantiate(args))),
+            SpecSort::Function(params, results) => SpecSort::Function(
+                params.into_iter().map(|ty| ty.instantiate(args)).collect(),
+                results.into_iter().map(|ty| ty.instantiate(args)).collect(),
+            ),
             sort => sort,
         }
     }

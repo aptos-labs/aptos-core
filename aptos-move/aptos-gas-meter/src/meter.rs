@@ -13,7 +13,10 @@ use aptos_gas_schedule::{
     gas_params::{instr::*, txn::*},
 };
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+    contract_event::ContractEvent,
+    on_chain_config::{TimedFeatureFlag, TimedFeatures, TimedFeaturesBuilder},
+    state_store::state_key::StateKey,
+    write_set::WriteOpSize,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -31,32 +34,38 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 
-// Charges for traversing the value graph produced when a resource is loaded and
-// deserialized by the interpreter. Mirrors the serialize-side `bcs` traversal
-// pricing (3x `cmp::compare`'s base and per-abstract-value-unit costs).
-// TODO: add these to 1.50 schedule.
-const LOAD_RESOURCE_PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
-const LOAD_RESOURCE_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
-    InternalGasPerAbstractValueUnit::new(420);
+// `MeterPackClosureCapturedValues` can turn metering on before 1.50 puts
+// `pack_closure.per_abs_val_unit` on chain. Same value, so the switch does not
+// change pricing.
+const PACK_CLOSURE_PER_ABS_VAL_UNIT_BEFORE_V1_50: InternalGasPerAbstractValueUnit =
+    InternalGasPerAbstractValueUnit::new(140);
 
 /// The official gas meter used inside the Aptos VM.
 /// It maintains an internal gas counter, measured in internal gas units, and carries an environment
 /// consisting all the gas parameters, which it can lookup when performing gas calculations.
 pub struct StandardGasMeter<A> {
     algebra: A,
-    /// Whether to charge execution gas for the value graph produced on a
-    /// resource load.
-    meter_value_nodes_on_deserialize: bool,
+    /// Timed features which switch on charges ahead of the gas feature version.
+    timed_features: TimedFeatures,
 }
 
 impl<A> StandardGasMeter<A>
 where
     A: GasAlgebra,
 {
-    pub fn new(algebra: A, meter_value_nodes_on_deserialize: bool) -> Self {
+    /// Creates a meter which applies all charges, as if every timed feature were enabled.
+    pub fn new(algebra: A) -> Self {
         Self {
             algebra,
-            meter_value_nodes_on_deserialize,
+            timed_features: TimedFeaturesBuilder::enable_all().build(),
+        }
+    }
+
+    /// Creates a meter which applies charges gated by a timed feature only if it is enabled.
+    pub fn new_with_timed_features(algebra: A, timed_features: &TimedFeatures) -> Self {
+        Self {
+            algebra,
+            timed_features: timed_features.clone(),
         }
     }
 
@@ -257,18 +266,16 @@ where
         // IO charge below reflects only the stored blob length, but a value
         // can amplify into a graph orders of magnitude larger; charge the
         // execution gas proportional to that graph.
-        if self.meter_value_nodes_on_deserialize
+        if self
+            .timed_features
+            .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize)
             && let Some(val) = &val
         {
-            let size = self
-                .vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_value_size(val, self.feature_version())?;
-            self.algebra.charge_execution(
-                LOAD_RESOURCE_PER_VALUE_TRAVERSAL_BASE
-                    + LOAD_RESOURCE_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * size,
-            )?;
+            let feature_version = self.feature_version();
+            let misc = &self.vm_gas_params().misc;
+            let size = misc.abs_val.abstract_value_size(val, feature_version)?;
+            let cost = misc.value_traversal.cost(feature_version, size);
+            self.algebra.charge_execution(cost)?;
         }
 
         let cost = self
@@ -407,6 +414,34 @@ where
             true => self.algebra.charge_execution(
                 PACK_CLOSURE_GENERIC_BASE + PACK_CLOSURE_GENERIC_PER_ARG * num_args,
             ),
+        }
+    }
+
+    #[inline]
+    fn charge_pack_closure_captured_values(
+        &mut self,
+        mut args: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let feature_version = self.feature_version();
+        let is_v1_50 = feature_version >= RELEASE_V1_50;
+        if !is_v1_50
+            && !self
+                .timed_features
+                .is_enabled(TimedFeatureFlag::MeterPackClosureCapturedValues)
+        {
+            return Ok(());
+        }
+
+        let abs_val = &self.vm_gas_params().misc.abs_val;
+        let size = args.try_fold(AbstractValueSize::zero(), |acc, val| {
+            Ok::<_, PartialVMError>(acc + abs_val.abstract_value_size(val, feature_version)?)
+        })?;
+        if is_v1_50 {
+            self.algebra
+                .charge_execution(PACK_CLOSURE_PER_ABS_VAL_UNIT * size)
+        } else {
+            self.algebra
+                .charge_execution(PACK_CLOSURE_PER_ABS_VAL_UNIT_BEFORE_V1_50 * size)
         }
     }
 

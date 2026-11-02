@@ -6,7 +6,9 @@ use crate::publishing::prebuild_packages::PrebuiltPackagesBundle;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     move_types::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
     },
     types::transaction::{EntryFunction, TransactionPayload},
 };
@@ -97,6 +99,13 @@ pub trait EntryPointTrait: std::fmt::Debug + Sync + Send + CloneEntryPointTrait 
         None
     }
 
+    /// Like `initialize_entry_point`, but signed by the root account and
+    /// submitted ahead of it, for setup that needs a governance signer —
+    /// which the root account can borrow on test genesis.
+    fn root_initialize_entry_point(&self) -> Option<Box<dyn EntryPointTrait>> {
+        None
+    }
+
     fn multi_sig_additional_num(&self) -> MultiSigConfig {
         MultiSigConfig::None
     }
@@ -111,7 +120,16 @@ pub fn get_payload(
     func: Identifier,
     args: Vec<Vec<u8>>,
 ) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, func, vec![], args))
+    get_payload_with_ty_args(module_id, func, vec![], args)
+}
+
+pub fn get_payload_with_ty_args(
+    module_id: ModuleId,
+    func: Identifier,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(module_id, func, ty_args, args))
 }
 
 pub trait CloneEntryPointTrait {

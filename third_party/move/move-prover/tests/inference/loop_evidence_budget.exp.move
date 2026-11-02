@@ -72,7 +72,7 @@ warning: WP inferred `vacuous` conditions after this loop without an invariant. 
    = seek a predicate which includes the entry facts and is preserved by one back-edge; bounded observations are not an invariant or a proof
 
 warning: WP could not characterize the aborts of `loop_evidence_budget::one_loop` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an emitted abort condition is flagged `vacuous` or `sathard`
+  = an emitted abort condition is `vacuous` or relies on a `result_of` which is not related to the callee's actual result
    ┌─ tests/inference/loop_evidence_budget.move:17:5
    │
 17 │ ╭     fun one_loop(n: u64): u64 {
@@ -196,7 +196,7 @@ warning: WP inferred `vacuous` conditions after this loop without an invariant. 
    = seek a predicate which includes the entry facts and is preserved by one back-edge; bounded observations are not an invariant or a proof
 
 warning: WP could not characterize the aborts of `loop_evidence_budget::many_loops` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an emitted abort condition is flagged `vacuous` or `sathard`
+  = an emitted abort condition is `vacuous` or relies on a `result_of` which is not related to the callee's actual result
    ┌─ tests/inference/loop_evidence_budget.move:27:5
    │
 27 │ ╭     fun many_loops(n: u64): u64 {

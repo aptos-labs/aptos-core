@@ -155,6 +155,7 @@ export function getEnvironment() {
 export const CargoBuildFeatures = {
   Default: "default",
   Failpoints: "failpoints",
+  ConsensusOnly: "consensus_only_perf_test",
 };
 
 export const CargoBuildProfiles = {
@@ -163,6 +164,10 @@ export const CargoBuildProfiles = {
 }
 
 export function getImagesToWaitFor(args) {
+  // Retain the historical default without implicitly requiring opt-in images.
+  if (!args.PROFILE_RELEASE && !args.PROFILE_PERF && !args.FEATURE_FAILPOINTS && !args.FEATURE_CONSENSUS_ONLY) {
+    args = { ...args, PROFILE_RELEASE: true, PROFILE_PERF: true, FEATURE_FAILPOINTS: true };
+  }
   const perfImages = ["validator", "validator-testing", "faucet", "tools", "indexer-grpc"];
   const images = ["forge"];
   const imagesToWaitFor = {};
@@ -171,6 +176,11 @@ export function getImagesToWaitFor(args) {
 
     if (args.PROFILE_RELEASE) {
       imageConfig[CargoBuildProfiles.Release] = [CargoBuildFeatures.Default];
+    }
+
+    if (args.FEATURE_CONSENSUS_ONLY) {
+      imageConfig[CargoBuildProfiles.Release] ??= [];
+      imageConfig[CargoBuildProfiles.Release].push(CargoBuildFeatures.ConsensusOnly);
     }
 
     if (perfImages.includes(image)) {

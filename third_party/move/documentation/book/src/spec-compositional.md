@@ -610,6 +610,8 @@ In loop invariants and inline `spec { .. }` blocks, user-written `old(..)` over 
 
 When a higher-order function takes a function parameter, the prover needs to know which global resources the parameter may read or write in order to establish frame conditions (what is unchanged after the call). Without `modifies_of`/`reads_of` declarations, the function parameter is treated as **pure**: its behavioral predicates can only reason about data arguments and return values, not global state. This is correct for transparent (non-opaque) higher-order functions, where the closure body is inlined and verified directly. For opaque higher-order functions whose parameters modify global state, `modifies_of` and/or `reads_of` declarations are required to make those effects visible to the specification.
 
+There is one exception, covered in detail below: an opaque function whose body is never verified and whose specification names no global memory is generic over its callers, and an undeclared function parameter is not held to the empty frame when the argument is a closure written at the call site.
+
 The `modifies_of` and `reads_of` declarations in a function's specification describe these resource access permissions:
 
 ```move
@@ -762,7 +764,24 @@ spec test_mixed {
 
 ### Access Validation
 
-The compiler validates that closures passed to a function do not exceed the declared access. If a closure accesses resources not listed in `reads_of` or `modifies_of`, or writes to a resource declared with `reads_of`, the compiler reports an error. When no `modifies_of`/`reads_of` declarations exist for a parameter, no access validation is performed — the parameter is treated as pure (see above).
+The compiler validates that closures passed to a function do not exceed the declared access. If a closure accesses resources not listed in `reads_of` or `modifies_of`, or writes to a resource declared with `reads_of`, the compiler reports an error.
+
+When no `modifies_of`/`reads_of` declarations exist for a parameter, what happens depends on the callee. By default the parameter is held to the empty frame: any access by the closure is an error. The omission is meaningful, because two things read it. The callee's own proof reads it — the `Invoke` inside the body havocs only the declared frame, so `ensures R[a] == old(R[a])` is provable only if the closure leaves `R` alone. And every caller reads it, because the callee's `ensures` are assumed after the call.
+
+The frame is left to the call site only when neither of those applies: the callee carries `pragma verify = false`, so its body is never proven, *and* its specification names no global memory, so none of its conditions can re-establish a claim about memory the closure wrote. Such a callee is generic over its callers — it cannot name the resources their closures touch, and it asserts nothing those closures could falsify. This is what lets a generic container operation take an effectful callback. The callback's effect is still accounted for: the havoc across the opaque call uses the closure's own footprint, so a caller cannot assume the memory survived the call.
+
+Either condition alone is not enough. A proven body consumes the frame even when the conditions are memory-free, and conditions that constrain memory are assumed by every caller even when the body is unproven. "Names no global memory" is about the callee's conditions; its own `modifies` clause does not count, because that is a permission rather than a claim a caller could rely on, and a caller havocs what it names in any case.
+
+Both conditions are read off the specification as written, not off what a particular run verifies. Narrowing a run to one function with `--verify-only` does not change which calls are accepted.
+
+Nor are the two of them enough on their own, because the call site has to be able to answer the question the callee left open. It can for a closure written at that call site, whose footprint the prover reads off the closure's own code and havocs across the call. A function value of any other origin — a parameter forwarded in from the enclosing function, a callback loaded from a struct field — has no footprint to havoc, and the enclosing function's own `modifies_of` for it does not reach the inner call. There the callee's empty frame still applies and the argument is rejected:
+
+```
+error: cannot establish what function argument `fv` may modify: `apply` declares no
+       `modifies_of` for it, and the argument is not a closure built at this call site
+```
+
+To forward a function parameter into a higher-order callee, the callee must declare a frame for it, which propagates the caller's frame through the call in the usual way.
 
 **Too narrow (missing resource):** The `reads_of` declares only `Counter`, but the closure also reads `Config`:
 

@@ -8,12 +8,12 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
-        RELEASE_V1_41, RELEASE_V1_45,
+        RELEASE_V1_41, RELEASE_V1_45, RELEASE_V1_50,
     },
 };
 use aptos_gas_algebra::{
-    AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
-    GasScalingFactor, GasUnit, NumModules, NumSlots, NumTypeNodes,
+    AbstractValueSize, BytecodeVersion, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas,
+    GasExpression, GasScalingFactor, GasUnit, NumModules, NumSlots, NumTypeNodes,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -297,6 +297,14 @@ crate::gas_schedule::macros::define_gas_parameters!(
             encrypted_txn_min_price_per_gas_unit: FeePerGasUnit,
             { RELEASE_V1_45.. => "encrypted_txn_min_price_per_gas_unit" },
             200,  // 2x the current min_price_per_gas_unit (100)
+        ],
+        // Modules with a bytecode (file format) version below this cannot be published.
+        // Only publishing is gated: modules already on chain keep loading and executing at any
+        // version. Policy: permit the latest version and the two before it (VERSION_MAX - 2).
+        [
+            min_module_bytecode_version: BytecodeVersion,
+            { RELEASE_V1_50.. => "min_module_bytecode_version" },
+            8, // VERSION_MAX (10) - 2
         ],
     ]
 );

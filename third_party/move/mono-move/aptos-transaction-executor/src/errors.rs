@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_keyless_validation::KeylessValidationError;
 use aptos_types::{
     error::{split_canonical, OUT_OF_RANGE},
     transaction::validation::ECANT_PAY_GAS_DEPOSIT,
@@ -36,10 +37,16 @@ impl MaterializationError {
 /// rejection reason is observable.
 #[derive(Debug)]
 pub enum DiscardReason {
+    /// The transaction's signature did not verify.
+    InvalidSignature,
+    /// A keyless authenticator did not validate.
+    KeylessValidationFailure(KeylessValidationError),
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.
     Deprecated(&'static str),
+    /// A non-multisig transaction carries no executable.
+    EmptyPayload,
     /// A pre-execution check failed.
     PreExecutionCheck(PreExecutionCheckFailure),
     /// A type argument failed to resolve.
@@ -85,6 +92,14 @@ pub enum PreExecutionCheckFailure {
     GasBudgetBelowIntrinsicCost { max_gas: u64, min: u64 },
     #[error("gas unit price {price} is below the minimum {min}")]
     GasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("gas unit price {price} is below the encrypted-transaction minimum {min}")]
+    EncryptedGasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("gas unit price {price} is below the raised-limits minimum {min}")]
+    HighLimitGasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("limits multiplier {percent}% must be above {min}% and at most {max}%")]
+    InvalidLimitsMultiplier { percent: u64, min: u64, max: u64 },
+    #[error("an approved governance script may not request raised limits")]
+    LimitsRequestOnGovernanceScript,
     #[error("gas unit price {price} is above the maximum {max}")]
     GasPriceAboveMaximum { price: u64, max: u64 },
 }
@@ -114,17 +129,33 @@ pub enum ExecutionStatus {
     },
 }
 
-/// Why a transaction's arguments were rejected.
+/// Why a transaction's call was rejected: the function is not one a
+/// transaction may call, or the arguments do not fit it. In the order they are
+/// checked.
 #[derive(Debug)]
 pub enum InvalidArguments {
+    /// The function is a native, which a transaction may not call directly.
+    NativeEntryFunction,
+    /// The function is not an `entry` function.
+    NotEntryFunction,
+    /// The function returns values.
+    ReturnsValues,
     /// A signer parameter follows a non-signer one.
     SignerAfterArgument,
+    /// A parameter has a type a transaction argument cannot fill.
+    DisallowedParameterType,
     /// The argument count does not match the function's parameters.
     ArgumentCountMismatch,
     /// The signer count does not match the function's signer parameters.
     SignerCountMismatch,
     /// An argument's bytes do not decode to its parameter's type.
     UndecodableArgument,
+    /// A `String` argument is not valid UTF-8.
+    MalformedString,
+    /// An `Object<T>` argument names an address holding no object.
+    ObjectDoesNotExist,
+    /// An `Object<T>` argument names an object holding no `T`.
+    ObjectLacksResource,
 }
 
 /// Why a script was refused before running.
@@ -151,6 +182,8 @@ pub enum MoveExecutionFailure {
     InvalidArguments(InvalidArguments),
     /// The transaction's script was refused before running.
     RejectedScript(ScriptRejection),
+    /// The payload is still encrypted: decryption failed before execution.
+    UndecryptedPayload,
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
 }
@@ -170,6 +203,7 @@ pub(crate) fn call_result(status: RuntimeStatus) -> Result<(), MoveExecutionFail
             code,
             message,
             location,
+            ..
         } => Err(MoveExecutionFailure::Abort {
             code,
             message,

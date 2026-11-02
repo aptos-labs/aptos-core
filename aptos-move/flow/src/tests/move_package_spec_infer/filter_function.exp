@@ -1,5 +1,10 @@
-inference succeeded, injected specs into 1 file(s) (read the files to see the changes):
+inference succeeded, injected specs into 1 file(s); the inferred specification blocks as they now read:
 - <TEMPDIR>/multi.move
+    5 |     spec add_one(x: u64): u64 {
+    6 |         pragma opaque = true;
+    7 |         ensures [inferred] result == x + 1;
+    8 |         aborts_if [inferred] x == MAX_U64;
+    9 |     }
 
 === source after inference ===
 module 0xCAFE::multi {

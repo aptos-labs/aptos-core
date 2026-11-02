@@ -1,0 +1,27 @@
+diff --git a/sources/trading/extracted_price_time_index.move b/sources/trading/extracted_price_time_index.move
+index fc3c627f87..d6ded615f8 100644
+--- a/sources/trading/extracted_price_time_index.move
++++ b/sources/trading/extracted_price_time_index.move
+@@ -18,10 +18,22 @@ module aptos_experimental::extracted_price_time_index {
+         self.best_bid
+     }
+ 
++    spec best_bid_price {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.best_bid;
++    }
++
+     fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
+         self.best_ask
+     }
+ 
++    spec best_ask_price {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.best_ask;
++    }
++
+     public(friend) fun is_taker_order(
+         self: &PriceTimeIndex, price: u64, is_bid: bool
+     ): bool {

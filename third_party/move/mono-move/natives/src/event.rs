@@ -4,7 +4,12 @@
 //! Natives for the `event` module, plus the backing event store.
 
 use crate::{polymorphic_natives, NativeEntry};
+#[cfg(feature = "testing")]
+use aptos_types::event::EventKey;
+#[cfg(feature = "testing")]
+use mono_move_core::native::{Opaque, Ref};
 use mono_move_core::{
+    memory::{read_ptr, write_ptr, MemoryRegion},
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus, Vector,
@@ -12,9 +17,13 @@ use mono_move_core::{
     types::{view_type, InternedType, Type},
     VMResult,
 };
+#[cfg(feature = "testing")]
+use move_core_types::account_address::AccountAddress;
 
-/// Number of bytes a heap pointer occupies in the flat value representation.
-const POINTER_SIZE: usize = 8;
+/// Byte offset of `GUID::ID::creation_num` within `EventHandle<T>`, whose first
+/// field is a `u64` counter. `addr` follows immediately.
+#[cfg(feature = "testing")]
+const GUID_CREATION_NUM_OFFSET: usize = 8;
 
 /// Axuiliary info/tag to distinguish the two event formats.
 pub enum EventKind {
@@ -27,7 +36,9 @@ pub enum EventKind {
 /// Represents a recorded event. Supports both V1 and V2.
 pub struct EventEntry {
     pub msg_ty: InternedType,
-    pub msg_data: Vec<u8>,
+    /// The event value's in-frame representation from [`NativeContext::arg_raw`].
+    pub msg_data: MemoryRegion,
+    /// Heap-pointer offsets within `msg_data`.
     pub ptr_offsets: Vec<u32>,
     pub kind: EventKind,
 }
@@ -51,7 +62,7 @@ impl EventStore {
     fn emit(
         &mut self,
         msg_ty: InternedType,
-        msg_data: Vec<u8>,
+        msg_data: MemoryRegion,
         ptr_offsets: Vec<u32>,
         kind: EventKind,
     ) {
@@ -72,15 +83,16 @@ impl EventStore {
 impl NativeExtension for EventStore {
     unsafe fn relocate_roots(&mut self, relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
         for entry in &mut self.entries {
+            let base = entry.msg_data.as_ptr();
             for &off in &entry.ptr_offsets {
                 let off = off as usize;
-                let bytes: [u8; POINTER_SIZE] = entry.msg_data[off..off + POINTER_SIZE]
-                    .try_into()
-                    .expect("offsets keep each pointer slot in bounds");
-                let ptr = usize::from_ne_bytes(bytes) as *mut u8;
-                if let Some(new) = relocate(ptr) {
-                    entry.msg_data[off..off + POINTER_SIZE]
-                        .copy_from_slice(&(new as usize).to_ne_bytes());
+                // SAFETY: `arg_ptr_offsets` provides complete, pointer-aligned
+                // slots within the aligned `msg_data` allocation. Typed pointer
+                // accesses preserve provenance.
+                unsafe {
+                    if let Some(new) = relocate(read_ptr(base, off)) {
+                        write_ptr(base, off, new);
+                    }
                 }
             }
         }
@@ -156,6 +168,100 @@ pub fn native_write_to_event_store<C: NativeContext>(ctx: &C) -> VMResult<Native
     Ok(NativeStatus::Success)
 }
 
+/// Builds a `vector<T>` holding a copy of every entry of type `msg_ty` that
+/// `selects` accepts, in emission order.
+#[cfg(feature = "testing")]
+fn collect_events<'a, C: NativeContext>(
+    ctx: &'a C,
+    msg_ty: InternedType,
+    selects: impl Fn(&EventEntry) -> bool,
+) -> VMResult<Vector<'a, Opaque>> {
+    let elem_size = ctx.value_size(msg_ty)?;
+    let descriptor = ctx.required_descriptor(0).ok_or_else(|| {
+        native_invariant_violation("emitted events: missing vector<T> descriptor".into())
+    })?;
+
+    // Indices only: the allocation below can collect, and a collection
+    // re-borrows every extension.
+    let indices = {
+        let store = ctx.get_extension::<EventStore>()?;
+        store
+            .entries()
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.msg_ty == msg_ty && selects(entry))
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>()
+    };
+
+    let vector = ctx.new_vector(descriptor, elem_size, indices.len() as u64)?;
+
+    // Read after the allocation, so the payloads' pointers reflect any
+    // relocation it caused, and owned so the borrow is gone before the deep
+    // copies below can collect.
+    let data = {
+        let store = ctx.get_extension::<EventStore>()?;
+        let mut data = Vec::with_capacity(indices.len() * elem_size as usize);
+        for &index in &indices {
+            data.extend_from_slice(store.entries()[index].msg_data.as_uninit_slice());
+        }
+        data
+    };
+    // SAFETY: each payload is the event value's in-frame image, held in a Rust
+    // `Vec` outside the heap, and the store keeps every pointer it holds live.
+    unsafe { ctx.vector_write_elements_raw_test_only(&vector, elem_size, &data) }?;
+    Ok(vector)
+}
+
+/// `0x1::event::emitted_events<T>(): vector<T>` (test-only)
+#[cfg(feature = "testing")]
+pub fn native_emitted_events<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    let msg_ty = ctx.ty_arg(0)?;
+    let vector = collect_events(ctx, msg_ty, |entry| matches!(entry.kind, EventKind::V2))?;
+    // SAFETY: return 0 is `vector<T>`.
+    unsafe { ctx.set_return(0, vector) }?;
+    Ok(NativeStatus::Success)
+}
+
+/// `0x1::event::emitted_events_by_handle<T>(handle: &EventHandle<T>): vector<T>`
+/// (test-only)
+#[cfg(feature = "testing")]
+pub fn native_emitted_events_by_handle<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    let msg_ty = ctx.ty_arg(0)?;
+
+    // `EventHandle<T> { counter: u64, guid: GUID }` with `GUID { id: ID }` and
+    // `ID { creation_num: u64, addr: address }` flattens to `counter` at 0,
+    // `creation_num` at 8 and `addr` at 16.
+    // SAFETY: arg 0 is `&EventHandle<T>`.
+    let handle = unsafe { ctx.arg::<Ref<Opaque>>(0)? };
+    let base = handle.ptr();
+    // SAFETY: `base` references a live `EventHandle<T>`, so both fields lie
+    // within it. Nothing allocates before these reads.
+    let (creation_num, addr) = unsafe {
+        let mut addr = [0u8; AccountAddress::LENGTH];
+        std::ptr::copy_nonoverlapping(
+            base.add(GUID_CREATION_NUM_OFFSET + std::mem::size_of::<u64>()),
+            addr.as_mut_ptr(),
+            AccountAddress::LENGTH,
+        );
+        (
+            std::ptr::read_unaligned(base.add(GUID_CREATION_NUM_OFFSET) as *const u64),
+            AccountAddress::new(addr),
+        )
+    };
+    let key = EventKey::new(creation_num, addr);
+
+    let vector = collect_events(ctx, msg_ty, |entry| match &entry.kind {
+        EventKind::V2 => false,
+        // A guid that does not parse cannot exist on the legacy VM, which
+        // validates it at emit time; skipping matches "no such event".
+        EventKind::V1 { guid, .. } => bcs::from_bytes::<EventKey>(guid).is_ok_and(|k| k == key),
+    })?;
+    // SAFETY: return 0 is `vector<T>`.
+    unsafe { ctx.set_return(0, vector) }?;
+    Ok(NativeStatus::Success)
+}
+
 /// Natives for the `event` module.
 pub fn make_all_event_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
     polymorphic_natives![
@@ -168,4 +274,46 @@ pub fn make_all_event_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
             native_write_to_event_store
         ),
     ]
+}
+
+/// Test-only natives for the `event` module.
+#[cfg(feature = "testing")]
+pub fn make_all_event_test_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
+    polymorphic_natives![
+        ("0x1::event::emitted_events", native_emitted_events),
+        (
+            "0x1::event::emitted_events_by_handle",
+            native_emitted_events_by_handle
+        ),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mono_move_core::types::U64_TY;
+
+    /// Event payload pointers remain dereferenceable during relocation and
+    /// after the relocated pointer is written back.
+    #[test]
+    fn relocate_roots_keeps_payload_pointers_usable() {
+        let (old_val, new_val) = (1u64, 2u64);
+        let old = std::ptr::from_ref(&old_val).cast_mut().cast::<u8>();
+        let new = std::ptr::from_ref(&new_val).cast_mut().cast::<u8>();
+        // The second word holds a pointer; relocation uses `ptr_offsets`,
+        // independent of `msg_ty`.
+        let payload = MemoryRegion::new_zeroed(16);
+        unsafe { write_ptr(payload.as_ptr(), 8usize, old) };
+        let mut store = EventStore::new();
+        store.emit(U64_TY, payload, vec![8], EventKind::V2);
+
+        unsafe {
+            store.relocate_roots(&mut |ptr| {
+                assert_eq!(*ptr.cast::<u64>(), 1);
+                Some(new)
+            })
+        };
+        let relocated = unsafe { read_ptr(store.entries()[0].msg_data.as_ptr(), 8usize) };
+        assert_eq!(unsafe { *relocated.cast::<u64>() }, 2);
+    }
 }

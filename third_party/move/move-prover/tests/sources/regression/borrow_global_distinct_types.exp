@@ -1,0 +1,23 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/borrow_global_distinct_types.move:29:9
+   │
+29 │         ensures result == 0; // error: the field returned was never written
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/borrow_global_distinct_types.move:19: write_zero_and_return_other
+   =     at tests/sources/regression/borrow_global_distinct_types.move:28: write_zero_and_return_other (spec)
+   =     at tests/sources/regression/borrow_global_distinct_types.move:19: write_zero_and_return_other
+   =         choose_a = <redacted>
+   =         addr = <redacted>
+   =     at tests/sources/regression/borrow_global_distinct_types.move:20: write_zero_and_return_other
+   =         a = <redacted>
+   =     at tests/sources/regression/borrow_global_distinct_types.move:21: write_zero_and_return_other
+   =         b = <redacted>
+   =     at tests/sources/regression/borrow_global_distinct_types.move:22: write_zero_and_return_other
+   =         selected = <redacted>
+   =     at tests/sources/regression/borrow_global_distinct_types.move:23: write_zero_and_return_other
+   =     at tests/sources/regression/borrow_global_distinct_types.move:24: write_zero_and_return_other
+   =     at tests/sources/regression/borrow_global_distinct_types.move:19: write_zero_and_return_other
+   =         result = <redacted>
+   =     at tests/sources/regression/borrow_global_distinct_types.move:29: write_zero_and_return_other (spec)

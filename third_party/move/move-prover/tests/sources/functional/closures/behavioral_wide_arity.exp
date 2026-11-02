@@ -1,0 +1,31 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_wide_arity.move:59:5
+   │
+36 │           (cb.settle)(a, b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, o)
+   │           -------------------------------------------------------- abort happened here with code 0x0
+   ·
+59 │ ╭     spec run_concrete_wrong {
+60 │ │         aborts_if o == 0;
+61 │ │         ensures result == a;
+62 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:55: run_concrete_wrong
+   =         a = <redacted>
+   =         b = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:56: run_concrete_wrong
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:32: callbacks
+   =         result = <redacted>
+   =         cb = <redacted>
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:57: run_concrete_wrong
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:35: run
+   =         cb = <redacted>
+   =         a = <redacted>
+   =         b = <redacted>
+   =         o = <redacted>
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:36: run
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/behavioral_wide_arity.move:36: run
+   =         ABORTED

@@ -31,7 +31,7 @@ pub trait WeightedVUF {
     /// the stake must've contributed to create it.
     type Evaluation: Serialize + Debug + Eq;
 
-    fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn augment_key_pair<R: rand::RngCore + rand::CryptoRng>(
         pp: &Self::PublicParameters,
         sk: Self::SecretKeyShare,
         pk: Self::PubKeyShare,

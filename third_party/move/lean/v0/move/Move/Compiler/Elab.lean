@@ -7,7 +7,7 @@ import Move.Compiler.Normalize
 # Module elaboration
 
 `lowerToIR ``Namespace` performs compilation during elaboration through
-`Move.Compiler.LIR` into `MoveModel.IR`, then embeds semantic IR directly as
+`Move.Compiler.VIR` into `MoveModel.IR`, then embeds semantic IR directly as
 an ordinary Lean value. The quoted namespace is a registered Move module
 identity, not a Lean value.
 -/
@@ -156,11 +156,11 @@ def elabLowerToIR : TermElab := fun stx expectedType? => do
   let (structNames, funNames) ← discoverModuleDecls ns
   elaborateModule module structNames funNames expectedType?
 
-syntax (name := printLeanerIR)
-  "#print_leaner_ir" str "structs" "[" ident,* "]" "functions" "[" ident,* "]" : command
+syntax (name := printVerexIR)
+  "#print_verex_ir" str "structs" "[" ident,* "]" "functions" "[" ident,* "]" : command
 
-@[command_elab printLeanerIR]
-def elabPrintLeanerIR : Elab.Command.CommandElab := fun stx => do
+@[command_elab printVerexIR]
+def elabPrintVerexIR : Elab.Command.CommandElab := fun stx => do
   let moduleName := stx[1]
   let some name := moduleName.isStrLit? | throwErrorAt moduleName "expected module name"
   let structNames ← Elab.Command.liftTermElabM <| resolveNames (identifiers stx[4])

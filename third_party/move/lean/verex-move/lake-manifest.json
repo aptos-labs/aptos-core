@@ -1,0 +1,13 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "«verex-ir»",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../verex-ir",
+   "configFile": "lakefile.toml"}],
+ "name": "«verex-move»",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

@@ -37,8 +37,12 @@ use move_model::{
         INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
         INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
+    spec_derivation,
     symbol::Symbol,
-    ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
+    ty::{
+        NoUnificationContext, PrimitiveType, ReferenceKind, Substitution, Type, TypeDisplayContext,
+        Variance, WideningOrder,
+    },
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
         OBJECT_SPEC_EXISTS_AT, TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE,
@@ -57,6 +61,62 @@ use std::{
     rc::Rc,
 };
 
+/// Maximum number of aliasing cases verified for one function; exceeding it is an error.
+const MAX_ALIASING_INSTANCES: usize = 256;
+
+/// The type parameters occurring in `tys`, in order of first occurrence.
+pub fn type_params_in_order(tys: &[Type]) -> Vec<u16> {
+    let mut order = vec![];
+    for ty in tys {
+        ty.visit(&mut |t| {
+            if let Type::TypeParameter(idx) = t {
+                if !order.contains(idx) {
+                    order.push(*idx);
+                }
+            }
+        });
+    }
+    order
+}
+
+/// Renames the type parameters of an aliasing instantiation in order of first occurrence, so
+/// that instantiations describing the same case compare equal.
+fn canonical_aliasing_inst(inst: &[Type], arity: usize) -> Vec<Type> {
+    let renaming = Type::type_param_map_to_inst(
+        arity,
+        type_params_in_order(inst)
+            .into_iter()
+            .enumerate()
+            .map(|(new, old)| (old, Type::new_param(new)))
+            .collect(),
+    );
+    inst.iter().map(|t| t.instantiate(&renaming)).collect()
+}
+
+/// Maps `Var(i)` to `TypeParameter(i)`.
+fn vars_to_type_params(ty: &Type) -> Type {
+    match ty {
+        Type::Var(i) => Type::TypeParameter(*i as u16),
+        Type::Vector(et) => Type::Vector(Box::new(vars_to_type_params(et))),
+        Type::Struct(mid, sid, inst) => {
+            Type::Struct(*mid, *sid, inst.iter().map(vars_to_type_params).collect())
+        },
+        Type::Tuple(ts) => Type::Tuple(ts.iter().map(vars_to_type_params).collect()),
+        Type::Reference(kind, bt) => Type::Reference(*kind, Box::new(vars_to_type_params(bt))),
+        Type::Fun(params, results, abilities) => Type::Fun(
+            Box::new(vars_to_type_params(params)),
+            Box::new(vars_to_type_params(results)),
+            *abilities,
+        ),
+        Type::TypeDomain(bt) => Type::TypeDomain(Box::new(vars_to_type_params(bt))),
+        Type::Primitive(_)
+        | Type::TypeParameter(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error => ty.clone(),
+    }
+}
+
 /// The environment extension computed by this analysis.
 #[derive(Clone, Default, Debug)]
 pub struct MonoInfo {
@@ -74,6 +134,10 @@ pub struct MonoInfo {
     /// callee. `info.funs` isn't populated for these callees, so post-passes use this
     /// map to ask which intrinsic roles were called and with which type args.
     pub intrinsic_calls: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
+    /// Key types of key-ordered maps whose positions a spec reads. Their order facts
+    /// need `cmp::compare<K>`, which only the backend can tell is declared, so they are
+    /// kept apart from `native_inst`; the backend adds them to its `cmp` instances.
+    pub position_read_keys: BTreeSet<Type>,
     pub all_types: BTreeSet<Type>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
     /// A map from function types used in the program to the closures appearing in
@@ -201,6 +265,7 @@ impl MonoAnalysisProcessor {
             node_deps: BTreeMap::new(),
             node_types: BTreeMap::new(),
             selected_root: root,
+            native_spec_fun_insts: BTreeSet::new(),
         };
         // Analyze axioms found in modules.
         for module_env in env.get_modules() {
@@ -344,6 +409,9 @@ struct Analyzer<'a> {
     node_deps: BTreeMap<MonoNode, BTreeSet<MonoNode>>,
     node_types: BTreeMap<MonoNode, BTreeSet<Type>>,
     selected_root: Option<VerificationRoot>,
+    /// Instantiations of native spec functions reached from this analysis, by function.
+    /// `info.native_inst` keeps them only per module.
+    native_spec_fun_insts: BTreeSet<(QualifiedId<SpecFunId>, Vec<Type>)>,
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -353,7 +421,7 @@ enum MonoNode {
 }
 
 /// Locate the `0x1::option::Option` struct. Pinned to `0x1` because the backend
-/// hard-codes `$1_option_*` Boogie symbols.
+/// hard-codes `$1.option.*` Boogie symbols.
 fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
     let option_module_sym = env.symbol_pool().make("option");
     let option_struct_sym = env.symbol_pool().make("Option");
@@ -370,7 +438,7 @@ fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
 }
 
 /// Locate the `0x1::cmp` module. Pinned to `0x1` because the backend hard-codes
-/// `$1_cmp_*` Boogie symbols.
+/// `$1.cmp.*` Boogie symbols.
 fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
     let cmp_sym = env.symbol_pool().make("cmp");
     let std_addr = Address::Numerical(AccountAddress::ONE);
@@ -381,6 +449,35 @@ fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
         }
     }
     None
+}
+
+/// Whether comparing values of `ty` reaches a vector or an intrinsic map, directly or
+/// through a field. Intrinsic structs are judged as maps, not by their declared Move
+/// fields: their comparison has no model.
+pub fn compare_reaches_vector(env: &GlobalEnv, ty: &Type) -> bool {
+    match ty {
+        Type::Vector(_) => true,
+        // Function values have no comparison model here; treat them like vectors so
+        // the facts that need one are not emitted.
+        Type::Fun(..) => true,
+        Type::Reference(_, inner) => compare_reaches_vector(env, inner),
+        Type::Tuple(elems) => elems.iter().any(|elem| compare_reaches_vector(env, elem)),
+        Type::Struct(mid, sid, targs) => {
+            let qid = mid.qualified(*sid);
+            env.get_intrinsics().get_decl_for_struct(&qid).is_some()
+                || env
+                    .get_struct(qid)
+                    .get_fields()
+                    .any(|field| compare_reaches_vector(env, &field.get_type().instantiate(targs)))
+        },
+        Type::Primitive(_)
+        | Type::TypeParameter(_)
+        | Type::TypeDomain(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => false,
+    }
 }
 
 /// How a data invariant can observe hidden validity slots: by (transitively)
@@ -455,6 +552,7 @@ impl Analyzer<'_> {
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
+        let mut position_read_keys: Vec<Type> = vec![];
         let mut vec_k_to_register: Vec<Type> = vec![];
         let mut iter_ptr_to_register: Vec<Type> = vec![];
         let mut spec_fun_to_register: Vec<(QualifiedId<SpecFunId>, Vec<Type>)> = vec![];
@@ -469,6 +567,26 @@ impl Analyzer<'_> {
             if needs_option_v {
                 for (_k, v) in ty_args.iter() {
                     option_v_to_register.push(v.clone());
+                }
+            }
+            // The key-ordered enumeration ascends under `cmp::compare<K>`, and that
+            // axiom is stated through `compare`. A spec that reads positions needs it
+            // even when no ordering role is called, so a use of the sorted `key_at`
+            // records K for the backend, which registers `compare<K>` when `compare`
+            // is declared. The map's own frame clauses read positions too, so this
+            // reaches most keyed maps; keys for which `compare_reaches_vector` holds
+            // (a vector, an intrinsic map or a function value) are skipped, since
+            // their comparison is costly or has no model, and they keep the
+            // behaviour of an uncalled ordering role.
+            if let Some(key_at) = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT) {
+                for (sf, actuals) in &self.native_spec_fun_insts {
+                    if *sf == key_at {
+                        if let Some(k) = actuals.first() {
+                            if !compare_reaches_vector(self.env, k) {
+                                position_read_keys.push(k.clone());
+                            }
+                        }
+                    }
                 }
             }
             let needs_vec_k = vec_k_roles_eager
@@ -1101,7 +1219,11 @@ impl Analyzer<'_> {
                 .flatten()
                 .filter_map(|inst| inst.first().cloned())
                 .collect::<Vec<_>>();
-            for ty in existing_cmp_ks.iter().chain(cmp_k_to_register.iter()) {
+            for ty in existing_cmp_ks
+                .iter()
+                .chain(cmp_k_to_register.iter())
+                .chain(position_read_keys.iter())
+            {
                 cmp_closure.extend(ty.get_all_contained_types_with_skip_reference(self.env));
             }
             for (struct_qid, ty_args) in self.info.table_inst.iter() {
@@ -1140,6 +1262,7 @@ impl Analyzer<'_> {
                     .insert(vec![ty]);
             }
         }
+        self.info.position_read_keys.extend(position_read_keys);
         for (spec_fun_qid, ty_args) in spec_fun_to_register {
             self.info
                 .spec_funs
@@ -1489,35 +1612,138 @@ impl Analyzer<'_> {
             let fun_type_params_arity = target.get_type_parameter_count();
             let usage_state = UsageProcessor::analyze(self.targets, target.func_env, target.data);
 
-            // collect instantiations
-            let mut all_insts = BTreeSet::new();
-            for lhs_m in usage_state.accessed.all.iter() {
-                let lhs_ty = lhs_m.to_type();
-                for rhs_m in usage_state.accessed.all.iter() {
-                    let rhs_ty = rhs_m.to_type();
-
-                    // make sure these two types unify before trying to instantiate them
-                    let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
-                    if adapter
-                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
-                        .is_none()
-                    {
-                        continue;
+            // Collect aliasing instantiations: substitutions of the function's type parameters
+            // under which some accessed memories have the same type. Each case is the most
+            // general unifier of a set of equations between memories; the search extends every
+            // case found by each pair of memories it can still make equal.
+            //
+            // Ghost type parameters (indices at or above the declared count) are added by global
+            // invariant instrumentation. The search does not extend into them; pairs mentioning a
+            // ghost are matched by `progressive_instantiation` instead.
+            // Memory a function value may write by its `modifies_of` frame is included.
+            let accessed: Vec<Type> = usage_state
+                .accessed
+                .all
+                .iter()
+                .chain(usage_state.invoke_frame.all.iter())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .map(|m| m.to_type())
+                .collect();
+            let declared_arity = target.func_env.get_type_parameters().len();
+            let mentions_ghost: Vec<bool> = accessed
+                .iter()
+                .map(|ty| {
+                    type_params_in_order(std::slice::from_ref(ty))
+                        .iter()
+                        .any(|i| *i as usize >= declared_arity)
+                })
+                .collect();
+            let as_vars: Vec<Type> = (0..fun_type_params_arity)
+                .map(|i| Type::Var(i as u32))
+                .collect();
+            let adapted: Vec<Type> = accessed.iter().map(|m| m.instantiate(&as_vars)).collect();
+            // A case is verified as read back and identified by its canonical form.
+            let inst_of = |subst: &Substitution| -> Vec<Type> {
+                (0..fun_type_params_arity)
+                    .map(|i| vars_to_type_params(&subst.specialize(&Type::Var(i as u32))))
+                    .collect()
+            };
+            // Whether a ghost is bound, or occurs in another type parameter's binding.
+            let involves_ghost = |subst: &Substitution| -> bool {
+                let bound: Vec<Type> = (0..fun_type_params_arity)
+                    .map(|i| subst.specialize(&Type::Var(i as u32)))
+                    .collect();
+                (declared_arity..fun_type_params_arity).any(|g| {
+                    bound[g] != Type::Var(g as u32)
+                        || bound
+                            .iter()
+                            .enumerate()
+                            .any(|(v, ty)| v != g && ty.get_vars().contains(&(g as u32)))
+                })
+            };
+            let mut all_insts: BTreeSet<Vec<Type>> = BTreeSet::new();
+            let mut cases: BTreeSet<Vec<Type>> = BTreeSet::new();
+            // A function accessing no memory has no aliasing case.
+            if !adapted.is_empty() {
+                let open = inst_of(&Substitution::new());
+                cases.insert(canonical_aliasing_inst(&open, fun_type_params_arity));
+                all_insts.insert(open);
+                let mut work = vec![Substitution::new()];
+                'search: while let Some(subst) = work.pop() {
+                    let current: Vec<Type> = adapted.iter().map(|m| subst.specialize(m)).collect();
+                    for i in 0..current.len() {
+                        for j in i + 1..current.len() {
+                            if current[i] == current[j] {
+                                continue;
+                            }
+                            let mut next = subst.clone();
+                            // Exact unification: memories alias only if their types are equal.
+                            if next
+                                .unify(
+                                    &mut NoUnificationContext,
+                                    Variance::NoVariance,
+                                    WideningOrder::LeftToRight,
+                                    &current[i],
+                                    &current[j],
+                                )
+                                .is_err()
+                            {
+                                continue;
+                            }
+                            if involves_ghost(&next) {
+                                continue;
+                            }
+                            // Unifiers equal up to renaming extend alike.
+                            let inst = inst_of(&next);
+                            if !cases.insert(canonical_aliasing_inst(&inst, fun_type_params_arity))
+                            {
+                                continue;
+                            }
+                            all_insts.insert(inst);
+                            if cases.len() > MAX_ALIASING_INSTANCES {
+                                self.env.error(
+                                    &target.get_loc(),
+                                    &format!(
+                                        "too many type-aliasing cases to verify for `{}` (more \
+                                         than {}): the function accesses too many global \
+                                         resources whose types can coincide under some \
+                                         instantiation of its type parameters",
+                                        target.func_env.get_full_name_str(),
+                                        MAX_ALIASING_INSTANCES
+                                    ),
+                                );
+                                break 'search;
+                            }
+                            work.push(next);
+                        }
                     }
-
-                    // find all instantiation combinations given by this unification
-                    let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
-                        std::iter::once(&lhs_ty),
-                        std::iter::once(&rhs_ty),
-                        true,
-                        false,
-                        true,
-                        false,
-                        fun_type_params_arity,
-                        true,
-                        false,
-                    );
-                    all_insts.extend(fun_insts);
+                }
+                for (i, lhs_ty) in accessed.iter().enumerate() {
+                    for (j, rhs_ty) in accessed.iter().enumerate() {
+                        if !(mentions_ghost[i] || mentions_ghost[j]) {
+                            continue;
+                        }
+                        let adapter = TypeUnificationAdapter::new_pair(lhs_ty, rhs_ty, true, true);
+                        if adapter
+                            .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
+                            .is_none()
+                        {
+                            continue;
+                        }
+                        let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
+                            std::iter::once(lhs_ty),
+                            std::iter::once(rhs_ty),
+                            true,
+                            false,
+                            true,
+                            false,
+                            fun_type_params_arity,
+                            true,
+                            false,
+                        );
+                        all_insts.extend(fun_insts);
+                    }
                 }
             }
 
@@ -1538,7 +1764,17 @@ impl Analyzer<'_> {
         // For monomorphization, we only need to analyze function calls, not `pack` or other
         // instructions because the types those are using are reflected in locals which are analyzed
         // elsewhere.
+        //
+        // `Exists` and `HavocGlobal` reflect their resource type in no local, so it must be
+        // registered here or the translator emits an undeclared `<T>_$memory`. `HavocGlobal` has
+        // its own arm below. The rest need nothing: `BorrowGlobal` yields `&T`, `MoveFrom` yields
+        // `T`, `MoveTo` consumes `T`.
         match bc {
+            Call(_, _, Exists(mid, sid, inst), ..) => {
+                let inst = self.instantiate_vec(inst);
+                let struct_env = self.env.get_module(*mid).into_struct(*sid);
+                self.add_struct(struct_env, &inst);
+            },
             Call(_, _, Invoke, srcs, _) => {
                 if let Some(fun) = srcs.last() {
                     let fun_type =
@@ -1707,8 +1943,49 @@ impl Analyzer<'_> {
                 .chain(spec.proof_exps().into_iter().cloned())
                 .collect::<Vec<_>>()
         };
+
+        // When no caller-visible `aborts_if` constrains the aborts, the Boogie
+        // backend does not default `aborts_of` to `false`; it derives the abort
+        // behavior from the body instead (`derived_aborts` in
+        // `bytecode_translator::translate_fun_spec_conditions`). Those derived
+        // expressions call the functions the body calls, so unless they are walked
+        // here the callees are never registered and the emitted predicate refers to
+        // declarations that were never produced. Reachable whenever a spec-less
+        // lambda is named by a behavioral predicate -- its spec is empty by design,
+        // so the loop above sees nothing.
+        let derived = if spec_derivation::spec_aborts_are_exact(self.env, fun.to_qualified_id()) {
+            None
+        } else {
+            spec_derivation::derive_fun_aborts_conditions(
+                self.env,
+                fun.to_qualified_id(),
+                &fun.inst,
+            )
+        };
+        // The backend also interprets a spec-less function's ensures from its
+        // body. These expressions can introduce dependencies absent from both
+        // its source specification and its derived abort conditions.
+        let derived_ensures =
+            if spec_derivation::has_derived_behavior(self.env, fun.to_qualified_id(), &fun.inst) {
+                spec_derivation::derive_fun_ensures_conditions(
+                    self.env,
+                    fun.to_qualified_id(),
+                    &fun.inst,
+                )
+            } else {
+                None
+            };
         let saved_inst = self.inst_opt.replace(fun.inst.clone());
         for exp in exps {
+            self.analyze_exp(&exp);
+        }
+        // Derived conditions are already instantiated at `fun.inst`.
+        self.inst_opt = None;
+        for exp in derived
+            .into_iter()
+            .flatten()
+            .chain(derived_ensures.into_iter().flatten())
+        {
             self.analyze_exp(&exp);
         }
         self.inst_opt = saved_inst;
@@ -1872,6 +2149,8 @@ impl Analyzer<'_> {
                 }
 
                 if spec_fun.is_native && !actuals.is_empty() {
+                    self.native_spec_fun_insts
+                        .insert((mid.qualified(*fid), actuals.clone()));
                     // Add module to native modules
                     self.info
                         .native_inst

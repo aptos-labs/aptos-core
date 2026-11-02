@@ -976,7 +976,9 @@ impl Bytecode {
                 // write-ref only distorts the value of the reference, but not the pointer itself
                 (add_abort(vec![], aa), vec![(srcs[0], false)])
             },
-            Call(_, dests, Function(..), srcs, aa) => {
+            // A call through a function value modifies the values behind its `&mut`
+            // arguments, like a direct call.
+            Call(_, dests, Function(..) | Invoke, srcs, aa) => {
                 let mut val_targets = vec![];
                 let mut mut_targets = vec![];
                 for src in srcs {

@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/loop_invariant_invalid.move:6:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence
+tests/sources/functional/loop_invariant_invalid.move:21:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence
+tests/sources/functional/loop_invariant_invalid.move:36:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence
+tests/sources/functional/loop_invariant_invalid.move:51:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence

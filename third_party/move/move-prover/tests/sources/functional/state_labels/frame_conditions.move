@@ -172,11 +172,12 @@ module 0x42::frame_conditions {
     }
 
     // =========================================================================
-    // 4. WritesAt — only the specified address can change
+    // 4. WritesAt — the frame names the address, but `apply_void` may invoke `f`
+    //    at any address
     // =========================================================================
 
-    /// After increment_balance(addr), Config is unchanged (reads-only)
-    /// and Balance at other addresses is unchanged (writes-at frame).
+    /// After increment_balance(addr), Config is unchanged (reads-only).
+    /// Balance at other addresses is not known to be unchanged.
     fun test_writes_at_frame(addr: address) acquires Balance, Config {
         apply_void(|a| increment_balance(a) spec {
             modifies Balance[a];
@@ -187,7 +188,7 @@ module 0x42::frame_conditions {
         pragma aborts_if_is_partial;
         ensures Config[addr] == old(Config[addr]);
         ensures forall a: address where a != addr:
-            Balance[a] == old(Balance[a]);
+            Balance[a] == old(Balance[a]); // error: post-condition does not hold
     }
 
     // =========================================================================

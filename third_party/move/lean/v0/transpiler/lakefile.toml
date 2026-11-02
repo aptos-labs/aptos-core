@@ -1,5 +1,5 @@
-# Move-to-Leaner transpiler: decodes XAST (the compiler-v2 typed AST exported
-# by `aptos move exchange --format ast`) and prints textual Leaner Move.  The
+# Move-to-Verex transpiler: decodes XAST (the compiler-v2 typed AST exported
+# by `aptos move exchange --format ast`) and prints textual Verex Move.  The
 # library depends on Lean core only; `move` is required so the elaboration
 # gate in the test suite can build generated modules against `Move`.
 name = "transpiler"
@@ -11,8 +11,8 @@ name = "move"
 path = "../move"
 
 [[require]]
-name = "leaner-move"
-path = "../../leaner-move"
+name = "verex-move"
+path = "../../verex-move"
 
 [[lean_lib]]
 name = "Transpiler"

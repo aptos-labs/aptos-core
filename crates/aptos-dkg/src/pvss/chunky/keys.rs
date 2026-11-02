@@ -63,7 +63,7 @@ pub struct DecryptPrivKey<E: Pairing> {
 impl<E: Pairing> Uniform for DecryptPrivKey<E> {
     fn generate<R>(rng: &mut R) -> Self
     where
-        R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+        R: rand::Rng + rand::CryptoRng,
     {
         DecryptPrivKey::<E> {
             dk: arkworks::random::sample_field_element(rng),

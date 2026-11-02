@@ -451,8 +451,11 @@ fn resolve_spec_fun_qid(fields: &[&str], env: &GlobalEnv) -> Option<String> {
 fn humanize_legacy_definition_qid(base: &str) -> String {
     let symbol = base.strip_suffix(".def").unwrap_or(base);
     let symbol = symbol.strip_prefix('$').unwrap_or(symbol);
+    // Drop the leading address component of the generated name, which carries no
+    // information for a reader. `.` is the component separator of generated names
+    // (see `boogie_module_name`), so the address is the first component.
     let symbol = symbol
-        .split_once('_')
+        .split_once('.')
         .filter(|(prefix, _)| !prefix.is_empty() && prefix.chars().all(|ch| ch.is_ascii_hexdigit()))
         .map_or(symbol, |(_, rest)| rest);
     format!("generated definition for {}", symbol)
@@ -800,7 +803,7 @@ mod tests {
         assert!(vc_matches(Some("p"), Some("p")));
         assert!(vc_matches(Some("p"), Some("p_split0")));
         assert!(!vc_matches(Some("p"), Some("other_split0")));
-        assert_eq!(normalize_vc_id("'$1_p$verify'."), "$1_p$verify");
+        assert_eq!(normalize_vc_id("'$1.p.$verify'."), "$1.p.$verify");
     }
 
     #[test]
@@ -986,8 +989,8 @@ mod tests {
     #[test]
     fn legacy_definition_qids_are_humanized() {
         assert_eq!(
-            humanize_legacy_definition_qid("$1_staking_contract_spec_fold.def"),
-            "generated definition for staking_contract_spec_fold"
+            humanize_legacy_definition_qid("$1.staking_contract.spec_fold.def"),
+            "generated definition for staking_contract.spec_fold"
         );
         assert_eq!(
             humanize_legacy_definition_qid("$spec_fun.def"),

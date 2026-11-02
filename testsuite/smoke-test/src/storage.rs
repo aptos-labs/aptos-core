@@ -207,7 +207,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("Backup verified in {} seconds.", now.elapsed().as_secs());
 }
 
-fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
+fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint], extra_args: &[&str]) {
     info!("---------- running replay-verify");
     let now = Instant::now();
     let metadata_cache_path = TempPath::new();
@@ -233,6 +233,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
             "--local-fs-dir",
             backup_path.to_str().unwrap(),
         ])
+        .args(extra_args)
         .current_dir(workspace_root())
         .output()
         .unwrap();
@@ -316,7 +317,6 @@ fn get_backup_storage_state(
     std::str::from_utf8(&output)?.parse()
 }
 
-#[allow(clippy::zombie_processes)]
 pub(crate) fn db_backup(
     backup_service_port: u16,
     target_epoch: u64,
@@ -324,6 +324,28 @@ pub(crate) fn db_backup(
     transaction_batch_size: usize,
     state_snapshot_interval_epochs: usize,
     trusted_waypoints: &[Waypoint],
+) -> (TempPath, Version) {
+    db_backup_with_args(
+        backup_service_port,
+        target_epoch,
+        target_version,
+        transaction_batch_size,
+        state_snapshot_interval_epochs,
+        trusted_waypoints,
+        &[],
+    )
+}
+
+/// `replay_verify_args` go to the replay-verify run that checks the backup.
+#[allow(clippy::zombie_processes)]
+pub(crate) fn db_backup_with_args(
+    backup_service_port: u16,
+    target_epoch: u64,
+    target_version: Version,
+    transaction_batch_size: usize,
+    state_snapshot_interval_epochs: usize,
+    trusted_waypoints: &[Waypoint],
+    replay_verify_args: &[&str],
 ) -> (TempPath, Version) {
     info!("---------- running aptos db tool backup");
     let now = Instant::now();
@@ -401,7 +423,7 @@ pub(crate) fn db_backup(
     );
     backup_coordinator.kill().unwrap();
     let snapshot_ver = wait_res.unwrap();
-    replay_verify(backup_path.path(), trusted_waypoints);
+    replay_verify(backup_path.path(), trusted_waypoints, replay_verify_args);
     (backup_path, snapshot_ver)
 }
 
@@ -410,6 +432,16 @@ pub(crate) fn db_restore(
     db_path: &Path,
     trusted_waypoints: &[Waypoint],
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
+) {
+    db_restore_with_args(backup_path, db_path, trusted_waypoints, target_verion, &[]);
+}
+
+pub(crate) fn db_restore_with_args(
+    backup_path: &Path,
+    db_path: &Path,
+    trusted_waypoints: &[Waypoint],
+    target_verion: Option<Version>,
+    extra_args: &[&str],
 ) {
     let now = Instant::now();
     let metadata_cache_path = TempPath::new();
@@ -425,6 +457,7 @@ pub(crate) fn db_restore(
 
     cmd.arg("--enable-storage-sharding");
     cmd.arg("--enable-state-indices");
+    cmd.args(extra_args);
     if let Some(version) = target_verion {
         cmd.arg("--target-version");
         cmd.arg(version.to_string());

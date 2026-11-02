@@ -8,9 +8,9 @@
 //! constructors used by the binary module loader.
 
 use crate::{
-    ast::{Attribute, ModuleName, Spec},
+    ast::{Attribute, FriendDecl, ModuleName, Spec},
     model::{
-        FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, Parameter,
+        FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter,
         QualifiedId, StructData, StructId, StructVariant, TypeParameter,
     },
     symbol::Symbol,
@@ -36,6 +36,7 @@ pub struct XirStructData {
     pub fields: Vec<FieldData>,
     pub variants: Option<Vec<XirVariantData>>,
     pub visibility: Visibility,
+    pub attributes: Vec<Attribute>,
 }
 
 pub struct XirVariantData {
@@ -54,6 +55,8 @@ pub struct XirFunctionData {
     pub params: Vec<Parameter>,
     pub result_type: Type,
     pub acquired_structs: BTreeSet<StructId>,
+    /// The called functions and the targets of closures.
+    pub used_funs: BTreeSet<QualifiedId<FunId>>,
     pub called_funs: BTreeSet<QualifiedId<FunId>>,
 }
 
@@ -110,6 +113,7 @@ impl GlobalEnv {
                             variants,
                             false,
                             decl.visibility,
+                            decl.attributes,
                         ),
                     )
                     .is_none(),
@@ -136,6 +140,7 @@ impl GlobalEnv {
                             decl.result_type,
                             None,
                             Some(decl.acquired_structs),
+                            Some(decl.used_funs),
                             Some(decl.called_funs),
                         ),
                     )
@@ -159,5 +164,50 @@ impl GlobalEnv {
             Spec::default(),
             vec![],
         ))
+    }
+
+    /// Replaces the functions an XIR function uses and calls with those of
+    /// its translated code. Calls the reader lowers, such as vector operations
+    /// and a generic `<`, exist only there; a closure's target is used without
+    /// being called.
+    pub fn set_xir_used_functions(
+        &mut self,
+        fun: QualifiedId<FunId>,
+        used: BTreeSet<QualifiedId<FunId>>,
+        called: BTreeSet<QualifiedId<FunId>>,
+    ) {
+        let data = self
+            .get_module_data_mut(fun.module_id)
+            .function_data
+            .get_mut(&fun.id)
+            .expect("the XIR function is loaded");
+        data.used_funs = Some(used);
+        data.called_funs = Some(called);
+        // As for `set_function_def`: cached call-graph entries may now be stale.
+        self.call_graph_cache.invalidate();
+    }
+
+    /// Declares `module` a friend of each module in its package whose package
+    /// functions it calls, as the model builder does for source modules. An
+    /// XIR module is loaded after that pass, so it would otherwise have none.
+    pub fn add_package_friends(&mut self, module: ModuleId) {
+        let module_env = self.get_module(module);
+        // Only a module being compiled, as in the builder's pass. Not
+        // `is_target`, which whole-program mode makes true for every module.
+        if !module_env.is_primary_target() {
+            return;
+        }
+        let name = module_env.get_name().clone();
+        let callees = module_env.need_to_be_friended_by();
+        for callee in callees {
+            let data = self.get_module_data_mut(callee);
+            if data.friend_modules.insert(module) {
+                data.friend_decls.push(FriendDecl {
+                    loc: data.loc.clone(),
+                    module_name: name.clone(),
+                    module_id: Some(module),
+                });
+            }
+        }
     }
 }

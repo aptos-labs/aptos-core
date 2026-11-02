@@ -66,6 +66,8 @@ pub enum NamedSlot {
     Home(HomeIndex),
     /// Call-interface slots, used for both passing arguments to a callee
     /// (before the call) and receiving return values (after the call).
+    /// Arguments of `Call` and results of `Call` or `CallClosure` may use
+    /// these slots; closure operands must use `Home` slots.
     /// `Transfer` overlaps with the callee's parameter/return area, so
     /// values produced directly into a `Transfer` slot avoid a copy at the
     /// call site. Displayed as `x0, x1, ...`.
@@ -143,6 +145,20 @@ pub struct CallData<SlotForm> {
     pub function_handle: FunctionHandleIndex,
     pub ty_args: InternedTypeList,
     pub args: Box<[SlotForm]>,
+    pub reentrancy_check: ReentrancyCheck,
+}
+
+/// Whether a regular call requires a reentrancy check.
+///
+/// Same-module calls to definitions without `#[module_lock]` are `Exempt`:
+/// they preserve module activity, module locks, and resource access. All other
+/// regular calls are `Required`; choosing `Required` for an exempt call is safe
+/// but adds runtime checker work to every such call.
+/// Note: closure calls always run the check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReentrancyCheck {
+    Required,
+    Exempt,
 }
 
 /// Payload of [`Instr::PackClosure`] (same `(function_handle, ty_args)`

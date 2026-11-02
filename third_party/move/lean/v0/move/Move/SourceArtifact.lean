@@ -4,7 +4,7 @@
 import Lean
 
 /-!
-# Retained Leaner Move module source
+# Retained Verex Move module source
 
 The `module` elaborator expands source items into ordinary Lean declarations,
 compiler attributes, and verification definitions.  Some of that expansion is
@@ -14,7 +14,7 @@ not retain the authored specification-clause boundary.
 This persistent artifact keeps the already parsed module items at the
 frontend boundary.  Consumers must translate them to their own semantic IR;
 the artifact is not a backend representation and must not be consulted after
-raw LIR construction.
+raw VIR construction.
 -/
 
 namespace Move
@@ -38,12 +38,12 @@ private initialize sourceModuleArtifactExt :
           modules.insert namespaceName artifact) {} entries
   }
 
-/-- Persist the parsed source owned by one Leaner Move module namespace. -/
+/-- Persist the parsed source owned by one Verex Move module namespace. -/
 def registerSourceModuleArtifact (env : Environment) (namespaceName : Name)
     (artifact : SourceModuleArtifact) : Environment :=
   sourceModuleArtifactExt.addEntry env (namespaceName, artifact)
 
-/-- Retrieve the parsed source of a local or imported Leaner Move module. -/
+/-- Retrieve the parsed source of a local or imported Verex Move module. -/
 def sourceModuleArtifact? (env : Environment) (namespaceName : Name) :
     Option SourceModuleArtifact :=
   (sourceModuleArtifactExt.getState env).find? namespaceName

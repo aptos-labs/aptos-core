@@ -1,0 +1,3 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/enum_update_out_of_variant.move:7:1: error: a field update on an enum whose variants do not all carry the field is not supported yet
+tests/sources/regression/enum_update_out_of_variant.move:7:1: error: a field update on an enum whose variants do not all carry the field is not supported yet

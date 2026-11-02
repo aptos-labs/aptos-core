@@ -21,7 +21,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
+    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, Result,
 };
 use aptos_types::{
     account_config::new_block_event_key,
@@ -34,6 +34,7 @@ use aptos_types::{
     transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
+use itertools::Itertools;
 use std::sync::Arc;
 
 /// Saves the given ledger infos to the ledger store. If a change set is provided,
@@ -264,14 +265,27 @@ pub(crate) fn save_transactions_impl(
         )?;
     }
 
-    if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        let (ledger_state, _hot_state_updates) = state_store.calculate_state_and_put_updates(
-            &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), vec![]),
+    if kv_replay {
+        let all_checkpoint_indices: Vec<_> = txn_infos
+            .iter()
+            .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+            .collect();
+        ensure!(
+            all_checkpoint_indices.last().map(|idx| idx + 1) == Some(txn_infos.len()),
+            "KV replay of {} txns from version {} doesn't end at a block end.",
+            txn_infos.len(),
+            first_version,
+        );
+        state_store.replay_kv(
+            &StateUpdateRefs::index_write_sets(
+                first_version,
+                write_sets,
+                write_sets.len(),
+                all_checkpoint_indices,
+            ),
             &mut ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
         )?;
-        // n.b. ideally this is set after the batches are committed
-        state_store.set_state_ignoring_summary(ledger_state);
     }
 
     let last_version = first_version + txns.len() as u64 - 1;
