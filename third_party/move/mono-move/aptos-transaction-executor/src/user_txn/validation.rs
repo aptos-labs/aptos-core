@@ -118,14 +118,9 @@ pub(crate) fn run_metered_prologue<'a>(
     let args = MeteredPrologueArgs::V1 {
         replay_protector: txn_data.replay_protector,
     };
-    let status = call_validation_function(
-        interp,
-        symbols,
-        symbols.versioned_metered_prologue,
-        signers,
-        &args,
-    )
-    .map_err(MoveExecutionFailure::RuntimeError)?;
+    let status =
+        call_validation_function(interp, symbols, symbols.metered_prologue, signers, &args)
+            .map_err(MoveExecutionFailure::RuntimeError)?;
     call_result(status)
 }
 

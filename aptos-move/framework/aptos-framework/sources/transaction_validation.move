@@ -919,7 +919,7 @@ module aptos_framework::transaction_validation {
         }
     }
 
-    /// Arguments for `versioned_metered_prologue`. Versioned like `PrologueArgs`:
+    /// Arguments for `metered_prologue`. Versioned like `PrologueArgs`:
     /// a new field becomes a new enum variant, and old variants keep their layout.
     enum MeteredPrologueArgs {
         V1 {
@@ -930,7 +930,7 @@ module aptos_framework::transaction_validation {
     /// The metered half of the prologue. Runs after `versioned_prologue` has
     /// validated the transaction and before the payload, charged against the
     /// transaction's gas budget. Its effects survive a failed payload.
-    fun versioned_metered_prologue(sender: signer, _fee_payer: signer, args: MeteredPrologueArgs) {
+    fun metered_prologue(sender: signer, _fee_payer: signer, args: MeteredPrologueArgs) {
         match (args) {
             V1 { replay_protector } => {
                 create_sender_account_if_needed(&sender, replay_protector);

@@ -518,7 +518,7 @@ spec aptos_framework::transaction_validation {
         include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
     }
 
-    spec versioned_metered_prologue {
+    spec metered_prologue {
         pragma verify = false;
     }
 
