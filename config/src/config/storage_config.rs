@@ -254,6 +254,9 @@ impl Default for RocksdbConfigs {
 pub struct HotStateConfig {
     /// Max number of items in each shard.
     pub max_items_per_shard: usize,
+    /// Max sum of value sizes in each shard. Values vary a lot in size, so capping the item count
+    /// alone doesn't bound memory usage.
+    pub max_value_bytes_per_shard: usize,
     /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
     /// evicted.
     pub refresh_interval_versions: u64,
@@ -265,6 +268,7 @@ impl Default for HotStateConfig {
     fn default() -> Self {
         Self {
             max_items_per_shard: 250_000,
+            max_value_bytes_per_shard: 512 << 20,
             refresh_interval_versions: 100_000,
             delete_on_restart: true,
         }
