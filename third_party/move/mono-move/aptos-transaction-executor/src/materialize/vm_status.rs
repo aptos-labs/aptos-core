@@ -133,7 +133,7 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
     let code = match &failure {
         F::TransactionTooLarge { .. } => StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
         F::GasBudgetAboveBound { .. } => StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
-        F::GasBudgetBelowIntrinsicCost { .. } | F::GasBudgetBelowAccountCreationCost { .. } => {
+        F::GasBudgetBelowIntrinsicCost { .. } => {
             StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
         },
         F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,

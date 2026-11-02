@@ -2062,18 +2062,25 @@ fn account_created_when_payload_aborts_like_v1() {
     );
 }
 
-/// A budget too small to pay for the new account is rejected.
+/// A budget too small to pay for the new account. V1 rejects it up front, from
+/// an estimate of the slot fee. MonoMove has no such check: the metered
+/// prologue runs out of gas creating the account, and that discards.
+// TODO(metering): today the budget runs out on uncalibrated execution gas. Once
+// the metered prologue charges the slot fee as it writes the account, that fee
+// is what must exhaust the budget here.
 #[test]
-fn unaffordable_account_creation_discarded_like_v1() {
+fn unaffordable_account_creation_discarded_out_of_gas() {
     let (mut fx, alice, bob) = setup();
     let carol = fund_fresh_account(&mut fx, &alice, 100_000_000);
     let txn = first_transfer(&carol, &bob, 1_000, 100);
-    let v1_status = fx.execute_transaction(txn.clone()).status().clone();
     assert_eq!(
-        v1_status,
-        TransactionStatus::Discard(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS)
+        fx.execute_transaction(txn.clone()).status(),
+        &TransactionStatus::Discard(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS)
     );
-    assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
+    assert_eq!(
+        execute_v2(fx.get_state_view(), &txn).status(),
+        &TransactionStatus::Discard(StatusCode::OUT_OF_GAS)
+    );
 }
 
 /// An account that already exists is not created again.

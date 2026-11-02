@@ -24,8 +24,7 @@ use aptos_types::{
     on_chain_config::ApprovedExecutionHashes,
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{
-        AuxiliaryInfo, EntryFunction, ReplayProtector, Script, SignedTransaction,
-        TransactionExecutableRef,
+        AuxiliaryInfo, EntryFunction, Script, SignedTransaction, TransactionExecutableRef,
     },
 };
 use mono_move_core::{
@@ -141,16 +140,14 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                     ))
                 })?
         };
-        let checker = PreExecutionChecker::new(
+        PreExecutionChecker::new(
             gas_params,
             self.env.gas_feature_version(),
             approved_gov_scripts.as_ref(),
-            self.env.features(),
             txn_data,
-        );
-        checker
-            .run_checks()
-            .map_err(DiscardReason::PreExecutionCheck)?;
+        )
+        .run_checks()
+        .map_err(DiscardReason::PreExecutionCheck)?;
 
         // TODO(completeness): multisig payloads. Refused for now, since the
         // inner executable must run as the multisig account, not the sender.
@@ -177,27 +174,6 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         let signers = ValidationSigners::new(txn_data);
 
-        // The sender's first transaction may come from an address holding no
-        // `Account` resource yet. The metered prologue creates it, so the budget
-        // must cover that. The read is unmetered, like V1's.
-        let creates_sender_account = txn_data.replay_protector
-            == ReplayProtector::SequenceNumber(0)
-            && interp
-                .unmetered(|interp| {
-                    interp.read_resource(txn_data.sender, self.symbols.account_resource)
-                })
-                .map_err(|e| {
-                    DiscardReason::InvariantViolation(format!(
-                        "the sender's account is unreadable: {e}"
-                    ))
-                })?
-                .is_none();
-        if creates_sender_account {
-            checker
-                .check_gas_budget_covers_account_creation()
-                .map_err(DiscardReason::PreExecutionCheck)?;
-        }
-
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
         run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
@@ -208,20 +184,24 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         })?;
 
         // ======================== Metered prologue ==========================
-        // A second prologue stage for checks and state changes that may cost
-        // real gas (e.g. creating the sender's account on its first transaction).
-        // It runs once the fee payer is validated, so the work is paid for, and
-        // before the checkpoint below, so its effects survive a failed payload.
+        // State setup that costs real gas (today: creating the sender's
+        // account on its first transaction). Runs after the fee payer is
+        // validated and before the checkpoint, so it is paid for and survives
+        // a failed payload. A failure here discards, as in AptosVM: the
+        // epilogue needs the account to bump the sequence number.
         //
-        // Contract: this stage is expected to succeed. The pre-execution checks
-        // and the prologue must have ruled out every failure beforehand; one
-        // here means a check is missing, and discards the transaction.
+        // TODO(metering): eagarly charge a created slot's storage fee here,
+        // so the payload cannot spend that part of the budget.
         //
-        // TODO(cleanup, correctness): revisit discarding. The fee payer is
-        // validated by this point, so a failure here could commit and charge
-        // like a failed payload (rolling back to a checkpoint taken after the
-        // prologue). That would let this stage host user-triggerable checks,
-        // e.g. multisig validation, which AptosVM keeps and charges.
+        // TODO(correctness): right now the metered prologue only does account
+        // creation, so the transaction is discarded when there is an error.
+        //
+        // When additional checks or setup get added, we should make it so that
+        // 1. Account creation is the first thing done in the metered prologue
+        // 2. The transaction is discard only if account creation fails (as we
+        //    don't have a sequence number to increment)
+        // 3. Other errors, after account creation, should result in gas being
+        //    charged and the transaction being committed.
         self.run_metered(interp, |interp| {
             run_metered_prologue(interp, self.symbols, &signers, txn_data)
         })
@@ -260,6 +240,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ============================ Epilogue ==============================
         // Transaction cleanup -- charge gas, bump sequence number etc.
+        //
+        // TODO(correctness): remove the redundant account creation logic in the
+        // epilogue once the metered prologue ensures its existence.
         let fee_statement = placeholder_fee_statement(gas_used);
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(

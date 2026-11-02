@@ -90,8 +90,6 @@ pub enum PreExecutionCheckFailure {
     GasBudgetAboveBound { max_gas: u64, bound: u64 },
     #[error("max gas amount {max_gas} is below the transaction's base cost {min}")]
     GasBudgetBelowIntrinsicCost { max_gas: u64, min: u64 },
-    #[error("gas budget of {budget_octas} octas is below the account creation cost {min_octas}")]
-    GasBudgetBelowAccountCreationCost { budget_octas: u64, min_octas: u64 },
     #[error("gas unit price {price} is below the minimum {min}")]
     GasPriceBelowMinimum { price: u64, min: u64 },
     #[error("gas unit price {price} is below the encrypted-transaction minimum {min}")]
