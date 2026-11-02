@@ -33,6 +33,7 @@ pub struct FrameworkSymbols {
     /// `0x1::transaction_validation`.
     pub transaction_validation: InternedModuleId,
     pub versioned_prologue: InternedIdentifier,
+    pub metered_prologue: InternedIdentifier,
     pub versioned_epilogue: InternedIdentifier,
 
     /// `0x1::object`, whose `Object<T>` arguments the VM checks against the
@@ -66,6 +67,7 @@ impl FrameworkSymbols {
 
             transaction_validation: module(ident_str!("transaction_validation")),
             versioned_prologue: identifier(ident_str!("versioned_prologue")),
+            metered_prologue: identifier(ident_str!("metered_prologue")),
             versioned_epilogue: identifier(ident_str!("versioned_epilogue")),
 
             object,

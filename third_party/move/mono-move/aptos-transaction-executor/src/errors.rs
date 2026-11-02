@@ -108,6 +108,9 @@ pub enum PreExecutionCheckFailure {
 #[derive(Clone, Copy, Debug)]
 pub enum ExecutionStage {
     Prologue,
+    /// The metered half of the prologue, which creates the sender's account on
+    /// its first transaction.
+    MeteredPrologue,
     Payload,
     /// The epilogue after a payload that succeeded.
     Epilogue,
