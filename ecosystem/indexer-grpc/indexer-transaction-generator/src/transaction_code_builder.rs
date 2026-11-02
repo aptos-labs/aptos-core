@@ -67,10 +67,13 @@ impl TransactionCodeBuilder {
                 // Adds the constant to the list of all constants
                 all_constants.push_str(&format!("{},", const_name));
 
-                // If name function generation is requested, adds the corresponding match arm
+                // If name function generation is requested, adds the corresponding match arm.
+                //
+                // NOTE: compare in a guard because using large byte-slice constants as patterns
+                // overflows rustc's stack since 1.99.
                 if generate_name_function {
                     self.name_function_code.push_str(&format!(
-                        "        {const_name} => Some(\"{file_name}\"),\n",
+                        "        data if data == {const_name} => Some(\"{file_name}\"),\n",
                         const_name = const_name,
                         file_name = file_name
                     ));
