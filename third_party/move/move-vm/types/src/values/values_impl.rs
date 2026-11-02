@@ -25,11 +25,7 @@ use move_core_types::{
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
-<<<<<<< HEAD
-        PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
-=======
-        MAX_VALUE_NEST_DEPTH,
->>>>>>> b93156d239 ([api] Bound nesting depth when decoding Move values)
+        MAX_VALUE_NEST_DEPTH, PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
     },
     vm_status::{
         sub_status::{
