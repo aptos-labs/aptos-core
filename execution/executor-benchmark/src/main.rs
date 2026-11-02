@@ -30,7 +30,7 @@ use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
-use aptos_metrics_core::{register_int_gauge, IntGauge};
+use aptos_metrics_core::{register_int_gauge, Encoder, IntGauge, TextEncoder};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::WorkflowProgress;
@@ -41,12 +41,19 @@ use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
 };
 use clap::{Parser, Subcommand, ValueEnum};
+use hyper::{
+    header::CONTENT_TYPE,
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, Server, StatusCode,
+};
 use once_cell::sync::Lazy;
 use std::{
+    convert::Infallible,
     net::SocketAddr,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tokio::runtime::Runtime;
 
 #[cfg(unix)]
 aptos_jemalloc::setup_jemalloc!();
@@ -362,6 +369,10 @@ struct Opt {
 
     #[clap(long)]
     use_blockstm_v1: bool,
+
+    /// If set, serves Prometheus metrics at `0.0.0.0:<PORT>/metrics` while the benchmark runs.
+    #[clap(long)]
+    metrics_port: Option<u16>,
 }
 
 impl Opt {
@@ -640,6 +651,47 @@ where
     }
 }
 
+fn start_metrics_server(port: u16) -> Runtime {
+    let runtime = aptos_runtimes::spawn_named_runtime("metrics".into(), Some(1));
+    let address = SocketAddr::from(([0, 0, 0, 0], port));
+    // Bind eagerly so that a taken port fails the benchmark up front.
+    let server = {
+        let _guard = runtime.enter();
+        Server::try_bind(&address)
+            .unwrap_or_else(|e| panic!("Failed to bind metrics server to {address}: {e}"))
+    };
+    let local_addr = server.local_addr();
+    let make_service =
+        make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(serve_metrics)) });
+    runtime.spawn(async move {
+        if let Err(e) = server.serve(make_service).await {
+            aptos_logger::error!("Metrics server error: {e}");
+        }
+    });
+    println!("Serving metrics at http://{local_addr}/metrics");
+    runtime
+}
+
+async fn serve_metrics(request: Request<Body>) -> Result<Response<Body>, Infallible> {
+    if request.method() != Method::GET || request.uri().path() != "/metrics" {
+        let mut response = Response::new(Body::empty());
+        *response.status_mut() = StatusCode::NOT_FOUND;
+        return Ok(response);
+    }
+
+    let encoder = TextEncoder::new();
+    let mut buffer = vec![];
+    if let Err(e) = encoder.encode(&aptos_metrics_core::gather(), &mut buffer) {
+        let mut response = Response::new(Body::from(format!("Failed to encode metrics: {e}")));
+        *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+        return Ok(response);
+    }
+    Ok(Response::builder()
+        .header(CONTENT_TYPE, encoder.format_type())
+        .body(Body::from(buffer))
+        .expect("Metrics response should build"))
+}
+
 fn main() {
     let opt = Opt::parse();
     aptos_logger::Logger::new().init();
@@ -655,6 +707,7 @@ fn main() {
         .expect("Failed to build rayon global thread pool.");
 
     aptos_node_resource_metrics::register_node_metrics_collector(None);
+    let _metrics_server = opt.metrics_port.map(start_metrics_server);
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     let execution_threads = opt.execution_threads();
