@@ -537,7 +537,10 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, message);
             },
 
-            MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
+            MicroOp::CallByName { .. }
+            | MicroOp::CallByNameExempt { .. }
+            | MicroOp::CallByPtr { .. }
+            | MicroOp::CallByPtrExempt { .. } => {},
 
             MicroOp::CallNative { ref abi, .. } => {
                 self.check_native_abi(pc, abi);

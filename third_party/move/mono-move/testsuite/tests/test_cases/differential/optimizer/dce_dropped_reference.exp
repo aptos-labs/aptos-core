@@ -36,7 +36,7 @@ fun check(r0): bool {
     3: x0 := imm_borrow_loc r1 @5
     4: r2 := ld_u64 7 @6
     5: x1 := imm_borrow_loc r2 @8
-    6: [x0] := call contains, [x0, x1] @9
+    6: [x0] := call_exempt contains, [x0, x1] @9
     7: ret [x0] @10
   L0:
     8: r1 := pack_variant 0x42::dce_dropped_reference::Maybe@1, [] @11

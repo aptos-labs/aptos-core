@@ -1,0 +1,184 @@
+=== stackless ===
+// module 0x42::callee
+
+fun locked_noop() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret [] @0
+}
+
+fun locked_run(r0) {
+  slots: params(1), locals(0), temps(0)
+    r0: ||()
+  code:
+  L0:
+    0: [] := call_closure [||()], [r0] @1
+    1: ret [] @2
+}
+
+fun noop() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret [] @0
+}
+
+fun run(r0) {
+  slots: params(1), locals(0), temps(0)
+    r0: ||()
+  code:
+  L0:
+    0: [] := call_closure [||()], [r0] @1
+    1: ret [] @2
+}
+
+fun run_self() {
+  slots: params(0), locals(0), temps(0), transfer(1)
+  code:
+  L0:
+    0: x0 := pack_closure noop, 0, [] @0
+    1: [] := call_exempt run, [x0] @1
+    2: ret [] @2
+}
+=== stackless ===
+// module 0x42::caller
+
+fun locked_noop() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret [] @0
+}
+
+fun lock_released_before_dispatch(): u64 {
+  slots: params(0), locals(0), temps(1), transfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [] := call locked_noop, [] @0
+    1: x0 := pack_closure pure, 0, [] @1
+    2: [] := call run, [x0] @2
+    3: r0 := ld_u64 3 @3
+    4: ret [r0] @4
+}
+
+fun lock_via_cross_module_callee(): bool {
+  slots: params(0), locals(0), temps(1), transfer(1)
+    r0: bool
+  code:
+  L0:
+    0: x0 := pack_closure pure, 0, [] @0
+    1: [] := call locked_run, [x0] @1
+    2: r0 := ld_true @2
+    3: ret [r0] @3
+}
+
+fun lock_via_same_module_callee(): bool {
+  slots: params(0), locals(0), temps(0), transfer(1)
+  code:
+  L0:
+    0: [x0] := call locked_helper, [] @0
+    1: ret [x0] @1
+}
+
+fun locked_closure_target_reenters(): bool {
+  slots: params(0), locals(0), temps(1), transfer(1)
+    r0: bool
+  code:
+  L0:
+    0: x0 := pack_closure locked_pure, 0, [] @0
+    1: [] := call run, [x0] @1
+    2: r0 := ld_true @2
+    3: ret [r0] @3
+}
+
+fun locked_closure_target_releases(): u64 {
+  slots: params(0), locals(0), temps(1), transfer(1)
+    r0: u64
+  code:
+  L0:
+    0: x0 := pack_closure locked_noop, 0, [] @0
+    1: [] := call run, [x0] @1
+    2: x0 := pack_closure pure, 0, [] @2
+    3: [] := call run, [x0] @3
+    4: r0 := ld_u64 5 @4
+    5: ret [r0] @5
+}
+
+fun locked_helper(): bool {
+  slots: params(0), locals(0), temps(1), transfer(1)
+    r0: bool
+  code:
+  L0:
+    0: x0 := pack_closure pure, 0, [] @0
+    1: [] := call run, [x0] @1
+    2: r0 := ld_true @2
+    3: ret [r0] @3
+}
+
+fun locked_pure() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret [] @0
+}
+
+fun locked_root_no_reentry(): u64 {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+  L0:
+    0: [] := call noop, [] @0
+    1: [] := call run_self, [] @1
+    2: r0 := ld_u64 7 @2
+    3: ret [r0] @3
+}
+
+fun pure() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret [] @0
+}
+=== stackless ===
+// module 0x42::low
+
+fun noop() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: ret [] @0
+}
+
+fun run(r0) {
+  slots: params(1), locals(0), temps(0)
+    r0: ||()
+  code:
+  L0:
+    0: [] := call_closure [||()], [r0] @1
+    1: ret [] @2
+}
+=== stackless ===
+// module 0x42::mid
+
+fun back() {
+  slots: params(0), locals(0), temps(0)
+  code:
+  L0:
+    0: [] := call noop, [] @0
+    1: ret [] @1
+}
+=== stackless ===
+// module 0x42::top
+
+fun entry(): bool {
+  slots: params(0), locals(0), temps(1), transfer(1)
+    r0: bool
+  code:
+  L0:
+    0: x0 := pack_closure back, 0, [] @0
+    1: [] := call run, [x0] @1
+    2: r0 := ld_true @2
+    3: ret [r0] @3
+}

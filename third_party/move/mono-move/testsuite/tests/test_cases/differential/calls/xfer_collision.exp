@@ -33,9 +33,9 @@ fun caller(r0): u64 {
     r1: u64
   code:
   L0:
-    0: [x1, x2, r1] := call three_rets, [] @1
+    0: [x1, x2, r1] := call_exempt three_rets, [] @1
     1: r1 := add r1, #5 @3
-    2: [x0] := call three_args, [r0, x1, x2] @5
+    2: [x0] := call_exempt three_args, [r0, x1, x2] @5
     3: ret [x0] @6
 }
 === micro-ops ===
@@ -65,13 +65,13 @@ fun caller() {
   frame_data_size: 16
   entry_gas: 183
   code:
-    0: CallIndirect 0x66::xfer_collision::three_rets @1
+    0: CallByNameExempt 0x66::xfer_collision::three_rets @1
     1: Move8 [8] <- [56] @1
     2: AddU64Imm [8] <- [8] + #5 @3
     3: Move8 [56] <- [48] @5
     4: Move8 [48] <- [40] @5
     5: Move8 [40] <- [0] @5
-    6: CallIndirect 0x66::xfer_collision::three_args @5
+    6: CallByNameExempt 0x66::xfer_collision::three_args @5
     7: Move8 [0] <- [40] @6
     8: Return @6
 }
