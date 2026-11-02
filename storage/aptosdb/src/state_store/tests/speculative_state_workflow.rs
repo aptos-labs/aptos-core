@@ -25,7 +25,7 @@ use aptos_types::{
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
+        state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -52,6 +52,9 @@ use std::{
 
 const NUM_KEYS: usize = NUM_STATE_SHARDS * 6;
 const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = NUM_KEYS / NUM_STATE_SHARDS / 2;
+// Small enough that the byte limit regularly kicks in before the item limit, and a single large
+// value can exceed it on its own.
+const HOT_STATE_MAX_VALUE_BYTES_PER_SHARD: usize = ARB_STATE_VALUE_MAX_SIZE * 4 / 5;
 
 // Small enough that a block leaves many keys read but not written, so they are eligible for
 // promotion.
@@ -63,6 +66,7 @@ const REFRESH_INTERVAL_VERSIONS: Version = 20;
 
 const TEST_CONFIG: HotStateConfig = HotStateConfig {
     max_items_per_shard: HOT_STATE_MAX_ITEMS_PER_SHARD,
+    max_value_bytes_per_shard: HOT_STATE_MAX_VALUE_BYTES_PER_SHARD,
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
 };
@@ -287,8 +291,12 @@ impl VersionState {
 
         if is_checkpoint {
             for shard in hot_state.iter_mut() {
-                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD {
-                    let (k, _) = shard.pop_lru().unwrap();
+                let mut value_bytes: usize = shard.iter().map(|(_, slot)| slot.size()).sum();
+                while shard.len() > HOT_STATE_MAX_ITEMS_PER_SHARD
+                    || value_bytes > HOT_STATE_MAX_VALUE_BYTES_PER_SHARD
+                {
+                    let (k, slot) = shard.pop_lru().unwrap();
+                    value_bytes -= slot.size();
                     hot_smt_updates.push((k.hash(), None));
                 }
             }
