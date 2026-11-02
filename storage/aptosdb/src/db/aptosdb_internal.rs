@@ -115,6 +115,7 @@ impl AptosDB {
             update_subscriber: None,
             position: None,
             order: None,
+            collateral: None,
         }
     }
 
@@ -211,6 +212,14 @@ impl AptosDB {
                 readonly,
                 for_restore,
             )?;
+            myself.init_native_collateral(
+                db_paths,
+                &native_store_configs,
+                &env,
+                &block_cache,
+                readonly,
+                for_restore,
+            )?;
         }
 
         if !readonly {
@@ -262,6 +271,9 @@ impl AptosDB {
             }
             if let Some(order) = myself.order.as_ref() {
                 order.store.activate_pruners(synced_version);
+            }
+            if let Some(collateral) = myself.collateral.as_ref() {
+                collateral.activate_pruners(synced_version);
             }
         }
 
