@@ -18,7 +18,9 @@ use std::{
 /// Extension for expected output files
 pub const EXP_EXT: &str = "exp";
 
-datatest_stable::harness!(test_runner, "tests", r".*\.move$");
+datatest_stable::harness! {
+    { test = test_runner, root = "tests", pattern = r".*\.move$" },
+}
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     logging::setup_logging_for_testing(None);

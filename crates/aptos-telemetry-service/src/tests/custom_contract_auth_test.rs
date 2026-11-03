@@ -137,8 +137,8 @@ async fn test_custom_contract_auth_with_resource() {
     // Mock the resource endpoint with required Aptos API headers
     let _resource_mock = server.mock(|when, then| {
         when.method(GET)
-            .path_contains("accounts")
-            .path_contains("resource");
+            .path_includes("accounts")
+            .path_includes("resource");
         then.status(200)
             .header("X-Aptos-Chain-Id", "21")
             .header("X-Aptos-Ledger-Version", "1000")
@@ -937,8 +937,8 @@ async fn test_custom_contract_auth_resource_not_found() {
     // Mock 404 response for non-existent resource (not used since cache is checked first)
     let _resource_mock = server.mock(|when, then| {
         when.method(GET)
-            .path_contains("accounts")
-            .path_contains("resource");
+            .path_includes("accounts")
+            .path_includes("resource");
         then.status(404)
             .header("X-Aptos-Chain-Id", "21")
             .header("X-Aptos-Ledger-Version", "1000")

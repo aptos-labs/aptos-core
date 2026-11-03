@@ -374,7 +374,7 @@ mod test {
             handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
 
         mock1.assert();
-        assert!(mock2.hits_async().await >= 1);
+        assert!(mock2.calls_async().await >= 1);
         assert!(result.is_ok());
     }
 
@@ -415,7 +415,7 @@ mod test {
         let result =
             handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
 
-        assert!(mock1.hits_async().await >= 1);
+        assert!(mock1.calls_async().await >= 1);
         mock2.assert();
         assert!(result.is_err());
     }
