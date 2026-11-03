@@ -358,6 +358,16 @@ TESTS = [
     for executor_type in executor_types
 ]
 
+# BISECT ONLY (not for merge): run just the vector rows, and add an
+# execution-only thread-scaling sweep to tell lock contention from per-call cost.
+TESTS = [
+    t
+    for t in TESTS
+    if t.key.transaction_type
+    in ("vector-trim-append-len3000-size1", "vector-remove-insert-len3000-size1")
+]
+EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32]
+
 # fmt: on
 
 # Run the single node with performance optimizations enabled
