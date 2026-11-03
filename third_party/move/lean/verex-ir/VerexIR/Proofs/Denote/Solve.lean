@@ -4,6 +4,7 @@
 import VerexIR.Proofs.Denote.Solve.Decide
 import VerexIR.Proofs.Denote.Solve.Normal
 import VerexIR.Proofs.Denote.Solve.Invoke
+import Std.Sync.Mutex
 
 /-!
 # Closing the verification condition of a denotation
@@ -362,6 +363,12 @@ structure SolveContext where
   budgets : IO.Ref SharedBudgets.Ledger
   normalization : Simp.Context × Simp.SimprocsArray
   startHeartbeats : Nat
+  /-- The context the walk started in, which a derived summary's walk
+  starts in too. -/
+  base? : Option (LocalContext × LocalInstances) := none
+  /-- The compiled callees whose summaries are being derived, innermost
+  last: such a walk hands its leaves over as the summary's conjuncts. -/
+  summarizing : Array Name := #[]
 
 /-- The number of a call among the target's calls of its callee, by its
 site. -/
@@ -2075,6 +2082,318 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
     queue (← getGoals) origin (if index ≤ 1 then #[] else clauses)
   charge "call" stageStart
 
+/-! ## Derived summaries
+
+A contract-free callee's summary is its weakest-precondition characterisation:
+`∀ args ensures aborts initial, Ψ → wp (call args) ensures aborts initial`,
+where `Ψ` conjoins the leaves the walk leaves on the callee's body with the
+continuations opaque, one per path. The walk's proof term proves it, checked
+by the kernel once; a call applies it as `applyCallTheorem` applies a
+contract, and its conjuncts, instantiated at the call, are the leaves an
+inlined body would give. -/
+
+/-- A derived summary: the theorems its proof needs, the hidden theorems it
+uses, then the summary itself, each by name, statement and proof; and its
+number of conjuncts. -/
+structure DerivedSummary where
+  declarations : Array (Name × Lean.Expr × Lean.Expr)
+  conjuncts : Nat
+
+/-- The summaries derived in this process, by compiled callee; none where the
+callee's walk does not qualify. Shared by the targets proved at once. -/
+initialize derivedSummaries : Std.Mutex (Std.HashMap Name (Option DerivedSummary)) ←
+  Std.Mutex.new {}
+
+/-- Record what a callee's summary is. -/
+private def recordSummary (compiled : Name) (summary : Option DerivedSummary) : BaseIO Unit :=
+  derivedSummaries.atomically (modify (·.insert compiled summary))
+
+/-- The traversal a summary's walk runs from a state to its final state, set
+where `traverse` is defined. -/
+initialize summaryTraversal : IO.Ref (SolveContext → SolveState → TacticM SolveState) ←
+  IO.mkRef fun _ state => pure state
+
+/-- Whether a compiled callee's form admits a summary: not generic, without
+a loop, not returning a reference. -/
+private def summaryForm (compiled : Name) : CoreM Bool := do
+  let env ← getEnv
+  let value (part : Name) := (env.find? (compiled.getPrefix ++ part)).bind (·.value?)
+  let some row := value `row | return false
+  let some shape := value `shape | return false
+  let some body := value `body | return false
+  let mentions (e : Lean.Expr) (name : Name) := (e.find? (·.isConstOf name)).isSome
+  return ![row, shape, body].any (mentions · ``VerexIR.Proofs.Denote.NTy.param) &&
+    !mentions body ``VerexIR.Proofs.Denote.Term.loop &&
+    !mentions shape ``VerexIR.Proofs.Denote.NTy.ref
+
+/-- The leading binders of a goal, `∀` and `let`. -/
+private partial def leadingBinders : Lean.Expr → Nat
+  | .forallE _ _ b _ | .letE _ _ _ b _ => leadingBinders b + 1
+  | .mdata _ b => leadingBinders b
+  | _ => 0
+
+/-- Declare a summary's theorems missing from the environment, checked at
+once, under the theorem being proved, as its auxiliary theorems are: the
+summary as declared here, recorded for the callee `compiled`. -/
+private def declareSummary (compiled : Name) (summary : DerivedSummary) :
+    TacticM DerivedSummary := do
+  let env ← getEnv
+  if summary.declarations.all fun (name, _, _) => env.contains name then return summary
+  let owner := (← Term.getDeclName?).getD .anonymous
+  let mut renamed : Std.HashMap Name Name := {}
+  let mut declared := #[]
+  for (name, type, value) in summary.declarations do
+    let rename (e : Lean.Expr) := e.replace fun
+      | .const constant levels => renamed[constant]?.map (mkConst · levels)
+      | _ => none
+    let (type, value) := (rename type, rename value)
+    if (← getEnv).contains name then
+      declared := declared.push (name, type, value)
+      continue
+    let mut fresh := owner ++ `_summary
+    let mut index := 1
+    while (← getEnv).contains fresh do
+      fresh := (owner ++ `_summary).appendIndexAfter index
+      index := index + 1
+    withOptions (Elab.async.set · false) do
+      addDecl (.thmDecl { name := fresh, levelParams := [], type, value })
+    renamed := renamed.insert name fresh
+    declared := declared.push (fresh, type, value)
+  let summary := { summary with declarations := declared }
+  recordSummary compiled (some summary)
+  return summary
+
+/-- The auxiliary theorems of the theorem being proved that a proof uses,
+those they use first: declared under that theorem, a summary used by
+another one declares them again. -/
+private def auxiliaryTheorems (proof : Lean.Expr) : TacticM (Array (Name × Lean.Expr × Lean.Expr)) := do
+  let owner := (← Term.getDeclName?).getD .anonymous
+  let env ← getEnv
+  let mut found := #[]
+  let mut visited : NameSet := {}
+  let mut pending := proof.getUsedConstants.toList.map (·, false)
+  while let (name, expanded) :: rest := pending do
+    pending := rest
+    if expanded then
+      if let some (.thmInfo info) := env.find? name then
+        found := found.push (name, info.type, info.value)
+      continue
+    if visited.contains name || !owner.isPrefixOf name || name == owner then continue
+    visited := visited.insert name
+    let some (.thmInfo info) := env.find? name | continue
+    pending := info.value.getUsedConstants.toList.map (·, false) ++ [(name, true)] ++ pending
+  return found
+
+/-- Derive the summary of the compiled callee of the call `goal`, whose
+meaning `meaning` reads only the walk's starting context: the walk of its
+body there, with fresh arguments, continuations and state, within
+`verex.summaryHeartbeats`. None where the walk does not end within the
+bounds. -/
+private def deriveSummary (ctx : SolveContext) (base : LocalContext × LocalInstances)
+    (goal : MVarId) (compiled : Name) (handle : Lean.Expr) (calleeName : String)
+    (theoremProof proofType meaning : Lean.Expr) : TacticM (Option DerivedSummary) := do
+  let target ← goal.withContext (instantiateMVars (← goal.getType))
+  let types ← goal.withContext do
+    #[(target.getArg! 3).consumeMData.appArg!, target.getArg! 4, target.getArg! 5,
+      target.getArg! 6].mapM fun e => do instantiateMVars (← inferType e)
+  unless types.all fun type => (collectFVars {} type).fvarIds.all base.1.contains do
+    return none
+  let callerState ← targetState
+  let sctx : SolveContext := { ctx with
+    summarizing := ctx.summarizing.push compiled
+    «profile» := false
+    preparesPaths := false }
+  let derive : TacticM (Option DerivedSummary) :=
+    withLCtx base.1 base.2 do
+    withLocalDeclD `args types[0]! fun args => withLocalDeclD `ensures types[1]! fun ensures =>
+    withLocalDeclD `aborts types[2]! fun aborts => withLocalDeclD `initial types[3]! fun initial => do
+      let statement := mkAppN target.getAppFn
+        ((target.getAppArgs.extract 0 3) ++ #[mkApp meaning args, ensures, aborts, initial])
+      let root ← mkFreshExprSyntheticOpaqueMVar statement
+      let rootContext ← getLCtx
+      setGoals [root.mvarId!]
+      let first : SolveStep :=
+        { goal := root.mvarId!, provenance := none, clauses := #[], stageStart := ← IO.getNumHeartbeats }
+      let ((), entered) ← (inlineCompiled sctx first handle calleeName theoremProof proofType).run
+        ({ pending := #[] } : SolveState)
+      let final ← (← summaryTraversal.get) sctx entered
+      let mut leaves := #[]
+      for (leaf, _) in final.handed do
+        unless (← leaf.isAssigned) || leaves.contains leaf do leaves := leaves.push leaf
+      if leaves.size > verex.summaryLeaves.get (← getOptions) then return none
+      -- Each leaf over the locals its path introduced.
+      let mut conjuncts := #[]
+      let mut introduced := #[]
+      for leaf in leaves do
+        let (conjunct, locals) ← leaf.withContext do
+          let leafTarget ← instantiateMVars (← leaf.getType)
+          if (leafTarget.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then
+            throwError "a summary's path does not end"
+          let locals := (← getLCtx).foldl (init := #[]) fun found decl =>
+            if rootContext.contains decl.fvarId || decl.isImplementationDetail then found
+            else found.push decl.toExpr
+          pure (← instantiateMVars (← mkForallFVars locals leafTarget), locals)
+        unless !conjunct.hasMVar && (collectFVars {} conjunct).fvarIds.all rootContext.contains do
+          return none
+        conjuncts := conjuncts.push conjunct
+        introduced := introduced.push locals
+      let summary := if conjuncts.isEmpty then mkConst ``True
+        else conjuncts.pop.foldr mkAnd conjuncts.back!
+      withLocalDeclD `summary summary fun premise => do
+        -- Each leaf is its conjunct at the locals of its path.
+        let mut rest := premise
+        for (leaf, index) in leaves.zipIdx do
+          let proof ← if index + 1 == leaves.size then pure rest
+            else mkAppM ``And.left #[rest]
+          if index + 1 < leaves.size then rest ← mkAppM ``And.right #[rest]
+          let arguments ← leaf.withContext do
+            introduced[index]!.filterM fun local_ => do return !(← local_.fvarId!.getDecl).isLet
+          leaf.assign (mkAppN proof arguments)
+        let proof ← instantiateMVars root
+        if proof.hasMVar || proof.hasSorry then return none
+        let parameters := #[args, ensures, aborts, initial]
+        let statement ← mkForallFVars parameters (← mkArrow summary statement)
+        let value ← mkLambdaFVars (parameters.push premise) proof
+        let some locals ← closingLocals (mkApp statement value) | return none
+        let type ← mkForallFVars locals statement
+        let value ← mkLambdaFVars locals value
+        if type.hasFVar || value.hasFVar || type.hasLevelParam || value.hasLevelParam then
+          return none
+        let used ← auxiliaryTheorems value
+        -- Named where it is declared.
+        let summary : DerivedSummary := {
+          declarations := used.push (compiled.getPrefix ++ `summary, type, value)
+          conjuncts := conjuncts.size }
+        return some (← declareSummary compiled summary)
+  -- The walk keeps a target state of its own, sharing the caller's hidden
+  -- theorems.
+  let key := (← getEnv).asyncPrefix?.getD .anonymous
+  let fresh ← TargetState.new
+  let fresh : TargetState := { fresh with
+    hiddenTheorems := callerState.hiddenTheorems
+    hiddenCount := callerState.hiddenCount
+    hiddenStatements := callerState.hiddenStatements
+    proofName := callerState.proofName }
+  let goals ← getGoals
+  let saved ← Tactic.saveState
+  let result ← tryCatchRuntimeEx
+    (do
+      modifyEnv (targetStateExt.setState · (some (key, fresh)))
+      withBudget (verex.summaryHeartbeats.get (← getOptions) * 1000) derive)
+    fun _ => pure none
+  match result with
+  | some _ => modifyEnv (targetStateExt.setState · (some (key, callerState)))
+  | none => saved.restore
+  setGoals goals
+  return result
+
+/-- A call of a contract-free callee by its derived summary, where one
+qualifies: the summary's conjuncts at the call's arguments and
+continuations, normalized around them and walked as the caller's goals.
+False where the callee is inlined. -/
+private def applyCallSummary (ctx : SolveContext) (step : SolveStep) (handle : Lean.Expr)
+    (calleeName : String) (theoremProof proofType : Lean.Expr) : SolveM Bool := do
+  let { goal, provenance, clauses, stageStart, .. } := step
+  let some base := ctx.base? | return false
+  if ctx.handOver || ctx.shared || !ctx.unrolls.isEmpty || !ctx.points.isEmpty then return false
+  let .const compiled _ := (proofType.getArg! 2).appArg! | return false
+  if ctx.summarizing.contains compiled then return false
+  let target ← goal.withContext (instantiateMVars (← goal.getType))
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return false
+  let action := (target.getArg! 3).consumeMData
+  unless action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 do return false
+  -- The meaning at the call reads only the starting context.
+  let meaning := action.appFn!
+  unless (collectFVars {} meaning).fvarIds.all base.1.contains do return false
+  if ← goal.withContext (ctx.preconditions.anyM fun (function, _) => isDefEq function handle) then
+    return false
+  if ← goal.withContext (ctx.invariants.anyM fun (_, function, _) => isDefEq function handle) then
+    return false
+  let derive : SolveM (Option DerivedSummary) := do
+    let context ← readThe Core.Context
+    let allowance := verex.summaryHeartbeats.get (← getOptions) * 1000
+    let limited := context.maxHeartbeats != 0 &&
+      context.initHeartbeats + context.maxHeartbeats < (← IO.getNumHeartbeats) + allowance
+    let start ← IO.getNumHeartbeats
+    let summary ← deriveSummary ctx base goal compiled handle calleeName theoremProof proofType
+      meaning
+    charge "summarize" start
+    -- A walk the target's own budget stopped says nothing of the callee.
+    if summary.isNone && !limited then recordSummary compiled none
+    return summary
+  let known ← derivedSummaries.atomically get
+  let (summary, fresh) ← match known[compiled]? with
+    | some (some summary) =>
+        try pure (some (← declareSummary compiled summary), false)
+        catch _ => pure (← derive, true)
+    | some none => return false
+    | none =>
+        unless ← summaryForm compiled do
+          recordSummary compiled none
+          return false
+        pure (← derive, true)
+  let some summary := summary | return false
+  -- The summary at the call: its context's locals by unification with the
+  -- call, or the caller's facts.
+  let instantiate (summary : DerivedSummary) : SolveM (Option MVarId) := do
+    let saved ← Tactic.saveState
+    let goal ← getMainGoal
+    let premise? ← goal.withContext do
+      let (arguments, _, conclusion) ← forallMetaTelescope (← inferType (mkConst summary.declarations.back!.1))
+      unless ← isDefEq conclusion (← instantiateMVars (← goal.getType)) do return none
+      for argument in arguments.pop do
+        let .mvar id ← instantiateMVars argument | continue
+        let some local_ ← findLocalDeclWithType? (← instantiateMVars (← id.getType))
+          | return none
+        id.assign (mkFVar local_)
+      let premise ← mkFreshExprSyntheticOpaqueMVar
+        (← instantiateMVars (← inferType arguments.back!))
+      arguments.back!.mvarId!.assign premise
+      goal.assign (← instantiateMVars (mkAppN (mkConst summary.declarations.back!.1) arguments))
+      pure (some premise.mvarId!)
+    if premise?.isNone then saved.restore
+    return premise?
+  setGoals [goal]
+  let values := action.getAppArgs.push (target.getArg! 6)
+  let held ← holdContinuations #[target.getArg! 4, target.getArg! 5]
+  let premise ← match ← instantiate summary with
+    | some premise => pure premise
+    | none =>
+        if fresh then return false
+        let some summary ← derive | return false
+        let some premise ← instantiate summary | return false
+        pure premise
+  -- One goal per conjunct.
+  let mut conjuncts := #[]
+  let mut rest := premise
+  for _ in [1:summary.conjuncts] do
+    let type ← rest.withContext do whnfR (← instantiateMVars (← rest.getType))
+    let some (left, right) := type.and? | throwError "a summary's premise is not its conjunction"
+    let (leftGoal, rightGoal) ← rest.withContext do
+      let leftGoal ← mkFreshExprSyntheticOpaqueMVar left
+      let rightGoal ← mkFreshExprSyntheticOpaqueMVar right
+      rest.assign (mkApp4 (mkConst ``And.intro) left right leftGoal rightGoal)
+      pure (leftGoal.mvarId!, rightGoal.mvarId!)
+    conjuncts := conjuncts.push leftGoal
+    rest := rightGoal
+  if summary.conjuncts == 0 then rest.assign (mkConst ``True.intro)
+  else conjuncts := conjuncts.push rest
+  let mut next := #[]
+  for conjunct in conjuncts do
+    setGoals [conjunct]
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization values
+    let mut introduced := #[]
+    for goal in ← getGoals do
+      let binders ← goal.withContext do
+        pure (leadingBinders (← instantiateMVars (← goal.getType)))
+      introduced := introduced.push (← goal.introNP binders).2
+    setGoals introduced.toList
+    releaseContinuations ctx.normalization held walkFixedPoints
+    next := next ++ (← getGoals).toArray
+  queue (← rewriteEquations ctx.equations next.toList) provenance clauses
+  charge "summary" stageStart
+  return true
+
 /-- A call of a verified callee: inlined by its refinement under a model,
 inlined by the agreement theorem where it is unspecified, else by its
 theorem. `isDenoted` says the goal is a run `denotedRun` reads. -/
@@ -2113,7 +2432,9 @@ private def callStep (ctx : SolveContext) (step : SolveStep) (isDenoted : Bool) 
     inlineRefinement ctx step refinesProof ((ctx.inlinedHandles.find? (·.1 == handle)).map (·.2))
       calleeName
   else if proofType.isAppOfArity ``Eq 3 then
-    inlineCompiled ctx step handle calleeName theoremProof proofType
+    unless ← applyCallSummary ctx step handle calleeName theoremProof proofType do
+      setGoals [goal]
+      inlineCompiled ctx step handle calleeName theoremProof proofType
   else
     applyCallTheorem ctx step calleeName theoremProof proofType theoremArguments proofSyntax
   return true
@@ -2455,7 +2776,7 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
   let { goal, provenance, clauses, .. } := step
   setGoals [goal]
   modify fun s => { s with leaves := s.leaves + 1 }
-  if ctx.handOver then
+  if ctx.handOver || !ctx.summarizing.isEmpty then
     (← targetState).leafOrigins.modify (·.insert goal (provenance, clauses))
     let key ← leafKey goal provenance clauses ctx.names
     -- A path returns where it aborts nowhere and owes no abort's condition.
@@ -2883,7 +3204,8 @@ private def reportProfile (ctx : SolveContext) (state : SolveState) (stopped : B
   for (stage, count, sum) in stages do
     lines := lines.push s!"  stage {stage} ×{count} {sum / 1000}k"
   let counts ← (← targetState).fixedPointCounts.get
-  lines := lines.push s!"  fixed points: hits {counts[0]!}, misses {counts[1]!}, recorded {counts[2]!}"
+  lines := lines.push s!"  fixed points: hits {counts[0]!}, misses {counts[1]!}, recorded {counts[2]!}; \
+    dsimp hits {counts[3]!}, misses {counts[4]!}, recorded {counts[5]!}"
   let steps := (← (← targetState).stepProfile.get).toArray.qsort fun a b =>
     a.2.2.2.1 + a.2.2.2.2 > b.2.2.2.1 + b.2.2.2.2
   for (label, runs, failures, succeeding, failing) in steps do
@@ -2964,6 +3286,10 @@ private def traverse (ctx : SolveContext) : SolveM Unit :=
         lastStage := state.stageCost.back?.map (·.1) })
     throw failure
 
+initialize summaryTraversal.set fun ctx state => do
+  let ((), final) ← (traverse ctx).run state
+  return final
+
 /-- Solve every goal: a loop by its invariant, a recursive-call leaf by the
 loop hypothesis, a call by the callee's theorem, a structural node by
 splitting, and a leaf by `solveLeaf`, or, with `handOver`, as the leaf of
@@ -3003,7 +3329,8 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   (← targetState).readForms.set {}
   (← targetState).readMentions.set {}
   (← targetState).fixedPoints.set {}
-  (← targetState).fixedPointCounts.set #[0, 0, 0]
+  (← targetState).dsimpResults.set {}
+  (← targetState).fixedPointCounts.set #[0, 0, 0, 0, 0, 0]
   (← targetState).familyProofs.set {}
   (← targetState).contextRules.set {}
   (← targetState).stageNormalHypotheses.set {}
@@ -3026,6 +3353,9 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     setGoals (← (← getGoals).mapM fun goal => (enterResult goal : MetaM MVarId))
   let startHeartbeats ← IO.getNumHeartbeats
   let normalization ← normalization
+  let pending := (← (← getGoals).toArray.mapM hideModelBinders).map fun g => (g, none, #[], none)
+  let base? ← pending[0]?.mapM fun (goal, _) => goal.withContext do
+    return (← getLCtx, ← getLocalInstances)
   let ctx : SolveContext := {
     invariants := invariants
     callees := callees
@@ -3048,8 +3378,8 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     shared := verex.sharedContinuations.get (← getOptions) && !handOver
     budgets := ← IO.mkRef {}
     normalization := normalization
-    startHeartbeats := startHeartbeats }
-  let pending := (← (← getGoals).toArray.mapM hideModelBinders).map fun g => (g, none, #[], none)
+    startHeartbeats := startHeartbeats
+    base? := base? }
   let previousPreparation ← (← targetState).preparationProofs.get
   let previousOwners ← (← targetState).preparationOwners.get
   let messagesBefore := (← Core.getMessageLog).unreported.size

@@ -3031,11 +3031,33 @@ def resultCodec : (shape : ResultShape) → Codec shape.carrier (Array RuntimeVa
         | _ => none
       decode_encode := by intro value; simp }
 
-/-- The initial locals of a body: its arguments, then uninitialized slots. -/
-def initialEnv : (params rest : NRow) → HList params → HEnv (params ++ rest)
-  | .nil, .nil, _ => ()
-  | .nil, .cons _ rest, _ => (none, initialEnv .nil rest ())
-  | .cons _ params, rest, values => (some values.1, initialEnv params rest values.2)
+/-- The initial locals of a body over its frame, the row its arguments and
+remaining locals spell: its arguments, then uninitialized slots. -/
+def initialEnv : (params rest : NRow) → {frame : NRow} → params ++ rest = frame →
+    HList params → HEnv frame
+  | .nil, .nil, .nil, _, _ => ()
+  | .nil, .nil, .cons _ _, framed, _ => nomatch framed
+  | .nil, .cons _ _, .nil, framed, _ => nomatch framed
+  | .nil, .cons _ rest, .cons _ _, framed, _ =>
+      (none, initialEnv .nil rest (NRow.cons.inj framed).2 ())
+  | .cons _ _, _, .nil, framed, _ => nomatch framed
+  | .cons _ params, rest, .cons _ _, framed, values =>
+      (some ((NRow.cons.inj framed).1 ▸ values.1), initialEnv params rest (NRow.cons.inj framed).2 values.2)
+
+/-! The equations at a frame spelled as its row: no cast remains. -/
+
+theorem initialEnv_nil (framed : NRow.nil ++ NRow.nil = NRow.nil) (values : HList .nil) :
+    initialEnv .nil .nil framed values = () := rfl
+
+theorem initialEnv_nil_cons {τ : NTy} {rest frame : NRow}
+    (framed : NRow.nil ++ NRow.cons τ rest = .cons τ frame) (values : HList .nil) :
+    initialEnv .nil (.cons τ rest) framed values =
+      (none, initialEnv .nil rest (NRow.cons.inj framed).2 ()) := rfl
+
+theorem initialEnv_cons {τ : NTy} {params rest frame : NRow}
+    (framed : NRow.cons τ params ++ rest = .cons τ frame) (values : HList (.cons τ params)) :
+    initialEnv (.cons τ params) rest framed values =
+      (some values.1, initialEnv params rest (NRow.cons.inj framed).2 values.2) := rfl
 
 end Carriers
 
@@ -4535,7 +4557,8 @@ attribute [vir_denote] wp_ite wp_bottom wp_checked_add wp_checked_subtract wp_ch
   BitOp.eval_and BitOp.eval_or BitOp.eval_xor CompareOp.decide_less CompareOp.decide_greater CompareOp.decide_lessEqual
   CompareOp.decide_greaterEqual NTy.eqb_int NTy.eqb_bool NTy.eqb_num NTy.eqb_address NTy.eqb_unit
   NTy.eqb_param NTy.eqb_function
-  IntegerValueFits_unsigned_succ IntegerValueFits_signed_succ initialEnv
+  IntegerValueFits_unsigned_succ IntegerValueFits_signed_succ initialEnv_nil initialEnv_nil_cons
+  initialEnv_cons
 
 /-! ## State operations
 

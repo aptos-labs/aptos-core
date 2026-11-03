@@ -753,13 +753,18 @@ mutual
               let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
                   some ⟨θ, inhabitable⟩ else none
                 | notCarried "a type argument without values"
+              -- The signature θ instantiates, evaluated here; the node keeps the evidence.
+              let parameters' := NRow.subst θ.1 parameters
+              let shape' := shape.subst θ.1
+              let resolved : (NRow.subst θ.1 parameters == parameters' &&
+                  shape.subst θ.1 == shape') = true := by simp [parameters', shape']
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
-                (NRow.subst θ.1 parameters)
-              let value : Term unit ρ Γ (shape.subst θ.1).bodyType :=
+                parameters'
+              let value : Term unit ρ Γ shape'.bodyType :=
                 .callGeneric (loopSite namespaceId.index id.index) handle typeArgs.toArray θ shape
-                  arguments
+                  shape' resolved arguments
               match τ? with
-              | some τ => .ok (.at τ (← Compiled.at? τ (.at (shape.subst θ.1).bodyType value)))
+              | some τ => .ok (.at τ (← Compiled.at? τ (.at shape'.bodyType value)))
               | none => notCarried "a call of type never"
         | .operation (.call (.closure reference mask)) instantiations captures _ =>
             let some τ := τ? | notCarried "a closure of type never"
@@ -821,15 +826,18 @@ mutual
               then
                 if sharing : closureShared unit handle weave.mask = shared then
                 if below : closureSignatureBelow unit handle = true then
+                  let captured' := NRow.subst θ.1 captured
+                  let supplied' := NRow.subst θ.1 supplied
+                  let shape' := shape.subst θ.1
+                  let resolved : (NRow.subst θ.1 captured == captured' &&
+                      NRow.subst θ.1 supplied == supplied' && shape.subst θ.1 == shape') = true := by
+                    simp [captured', supplied', shape']
                   let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
-                    captures.toList (NRow.subst θ.1 captured)
-                  let value : Term unit ρ Γ
-                      (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row) :=
-                    .closureGeneric handle weave typeArgs.toArray θ shape shared rows sharing below
-                      captures
-                  .ok (.at τ (← Compiled.at? τ
-                    (.at (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
-                      value)))
+                    captures.toList captured'
+                  let value : Term unit ρ Γ (.function supplied' shared shape'.row) :=
+                    .closureGeneric handle weave typeArgs.toArray θ shape shape' shared rows sharing
+                      below resolved captures
+                  .ok (.at τ (← Compiled.at? τ (.at (.function supplied' shared shape'.row) value)))
                 else notCarried "a closure target whose signature names foreign type parameters"
                 else notCarried "a closure whose shared parameters are not its target's"
               else notCarried "a closure whose rows are not its target's"
@@ -1712,14 +1720,15 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
     | _ => notCarried "several results"
   unless paramTypes.all NTy.lendable && result.lendable do
     notCarried "a reference inside an aggregate"
-  let body ← compileExpr unit (loanFactsOf unit handle) result (params ++ locals)
+  let frame := params ++ locals
+  let body ← compileExpr unit (loanFactsOf unit handle) result frame
     view handle.namespaceId
     view.fuel root
   let body ← body.at? result.bodyType
   -- A parameter's reference resolves where the function leaves it: in its
   -- own slot or in a local it was moved into.
-  let mutables ← mutableSlots (params ++ locals) 0 allLocals.length
-  .ok { params, locals, result, body, mutables }
+  let mutables ← mutableSlots frame 0 allLocals.length
+  .ok { params, locals, frame, frame_eq := rfl, result, body, mutables }
 
 /-- The compiled function a handle names, or the construct that stops it:
 its denotation, which agrees with its runtime meaning. A unit declaring

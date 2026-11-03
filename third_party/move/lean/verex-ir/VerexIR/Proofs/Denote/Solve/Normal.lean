@@ -160,6 +160,14 @@ dsimproc ↓ [vir_denote, vir_denote_norm] reduceRowsSubst
   let_expr VerexIR.Proofs.Denote.NRows.subst row rows := e | return .continue
   reduceSubst substituteNRows e row rows
 
+/-- A transport between types that agree, such as one by a generic site's
+compile-time evidence (`Term.callGeneric`, `Term.closureGeneric`): the value
+itself. -/
+dsimproc ↓ [vir_denote, vir_denote_norm] resolvedCast (cast _ _) := fun e => do
+  let_expr cast α β _ value := e | return .continue
+  unless ← withTransparency .default (isDefEq α β) do return .continue
+  return .visit value
+
 /-- The typed reads of a type at a family (`NTy.read` and its carrier,
 instances, write, read-back, and view). -/
 private def typedReads : List Name :=

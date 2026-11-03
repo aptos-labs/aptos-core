@@ -683,17 +683,25 @@ private def publishCompiled (segments : Array String) (unit : ValidatedUnit)
   if (← getEnv).contains (artifacts ++ (if declaresGhosts unit then `compiled else `compiled_eq)) then
     return
   let semantics := mkConst (unitName segments)
-  addAbbrev (artifacts ++ `row) (← quoteRow (compiled.params ++ compiled.locals))
+  addAbbrev (artifacts ++ `row) (← quoteRow compiled.frame)
   -- The signature a caller assuming the function's interface published.
   unless (← getEnv).contains (artifacts ++ `params) do
     addAbbrev (artifacts ++ `params) (← quoteRow compiled.params)
   addAbbrev (artifacts ++ `locals) (← quoteRow compiled.locals)
+  -- The row spelled by the parameters and locals, decided once by the kernel.
+  let (params, locals, row) :=
+    (mkConst (artifacts ++ `params), mkConst (artifacts ++ `locals), mkConst (artifacts ++ `row))
+  addDecl (.thmDecl {
+    name := artifacts ++ `frame_eq, levelParams := []
+    type := ← mkEq (← mkAppM ``HAppend.hAppend #[params, locals]) row
+    value := ← mkEqRefl row })
   unless (← getEnv).contains (artifacts ++ `shape) do
     addAbbrev (artifacts ++ `shape) (← quoteShape compiled.result)
   addAbbrev (artifacts ++ `body) (← quoteTerm semantics compiled.body)
   addAbbrev (artifacts ++ `mutables) (← quoteMutables compiled.mutables)
   addAbbrev (artifacts ++ `compiled)
-    (← quoteFunction semantics compiled (mkConst (artifacts ++ `body))
+    (← quoteFunction semantics compiled params locals row (mkConst (artifacts ++ `frame_eq))
+      (mkConst (artifacts ++ `body))
       (mkConst (artifacts ++ `mutables)))
   -- A model's function has no runtime certificate (`doc/designs/ghost-fields.md`).
   if declaresGhosts unit then return
@@ -2413,7 +2421,7 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
   let invariants ← liftTermElabM <| withExecutableSkolems unit fun executable skolems => do
     owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
       let types ← Contract.frameTypes skolems
-      let row := ownerCompiled.params ++ ownerCompiled.locals
+      let row := ownerCompiled.frame
       let invariants ← loopInvariants unit executable owner.namespaceId ownerNs ownerDeclaration
         ownerCompiled.params row types stored.predicate
       let assertions ← assertionConditions unit executable owner.namespaceId ownerNs ownerDeclaration
@@ -2582,7 +2590,7 @@ private def sharedMeanings (m : Member) (routed : Array (FunctionHandle × Strin
 them, which the hypothesis that they hold relates: its assumption table and
 the two meanings. -/
 private def assumptionDefinitions (m : Member)
-    (bodyIdent row paramsTerm localsTerm shapeTerm mutablesTerm assumedIdent
+    (bodyIdent row paramsTerm localsTerm frameEqTerm shapeTerm mutablesTerm assumedIdent
       tableIdent : Ident) : CommandElabM Unit := do
   let { ns, declaration, handle, artifacts, unitTerm, .. } := m
   let unit := m.unit
@@ -2591,7 +2599,7 @@ private def assumptionDefinitions (m : Member)
   let table ← liftTermElabM <| withExecutableSkolems unit fun executable skolems => do
     let types ← Contract.frameTypes skolems
     mkLambdaFVars (← executableBinders executable skolems) (← assumptionTable unit executable
-      handle.namespaceId ns declaration compiled.params (compiled.params ++ compiled.locals)
+      handle.namespaceId ns declaration compiled.params compiled.frame
       types)
   liftTermElabM (addAbbrev (artifacts ++ `assumptions) table)
   -- The readings under the meanings the theorem reads the body under, and
@@ -2606,7 +2614,7 @@ private def assumptionDefinitions (m : Member)
       fun (args : VerexIR.Proofs.Denote.HList $paramsTerm) => VerexIR.Proofs.Spec.bind
         (VerexIR.Proofs.Denote.Term.denote meanings
           (ρ := $shapeTerm) (Γ := $row) $bodyIdent
-          (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
+          (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
         (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)))
   elabCommand (← `(command|
     noncomputable def $assumedIdent (executable : VerexIR.Validation.ExecutableUnit $unitTerm)
@@ -2618,7 +2626,7 @@ private def assumptionDefinitions (m : Member)
             ({ meanings with assumption := $tableIdent reader args start } :
               VerexIR.Proofs.Denote.Meanings executable)
             (ρ := $shapeTerm) (Γ := $row) $bodyIdent
-            (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
+            (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
           (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)))
 
 /-- The hypotheses the theorems take, as binders and as the arguments
@@ -2968,6 +2976,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let row := rootIdent (Name.str (Name.str namespaceName function) "row")
   let paramsTerm := rootIdent (Name.str (Name.str namespaceName function) "params")
   let localsTerm := rootIdent (Name.str (Name.str namespaceName function) "locals")
+  let frameEqTerm := rootIdent (Name.str (Name.str namespaceName function) "frame_eq")
   let shapeTerm := rootIdent (Name.str (Name.str namespaceName function) "shape")
   let mutablesTerm := rootIdent (Name.str (Name.str namespaceName function) "mutables")
   let compiledEqIdent := rootIdent (compiledEqName segments function)
@@ -3044,7 +3053,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let assumedIdent := rootIdent (artifacts ++ `assumedMeaning)
   let tableIdent := rootIdent (artifacts ++ `assumptions)
   if ownAssumptions then
-    assumptionDefinitions m bodyIdent row paramsTerm localsTerm shapeTerm mutablesTerm
+    assumptionDefinitions m bodyIdent row paramsTerm localsTerm frameEqTerm shapeTerm mutablesTerm
       assumedIdent tableIdent
   let (nativeBinders, nativeArgs, assumptionBinders, assumedArgs, assumesTyping) ←
     theoremHypotheses m natives assumptionDeps trustDeps
@@ -3102,7 +3111,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
         VerexIR.Proofs.Satisfies
           (fun args => VerexIR.Proofs.Spec.bind
             (VerexIR.Proofs.Denote.Term.denote $meanings (ρ := $shapeTerm) (Γ := $row)
-              $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
+              $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
             (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm))
           $contract))
   let markReturns ← if script?.isSome then `(tactic| verex_mark_returns) else `(tactic| skip)

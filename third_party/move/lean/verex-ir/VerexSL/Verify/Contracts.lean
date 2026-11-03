@@ -335,10 +335,16 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | _, @Term.call _ _ _ σs site handle calleeShape arguments =>
       return mkAppN (mkConst ``Term.call) #[unitExpr, shape, context, ← quoteRow σs, Lean.toExpr site,
         Lean.toExpr handle, ← quoteShape calleeShape, ← quoteArgs unitExpr arguments]
-  | _, @Term.callGeneric _ _ _ σs site handle typeArgs θ calleeShape arguments => do
-      return mkAppN (mkConst ``Term.callGeneric) #[unitExpr, shape, context, ← quoteRow σs,
-        Lean.toExpr site, Lean.toExpr handle, Lean.toExpr typeArgs, ← quoteTypeArgs θ, ← quoteShape calleeShape,
-        ← quoteArgs unitExpr arguments]
+  | _, @Term.callGeneric _ _ _ σs σs' site handle typeArgs θ calleeShape calleeShape' _ arguments => do
+      let (σsExpr, σsExpr', θExpr) := (← quoteRow σs, ← quoteRow σs', ← quoteTypeArgs θ)
+      let (shapeExpr, shapeExpr') := (← quoteShape calleeShape, ← quoteShape calleeShape')
+      let row ← mkAppM ``Subtype.val #[θExpr]
+      let resolved ← kernelTrue (mkApp2 (mkConst ``and)
+        (← mkAppM ``BEq.beq #[mkApp2 (mkConst ``NRow.subst) row σsExpr, σsExpr'])
+        (← mkAppM ``BEq.beq #[mkApp2 (mkConst ``ResultShape.subst) row shapeExpr, shapeExpr']))
+      return mkAppN (mkConst ``Term.callGeneric) #[unitExpr, shape, context, σsExpr, σsExpr',
+        Lean.toExpr site, Lean.toExpr handle, Lean.toExpr typeArgs, θExpr, shapeExpr, shapeExpr',
+        resolved, ← quoteArgs unitExpr arguments]
   | _, @Term.closure _ _ _ full captured supplied handle weave results shared _ _ _ _ captures => do
       let (fullExpr, capturedExpr, suppliedExpr) :=
         (← quoteRow full, ← quoteRow captured, ← quoteRow supplied)
@@ -357,8 +363,8 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
       return mkAppN (mkConst ``Term.closure) #[unitExpr, shape, context, fullExpr, capturedExpr,
         suppliedExpr, Lean.toExpr handle, weaveExpr, resultsExpr, Lean.toExpr shared, rowsProof,
         sharingProof, closedProof, faithfulProof, ← quoteArgs unitExpr captures]
-  | _, @Term.closureGeneric _ _ _ full captured supplied handle weave typeArgs θ targetShape shared
-      _ _ _ captures => do
+  | _, @Term.closureGeneric _ _ _ full captured supplied captured' supplied' handle weave typeArgs θ
+      targetShape targetShape' shared _ _ _ _ captures => do
       let (fullExpr, capturedExpr, suppliedExpr) :=
         (← quoteRow full, ← quoteRow captured, ← quoteRow supplied)
       let weaveExpr ← quoteWeave weave
@@ -369,10 +375,18 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
         (mkApp2 (mkConst ``closureSignatureBelow) unitExpr (Lean.toExpr handle))
       let sharingProof ← closureSharingProof unitExpr handle fullExpr capturedExpr suppliedExpr
         weaveExpr shared
+      let (capturedExpr', suppliedExpr', θExpr) :=
+        (← quoteRow captured', ← quoteRow supplied', ← quoteTypeArgs θ)
+      let shapeExpr' ← quoteShape targetShape'
+      let row ← mkAppM ``Subtype.val #[θExpr]
+      let resolved ← kernelTrue (mkApp2 (mkConst ``and) (mkApp2 (mkConst ``and)
+        (← mkAppM ``BEq.beq #[mkApp2 (mkConst ``NRow.subst) row capturedExpr, capturedExpr'])
+        (← mkAppM ``BEq.beq #[mkApp2 (mkConst ``NRow.subst) row suppliedExpr, suppliedExpr']))
+        (← mkAppM ``BEq.beq #[mkApp2 (mkConst ``ResultShape.subst) row shapeExpr, shapeExpr']))
       return mkAppN (mkConst ``Term.closureGeneric) #[unitExpr, shape, context, fullExpr,
-        capturedExpr, suppliedExpr, Lean.toExpr handle, weaveExpr, Lean.toExpr typeArgs,
-        ← quoteTypeArgs θ, shapeExpr, Lean.toExpr shared, rowsProof, sharingProof, belowProof,
-        ← quoteArgs unitExpr captures]
+        capturedExpr, suppliedExpr, capturedExpr', suppliedExpr', Lean.toExpr handle, weaveExpr,
+        Lean.toExpr typeArgs, θExpr, shapeExpr, shapeExpr', Lean.toExpr shared, rowsProof,
+        sharingProof, belowProof, resolved, ← quoteArgs unitExpr captures]
   | _, @Term.invoke _ _ _ σs shared site invokeShape function arguments =>
       return mkAppN (mkConst ``Term.invoke) #[unitExpr, shape, context, ← quoteRow σs,
         Lean.toExpr shared, Lean.toExpr site, ← quoteShape invokeShape, ← quoteTerm unitExpr function,
@@ -581,13 +595,13 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   | _, _, .ghostSlot value, found => value.foldNodes visit atSite atClosure found
   | _, _, .ghostInit _ _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .call _ handle _ arguments, found => arguments.foldNodes visit atSite atClosure (visit handle #[] none found)
-  | _, _, .callGeneric _ handle typeArgs θ _ arguments, found =>
+  | _, _, .callGeneric _ handle typeArgs θ _ _ _ arguments, found =>
       arguments.foldNodes visit atSite atClosure (visit handle typeArgs (some θ) found)
   -- An invocation of a closure runs its target, whose theorem a proof uses.
   | _, _, .closure handle weave _ _ _ _ _ _ captures, found =>
       captures.foldNodes visit atSite atClosure
         (atClosure handle weave.mask #[] none (visit handle #[] none found))
-  | _, _, .closureGeneric handle weave typeArgs θ _ _ _ _ _ captures, found =>
+  | _, _, .closureGeneric handle weave typeArgs θ _ _ _ _ _ _ _ captures, found =>
       captures.foldNodes visit atSite atClosure
         (atClosure handle weave.mask typeArgs (some θ) (visit handle typeArgs (some θ) found))
   | _, _, .invoke site _ function arguments, found =>
@@ -1061,9 +1075,9 @@ def quoteMutables {Γ : NRow} : Mutables Γ → MetaM Lean.Expr
         #[← quoteRow Γ, ← quoteNTy τ, ← quoteVar x, ← quoteMutables rest]
 
 def quoteFunction {unit : ValidatedUnit} (unitExpr : Lean.Expr) (f : Function unit)
-    (body mutables : Lean.Expr) : MetaM Lean.Expr :=
+    (params locals frame frameEq body mutables : Lean.Expr) : MetaM Lean.Expr :=
   return mkAppN (mkConst ``Function.mk)
-    #[unitExpr, ← quoteRow f.params, ← quoteRow f.locals, ← quoteShape f.result, body, mutables]
+    #[unitExpr, params, locals, frame, frameEq, ← quoteShape f.result, body, mutables]
 
 /-! ## Names -/
 
@@ -2613,7 +2627,7 @@ def ghostTables (unit : ValidatedUnit) (outer : Lean.Expr)
     for (owner, ns, declaration, compiled) in owners do
       let .structured root := declaration.body | continue
       let some view := compileNamespaceAt? unit owner.namespaceId | continue
-      let row := compiled.params ++ compiled.locals
+      let row := compiled.frame
       let rowTypes := row.toList
       let localTypes ← clauseLocalTypes unit ns declaration
       for id in bodyExpressionIds ns root do

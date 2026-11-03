@@ -591,7 +591,11 @@ its captures, its literals unfolded (`literalValue?`), by constructor. -/
   /-- The terms a simp context left unchanged without reading the local
   context, by the context's stamp (`FixedPoints`). -/
   fixedPoints : IO.Ref (Std.HashMap Name (IO.Ref (Std.HashSet Lean.Expr)))
-  /-- The fixed-point lookups that hit and missed, and the terms recorded. -/
+  /-- The results of the dsimp calls of a simp context that read no local
+  context, by the context's stamp (`FixedPoints`). -/
+  dsimpResults : IO.Ref (Std.HashMap Name (IO.Ref (Std.HashMap Lean.Expr Lean.Expr)))
+  /-- The fixed-point lookups that hit and missed, and the terms recorded;
+  then the same for dsimp calls. -/
   fixedPointCounts : IO.Ref (Array Nat)
   /-- Where the budget stopped when the last target hit `isMaxHeartbeat`,
   populated by `traverse` and read via `ProofReport`. -/
@@ -658,7 +662,8 @@ def TargetState.new : IO TargetState := do
     stepMode := ← IO.mkRef {}
     siteClosureTypes := ← IO.mkRef {}
     fixedPoints := ← IO.mkRef {}
-    fixedPointCounts := ← IO.mkRef #[0, 0, 0]
+    dsimpResults := ← IO.mkRef {}
+    fixedPointCounts := ← IO.mkRef #[0, 0, 0, 0, 0, 0]
     budgetStop := ← IO.mkRef none
   }
 
@@ -1027,7 +1032,7 @@ def bindResult (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
 def captureScopeRow (goal : MVarId) : MetaM Unit := goal.withContext do
   let some _ ← scopeTable? | return
   let target ← instantiateMVars (← goal.getType)
-  let some env := target.find? (·.isAppOfArity ``initialEnv 4) | return
+  let some env := target.find? (·.isAppOfArity ``initialEnv 6) | return
   let type ← inferType env
   let type ← if type.isAppOf ``HEnv then pure type else whnfR type
   if type.isAppOf ``HEnv then (← targetState).scopeRow.set (some type.appArg!)
@@ -1326,6 +1331,20 @@ register_option verex.solverDebug : Bool := {
 register_option verex.contractLemmas : Bool := {
   defValue := true
   descr := "call through a callee's contract normalized once per contract and argument pattern"
+}
+
+/-- The heartbeats, in thousands, the walk deriving a contract-free callee's
+summary may spend; past them the callee is inlined. -/
+register_option verex.summaryHeartbeats : Nat := {
+  defValue := 3000
+  descr := "heartbeat budget of the walk deriving a contract-free callee's summary (thousands)"
+}
+
+/-- The most conjuncts, one per path, a contract-free callee's summary may
+have; a callee with more paths is inlined. -/
+register_option verex.summaryLeaves : Nat := {
+  defValue := 8
+  descr := "the most conjuncts a contract-free callee's derived summary may have"
 }
 
 register_option verex.solverProfile : Bool := {
@@ -5196,7 +5215,10 @@ A term a simp context left unchanged is unchanged wherever it recurs, as
 long as its traversal read nothing of the local context: no discharger
 call, no simproc searching the hypotheses, no subterm taken as normal
 without traversal. Such terms are recorded per target and context stamp,
-and a later traversal of the context skips them (`.done`, no proof). -/
+and a later traversal of the context skips them (`.done`, no proof).
+Likewise the result of a dsimp call that read nothing of the context (binder
+domains, mostly types, recur on every visit of their binder); a subterm a
+later call takes as normal is normal, so the result stands there too. -/
 
 /-- Whether simp may read the local context at a term: a
 `contextDependent` shape, or one of a simproc searching the hypotheses
@@ -5229,6 +5251,12 @@ structure FixedPoints where
   tainted : IO.Ref (Std.HashSet Lean.Expr)
   /-- Hits, misses, and terms recorded. -/
   counts : IO.Ref (Array Nat)
+  /-- The results of the context's dsimp calls that read no local context. -/
+  dsimped : IO.Ref (Std.HashMap Lean.Expr Lean.Expr)
+  /-- Whether a recorded dsimp call is running. -/
+  dsimping : IO.Ref Bool
+  /-- Whether the running dsimp call met a context-reading shape. -/
+  dsimpReads : IO.Ref Bool
 
 /-- The stamp of the walk's normalization (`normalization`). -/
 def walkFixedPoints : Option Name := some `walk
@@ -5243,10 +5271,19 @@ def FixedPoints.new? (stamp : Option Name) : CoreM (Option FixedPoints) := do
       let known ← IO.mkRef {}
       state.fixedPoints.modify (·.insert stamp known)
       pure known
+  let dsimped ← match (← state.dsimpResults.get)[stamp]? with
+    | some dsimped => pure dsimped
+    | none => do
+      let dsimped ← IO.mkRef {}
+      state.dsimpResults.modify (·.insert stamp dsimped)
+      pure dsimped
   let reads ← IO.mkRef 0
   let frames ← IO.mkRef #[]
   let tainted ← IO.mkRef {}
-  return some { known, reads, frames, tainted, counts := state.fixedPointCounts }
+  let dsimping ← IO.mkRef false
+  let dsimpReads ← IO.mkRef false
+  let counts := state.fixedPointCounts
+  return some { known, reads, frames, tainted, counts, dsimped, dsimping, dsimpReads }
 
 /-- Whether a term is worth recording: no metavariables, not small. -/
 private def fixedPointCandidate (e : Lean.Expr) : Bool :=
@@ -5311,7 +5348,29 @@ def FixedPoints.wrap (fp : FixedPoints) (methods : Simp.Methods)
       if ← assumed e then
         fp.reads.modify (· + 1)
         return .done e
-      methods.dpre e
+      if !fixedPointCandidate e then
+        return ← methods.dpre e
+      if let some e' := (← fp.dsimped.get)[e]? then
+        fp.counts.modify (·.modify 3 (· + 1))
+        return .done e'
+      if (← fp.known.get).contains e then
+        fp.counts.modify (·.modify 3 (· + 1))
+        return .done e
+      if ← fp.dsimping.get then
+        -- A context-reading shape keeps the enclosing call from recording.
+        if contextReadingHead e then fp.dsimpReads.set true
+        return ← methods.dpre e
+      -- The outermost candidate of a dsimp call: run the call here, to see
+      -- its result and whether it read the context.
+      fp.counts.modify (·.modify 4 (· + 1))
+      let before ← fp.reads.get
+      fp.dsimpReads.set (contextReadingHead e)
+      fp.dsimping.set true
+      let e' ← try Simp.dsimp e finally fp.dsimping.set false
+      if (← fp.reads.get) == before && !(← fp.dsimpReads.get) then
+        fp.dsimped.modify (·.insert e e')
+        fp.counts.modify (·.modify 5 (· + 1))
+      return .done e'
     post := fun e => do
       if e.isAtomic then return ← methods.post e
       let depth ← MonadRecDepth.getRecDepth
