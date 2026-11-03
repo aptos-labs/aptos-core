@@ -23,7 +23,8 @@ Prover's paper (`move-prover/doc/higher-order-paper-26`) and implementation
 
 - A function type `|T1, …| R has A` has abilities from `copy`, `drop`,
   `store`. Naming a function gives `copy + drop`, plus `store` when the
-  function is persistent (public, entry, or `#[persistent]`).
+  function is persistent (public or `#[persistent]`; `entry` alone does not
+  make a function persistent).
 - `PackClosure(f, mask, c1..cn)` binds the parameters of `f` whose mask bit is
   set, in any positions, to the captured values; its type is the function
   type of the remaining parameters. Capturing moves the values. A closure's

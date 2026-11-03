@@ -1,0 +1,13 @@
+processed 4 tasks
+task 0 lines 4-23:  publish [// A private `entry` function without the attribute: the closure lacks `store`,]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000067::private_entry'. Got VMError: {
+    major_status: PACK_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: 0x67::private_entry,
+    indices: [(FunctionDefinition, 1)],
+    offsets: [(FunctionDefinitionIndex(1), 2)],
+}
+task 1 lines 25-52:  publish [// The same function with the `persistent` attribute: accepted, stored, loaded]
+task 2 lines 54-54:  run 0x68::persistent_entry::store --signers 0x68
+task 3 lines 56-56:  run 0x68::persistent_entry::exec --args @0x68
+return values: 2
