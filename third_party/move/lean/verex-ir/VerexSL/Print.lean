@@ -106,8 +106,7 @@ private def sourceIdentifier (value : String) : String :=
       (value.drop 1).toString
     else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken
-    (isToken := isReservedWord)
+  else escapedIdentifier value
 
 /-- Compiler-v2 records the authored receiver head (for example
 `self.list.contains`) in the call name for some Move 2 calls. The semantic
@@ -1372,6 +1371,12 @@ private partial def observesPlace (context : Context) (fuel : Nat) (value : Expr
         owner == owner' &&
           (context.ns.tables.names[field'.index]?).any (·.name == field) &&
           observesPlace context fuel inner base
+    | some (.operation (.data (.selectVariants owner fields)) _ #[inner] _),
+      some (.field base owner' field') =>
+        owner == owner' &&
+          (context.ns.tables.names[field'.index]?).any (fun name =>
+            fields.any (·.2 == name.name)) &&
+          observesPlace context fuel inner base
     | some (.operation (.primitive .index) _ #[inner, i] _), some (.index base j) =>
         i == j && observesPlace context fuel inner base
     | _, _ => false
@@ -1443,6 +1448,9 @@ private partial def sameCollection (context : Context) (left right : ExprId) : B
      | some (.operation (.data (.select owner field)) _ #[a] _),
        some (.operation (.data (.select owner' field')) _ #[b] _) =>
          owner == owner' && field == field' && sameCollection context a b
+     | some (.operation (.data (.selectVariants owner fields)) _ #[a] _),
+       some (.operation (.data (.selectVariants owner' fields')) _ #[b] _) =>
+         owner == owner' && fields == fields' && sameCollection context a b
      | _, _ => false)
 
 /-- Whether a place reaches the element `collection` observes at `index`,
@@ -4521,9 +4529,9 @@ private def fieldText (unit : ValidatedUnit) (ns : PrintNamespace)
   pure s!"{← nameAt unit field.name} : {← typeText unit ns binders field.type.typeId}"
 
 /-- Canonical declaration metadata, separate from contract pragmas. -/
-private partial def sourceAttributeText : Attribute → Except String String
+private partial def sourceAttributeText (unit : ValidatedUnit) : Attribute → Except String String
   | .call name arguments _ => do
-      let arguments ← arguments.mapM sourceAttributeText
+      let arguments ← arguments.mapM (sourceAttributeText unit)
       pure <| sourceIdentifier name ++ (if arguments.isEmpty then "" else
         s!" ({commaSep arguments})")
   | .assign name (.constant (.integer value)) _ => do
@@ -4533,6 +4541,10 @@ private partial def sourceAttributeText : Attribute → Except String String
       pure s!"{sourceIdentifier name} = {repr value}"
   | .assign name (.name none value) _ =>
       pure s!"{sourceIdentifier name} = {sourceIdentifier value}"
+  | .assign name (.name (some namespaceId) value) _ => do
+      pure s!"{sourceIdentifier name} = {← namespacePath unit namespaceId}::{sourceIdentifier value}"
+  | .assign name (.qualifiedName value) _ =>
+      pure s!"{sourceIdentifier name} = {value}"
   | attr => throw s!"attribute `{repr attr}` has no canonical source spelling"
 
 private def isFunctionModifierAttribute : Attribute → Bool
@@ -5001,7 +5013,7 @@ where
         (body : String) : Except Error String := do
       let values := intrinsicAttributes.filterMap fun (index, value) =>
         if index == name.index then some value else none
-      let values := values ++ (← (attributes.mapM sourceAttributeText).mapError
+      let values := values ++ (← (attributes.mapM (sourceAttributeText unit)).mapError
         fun message => ({ message } : Error))
       pure <| if values.isEmpty then body
         else s!"@[{", ".intercalate values.toList}]\n{body}"
@@ -5221,8 +5233,11 @@ private def dependencyInterfaceItem? : Item → Option Item
       declaration with isOpaque := true, body := none }
   | .lemma declaration => some <| .lemma {
       declaration with decreases := #[], contract := #[], proof := #[] }
+  -- A spec variable's memory is one in every namespace that names it.
   | .struct declaration => some <| .struct {
-      declaration with contract := #[], pragmas := #[] }
+      declaration with
+      contract := #[]
+      pragmas := declaration.pragmas.filter (·.name == "ghost_memory") }
   | .enum declaration => some <| .enum {
       declaration with contract := #[], pragmas := #[] }
   | .constant _ => none
@@ -5242,7 +5257,10 @@ private def interfaceSource (ns : ValidatedNamespace) : ValidatedNamespace :=
     functions := ns.functions.map fun declaration =>
       { declaration with body := .absent, contract := {}, pragmas := #[] }
     specFunctions := ns.specFunctions.map fun declaration => { declaration with body := none }
-    structs := ns.structs.map fun declaration => { declaration with contract := {} }
+    structs := ns.structs.map fun declaration => { declaration with
+      contract := if declaration.isGhostMemory then
+          { pragmas := declaration.contract.pragmas }
+        else {} }
     constants := #[], invariants := #[], comments := #[], pragmas := #[] }
 
 /-- The Move function whose logical meaning this specification function is,

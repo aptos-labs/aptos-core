@@ -282,8 +282,16 @@ partial def resolveAnchors (goal : MVarId) (predicate : Lean.Expr) :
 def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := true) :
     TacticM (Option (List MVarId × Bool)) := do
   -- The exit binds `result` in a step proof, before the paths split.
-  if let some next ← bindResult goal then return some ([next], false)
+  let bound ← IO.mkRef none
+  timedStep "split/result" do bound.set (← bindResult goal)
+  if let some next ← bound.get then return some ([next], false)
   let target ← goal.withContext (instantiateMVars (← goal.getType))
+  -- A quantified or conjoined obligation a hypothesis states closes as it is:
+  -- its parts, once split, are no longer the hypothesis's.
+  let statement := StatedFacts.unmarked target
+  if obligations && (statement.isForall || statement.isAppOfArity ``And 2) &&
+      (statement.find? (·.isAppOf ``VerexIR.Proofs.wp)).isNone then
+    if ← StatedFacts.close goal (exact := true) then return some ([], true)
   if target.isForall then
     -- A quantified variable keeps its name, for an authored proof; a
     -- borrow's prophecy mark is consumed.
@@ -299,7 +307,8 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   -- processed as computation rather than left beneath a proof binder.
   -- A source `let` binds its locals' names in a step proof, and the exit
   -- `result`.
-  if let some next ← bindLet goal then return some ([next], false)
+  timedStep "split/let" do bound.set (← bindLet goal)
+  if let some next ← bound.get then return some ([next], false)
   if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
     let action := target.getArg! 3
     if action.isAppOfArity ``dite 5 then
@@ -309,6 +318,17 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
           target.getArg! 4, target.getArg! 5, target.getArg! 6]
       let_expr Iff lhs rhs := ← goal.withContext (do whnfR (← inferType rule))
         | throwError "a dependent conditional rule is not an equivalence"
+      setGoals (← goal.apply (mkApp3 (mkConst ``Iff.mpr) lhs rhs rule))
+      evalTactic (← `(tactic| constructor <;> intro h))
+      return some (← getGoals, true)
+    -- A conditional splits by its rule at the goal's own instance, not by
+    -- `split`, which abstracts the conditional over the whole goal.
+    if action.isAppOfArity ``ite 5 then
+      let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_ite)
+        #[target.getArg! 0, target.getArg! 2, action.getArg! 1, action.getArg! 2,
+          action.getArg! 3, action.getArg! 4, target.getArg! 4, target.getArg! 5, target.getArg! 6]
+      let_expr Iff lhs rhs := ← goal.withContext (do whnfR (← inferType rule))
+        | throwError "a conditional rule is not an equivalence"
       setGoals (← goal.apply (mkApp3 (mkConst ``Iff.mpr) lhs rhs rule))
       evalTactic (← `(tactic| constructor <;> intro h))
       return some (← getGoals, true)
@@ -325,7 +345,7 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   if obligations || running then
     try
       setGoals [goal]
-      evalTactic (← `(tactic| verex_split))
+      timedStep "split/first" (evalTactic (← `(tactic| verex_split)))
       return some (← getGoals, true)
     catch _ =>
       saved.restore
@@ -335,7 +355,7 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   if prepare && target.isAppOfArity ``VerexIR.Proofs.wp 7 then
     try
       setGoals [goal]
-      evalTactic (← `(tactic| verex_prepare_leaf))
+      timedStep "split/prepare" (evalTactic (← `(tactic| verex_prepare_leaf)))
       let goals ← getGoals
       if goals.isEmpty then return some ([], true)
       if let [next] := goals then
@@ -449,6 +469,59 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
     if head.isFVar && callees.any (·.1 == head) then return some (head, action)
     return none
 
+/-- The main goal with the continuations of its weakest precondition, the
+postcondition and the failure continuation, as local definitions, so that a
+rule applying them to fresh variables leaves them unreduced and a step's
+simp does not walk them: they are normal, and normal at fresh variables.
+The definitions with their values. -/
+def holdContinuations : TacticM (Array (FVarId × Lean.Expr)) := do
+  let mut goal ← getMainGoal
+  let mut held := #[]
+  for index in [4, 5] do
+    let (next, entry) ← goal.withContext do
+      let target ← instantiateMVars (← goal.getType)
+      unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return (goal, none)
+      let part := target.getArg! index
+      unless part.isLambda do return (goal, none)
+      let defined ← goal.define `verexHeld (← inferType part) part
+      let (local_, folded) ← defined.intro1P
+      folded.withContext do
+        let target ← instantiateMVars (← folded.getType)
+        let folded ← folded.replaceTargetDefEq
+          (mkAppN target.getAppFn (target.getAppArgs.set! index (mkFVar local_)))
+        return (folded, some (local_, part))
+    goal := next
+    if let some entry := entry then held := held.push entry
+  replaceMainGoal [goal]
+  return held
+
+/-- The goals with the continuations `holdContinuations` set aside back in
+place, reduced at their arguments. Applied to variables only, a continuation
+is normal as it was; otherwise the goal is normalized again. -/
+def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
+    (held : Array (FVarId × Lean.Expr)) : TacticM Unit := do
+  if held.isEmpty then return
+  let lookup (e : Lean.Expr) : Option Lean.Expr :=
+    match e.getAppFn with
+    | .fvar id => (held.find? (·.1 == id)).map (·.2)
+    | _ => none
+  let mut released := #[]
+  for goal in ← getGoals do
+    let (next, atVariables) ← goal.withContext do
+      let target ← instantiateMVars (← goal.getType)
+      let atVariables := (target.find? fun e =>
+        (lookup e).isSome && !e.getAppArgs.all fun a => a.isBVar || a.isFVar).isNone
+      let restored := target.replace fun e => (lookup e).map (·.beta e.getAppArgs)
+      let next ← if restored == target then pure goal else goal.replaceTargetDefEq restored
+      return (next, atVariables)
+    let mut next := next
+    for (local_, _) in held.reverse do
+      next ← next.tryClear local_
+    setGoals [next]
+    unless atVariables do normalizeAround normalization #[]
+    released := released ++ (← getGoals).toArray
+  setGoals released.toList
+
 /-- The contract constants a callee theorem speaks about, to unfold at a
 call site: the typed contract and the raw contract it wraps. -/
 def contractConstants (theoremType : Lean.Expr) : MetaM (Array Name) := do
@@ -533,12 +606,19 @@ private def executableOf? (invoke : Lean.Expr) : Option Lean.Expr :=
   let invoke := invoke.consumeMData
   if invoke.isAppOfArity ``closureMeaning 4 then some (invoke.getArg! 2) else none
 
+/-- Whether a statement is `ensures_of` or `aborts_of` of a known target read
+directly (`CallEnsures`, `CallAborts`). -/
+private def statesDirectCall (statement : Lean.Expr) : Bool :=
+  statement.isAppOfArity ``VerexIR.Proofs.CallEnsures 7 ||
+    statement.isAppOfArity ``VerexIR.Proofs.CallAborts 5
+
 /-- Whether a statement is `ensures_of` or `aborts_of` under premises. -/
 private partial def states (statement : Lean.Expr) : Bool :=
   if statement.isArrow then states statement.bindingBody!
   else
     let statement := unmarked statement
-    statement.isAppOf ``VerexIR.Proofs.EnsuresOf || statement.isAppOf ``VerexIR.Proofs.AbortsOf
+    statement.isAppOf ``VerexIR.Proofs.EnsuresOf || statement.isAppOf ``VerexIR.Proofs.AbortsOf ||
+      statesDirectCall statement
 
 /-- Behavioral contract derivation only handles literal closures. An abstract
 function value has no target theorem to re-derive, so trying to avoid that
@@ -579,7 +659,8 @@ private partial def literalAbortAlternative (environment : Environment) (stateme
     literalAbortAlternative environment (statement.getArg! 0) ||
       literalAbortAlternative environment (statement.getArg! 1)
   else
-    statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 && statesLiteralBehavior environment statement
+    (statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 && statesLiteralBehavior environment statement) ||
+      statement.isAppOfArity ``VerexIR.Proofs.CallAborts 5
 
 /-- Expose the abort alternatives of a literal closure's contract before
 reading another invocation's result. A disjunction only states that one run
@@ -732,7 +813,8 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
 /-- Whether a statement reads a behavioral predicate. -/
 private def readsBehavior (statement : Lean.Expr) : Bool :=
   (statement.find? fun e => e.isAppOf ``VerexIR.Proofs.RequiresOf ||
-    e.isAppOf ``VerexIR.Proofs.AbortsOf || e.isAppOf ``VerexIR.Proofs.EnsuresOf).isSome
+    e.isAppOf ``VerexIR.Proofs.AbortsOf || e.isAppOf ``VerexIR.Proofs.EnsuresOf ||
+    statesDirectCall e).isSome
 
 /-- `next` with the facts `before` does not state out of their clause
 markers: the deciders read a derived fact's statement. -/
@@ -1991,6 +2073,62 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
         #[σ, ε, α, action, initial, leaf, established, run])
       return some established.mvarId!
 
+/-- A leaf's run or abort of a known target read directly (`CallEnsures`,
+`CallAborts`): the leaf becomes the weakest precondition of the call under which it
+holds of each run or abort (`forall_ok_of_wp`, `of_aborts_of_wp`), which the call
+rule reads by the target's theorem or body, as a body's call. The hypothesis stays,
+marked read. A run naming no local for its result stays a fact. -/
+private def denotedDirectCall (goal : MVarId) (hypothesis : FVarId) (stated type : Lean.Expr) :
+    MetaM (Option MVarId) := do
+  let mark := mkApp (mkConst ``VerexIR.Proofs.Denoted) type
+  if type.isAppOfArity ``VerexIR.Proofs.CallEnsures 7 then
+    let (call, result, initial, post) :=
+      (type.getArg! 3, type.getArg! 4, type.getArg! 5, type.getArg! 6)
+    let some shape := if call.isAppOfArity ``propheticMeaning 9 then some (call.getArg! 7) else none
+      | return none
+    let unitShape := shape.consumeMData.isConstOf ``ResultShape.none
+    let .fvar finalVar := post | return none
+    let resultVar? ← if unitShape then pure none else
+      let .fvar resultVar := result | return none
+      pure (some resultVar)
+    let run ← mkExpectedTypeHint stated (← mkAppM ``VerexIR.Proofs.Spec.ok #[call, initial, result, post])
+    let runType ← inferType run
+    let goal ← goal.replaceLocalDeclDefEq hypothesis mark
+    let (runVar, goal) ← goal.withContext do (← goal.assert `verexRun runType run).intro1P
+    let reverted := (resultVar?.map (#[·])).getD #[] |>.push finalVar
+    let dependents ← goal.withContext do
+      (← getLCtx).foldlM (init := #[]) fun found decl => do
+        if decl.isImplementationDetail || decl.fvarId == runVar || reverted.contains decl.fvarId then
+          return found
+        let declType ← instantiateMVars decl.type
+        if reverted.any declType.containsFVar then return found.push decl.fvarId
+        return found
+    let (_, goal) ← goal.revert dependents (preserveOrder := true)
+    let (_, goal) ← goal.revert #[runVar]
+    let (_, goal) ← goal.revert reverted (preserveOrder := true)
+    let rule := if unitShape then ``VerexIR.Proofs.forall_ok_unit_of_wp
+      else ``VerexIR.Proofs.forall_ok_of_wp
+    let [next] ← goal.apply (← mkConstWithFreshMVarLevels rule) | return none
+    return some next
+  let (call, initial) := (type.getArg! 3, type.getArg! 4)
+  let callType ← whnfR (← inferType call)
+  unless callType.isAppOfArity ``VerexIR.Proofs.Spec 3 do return none
+  let (σ, ε, α) := (callType.getArg! 0, callType.getArg! 1, callType.getArg! 2)
+  let run ← withLocalDeclD `error ε fun error => do
+    let failed ← mkAppM ``VerexIR.Proofs.Spec.aborts #[call, initial, error]
+    mkExpectedTypeHint stated (← mkAppM ``Exists #[← mkLambdaFVars #[error] failed])
+  let goal ← goal.replaceLocalDeclDefEq hypothesis mark
+  goal.withContext do
+    let leaf ← goal.getType
+    let returns ← withLocalDeclD `result α fun result => withLocalDeclD `final σ fun final =>
+      mkLambdaFVars #[result, final] (mkConst ``True)
+    let fails ← withLocalDeclD `error ε fun error => mkLambdaFVars #[error] leaf
+    let established ← mkFreshExprSyntheticOpaqueMVar
+      (mkAppN (mkConst ``VerexIR.Proofs.wp) #[σ, ε, α, call, returns, fails, initial])
+    goal.assign (mkAppN (mkConst ``VerexIR.Proofs.of_aborts_of_wp)
+      #[σ, ε, α, call, initial, leaf, established, run])
+    return some established.mvarId!
+
 /-- A leaf's first run or abort of a literal closure of an inlined target
 (`denotedRun`), as a hypothesis states it under premises the leaf holds
 and its clause's marker. -/
@@ -2004,6 +2142,7 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
       let mut type := type
       while type.isArrow do type := type.bindingBody!
       let statement := unmarked type
+      if statesDirectCall statement then return some statement
       let some view := behaviorView? statement | none
       if (literalFunction? environment view.function).isSome then some statement else none
     let stating ← (← getLCtx).foldlM (init := #[]) fun found decl => do
@@ -2032,7 +2171,10 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
   for (hypothesis, stated, type) in candidates do
     let state ← saveState
     try
-      if let some next ← goal.withContext (denotedRun goal callees hypothesis stated type) then
+      if statesDirectCall type then
+        if let some next ← goal.withContext (denotedDirectCall goal hypothesis stated type) then
+          return some next
+      else if let some next ← goal.withContext (denotedRun goal callees hypothesis stated type) then
         return some next
       state.restore
     catch ex =>
@@ -2133,7 +2275,8 @@ continuations it reaches (`findReached?`). -/
 def statesBehavior (es : Array Lean.Expr) (continuations : Array Name := #[]) : MetaM Bool := do
   let behavioral (sub : Lean.Expr) : Bool :=
     sub.isConstOf ``VerexIR.Proofs.EnsuresOf || sub.isConstOf ``VerexIR.Proofs.AbortsOf ||
-      sub.isConstOf ``VerexIR.Proofs.ResultOf || sub.isConstOf ``VerexIR.Proofs.StateOf
+      sub.isConstOf ``VerexIR.Proofs.ResultOf || sub.isConstOf ``VerexIR.Proofs.StateOf ||
+      sub.isConstOf ``VerexIR.Proofs.CallEnsures || sub.isConstOf ``VerexIR.Proofs.CallAborts
   return (← findReached? es continuations fun next =>
     pure (if (next.find? behavioral).isSome then some () else none)).isSome
 
@@ -2168,6 +2311,98 @@ private def namingLiteral? (target : Lean.Expr) (continuations : Array Name)
       return some literal.closed
     return none
 
+/-- The direct reading of a call's target the goal owes (`CallEnsures`, `CallAborts`):
+the meaning it states, at the call's family and target, whose instantiation names
+the call's type arguments, however they are located. -/
+private def owedDirectCall? (target : Lean.Expr) (continuations : Array Name)
+    (meaning : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  findReached? (← owedStatements target) continuations fun next => do
+    for statement in sitesWhere statesDirectCall #[next] do
+      let owed := (statement.getArg! 3).consumeMData
+      unless owed.isAppOfArity ``propheticMeaning 9 do continue
+      if (owed.getArg! 5).hasLooseBVars || (owed.getArg! 4).hasLooseBVars ||
+          (owed.getArg! 3).hasLooseBVars then continue
+      unless ← isDefEq (owed.getArg! 5) (meaning.getArg! 5) do continue
+      unless ← isDefEq (owed.getArg! 3) (meaning.getArg! 3) do continue
+      return some owed
+    return none
+
+/-- Whether a goal's call is of a target the goal owes the direct reading of. -/
+def owesDirectCall (goal : MVarId) (continuations : Array Name := #[]) : MetaM Bool :=
+    goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return false
+  let meaning := target.getArg! 3
+  unless meaning.isAppOfArity ``propheticMeaning 9 do return false
+  return (← owedDirectCall? target continuations meaning).isSome
+
+/-- The goal's call at the instantiation a direct reading states, where the two name
+the same types (`frameInstantiation_congr`). -/
+private def callAtOwedInstantiation (goal : MVarId) (owed : Lean.Expr) : MetaM (Option MVarId) :=
+    goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  let meaning := target.getArg! 3
+  let (actual, stated) := (meaning.getArg! 4, owed.getArg! 4)
+  if ← withReducible (isDefEq actual stated) then return some goal
+  unless actual.isAppOfArity ``frameInstantiation 4 && stated.isAppOfArity ``frameInstantiation 4 do
+    return none
+  unless ← isDefEq (actual.getArg! 2) (stated.getArg! 2) do return none
+  unless ← isDefEq (actual.getArg! 1) (stated.getArg! 1) do return none
+  let ids (instantiation : Lean.Expr) : MetaM Lean.Expr := do
+    let typeUse := mkConst ``VerexIR.TypeUse
+    let toTypeId := .lam `use typeUse (mkApp (mkConst ``VerexIR.TypeUse.typeId) (.bvar 0)) .default
+    mkAppM ``List.map #[toTypeId, ← mkAppM ``Array.toList #[instantiation.getArg! 3]]
+  let (left, right) := (← ids actual, ← ids stated)
+  unless ← withDefault (isDefEq left right) do return none
+  let same ← mkExpectedTypeHint (← mkEqRefl left) (← mkEq left right)
+  let congr ← mkAppOptM ``frameInstantiation_congr
+    #[actual.getArg! 0, actual.getArg! 1, actual.getArg! 2, actual.getArg! 3, stated.getArg! 3, same]
+  let args := target.getAppArgs
+  let motive ← withLocalDeclD `instantiation (← inferType actual) fun instantiation => do
+    mkLambdaFVars #[instantiation]
+      (mkAppN target.getAppFn (args.set! 3 (mkAppN meaning.getAppFn
+        (meaning.getAppArgs.set! 4 instantiation))))
+  let proof ← mkCongrArg motive congr
+  let next := mkAppN target.getAppFn (args.set! 3 (mkAppN meaning.getAppFn
+    (meaning.getAppArgs.set! 4 stated)))
+  return some (← goal.replaceTargetEq next proof)
+
+/-- A call where the goal owes the direct reading of its target
+(`owedDirectCall?`), as a body's call of it reads: its continuations assume the
+call's `ensures_of` and `aborts_of` (`wp_call_runs`) and, where runs agree and the
+row lends flatly, the absence of its abort (`wp_call_runs_agree`). -/
+private def directCall (goal : MVarId) (throughContract : Bool) (owed : Lean.Expr) :
+    TacticM (Option MVarId) := do
+  let some goal ← callAtOwedInstantiation goal owed | return none
+  let target ← goal.withContext do instantiateMVars (← goal.getType)
+  let meaning := target.getArg! 3
+  let (unit, functions, executable, frame) :=
+    (meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2, meaning.getArg! 3)
+  let agrees? ← goal.withContext do
+    (← getLCtx).findDeclM? fun declaration => do
+      if declaration.isImplementationDetail then return none
+      let type ← instantiateMVars declaration.type
+      return if type.isAppOfArity ``VerexIR.Proofs.RunsAgree 2 then some declaration.toExpr else none
+  let saved ← saveState
+  if let some agrees := agrees? then
+    try
+      setGoals [goal]
+      let agreesSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax agrees)
+      let rule ← goal.withContext <| Lean.Elab.Term.exprToSyntax
+        (mkApp4 (mkConst ``VerexIR.Proofs.wp_call_runs_agree) unit functions executable frame)
+      Term.withoutErrToSorry <| withoutRecover <|
+        evalTactic (← `(tactic| refine $rule $agreesSyntax (by decide) ?_))
+      let [named] ← getGoals | throwError "the direct call leaves one goal"
+      return some (← if throughContract then markNamedRead named else pure named)
+    catch failure =>
+      saved.restore
+      if verex.solverDebug.get (← getOptions) then
+        logInfo m!"direct call where runs agree not taken: {failure.toMessageData}"
+  let [named] ← goal.withContext do
+    goal.apply (mkApp2 (mkConst ``VerexIR.Proofs.wp_call_runs) unit functions)
+    | return none
+  return some (← if throughContract then markNamedRead named else pure named)
+
 /-- A call of a target taking and returning no reference, where the goal
 owes a behavioral predicate (`obligesBehavior`): its continuations assume
 `ensures_of` and `aborts_of` of the function value naming the target
@@ -2186,6 +2421,8 @@ def namedCall (goal : MVarId) (throughContract : Bool)
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return goal
   let meaning := target.getArg! 3
   unless meaning.isAppOfArity ``propheticMeaning 9 do return goal
+  if let some owed ← goal.withContext (owedDirectCall? target continuations meaning) then
+    if let some next ← directCall goal throughContract owed then return next
   let (unit, functions, executable, frame) :=
     (meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2, meaning.getArg! 3)
   let some naming ← goal.withContext (namingLiteral? target continuations (meaning.getArg! 5)

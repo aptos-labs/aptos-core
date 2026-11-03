@@ -46,14 +46,18 @@ verify buy_in by lean =>
     rcases aborted with ⟨present, overflow⟩ | ⟨missing, nonzero, full⟩
     · exact Or.inl (Or.inr ⟨positive, present, overflow⟩)
     · exact Or.inr ⟨positive, missing, nonzero, full⟩
+  | aborts_if 1, aborts_if 2, aborts_if 3, aborts_if 4 when returns =>
+    verex_prepare only
+    all_goals verex_scalar_equalities
+    all_goals try simp (disch := verex_arithmetic_only) only [if_pos, Int.zero_mul, Int.zero_ediv] at *
+    all_goals try verex_decide
+    all_goals grind -ring only
   | _ => skip
   all_goals verex_prepare only
   all_goals try verex_decide
   all_goals verex_scalar_equalities
   all_goals try simp (disch := verex_arithmetic_only) only [if_pos, Int.zero_mul, Int.zero_ediv] at *
   all_goals try verex_decide
-  case after_call_1_of_add_shares_1 =>
-    grind -ring only
 
 -- A successful deduction supplies nonnegative remaining totals. Separate
 -- the membership flag before the final arithmetic check.

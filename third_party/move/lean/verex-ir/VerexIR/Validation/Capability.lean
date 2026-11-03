@@ -707,6 +707,9 @@ private def specProjectedAgree (ns : ValidatedNamespace)
      -- A vector reads its elements at projection too.
      | fuel + 1, some (.vector specElement _), some (.vector execElement _) =>
          specProjectedAgree ns specElement execElement fuel
+     -- So does a reference its referent.
+     | fuel + 1, some (.reference specReference), some (.reference execReference) =>
+         specProjectedAgree ns specReference.referent execReference.referent fuel
      | _, _, _ => false) ||
     (isAnyIntegerType ns specType && isAnyIntegerType ns execType) ||
     (match ns.tables.types[execType.index]? with
@@ -1959,6 +1962,8 @@ private def fieldRequirementForDeclaredAbility (profile : Profile)
 
 private def structAbilityDiagnostics (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : StructDecl) : Array Diagnostic :=
+  -- A spec variable's memory never exists at run time.
+  if declaration.isGhostMemory then #[] else
   let profile := ns.profile.getD .move
   let fields := declaration.fields ++ declaration.variants.flatMap (·.fields)
   declaration.abilities.foldl (fun ds declaredAbility =>

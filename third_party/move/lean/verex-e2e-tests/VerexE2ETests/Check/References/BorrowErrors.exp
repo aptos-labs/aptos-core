@@ -1,2 +1,3 @@
 VerexE2ETests/Check/References/BorrowErrors.lean:92:0: error: the borrow analysis rejects the unit, so preparation refuses it:
-VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+VIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan at VerexE2ETests/Check/References/BorrowErrors.lean:96:21
+  active loan originates here: VerexE2ETests/Check/References/BorrowErrors.lean:95:21

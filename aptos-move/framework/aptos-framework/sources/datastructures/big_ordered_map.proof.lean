@@ -268,7 +268,7 @@ verify test_verify_lower_bound_scan_start_symbolic by lean =>
       have valid : SpecMap.Valid (.ordered SpecMap.intOrder) m := by assumption
       have present : SpecMap.hasKey m (SpecMap.keyAt m i) = true :=
         SpecMap.hasKey_keyAt (by omega) (by omega)
-      have ordered := SpecMap.keyAt_lt_of_lt valid i (SpecMap.rank m x_Some_2.val)
+      have ordered := SpecMap.keyAt_lt_of_lt valid i (SpecMap.rank m internal_lower_bound_result_Some_2.val)
         (by omega) (by omega) bound
       rw [SpecMap.keyAt_rank internal_lower_bound_ensures_3] at ordered
       apply Classical.byContradiction
@@ -564,28 +564,26 @@ verify test_verify_leaf_walk_sum_symbolic by lean =>
       have read := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_8 oit_Position.val low inside
       have leaf := internal_leaf_iter_borrow_entries_and_next_leaf_index_ensures_7 oit_Position.val low inside
       verex_canonical_families
-      try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at read leaf iter_borrow_ensures_1
+      try simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval] at read leaf internal_leaf_borrow_value_ensures_1
       first
       | obtain ⟨payload, node⟩ := variantCarrier.second_of_name "Inner" "Leaf" (by decide) leaf
       | obtain ⟨payload, node⟩ := variantCarrier.second_of_name "Inner" "Leaf" (by decide) leaf.symm
       first
-      | rw [node] at read iter_borrow_ensures_1
+      | rw [node] at read internal_leaf_borrow_value_ensures_1
       simp only [variantName, variantPayload, vir_denote_norm, vir_denote_eval,
         Option.some.injEq, String.reduceEq, reduceCtorEq,
-        and_false, false_and] at read iter_borrow_ensures_1
-      all_goals first
-      | (exfalso; exact iter_borrow_ensures_1)
-      | (exfalso; simp at iter_borrow_ensures_1; done)
-      | (first
-         | (have size_eq : entries.size = oit_Position.val + 1 := by omega
-            rw [size_eq])
-         | rw [iter_next_ensures_2]
-         conv => rhs; rw [spec_test_sum_upto.spec.unfold]
-         dsimp only
-         try verex_name_maps
-         rw [dif_neg (by omega)]
-         simp only [← Int.add_assoc, Int.add_sub_cancel]
-         omega)
+        and_false, false_and] at read internal_leaf_borrow_value_ensures_1
+      all_goals
+        first
+        | (have size_eq : entries.size = oit_Position.val + 1 := by omega
+           rw [size_eq])
+        | rw [iter_next_ensures_2]
+        conv => rhs; rw [spec_test_sum_upto.spec.unfold]
+        dsimp only
+        try verex_name_maps
+        rw [dif_neg (by omega)]
+        simp only [← Int.add_assoc, Int.add_sub_cancel]
+        omega
   | _ =>
     verex_prepare typed
     all_goals try verex_cases it
@@ -661,8 +659,7 @@ verify test_verify_drain_loop by
       have sizes : SpecMap.size map' = SpecMap.size map - 1 := by omega
       rcases (show SpecMap.size map = 1 ∨ SpecMap.size map = 2 ∨ SpecMap.size map = 3 by omega)
         with len | len | len <;>
-      simp only [sizes, len, pop_front_result_1_eq, pop_front_result_0_eq, Int.reduceSub, Int.reduceMul,
-        Int.reduceTDiv, Int.reduceAdd] at * <;> omega
+      simp only [sizes, len, Int.reduceSub, Int.reduceMul, Int.reduceTDiv, Int.reduceAdd] at * <;> omega
   }
   on invariant 2 entry {
     split i in 0..3
@@ -677,7 +674,7 @@ verify test_verify_drain_loop by
     assert 10 * (3 - spec_len(new_from_result)) * (4 - spec_len(new_from_result)) / 2 == 0 by eval
   }
   on assert 14 {
-    lean => simpa only [x_eq, Int.reduceSub, Int.reduceMul, Int.reduceDiv] using invariant_4
+    lean => simpa only [new_from_result_eq, Int.reduceSub, Int.reduceMul, Int.reduceDiv] using invariant_4
   }
   on assert 5 {
     lean => verex_goal_witnesses
@@ -830,8 +827,30 @@ verify test_verify_back_key_rank_symbolic by lean =>
   verex_on
   | ensures_1, ensures_2 =>
     verex_prepare typed
-    rw [← x]
+    rw [← ‹m.keyAt (m.size - 1) = back_key_result.val›]
     first
     | exact SpecMap.hasKey_keyAt (by omega) (by omega)
     | exact SpecMap.rank_keyAt (by assumption) (by omega) (by omega)
   | _ => verex_decide
+
+-- A found iterator's key is the key looked up, so each closure's postcondition speaks
+-- of key 1; the first write leaves the key present, so the second search finds it too.
+
+verify test_verify_modify by
+  on requires 1 of iter_modify at call 2, requires 2 of iter_modify at call 1, requires 2 of iter_modify at call 2 {
+    split internal_find_result
+  }
+  after call 2 of internal_find {
+    assert old_internal_find_result.key == 1
+    assert spec_contains_key(map', 1) by congr
+  }
+  after call 2 of iter_modify {
+    split internal_find_result
+    assert internal_find_result.key == 1
+    assert spec_get(map', 1) == 12 by congr
+  }
+  on assert 1 {
+    assert internal_find_result.key == 1
+    assert spec_get(map', 1) == 11 by congr
+  }
+  on _ { }

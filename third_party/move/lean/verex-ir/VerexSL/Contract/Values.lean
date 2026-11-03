@@ -19,6 +19,7 @@ import VerexIR.Proofs.IntegerArithmetic
 import VerexIR.Proofs.Denote.Types
 import VerexIR.Proofs.Maps
 import VerexIR.Proofs.Denote.NativeMaps
+import VerexIR.Proofs.Denote.TypeReflection
 
 /-!
 # Generated contracts: native types and values
@@ -327,6 +328,14 @@ structure StateDefinition where
   operation : ExprId
   bindings : Array (VerexIR.PatternId × ExprId)
 
+/-- What a contract states of a known target at a frame and instantiation
+(`doc/designs/ghost-fields.md`): the contract, none where the target has no contract,
+and whether it states the target's aborts exactly: at least one `aborts_if` its callers
+see, and not `aborts_if_is_partial`. -/
+structure DirectContract where
+  contract? : Option Lean.Expr
+  exactAborts : Bool
+
 /-- Translation context for one function's specification clauses. -/
 structure Context where
   unit : ValidatedUnit
@@ -397,6 +406,10 @@ structure Context where
   typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]
   /-- Inside the body of a recursive specification function's definition. -/
   definition : Option RecursiveDefinition := none
+  /-- In a contract, what a known target's contract states at a frame and, for a
+  target with type parameters, an instantiation. -/
+  directContract : Option (VerexIR.FunctionHandle → Lean.Expr → Option Lean.Expr →
+    MetaM DirectContract) := none
   /-- The conditions on the path to the current position, which prove a
   recursive call's measure smaller. -/
   facts : Array Lean.Expr := #[]
@@ -1022,11 +1035,16 @@ meaning the prelude of `profile` gives the function
 (`specificationModel?`). -/
 def opaqueValue (name : String) (typeArguments : List Lean.Expr) (result inhabited : Lean.Expr)
     (arguments : Array Lean.Expr) (profile : Option VerexIR.Profile := none) : MetaM Lean.Expr := do
-  let typeArguments ← mkListLit (mkConst ``VerexSL.Contract.SpecTypeArgument) typeArguments
-  if let some .serialization := specificationModel? profile name then
-    return ← mkAppOptM ``VerexIR.Proofs.serializedBytes #[none, typeArguments, none, ← bundleOf arguments]
-  mkAppOptM ``VerexSL.Contract.opaqueSpec
-    #[toExpr name, typeArguments, result, inhabited, none, ← bundleOf arguments]
+  let typeList ← mkListLit (mkConst ``VerexSL.Contract.SpecTypeArgument) typeArguments
+  let model := specificationModel? profile name
+  if let some .serialization := model then
+    return ← mkAppOptM ``VerexIR.Proofs.serializedBytes #[none, typeList, none, ← bundleOf arguments]
+  let value ← mkAppOptM ``VerexSL.Contract.opaqueSpec
+    #[toExpr name, typeList, result, inhabited, none, ← bundleOf arguments]
+  if let (some .isStruct, [argument]) := (model, typeArguments) then
+    if argument.isAppOfArity ``VerexSL.Contract.SpecTypeArgument.native 1 then
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.reflectedIsStruct) argument.appArg! value
+  return value
 
 /-- An unspecified value of a native type at a frame, as an aborting
 specification branch denotes one (`arbitraryValue`): one fixed value of the
@@ -1810,11 +1828,18 @@ def readsFrom (unit : ValidatedUnit) (start : List (VerexIR.NamespaceId × ExprI
         match expression.kind with
         | .operation (.specification (.behavior .requiresOf _)) .. =>
             reads := { reads with requires := true, state := true }
-        | .operation (.specification (.behavior kind range)) .. =>
+        | .operation (.specification (.behavior kind range)) _ arguments _ =>
+            -- In a unit verified through its model, `aborts_of` of a literal of a known
+            -- target is what its contract states, with no run to rest on.
+            let readsContract := VerexIR.Proofs.Denote.declaresGhosts unit && kind == .abortsOf &&
+              ((arguments[0]?.bind fun callable =>
+                  unit.namespaces[owner.index]?.bind (·.expressions[callable.index]?)).any fun
+                | { kind := .operation (.call (.closure _ 0)) _ #[] _, .. } => true
+                | _ => false)
             reads := { reads with unit := true, state := true
-                                  determinism := reads.determinism ||
-                                    (kind matches .abortsOf | .resultOf) ||
-                                    (kind == .ensuresOf && range.post.isSome)
+                                  determinism := reads.determinism || (!readsContract &&
+                                    ((kind matches .abortsOf | .resultOf) ||
+                                      (kind == .ensuresOf && range.post.isSome)))
                                   result := reads.result || kind matches .resultOf }
         | .operation (.specification (.global _)) .. | .operation (.global _) .. |
             .operation (.specification (.publish _)) .. |

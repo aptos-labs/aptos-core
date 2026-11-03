@@ -76,6 +76,30 @@ partial def nativeValueRow (carriers : Lean.Expr) :
         #[carriers, ← quoteNTy τ, ← quoteRow rest, value, ← nativeValueRow carriers rest values]
   | _, _ => throwError "internal: a row of native values differs from its row type"
 
+/-- The value of a type-reflecting native at the type `τ`, as its result type
+`result` holds it, `fallback` where `τ` mentions a parameter. -/
+def reflectedValue (reflection : TypeReflection) (carriers : Lean.Expr)
+    (result : VerexIR.Proofs.Denote.NTy) (τ fallback : Lean.Expr) : MetaM Lean.Expr := do
+  let some (unit, _, _) := carriersFrame? carriers
+    | throwError "a reflecting native is applied outside a frame"
+  let carrier := carrierType carriers (← quoteNTy result)
+  let bytes := mkApp (mkConst ``VerexIR.SpecVector)
+    (mkApp2 (mkConst ``VerexIR.SpecInt) (toExpr (VerexIR.IntWidth.bits 8)) (toExpr false))
+  let .struct _ _ row := result
+    | throwError "a reflecting native returns a structure"
+  match reflection with
+  | .name =>
+      let pack ← withLocalDeclD `name bytes fun name => do
+        mkLambdaFVars #[name] (← nativeValueRow carriers row [name])
+      return mkApp5 (mkConst ``VerexIR.Proofs.Denote.reflectedTypeName) carrier unit τ pack fallback
+  | .info =>
+      let pack ← withLocalDeclD `account (mkConst ``String) fun account =>
+        withLocalDeclD `module bytes fun module =>
+          withLocalDeclD `name bytes fun name => do
+            mkLambdaFVars #[account, module, name]
+              (← nativeValueRow carriers row [account, module, name])
+      return mkApp5 (mkConst ``VerexIR.Proofs.Denote.reflectedTypeInfo) carrier unit τ pack fallback
+
 /-- A native value read at a type differing from its own only in the widths
 of the integers it holds, as a specification function's value at a call the
 specification types otherwise: an integer by its value, cut to the width it
@@ -100,6 +124,11 @@ partial def coerceNative (carriers : Lean.Expr) :
         mkAppM ``VerexIR.SpecVector.map #[element, value]
     | _, _ => throwError m!"a specification value of type {repr σ} is read at the type \
         {repr τ}, which generated contracts do not carry"
+
+/-- A proposition by cases on `test`, each branch knowing it. -/
+private def propDite (test thenBranch elseBranch : Lean.Expr) : Lean.Expr :=
+  mkApp5 (mkConst ``dite [1]) (mkSort .zero) test (mkApp (mkConst ``Classical.propDecidable) test)
+    thenBranch elseBranch
 
 mutual
 /-- A type with its integers unbounded: what values of types differing only
@@ -127,16 +156,34 @@ def Context.uninterpretedParameterType (callee : Context) (typeId : TypeId) :
     | throwError "a type argument of an uninterpreted function has no native type"
   return widened.subst (VerexIR.Proofs.Denote.NRow.ofList row)
 
+/-- How a behavioral predicate reads a known target directly: in an executable
+unit its run, its meaning before its arguments; in a unit verified through its
+model what its contract states (`doc/designs/ghost-fields.md`). -/
+inductive DirectReading where
+  | run (meaning : Lean.Expr)
+  | contract (found : DirectContract)
+
+/-- A known target capturing nothing, as a behavioral predicate reads it directly, at
+the frame its type arguments induce: its reading, the type arguments if it has any, and
+its own row and shape. -/
+structure DirectTarget where
+  reading : DirectReading
+  θ? : Option Lean.Expr
+  full : Lean.Expr
+  shape : VerexIR.Proofs.Denote.ResultShape
+
 /-- An invocation of a function value a behavioral predicate and its
 defined label share (`Proofs/Behavior.lean`): the invocation meaning, the
-closure, the supplied row and result shape, each parameter's entry value
-(a mutable reference's at the pre-state), and the pre-state. -/
+closure, or the known target it is read directly as (`DirectTarget`), the
+supplied row and result shape, each parameter's entry value (a mutable
+reference's at the pre-state), and the pre-state. -/
 structure Invocation where
   unit : Lean.Expr
   functions : Lean.Expr
   frame : Lean.Expr
   invoke : Lean.Expr
-  function : Lean.Expr
+  function? : Option Lean.Expr
+  direct? : Option DirectTarget
   row : VerexIR.Proofs.Denote.NRow
   shared : VerexIR.Proofs.Denote.Sharing
   shape : VerexIR.Proofs.Denote.ResultShape
@@ -162,6 +209,13 @@ def Invocation.arguments (invocation : Invocation) (finals : Array Lean.Expr := 
     | _ => values := values.push entry
   nativeValueRow carriers invocation.row values.toList
 
+/-- The function value of an invocation; a known target read directly has none
+(`DirectTarget`): only `aborts_of` and `ensures_of` read it. -/
+def Invocation.function (invocation : Invocation) : MetaM Lean.Expr := do
+  let some function := invocation.function?
+    | throwError "a function value with type arguments is not carried in generated contracts"
+  return function
+
 /-- A behavioral predicate of an invocation, applied to the invocation's
 meaning, row, shared flags, shape, and function value, then `rest`. -/
 def Invocation.predicate (invocation : Invocation) (predicate : Name) (rest : Array Lean.Expr) :
@@ -169,7 +223,61 @@ def Invocation.predicate (invocation : Invocation) (predicate : Name) (rest : Ar
   return mkAppN (mkConst predicate)
     (#[invocation.unit, invocation.functions, invocation.frame, invocation.invoke,
       ← quoteRow invocation.row,
-      toExpr invocation.shared, ← quoteShape invocation.shape, invocation.function] ++ rest)
+      toExpr invocation.shared, ← quoteShape invocation.shape, ← invocation.function] ++ rest)
+
+/-- The arguments of a target read directly, in its view, as a body's call passes
+them (`Term.callGeneric`). -/
+def Invocation.directArguments (invocation : Invocation) (direct : DirectTarget)
+    (arguments : Lean.Expr) : Lean.Expr :=
+  match direct.θ? with
+  | none => arguments
+  | some θ =>
+      let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
+        invocation.functions invocation.frame
+      mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.toSkolem) carriers θ direct.full arguments
+
+/-- `aborts_of` of a target read directly: its call aborts (`CallAborts`), or its
+contract's `mayAbort`, which only exact aborts make the predicate's reading. -/
+def Invocation.directAborts (invocation : Invocation) (direct : DirectTarget)
+    (arguments : Lean.Expr) : MetaM Lean.Expr := do
+  let arguments := invocation.directArguments direct arguments
+  match direct.reading with
+  | .run meaning =>
+      let call := mkApp meaning arguments
+      return mkApp5 (mkConst ``VerexIR.Proofs.CallAborts) invocation.unit invocation.functions
+        (← inferType call).appArg! call invocation.pre
+  | .contract found =>
+      let some contract := found.contract?
+        | throwError "`aborts_of` of a function without a contract is not carried in generated \
+            contracts of a unit verified through its model"
+      unless found.exactAborts do
+        throwError "`aborts_of` of a function whose aborts are not exact is not carried in \
+          generated contracts of a unit verified through its model: it reads the function's \
+          contract, exact with an `aborts_if` its callers see and without `aborts_if_is_partial`"
+      return (contract.getArg! 8).beta #[arguments, invocation.pre]
+
+/-- `ensures_of` of a target read directly, its result at the caller's view: its call
+runs (`CallEnsures`), or its contract's `ensures` and frame. -/
+def Invocation.directEnsures (invocation : Invocation) (direct : DirectTarget)
+    (arguments result post : Lean.Expr) : MetaM Lean.Expr := do
+  let arguments := invocation.directArguments direct arguments
+  let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
+    invocation.functions invocation.frame
+  let inView ← match direct.θ?, direct.shape with
+    | some θ, .one τ => pure (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) carriers θ
+        (← quoteNTy τ) result)
+    | _, _ => pure result
+  match direct.reading with
+  | .run meaning =>
+      let call := mkApp meaning arguments
+      return mkApp7 (mkConst ``VerexIR.Proofs.CallEnsures) invocation.unit invocation.functions
+        (← inferType call).appArg! call inView invocation.pre post
+  | .contract found =>
+      let some contract := found.contract?
+        | throwError "`ensures_of` of a function without a contract is not carried in generated \
+            contracts of a unit verified through its model"
+      let stated := #[arguments, invocation.pre, inView, post]
+      mkAppM ``And #[(contract.getArg! 6).beta stated, (contract.getArg! 10).beta stated]
 
 /-- A value of a specification binder at a type, as a bundle component: an
 integer, a Boolean decided, a string, or a native value. -/
@@ -410,7 +518,12 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
     let some operand := operands[index]? | break
     let some operandExpression := context.ns.expressions[operand.index]? | break
     literal := operandExpression
-  let function ← match literal.kind with
+  let direct? ← match literal.kind with
+    | .operation (.call (.closure reference 0)) instantiations #[] _ =>
+        directTarget? context executable frame reference instantiations
+    | _ => pure none
+  -- A literal with type arguments read directly constructs no value.
+  let function? ← if direct?.any (·.θ?.isSome) then pure none else some <$> match literal.kind with
     | .operation (.call (.closure reference mask)) instantiations captures _ =>
         functionLiteral context reference mask instantiations captures
     | .operation (.data (.selectVariants _ _)) _ _ _ =>
@@ -440,7 +553,62 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
     | none, none => do
         let some state := context.state | throwError "an invocation needs a pre-state"
         pure state
-  return { unit, functions, frame, invoke, function, row, shared, shape, entries, pre }
+  return { unit, functions, frame, invoke, function?, direct?, row, shared, shape, entries, pre }
+
+/-- The direct reading of a known target (`doc/designs/higher-order-functions.md`,
+"Denotation"; `doc/designs/ghost-fields.md`). With type arguments, in an executable unit,
+`aborts_of` and `ensures_of` of the literal are those of the call a body's `f<τ̄>(x)`
+denotes, the target's meaning at the family its type arguments induce and the
+instantiation its frame computes, which owes no coherence
+(`closureMeaning_closureOfGeneric` is the other side). Over a model, whose calls are
+routed members no contract names, with or without type arguments, they are what the
+target's contract states at that frame and instantiation. Without type arguments in an
+executable unit the literal is its closure site's. -/
+private partial def directTarget? (context : Context) (executable frame : Lean.Expr)
+    (reference : VerexIR.QualifiedRef) (instantiations : Array VerexIR.GenericArgument) :
+    MetaM (Option DirectTarget) := do
+  let model := (← modelInvoke? executable frame).isSome
+  if instantiations.isEmpty && !model then return none
+  let some handle := VerexIR.SemanticOperations.resolveFunction? context.unit
+      context.namespaceId reference
+    | return none
+  let some (parameters, results) := VerexIR.Proofs.Denote.closureSignature? context.unit handle
+    | return none
+  let shape ← match results with
+    | [] => pure VerexIR.Proofs.Denote.ResultShape.none
+    | [σ] => pure (VerexIR.Proofs.Denote.ResultShape.one σ)
+    | _ => return none
+  let full ← quoteRow (VerexIR.Proofs.Denote.NRow.ofList parameters)
+  if instantiations.isEmpty then
+    let some contractOf := context.directContract | return none
+    return some { reading := .contract (← contractOf handle frame none), θ? := none, full, shape }
+  let some typeArgs := instantiations.mapM fun argument => match argument with
+      | .typeArg value => some value
+      | _ => none
+    | return none
+  let row := VerexIR.Proofs.Denote.NRow.ofList
+    (← typeArgs.toList.mapM fun value => context.nativeType value.typeId)
+  unless row.refFree && row.inhabitable do return none
+  let leading ← frameLeading frame
+  let θ ← quoteTypeArgs.quoteTypeArgsRow row
+  let outer ← match context.typeInstantiation with
+    | some instantiation => pure instantiation
+    | none => mkArrayLit (← mkAppM ``Prod #[mkConst ``TypeId, mkConst ``TypeId]) []
+  let handleExpr := toExpr handle
+  -- Its reading does not depend on where its type arguments are written
+  -- (`frameInstantiation_congr`).
+  let located := typeArgs.map fun value => { value with loc := ⟨0⟩ }
+  let instantiation := mkApp4 (mkConst ``VerexIR.Proofs.Denote.frameInstantiation) leading[0]!
+    handleExpr outer (toExpr located)
+  let induced := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) (leading ++ #[θ, frame])
+  if model then
+    let some contractOf := context.directContract | return none
+    return some { reading := .contract (← contractOf handle induced (some instantiation))
+                  θ? := some θ, full, shape }
+  let meaning := mkAppN (mkConst ``VerexIR.Proofs.Denote.propheticMeaning)
+    #[leading[0]!, leading[1]!, executable, induced, instantiation, handleExpr, full,
+      ← quoteShape shape]
+  return some { reading := .run meaning, θ? := some θ, full, shape }
 
 /-- A literal function value of a target without type parameters, its
 captures native, its mask the target's parameters woven, as the program
@@ -1125,7 +1293,12 @@ where
     let [result] := declaration.signature.results.toList
       | throwError "a recursive specification function returns one value"
     let resultDomain ← domainAt result.typeId "a specification function result"
-    let resultNative ← nativeAt resultDomain result.typeId true
+    -- A definition's value is its body's, which a tuple types logically.
+    let valueTypeId := (do
+      let root ← declaration.body
+      let expression ← targetNs.expressions[root.index]?
+      pure expression.typeId).getD result.typeId
+    let resultNative ← nativeAt resultDomain valueTypeId true
     let mut name ← specDefinitionName context.unit reference
     unless typeArgumentTypes.isEmpty do
       let spelled ← typeArgumentTypes.mapM fun
@@ -1969,7 +2142,9 @@ where
           -- value at an instance whose type a clause reads otherwise.
           match shape.resultNative with
           | some τ =>
-              if domainOf ty == .native then return mkApp applied bundle
+              if domainOf ty == .native then
+                return ← coerceNative (← context.carriers) τ (← context.nativeType resultTypeId)
+                  (mkApp applied bundle)
               return ← clauseOfNative τ (mkApp applied bundle)
           | none => return mkApp applied bundle
         if context.specCallStack.contains reference then
@@ -2007,8 +2182,50 @@ where
             let (leftValue, τ) ← nativeOperand context left
             let (rightValue, _) ← nativeOperand context right
             return ← orderingTerm context ty (← structuralOrderTerm context τ leftValue rightValue)
+          -- A field the prelude's specification function writes.
+          if let some (.setField index) := specificationModel? targetNs.profile own then
+            let (some operand, some written) := (arguments[0]?, arguments[1]?)
+              | throwError "a field model writes one operand"
+            let (value, τ) ← nativeOperand context operand
+            let .struct _ _ row := τ
+              | throwError "a field model writes a structure"
+            let some σ := row.toList[index]?
+              | throwError "a field model writes a field out of range"
+            let carriers ← context.carriers
+            let components ← nativeComponents carriers (← quoteNTy τ) value
+            return ← nativeValueRow carriers row
+              ((components.map (·.2)).set! index
+                (← nativeOfClause carriers σ (← translate context written))).toList
+          -- A field the prelude's specification function reads.
+          let field? := match specificationModel? targetNs.profile own, model with
+            | some (.field index), _ => some index
+            | _, some (.aggregator .read) => some 0
+            | _, _ => none
+          if let some index := field? then
+            let some operand := arguments[0]?
+              | throwError "a field model reads one operand"
+            let (value, τ) ← nativeOperand context operand
+            let .struct _ _ row := τ
+              | throwError "a field model reads a structure"
+            let some σ := row.toList[index]?
+              | throwError "a field model reads a field out of range"
+            let some (_, selected) := (← nativeComponents (← context.carriers) (← quoteNTy τ) value)[index]?
+              | throwError "a field model reads a field out of range"
+            return ← clauseOfNative σ selected
+          -- The prelude's function at an element it computes on; uninterpreted
+          -- at any other.
+          if let some (.aggregator .isAtLeast) := model then
+            let (some operand, some minimum) := (arguments[0]?, arguments[1]?)
+              | throwError "`is_at_least_impl` reads two operands"
+            let (value, τ) ← nativeOperand context operand
+            if let .struct _ _ (.cons σ _) := τ then
+              if σ.isAggregatorElement then
+                let some (_, current) := (← nativeComponents (← context.carriers) (← quoteNTy τ) value)[0]?
+                  | throwError "an aggregator has a value"
+                let (lower, _) ← nativeOperand context minimum
+                return ← mkAppM ``LE.le #[← clauseOfNative σ lower, ← clauseOfNative σ current]
           let name : String := match model with
-            | some (.uninterpreted _ (some function) _) => function
+            | some (.uninterpreted _ (some function) _ _) => function
             | _ => own
           -- The type arguments as native types under the contract's family,
           -- which an instantiation of the contract resolves to the caller's,
@@ -2068,6 +2285,10 @@ where
                 bundleComponent domain value
             | none => bundleComponent domain value
           let domain := domainOf ty
+          let reflect (nty : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) : MetaM Lean.Expr := do
+            let some (.uninterpreted _ _ _ (some reflection)) := model | return value
+            let some argument := typeArgumentTerms[0]? | return value
+            reflectedValue reflection (← context.carriers) nty argument.appArg! value
           -- A native result read at the call's domain.
           if let some resultTypeId := resultTypeIds[0]? then
             if declaredNative resultTypeId && domain != .native then
@@ -2077,8 +2298,8 @@ where
               let carrier := carrierType carriers τ
               let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier
                 (← typedInhabitant carriers τ)
-              return ← clauseOfNative nty
-                (← opaqueValue name typeArgumentTerms.toList carrier inhabited values targetNs.profile)
+              return ← clauseOfNative nty (← reflect nty
+                (← opaqueValue name typeArgumentTerms.toList carrier inhabited values targetNs.profile))
           match domain, domain.scalarType? with
           | .native, _ =>
               -- An unspecified value of a native type is a native value.
@@ -2088,7 +2309,24 @@ where
               let carrier := carrierType carriers τ
               let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier
                 (← typedInhabitant carriers τ)
-              opaqueValue name typeArgumentTerms.toList carrier inhabited values targetNs.profile
+              let value ← reflect nty
+                (← opaqueValue name typeArgumentTerms.toList carrier inhabited values targetNs.profile)
+              -- The fields the prelude states of the uninterpreted value.
+              let some (.stated fields) := specificationModel? targetNs.profile own | return value
+              let .struct _ _ row := nty
+                | throwError "a stated field model is of a structure"
+              let mut components := (← nativeComponents carriers τ value).map (·.2)
+              for (index, stated) in fields do
+                let some σ := row.toList[index]?
+                  | throwError "a stated field model states a field out of range"
+                let clause ← match stated with
+                  | .argument position =>
+                      let some argument := arguments[position]?
+                        | throwError "a stated field model reads an argument out of range"
+                      translate context argument
+                  | .zero => pure (toExpr (0 : Int))
+                components := components.set! index (← nativeOfClause carriers σ clause)
+              nativeValueRow carriers row components.toList
           | _, some type =>
               let inhabited ← synthInstance (← mkAppM ``Inhabited #[type])
               domain.ofBinder
@@ -2156,7 +2394,7 @@ where
             if (callee.valueTypeOf? result.typeId).map domainOf == some .native then
               return ← clauseOfNative (← callee.nativeType result.typeId) value
             return value
-          let σ ← callee.nativeType result.typeId
+          let σ ← callee.exprType body
           let τ ← context.nativeType resultTypeId
           if σ == τ then return value
           coerceNative (← context.carriers) σ τ value
@@ -2437,6 +2675,8 @@ where
     let carriers ← context.carriers
     match kind with
     | .abortsOf =>
+        if let some direct := invocation.direct? then
+          return ← invocation.directAborts direct (← invocation.arguments)
         invocation.predicate ``VerexIR.Proofs.AbortsOf #[← invocation.arguments, invocation.pre]
     | .ensuresOf =>
         let some callableExpression := context.ns.expressions[arguments[0]!.index]?
@@ -2464,6 +2704,10 @@ where
               mkAppM ``Prod.mk #[value, value]
           | .one τ, [output] => nativeOfClause carriers τ (← translate context output)
           | _, _ => throwError "`ensures_of` names one value for the function's result"
+        -- A state label a predicate defines names the run `state_of` reads.
+        if let some direct := invocation.direct? then
+          if range.post.isNone || direct.θ?.isSome then
+            return ← invocation.directEnsures direct (← invocation.arguments finalValues) result post
         invocation.predicate ``VerexIR.Proofs.EnsuresOf
           #[← invocation.arguments finalValues, result, invocation.pre, post]
     | .resultOf =>
@@ -2483,7 +2727,7 @@ where
         return mkAppN (mkConst ``VerexIR.Proofs.RequiresOf)
           #[invocation.unit, invocation.functions, invocation.frame, table,
             ← quoteRow invocation.row,
-            toExpr invocation.shared, ← quoteRow invocation.shape.row, invocation.function,
+            toExpr invocation.shared, ← quoteRow invocation.shape.row, ← invocation.function,
             ← invocation.arguments, invocation.pre]
     | .unchangedOf | .foldsOf | .writeOf _ =>
         throwError "behavioral predicate {repr kind} is not carried in generated contracts"
@@ -2491,6 +2735,24 @@ where
     let some left := arguments[0]? | throwError "a binary specification operation needs two operands"
     let some right := arguments[1]? | throwError "a binary specification operation needs two operands"
     return (← translate context left, ← translate context right)
+  /-- `&&`, `||` or `==>`. Inside a recursive definition the right operand
+  knows the left one (`negate`d for `||`), which a recursive call's
+  termination may need; `dependent` builds the term when it uses that fact. -/
+  shortCircuit (arguments : Array ExprId) (negate : Bool)
+      (plain : Lean.Expr → Lean.Expr → MetaM Lean.Expr)
+      (dependent : Lean.Expr → Lean.Expr → Lean.Expr) : MetaM Lean.Expr := do
+    if context.definition.isNone then
+      let (l, r) ← binary arguments
+      return ← plain l r
+    let (some left, some right) := (arguments[0]?, arguments[1]?)
+      | throwError "a binary specification operation needs two operands"
+    let left ← translate context left
+    let fact := if negate then mkNot left else left
+    withLocalDeclD `fact fact fun hypothesis => do
+      let right ← translate { context with facts := context.facts.push hypothesis } right
+      if right.containsFVar hypothesis.fvarId! then
+        return dependent left (← mkLambdaFVars #[hypothesis] right)
+      plain left right
   unary (arguments : Array ExprId) : MetaM Lean.Expr := do
     let some only := arguments[0]? | throwError "a unary specification operation needs one operand"
     translate context only
@@ -2621,10 +2883,16 @@ where
         let (some left, some right) := (arguments[0]?, arguments[1]?)
           | throwError "an inequality needs two operands"
         return mkNot (← equation left right)
-    | .logicalAnd => let (l, r) ← binary arguments; mkAppM ``And #[l, r]
-    | .logicalOr => let (l, r) ← binary arguments; mkAppM ``Or #[l, r]
+    | .logicalAnd =>
+        shortCircuit arguments false (fun l r => mkAppM ``And #[l, r]) fun l right =>
+          propDite l right (.lam `fact (mkNot l) (mkConst ``False) .default)
+    | .logicalOr =>
+        shortCircuit arguments true (fun l r => mkAppM ``Or #[l, r]) fun l right =>
+          propDite l (.lam `fact l (mkConst ``True) .default) right
     | .logicalNot => let value ← unary arguments; mkAppM ``Not #[value]
-    | .implies => let (l, r) ← binary arguments; return ← mkArrow l r
+    | .implies =>
+        shortCircuit arguments false (fun l r => mkArrow l r) fun l right =>
+          propDite l right (.lam `fact (mkNot l) (mkConst ``True) .default)
     | .equivalent => let (l, r) ← binary arguments; mkAppM ``Iff #[l, r]
     | _ =>
         throwError "specification primitive {repr primitive} at type \

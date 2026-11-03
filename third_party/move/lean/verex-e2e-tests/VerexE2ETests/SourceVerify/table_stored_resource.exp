@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/table_stored_resource.move:76:9: error: the specification clause `ensures result` is not established
+VerexE2ETests/SourceVerify/table_stored_resource.move:74:5: error: verex verification failed: the automatic verification of `read_flag_false` failed; provide a proof in `VerexE2ETests/SourceVerify/table_stored_resource.proof.lean`:
+  verify read_flag_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/table_stored_resource.move:94:9: error: the specification clause `ensures result` is not established
+VerexE2ETests/SourceVerify/table_stored_resource.move:92:5: error: verex verification failed: the automatic verification of `read_false` failed; provide a proof in `VerexE2ETests/SourceVerify/table_stored_resource.proof.lean`:
+  verify read_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/table_stored_resource.move:122:9: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/SourceVerify/table_stored_resource.move:120:5: error: verex verification failed: the automatic verification of `publish_false` failed; provide a proof in `VerexE2ETests/SourceVerify/table_stored_resource.proof.lean`:
+  verify publish_false by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

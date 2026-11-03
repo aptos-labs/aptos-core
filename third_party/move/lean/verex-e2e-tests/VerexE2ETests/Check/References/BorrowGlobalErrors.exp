@@ -1,2 +1,3 @@
 VerexE2ETests/Check/References/BorrowGlobalErrors.lean:59:0: error: the borrow analysis rejects the unit, so preparation refuses it:
-VIR-SEMANTIC-BORROW-CONFLICT: global owner write conflicts with an active shared loan
+VIR-SEMANTIC-BORROW-CONFLICT: global owner write conflicts with an active shared loan at VerexE2ETests/Check/References/BorrowGlobalErrors.lean:52:50
+  active loan originates here: VerexE2ETests/Check/References/BorrowGlobalErrors.lean:51:24

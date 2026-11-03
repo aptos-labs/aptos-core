@@ -249,6 +249,16 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
     -- family, spelled as the normal form spells it (`typedReadSpelling`).
     if typedReads.contains head then
       let #[family, τ] := args.extract 0 2 | return .continue
+      -- A native type's default stays at its family: the outer family's
+      -- default is equal by a lemma (`ownInstance?`), not by definition.
+      let τ₀ := τ.consumeMData
+      if head == ``VerexIR.Proofs.Denote.NTy.readInhabited && (induced family).isSome &&
+          !(τ₀.isAppOfArity ``VerexIR.Proofs.Denote.NTy.param 1 ||
+            τ₀.isAppOfArity ``VerexIR.Proofs.Denote.NTy.int 2 ||
+            τ₀.isConstOf ``VerexIR.Proofs.Denote.NTy.num) then
+        match ← typedReadSpelling head family τ (args.extract 2 args.size) with
+        | some t' => return .done t'
+        | none => return .continue
       let (family, τ) ← match induced family with
         | some (outer, row) =>
             let some τ' := substituteNTy row τ | return .continue
@@ -284,16 +294,52 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
     | some t' => return .done t'
     | none => return .continue)
 
+/-- Whether a term and its respelling are definitionally equal, by `isDefEq` on
+the smallest applications they differ in, each distinct pair once per target. A
+family converts only under the application it instantiates. On the whole term,
+`isDefEq` fails on that argument at every enclosing application and unfolds it
+instead, which on a term of shared reads costs the term's unshared size. -/
+private partial def convertsAtSites (left right : Lean.Expr) : MetaM Bool := do
+  if left == right then return true
+  let conversions := (← targetState).familyConversions
+  if let some known := (← conversions.get)[(left, right)]? then return known
+  let result ← match left, right with
+    | .mdata _ inner, _ => convertsAtSites inner right
+    | _, .mdata _ inner => convertsAtSites left inner
+    | .lam name type body info, .lam _ type' body' _
+    | .forallE name type body info, .forallE _ type' body' _ =>
+      if ← convertsAtSites type type' <&&> withLocalDecl name info type fun local_ =>
+          convertsAtSites (body.instantiate1 local_) (body'.instantiate1 local_) then
+        pure true
+      else isDefEq left right
+    | .app .., .app .. =>
+      let (arguments, arguments') := (left.getAppArgs, right.getAppArgs)
+      let sameHead := left.getAppFn == right.getAppFn && arguments.size == arguments'.size
+      if ← pure sameHead <&&> arguments.size.allM fun index _ =>
+          convertsAtSites arguments[index]! arguments'[index]! then
+        pure true
+      else isDefEq left right
+    | _, _ => isDefEq left right
+  unless left.hasMVar || right.hasMVar do conversions.modify (·.insert (left, right) result)
+  return result
+
 /-- The canonical spelling of an expression's families, where it converts.
 An expression the search left as it was is not searched again. -/
 private def canonicalFamilyResult (e : Lean.Expr) : MetaM Simp.Result := do
   if (← (← targetState).canonicalForms.get).contains e then return { expr := e }
-  let canonical ← canonicalFamilies e
+  -- A pass takes off one level of induced families: a callee's callee at
+  -- generic types is two levels below the caller.
+  let mut canonical ← canonicalFamilies e
   if canonical == e then
     unless e.hasMVar do (← targetState).canonicalForms.modify (·.insert e)
     return { expr := e }
-  if ← isDefEq e canonical then return { expr := canonical }
-  return { expr := e }
+  unless ← convertsAtSites e canonical do return { expr := e }
+  repeat
+    let next ← canonicalFamilies canonical
+    if next == canonical then break
+    unless ← convertsAtSites canonical next do break
+    canonical := next
+  return { expr := canonical }
 
 /-- Make the family spellings of the goals canonical, their targets too
 where `target` holds (`canonicalFamilies`). -/
@@ -571,6 +617,170 @@ simproc ↓ [vir_denote_norm] equalOuterFamily
     | return .continue
   return .visit { expr := value, proof? := some equation }
 
+mutual
+/-- Native equality at a type that compares a value by every part, directly:
+none of its parts is a type parameter's or a function value's, compared by an
+erasure, or a ghost slot, which equality ignores. -/
+def NTy.comparesByValue : NTy → Bool
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => true
+  | .tuple row | .struct _ _ row => NRow.comparesByValue row
+  | .enum _ _ _ rows _ => NRows.comparesByValue rows
+  | .vector element => element.comparesByValue
+  | .table key value => key.comparesByValue && value.comparesByValue
+  | .ref referent => referent.comparesByValue
+  | .ghost _ | .param _ | .function _ _ _ => false
+
+def NRow.comparesByValue : NRow → Bool
+  | .nil => true
+  | .cons τ rest => τ.comparesByValue && NRow.comparesByValue rest
+
+def NRows.comparesByValue : NRows → Bool
+  | .nil => true
+  | .cons row rest => NRow.comparesByValue row && NRows.comparesByValue rest
+end
+
+section EqualAsEquation
+variable [Carriers]
+
+private theorem listEqual_iff_eq {α : Type} (equal : α → α → Bool)
+    (same : ∀ a b, equal a b = true ↔ a = b) (left right : List α) :
+    listEqual equal left right = true ↔ left = right := by
+  simpa using NativeMaps.listEqual_iff_map equal id (by simpa using same) left right
+
+mutual
+/-- At a type comparing by value, native equality is the equation of the values. -/
+theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left right : τ.carrier) →
+    (NTy.equal false τ left right = true ↔ left = right)
+  | .unit, _, _, _ => by simp [NTy.equal]
+  | .bool, _, _, _ => by simp [NTy.equal]
+  | .int _ _, _, left, right => by simp [NTy.equal, SpecInt.eq_iff_val left right]
+  | .num, _, left, right => by simp [NTy.equal, SpecInt.eq_iff_val left right]
+  | .address, _, _, _ => by simp [NTy.equal]
+  | .signer, _, _, _ => by simp [NTy.equal]
+  | .string, _, _, _ => by simp [NTy.equal]
+  | .bytes, _, _, _ => by simp [NTy.equal]
+  | .tuple row, plain, left, right => by
+      simp only [NTy.equal]
+      exact HList.equal_iff_eq row (by simpa [NTy.comparesByValue] using plain) left right
+  | .struct _ _ row, plain, left, right => by
+      simp only [NTy.equal, Bool.false_and, Bool.false_eq_true, ↓reduceIte]
+      exact HList.equal_iff_eq row (by simpa [NTy.comparesByValue] using plain) left right
+  | .enum _ _ names rows _, plain, left, right => by
+      simp only [NTy.equal]
+      exact variantCarrier.equal_iff_eq names rows (by simpa [NTy.comparesByValue] using plain)
+        left right
+  | .vector element, plain, left, right => by
+      simp only [NTy.equal]
+      rw [listEqual_iff_eq _
+        (NTy.equal_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
+      exact ⟨fun same => SpecVector.ext (Array.toList_inj.mp same),
+        fun same => congrArg (·.values.toList) same⟩
+  | .table key value, plain, left, right => by
+      have plains : key.comparesByValue = true ∧ value.comparesByValue = true := by
+        simpa [NTy.comparesByValue] using plain
+      simp only [NTy.equal]
+      rw [listEqual_iff_eq _ fun a b => by
+        simp only [Bool.and_eq_true, NTy.equal_iff_eq key plains.1,
+          NTy.equal_iff_eq value plains.2, Prod.ext_iff]]
+      exact ⟨fun same => SpecEntries.ext same, fun same => congrArg (·.entries) same⟩
+  | .ref referent, plain, left, right => by
+      have plain : referent.comparesByValue = true := by simpa [NTy.comparesByValue] using plain
+      simp only [NTy.equal, Bool.and_eq_true, NTy.equal_iff_eq referent plain, Prod.ext_iff]
+  | .ghost _, plain, _, _ | .param _, plain, _, _ | .function _ _ _, plain, _, _ => by
+      simp [NTy.comparesByValue] at plain
+
+/-- Rows comparing by value compare as the equation of the rows. -/
+theorem HList.equal_iff_eq : (row : NRow) → row.comparesByValue = true →
+    (left right : HList row) → (HList.equal false row left right = true ↔ left = right)
+  | .nil, _, _, _ => by simp only [HList.equal]; exact ⟨fun _ => rfl, fun _ => trivial⟩
+  | .cons τ rest, plain, left, right => by
+      have plains : τ.comparesByValue = true ∧ rest.comparesByValue = true := by
+        simpa [NRow.comparesByValue] using plain
+      simp only [HList.equal, Bool.and_eq_true, NTy.equal_iff_eq τ plains.1,
+        HList.equal_iff_eq rest plains.2]
+      exact ⟨fun same => Prod.ext same.1 same.2, fun same => same ▸ ⟨rfl, rfl⟩⟩
+
+/-- Variants comparing by value compare as the equation of the variants. -/
+theorem variantCarrier.equal_iff_eq : (names : List String) → (rows : NRows) →
+    rows.comparesByValue = true → (left right : variantCarrier names rows) →
+    (variantCarrier.equal false names rows left right = true ↔ left = right)
+  | _, .nil, _, left, _ => nomatch left
+  | [], .cons _ _, _, left, _ => nomatch left
+  | _ :: _, .cons fields rest, plain, .inl left, .inl right => by
+      have plains : fields.comparesByValue = true ∧ rest.comparesByValue = true := by
+        simpa [NRows.comparesByValue] using plain
+      simp only [variantCarrier.equal]
+      exact (HList.equal_iff_eq fields plains.1 left right).trans
+        ⟨congrArg Sum.inl, Sum.inl.inj⟩
+  | _ :: _, .cons _ _, _, .inl _, .inr _ => by simp [variantCarrier.equal]
+  | _ :: _, .cons _ _, _, .inr _, .inl _ => by simp [variantCarrier.equal]
+  | _ :: names, .cons fields rest, plain, .inr left, .inr right => by
+      have plains : fields.comparesByValue = true ∧ rest.comparesByValue = true := by
+        simpa [NRows.comparesByValue] using plain
+      simp only [variantCarrier.equal]
+      exact (variantCarrier.equal_iff_eq names rest plains.2 left right).trans
+        ⟨congrArg Sum.inr, Sum.inr.inj⟩
+end
+
+/-- `NTy.equal_iff_eq` as a Boolean, in the form of native equality at a scalar. -/
+theorem NTy.equal_eq_decide (τ : NTy) (plain : τ.comparesByValue = true) (left right : τ.carrier) :
+    NTy.equal false τ left right = @decide (left = right) (Classical.propDecidable _) := by
+  rw [Bool.eq_iff_iff, NTy.equal_iff_eq τ plain]
+  simp only [decide_eq_true_eq]
+
+end EqualAsEquation
+
+/-- Whether a quoted type compares by value, read off its constructors; a type
+not literal to its leaves does not count. -/
+private partial def comparesByValueQuoted (τ : Lean.Expr) : Bool :=
+  let τ := τ.consumeMData
+  let row := fun (row : Lean.Expr) => rowCompares row
+  match τ.getAppFn.constName?, τ.getAppArgs with
+  | some ``NTy.unit, _ | some ``NTy.bool, _ | some ``NTy.int, _ | some ``NTy.num, _
+  | some ``NTy.address, _ | some ``NTy.signer, _ | some ``NTy.string, _ | some ``NTy.bytes, _ => true
+  | some ``NTy.tuple, #[elements] => row elements
+  | some ``NTy.struct, #[_, _, fields] => row fields
+  | some ``NTy.enum, #[_, _, _, rows, _] => rowsCompare rows
+  | some ``NTy.vector, #[element] => comparesByValueQuoted element
+  | some ``NTy.table, #[key, value] => comparesByValueQuoted key && comparesByValueQuoted value
+  | some ``NTy.ref, #[referent] => comparesByValueQuoted referent
+  | _, _ => false
+where
+  rowCompares (row : Lean.Expr) : Bool :=
+    let row := row.consumeMData
+    match row.getAppFn.constName?, row.getAppArgs with
+    | some ``NRow.nil, _ => true
+    | some ``NRow.cons, #[τ, rest] => comparesByValueQuoted τ && rowCompares rest
+    | _, _ => false
+  rowsCompare (rows : Lean.Expr) : Bool :=
+    let rows := rows.consumeMData
+    match rows.getAppFn.constName?, rows.getAppArgs with
+    | some ``NRows.nil, _ => true
+    | some ``NRows.cons, #[row, rest] => rowCompares row && rowsCompare rest
+    | _, _ => false
+
+/-- Native equality between values, one of them not built, at a compound type
+comparing by value: the equation of the values, which rewrites where a
+comparison of an opaque value by its parts is stuck. Built values compare part
+by part (`HList.equal_cons`, `variantCarrier.equal_inr_inr`). -/
+simproc ↓ [vir_denote_norm] equalAsEquation
+    (@VerexIR.Proofs.Denote.NTy.equal ?carriers _ _ _ _) := fun e => do
+  let e := e.consumeMData
+  let_expr VerexIR.Proofs.Denote.NTy.equal family handles τ left right := e | return .continue
+  unless handles.isConstOf ``Bool.false do return .continue
+  if (inducedCarriers? family.consumeMData).isSome then return .continue
+  if τ.consumeMData.getAppFn.constName?.any (· matches ``NTy.unit | ``NTy.bool | ``NTy.int | ``NTy.num
+      | ``NTy.address | ``NTy.signer | ``NTy.string | ``NTy.bytes) then return .continue
+  unless comparesByValueQuoted τ do return .continue
+  let built (value : Lean.Expr) : MetaM Bool :=
+    return (← isConstructorApp? value.consumeMData).isSome
+  if (← built left) && (← built right) then return .continue
+  let plain ← mkExpectedTypeHint (mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true))
+    (← mkEq (mkApp (mkConst ``NTy.comparesByValue) τ) (mkConst ``Bool.true))
+  let proof := mkAppN (mkConst ``NTy.equal_eq_decide) #[family, τ, plain, left, right]
+  let some (_, _, value) := (← inferType proof).eq? | return .continue
+  return .visit { expr := value, proof? := some proof }
+
 /-- The name at a position of a literal list of names. -/
 private partial def literalNameAt? (list : Lean.Expr) (position : Nat) : Option String :=
   let list := list.consumeMData
@@ -796,22 +1006,42 @@ private def ownInstance? (inhabited : Lean.Expr) (view : NativeMaps.TypedView) :
   -- Unfolding the two instances compares their types' codecs; only an
   -- instance at an induced family is related by the lemma, any other by
   -- reducible unfolding.
-  let induced? : Option (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) := do
-    let_expr VerexIR.Proofs.Denote.nativeInhabited family τ fallback := inhabited | none
-    let_expr VerexIR.Proofs.Denote.NTy.inhabitantOf _ _ inhabitable := fallback | none
-    let (θ, induced) ← inducedCarriers? family
-    some (θ, induced, τ, inhabitable)
+  let induced? : Option (Lean.Expr × Lean.Expr × Lean.Expr) := do
+    let_expr VerexIR.Proofs.Denote.nativeInhabited _ _ fallback := inhabited | none
+    let_expr VerexIR.Proofs.Denote.NTy.inhabitantOf family τ inhabitable := fallback | none
+    let _ ← inducedCarriers? family
+    some (family, τ, inhabitable)
   try withTransparency .default do
-    let some (θ, induced, τ, inhabitable) := induced?
+    let some (family, τ, inhabitable) := induced?
       | if ← withReducible (isDefEq inhabited view.inhabited) then return some none else return none
     let_expr VerexIR.Proofs.Denote.nativeInhabited outer substituted own := view.inhabited
       | return none
-    let_expr VerexIR.Proofs.Denote.NTy.inhabitantOf _ _ decided := own | return none
+    let_expr VerexIR.Proofs.Denote.NTy.inhabitantOf ownFamily _ _ := own | return none
     let fallback := inhabited.appArg!
-    let heq ← mkAppOptM ``VerexIR.Proofs.Denote.NTy.inhabitantOf_instantiate
-      #[some induced, some θ, some τ, some inhabitable, some decided]
+    -- Each level of induced families by the lemma, down to the map's own.
+    let mut family := family
+    let mut τ := τ
+    let mut inhabitable := inhabitable
+    let mut chain : Option Lean.Expr := none
+    repeat
+      let some (θ, below) := inducedCarriers? family | return none
+      let some row := substitutionRow? θ | return none
+      let some next := substituteNTy row τ | return none
+      let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+        (← mkEq (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) next)
+          (mkConst ``Bool.true))
+      let heq ← mkAppOptM ``VerexIR.Proofs.Denote.NTy.inhabitantOf_instantiate
+        #[some below, some θ, some τ, some inhabitable, some decided]
+      chain ← match chain with
+        | some known => pure (some (← mkHEqTrans known heq))
+        | none => pure (some heq)
+      family := below
+      τ := next
+      inhabitable := decided
+      if below == ownFamily then break
+    let some equal := chain | return none
     let carrier ← inferType own
-    let defaults ← mkAppOptM ``eq_of_heq #[some carrier, some fallback, some own, some heq]
+    let defaults ← mkAppOptM ``eq_of_heq #[some carrier, some fallback, some own, some equal]
     let instanceOf ← withLocalDeclD `fallback carrier fun fallback =>
       mkLambdaFVars #[fallback]
         (mkApp3 (mkConst ``VerexIR.Proofs.Denote.nativeInhabited) outer substituted fallback)
@@ -829,8 +1059,11 @@ private def ownReadStep (e : Lean.Expr) (typePosition instancePosition : Nat) (o
   -- A read at the map's own type whose instance is not at an induced family
   -- is as the map spells it; deciding the view costs more than most reads.
   let induced := match inhabited.consumeMData with
-    | .app (.app (.app (.const ``VerexIR.Proofs.Denote.nativeInhabited _) family) _) _ =>
-        (inducedCarriers? family).isSome
+    | .app (.app (.app (.const ``VerexIR.Proofs.Denote.nativeInhabited _) _) _) fallback =>
+        match fallback.consumeMData with
+        | .app (.app (.app (.const ``VerexIR.Proofs.Denote.NTy.inhabitantOf _) family) _) _ =>
+            (inducedCarriers? family).isSome
+        | _ => false
     | _ => false
   if args[typePosition]! == own && !induced then return .continue
   let some view ← view () | return .continue
@@ -1015,25 +1248,121 @@ simproc [vir_denote, vir_denote_norm] sumInjectionFamilies (@Eq _ _ _) := fun e 
     | return .continue
   return .visit { expr := equation.1, proof? := some equation.2 }
 
-/-- Two pairs compared, as rows of values are: the components compare
-(`Prod.mk.injEq`), which the lemma states at a product type where a row
-states the equation at its own, `HList (.cons τ rest)`, which unfolds to
-the product only beyond the matching's transparency. -/
+/-- The components of a side of an equation at `carrier`, a product: a pair's,
+or its reads, as the normal form spells them. -/
+private def rowComponents (carrier side : Lean.Expr) : Lean.Expr × Lean.Expr :=
+  if side.isAppOfArity ``Prod.mk 4 then (side.getArg! 2, side.getArg! 3)
+  else
+    let levels := carrier.getAppFn.constLevels!
+    let (α, β) := (carrier.getArg! 0, carrier.getArg! 1)
+    (mkApp3 (mkConst ``Prod.fst levels) α β side, mkApp3 (mkConst ``Prod.snd levels) α β side)
+
+/-- What a type spells of a row of values: the unit, or the product it
+unfolds to. -/
+private inductive RowSpelling where
+  | unit
+  | pair (carrier : Lean.Expr)
+
+/-- The row a type spells, read from the spelling alone: `Prod α β`, `Unit`,
+`HList row` and `NTy.carrier _ (.tuple row)`. The row needs no more than
+reducible unfolding; any other type is not a row here. -/
+private def rowSpelling? (spelled : Lean.Expr) : MetaM (Option RowSpelling) := do
+  if spelled.isAppOfArity ``Prod 2 then return some (.pair spelled)
+  if spelled.isConstOf ``Unit || spelled.isAppOf ``PUnit then return some .unit
+  let row? : Option (Lean.Expr × Lean.Expr) :=
+    if spelled.isAppOfArity ``HList 2 then some (spelled.getArg! 0, spelled.getArg! 1)
+    else if spelled.isAppOfArity ``NTy.carrier 2 && (spelled.getArg! 1).isAppOfArity ``NTy.tuple 1 then
+      some (spelled.getArg! 0, (spelled.getArg! 1).getArg! 0)
+    else none
+  let some (carriers, row) := row? | return none
+  let row ← withReducible (whnf row)
+  if row.isConstOf ``NRow.nil then return some .unit
+  unless row.isAppOfArity ``NRow.cons 2 do return none
+  return some (.pair (mkApp2 (mkConst ``Prod [levelZero, levelZero])
+    (mkApp2 (mkConst ``NTy.carrier) carriers (row.getArg! 0))
+    (mkApp2 (mkConst ``HList) carriers (row.getArg! 1))))
+
+/-- Two pairs compared, as rows of values are: the components compare, whichever
+the sides (`Prod.ext_iff`). Decided on the spelling of the equation: a side
+constructed, or a tuple's type, so that a struct's value compared whole stays
+whole. A local the other side does not mention is left to its substitution. A
+run's observation (`result_of`, `state_of`) stays whole: the run deciders read
+it as stated; what they derive of a local decomposes. The lemma `Prod.mk.injEq`
+covers two constructors at a product type; a row states the equation at its
+own, `HList (.cons τ rest)`, which unfolds to the product only beyond the
+matching's transparency. -/
 simproc [vir_denote_norm] pairInjectionRows (@Eq _ _ _) := fun e => do
   let e := e.consumeMData
   let_expr Eq type lhs rhs := e | return .continue
   let lhs := lhs.consumeMData
   let rhs := rhs.consumeMData
-  unless lhs.isAppOfArity ``Prod.mk 4 && rhs.isAppOfArity ``Prod.mk 4 do return .continue
-  if type.consumeMData.isAppOfArity ``Prod 2 then return .continue
-  let some equation ← (try withTransparency .default do
-      let proof ← mkAppOptM ``Prod.mk.injEq #[some (lhs.getArg! 0), some (lhs.getArg! 1),
-        some (lhs.getArg! 2), some (lhs.getArg! 3), some (rhs.getArg! 2), some (rhs.getArg! 3)]
-      let some (_, _, components) := (← inferType proof).eq? | return none
-      pure (some (components, ← mkExpectedTypeHint proof (← mkEq e components)))
-    catch _ => pure none)
-    | return .continue
-  return .visit { expr := equation.1, proof? := some equation.2 }
+  let observation (side : Lean.Expr) : Bool :=
+    side.isAppOf ``VerexIR.Proofs.ResultOf || side.isAppOf ``VerexIR.Proofs.StateOf
+  if observation lhs || observation rhs then return .continue
+  let spelled := type.consumeMData
+  let (leftPair, rightPair) := (lhs.isAppOfArity ``Prod.mk 4, rhs.isAppOfArity ``Prod.mk 4)
+  if leftPair && rightPair && spelled.isAppOfArity ``Prod 2 then return .continue
+  let tupleRow := spelled.isAppOf ``HList ||
+    (spelled.isAppOfArity ``NTy.carrier 2 && (spelled.getArg! 1).isAppOf ``NTy.tuple)
+  let unitSide := lhs.isConstOf ``Unit.unit || lhs.isConstOf ``PUnit.unit ||
+    rhs.isConstOf ``Unit.unit || rhs.isConstOf ``PUnit.unit
+  unless leftPair || rightPair || tupleRow || unitSide do return .continue
+  let substitutable (side other : Lean.Expr) : Bool := match side with
+    | .fvar x => !other.containsFVar x
+    | _ => false
+  if substitutable lhs rhs || substitutable rhs lhs then return .continue
+  match ← rowSpelling? spelled with
+  | none => return .continue
+  | some .unit =>
+    let same ← mkExpectedTypeHint (← mkEqRefl lhs) e
+    return .visit { expr := mkConst ``True, proof? := some (mkApp2 (mkConst ``eq_true) e same) }
+  | some (.pair carrier) =>
+    let (leftFirst, leftSecond) := rowComponents carrier lhs
+    let (rightFirst, rightSecond) := rowComponents carrier rhs
+    let components ← mkAppM ``And #[← mkEq leftFirst rightFirst, ← mkEq leftSecond rightSecond]
+    let split := mkApp4 (mkConst ``Prod.ext_iff carrier.getAppFn.constLevels!)
+      (carrier.getArg! 0) (carrier.getArg! 1) lhs rhs
+    return .visit { expr := components, proof? := some (mkApp3 (mkConst ``propext) e components split) }
+
+/-- The value and position a pair's component reads, as a read of a value. -/
+private def pairRead? (component : Lean.Expr) : Option (Lean.Expr × Bool) :=
+  let component := component.consumeMData
+  if component.isAppOfArity ``Prod.fst 3 then some (component.getArg! 2, true)
+  else if component.isAppOfArity ``Prod.snd 3 then some (component.getArg! 2, false)
+  else match component with
+    | .proj ``Prod index value => some (value, index == 0)
+    | _ => none
+
+/-- Whether a type's spelling is a row's end: `Unit`, or the empty row. -/
+private def spelledRowEnd (type : Lean.Expr) : MetaM Bool := do
+  let type ← whnfR type
+  return type.isConstOf ``Unit || type.isAppOf ``PUnit ||
+    (type.isAppOf ``VerexIR.Proofs.Denote.HList && type.appArg!.isAppOf ``VerexIR.Proofs.Denote.NRow.nil)
+
+/-- Whether a type's spelling is a row of one component: `Prod τ Unit`, or a row
+`.cons τ .nil`. Read at reducible transparency, and nothing more. -/
+private def spelledSingleton (type : Lean.Expr) : MetaM Bool := do
+  let type ← whnfR type
+  if type.isAppOfArity ``Prod 2 then return ← spelledRowEnd type.appArg!
+  unless type.isAppOf ``VerexIR.Proofs.Denote.HList do return false
+  let row ← whnfR type.appArg!
+  unless row.isAppOf ``VerexIR.Proofs.Denote.NRow.cons do return false
+  return (← whnfR row.appArg!).isAppOf ``VerexIR.Proofs.Denote.NRow.nil
+
+/-- A row of the reads of one value is that value, up to its unit end
+(`(e.1, e.2)`, `(e.1, ())` where the spelling of `e`'s type shows a unit second
+component): the form the components of an equation leave where a value is rebuilt
+from them. Definitional, by structure eta. -/
+dsimproc [vir_denote_norm] rowOfReads (Prod.mk _ _) := fun e => do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``Prod.mk 4 do return .continue
+  let some (value, true) := pairRead? (e.getArg! 2) | return .continue
+  let second := (e.getArg! 3).consumeMData
+  if let some (other, false) := pairRead? second then
+    return if other == value then .visit value else .continue
+  unless second.isConstOf ``Unit.unit || second.isConstOf ``PUnit.unit do return .continue
+  unless ← spelledSingleton (← inferType value) do return .continue
+  return .visit value
 
 -- Constructed values compared: a different constructor refutes, the same
 -- one compares its fields.
@@ -1298,6 +1627,54 @@ simproc ↓ [vir_denote_norm] existsNamedValue (∃ _ : VerexIR.SpecInt _ _, _) 
     #[none, none, none, some (.lam name domain rest info), certified, named]
   return .visit { expr := rest.instantiate1 certified, proof? := some (← mkPropExt proof) }
 
+/-- A certified integer defined by its value and read only by its value is the
+value, its range a conjunct: no cut is left to read back. -/
+theorem SpecInt.exists_val_read_unsigned (n : Nat) {value : Int} {p : Int → Prop} :
+    (∃ c : VerexIR.SpecInt (.bits (n + 1)) false, c.val = value ∧ p c.val) ↔
+      (0 ≤ value ∧ value ≤ 2 ^ (n + 1) - 1) ∧ p value :=
+  ⟨fun ⟨c, defined, held⟩ =>
+    ⟨(IntegerValueFits_unsigned_succ n value).mp (defined ▸ c.fits), defined ▸ held⟩,
+    fun ⟨bounds, held⟩ =>
+      ⟨⟨value, (IntegerValueFits_unsigned_succ n value).mpr bounds⟩, rfl, held⟩⟩
+
+theorem SpecInt.exists_val_read_signed (n : Nat) {value : Int} {p : Int → Prop} :
+    (∃ c : VerexIR.SpecInt (.bits (n + 1)) true, c.val = value ∧ p c.val) ↔
+      (-(2 : Int) ^ n ≤ value ∧ value ≤ 2 ^ n - 1) ∧ p value :=
+  ⟨fun ⟨c, defined, held⟩ =>
+    ⟨(IntegerValueFits_signed_succ n value).mp (defined ▸ c.fits), defined ▸ held⟩,
+    fun ⟨bounds, held⟩ =>
+      ⟨⟨value, (IntegerValueFits_signed_succ n value).mpr bounds⟩, rfl, held⟩⟩
+
+open Lean Meta Simp in
+/-- One spelling of a defined value: `∃ c, c.val = v ∧ p c` at a fixed width is
+the range of `v` and `p` at the value `v` cut to the width, wherever it occurs;
+where `p` reads `c` only by its value, `p` at `v` itself. -/
+simproc [vir_denote_norm] existsDefinedValue (∃ _ : VerexIR.SpecInt _ _, _) := fun e => do
+  let_expr Exists domain body := e | return .continue
+  let .lam name _ (.app (.app (.const ``And _) definition) rest) info := body | return .continue
+  let some (_, lhs, value) := definition.eq? | return .continue
+  unless lhs.isAppOfArity ``VerexIR.SpecInt.val 3 && lhs.appArg! == .bvar 0 do return .continue
+  if value.hasLooseBVars then return .continue
+  let_expr VerexIR.SpecInt width signed := domain | return .continue
+  let_expr VerexIR.IntWidth.bits bits := width | return .continue
+  let some bits := bits.nat? | return .continue
+  let .succ n := bits | return .continue
+  let signed? := signed.isConstOf ``Bool.true
+  -- `c`'s reads by its value abstracted; `c` left is another read.
+  let (theorem_, predicate) ← withLocalDeclD name domain fun c => do
+    let held := rest.instantiate1 c
+    withLocalDeclD name (mkConst ``Int) fun read => do
+      let reading := held.replace fun sub =>
+        if sub.isAppOfArity ``VerexIR.SpecInt.val 3 && sub.appArg! == c then some read else none
+      if reading.containsFVar c.fvarId! then
+        return (if signed? then ``SpecInt.exists_val_cut_signed else ``SpecInt.exists_val_cut_unsigned,
+          Expr.lam name domain rest info)
+      return (if signed? then ``SpecInt.exists_val_read_signed else ``SpecInt.exists_val_read_unsigned,
+        ← mkLambdaFVars #[read] reading)
+  let iff ← mkAppOptM theorem_ #[mkNatLit n, some value, some predicate]
+  let some (_, rhs) := (← instantiateMVars (← inferType iff)).iff? | return .continue
+  return .visit { expr := rhs.headBeta, proof? := some (← mkPropExt iff) }
+
 /-- Whether an expression states a value a clause defines (`bindCuts`): a
 certified integer by its value, or the check of a literal function value. -/
 private def statesDefinedValue (e : Lean.Expr) : Bool :=
@@ -1375,10 +1752,10 @@ elab "verex_defined_values" : tactic => focusGoal do
   if stating.isEmpty && !target then return
   let mut theorems : SimpTheorems := {}
   for name in [``SpecInt.exists_val, ``SpecInt.exists_unbounded, ``SpecInt.exists_val_unsigned,
-      ``SpecInt.exists_val_signed, ``SpecInt.exists_val_unbounded, ``SpecInt.exists_val_cut_unsigned,
-      ``SpecInt.exists_val_cut_signed] do
+      ``SpecInt.exists_val_signed, ``SpecInt.exists_val_unbounded] do
     theorems ← theorems.addConst name
   let simprocs ← ({} : Simprocs).add ``existsNamedValue (post := false)
+  let simprocs ← simprocs.add ``existsDefinedValue (post := true)
   let simprocs ← simprocs.add ``existsClosureChecked (post := false)
   let ctx ← Simp.mkContext (config := { failIfUnchanged := false }) (simpTheorems := #[theorems])
     (congrTheorems := ← getSimpCongrTheorems)
@@ -1483,6 +1860,9 @@ simproc [vir_denote_norm] tmodOfNonnegative (Int.tmod _ _) := fun e => do
   let proof := mkApp3 (mkConst ``Int.tmod_eq_emod_of_nonneg) dividend divisor nonnegative
   return .visit { expr := remainder, proof? := some proof }
 
+-- A concatenation's size, linear in its parts'.
+attribute [vir_denote_norm] Array.size_append
+
 -- The identities of zero and one, which a substitution or a case split
 -- leaves (`r - 0`, `r * 0`): the arithmetic in its simplest spelling.
 attribute [vir_denote_norm] Int.add_zero Int.zero_add Int.sub_zero Int.mul_zero Int.zero_mul
@@ -1562,6 +1942,105 @@ theorem forall_position_ne_iff {α : Type} (xs : Array α) (d e : α) :
 attribute [vir_denote_norm] Array.mem_push Array.mem_append Array.mem_singleton List.mem_toArray
   Array.mem_map
 
+open Lean Meta Simp in
+/-- `∀ x, p x ∧ q x` as `(∀ x, p x) ∧ (∀ x, q x)`, `forall_and`, its binder's name
+kept: a clause's binder stays in a proof's scope. -/
+def forallAndKeepingName : Simproc := fun e => do
+  let .forallE name domain body info := e | return .continue
+  let body' := body.consumeMData
+  unless body'.isAppOfArity ``And 2 do return .continue
+  let (left, right) := (body'.getArg! 0, body'.getArg! 1)
+  let iff ← mkAppOptM ``forall_and #[domain, some (.lam name domain left info), some (.lam name domain right info)]
+  let result := mkAnd (.forallE name domain left info) (.forallE name domain right info)
+  return .visit { expr := result, proof? := some (← mkPropExt iff) }
+
+open Lean Meta Simp in
+simproc [vir_denote_norm] forallAndDependent (∀ x : ?α, ?p x) := forallAndKeepingName
+
+open Lean Meta Simp in
+simproc [vir_denote_norm] forallAndArrow (_ → _) := forallAndKeepingName
+
+open Lean Meta Simp in
+/-- A literal position: the normal form evaluates it wherever a substitution leaves
+one. -/
+simproc [vir_denote_norm] literalToNat (Int.toNat _) := fun e => do
+  let some value := e.appArg!.int? | return .continue
+  return .done { expr := toExpr value.toNat }
+
+/-- The lengths of a nest of concatenations from `start`, as integers, in the order
+of its leaves: `start + len(b) + len(c) + …`. -/
+def SpecVector.lengthsFrom {α : Type} (start : Int) (rest : List (VerexIR.SpecVector α)) : Int :=
+  rest.foldl (fun sum vector => sum + (vector.values.size : Int)) start
+
+private theorem SpecVector.le_lengthsFrom {α : Type} (rest : List (VerexIR.SpecVector α)) (start : Int) :
+    start ≤ SpecVector.lengthsFrom start rest := by
+  induction rest generalizing start with
+  | nil => exact Int.le_refl _
+  | cons vector rest induction =>
+      have := induction (start + (vector.values.size : Int))
+      simp only [SpecVector.lengthsFrom, List.foldl_cons] at this ⊢
+      omega
+
+/-- A nest of concatenations is one concatenation under one premise on its
+leaves' lengths: the depth-one lemma, leaf by leaf. -/
+theorem SpecVector.values_nest {α : Type} (rest : List (VerexIR.SpecVector α))
+    (first : VerexIR.SpecVector α)
+    (bounded : SpecVector.lengthsFrom (first.values.size : Int) rest ≤ 18446744073709551615) :
+    (rest.foldl VerexIR.SpecVector.append first).values =
+      rest.foldl (fun values vector => values ++ vector.values) first.values := by
+  induction rest generalizing first with
+  | nil => rfl
+  | cons vector rest induction =>
+      have below : (first.values.size : Int) + (vector.values.size : Int) ≤
+          SpecVector.lengthsFrom (first.values.size : Int) (vector :: rest) :=
+        SpecVector.le_lengthsFrom rest _
+      have joined : (first.append vector).values = first.values ++ vector.values :=
+        VerexIR.SpecVector.values_append (by omega)
+      have size : (((first.append vector).values.size : Nat) : Int) =
+          (first.values.size : Int) + (vector.values.size : Int) := by
+        rw [joined, Array.size_append]
+        omega
+      have step := induction (first.append vector) (by
+        rw [size]
+        exact bounded)
+      simp only [List.foldl_cons]
+      rw [step, joined]
+
+open Lean Meta Simp in
+/-- A nest of concatenations is one concatenation: the values of a left nest of
+`SpecVector.append` are the concatenation of its leaves' under one premise, the
+sum of the leaves' lengths as integers (a literal vector's as a literal), in their
+order, at most `MAX_U64`. A proof states it (`len(a) + len(b) + … <= MAX_U64`), matched by spelling in the normal
+form; `omega` proves it at a leaf. -/
+simproc [vir_denote_norm] valuesOfNest
+    (VerexIR.SpecVector.values (VerexIR.SpecVector.append _ _)) := fun e => do
+  let_expr VerexIR.SpecVector.values α nest := e | return .continue
+  let mut first := nest
+  let mut rest : List Lean.Expr := []
+  while first.isAppOfArity ``VerexIR.SpecVector.append 3 do
+    rest := first.appArg! :: rest
+    first := first.getArg! 1
+  let int := mkConst ``Int
+  -- A literal vector's length is its literal, which `omega` reads.
+  let length (vector : Lean.Expr) : MetaM Lean.Expr := do
+    let vector := vector.consumeMData
+    if vector.isAppOfArity ``VerexIR.SpecVector.mk 3 then
+      let values := (vector.getArg! 1).consumeMData
+      if values.isAppOfArity ``List.toArray 2 then
+        if let some (_, elements) := values.appArg!.listLit? then
+          return toExpr (Int.ofNat elements.length)
+    mkAppOptM ``Nat.cast #[int, none, ← mkAppM ``Array.size #[← mkAppM ``VerexIR.SpecVector.values #[vector]]]
+  let sum ← rest.foldlM (init := ← length first) fun sum vector => do
+    mkAppM ``HAdd.hAdd #[sum, ← length vector]
+  let leaves ← mkListLit (mkApp (mkConst ``VerexIR.SpecVector) α) rest
+  let values ← rest.foldlM (init := ← mkAppM ``VerexIR.SpecVector.values #[first]) fun values vector => do
+    mkAppM ``HAppend.hAppend #[values, ← mkAppM ``VerexIR.SpecVector.values #[vector]]
+  let premise ← mkAppM ``LE.le #[sum, toExpr (18446744073709551615 : Int)]
+  let some bounded ← (← getMethods).discharge? premise | return .continue
+  let proof := mkApp4 (mkConst ``SpecVector.values_nest) α leaves first bounded
+  let statement ← mkEq e values
+  return .visit { expr := values, proof? := some (← mkExpectedTypeHint proof statement) }
+
 -- A resolved prophecy brings an operation's result into a leaf.
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.wrapInt_unsigned
   VerexIR.Proofs.Denote.wrapInt_signed VerexIR.Proofs.Denote.ModularOp.run_val
@@ -1580,7 +2059,7 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.Denote.ResultShape.bodyType Bool.not_eq_true decide_eq_true_eq Bool.and_eq_true
   Bool.or_eq_true and_assoc exists_and_left exists_and_right exists_eq_left exists_eq_left'
   exists_true_left
-  and_true true_and and_imp forall_and forall_eq forall_eq' Prod.mk.injEq exists_eq exists_eq'
+  and_true true_and and_imp forall_eq forall_eq' Prod.mk.injEq exists_eq exists_eq'
   and_false false_and not_false_eq_true not_true_eq_false true_implies false_implies implies_true
   true_or or_true false_or or_false
   imp_self eq_self_iff_true ite_true ite_false Bool.false_eq_true Bool.true_eq_false
@@ -1611,7 +2090,7 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.Denote.not_eq_none_iff_isSome
   Int.toNat_natCast Array.toArray_toList List.toList_toArray Array.length_toList Array.size_set!
   Array.size_push Array.size_map VerexIR.Proofs.Denote.toArray_inj_iff
-  VerexIR.SpecVector.values_push VerexIR.SpecVector.values_append Array.append_singleton
+  VerexIR.SpecVector.values_push Array.append_singleton
   -- A field update a clause states (`nativeFieldUpdate`).
   VerexIR.Proofs.Denote.Var.update_here VerexIR.Proofs.Denote.Var.update_there
   List.map_toArray List.map_cons List.map_nil List.push_toArray

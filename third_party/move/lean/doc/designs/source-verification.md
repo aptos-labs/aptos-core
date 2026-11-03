@@ -183,8 +183,24 @@ function of the type arguments and arguments: `hash::sha2_256` and
 `hash::sha3_256` with a 32-byte result, `bcs::to_bytes` as the
 specification function `bcs::serialize`, `type_info::type_name` and
 `type_info::type_of` as functions of the type, the latter aborting unless
-`type_info::spec_is_struct` holds. The prelude's injectivity and length
-axioms are not mirrored.
+`type_info::spec_is_struct` holds. At a type mentioning no parameter these
+three take the values the translator computes (the canonical name; the
+address, module, and name with type arguments;
+whether it is a struct or enum), `VerexIR.Proofs.Denote.reflectedTypeInfo`
+and its siblings. The prelude's injectivity and length axioms are not
+mirrored. `aggregator_v2`'s `create_aggregator`, `create_unbounded_aggregator`,
+`try_add`, `try_sub`, `is_at_least_impl` and `read` are the prelude's
+procedures by the element type (`NativeModel.aggregator`): at `u64` and `u128`
+exact arithmetic over the fields `value` and `max_value`; they abort unless
+the element's `type_name` is one of those two, so at another concrete type
+always; at a type parameter that does not abort, the result and the referent
+are unconstrained. `spec_get_value` and `spec_get_max_value` read the fields
+(`SpecificationModel.field`), as `aggregator::spec_get_handle`, `spec_get_key`
+and `spec_get_limit` do. The wrappers with bodies (`add`, `sub`,
+`is_at_least`, `max_value`, `*_with_value`) are read by their Move bodies,
+which at a type parameter differs from the prelude's `add` and `sub`: the
+body's assertion can abort on the unconstrained result, the prelude's cannot,
+and at `u64` the body is what runs.
 
 A Move specification function is partial: it is defined where its
 parameters declared with fixed-width integer types hold values of those
@@ -196,8 +212,9 @@ reads `x` as an `Int`, and the verifier derives the domain from the type.
 A recursive specification function unfolds where its measure descends, and
 a leaf holds it unfolded once at each application whose guard the context
 decides. The measure is the `decreases` clause or an integer parameter
-every recursive call provably decreases on its path; failing that, one the
-calls decrease on for non-negative parameters, and each call the path
+every recursive call provably decreases on its path, the conditions of the
+`if`s and the left operands of the `&&`, `||` and `==>` above it; failing
+that, one the calls decrease on for non-negative parameters, and each call the path
 conditions do not prove descending is guarded by its descent, taking an
 arbitrary value where the measure does not descend: the definable reading
 of the Prover's unguarded axiom. Parameters of bounded integer type also
@@ -343,9 +360,10 @@ The automatic verification is `verex_obligations` followed by
 
 A leaf of the automatic verification has its own budget, `pragma
 leaf_heartbeats = N` on the spec block or `verex.leafHeartbeats`, in
-thousands of heartbeats, twenty million by default; one cap covers the
-complete attempt (call observations, deciders, preparation, fallback),
-past which the leaf is reported for the proof file
+thousands of heartbeats, twenty million by default, for each attempt, the
+first and each case of its prepared split: the attempt's call observations,
+deciders and fallback, not its preparation, which the target's budget
+bounds. Past it the leaf is reported for the proof file
 ([`proof-strategy.md`](proof-strategy.md), P3). An authored proof hands
 every obligation to its script without the automatic leaf solver; the leaf
 cap applies there only under an explicit `verex_solve`, while the function

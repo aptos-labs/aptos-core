@@ -65,6 +65,11 @@ theorem mod_small (x c : Int) (_ : 0 ≤ x) (_ : x < c) : x.tmod c = x := by
   rw [Int.tmod_eq_emod_of_nonneg ‹_›]
   exact Int.emod_eq_of_lt ‹_› ‹_›
 
+theorem div_mod (x c : Int) (_ : 0 ≤ x) (_ : 0 < c) :
+    x.tdiv c * c + x.tmod c = x ∧ 0 ≤ x.tmod c ∧ x.tmod c < c := by
+  rw [Int.tdiv_eq_ediv_of_nonneg ‹_›, Int.tmod_eq_emod_of_nonneg ‹_›]
+  exact ⟨Int.ediv_mul_add_emod x c, Int.emod_nonneg x (Int.ne_of_gt ‹_›), Int.emod_lt_of_pos x ‹_›⟩
+
 theorem shl_mul (x k : Int) : x.shiftLeft k.toNat = x * 2 ^ k.toNat :=
   Int.shiftLeft_eq x k.toNat
 

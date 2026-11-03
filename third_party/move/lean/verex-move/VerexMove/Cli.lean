@@ -114,6 +114,11 @@ def run (arguments : List String) : IO UInt32 := do
         IO.println (← Lean.findOLean name)
       return 0
   | "verify" :: source :: rest => verifySource source (← parseOptions rest {})
+  | ["elaborate", file] => do
+      let environment ← VerexMove.SourceVerify.importEnvironment
+      let messages ← VerexSL.SourceVerify.elaborateFile environment file
+      for message in messages do IO.print (← message.toString)
+      return if messages.any (·.severity == .error) then 1 else 0
   | _ => fail "expected a command"
 
 end VerexMove.Cli

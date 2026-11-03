@@ -627,9 +627,9 @@ private def publishCompiled (segments : Array String) (unit : ValidatedUnit)
   addAbbrev (artifacts ++ `compiled)
     (← quoteFunction semantics compiled (mkConst (artifacts ++ `body))
       (mkConst (artifacts ++ `mutables)))
-  let viewEq ← publishCompileView segments unit handle.namespaceId
   -- A model's function has no runtime certificate (`doc/designs/ghost-fields.md`).
   if declaresGhosts unit then return
+  let viewEq ← publishCompileView segments unit handle.namespaceId
   let noGhosts ← publishNoGhosts segments unit
   let lhs := mkAppN (mkConst ``compileFunction) #[semantics, toExpr handle]
   let rhs := mkAppN (mkConst ``Except.ok [Level.zero, Level.zero])
@@ -690,6 +690,30 @@ def contractClosureTargets (unit : ValidatedUnit) (namespaceId : NamespaceId)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return targets
 
+/-- The known targets with type arguments a function's contract reads directly
+(`directTarget?`), each with its type arguments at location 0, as the clause spells
+them: their frames are certified as a call's are. -/
+def contractDirectTargets (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Array (FunctionHandle × Array VerexIR.TypeUse) := Id.run do
+  let mut targets := #[]
+  let mut pending := declaration.contract.conditions.map (·.expression)
+  let mut visited : Array Nat := #[]
+  while let some id := pending.back? do
+    pending := pending.pop
+    if visited.contains id.index then continue
+    visited := visited.push id.index
+    let some expression := ns.expressions[id.index]? | continue
+    if let .operation (.call (.closure reference 0)) instantiations #[] _ := expression.kind then
+      let typeArgs := instantiations.filterMap fun argument => match argument with
+        | .typeArg value => some { value with loc := ⟨0⟩ }
+        | _ => none
+      if let some target := VerexIR.SemanticOperations.resolveFunction? unit namespaceId reference then
+        unless typeArgs.isEmpty || targets.contains (target, typeArgs) do
+          targets := targets.push (target, typeArgs)
+    pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
+  return targets
+
 /-- Whether a contract definition takes the executable unit (its contract
 states a behavioral predicate) and the table of declared preconditions
 (it states `requires_of`), as its last parameters. -/
@@ -706,18 +730,6 @@ where
           requires || domain.isAppOf ``VerexIR.Proofs.RequiresMeaning)
     | _ => (false, false)
 
-/-- Prove once per unit, by evaluation, that its resource types correspond
-to their keys' types (`ResourcesTyped`): every memory's runtime encoding is
-then typed. -/
-def ensureResourcesTyped (segments : Array String) (unit : ValidatedUnit) : CommandElabM Name := do
-  let name := resourcesTypedName segments
-  if (← getEnv).contains name then return name
-  let unitDefinition ← ensureUnitInstance segments unit
-  elabCommand (← `(command|
-    theorem $(rootIdent name) : VerexIR.Proofs.ResourcesTyped $(rootIdent unitDefinition) :=
-      VerexIR.Proofs.ResourcesTyped.ofCheck (by decide +kernel)))
-  return name
-
 /-- Prove once per unit, by evaluation, that its native and semantic readings
 agree (`TypesAgree`), where they do: a function value is then typed by its
 carrier. -/
@@ -731,6 +743,24 @@ def ensureTypesAgree (segments : Array String) (unit : ValidatedUnit) :
     theorem $(rootIdent name) : VerexIR.Proofs.TypesAgree $(rootIdent unitDefinition) :=
       VerexIR.Proofs.TypesAgree.ofCheck (by decide +kernel)))
   return some name
+
+/-- Prove once per unit, by evaluation, that its resource types correspond
+to their keys' types (`ResourcesTyped`): every memory's runtime encoding is
+then typed. -/
+def ensureResourcesTyped (segments : Array String) (unit : ValidatedUnit) : CommandElabM Name := do
+  let name := resourcesTypedName segments
+  if (← getEnv).contains name then return name
+  let agreement ← ensureTypesAgree segments unit
+  let unitDefinition ← ensureUnitInstance segments unit
+  let check ← match agreement with
+    | some agreement => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := true)
+        (fun _ => $(rootIdent agreement)) (by decide +kernel))
+    | none => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := false)
+        (fun absurd => by cases absurd) (by decide +kernel))
+  elabCommand (← `(command|
+    theorem $(rootIdent name) : VerexIR.Proofs.ResourcesTyped $(rootIdent unitDefinition) :=
+      $check))
+  return name
 
 /-- The module's unit, the constant a theorem's frames and memory are at. -/
 def unitTermOf (segments : Array String) (unit : ValidatedUnit) : CommandElabM Term :=
@@ -1359,6 +1389,10 @@ structure ProofReport where
   elapsedMs : Nat := 0
   /-- The leaves the automatic proof did not decide, in report order. -/
   failedLeaves : Array String := #[]
+  /-- The failed leaves that exhausted an attempt's allowance, and those whose
+  deciders all rejected them. -/
+  exhaustedLeaves : Nat := 0
+  undecidedLeaves : Nat := 0
   /-- What the proof printed, under the solver's debugging and profiling
   options: a task's streams are its own, so the command prints it in the
   target's turn. -/
@@ -1389,6 +1423,7 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
   state.scopeNames.set none
   state.scopeLocals.set #[]
   state.routedKeys.set none
+  VerexIR.Proofs.Denote.recordStatementCost
   let main ← Lean.Elab.Tactic.getMainGoal
   -- The streams are the thread's: what the proof prints is kept for the
   -- report, as the tactics leave it. An exception passes with the state
@@ -1406,10 +1441,12 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
     let heartbeats := (← IO.getNumHeartbeats) - (← readThe Core.Context).initHeartbeats
     let elapsedMs := ((← IO.monoNanosNow) - started) / 1000000
     let failedLeaves ← VerexIR.Proofs.Denote.failedLeafNames
+    let exhaustedLeaves ← state.exhaustedLeaves.get
+    let undecidedLeaves ← state.undecidedLeaves.get
     let output := String.fromUTF8! (← printed.get).data
     Perf.chargeHeartbeats .verification heartbeats
-    proofReports.modify
-      (·.insert theorem_.getId { heartbeats, elapsedMs, failedLeaves, output })
+    proofReports.modify (·.insert theorem_.getId
+      { heartbeats, elapsedMs, failedLeaves, exhaustedLeaves, undecidedLeaves, output })
 
 /-- A target whose proofs elaborate in tasks, and how to conclude it once
 they ended. -/
@@ -1526,14 +1563,32 @@ private def modelRoutesGeneric (unit : ValidatedUnit) (compiled : Function unit)
       worklist := calleeCompiled.body.callees worklist
   return false
 
+/-- The contract a routed member satisfies: a model's callee with a body is seen
+as its callers see it, a cycle's member and the target itself as its body is
+proved, a native's only contract is that view. -/
+private def routedContractName (segments : Array String) (unit : ValidatedUnit) (model : Bool)
+    (target member : FunctionHandle) (name : String) : Name :=
+  if model && member != target && (declarationOf? unit member).any fun declaration =>
+      declaration.body != .absent && hasInterfaceView declaration then
+    typedInterfaceContractName segments name
+  else typedContractName segments name
+
+/-- The value of the definition `f` at `arguments`: a statement reading one
+term many times elaborates it once, in the definition. -/
+elab "verex_value_at% " f:ident arguments:(ppSpace colGt term:max)* : term => do
+  let info ← getConstInfo (← realizeGlobalConstNoOverload f)
+  let arguments ← arguments.mapM fun argument => Term.elabTerm argument.raw none
+  return info.value!.beta arguments
+
 /-- The binders of the meanings a proof's routed members stand for, each
 with its hypothesis: a cycle's member, or a model's callee used through its
 contract, satisfies its contract; a model's inlined callee refines its body
 under the same meanings. At the runtime family, or at every skolem family
 and type instantiation. -/
 private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (unitTerm : Term)
-    (namespaceName : Name) (routed : Array (FunctionHandle × String)) (family : Bool)
-    (inlinedMember : String → Bool) (meanings : Term) (atRuntime : Term → CommandElabM Term) :
+    (namespaceName : Name) (routed : Array (FunctionHandle × String)) (family model : Bool)
+    (target : FunctionHandle) (inlinedMember : String → Bool) (meanings : Term)
+    (atRuntime : Term → CommandElabM Term) :
     CommandElabM (Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) := do
   -- Every member's meaning is bound before any hypothesis: a hypothesis's
   -- meanings name them all, and an unbound name would be bound implicitly
@@ -1542,7 +1597,8 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
     let memberArtifacts := Name.str namespaceName name
     let memberParams := rootIdent (memberArtifacts ++ `params)
     let memberShape := rootIdent (memberArtifacts ++ `shape)
-    let memberContract := rootIdent (typedContractName segments name)
+    let contractName := routedContractName segments unit model target member name
+    let memberContract := rootIdent contractName
     if family && inlinedMember name then
       -- At every family and instantiation: the body under the meanings
       -- there, which name the members at that family.
@@ -1555,7 +1611,7 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
             VerexIR.Proofs.Spec.Refines ($(cycleSelf name) Θ typeInstantiation args)
               (VerexIR.Proofs.Denote.Function.denoteWith $meanings $memberCompiled args))))
     else if family then
-      let atFamily ← atUnit segments unit (typedContractName segments name) memberContract
+      let atFamily ← atUnit segments unit contractName memberContract
         (some (← `(term| family)))
         (← if (declarationOf? unit member).any isGeneric then
           pure #[← `(term| instantiation)] else pure #[])
@@ -1588,7 +1644,7 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
                 (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm) $memberShape))),
         ← `(bracketedBinder| ($(cycleSelfVerified name) :
             VerexIR.Proofs.Satisfies $(cycleSelf name)
-              $(← atUnit segments unit (typedContractName segments name) memberContract
+              $(← atUnit segments unit contractName memberContract
                 (some (← `(term| ($(mkCIdent ``VerexIR.Proofs.Denote.Skolems.runtime) $unitTerm))))))))
   return pairs.map (·.1) ++ pairs.map (·.2)
 
@@ -1879,6 +1935,9 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
       if throughContract then
         ensureContracts segments calleeKey unit callee.namespaceId.index calleeNs
           calleeDeclaration calleeParams calleeResult
+        if hasInterfaceView calleeDeclaration then
+          ensureInterfaceContract segments calleeKey unit callee.namespaceId.index calleeNs
+            calleeDeclaration calleeParams calleeResult
         liftTermElabM (publishNativeSignature segments calleeKey calleeParams calleeResult)
         modelMembers := modelMembers.push (callee, calleeKey, false)
       else
@@ -2307,6 +2366,44 @@ private def meaningsTerm (m : Member) (routed : Array (FunctionHandle × String)
         $initTerm⟩ :
       VerexIR.Proofs.Denote.Meanings executable))
 
+/-- The meanings of `meaningsTerm` as the value of a definition over what they
+name, and the term reading that value here. Without routed members they are
+small, and stay as they are. -/
+private def sharedMeanings (m : Member) (routed : Array (FunctionHandle × String)) (meanings : Term)
+    (atRuntime : Term → CommandElabM Term)
+    (invokeBinders selfBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) :
+    CommandElabM (Term × Nat) := do
+  if routed.isEmpty then return (meanings, 0)
+  let { artifacts, unitTerm, generic, model, .. } := m
+  let name := artifacts ++ `routedMeanings
+  let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
+      pure #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
+        ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})]
+    else pure #[]
+  let mut cost := 0
+  unless (← getEnv).contains name do
+    let budget := (heartbeatBudget? m.declaration).getD (verex.verifyHeartbeats.get (← getOptions))
+    let started ← IO.getNumHeartbeats
+    elabCommand (← `(command|
+      set_option Elab.async false in
+      set_option maxHeartbeats $(Syntax.mkNumLit (toString budget)) in
+      noncomputable def $(rootIdent name)
+          {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
+          $familyBinders* $invokeBinders* $selfBinders* :=
+        $(← atRuntime meanings)))
+    cost := (← IO.getNumHeartbeats) - started
+    stageLog s!"{m.function}: routed meanings {cost / 1000}k"
+  let familyArguments : Array Term ← if generic then
+      pure #[← `(term| Θ), ← `(term| typeInstantiation)]
+    else pure #[]
+  let invokeArguments : Array Term ← if model then
+      pure #[invokeIdent, mkIdent `verexInvokeDefined, mkIdent `verexInvokeCoherent]
+    else pure #[]
+  let selves : Array Term := routed.map fun (_, member) => cycleSelf member
+  let arguments := #[← `(term| executable)] ++ familyArguments ++ invokeArguments ++ selves
+  let definition := rootIdent name
+  return (← `(term| verex_value_at% $definition:ident $arguments:term*), cost)
+
 /-- The readings of a function with in-body assumptions, with and without
 them, which the hypothesis that they hold relates: its assumption table and
 the two meanings. -/
@@ -2407,7 +2504,7 @@ private def specializationCertificates (m : Member) (callees : Callees m.unit)
   let contracted := routed.filter fun (member, _) =>
     !callees.modelMembers.any fun (other, _, inlined) => inlined && other == member
   let contracts := callees.contracts ++ contracted.map fun (member, name) =>
-    (member, typedContractName m.segments name)
+    (member, routedContractName m.segments unit m.model m.handle member name)
   let mut calls : Array (FunctionHandle × TypeArgs) := m.compiled.body.foldCalls collect (fun _ _ found => found) #[]
   for (_, _, _, inlined) in callees.inlined do
     calls := inlined.body.foldCalls collect (fun _ _ found => found) calls
@@ -2483,7 +2580,8 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
       -- A data invariant numbered by its position in its type's spec block.
       (declaration.contract.conditions.filter (·.kind == .structInvariant)).zipIdx.map
         fun (condition, position) =>
-          (s!"data invariant_{position + 1}", Contract.locRange unit condition.loc)) ++
+          (s!"data invariant_{position + 1}@{((unit.tables.names[declaration.name.index]?).map (·.name)).getD ""}",
+            Contract.locRange unit condition.loc)) ++
     (invariantNs.invariants.map fun invariant =>
       ("module invariant", Contract.locRange unit invariant.condition.loc))).flatten
   let keyed ← invariantClauses.mapM fun (kind, range) =>
@@ -2747,14 +2845,21 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
     else if family then `(term| ($invokeIdent Θ))
     else `(term| ($invokeIdent ($(mkCIdent ``VerexIR.Proofs.Denote.Skolems.runtime) $unitTerm)))
   let meanings ← meaningsTerm m routed instantiation ghostTerm initTerm invokeTerm
+  let (invokeBinders, routingBinders, routingLemmas) ← if !model then pure (#[], #[], #[]) else
+    modelInvokeBinders segments unit unitTerm namespaceName routed family
   -- A member of a cycle is verified over a meaning per member satisfying
   -- its contract: at the runtime family, or at every family and
   -- instantiation. Under a model an inlined callee's meaning refines its
   -- body under the same meanings.
-  let selfBinders ← routedSelfBinders segments unit unitTerm namespaceName routed family
-    inlinedMember meanings atRuntime
-  let (invokeBinders, routingBinders, routingLemmas) ← if !model then pure (#[], #[], #[]) else
-    modelInvokeBinders segments unit unitTerm namespaceName routed family
+  let routedBinders ← routedSelfBinders segments unit unitTerm namespaceName routed family model
+    m.handle inlinedMember meanings atRuntime
+  -- Every routed member's hypothesis reads the meanings, which name every
+  -- member: elaborated once, as a definition over the members.
+  let (meanings, meaningsCost) ← sharedMeanings m routed meanings atRuntime invokeBinders
+    (routedBinders.extract 0 routed.size)
+  let selfBinders ← if routed.isEmpty then pure routedBinders else
+    routedSelfBinders segments unit unitTerm namespaceName routed family model
+      m.handle inlinedMember meanings atRuntime
   -- The readings of the function with and without its in-body assumptions,
   -- which the hypothesis that they hold relates.
   let assumptionsIdent := mkIdent (Name.mkSimple s!"assumptions_{function}")
@@ -2775,6 +2880,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let assumed := mkIdent `assumed
   let introduction ← introductionTactic m stored pattern assumed permitted
   let unitFact ← unitFactTactic m assumesTyping
+  stageLog s!"{function}: unit facts"
   let (automaticTactic, scriptTactic) ← proofTactics script? opens solveTactic obligationsTactic
   -- Under its in-body assumptions: the reading that assumes them is
   -- verified, and the hypothesis that they hold carries the contract over.
@@ -2818,6 +2924,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
               $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
             (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm))
           $contract))
+  let markReturns ← if script?.isSome then `(tactic| verex_mark_returns) else `(tactic| skip)
   let typedCommand ← withRef (script?.map (·.tactic.raw) |>.getD reference) do `(command|
     set_option Elab.async true in
     set_option maxHeartbeats $budget:num in
@@ -2829,21 +2936,23 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
           $(mkIdent unitDefinition) = .ok executable) $familyBinders* $nativeBinders*
           $invokeBinders* $selfBinders* $routingBinders* $assumptionBinders* : $typedStatement := by
       verex_proof $(mkIdent attempt) =>
-        $unitFact:tactic
+        verex_timed "setup unit fact" $unitFact:tactic
         $assumptionsTactic:tactic
-        apply VerexIR.Proofs.satisfies_of_wp
-        $introduction:tactic
+        verex_timed "setup wp" (apply VerexIR.Proofs.satisfies_of_wp)
+        $markReturns:tactic
+        verex_timed "setup introduction" $introduction:tactic
         all_goals
-        (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
+        (verex_timed "setup unfold" (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
           $shapeTerm:ident, $mutablesTerm:ident, $typedContract:ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
-          String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢
+          String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢)
          -- The function assumes its preconditions; their markers locate
          -- them for its callers only.
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
-         all_goals verex_normalize at $permitted:ident ⊢
+         all_goals verex_timed "setup normalize" (verex_normalize at $permitted:ident ⊢)
          all_goals $automaticTactic:tactic)
-        $scriptTactic:tactic)
+        -- A variant the setup refutes leaves the script no goal.
+        all_goals $scriptTactic:tactic)
   let typedCommand ← if selectsBitVectors declaration then
       `(command| set_option verex.bitVectors true in $typedCommand)
     else pure typedCommand
@@ -2858,10 +2967,14 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
     let report ← takeProofReport attempt
     IO.print report.output
     let outcome := if !failed then "verified" else if overBudget then "budget" else "failed"
-    stageLog s!"{function}: theorem done, {report.heartbeats} heartbeats, {outcome}, \
+    let heartbeats := report.heartbeats + meaningsCost
+    stageLog s!"{function}: theorem done, {heartbeats} heartbeats, {outcome}, \
       {if script?.isSome then "authored" else "automatic"}"
+    if report.exhaustedLeaves + report.undecidedLeaves > 0 then
+      stageLog s!"{function}: leaves exhausted {report.exhaustedLeaves}, \
+        undecided {report.undecidedLeaves}"
     Perf.recordArtifacts s!"{namespaceName}::{function} typed" #[attemptFull]
-      report.heartbeats report.elapsedMs
+      heartbeats report.elapsedMs
     if failed then
       throwErrorAt reference
         (failureMessage ns function script?.isSome overBudget budgetValue report.failedLeaves)
@@ -2990,13 +3103,18 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     unitDefinition := unitDefinition
     unitTerm := unitTerm
     handleTerm := handleTerm }
+  let directTargets := contractDirectTargets unit handle.namespaceId ns declaration
+  let recordOwnCall (callee : FunctionHandle) (typeArgs : Array VerexIR.TypeUse)
+      (found : Array (FunctionHandle × Array VerexIR.TypeUse)) :=
+    if !typeArgs.isEmpty && typeArgs.size == arity &&
+        callee.namespaceId == handle.namespaceId &&
+        VerexIR.SemanticOperations.ownParametersIn unit handle typeArgs &&
+        !found.contains (callee, typeArgs)
+      then found.push (callee, typeArgs) else found
   let ownCalls : Array (FunctionHandle × Array VerexIR.TypeUse) := if !framed then #[] else
-    compiled.body.foldCalls (fun callee typeArgs _ found =>
-      if !typeArgs.isEmpty && typeArgs.size == arity &&
-          callee.namespaceId == handle.namespaceId &&
-          VerexIR.SemanticOperations.ownParametersIn unit handle typeArgs &&
-          !found.contains (callee, typeArgs)
-        then found.push (callee, typeArgs) else found) (fun _ _ found => found) #[]
+    directTargets.foldl (fun found (callee, typeArgs) => recordOwnCall callee typeArgs found)
+      (compiled.body.foldCalls (fun callee typeArgs _ found => recordOwnCall callee typeArgs found)
+        (fun _ _ found => found) #[])
   -- The assumed steps of the lemmas its own proof applies.
   let trustDeps : Array Name ← liftTermElabM do
     (functionLemmas ns declaration).foldlM (init := #[]) fun found lemma => do
@@ -3013,7 +3131,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     assumptionDeps := if ownAssumptions then #[(handle, function)] else #[]
     trustDeps := trustDeps
     edges := #[(handle, worklist)]
-    instantiated := if generic then ownCalls else compiled.body.foldCalls recordGenericCall (fun _ _ found => found) #[]
+    instantiated := if generic then ownCalls else
+      directTargets.foldl (fun found (callee, typeArgs) => recordGenericCall callee typeArgs none found)
+        (compiled.body.foldCalls recordGenericCall (fun _ _ found => found) #[])
     contractTargets := contractClosureTargets unit handle.namespaceId ns declaration }
   callees := { callees with calleePairs := callees.calleePairs ++ callees.behaviorPairs }
   -- Each generic call at the empty instantiation instantiates its callee's
@@ -3048,9 +3168,11 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     if model then callees.modelMembers.map fun (member, name, _) => (member, name) else cycle
   let inlinedMember := fun (name : String) =>
     callees.modelMembers.any fun (_, key, inlined) => inlined && key == name
-  for (_, name) in routed do
-    let pair ← `(term| PProd.mk $(cycleSelf name) (PProd.mk $(Syntax.mkStrLit name)
-      $(if inlinedMember name then cycleSelfRefines name else cycleSelfVerified name)))
+  for (member, name) in routed do
+    let proved ← if inlinedMember name then
+        `(term| PProd.mk $(← handleSyntax member) $(cycleSelfRefines name))
+      else pure (cycleSelfVerified name)
+    let pair ← `(term| PProd.mk $(cycleSelf name) (PProd.mk $(Syntax.mkStrLit name) $proved))
     callees := { callees with calleePairs := callees.calleePairs.push pair }
   -- A failure before the proof's task began leaves no artifacts behind;
   -- the target concludes outside this state.

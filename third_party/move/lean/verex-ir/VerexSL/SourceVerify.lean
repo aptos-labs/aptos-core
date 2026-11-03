@@ -422,6 +422,38 @@ private def elaborateRendering (environment : Environment) (input fileName : Str
     (Elab.Command.mkState environment {} (driverOptions options))
   pure (messages.toArray, commands)
 
+/-- The options `VEREX_OPTIONS` sets beside a request's, for debugging a
+verification the CLI or the benchmark runs: `name=value` assignments
+separated by commas, each value read at the type its registered option
+declares, as `lean -D` reads one. -/
+private def environmentOptions (options : Options) : IO Options := do
+  let some assignments ← IO.getEnv "VEREX_OPTIONS" | return options
+  let declarations ← getOptionDecls
+  (assignments.splitOn ",").foldlM (init := options) fun options assignment => do
+    let [name, value] := assignment.splitOn "="
+      | throw <| IO.userError s!"VEREX_OPTIONS: `{assignment}` is not `name=value`"
+    let name := name.toName
+    let some declaration := declarations.find? name
+      | throw <| IO.userError s!"VEREX_OPTIONS: `{name}` is not a registered option"
+    match declaration.defValue with
+    | .ofBool _ => match value with
+      | "true" => return options.setBool name true
+      | "false" => return options.setBool name false
+      | _ => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` takes `true` or `false`"
+    | .ofNat _ => match value.toNat? with
+      | some number => return options.set name number
+      | none => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` takes a numeral"
+    | .ofString _ => return options.set name value
+    | _ => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` is not a Bool, Nat, or String option"
+
+/-- Elaborate a rendering from a file over an environment that has imported
+`VerexSL`, natively, the way verifying a source elaborates its own, for what
+`scripts/isolate-target.py` cuts: its messages. -/
+def elaborateFile (environment : Environment) (path : System.FilePath) : IO (Array Message) := do
+  let (messages, commands) ← elaborateRendering environment (← IO.FS.readFile path) path.toString
+    (← environmentOptions {})
+  return commands.foldl (init := messages) (· ++ ·.messages)
+
 /-- Elaborate a proof file over the state its module's command left: its
 messages. Its imports must be loaded already, and it holds its header and
 `verex proofs where`, which verifies the module. -/
@@ -470,30 +502,6 @@ Move address alias, which a rendering does not spell. -/
 private def pathKey (ns : ValidatedNamespace) : Option (String × String) := do
   let segments ← ns.tables.namespaces[ns.identity.index]? |>.map (·.segments)
   return (← segments[0]?, ← segments.back?)
-
-/-- The options `VEREX_OPTIONS` sets beside a request's, for debugging a
-verification the CLI or the benchmark runs: `name=value` assignments
-separated by commas, each value read at the type its registered option
-declares, as `lean -D` reads one. -/
-private def environmentOptions (options : Options) : IO Options := do
-  let some assignments ← IO.getEnv "VEREX_OPTIONS" | return options
-  let declarations ← getOptionDecls
-  (assignments.splitOn ",").foldlM (init := options) fun options assignment => do
-    let [name, value] := assignment.splitOn "="
-      | throw <| IO.userError s!"VEREX_OPTIONS: `{assignment}` is not `name=value`"
-    let name := name.toName
-    let some declaration := declarations.find? name
-      | throw <| IO.userError s!"VEREX_OPTIONS: `{name}` is not a registered option"
-    match declaration.defValue with
-    | .ofBool _ => match value with
-      | "true" => return options.setBool name true
-      | "false" => return options.setBool name false
-      | _ => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` takes `true` or `false`"
-    | .ofNat _ => match value.toNat? with
-      | some number => return options.set name number
-      | none => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` takes a numeral"
-    | .ofString _ => return options.set name value
-    | _ => throw <| IO.userError s!"VEREX_OPTIONS: `{name}` is not a Bool, Nat, or String option"
 
 /-- Render, write, and elaborate a unit, and report every message in the
 coordinates of its source. The environment has imported `VerexSL` and what

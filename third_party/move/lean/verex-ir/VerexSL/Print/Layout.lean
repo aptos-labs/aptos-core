@@ -104,7 +104,7 @@ private def byteLiteral (values : Array UInt8) : String :=
 private def identifier (value : String) : String :=
   let value := if value.startsWith "'" then (value.drop 1).toString else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken (isToken := isReservedWord)
+  else escapedIdentifier value
 
 private def pragmaName (value : String) : String :=
   if value == "opaque" then value else identifier value
@@ -448,6 +448,12 @@ private def operatorInfoForExpr? : Expr → Option OperatorInfo
       if arguments.size == arity then some info else none
   | _ => none
 
+/-- Whether an expression's text ends in the type of a cast. -/
+private partial def endsInCast : Expr → Bool
+  | .typedPrimitive .profileCast .. => true
+  | .primitive _ arguments _ => (arguments.back?).any endsInCast
+  | _ => false
+
 private def expressionPrecedence (expression : Expr) : Nat :=
   if let some info := operatorInfoForExpr? expression then info.precedence
   else match expression with
@@ -542,7 +548,10 @@ mutual
                 | .left => (info.precedence, info.precedence + 1)
                 | .right => (info.precedence + 1, info.precedence)
                 | .none => (info.precedence + 1, info.precedence + 1)
+              -- `x as u8 < y` would read `u8 <` as the start of type arguments.
+              let leftEndsInCast := info.symbol == "<" && endsInCast left
               let left ← expressionDocAt leftPrecedence left
+              let left := if leftEndsInCast then text "(" ++ left ++ text ")" else left
               let right ← expressionDocAt rightPrecedence right
               pure <| Format.group <| left ++
                 Format.nest 2 (soft ++ text s!"{info.symbol} " ++ right)
@@ -794,7 +803,7 @@ mutual
           let [element] := types.toList
             | throw "spec.emptyVector expects one element type"
           unless arguments.isEmpty do throw "spec.emptyVector expects no operands"
-          return text s!"vec::<{typeText element.value}>()"
+          return text s!"vec::<{closeAngles (typeText element.value)}()"
         let builtin? := match operation with
           | .singletonVector => some "vec"
           | .updateVector => some "update"
@@ -1272,6 +1281,7 @@ private partial def sourceAttributeText : SourceAttribute → String
         | .number value => toString value
         | .string value => toString (repr value)
         | .name value => identifier value
+        | .qualifiedName value => value
 
 private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
   if attributes.isEmpty then .nil else

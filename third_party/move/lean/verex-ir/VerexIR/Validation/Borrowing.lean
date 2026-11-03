@@ -1418,7 +1418,10 @@ mutual
                             accessDiagnostics afterArguments expression.loc
                               { root := .global resource.typeId } true "global owner write"
                         | _ => #[]
-                      (some afterArguments, #[], #[], diagnostics)
+                      -- A temporary borrow, of the signer `move_to` takes, ends
+                      -- with the operation: its result carries no loan.
+                      (some (discardUncarriedTemporaries afterArguments argumentsFlow.observed #[]),
+                        #[], #[], diagnostics)
                   | .borrow kind place =>
                       let (state, loans, diagnostics) :=
                         addBorrow ns exprId expression.loc expression.typeId kind place afterArguments

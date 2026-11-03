@@ -23,6 +23,7 @@ import VerexIR.Proofs.Denote.FamilyTransport
 import VerexIR.Proofs.Denote.StatedFacts
 import VerexIR.Proofs.Denote.StrictCalls
 import VerexIR.Proofs.Denote.NativeMaps
+import VerexIR.Proofs.Denote.TypeReflection
 import VerexIR.Proofs.Serialization
 
 /-!
@@ -183,6 +184,12 @@ def ProgramPointKey.selects (pattern point : ProgramPointKey) : Bool :=
       number == other && callee == otherCallee
   | _, _ => pattern == point
 
+/-- A returning path's obligation that no abort condition of the target holds,
+which the walk meets as the marked conclusion of an authored proof's goal and
+takes off (`Provenance.returns`); the proposition itself, reducibly, so that the
+normal form's rules read it as they read the statement (`imp_self`, `and_true`). -/
+@[reducible] def NoAbort (p : Prop) : Prop := p
+
 /-- What a leaf owes, as a proof addresses it (`doc/plan/proof-language.md`,
 "Obligation addressing"): a clause by its kind and number among the clauses
 of that kind, a loop invariant at entry or at a step, a callee's
@@ -205,13 +212,19 @@ structure ObligationKey where
   loop : Option Nat := none
   /-- The point an `assert` of a proof's point step is at. -/
   point : Option ProgramPointKey := none
+  /-- The other clauses a leaf owing several at once owes: a returning path, that
+  no abort condition of the target holds. -/
+  also : Array Nat := #[]
+  /-- The struct a data invariant's clause is of, where a proof routes by it. -/
+  owner : Option String := none
   deriving BEq, Inhabited
 
 /-- The key as a proof and a message spell it: `ensures 1`, `invariant 2
 step`, `invariant 3 of loop 2 entry`, `requires 1 of iter_next at call 2`,
 `after call 1 of add_shares`, `assert 1 of at entry`. -/
 def ObligationKey.text (key : ObligationKey) : String :=
-  let index := (key.index.map (s!" {·}")).getD ""
+  let index := (key.index.map (s!" {·}")).getD "" ++
+    String.join (key.also.toList.map (s!", {·}")) ++ (key.owner.map (s!" of {·}")).getD ""
   let call := (key.call.map (s!" at call {·}")).getD ""
   match key.kind, key.callee with
   | "requires", some callee => s!"requires{index} of {callee}{call}"
@@ -224,13 +237,15 @@ def ObligationKey.text (key : ObligationKey) : String :=
 /-- The key as a goal's tag: its text with underscores (`ensures_1`,
 `requires_1_of_iter_next_at_call_2`). -/
 def ObligationKey.tag (key : ObligationKey) : Name :=
-  Name.mkSimple (key.text.map fun c => if c == ' ' then '_' else c)
+  Name.mkSimple ((key.text.replace ", " "_").map fun c => if c == ' ' then '_' else c)
 
 /-- Whether a leaf's key is one a pattern selects: the same kind, and every
 part the pattern states the same. -/
 def ObligationKey.selects (pattern key : ObligationKey) : Bool :=
   pattern.kind == key.kind &&
-    (pattern.index.all (some · == key.index)) && (pattern.phase.all (some · == key.phase)) &&
+    (pattern.index.all fun index => some index == key.index || key.also.contains index) &&
+    (pattern.owner.all (some · == key.owner)) &&
+    (pattern.phase.all (some · == key.phase)) &&
     (pattern.callee.all (some · == key.callee)) && (pattern.call.all (some · == key.call)) &&
     (pattern.loop.all (some · == key.loop)) &&
     -- An assert of the body is no point's.
@@ -250,6 +265,8 @@ inductive Decision where
   /-- The `number`-th invocation taking the arm of a closure site of
   `target`, or of `foreign`. -/
   | invoke (number : Nat) (target : String)
+  /-- The path returns: it is complete and aborts nowhere. -/
+  | returns
   deriving BEq, Inhabited
 
 /-- The decision as a selector spells it: `if 1 then`, `match 2 Some`,
@@ -263,6 +280,7 @@ def Decision.text : Decision → String
   | .aborts (.op number) => s!"aborts at op {number}"
   | .aborts (.invoke number) => s!"aborts at invoke {number}"
   | .invoke number target => s!"invoke {number} {target}"
+  | .returns => "returns"
 
 /-- Whether a path's decision is one a selector states: the same, a call
 without its callee counted among all calls. -/
@@ -304,6 +322,8 @@ inductive Provenance where
   | ghostWrite
   /-- The `index`-th `assert` of a proof's steps at a point. -/
   | pointAssert (point : ProgramPointKey) (index : Nat)
+  /-- That no abort condition of the target holds, on a returning path. -/
+  | returns
   deriving BEq
 
 /-- A hypothesis's normal form up to the names of its free variables: the
@@ -349,6 +369,10 @@ structure TargetState where
   /-- The last target's undecided leaves with their actual diagnostic
   locations, including foreign files and fallback locations. -/
   failedLeaves : IO.Ref (Array (Message × String))
+  /-- The last target's failed leaves: those that exhausted an attempt's
+  allowance, and those whose deciders all rejected them. -/
+  exhaustedLeaves : IO.Ref Nat
+  undecidedLeaves : IO.Ref Nat
   /-- The first runtime value a goal of the target states
   (`recordRuntimeValues`), reported once (`reportRuntimeMention`) outside
   the states a failed attempt restores. -/
@@ -464,6 +488,9 @@ structure TargetState where
   path of a clause's goal once taken apart: what a selector of `verex_on`
   reads. -/
   leafDecisions : IO.Ref (Std.HashMap MVarId (Array Decision))
+  /-- The accessible names of hypotheses a path's decisions introduced, which a
+  proof may read and so keep their names (`isPathDecision`). -/
+  decisionNames : IO.Ref NameSet
   /-- The paths of a clause's goal: each leaf's tag, its origin, which of
   the binders it quantifies over were implementation details, and its
   decisions. -/
@@ -478,6 +505,9 @@ structure TargetState where
   (`verex_canonical_families`): a pass skips them, as their canonical
   spelling is themselves. -/
   canonicalForms : IO.Ref (Std.HashSet Lean.Expr)
+  /-- The pairs a respelling of families compared, and whether they convert;
+  the same terms recur across a target's hypotheses. -/
+  familyConversions : IO.Ref (Std.HashMap (Lean.Expr × Lean.Expr) Bool)
   /-- The contract patterns met once (`contractNormalForms`): a pattern's
   normal forms are found where it is met again, so that a callee called once
   is normalized at its call, without the cost of normal forms. -/
@@ -532,6 +562,8 @@ def TargetState.new : IO TargetState := do
     preconditionNumbers := ← IO.mkRef #[]
     invariantKeys := ← IO.mkRef #[]
     failedLeaves := ← IO.mkRef #[]
+    exhaustedLeaves := ← IO.mkRef 0
+    undecidedLeaves := ← IO.mkRef 0
     runtimeMention := ← IO.mkRef .none
     nativeStatements := ← IO.mkRef {}
     assumedClauses := ← IO.mkRef #[]
@@ -555,6 +587,7 @@ def TargetState.new : IO TargetState := do
     leafOrigins := ← IO.mkRef {}
     leafKeys := ← IO.mkRef {}
     leafDecisions := ← IO.mkRef {}
+    decisionNames := ← IO.mkRef {}
     selectorUses := ← IO.mkRef #[]
     stepSimpContexts := ← IO.mkRef #[]
     stepRuleTheorems := ← IO.mkRef {}
@@ -563,6 +596,7 @@ def TargetState.new : IO TargetState := do
     leafPaths := ← IO.mkRef {}
     contractNormalForms := ← IO.mkRef {}
     canonicalForms := ← IO.mkRef {}
+    familyConversions := ← IO.mkRef {}
     contractPatternsMet := ← IO.mkRef {}
     proofName := ← IO.mkRef .anonymous
     hiddenTheorems := ← IO.mkRef {}
@@ -1074,6 +1108,32 @@ def declareHiddenTheorems (proof : Lean.Expr) : CoreM Unit := do
     unless (← getEnv).contains name do
       if let some declaration := hidden[name]? then addDecl declaration
 
+/-- The facts connected to `seeds`: each sharing a key with a seed or with a
+fact reached, to a fixpoint, in context order per round. A fact not reached
+says nothing of the seeds' keys: variables, or arithmetic atoms. -/
+def connectedBy {κ : Type} [BEq κ] [Hashable κ] (facts : Array (α × Array κ))
+    (seeds : Std.HashSet κ) : Array α := Id.run do
+  let mut reached := seeds
+  let mut relevant := #[]
+  let mut remaining := facts
+  let mut grown := true
+  while grown do
+    grown := false
+    let mut rest := #[]
+    for (fact, keys) in remaining do
+      if keys.any reached.contains then
+        relevant := relevant.push fact
+        reached := keys.foldl (fun found key => found.insert key) reached
+        grown := true
+      else rest := rest.push (fact, keys)
+    remaining := rest
+  return relevant
+
+/-- The facts connected to `seeds` through shared variables (`connectedBy`). -/
+def connectedFacts (facts : Array (α × FVarIdSet)) (seeds : FVarIdSet) : Array α :=
+  connectedBy (facts.map fun (fact, variables) => (fact, variables.toArray))
+    (seeds.foldl (fun found x => found.insert x) {})
+
 /-- Close a goal by omega over `facts`, its proof an auxiliary theorem
 (`hiddenTheorem`), as the `omega` tactic stores its own: the proof stays
 small for the passes that follow. -/
@@ -1194,6 +1254,7 @@ def Provenance.describe : Provenance → String
   | .storedWrite => "the data invariant of a value written to memory"
   | .ghostWrite => "the domain of a ghost field an update writes"
   | .pointAssert point index => s!"the assertion {index} {point.text}"
+  | .returns => "that no abort condition holds where the function returns"
 
 /-- The heartbeats one complete automatic leaf attempt may spend, in
 thousands, including call observations, cheap deciders and preparation.
@@ -1268,6 +1329,12 @@ private def recordStep (label : String) (failed : Bool) (cost : Nat) : CoreM Uni
     let (runs, failures, succeeding, failing) := profile.getD label (0, 0, 0, 0)
     profile.insert label (if failed then (runs + 1, failures + 1, succeeding, failing + cost)
       else (runs + 1, failures, succeeding + cost, failing))
+
+/-- Under `verex.solverProfile`, what a target spent before its proof's first
+tactic. -/
+def recordStatementCost : CoreM Unit := do
+  if verex.solverProfile.get (← getOptions) then
+    recordStep "statement" false ((← IO.getNumHeartbeats) - (← readThe Core.Context).initHeartbeats)
 
 /-- Run a step and, under `verex.solverDebug`, report its heartbeats; under
 `verex.solverProfile`, add them to its label's totals. -/
@@ -1822,9 +1889,115 @@ def containerBounds (expressions : Array Lean.Expr) : MetaM (Array Lean.Expr) :=
       if let some fact := fact then facts := facts.push fact
   return facts
 
+/-- The user name of an inaccessible hypothesis a path's decision introduced: a
+branch's condition, an arm's test, a failed check, an abort condition. The parts
+of such a hypothesis keep it, as rewriting and substitution do. -/
+def pathDecisionName : Name := `pathDecision
+
+/-- Whether a user name marks a path's decision. -/
+def isPathDecision (name : Name) : CoreM Bool := do
+  return name.eraseMacroScopes == pathDecisionName ||
+    (← (← targetState).decisionNames.get).contains name
+
+mutual
+/-- The atoms `omega` reads of a term: through sums, differences, negations,
+literal multiples, quotients and remainders by literals, and coercions. Any
+other term is one atom: a read, a projection chain, an uninterpreted
+application. A constructor reads as its fields, a conditional as its condition
+and branches. A term with no local is no atom; one under a binder reads as the
+closed terms it is built from. -/
+private partial def termAtoms (e : Lean.Expr) (found : Std.HashSet Lean.Expr) :
+    MetaM (Std.HashSet Lean.Expr) := do
+  let e := e.consumeMData
+  unless e.hasFVar do return found
+  if e.hasLooseBVars then return ← closedParts e found
+  if e.isAppOfArity ``HAdd.hAdd 6 || e.isAppOfArity ``HSub.hSub 6 then
+    return ← termAtoms (e.getArg! 5) (← termAtoms (e.getArg! 4) found)
+  if e.isAppOfArity ``HMul.hMul 6 && (!(e.getArg! 4).hasFVar || !(e.getArg! 5).hasFVar) then
+    return ← termAtoms (e.getArg! 5) (← termAtoms (e.getArg! 4) found)
+  if (e.isAppOfArity ``HDiv.hDiv 6 || e.isAppOfArity ``HMod.hMod 6) && !(e.getArg! 5).hasFVar then
+    return ← termAtoms (e.getArg! 4) found
+  if e.isAppOfArity ``Neg.neg 3 || e.isAppOfArity ``Nat.cast 3 ||
+      e.isAppOfArity ``IntCast.intCast 3 || e.isAppOfArity ``Int.ofNat 1 ||
+      e.isAppOfArity ``Int.toNat 1 then
+    return ← termAtoms e.appArg! found
+  if e.isAppOfArity ``ite 5 then
+    return ← termAtoms (e.getArg! 4) (← termAtoms (e.getArg! 3) (← propositionAtoms (e.getArg! 1) found))
+  if let .const name _ := e.getAppFn then
+    if (← getEnv).isConstructor name then return ← explicitAtoms e found
+  return found.insert e
+
+/-- The closed terms with a local that a term under a binder is built from. -/
+private partial def closedParts (e : Lean.Expr) (found : Std.HashSet Lean.Expr) :
+    MetaM (Std.HashSet Lean.Expr) := do
+  unless e.hasFVar do return found
+  unless e.hasLooseBVars do return ← termAtoms e found
+  match e with
+  | .app function argument => closedParts argument (← closedParts function found)
+  | .lam _ _ body _ | .forallE _ _ body _ | .mdata _ body | .proj _ _ body => closedParts body found
+  | .letE _ _ value body _ => closedParts body (← closedParts value found)
+  | _ => return found
+
+/-- The atoms of an application's explicit arguments. -/
+private partial def explicitAtoms (e : Lean.Expr) (found : Std.HashSet Lean.Expr) :
+    MetaM (Std.HashSet Lean.Expr) := do
+  let info ← getFunInfo e.getAppFn
+  let mut found := found
+  for argument in e.getAppArgs, index in [0:e.getAppNumArgs] do
+    let explicit := match info.paramInfo[index]? with
+      | some parameter => parameter.binderInfo.isExplicit
+      | none => true
+    if explicit then found ← termAtoms argument found
+  return found
+
+/-- The atoms a proposition reads: of the sides of its comparisons, through its
+connectives and binders, and of a predicate's explicit arguments. -/
+private partial def propositionAtoms (e : Lean.Expr) (found : Std.HashSet Lean.Expr) :
+    MetaM (Std.HashSet Lean.Expr) := do
+  let e := e.consumeMData
+  unless e.hasFVar do return found
+  if e.isAppOfArity ``VerexIR.Proofs.Obligation 4 then return ← propositionAtoms (e.getArg! 3) found
+  if e.isAppOfArity ``Not 1 then return ← propositionAtoms e.appArg! found
+  if e.isAppOfArity ``And 2 || e.isAppOfArity ``Or 2 || e.isAppOfArity ``Iff 2 then
+    return ← propositionAtoms (e.getArg! 1) (← propositionAtoms (e.getArg! 0) found)
+  if let .forallE _ domain body _ := e then
+    return ← propositionAtoms body (← propositionAtoms domain found)
+  if e.isAppOfArity ``Exists 2 then
+    if let .lam _ _ body _ := e.appArg!.consumeMData then return ← propositionAtoms body found
+  if e.isAppOfArity ``Eq 3 || e.isAppOfArity ``Ne 3 then
+    return ← termAtoms (e.getArg! 2) (← termAtoms (e.getArg! 1) found)
+  if e.isAppOfArity ``LE.le 4 || e.isAppOfArity ``LT.lt 4 ||
+      e.isAppOfArity ``GE.ge 4 || e.isAppOfArity ``GT.gt 4 then
+    return ← termAtoms (e.getArg! 3) (← termAtoms (e.getArg! 2) found)
+  if e.hasLooseBVars then return ← closedParts e found
+  if e.isApp then return ← explicitAtoms e found
+  return found.insert e
+end
+
+/-- Of a context's terms, those of the obligation: the goal, the path's
+decisions, what is not a proposition, and the facts connected to those through
+shared atoms (`connectedBy`). With no atom in the goal and the decisions, the
+whole context. -/
+private def obligationTerms (target : Lean.Expr) (decisions terms : Array Lean.Expr) :
+    MetaM (Array Lean.Expr) := do
+  let seeds ← decisions.foldlM (fun found decision => propositionAtoms decision found)
+    (← propositionAtoms target {})
+  if seeds.isEmpty then return terms
+  let mut facts : Array (Lean.Expr × Array Lean.Expr) := #[]
+  let mut others : Array Lean.Expr := #[]
+  for term in terms do
+    if ← isProp term then
+      facts := facts.push (term, (← propositionAtoms term {}).toArray)
+    else others := others.push term
+  let connected : Std.HashSet Lean.Expr := (connectedBy facts seeds).foldl (·.insert ·) {}
+  return terms.filter fun term => connected.contains term || others.contains term
+
 /-- Assert the facts a leaf needs beside its hypotheses: the bounds of every
-certified integer in context, and the bounds of every bit operation on
-them that the goal or a hypothesis mentions. A fact whose statement is in
+certified local in context, and the bounds of the operation sites of the goal,
+of the path's decisions and of the facts connected to them
+(`obligationTerms`). A decider that brings
+in another fact asserts them again, for what that fact connects. An authored
+preparation (`typedOnly`) reads every term. A fact whose statement is in
 `skip` is not asserted. A bounded arithmetic attempt can omit magnitude
 facts, whose signed case splits may be unnecessary after call results are
 rewritten. The statements asserted are returned. -/
@@ -1836,11 +2009,14 @@ def assertBounds (skip : Array Lean.Expr := #[]) (includeMagnitudes : Bool := tr
     let mut facts : Array Lean.Expr := #[]
     let target ← instantiateMVars (← goal.getType)
     let mut expressions := #[target]
+    let mut decisions := #[]
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
       let ty ← boundType decl.type
       expressions := expressions.push (← instantiateMVars decl.type)
+      if ← isPathDecision decl.userName then decisions := decisions.push expressions.back!
       if let some fact ← typedBound? decl.toExpr ty then facts := facts.push fact
+    unless typedOnly do expressions ← obligationTerms target decisions expressions
     -- A vector a term builds carries its length bound, which its writes and
     -- concatenations read (`SpecVector.values_push`, `values_append`).
     for built in sitesWhere (fun e => e.isAppOfArity ``VerexIR.SpecVector.mk 3 && !e.hasLooseBVars)
@@ -2950,7 +3126,9 @@ private def assertProductBounds (goal : MVarId) : MetaM MVarId := goal.withConte
 /-- `grind` over a leaf's own facts, within an attempt's budget. The callees'
 contracts, which the call rule has consumed, and the continuations bound in
 the context are cleared first; `grind` would instantiate the contracts at
-every term they match. Rank tables and function values are abstracted to
+every term they match, and so are the facts not connected to the goal
+(`connectedFacts`), unless it is `False` and states no variable. Rank tables
+and function values are abstracted to
 variables, which is all `grind` reads of them. An equation between arrays is taken element by
 element (`arraysByElements`), and reads at equal positions are spelled alike
 (`identifyReads`). Vectors and certified integers compare as themselves,
@@ -2960,13 +3138,23 @@ function reads is equal by congruence. -/
 elab "verex_grind" : tactic => focusGoal do
   let goal ← getMainGoal
   let victims ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
     let mut found := #[]
+    let mut propositions := #[]
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
-      if decl.isLet ||
-          (← instantiateMVars decl.type).getUsedConstants.contains ``VerexIR.Proofs.Satisfies then
+      let type ← instantiateMVars decl.type
+      if decl.isLet || type.getUsedConstants.contains ``VerexIR.Proofs.Satisfies then
         found := found.push decl.fvarId
-    pure found
+      else if ← isProp type then
+        propositions := propositions.push (decl.fvarId, (collectFVars {} type).fvarSet)
+    if target.isConstOf ``False then
+      if verex.solverProfile.get (← getOptions) then recordStep "grind refutation" false 0
+      return found
+    let connected := connectedFacts propositions (collectFVars {} target).fvarSet
+    for (fvarId, _) in propositions do
+      unless connected.contains fvarId do found := found.push fvarId
+    return found
   let mut goal := goal
   for fvarId in victims.reverse do
     goal ← goal.tryClear fvarId
@@ -3100,24 +3288,10 @@ elab "verex_intro_negation" : tactic => focusGoal do
   else replaceMainGoal [goal]
 
 /-- The propositions of the context connected to a type through shared
-variables, transitively, in context order. -/
+variables, transitively. -/
 private def connectedPropositions (propositions : Array (Lean.Expr × FVarIdSet)) (type : Lean.Expr) :
-    Array Lean.Expr := Id.run do
-  let mut reached := (collectFVars {} type).fvarSet
-  let mut relevant := #[]
-  let mut remaining := propositions
-  let mut grown := true
-  while grown do
-    grown := false
-    let mut rest := #[]
-    for (proposition, variables) in remaining do
-      if variables.any fun x => reached.contains x then
-        relevant := relevant.push proposition
-        reached := variables.foldl (fun found x => found.insert x) reached
-        grown := true
-      else rest := rest.push (proposition, variables)
-    remaining := rest
-  return relevant
+    Array Lean.Expr :=
+  connectedFacts propositions (collectFVars {} type).fvarSet
 
 /-- A proof of an arithmetic premise by omega from the hypotheses connected
 to it through shared variables, within a bounded allowance, as the
@@ -3575,15 +3749,20 @@ private partial def decidedEquivalence? (hypothesis type : Lean.Expr) :
 
 /-- Each equivalence with a decided side replaced by what it states of the
 other (`decidedEquivalence?`). -/
-def decideEquivalences (goal : MVarId) : MetaM MVarId := goal.withContext do
+def decideEquivalences (goal : MVarId) : MetaM MVarId := do
   let mut goal := goal
-  for decl in ← getLCtx do
-    if decl.isImplementationDetail then continue
-    let type ← instantiateMVars decl.type
-    let stated := if type.isAppOfArity ``VerexIR.Proofs.Obligation 4 then type.appArg! else type
-    unless stated.isAppOfArity ``Iff 2 do continue
-    let some (statement, proof) ← goal.withContext (decidedEquivalence? decl.toExpr type) | continue
-    goal := (← goal.replace decl.fvarId proof (some statement)).mvarId
+  -- Replacing a hypothesis re-creates the ones after it: scan the new context.
+  repeat
+    let decided ← goal.withContext do
+      (← getLCtx).findDeclM? fun decl => do
+        if decl.isImplementationDetail then return none
+        let type ← instantiateMVars decl.type
+        let stated := if type.isAppOfArity ``VerexIR.Proofs.Obligation 4 then type.appArg! else type
+        unless stated.isAppOfArity ``Iff 2 do return none
+        return (← decidedEquivalence? decl.toExpr type).map fun (statement, proof) =>
+          (decl.fvarId, statement, proof)
+    let some (hypothesis, statement, proof) := decided | break
+    goal := (← goal.replace hypothesis proof (some statement)).mvarId
   return goal
 
 /-- A fresh name for an earlier value or fact that a later one of the same
@@ -3660,6 +3839,9 @@ elab "verex_split_hypotheses" : tactic => focusGoal do
         let ty ← instantiateMVars decl.type
         let user := decl.userName
         if !ty.isAppOfArity ``And 2 then return (#[] : Array AltVarNames)
+        if user.eraseMacroScopes == pathDecisionName then
+          return #[{ varNames := [← mkFreshUserName pathDecisionName,
+            ← mkFreshUserName pathDecisionName] }]
         -- The loop invariant's conjuncts take their clauses' names, in order
         -- (the hypothesis is introduced hygienically).
         let invariantPart? := match user.eraseMacroScopes with
@@ -4060,12 +4242,16 @@ def refuteFallthrough (goal : MVarId) : MetaM Bool := goal.withContext do
     if refuted.isSome then return true
   return false
 
+/-- A `simp only` tactic as a simp context and its simprocs, to run over the
+parts of a goal directly. -/
+def simpContextOf (stx : Syntax) : TacticM (Simp.Context × Simp.SimprocsArray) := do
+  let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
+  return (ctx, simprocs)
+
 /-- The normalization of `verex_normalize`, as a simp context and its
 simprocs. It reads no hypothesis, so one serves every goal of a target. -/
 def normalization : TacticM (Simp.Context × Simp.SimprocsArray) := do
-  let stx ← `(tactic| simp only [vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd])
-  let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
-  return (ctx, simprocs)
+  simpContextOf (← `(tactic| simp only [vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]))
 
 /-- The variant names of an enum carrier's type, spelled through its
 definitions: `(NTy.enum _ _ names _ _).carrier` or `variantCarrier names _`. -/
@@ -4391,8 +4577,8 @@ def reduceVariantComputations (e : Lean.Expr) : MetaM Lean.Expr :=
     return some reduced
   Meta.transform e (post := fun sub => do
     if computation sub then
-      let decisive := if sub.isAppOfArity ``Option.map 4 || sub.isAppOfArity ``Option.bind 4 then
-          sub.getArg! 3
+      let decisive := if sub.isAppOfArity ``Option.map 4 then sub.getArg! 3
+        else if sub.isAppOfArity ``Option.bind 4 then sub.getArg! 2
         else if sub.isAppOfArity ``Option.getD 3 then sub.getArg! 1
         else sub.appArg!
       if constructor decisive then
@@ -4616,20 +4802,98 @@ private partial def forOuterCases (type : Lean.Expr) (k : Lean.Expr → MetaM α
   let rest ← forOuterCases right fun rest => k (mkApp3 (.const ``Sum.inr levels) left right rest)
   return #[first] ++ rest
 
-/-- How many cases of `local_`'s outer split its observations leave: each
-observation evaluated at each of the local's constructors over a fresh
-payload (`reduceVariantComputations`) and decided (`decidedValue`), a case
-surviving unless one decides false. The whole context is split only when
-the count makes the split a rewrite. -/
-private def survivingCases (goal : MVarId) (local_ : FVarId) (observations : Array FVarId) :
-    MetaM Nat := goal.withContext do
-  let types ← observations.mapM fun hyp => do instantiateMVars (← hyp.getType)
-  let surviving ← forOuterCases (← instantiateMVars (← local_.getType)) fun term => do
-    for type in types do
-      let value ← reduceVariantComputations (type.replaceFVar (.fvar local_) term)
+/-- How many cases of an outer split of a value of `type` its observations
+leave: each observation, abstracted over the value, evaluated at each of its
+constructors over a fresh payload (`reduceVariantComputations`) and decided
+(`decidedValue`), a case surviving unless one decides false. The whole context
+is split only when the count makes the split a rewrite. -/
+private def survivingCases (type : Lean.Expr) (observations : Array Lean.Expr) : MetaM Nat := do
+  let surviving ← forOuterCases type fun term => do
+    for observation in observations do
+      let value ← reduceVariantComputations (observation.instantiate1 term)
       if decidedValue value == some false then return false
     return true
   return (surviving.filter id).size
+
+/-- The value tested by a tag test or payload projection, other than a local
+(`testedIn`) or a constructor: a map's value at a key, a field of a read. -/
+private def testedTerm? (e : Lean.Expr) : Option Lean.Expr :=
+  if e.isAppOfArity ``VerexIR.Proofs.Denote.variantName 4 ||
+      e.isAppOfArity ``VerexIR.Proofs.Denote.Choices.select? 8 ||
+      e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 8 then
+    let subject := e.appArg!.consumeMData
+    let constructor := subject.isAppOf ``Sum.inl || subject.isAppOf ``Sum.inr ||
+      subject.isAppOf ``Prod.mk || subject.isAppOf ``Option.some || subject.isAppOf ``Option.none
+    if subject.isFVar || subject.hasLooseBVars || constructor then none else some subject
+  else none
+
+/-- A hypothesis, abstracted over a tested term, equating the term to a
+constructor: it determines the term's variant as a tag test does. -/
+private def statesConstructor (abstracted : Lean.Expr) : Bool :=
+  let constructor (e : Lean.Expr) := e.isAppOf ``Sum.inl || e.isAppOf ``Sum.inr
+  abstracted.isAppOfArity ``Eq 3 &&
+    ((abstracted.getArg! 1 == .bvar 0 && constructor (abstracted.getArg! 2)) ||
+      (abstracted.getArg! 2 == .bvar 0 && constructor (abstracted.getArg! 1)))
+
+/-- The tested terms (`testedTerm?`) whose variant the leaf's observations
+determine, each generalized to a local and destructured as a local is: a
+value read from a map tests no local, however its variant is known. The goal
+left, `none` where the observations refute the leaf. Fails where no term is
+determined. -/
+private def determinedTerms (goal : MVarId) (decide : Simp.Context × Simp.SimprocsArray) :
+    TacticM (Option MVarId) := do
+  let mut goal := goal
+  let mut progress := false
+  let mut stuck : Array Lean.Expr := #[]
+  let mut changed := true
+  while changed do
+    changed := false
+    let (hyps, target) ← goal.withContext do
+      let hyps ← goal.getNondepPropHyps
+      return (← hyps.mapM fun hyp => do return (hyp, ← instantiateMVars (← hyp.getType)),
+        ← instantiateMVars (← goal.getType))
+    let found ← IO.mkRef (#[] : Array Lean.Expr)
+    let collect (e : Lean.Expr) : TacticM Unit := e.forEach fun sub => do
+      if let some subject := testedTerm? sub then
+        found.modify fun known =>
+          if known.contains subject || stuck.contains subject then known else known.push subject
+    collect target
+    for (_, type) in hyps do
+      if isVariantObservation type then collect type
+    for subject in ← found.get do
+      -- At default transparency: a callee's facts spell the term's types at
+      -- its family.
+      let observations ← goal.withContext do
+        withTransparency .default do
+          hyps.filterMapM fun (_, type) => do
+            let abstracted ← kabstract type subject
+            return if abstracted.hasLooseBVars &&
+                (isVariantObservation type || statesConstructor abstracted) then
+              some abstracted else none
+      let type ← goal.withContext do instantiateMVars (← inferType subject)
+      if observations.isEmpty || (← goal.withContext (survivingCases type observations)) > 1 then
+        stuck := stuck.push subject
+        continue
+      let saved ← saveState
+      let value ← mkFreshUserName `value
+      let (_, introduced, generalized) ← goal.withContext do
+        goal.generalizeHyp
+          #[{ expr := subject, xName? := some value, hName? := some (← mkFreshUserName `value_eq) }]
+          (hyps.map (·.1)) (transparency := .default)
+      let some local_ := introduced[0]? | throwError "the tested term is not generalized"
+      let cases ← prunedCases #[generalized] local_ true decide
+      match ← computeCases generalized cases decide true with
+      | #[] => return none
+      | #[next] =>
+          goal := next
+          progress := true
+          changed := true
+          break
+      | _ =>
+          saved.restore
+          stuck := stuck.push subject
+  unless progress do throwError "no observation determines a tested term"
+  return some goal
 
 /-- The variants the leaf's observations determine: a local an observation
 (`isVariantObservation`) tests whose outer split leaves one case
@@ -4639,14 +4903,27 @@ may be determined in turn. A rewrite, not a split. Fails when no local is
 determined. -/
 elab "verex_determined_variants" : tactic => focusGoal do
   let mut goal ← getMainGoal
+  -- Built while the goal is open: destructuring assigns it.
+  let decide ← variantDecision
+  let mut progress := false
+  let saved ← saveState
+  try
+    match ← determinedTerms goal decide with
+    | none =>
+        replaceMainGoal []
+        return
+    | some next =>
+        goal := next
+        progress := true
+  catch failure =>
+    saved.restore
+    if verex.solverDebug.get (← getOptions) then
+      IO.println (← (m!"    determined terms: {failure.toMessageData}").toString)
   -- Only an observation of a variant determines one.
   let observed ← goal.withContext do
     (← goal.getNondepPropHyps).anyM fun hyp => do
       return isVariantObservation (← instantiateMVars (← hyp.getType))
-  unless observed do throwError "no observation determines a variant"
-  -- Built while the goal is open: destructuring assigns it.
-  let decide ← variantDecision
-  let mut progress := false
+  unless observed || progress do throwError "no observation determines a variant"
   let mut stuck : Array FVarId := #[]
   let mut changed := true
   while changed do
@@ -4664,7 +4941,11 @@ elab "verex_determined_variants" : tactic => focusGoal do
             | none => found.push (x, #[hyp])
       return found
     for (local_, observations) in candidates do
-      unless (← survivingCases goal local_ observations) ≤ 1 do
+      let surviving ← goal.withContext do
+        let types ← observations.mapM fun hyp => do
+          return (← instantiateMVars (← hyp.getType)).abstract #[.fvar local_]
+        survivingCases (← instantiateMVars (← local_.getType)) types
+      unless surviving ≤ 1 do
         stuck := stuck.push local_
         continue
       let saved ← saveState
@@ -4774,7 +5055,8 @@ hypothesis may normalize further where more is known. -/
 private def contextDependent (type : Lean.Expr) : Bool :=
   (type.find? fun e => e.isAppOf ``ite || e.isAppOf ``dite || e.isAppOf ``Int.tmod ||
     e.isAppOf ``Int.tdiv || e.isAppOf ``VerexIR.SpecInt.ofInt ||
-    e.isAppOf ``VerexIR.SpecInt.ofSize).isSome
+    e.isAppOf ``VerexIR.SpecInt.ofSize || e.isAppOf ``VerexIR.SpecVector.append ||
+    e.isAppOf ``VerexIR.SpecVector.push).isSome
 
 private def contextDischargeCore (context : LocalContext) (condition : Lean.Expr)
     (atoms : FVarIdSet) : MetaM (Option Lean.Expr) := do
@@ -4800,21 +5082,7 @@ private def contextDischargeCore (context : LocalContext) (condition : Lean.Expr
         let type ← instantiateMVars decl.type
         unless arithmeticProposition type do return found
         return found.push (decl.toExpr, (collectFVars {} type).fvarSet)
-      let mut reached := atoms
-      let mut relevant : Array Lean.Expr := #[]
-      let mut remaining := facts
-      let mut grown := true
-      while grown do
-        grown := false
-        let mut rest := #[]
-        for (fact, variables) in remaining do
-          if variables.any fun x => reached.contains x then
-            relevant := relevant.push fact
-            reached := variables.foldl (fun found x => found.insert x) reached
-            grown := true
-          else rest := rest.push (fact, variables)
-        remaining := rest
-      omegaHidden relevant.toList refutation
+      omegaHidden (connectedFacts facts atoms).toList refutation
     return some (← instantiateMVars proof)
   catch _ => return none
 
@@ -4876,9 +5144,11 @@ at reducible transparency, or omega proves it from the hypotheses connected
 to it through shared variables, not from the whole context, whose size the
 condition's cost would otherwise follow. A lemma's premise is matched in the
 normal form the context has, so a lemma may state a role's own atom. -/
-private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.HashMap Lean.Expr (Option Lean.Expr))) :
+private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.HashMap Lean.Expr (Option Lean.Expr)))
+    (arithmetic : Bool := true) :
     Simp.Discharge := fun condition => do
   let condition ← instantiateMVars condition
+  if !arithmetic && arithmeticProposition condition then return none
   let atoms := (collectFVars {} condition).fvarSet
   -- A condition asked before in this pass, decided or not, is answered again;
   -- an answer whose proof reads a local of a binder simp entered holds only
@@ -4905,7 +5175,8 @@ private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.Has
   let started ← IO.getNumHeartbeats
   let mut result ← boundedContextDischarge context condition atoms
   -- Arithmetic went to omega; any other condition is matched again in the
-  -- normal form the context has.
+  -- normal form the context has: a lemma's premise instantiated at a literal
+  -- is not in it.
   if result.isNone && !arithmeticProposition condition then
     result ← normalizedDischarge context condition
   remember result
@@ -4918,9 +5189,11 @@ private def contextDischarge (context : LocalContext) (decided : IO.Ref (Std.Has
   return result
 
 /-- The normalization's discharger over a goal's context (`contextDischarge`),
-for a normal form computed outside a leaf's normalization, such as a step's. -/
-def goalDischarge (goal : MVarId) : MetaM Simp.Discharge := goal.withContext do
-  return contextDischarge (← getLCtx) (← IO.mkRef {})
+for a normal form computed outside a leaf's normalization, such as a step's;
+a step's states an arithmetic condition itself. -/
+def goalDischarge (goal : MVarId) (arithmetic : Bool := true) : MetaM Simp.Discharge :=
+  goal.withContext do
+    return contextDischarge (← getLCtx) (← IO.mkRef {}) arithmetic
 
 /-- Record the normal form `result` of a hypothesis of type `type`, if its
 proof reads only the hypothesis's variables and facts of the context whose
@@ -5339,7 +5612,9 @@ def writeBackCarrier (goal : MVarId) (definition : FVarId) (hide : Bool := false
       return some (written, ← mkExpectedTypeHint proof written)
     | return none
   let (equation, next) ← (← goal.assert `written written proof).intro1P
-  let some (substitution, next) ← (try some <$> next.withContext (Lean.Meta.substEq next equation)
+  -- The left side is the carrier. `substEq` would reduce the right side to look
+  -- for a local, evaluating a closed map.
+  let some (substitution, next) ← (try some <$> next.withContext (substCore next equation)
       catch _ => pure none) | return none
   unless hide do return some next
   let .fvar read := substitution.get definition | return some next

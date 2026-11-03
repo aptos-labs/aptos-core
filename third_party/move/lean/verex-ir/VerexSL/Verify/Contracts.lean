@@ -1172,6 +1172,27 @@ family and type instantiation. -/
 def isGeneric (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
   declaration.signature.generics.any (·.kind == .typeArg)
 
+/-- What a known target's contract states at a frame and instantiation: the view its
+callers see. None of a target without a contract, or one whose contract reads itself. -/
+private partial def directContractOf (unit : ValidatedUnit) (stored : Contract.StoredInvariants)
+    (executable requiresMeaning : Option Lean.Expr) (visiting : Array FunctionHandle)
+    (handle : FunctionHandle) (frame : Lean.Expr) (instantiation : Option Lean.Expr) :
+    MetaM Contract.DirectContract := do
+  let absent : Contract.DirectContract := { contract? := none, exactAborts := false }
+  if visiting.contains handle then return absent
+  let some ns := unit.namespaces[handle.namespaceId.index]? | return absent
+  let some declaration := ns.functions[handle.functionId.index]? | return absent
+  unless declaration.contract.loc.isSome do return absent
+  let some (params, result) := nativeSignature? unit handle.namespaceId declaration | return absent
+  let view := ContractView.interface.of declaration
+  let contract ← buildContract unit handle.namespaceId ns view
+    (← quoteNativeSignature frame params result) (types := ← Contract.frameTypes frame)
+    (typeInstantiation := instantiation) (nativeModel := nativeModelOf? unit handle ns declaration)
+    (executable := executable) (requiresMeaning := requiresMeaning) (stored := stored)
+    (directContract := some (directContractOf unit stored executable requiresMeaning
+      (visiting.push handle)))
+  return { contract? := some contract, exactAborts := abortsAreExact view }
+
 /-- The typed contract of a function over its native arguments, abstracted
 over the skolem family and, for a generic function, its type
 instantiation. -/
@@ -1195,6 +1216,7 @@ def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Validate
         (types := types) (typeInstantiation := typeInstantiation)
         (nativeModel := nativeModel) (executable := executable) (requiresMeaning := requiresMeaning)
         (stored := stored)
+        (directContract := some (directContractOf unit stored executable requiresMeaning #[]))
     -- One stating `requires_of` takes the table of declared preconditions
     -- at the unit, last.
     let close (binders : Array Lean.Expr) (typeInstantiation : Option Lean.Expr) :
@@ -1692,9 +1714,9 @@ private def updatesMemory (ns : ValidatedNamespace) (block : VerexIR.SpecBlock) 
 
 mutual
 /-- Whether evaluating an expression may change the global store: through a
-global operation, or through a call to a function that may. An invocation
-of a `kept` local, a function-typed parameter the body does not reassign,
-keeps the store (`KeepsMemoryAt`); building a closure runs nothing, and a
+global operation other than a read, or through a call to a function that may.
+An invocation of a `kept` local, a function-typed parameter the body does not
+reassign, keeps the store (`KeepsMemoryAt`); building a closure runs nothing, and a
 specification block changes only a spec variable's memory, in the model. -/
 private partial def mayTouchStore (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (id : VerexIR.ExprId) (visiting : Array FunctionHandle) (kept : Array Nat := #[]) : Bool :=
@@ -1706,7 +1728,10 @@ private partial def mayTouchStore (unit : ValidatedUnit) (namespaceId : Namespac
   | some { kind := .spec block, .. } => updatesMemory ns block
   | some expression =>
       let direct := match expression.kind with
-        | .operation (.global _) _ _ _ => true
+        | .operation (.global kind) _ _ _ =>
+            match kind with
+            | .contains | .borrow .immutable => false
+            | .borrow .mutable | .borrow (.profile _) | .take | .publish => true
         | .operation (.call (.function reference)) _ _ _ =>
             match VerexIR.SemanticOperations.resolveFunction? unit namespaceId reference with
             | some callee => calleeMayTouchStore unit callee visiting
@@ -2114,6 +2139,11 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
             stateFrame := stateFrame.push (← mkArrow
               (← mkAppM ``VerexIR.Proofs.Denote.MemoryInvariants #[invariant, startState])
               (← mkAppM ``VerexIR.Proofs.Denote.MemoryInvariants #[invariant, state]))
+        else if Contract.rootsAllocateTables unit [(namespaceId, site)] then
+          -- Allocating a table records its handle in the allocation history.
+          stateFrame := stateFrame.push (← Contract.slotFrame initial state
+            #[(mkConst ``VerexIR.Proofs.Denote.TableMemory.allocationResource,
+              mkConst ``VerexIR.StorageKey.unit)] false)
         else
           stateFrame := stateFrame.push (← mkEq state initial)
         let conjunction ← ((frame.push authored) ++ stateFrame).foldrM (init := mkConst ``True)

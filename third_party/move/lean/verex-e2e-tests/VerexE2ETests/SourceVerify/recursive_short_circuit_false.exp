@@ -1,0 +1,4 @@
+VerexE2ETests/SourceVerify/recursive_short_circuit_false.move:3:1: error: no measure of the recursive specification function `unguarded` decreases at every recursive call: the recursive call of `unguarded` does not decrease its measure under the conditions on its path: omega could not prove the goal:
+No usable constraints found. You may need to unfold definitions so `omega` can see linear arithmetic facts about `Nat` and `Int`, which may also involve multiplication, division, and modular remainder by constants.
+goal: (bundle.snd.fst - 1).toNat < bundle.snd.fst.toNat
+conditions: []

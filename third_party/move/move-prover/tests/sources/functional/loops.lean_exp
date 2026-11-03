@@ -64,7 +64,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
-a✝ : 10 < i.val
+pathDecision✝ : 10 < i.val
 ⊢ False
 tests/sources/functional/loops.move:57:5: error: verex verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof in `tests/sources/functional/loops.proof.lean`:
   verify iter10_no_abort_incorrect by lean =>

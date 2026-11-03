@@ -451,6 +451,32 @@ theorem closureMeaning_closureOf_coherent (executable : ExecutableUnit unit)
   rw [closureRun_closureOf executable handle weave capturedFree
     typeInstantiation captures shape args, propheticMeaning_of_coherent coherent]
 
+omit [Skolems unit] in
+/-- `aborts_of<f<τ̄>>(x)` of a known target with type arguments, read directly: the
+call of the target at the frame its type arguments induce aborts from `state`
+(`closureMeaning_closureOfGeneric` reduces an invocation of the literal to it). -/
+def CallAborts {α : Type} (call : Comp unit α) (state : Memory unit) : Prop :=
+  ∃ error, call.aborts state error
+
+omit [Skolems unit] in
+/-- `ensures_of<f<τ̄>>(x)` of a known target with type arguments, read directly: the
+call of the target at the frame its type arguments induce runs from `pre` to
+`post`, returning `result`. -/
+def CallEnsures {α : Type} (call : Comp unit α) (result : α) (pre post : Memory unit) : Prop :=
+  call.ok pre result post
+
+omit [Skolems unit] in
+/-- Where a call is made, its continuations may assume its run where it returns
+and its abort where it aborts. -/
+theorem wp_call_runs {α : Type} {call : Comp unit α} {ensures : α → Memory unit → Prop}
+    {aborts : Failure → Prop} {initial : Memory unit}
+    (continued : wp call
+      (fun result final => CallEnsures call result initial final → ensures result final)
+      (fun error => CallAborts call initial → aborts error) initial) :
+    wp call ensures aborts initial :=
+  ⟨fun result final run => continued.1 result final run run,
+    fun error failed => continued.2.1 error failed ⟨error, failed⟩, continued.2.2⟩
+
 /-- `ensures_of` of a function value whose target, weave, and captures a proof
 sees is a run of the target's prophetic meaning on the woven arguments. -/
 theorem ensuresOf_closureOf {executable : ExecutableUnit unit} {handle : FunctionHandle}

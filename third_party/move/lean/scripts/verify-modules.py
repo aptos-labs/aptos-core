@@ -11,8 +11,8 @@ time in the previous run), and prints each module's status, then the modules'
 reports in module order:
 
     scripts/verify-modules.py <package> [--filter <file name part>]
-        [--modules a::m,...] [--jobs N] [--heartbeats N] [--ignore-proofs] [--dev]
-        [--no-build] [--logs <dir>]
+        [--modules a::m,...] [--jobs N] [--heartbeats N] [--timeout SECONDS]
+        [--ignore-proofs] [--dev] [--no-build] [--logs <dir>]
 
 Each process exports only what verifying its module reads (`--modules`) and
 writes its rendering into the log directory, so the package's
@@ -21,7 +21,10 @@ callees in other modules are verified again in every importer
 (`roadmap.md`, R3), so a report can repeat across modules; it is printed
 once. `VEREX_OPTIONS` reaches every process; each proves its module's targets
 several at a time (`verex.jobs`), the processes sharing half the hardware
-threads, unless `VEREX_OPTIONS` sets `verex.jobs` itself.
+threads, unless `VEREX_OPTIONS` sets `verex.jobs` itself. With `--logs`, each
+module's stage log (`verex.stageLog`), one line per target with its outcome, is
+kept there as `<module>.stages`. `--timeout` stops a module's process after that
+many seconds and reports it as `timeout`; its stage log keeps what finished.
 """
 
 import argparse
@@ -115,6 +118,12 @@ def lake_environment():
     return env
 
 
+def with_option(env, option):
+    """`env` with `option` added to `VEREX_OPTIONS`."""
+    options = [existing for existing in env.get("VEREX_OPTIONS", "").split(",") if existing]
+    return dict(env, VEREX_OPTIONS=",".join(options + [option]))
+
+
 def share_threads(env, processes):
     """Each process proves the targets of its module several at a time
     (`verex.jobs`): the processes share half the hardware threads, unless
@@ -123,9 +132,7 @@ def share_threads(env, processes):
     if any(option.startswith("verex.jobs=") for option in options):
         return env
     jobs = max(1, max(1, (os.cpu_count() or 2) // 2) // max(1, processes))
-    env = dict(env)
-    env["VEREX_OPTIONS"] = ",".join(options + [f"verex.jobs={jobs}"])
-    return env
+    return with_option(env, f"verex.jobs={jobs}")
 
 
 def build():
@@ -143,8 +150,9 @@ class Runner:
     """Runs the modules' processes, each in its own process group, so that an
     interrupted run stops all of them."""
 
-    def __init__(self, package, env, logs, extra):
+    def __init__(self, package, env, logs, extra, timeout):
         self.package, self.env, self.logs, self.extra = package, env, logs, extra
+        self.timeout = timeout
         self.groups = set()
         self.lock = threading.Lock()
         self.finished = 0
@@ -154,14 +162,27 @@ class Runner:
         rendering = self.logs / f"{stem}.lean"
         command = [str(EXECUTABLE), "verify", str(self.package), "--modules", selector,
                    "--output", str(rendering), *self.extra]
+        stages = self.logs / f"{stem}.stages"
+        stages.unlink(missing_ok=True)
+        env = with_option(self.env, f"verex.stageLog={stages}")
         started = time.monotonic()
         with open(self.logs / f"{stem}.out", "w") as out, \
                 open(self.logs / f"{stem}.err", "w") as err:
-            process = subprocess.Popen(command, cwd=self.package, env=self.env, stdout=out,
+            process = subprocess.Popen(command, cwd=self.package, env=env, stdout=out,
                                        stderr=err, start_new_session=True)
             with self.lock:
                 self.groups.add(process.pid)
+            timer = None
+            expired = threading.Event()
+            if self.timeout:
+                def expire():
+                    expired.set()
+                    os.killpg(process.pid, signal.SIGKILL)
+                timer = threading.Timer(self.timeout, expire)
+                timer.start()
             _, status, usage = os.wait4(process.pid, 0)
+            if timer:
+                timer.cancel()
             with self.lock:
                 self.groups.discard(process.pid)
         wall = time.monotonic() - started
@@ -169,7 +190,9 @@ class Runner:
         stderr = (self.logs / f"{stem}.err").read_text(errors="replace")
         code = os.waitstatus_to_exitcode(status)
         errors = sum(1 for match in REPORT.finditer(stdout) if ": error: " in match.group(0))
-        if "verex-move: verification complete" not in stderr:
+        if expired.is_set():
+            outcome = "timeout"
+        elif "verex-move: verification complete" not in stderr:
             outcome = "crashed"
         elif errors or code != 0:
             outcome = "failed"
@@ -213,6 +236,7 @@ def main():
     parser.add_argument("--jobs", "-j", type=int, help="processes at once (default: "
                         f"half the hardware threads, one per {PROCESS_GB} GB available)")
     parser.add_argument("--heartbeats", help="passed to verex-move verify")
+    parser.add_argument("--timeout", type=float, help="stop a module's process after these seconds")
     parser.add_argument("--ignore-proofs", action="store_true", help="passed to verex-move verify")
     parser.add_argument("--dev", action="store_true", help="passed to verex-move verify")
     parser.add_argument("--no-build", action="store_true", help="use the built verex-move as it is")
@@ -262,7 +286,7 @@ def main():
     print(f"verify-modules: {len(order)} modules of {package.name}, {jobs} at a time, "
           f"logs in {logs}", file=sys.stderr, flush=True)
 
-    runner = Runner(package, env, logs, extra)
+    runner = Runner(package, env, logs, extra, args.timeout)
     started = time.monotonic()
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:

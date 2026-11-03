@@ -733,7 +733,7 @@ private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource)
   -- The lemma items of the proof file; a module holds `spec lemma`s.
   let proofLemmas ← sources.toList.zipIdx.toArray.flatMapM fun (source, position) => do
     let found := proofLemmaItems source.stx
-    if position == 0 then
+    if position == 0 && !verex.lemmaItemsInModule.get (← getOptions) then
       for item in found do
         logErrorAt item "a `lemma` item belongs to a proof file; a module states `spec lemma`"
       return #[]

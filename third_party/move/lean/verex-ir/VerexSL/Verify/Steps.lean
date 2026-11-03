@@ -45,13 +45,17 @@ syntax verexStepBlock := "{" ppIndent((ppLine verexProofStep)*) ppLine "}"
 /-- The block's steps under the fact's negation, until `decide` finds the
 contradiction. -/
 syntax (name := closerContradiction) &"contradiction" verexStepBlock : verexCloser
+/-- `assert (∃ x, φ) by witness e, …`: the assert's existential at the witnesses,
+each at its own type and coerced to the binder's; its body by `decide`. -/
+syntax (name := closerWitness) &"witness" verexExpr,+ : verexCloser
 
 /-- `on k, … when d, … { … }` proves the obligations it names, on the paths
 its selector takes. -/
 syntax (name := stepOn) &"on" verexKey,+ (&"when" verexDecision,+)? verexStepBlock :
   verexProofStep
-/-- `on _ { … }` proves every obligation no earlier `on` names. -/
-syntax (name := stepOnDefault) &"on" "_" verexStepBlock : verexProofStep
+/-- `on _ { … }` proves every obligation no earlier `on` names, `on _ when d,
+… { … }` those on the paths its selector takes. -/
+syntax (name := stepOnDefault) &"on" "_" (&"when" verexDecision,+)? verexStepBlock : verexProofStep
 /-- `at p { … }` places facts at a program point (`at entry`, `at exit`,
 `at loop k entry|step`): owed once there, inherited by every obligation
 after it. -/
@@ -64,6 +68,9 @@ syntax (name := stepLet) "let " ident " := " verexExpr : verexProofStep
 /-- `let V { f, … } := e` owes `e is V` and binds each listed field `f` of
 its payload for the following steps. -/
 syntax (name := stepLetVariant) "let " ident " { " ident,+ " }" " := " verexExpr : verexProofStep
+/-- `let x : T where φ` owes `exists x : T: φ`, proved by `decide`, and gives
+`φ` with `x` in scope for the following steps. -/
+syntax (name := stepLetWhere) "let " verexQuantifierBinder " where " verexExpr : verexProofStep
 /-- `assert e by c` owes `e`, proved by `c` (`decide` without `by`), and gives
 it to the following steps. -/
 syntax (name := stepAssert) &"assert" verexExpr (" by " verexCloser)? : verexProofStep
@@ -275,6 +282,7 @@ def builtinLemmas : Array BuiltinLemma :=
     entry "lemma_div_mul_le" `div_mul_le (ints ["x", "c"]),
     entry "lemma_div_add_mul" `div_add_mul (ints ["x", "b", "c"]),
     entry "lemma_mod_small" `mod_small (ints ["x", "c"]),
+    entry "lemma_div_mod" `div_mod (ints ["x", "c"]),
     entry "lemma_shl_mul" `shl_mul (ints ["x", "k"]),
     entry "lemma_shr_div" `shr_div (ints ["x", "k"]),
     entry "lemma_vector_len_remove" `vector_len_remove #[v, param "i" .int],
@@ -546,9 +554,15 @@ def variantField (value field : Syntax) : Syntax :=
   mkNode ``verexFieldExpr #[mkNode ``verexParenExpr #[atom "(", value, atom ")"], atom ".",
     mkNode ``verexNamedFieldIdentifier #[field]]
 
-/-- The binders of a `forall` step: their names and types. -/
+/-- The existential `let x : T where φ` owes, at `φ`'s position. -/
+private def letWhereExists (step : Syntax) : Syntax :=
+  let atom (text : String) := Syntax.atom (SourceInfo.fromRef step[3] (canonical := true)) text
+  mkNode ``verexQuantifierExpr
+    #[atom "∃", atom "(", step[1], mkNullNode, atom ")", atom ",", step[3]]
+
+/-- The binders of a `forall` or `let … where` step: their names and types. -/
 private def forallBinders (step : Syntax) : Array (String × Syntax) :=
-  step[1].getSepArgs.filterMap fun binder => do
+  (if step.isOfKind ``stepLetWhere then #[step[1]] else step[1].getSepArgs).filterMap fun binder => do
     guard (binder.isOfKind ``verexQuantifierTypeBinderSyntax)
     let pattern := binder[0]
     guard (pattern.isOfKind ``verexVariableBindingPattern)
@@ -556,24 +570,30 @@ private def forallBinders (step : Syntax) : Array (String × Syntax) :=
 
 /-- The expressions of a block's steps, in order: what `assert`, `calc`, a
 guard and a split of an expression state, and the witnesses of an
-`on` block's obligation, at the types `witnesses` gives that block. A split
-of a name splits the value in scope; it lowers nothing. -/
+`on` block's obligation, at the types `witnesses` gives that block, else at
+their own. A split of a name splits the value in scope; it lowers nothing. -/
 partial def blockExpressions (block : Syntax) (lets : Array (Name × Syntax) := #[])
     (binders : Array (String × Syntax) := #[]) (witnesses : Syntax → Array String := fun _ => #[])
     (types : Array String := #[]) (keyBinders : Syntax → Array (String × Syntax) := fun _ => #[]) :
     Array StepExpression := Id.run do
   let mut found := #[]
   let mut lets := lets
+  let mut binders := binders
   for step in blockSteps block do
     let expression (stx : Syntax) : StepExpression :=
       { expression := stepExpression lets stx, binders }
     if step.isOfKind ``stepOn then
       found := found ++ blockExpressions step[3] lets (binders ++ keyBinders step) witnesses
         (witnesses step)
-    else if step.isOfKind ``stepOnDefault || step.isOfKind ``stepAt || step.isOfKind ``stepAfter then
+    else if step.isOfKind ``stepOnDefault then
+      found := found ++ blockExpressions step[3] lets binders witnesses
+    else if step.isOfKind ``stepAt || step.isOfKind ``stepAfter then
       found := found ++ blockExpressions step[2] lets binders witnesses
     else if step.isOfKind ``stepLet then
       lets := lets.push (step[1].getId, stepExpression lets step[3])
+    else if step.isOfKind ``stepLetWhere then
+      found := found.push (expression (letWhereExists step))
+      binders := binders ++ forallBinders step
     else if step.isOfKind ``stepLetVariant then
       -- The value, untyped; the test it owes; each field, whose lowering
       -- checks that the variant has it.
@@ -589,6 +609,9 @@ partial def blockExpressions (block : Syntax) (lets : Array (Name × Syntax) := 
         found := found ++ step[2][1][1].getSepArgs.flatMap (applyExpressions lets binders)
       if step[2].getNumArgs == 2 && step[2][1].isOfKind ``closerContradiction then
         found := found ++ blockExpressions step[2][1][1] lets binders
+      if step[2].getNumArgs == 2 && step[2][1].isOfKind ``closerWitness then
+        found := found ++ step[2][1][1].getSepArgs.map fun witness =>
+          { expression witness with type := none }
     else if step.isOfKind ``stepApply then
       found := found ++ step[1].getSepArgs.flatMap (applyExpressions lets binders)
     else if step.isOfKind ``stepSplit then
@@ -602,7 +625,7 @@ partial def blockExpressions (block : Syntax) (lets : Array (Name × Syntax) := 
         if links.size > 1 then found := found.push (expression conclusion)
     else if step.isOfKind ``stepWitness then
       found := found ++ step[1].getSepArgs.zipIdx.map fun (witness, position) =>
-        { expression witness with type := some ((types[position]?).getD "Bool") }
+        { expression witness with type := types[position]? }
     else if step.isOfKind ``stepIf then
       found := found.push (expression step[1])
       found := found ++ blockExpressions step[2] lets binders
@@ -793,7 +816,7 @@ leaf, the binders of the data invariants. -/
 def clauseNeeds (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (key : VerexIR.Proofs.Denote.ObligationKey) : ClauseNeeds :=
-  if key.kind == "data invariant" then
+  if key.kind == "data invariant" || key.kind == "stored invariant" then
     { reads := none, binders := dataInvariantBinders unit } else
   match clauseOf? unit namespaceIndex ns declaration key with
   | some (clauseNs, owner, clause) =>
@@ -918,10 +941,18 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
       unless step.isOfKind ``stepOn do continue
       unless (blockSteps step[3]).any (·.isOfKind ``stepWitness) do continue
       let keys := step[1].getSepArgs
+      -- The clause of a data or stored invariant is the one the leaf
+      -- instantiates: a witness has its own type, coerced at the leaf. One
+      -- `witness` applies to every obligation its `on` names, each stating
+      -- the existential; `witness` reports one that does not.
+      let patterns ← keys.mapM VerexIR.Proofs.Denote.keyPattern
+      if patterns.all (fun key => key.kind == "data invariant" || key.kind == "stored invariant") then
+        continue
       -- A selector takes paths of the one clause: its existential is the
       -- same on each of them.
       unless keys.size == 1 do
-        throwErrorAt step "an `on` block with a `witness` names one obligation"
+        throwErrorAt step "an `on` block with a `witness` names one clause, or the sites of a \
+          data invariant's"
       let key ← VerexIR.Proofs.Denote.keyPattern keys[0]!
       let some (clauseNs, owner, clause) := clauseOf? unit namespaceIndex ns declaration key
         | throwErrorAt keys[0]! "a `witness` supplies a clause's existential; this key names no clause"
@@ -984,7 +1015,8 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     -- An `on data invariant` block reads the data invariants' binders.
     let invariantBinders ← dataInvariantBinderTypes unit
     let keyBinders (step : Syntax) : Array (String × Syntax) :=
-      if step[1].getSepArgs.any (·.isOfKind ``VerexIR.Proofs.Denote.keyDataInvariant) then
+      if step[1].getSepArgs.any fun key => key.isOfKind ``VerexIR.Proofs.Denote.keyDataInvariant ||
+          key.isOfKind ``VerexIR.Proofs.Denote.keyStoredInvariant then
         invariantBinders.filter fun (name, _) => !scope.any (·.1 == name)
       else #[]
     for step in blockExpressions block (witnesses := witnesses) (keyBinders := keyBinders) do
@@ -1190,17 +1222,29 @@ open Meta Tactic VerexIR.Proofs.Denote
 
 /-- The carriers the leaf's native values are at: those of a local of a
 native type, else the target's family's, where the leaf holds its values
-typed only. -/
+typed only, else the runtime frame's, where the only native values are read
+from the store (`Carriers.runtime`) by a function with no parameters or where
+none is left (a parameter read as its typed map, its results substituted). -/
 private def leafCarriers? : MetaM (Option Lean.Expr) := do
   let mut family := none
+  let mut runtime := none
   for decl in ← getLCtx do
     if decl.isImplementationDetail then continue
     let type ← instantiateMVars decl.type
-    if type.isAppOfArity ``NTy.carrier 2 then return some (type.getArg! 0)
+    if type.isAppOfArity ``NTy.carrier 2 then
+      let carriers := (type.getArg! 0).consumeMData
+      if (Contract.carriersFrame? carriers).isSome then return some carriers
+      if runtime.isNone && carriers.isAppOfArity ``Carriers.runtime 2 then
+        let unit := carriers.getArg! 0
+        let functions := carriers.getArg! 1
+        runtime := some (mkApp3 (mkConst ``Skolems.toCarriers) unit functions
+          (mkApp2 (mkConst ``Skolems.runtime) unit functions))
     if family.isNone && type.isAppOfArity ``Skolems 2 then
       family := some (mkApp3 (mkConst ``Skolems.toCarriers) (type.getArg! 0) (type.getArg! 1)
         decl.toExpr)
-  return family
+    if runtime.isNone && type.isAppOf ``VerexIR.Validation.ExecutableUnit then
+      runtime := some (← Contract.frameCarriers (← Contract.executableRuntime decl.toExpr))
+  return family <|> runtime
 
 /-- The last local of a name that is no hypothesis: where a leaf holds the
 name's value. -/
@@ -1423,6 +1467,20 @@ elab "verex_negation_conflict" : tactic => focusGoal do
         return
     throwError "no hypothesis contradicts another"
 
+/-- `omega` over a goal's context without the hypotheses holding an existential
+below their top, a fact under `if` or a disjunct: `omega` would open it in one
+case split and read its witness as an atom of the others. -/
+elab "verex_block_omega" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let held ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type := (← instantiateMVars decl.type).consumeMData
+      if type.isAppOf ``Exists || type.isAppOf ``And then return found
+      return if (type.find? (·.isAppOf ``Exists)).isSome then found.push decl.fvarId else found
+  replaceMainGoal [← goal.tryClearMany held]
+  evalTactic (← `(tactic| omega))
+
 /-- `decide` at a step or an obligation of a block, on its normal form: the
 goal is a hypothesis or reflexive by its spelling, contradicts the context
 (a proposition and its negation, a Boolean both true and false), is an
@@ -1447,6 +1505,51 @@ private def positionalMembership? (e : Lean.Expr) : MetaM (Option (Lean.Expr × 
   let some (_, positional) := (← inferType reading).iff? | return none
   return if ← withReducible (isDefEq positional e) then some (xs, t) else none
 
+private theorem lt_of_le_literal {a b c : Int} (stated : a ≤ b) (literal : b + 1 = c) : a < c := by
+  omega
+
+private theorem le_of_lt_literal {a b c : Int} (stated : a < b) (literal : c + 1 = b) : a ≤ c := by
+  omega
+
+private theorem literal_lt_of_le {a b c : Int} (stated : b ≤ a) (literal : c + 1 = b) : c < a := by
+  omega
+
+private theorem literal_le_of_lt {a b c : Int} (stated : b < a) (literal : b + 1 = c) : c ≤ a := by
+  omega
+
+/-- An integer comparison with a literal bound in its other form (`a < k` as
+`a ≤ k − 1`, `a ≤ k` as `a < k + 1`, `k < a` as `k + 1 ≤ a`, `k ≤ a` as `k − 1 < a`),
+and the comparison's proof from a proof of that form. -/
+private def literalBoundForm? (target : Lean.Expr) :
+    MetaM (Option (Lean.Expr × (Lean.Expr → MetaM Lean.Expr))) := do
+  let literal (lower upper : Int) : MetaM Lean.Expr := do
+    mkDecideProof (← mkEq (← mkAppM ``HAdd.hAdd #[toExpr lower, toExpr (1 : Int)]) (toExpr upper))
+  match_expr target with
+  | LT.lt α _ a b =>
+      unless α.isConstOf ``Int do return none
+      if let some k := b.int? then
+        return some (← mkAppM ``LE.le #[a, toExpr (k - 1)], fun stated => do
+          return mkApp5 (mkConst ``lt_of_le_literal) a (toExpr (k - 1)) b stated (← literal (k - 1) k))
+      let some k := a.int? | return none
+      return some (← mkAppM ``LE.le #[toExpr (k + 1), b], fun stated => do
+        return mkApp5 (mkConst ``literal_lt_of_le) b (toExpr (k + 1)) a stated (← literal k (k + 1)))
+  | LE.le α _ a b =>
+      unless α.isConstOf ``Int do return none
+      if let some k := b.int? then
+        return some (← mkAppM ``LT.lt #[a, toExpr (k + 1)], fun stated => do
+          return mkApp5 (mkConst ``le_of_lt_literal) a (toExpr (k + 1)) b stated (← literal k (k + 1)))
+      let some k := a.int? | return none
+      return some (← mkAppM ``LT.lt #[toExpr (k - 1), b], fun stated => do
+        return mkApp5 (mkConst ``literal_le_of_lt) b (toExpr (k - 1)) a stated (← literal (k - 1) k))
+  | _ => return none
+
+/-- The same statement, up to its instances' and annotations' spelling. -/
+private def sameStatement (type wanted : Lean.Expr) : MetaM Bool := do
+  if type == wanted then return true
+  unless type.getAppFn == wanted.getAppFn && type.getAppNumArgs == wanted.getAppNumArgs do
+    return false
+  withReducible (isDefEq type wanted)
+
 /-- Close a goal its context states, by spelling (`doc/plan/proof-language.md`,
 "Closers": the facts decide what they state): a hypothesis of the goal's
 statement, a reflexive equation, `True`, or a hypothesis `False` or `¬True`,
@@ -1463,16 +1566,10 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
       return some (mkApp3 (mkConst ``Or.inl) left right proof)
     if let some proof ← statedProof? right then
       return some (mkApp3 (mkConst ``Or.inr) left right proof)
-  -- The same statement, up to its instances' and annotations' spelling.
-  let same (type wanted : Lean.Expr) : MetaM Bool := do
-    if type == wanted then return true
-    unless type.getAppFn == wanted.getAppFn && type.getAppNumArgs == wanted.getAppNumArgs do
-      return false
-    withReducible (isDefEq type wanted)
   for decl in ← getLCtx do
     if decl.isImplementationDetail then continue
     let type := (← instantiateMVars decl.type).consumeMData
-    if ← same type target then return some decl.toExpr
+    if ← sameStatement type target then return some decl.toExpr
     -- An equation stated the other way round.
     if let some (_, lhs, rhs) := target.eq? then
       if let some (_, lhs', rhs') := type.eq? then
@@ -1485,6 +1582,16 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
     if type.isConstOf ``False then return some (← mkFalseElim target decl.toExpr)
     if type.isAppOfArity ``Not 1 && type.appArg!.isConstOf ``True then
       return some (← mkFalseElim target (mkApp decl.toExpr (mkConst ``True.intro)))
+  -- A hypothesis read up to negation (`negationReadings`).
+  for reading in ← contextNegationReadings do
+    let statement ← inferType reading
+    if ← sameStatement (← whnfR statement) target then return some reading
+  -- A literal bound in its other form.
+  if let some (form, proof) ← literalBoundForm? target then
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      if ← sameStatement (← instantiateMVars decl.type).consumeMData form then
+        return some (← proof decl.toExpr)
   -- A membership, an atom in the block's normal form, stated by its
   -- positions, as the leaf's normalization reads it, and the converse.
   if target.isAppOfArity ``Membership.mem 5 && (target.getArg! 1).isAppOf ``Array then
@@ -1523,6 +1630,18 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
         let reading ← mkAppM ``VerexIR.Proofs.Denote.mem_iff_exists_int_index #[xs, t]
         let proof ← mkAppM ``Iff.mp #[reading, decl.toExpr]
         return some (← mkExpectedTypeHint proof target)
+  -- A conjunction part by part, as a disjunct states one.
+  if let some (left, right) := target.and? then
+    let some first ← statedProof? left | return none
+    let some second ← statedProof? right | return none
+    return some (mkApp4 (mkConst ``And.intro) left right first second)
+  -- An existential at a local a destructured fact left, its body stated there.
+  let_expr Exists α body := target | return none
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    unless (← instantiateMVars decl.type) == α do continue
+    if let some proof ← statedProof? (body.beta #[decl.toExpr]) then
+      return some (← mkAppOptM ``Exists.intro #[α, body, decl.toExpr, proof])
   return none
 
 /-- Close a goal its context states (`statedProof?`). -/
@@ -1680,6 +1799,8 @@ value. -/
 private def sideRank (e : Lean.Expr) : Nat :=
   if (localName? e).isSome then 1
   else if e.int?.isSome || e.nat?.isSome || e.isConstOf ``Bool.true || e.isConstOf ``Bool.false then 0
+  -- A bounded integer built at a literal is that value.
+  else if e.isAppOfArity ``VerexIR.SpecInt.mk 4 && (e.getArg! 2).int?.isSome then 0
   else 2
 
 /-- How a fact of the block rewrites: left to right, right to left, or not
@@ -1693,6 +1814,8 @@ equation from its higher side to its lower (`sideRank`), of two names
 toward the one declared first; no rewriting for a name equated to a term
 holding it (`a = C[a]`), whose rewriting would not end. -/
 private def factRule (statement : Lean.Expr) : MetaM FactRule := do
+  -- A fact under a guard or a binder is an implication, never a rule.
+  if statement.isForall then return .none
   let some (_, lhs, rhs) := statement.eq? | return .forward
   let holds (side other : Lean.Expr) : Bool :=
     match localName? side with | some x => other.containsFVar x | none => false
@@ -1774,6 +1897,10 @@ where
       if type.isConstOf ``Bool && (rhs.isConstOf ``Bool.true || rhs.isConstOf ``Bool.false) &&
           !lhs.isFVar then
         return { rules with booleans := rules.booleans.push decl.fvarId }
+      -- A term equated to a built value, as a path's split states it (`xs[k]? =
+      -- some v`): a rule toward the value.
+      if (localName? lhs).isNone && (← isConstructorApp rhs) && !(← isConstructorApp lhs) then
+        return { rules with definitionsForward := rules.definitionsForward.push decl.fvarId }
       -- A name or term equated to a literal, as a case split states it: a
       -- rule toward the literal (substitution in a leaf is total).
       if sideRank lhs ≥ 1 && sideRank rhs == 0 then
@@ -1839,7 +1966,8 @@ private def cachedSimpContext (call : StepCall) : TacticM (Simp.Context × Simp.
   if let some (_, context, simprocs) := (← cache.get).find? (·.1 == key) then
     return (context, simprocs)
   let syntax_ ← match call with
-    | .rules => `(tactic| simp only [])
+    -- A rule's value may leave a literal position in a read.
+    | .rules => `(tactic| simp only [VerexIR.Proofs.Denote.literalToNat])
     | .transport => `(tactic| simp only [vir_transport])
     -- Membership an atom (`stepPositional`), a search for an element read
     -- as the atom.
@@ -1886,13 +2014,53 @@ private def withRules (call : StepCall) (rules reversed : Array FVarId)
     for theorem_ in ← ruleTheorems rule true !preReversed do extra := extra.addSimpTheorem theorem_
   return (← Simp.mkContext config (ctx.simpTheorems.push extra) ctx.congrTheorems, simprocs)
 
-/-- A side condition from the step's rules, else as the leaf's normalization
-decides it (`goalDischarge`): one normal form for steps and leaves. -/
+/-- A side condition by spelling (`doc/plan/proof-language.md`, "Facts"): stated
+(`statedProof?`), part by part, or its negation stated in canonical form (`b ≤
+a` of `¬a < b`). No arithmetic: an arithmetic premise is stated by the proof. -/
+private partial def statedCondition? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let condition := (← instantiateMVars condition).consumeMData
+  if let some proof ← statedProof? condition then return some proof
+  if let some (left, right) := condition.and? then
+    let some first ← statedCondition? left | return none
+    let some second ← statedCondition? right | return none
+    return some (mkApp4 (mkConst ``And.intro) left right first second)
+  let_expr Not inner := condition | return none
+  let reading? ← match_expr inner.consumeMData with
+    | LT.lt type _ a b =>
+        if ← isDefEq type (mkConst ``Int) then
+          pure (some (← mkAppOptM ``Int.not_lt #[a, b])) else pure none
+    | LE.le type _ a b =>
+        if ← isDefEq type (mkConst ``Int) then
+          pure (some (← mkAppOptM ``Int.not_le #[a, b])) else pure none
+    | _ => pure none
+  let some reading := reading? | return none
+  let some (_, canonical) := (← inferType reading).iff? | return none
+  let some proof ← statedProof? canonical | return none
+  return some (← mkAppM ``Iff.mpr #[reading, proof])
+
+/-- A side condition from the step's rules, else by its spelling
+(`statedCondition?`), else, where it is no arithmetic, as the leaf's normalization
+decides it (`goalDischarge`): a lemma's premise in the context's normal form; or
+the premise's normal form by its spelling. -/
 private def stepDischarge (goal : MVarId) : MetaM Simp.Discharge := do
-  let context ← goalDischarge goal
+  let context ← goalDischarge goal (arithmetic := false)
+  let normalizing ← IO.mkRef false
   return fun condition => do
     if let some proof ← Simp.dischargeDefault? condition then return some proof
-    context condition
+    if let some proof ← statedCondition? condition then return some proof
+    if let some proof ← context condition then return some proof
+    -- A premise in the normal form, stated by its spelling: no arithmetic; one
+    -- level, as a premise of that normal form's rules is read as it stands.
+    if ← normalizing.get then return none
+    normalizing.set true
+    try
+      let normal ← Simp.simp (← instantiateMVars condition)
+      if normal.expr == condition then return none
+      let some proof ← statedCondition? normal.expr | return none
+      match normal.proof? with
+      | some equation => return some (← mkEqMPR equation proof)
+      | none => return some proof
+    finally normalizing.set false
 
 /-- `simp` at a goal's hypotheses and, when asked, its target, by a cached
 call with rules. The goal after, none where it is closed. -/
@@ -2222,10 +2390,56 @@ private def settleFact (goal : MVarId) (name : Name) : TacticM (Option MVarId) :
   if (← next.getDecl).lctx.contains fact then return some (← markFact next fact)
   return some next
 
+/-- A fact that its normal form states as an existential or a
+conjunction, taken apart: the witnesses locals, each part a fact of the block,
+`name`, `name_1`, …, as a model value a case reads (`∃ a, o = some a ∧ …`) is
+named for the facts that read it. The goal and the parts' names. -/
+private partial def takeFactApart (goal : MVarId) (name : Name) (next : Nat := 1) :
+    TacticM (MVarId × Array Name) := do
+  let some fact ← goal.withContext do return (← getLCtx).findFromUserName? name
+    | return (goal, #[])
+  let type ← goal.withContext do whnfR (← instantiateMVars fact.type)
+  if type.isAppOfArity ``Exists 2 then
+    let witness ← mkFreshUserName `witness
+    let #[case] ← goal.cases fact.fvarId #[{ varNames := [witness, name] }] | return (goal, #[name])
+    return ← takeFactApart case.mvarId name next
+  if type.isAppOfArity ``And 2 then
+    let rest := Name.mkSimple s!"{name}_{next}"
+    let #[case] ← goal.cases fact.fvarId #[{ varNames := [name, rest] }] | return (goal, #[name])
+    let some restFact ← case.mvarId.withContext do return (← getLCtx).findFromUserName? rest
+      | return (case.mvarId, #[name])
+    let goal ← markFact case.mvarId restFact.fvarId
+    let (goal, restParts) ← takeFactApart goal rest (next + 1)
+    let (goal, parts) ← takeFactApart goal name (next + 1)
+    return (goal, parts ++ restParts)
+  return (goal, #[name])
+
+/-- A fact taken apart (`takeFactApart`), then, under the bounds of the
+values its parts read, each part normalized and settled. The goal after,
+none where it is closed. -/
+private def destructureFact (goal : MVarId) (name : Name) (always : Bool := false) :
+    TacticM (Option MVarId) := do
+  let existential ← goal.withContext do
+    match (← getLCtx).findFromUserName? name with
+    | some fact => return (← whnfR (← instantiateMVars fact.type)).isAppOfArity ``Exists 2
+    | none => return false
+  let (goal, parts) ← takeFactApart goal name
+  if parts.size ≤ 1 && !existential && !always then return some goal
+  setGoals [goal]
+  evalTactic (← `(tactic| verex_type_bounds))
+  let [goal] ← getGoals | return none
+  let mut goal := goal
+  for part in parts do
+    let some next ← normalizeFact goal (some part) | return none
+    let some next ← settleFact next part | return none
+    goal := next
+  return some goal
+
 /-- Give a goal the fact `name : statement`, proved by `proof`, in normal
 form: an equation of a local and a term not holding it is substituted once
-over the context; any other fact is a rule of the block's normal form and
-rewrites no hypothesis. The goal after, none where the fact refutes it. -/
+over the context; an existential is taken apart (`destructureFact`); any other
+fact is a rule of the block's normal form and rewrites no hypothesis. The goal
+after, none where the fact refutes it. -/
 private def giveFact (goal : MVarId) (name : Name) (statement proof : Lean.Expr) :
     TacticM (Option MVarId) := do
   if statement.isConstOf ``True then return some goal
@@ -2233,6 +2447,7 @@ private def giveFact (goal : MVarId) (name : Name) (statement proof : Lean.Expr)
     goal.assign (← goal.withContext (mkFalseElim (← goal.getType) proof))
     return none
   let (_, next) ← (← goal.assert name statement proof).intro1P
+  if statement.isAppOfArity ``Exists 2 then return ← destructureFact next name
   settleFact next name
 
 /-- A fact's proof carried along the equation of its statement to its normal
@@ -2308,11 +2523,11 @@ private def renormalizeFacts (goal : MVarId) : TacticM (Option MVarId) := do
       | _ => pure ()
   return some goal
 
-/-- What the context's implications and equivalences give where their
-premises are stated (`statedProof?`) or true in the block's normal form:
-their conclusions, as facts (`implied_k`). Only a conclusion that shares a
-local with the goal, or any where the goal is `False`. The goal after, none
-where a conclusion refutes it. -/
+/-- What the context's implications, equivalences and disjunctions give where
+their premises, or a disjunct's negation, are stated (`statedProof?`) or true
+in the block's normal form: their conclusions, as facts (`implied_k`). Only a
+conclusion that shares a local with the goal, or any where the goal is
+`False`. The goal after, none where a conclusion refutes it. -/
 private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
   let rules ← blockRules goal
   let target ← goal.withContext do instantiateMVars (← goal.getType)
@@ -2341,6 +2556,15 @@ private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
         if let some proof ← premiseProof right then
           implied := implied.push (left, ← goal.withContext (mkAppM ``Iff.mpr #[hypothesis, proof]))
       continue
+    if let some (left, right) := type.app2? ``Or then
+      if relevant right then
+        if let some proof ← premiseProof (mkNot left) then
+          implied := implied.push (right, mkApp4 (mkConst ``Or.resolve_left) left right hypothesis proof)
+          continue
+      if relevant left then
+        if let some proof ← premiseProof (mkNot right) then
+          implied := implied.push (left, mkApp4 (mkConst ``Or.resolve_right) left right hypothesis proof)
+      continue
     -- An implication of propositions, its premises in order.
     let mut premises := #[]
     let mut conclusion := type
@@ -2367,6 +2591,226 @@ private def impliedFacts (goal : MVarId) : TacticM (Option MVarId) := do
     let some next ← settleFact next name | return none
     goal := next
   return some goal
+
+/-- The literal positions a term reads a collection at (`xs[3]?`). -/
+private def literalPositions (target : Lean.Expr) : Array Nat :=
+  Id.run do
+    let mut found := #[]
+    let mut pending := #[target]
+    while let some e := pending.back? do
+      pending := pending.pop
+      if e.isAppOfArity ``GetElem?.getElem? 7 then
+        if let some position := (e.getArg! 6).nat? then
+          unless found.contains position do found := found.push position
+      match e with
+      | .app f a => pending := (pending.push f).push a
+      | .mdata _ b | .proj _ _ b => pending := pending.push b
+      | .lam _ t b _ | .forallE _ t b _ => pending := (pending.push t).push b
+      | _ => pure ()
+    return found
+
+/-- The reads of collections in a term, with the position each reads at. -/
+private def readSites (e : Lean.Expr) : Array (Lean.Expr × Lean.Expr) :=
+  (sitesWhere (·.isAppOfArity ``GetElem?.getElem? 7) #[e]).map fun read =>
+    (read.getArg! 5, read.getArg! 6)
+
+/-- A read's position as an integer: its argument under `Int.toNat`, a literal. -/
+private def integerPosition (position : Lean.Expr) : Lean.Expr :=
+  if position.isAppOfArity ``Int.toNat 1 then position.getArg! 0
+  else match position.nat? with
+    | some literal => toExpr (Int.ofNat literal)
+    | none => mkApp3 (mkConst ``Nat.cast [0]) (mkConst ``Int) (mkConst ``instNatCastInt) position
+
+/-- The binder a position is solved for and its value, where the position is the
+binder at a literal offset: `i − c` against `t` gives `i := t + c`, `i + c` gives
+`i := t − c`. -/
+private def solvePosition (pattern t : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let pattern := (← instantiateMVars pattern).consumeMData
+  if pattern.isMVar then return some (pattern, t)
+  let offset (binder literal : Lean.Expr) (negate : Bool) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+    let binder := binder.consumeMData
+    let some c := literal.int? | return none
+    unless binder.isMVar do return none
+    let c := if negate then -c else c
+    if let some value := t.int? then return some (binder, toExpr (value + c))
+    if c < 0 then return some (binder, ← mkAppM ``HSub.hSub #[t, toExpr (-c)])
+    return some (binder, ← mkAppM ``HAdd.hAdd #[t, toExpr c])
+  if pattern.isAppOfArity ``HSub.hSub 6 then
+    return ← offset (pattern.getArg! 4) (pattern.getArg! 5) false
+  if pattern.isAppOfArity ``HAdd.hAdd 6 then
+    return ← offset (pattern.getArg! 4) (pattern.getArg! 5) true
+  return none
+
+/-- A term with its instantiated positions normalized: `k + c − c` is `k`,
+`k − c + c` is `k`. -/
+private def offsetsCancelled (e : Lean.Expr) : MetaM Simp.Result := do
+  let mut theorems : SimpTheorems := {}
+  theorems ← theorems.addConst ``Int.add_sub_cancel
+  theorems ← theorems.addConst ``Int.sub_add_cancel
+  let context ← Simp.mkContext (simpTheorems := #[theorems])
+    (congrTheorems := ← getSimpCongrTheorems)
+  return (← simp e context).1
+
+/-- Match a premise that is a read or an equation against a stated hypothesis of
+that shape; a position is solved up to its literal offset (`solvePosition`). -/
+private def matchStated (premise stated : Lean.Expr) : MetaM Bool := do
+  let some (_, lookup, value) := (← instantiateMVars premise).eq? | return false
+  let some (_, lookup', value') := stated.eq? | return false
+  if lookup.isAppOfArity ``GetElem?.getElem? 7 && lookup'.isAppOfArity ``GetElem?.getElem? 7 then
+    unless ← withReducible (isDefEq (lookup.getArg! 5) (lookup'.getArg! 5)) do return false
+    let position := integerPosition (lookup.getArg! 6)
+    if (← instantiateMVars position).hasExprMVar then
+      let some (binder, solved) ← solvePosition position (integerPosition (lookup'.getArg! 6))
+        | return false
+      unless ← isDefEq binder solved do return false
+    else
+      let position := (← offsetsCancelled (← instantiateMVars position)).expr
+      unless ← withReducible (isDefEq position (integerPosition (lookup'.getArg! 6))) do return false
+    return ← withReducible (isDefEq value value')
+  unless lookup.getAppFn == lookup'.getAppFn do return false
+  withReducible (isDefEq (← mkEq lookup value) (← mkEq lookup' value'))
+
+private theorem read_in_bounds {α : Type} (values : Array α) (position : Nat) (fallback : α)
+    (bound : position < values.size) :
+    values[position]? = some (values[position]?.getD fallback) := by
+  rw [Array.getElem?_eq_getElem bound]
+  rfl
+
+/-- A premise that an in-bounds read is the value its `getD` gives
+(`xs[k]? = some (xs[k]?.getD d)`): by the position's bounds, whose `toNat` omega
+reads. Whether it closes the goal. -/
+private def readInBounds (goal : MVarId) : TacticM Bool := goal.withContext do
+  let some (_, lookup, value) := (← instantiateMVars (← goal.getType)).eq? | return false
+  let_expr Option.some _ read := value.consumeMData | return false
+  unless lookup.isAppOfArity ``GetElem?.getElem? 7 && read.isAppOfArity ``Option.getD 3 do return false
+  unless ← withReducible (isDefEq lookup (read.getArg! 1)) do return false
+  let values := lookup.getArg! 5
+  unless (← inferType values).isAppOf ``Array do return false
+  let position := lookup.getArg! 6
+  let bound ← mkFreshExprSyntheticOpaqueMVar
+    (← mkAppM ``LT.lt #[position, ← mkAppM ``Array.size #[values]])
+  setGoals [bound.mvarId!]
+  evalTactic (← `(tactic| verex_block_omega))
+  goal.assign (← mkAppM ``read_in_bounds #[values, position, read.appArg!, bound])
+  return true
+
+/-- An instance of a quantified fact whose binders the goal and the stated facts
+determine (`doc/plan/proof-language.md`, "Closers"): a premise that is a read or
+an equation is matched against a stated hypothesis of that shape, an integer binder
+in a position against the positions the goal and the stated reads read that
+collection at; a read no statement holds takes its value from the goal, and is owed
+in bounds. The instance's conclusion in the block's normal form is the goal;
+the remaining premises as `blockInstance` proves them. Whether it closes the goal. -/
+private partial def determinedInstance (goal : MVarId) (candidate : Lean.Expr) : TacticM Bool := do
+  let rules ← blockRules goal
+  let (target, stated) ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    let stated ← (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type := (← instantiateMVars decl.type).consumeMData
+      let some (_, lhs, _) := type.eq? | return found
+      return if lhs.getAppFn.isConst || lhs.getAppFn.isFVar then found.push (decl.toExpr, type)
+        else found
+    return (target, stated)
+  let statedReads := stated.flatMap fun (_, type) => match type.eq? with
+    | some (_, lookup, _) => if lookup.isAppOfArity ``GetElem?.getElem? 7
+        then #[(lookup.getArg! 5, lookup.getArg! 6)] else #[]
+    | none => #[]
+  let positions := readSites target ++ statedReads
+  let (arguments, _, conclusion) ← goal.withContext do
+    withReducible (forallMetaTelescopeReducing (← inferType candidate))
+  if arguments.isEmpty then return false
+  let attempts ← IO.mkRef (32 : Nat)
+  let skippedReads ← IO.mkRef (#[] : Array Lean.Expr)
+  let rec finish : TacticM Bool := do
+    let conclusion ← instantiateMVars conclusion
+    if conclusion.hasExprMVar then
+      unless ← goal.withContext (withReducible (isDefEq conclusion target)) do return false
+    let cancelled ← goal.withContext do offsetsCancelled (← instantiateMVars conclusion)
+    let (normal, equality?) ← normalForm goal cancelled.expr rules
+    let (wanted, wantedEquality?) ← normalForm goal target rules
+    unless ← goal.withContext (sameStatement normal.consumeMData wanted.consumeMData) do
+      return false
+    for argument in arguments do
+      if ← argument.mvarId!.isAssigned then continue
+      let type ← goal.withContext (instantiateMVars (← inferType argument))
+      unless ← goal.withContext (isProp type) do return false
+      if type.hasExprMVar then return false
+      let premise ← goal.withContext (mkFreshExprSyntheticOpaqueMVar type)
+      argument.mvarId!.assign premise
+      let readBound ← do
+        let saved ← saveState
+        try readInBounds premise.mvarId! catch _ => saved.restore; pure false
+      if readBound then continue
+      let some next ← normalizeFact premise.mvarId! none | continue
+      setGoals [next]
+      try evalTactic (← `(tactic| first | verex_assumption | verex_block_omega))
+      catch _ => return false
+      unless (← getUnsolvedGoals).isEmpty do return false
+    goal.withContext do
+      let instance_ ← instantiateMVars (mkAppN candidate arguments)
+      if instance_.hasExprMVar then return false
+      let read ← cancelled.mkEqMP instance_
+      let read ← match equality? with
+        | some equality => mkEqMP equality read
+        | none => pure read
+      goal.assign (← match wantedEquality? with
+        | some equality => mkEqMPR equality read
+        | none => pure read)
+      return true
+  let rec search : TacticM Bool := do
+    let left ← attempts.get
+    if left == 0 then return false
+    attempts.set (left - 1)
+    -- A premise reading or equating a binder's value: by a stated hypothesis.
+    let skipped ← skippedReads.get
+    let triggers ← goal.withContext do arguments.filterM fun argument => do
+      if skipped.contains argument then return false
+      if ← argument.mvarId!.isAssigned then return false
+      let type ← instantiateMVars (← inferType argument)
+      let some (_, lhs, _) := type.eq? | return false
+      return type.hasExprMVar && (lhs.getAppFn.isConst || lhs.getAppFn.isFVar)
+    if let some trigger := triggers[0]? then
+      let premise ← goal.withContext (inferType trigger)
+      for (proof, type) in stated do
+        let saved ← saveState
+        if ← goal.withContext (matchStated premise type) then
+          trigger.mvarId!.assign proof
+          if ← search then return true
+        let names ← getNGen
+        saved.restore
+        setNGen names
+      -- A read no statement holds takes its value from the goal.
+      let isRead ← goal.withContext do
+        match (← instantiateMVars premise).eq? with
+        | some (_, lookup, _) => pure (lookup.isAppOfArity ``GetElem?.getElem? 7)
+        | none => pure false
+      unless isRead do return false
+      skippedReads.modify (·.push trigger)
+      let found ← search
+      skippedReads.modify (·.pop)
+      return found
+    -- An integer binder in a position, by the positions read of that collection.
+    let open_ ← goal.withContext do
+      let parts ← arguments.mapM fun argument => do instantiateMVars (← inferType argument)
+      let sites := readSites (← instantiateMVars conclusion) ++ parts.flatMap readSites
+      sites.filterM fun (_, position) => do
+        return (← instantiateMVars position).hasExprMVar
+    let some (collection, position) := open_[0]? | return ← finish
+    for (other, read) in positions do
+      let saved ← saveState
+      if ← goal.withContext do
+        unless ← withReducible (isDefEq collection other) do return false
+        let some (binder, solved) ← solvePosition (integerPosition position) (integerPosition read)
+          | return false
+        isDefEq binder solved
+      then
+        if ← search then return true
+      let names ← getNGen
+      saved.restore
+      setNGen names
+    return false
+  search
 
 /-- The goal as an instance of a quantified fact, each premise of the
 instance in the block's normal form, then stated by a hypothesis or decided by
@@ -2422,10 +2866,20 @@ where
         if decl.isImplementationDetail then return found
         return if (← whnfR (← instantiateMVars decl.type)).isForall then found.push decl.toExpr
           else found
-    for candidate in candidates.reverse do
+    -- A position the normal form evaluated: `xs[k.toNat]?` at the literal `0`
+    -- is the instance `k := 0`, read at the instance's transparency.
+    let instances ← goal.withContext do
+      candidates.flatMapM fun candidate => do
+        let .forallE _ domain _ _ ← whnfR (← inferType candidate) | return #[]
+        unless domain.isConstOf ``Int do return #[]
+        return (literalPositions target).map fun (position : Nat) =>
+          (mkApp candidate (toExpr (Int.ofNat position)), true)
+    let attempts := candidates.reverse.map (·, false) ++ instances
+    for (candidate, literal) in attempts do
       let saved ← saveState
       try
-        let premises ← withReducible (goal.apply candidate)
+        let premises ← if literal then goal.apply candidate
+          else withReducible (goal.apply candidate)
         let mut closed := true
         for premise in premises do
           if ← premise.isAssigned then continue
@@ -2434,7 +2888,7 @@ where
             break
           let some normal ← normalizeFact premise none | continue
           setGoals [normal]
-          try evalTactic (← `(tactic| first | verex_assumption | omega))
+          try evalTactic (← `(tactic| first | verex_assumption | verex_block_omega))
           catch _ => pure ()
           unless (← getUnsolvedGoals).isEmpty do
             closed := false
@@ -2443,6 +2897,17 @@ where
       catch _ => pure ()
       -- The names the attempt drew stay drawn: the step caches are keyed by
       -- goal and must not meet a goal of the same name.
+      let names ← getNGen
+      saved.restore
+      setNGen names
+    -- Instances whose binders the goal and the stated facts determine, on the
+    -- hypotheses as they stand and read up to negation.
+    let readings ← goal.withContext contextNegationReadings
+    for candidate in candidates.reverse ++ readings do
+      let saved ← saveState
+      try
+        if ← determinedInstance goal candidate then return true
+      catch _ => pure ()
       let names ← getNGen
       saved.restore
       setNGen names
@@ -2474,10 +2939,103 @@ private def statedWitness (goal : MVarId) : MetaM Bool := goal.withContext do
       return true
   return false
 
+/-- A goal `False` whose context negates an instance of a quantified hypothesis
+(`¬P a` or `b = false` beside `∀ x, … → P x`), the instance's premises as
+`blockInstance` proves them. Whether it closes the goal. -/
+private def instanceRefutation (goal : MVarId) : TacticM Bool := do
+  let negated ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type ← instantiateMVars decl.type
+      if let some inner := type.not? then return found.push (inner, decl.toExpr)
+      if let some (domain, value, literal) := type.eq? then
+        if domain.isConstOf ``Bool && literal.isConstOf ``Bool.false then
+          return found.push (← mkEq value (mkConst ``Bool.true),
+            ← mkAppM ``Iff.mp #[← mkAppOptM ``Bool.eq_false_iff #[some value], decl.toExpr])
+      return found
+  for (statement, refutes) in negated do
+    let owed ← goal.withContext (mkFreshExprSyntheticOpaqueMVar statement)
+    let saved ← saveState
+    if ← blockInstance owed.mvarId! then
+      goal.assign (← goal.withContext do
+        mkAbsurd (← goal.getType) (← instantiateMVars owed) refutes)
+      return true
+    let names ← getNGen
+    saved.restore
+    setNGen names
+  return false
+
+private theorem not_exists_of_forall.{u} {α : Sort u} {p : α → Prop} (held : ∀ x, ¬p x) : ¬∃ x, p x :=
+  fun ⟨x, holds⟩ => held x holds
+
+private theorem not_and_of_imp {a b : Prop} (held : a → ¬b) : ¬(a ∧ b) :=
+  fun ⟨left, right⟩ => held left right
+
+/-- `decide` reads a goal up to negation, as it reads a hypothesis: `¬¬A` as `A`,
+`¬(A ∨ B)` as its parts, `¬∃ x, φ` as `∀ x, ¬φ`, `¬(A ∧ B)` as `A → ¬B`; no normal
+form rewrites a negation. The goals the reading leaves, the goal itself where it
+reads none. -/
+private def readNegatedGoal (goal : MVarId) : MetaM (List MVarId) := goal.withContext do
+  let target ← whnfR (← instantiateMVars (← goal.getType))
+  let some inner := target.not? | return [goal]
+  let inner ← whnfR inner
+  if inner.isAppOfArity ``Not 1 then
+    return ← goal.apply (mkConst ``not_not_intro)
+  if inner.isAppOfArity ``Or 2 then
+    return ← goal.apply (mkConst ``not_or_intro)
+  if inner.isAppOfArity ``Exists 2 then
+    let [next] ← goal.apply (← mkConstWithFreshMVarLevels ``not_exists_of_forall) | return [goal]
+    let (_, next) ← next.intro1
+    return [next]
+  if inner.isAppOfArity ``And 2 then
+    let [next] ← goal.apply (mkConst ``not_and_of_imp) | return [goal]
+    let (_, next) ← next.intro1
+    return [next]
+  return [goal]
+
+/-- `decide`'s alternative at a goal `False` (`instanceRefutation`). -/
+elab "verex_instance_refutation" : tactic => focusGoal do
+  unless ← instanceRefutation (← getMainGoal) do
+    throwError "no hypothesis negates an instance of a quantified hypothesis"
+  replaceMainGoal []
+
+/-- A group's conjunction, part by part. -/
+private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MVarId) := do
+  match fuel with
+  | 0 => return [goal]
+  | fuel + 1 =>
+    let target ← goal.withContext do whnfR (← instantiateMVars (← goal.getType))
+    unless target.isAppOfArity ``And 2 do return [goal]
+    let halves ← goal.apply (mkConst ``And.intro)
+    halves.flatMapM (conjunctionParts · fuel)
+
 @[tactic blockDecideTactic] def evalBlockDecide : Tactic := fun _ => do
   let goal ← getMainGoal
   if (← closeByStatement goal) || (← statedWitness goal) then
     replaceMainGoal []
+    return
+  -- A goal read up to negation; a reading that does not close keeps the goal.
+  let saved ← saveState
+  let names ← getNGen
+  let parts ← readNegatedGoal goal
+  unless parts == [goal] do
+    try
+      for part in parts do
+        let some part ← normalizeFact part none | continue
+        setGoals [part]
+        evalTactic (← blockDecide)
+      setGoals []
+      return
+    catch _ =>
+      saved.restore
+      setNGen names
+  -- A conjunction part by part: each part is one bounded check.
+  if ← goal.withContext do return (← whnfR (← instantiateMVars (← goal.getType))).isAppOfArity ``And 2 then
+    let parts ← conjunctionParts goal
+    for part in parts do
+      setGoals [part]
+      evalTactic (← blockDecide)
+    setGoals []
     return
   let some goal ← impliedFacts goal | replaceMainGoal []
   replaceMainGoal [goal]
@@ -2491,14 +3049,15 @@ private def statedWitness (goal : MVarId) : MetaM Bool := goal.withContext do
     term.isAppOf ``VerexIR.SpecMap.keyAt || term.isAppOf ``VerexIR.SpecMap.valueAt ||
       term.isAppOf ``VerexIR.SpecMap.rank || term.isAppOf ``VerexIR.SpecMap.hasKey).isSome
   if target.isConstOf ``False then
-    evalTactic (← `(tactic| first | verex_negation_conflict | omega | verex_bool_conflict |
-      verex_instance))
+    evalTactic (← `(tactic| first
+      | verex_negation_conflict | verex_block_omega | verex_bool_conflict | verex_instance
+      | verex_instance_refutation))
   else if readsMap then
     evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_instance |
-      omega))
+      verex_block_omega))
   else
     try
-      evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | omega |
+      evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_block_omega |
         verex_instance))
     catch failure =>
       unless ← blockInstance goal do throw failure
@@ -3137,6 +3696,67 @@ def assertStep (step : Syntax) (index : String)
       remaining := remaining.push next
   setGoals remaining.toList
 
+/-- The value a conjunct of `φ` equates to its binder at index `depth`, under
+the membership a body reading the binder natively binds (`fits`). -/
+private partial def definingValue? (depth : Nat) (part : Lean.Expr) : Option Lean.Expr := do
+  let part := part.consumeMData
+  if part.isAppOfArity ``And 2 then
+    return ← definingValue? depth (part.getArg! 0) <|> definingValue? depth (part.getArg! 1)
+  if part.isAppOfArity ``Exists 2 then
+    let .lam _ _ inner _ := part.appArg!.consumeMData | none
+    return ← definingValue? (depth + 1) inner
+  let some (_, lhs, rhs) := part.eq? | none
+  if lhs == .bvar depth && !rhs.hasLooseBVars then return rhs
+  if rhs == .bvar depth && !lhs.hasLooseBVars then return lhs
+  none
+
+/-- The integer `∃ x : Int, φ` defines, `v` of a conjunct `x = v` or `v = x` of
+`φ`, `v` not holding `x`, and `φ`. -/
+private def definedInteger? (fact : Lean.Expr) : Option (Lean.Expr × Lean.Expr) := do
+  let fact := fact.consumeMData
+  guard (fact.isAppOfArity ``Exists 2 && (fact.getArg! 0).isConstOf ``Int)
+  let .lam _ _ body _ := fact.appArg!.consumeMData | none
+  return (← definingValue? 0 body, body)
+
+/-- `let x : T where φ` at each goal. Where `φ` defines `x` by an equation with
+an integer term `v`, `x` is the scope name of `v`, and `φ` at `v` with `x`'s
+range is owed by `decide` and given as the facts `fact.k`, `fact.k_1`, …: no
+witness local, no substitution. Otherwise `exists x : T: φ` is proved by
+`decide` and opened, the witness the local `x` in scope, `φ` the facts, in the
+normal form; `x` itself is never substituted. -/
+def letWhereStep (step : Syntax) (index : String) : TacticM Unit := do
+  let statement := letWhereExists step
+  let lowered ← loweredAt statement
+  let some (x, _) := (forallBinders step)[0]?
+    | throwErrorAt step[1] "`let … where` binds a name at its type: `let x : T where φ`"
+  let decide ← blockDecide
+  let name := blockFactName "fact" index
+  let mut remaining := #[]
+  for goal in ← getGoals do
+    let fact ← goal.withContext (translateStep lowered statement)
+    if let some (value, body) := definedInteger? fact then
+      let (normal, proof, _) ← proveNormal step goal (body.instantiate1 value) (evalTactic decide)
+        (← blockRules goal)
+      let named ← hideEntries (← addScopeEntries goal #[(x, value)])
+      let (_, opened) ← (← named.assert name normal proof).intro1P
+      if let some next ← destructureFact opened name (always := true) then
+        remaining := remaining.push next
+      continue
+    let (_, owed, equality?) ← proveNormal step goal fact (evalTactic decide) (← blockRules goal)
+    let proof ← goal.withContext do
+      match equality? with
+      | some equality => mkEqMPR equality owed
+      | none => pure owed
+    let (hypothesis, next) ← (← goal.assert name fact proof).intro1P
+    let #[case] ← next.cases hypothesis #[{ varNames := [Name.mkSimple x, name] }]
+      | throwErrorAt step "the existential did not open"
+    let some witness := case.fields[0]? | throwErrorAt step "the existential did not open"
+    let opened ← hideEntries (← addScopeEntries case.mvarId #[(x, witness)])
+    let some opened ← normalizeFact opened (some name) | continue
+    if let some next ← destructureFact opened name (always := true) then
+      remaining := remaining.push next
+  setGoals remaining.toList
+
 /-- A `calc` step's links and conclusion. -/
 private def calcChainOf (step : Syntax) : TacticM (Array Syntax × Syntax) :=
   match calcChain step[2] with
@@ -3268,46 +3888,6 @@ private def splitKind? (lowered : LoweredStep) : Option SplitKind := do
       else none
   | _ => none
 
-/-- A case fact that its normal form states as an existential or a
-conjunction, taken apart: the witnesses locals, each part a fact of the block,
-`name`, `name_1`, …, as a model value a case reads (`∃ a, o = some a ∧ …`) is
-named for the facts that read it. The goal and the parts' names. -/
-private partial def takeFactApart (goal : MVarId) (name : Name) (next : Nat := 1) :
-    TacticM (MVarId × Array Name) := do
-  let some fact ← goal.withContext do return (← getLCtx).findFromUserName? name
-    | return (goal, #[])
-  let type ← goal.withContext do whnfR (← instantiateMVars fact.type)
-  if type.isAppOfArity ``Exists 2 then
-    let witness ← mkFreshUserName `witness
-    let #[case] ← goal.cases fact.fvarId #[{ varNames := [witness, name] }] | return (goal, #[name])
-    return ← takeFactApart case.mvarId name next
-  if type.isAppOfArity ``And 2 then
-    let rest := Name.mkSimple s!"{name}_{next}"
-    let #[case] ← goal.cases fact.fvarId #[{ varNames := [name, rest] }] | return (goal, #[name])
-    let some restFact ← case.mvarId.withContext do return (← getLCtx).findFromUserName? rest
-      | return (case.mvarId, #[name])
-    let goal ← markFact case.mvarId restFact.fvarId
-    let (goal, restParts) ← takeFactApart goal rest (next + 1)
-    let (goal, parts) ← takeFactApart goal name (next + 1)
-    return (goal, parts ++ restParts)
-  return (goal, #[name])
-
-/-- A case fact taken apart (`takeFactApart`), then, under the bounds of the
-values its parts read, each part normalized and settled. The goal after,
-none where it is closed. -/
-private def destructureFact (goal : MVarId) (name : Name) : TacticM (Option MVarId) := do
-  let (goal, parts) ← takeFactApart goal name
-  if parts.size ≤ 1 then return some goal
-  setGoals [goal]
-  evalTactic (← `(tactic| verex_type_bounds))
-  let [goal] ← getGoals | return none
-  let mut goal := goal
-  for part in parts do
-    let some next ← normalizeFact goal (some part) | return none
-    let some next ← settleFact next part | return none
-    goal := next
-  return some goal
-
 /-- The hypotheses of a goal that hold a term, which a split of the term
 generalizes with the goal, so that each case reads them at its value. -/
 private def holding (goal : MVarId) (term : Lean.Expr) : MetaM (Array FVarId) := goal.withContext do
@@ -3425,16 +4005,6 @@ def letVariantStep (step : Syntax) (index : String) : TacticM Unit := do
       throwErrorAt step[6] "`let V \{ … } := e` destructures a value of an enum type"
     cases := cases ++ (← splitVariant goal step[6] term (blockFactName "let" index))
   setGoals (← (← prepareCases cases).mapM reduceDefinitions)
-
-/-- A group's conjunction, part by part. -/
-private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MVarId) := do
-  match fuel with
-  | 0 => return [goal]
-  | fuel + 1 =>
-    let target ← goal.withContext do whnfR (← instantiateMVars (← goal.getType))
-    unless target.isAppOfArity ``And 2 do return [goal]
-    let halves ← goal.apply (mkConst ``And.intro)
-    halves.flatMapM (conjunctionParts · fuel)
 
 /-- An obligation's target in the block's normal form: the block's rules,
 then the denotation's normal form, whose conditional rules (a quotient's
@@ -3564,10 +4134,12 @@ def closeByDecide : TacticM (Array MVarId) := do
   setGoals (← normalized.flatMapM (conjunctionParts ·))
   let mut open_ := #[]
   for goal in ← getGoals do
+    let started ← IO.getNumHeartbeats
     let (_, normal) ← goal.intros
     setGoals [normal]
     try evalTactic (← blockDecide)
     catch _ => pure ()
+    stageLog s!"decide goal: {((← IO.getNumHeartbeats) - started) / 1000}k"
     open_ := open_ ++ (← getUnsolvedGoals).toArray
   setGoals open_.toList
   return open_
@@ -3837,6 +4409,27 @@ def witnessStep (step : Syntax) : TacticM Unit := do
     if let some normal ← normalizeFact goal none then remaining := remaining.push normal
   setGoals remaining.toList
 
+/-- `assert (∃ x, φ) by witness e, …` at each goal: `witness`'s step at the owed
+existential, its body by `decide`, then a hypothesis `fact.k` of the goal. -/
+def assertWitnessStep (step : Syntax) (index : String) : TacticM Unit := do
+  let lowered ← loweredAt step[1]
+  let decide ← blockDecide
+  let prove : TacticM Unit := do
+    witnessStep step[2][1]
+    let mut open_ := #[]
+    for owed in ← getGoals do
+      setGoals [owed]
+      evalTactic decide
+      open_ := open_ ++ (← getUnsolvedGoals).toArray
+    setGoals open_.toList
+  let name := blockFactName "fact" index
+  let mut remaining := #[]
+  for goal in ← getGoals do
+    let fact ← goal.withContext (translateStep lowered step[1])
+    if let some next ← addFact step goal name fact prove false then
+      remaining := remaining.push next
+  setGoals remaining.toList
+
 /-- The unit a block's expressions are lowered in: the module's copy. -/
 private def blockUnit? (block : Syntax) : TacticM (Option ValidatedUnit) := do
   let some expression := (blockExpressions block)[0]? | return none
@@ -3908,10 +4501,14 @@ private def pointAssertStep (step : Syntax) (point : ProgramPointKey) (number : 
 partial def runSteps (block : Syntax) (path : String := "") : TacticM Unit := do
   for step in blockSteps block, position in [0:(blockSteps block).size] do
     let index := s!"{path}{position}"
-    if step.isOfKind ``stepAssert then
+    let started ← IO.getNumHeartbeats
+    if step.isOfKind ``stepAssert && step[2].getNumArgs == 2 && step[2][1].isOfKind ``closerWitness then
+      assertWitnessStep step index
+    else if step.isOfKind ``stepAssert then
       assertStep step index fun block path => do runSteps block path; closeByDecide
     else if step.isOfKind ``stepLet then pure ()
     else if step.isOfKind ``stepLetVariant then letVariantStep step index
+    else if step.isOfKind ``stepLetWhere then letWhereStep step index
     else if step.isOfKind ``stepSplit then splitStep step index
     else if step.isOfKind ``stepApply then
       applyStep step[1].getSepArgs (← blockDecide) index
@@ -3931,6 +4528,8 @@ partial def runSteps (block : Syntax) (path : String := "") : TacticM Unit := do
       let script : TSyntax ``Lean.Parser.Tactic.tacticSeq := ⟨step[2]⟩
       evalTactic (← `(tactic| all_goals $script))
     else throwErrorAt step "this step is not supported yet"
+    stageLog s!"step {index} at line {(← getFileMap).toPosition (step.getPos?.getD 0) |>.line}: \
+      {((← IO.getNumHeartbeats) - started) / 1000}k, {(← getGoals).length} goals"
 
 /-- A lemma item's steps over its theorem's goal, its premise taken apart:
 each parameter's binder entered under the parameter's name, the bounds of
@@ -3956,6 +4555,9 @@ for the conclusion. -/
   setGoals entered.toList
   evalTactic (← `(tactic| all_goals verex_type_bounds))
   setGoals (← (← getGoals).mapM reduceDefinitions)
+  -- The conclusion in the normal form under the premises: one spelling of a
+  -- quotient for the steps (`doc/plan/proof-language.md`, "One spelling").
+  setGoals (← (← getGoals).filterMapM fun goal => normalizeFact goal none)
   runSteps block
   let open_ ← closeByDecide
   for goal in open_ do
@@ -3985,9 +4587,30 @@ elab "verex_unmark" : tactic => focusGoal do
     goal ← goal.replaceTargetDefEq (← goal.withContext (unmark target))
   replaceMainGoal [goal]
 
+/-- The path's hypotheses holding a conditional a clause's premise decides, which
+the path prepared without it, with the conditional reduced (`reduceStatedIte`)
+and the branch read at the caller's family. -/
+elab "verex_premise_conditionals" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let decided ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let sites := sitesWhere (fun e => e.isAppOfArity ``ite 5 && !e.hasLooseBVars)
+        #[← instantiateMVars decl.type]
+      return if ← sites.anyM (fun site => return (← statedDecision? (site.getArg! 1)).isSome)
+        then found.push decl.fvarId else found
+  if decided.isEmpty then return
+  goal.withContext do
+    let ctx ← Simp.mkContext { failIfUnchanged := false } #[] (← getSimpCongrTheorems)
+    let simprocs ← ({} : Simprocs).add ``reduceStatedIte (post := true)
+    -- A branch reads a callee's results at the caller's family, as the path does.
+    let simprocs ← simprocs.add ``VerexIR.Proofs.Denote.whichProjectFamily (post := true)
+    let (result, _) ← simpGoal goal ctx #[simprocs] (simplifyTarget := false) (fvarIdsToSimp := decided)
+    replaceMainGoal (result.map (·.2) |>.toList)
+
 @[tactic verexStepObligation] def evalStepObligation : Tactic := fun stx => do
   let step := stx[1]
-  let block := if step.isOfKind ``stepOn then step[3] else step[2]
+  let block := if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then step[3] else step[2]
   let started ← IO.getNumHeartbeats
   -- The values prepared, the maps named (their size bounds and typed reads)
   -- where the block or the obligation reads a map: on a path prepared once
@@ -4063,6 +4686,7 @@ elab "verex_unmark" : tactic => focusGoal do
         prepared := prepared.push (← hideEntries goal)
     setGoals prepared.toList
     setGoals (← (← getGoals).mapM reduceDefinitions)
+    evalTactic (← `(tactic| all_goals verex_premise_conditionals))
     let preparedAt ← IO.getNumHeartbeats
     runSteps block
     let stepsAt ← IO.getNumHeartbeats
@@ -4271,7 +4895,9 @@ private def groupLeaves (alternatives : Array RouteAlternative) : TacticM Unit :
         else pure #[]
       return ({ items := some items, selector, reference := step, steps } : RouteAlternative)
     else if step.isOfKind ``stepOnDefault then
-      return { items := none, selector := #[], reference := step, steps }
+      let selector ← if step[2].getNumArgs == 2 then step[2][1].getSepArgs.mapM decisionPattern
+        else pure #[]
+      return { items := none, selector, reference := step, steps }
     else throwErrorAt step "at the top of a proof, a step is an `on`, `at` or `after` block or \
       `lean =>`"
   -- A point's `assert e by c` is shorthand for `on assert k of p { assert e by c }`,

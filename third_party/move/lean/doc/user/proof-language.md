@@ -18,7 +18,10 @@ files of the framework's `ordered_map` and of the end-to-end fixtures under
 Verifying `f` means discharging its *obligations*:
 
 - each `ensures`, `aborts_if`, and `aborts_with` clause of its spec, by index
-  in the block (`ensures 2`);
+  in the block (`ensures 2`). A
+  returning path owes that no abort condition holds, keyed `aborts_if k` for each
+  clause: `on aborts_if k` names the clause on every path, aborting and returning,
+  and `when aborts at …` or `when returns` selects one side;
 - each `requires` clause of every callee, owed at each call
   (`requires 1 of iter_next at call 2` is the first precondition of
   `iter_next`, owed at its second call in the body; `requires at invoke 1`
@@ -28,10 +31,12 @@ Verifying `f` means discharging its *obligations*:
   function has one loop);
 - each in-body `spec assert` (`assert 1`);
 - the data invariants of values the function builds, and the module and
-  stored invariants it owes (`data invariant`, `module invariant`, `stored
-  invariant`); a lemma application's premise (`lemma requires`), an
+  stored invariants it owes (`data invariant k`, `data invariant k of S` where a
+  function constructs two struct types, `module invariant`, `stored invariant k`); a lemma application's premise (`lemma requires`), an
   unrolled loop's bound (`unroll`), and a ghost field's domain (`ghost
-  domain`).
+  domain`);
+- a goal that is the whole continuation after a call, keyed by its point
+  (`after call 1 of g`).
 
 An obligation is keyed by what it is — the clause and the site that raises it
 — never by a position in some generated term. Sites are counted per kind in
@@ -133,6 +138,7 @@ map the iteration starts with, and `m'` is not yet bound there.
 | Step | Meaning |
 |---|---|
 | `let x := e` | bind `e` for the following steps |
+| `let x : T where φ` | owe `exists x : T: φ` by `decide` (an instance of a guarded quantified hypothesis included), and gain `φ` with the witness `x` in scope. Where `φ` defines `x` by an equation with an integer term, `x` names that term, and `φ` at it and its range are what is owed and gained |
 | `assert e by c` | owe `e`, proved by closer `c` (`decide` without `by`), then use it as a fact |
 | `assert e by contradiction { … }` | run the block under `!e`; closes when `decide` finds `false` |
 | `assume e` | use `e` without proof, for this obligation only; enters the assumption ledger, with a warning. Allowed inside an `on` block only |
@@ -142,9 +148,10 @@ map the iteration starts with, and `m'` is not yet bound there.
 | `let V { f, … } := e` | destructure a value known to be of variant `V`; owes `e is V`, creates no cases |
 | `calc(e₁ op e₂ …)` | a chain of steps, each proved by the closer, conclusion gained |
 | `forall x : T where g { … }` | run the block under `x` and `g`; gain `∀ x, g ==> (facts asserted)` |
-| `witness e, …` | supply the witnesses of an existential obligation or `assert`; its body is then owed |
+| `witness e, …` | supply the witnesses of an existential obligation or `assert`; its body is then owed. On `data invariant k` and `stored invariant k` a witness has its own type and is coerced to the binder's; it applies to every obligation the `on` names, each of which must state the existential (`on data invariant 1, stored invariant 1 { witness … }`) |
 | `if e { A } else { B }` | gain `e ==> A` and `!e ==> B` without splitting the proof |
 | `on k, … [when d, …] { … }` | prove the named obligations, on the paths the selector takes |
+| `on _ [when d, …] { … }` | prove every obligation no earlier `on` takes, on the paths the selector takes; the remaining paths go to the alternatives after it |
 | `at p [when d, …] { … }` / `after s { … }` | place facts at a program point, owed once, inherited by every obligation after it |
 | `lean => tac` | run Lean tactics on the goals at this step |
 
@@ -247,7 +254,7 @@ fact holds after the point.
 
 Selectors take paths apart by the source decisions on them: `if 3 then`,
 `match 2 Some`, `loop 1 exits`, `invoke 1 is g`, `aborts at call 1 of
-add_shares`. A path goes to the first `on` in text order whose key and
+add_shares`, `returns`. A path goes to the first `on` in text order whose key and
 selector match it, so a block for selected paths precedes the general block
 for the same clause. `pool_u64::buy_in` aborts either in its own addition
 or inside `add_shares`:
@@ -269,7 +276,7 @@ key's paths.
 
 | Closer | Decides |
 |---|---|
-| `decide` | the default: a fact stated by a hypothesis (or its disjunct, an equation either way round), a contradiction in the facts in scope, an instance of a quantified hypothesis, reflexivity, or linear arithmetic over the facts in scope; a hypothesis `p ==> q` or `p <==> q` gives `q` where `p` is stated. Bounded; no search |
+| `decide` | the default: a fact stated by a hypothesis (or its disjunct, an equation either way round), the remaining disjunct of a hypothesis whose other disjunct's negation is stated, a contradiction in the facts in scope, an instance of a quantified hypothesis, reflexivity, or linear arithmetic over the facts in scope; a hypothesis `p ==> q` or `p <==> q` gives `q` where `p` is stated. An instance's binders come from the goal and the stated facts: a premise that reads a vector or map or equates a call's result is matched against a stated fact of that shape, a shifted position `v[j - 1]` is solved against `v[k]` as `j := k + 1`, and the other premises go by arithmetic. A stated `a <= k - 1` states `a < k` for a literal `k`, and conversely. A disjunction closes from a stated disjunct, so a witness goes on an assert that states it: `assert ∃ (k : u64), … by witness i - 1`. Bounded; no search |
 | `arith` | linear arithmetic with the stated bounds, no case splits |
 | `eval` | closed maps, literal vectors, ground arithmetic |
 | `ring` | polynomial identities over the integers, `e₁ == e₂`, the facts in scope hidden |
@@ -449,6 +456,7 @@ and Euclidean division differ, the lemma requires nonnegative operands):
 | `lemma_div_mul_le(x, c)` | `0 <= x && 0 < c ==> x / c * c <= x` |
 | `lemma_div_add_mul(x, b, c)` | `0 <= x && 0 <= b && 0 < c ==> (x + b * c) / c == x / c + b` |
 | `lemma_mod_small(x, c)` | `0 <= x && x < c ==> x % c == x` |
+| `lemma_div_mod(x, c)` | `0 <= x && 0 < c ==> x / c * c + x % c == x && 0 <= x % c && x % c < c` |
 | `lemma_shl_mul(x, k)` | `x << k == x * 2^k` |
 | `lemma_shr_div(x, k)` | `0 <= x ==> x >> k == x / 2^k` |
 

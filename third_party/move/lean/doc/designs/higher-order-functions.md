@@ -127,6 +127,22 @@ and closure targets join a function's callees. Since
 `invoke`'s denotation is defined from the big-step meaning, its case of
 the agreement is by definition.
 
+`aborts_of` and `ensures_of` of a known target with type arguments are read
+directly: `aborts_of<f<τ̄>>(x)` means the call `f<τ̄>(x)` a body denotes aborts
+(`CallAborts`, `CallEnsures`), the target's meaning at the family its type arguments
+induce and the instantiation its frame computes from the enclosing function's. No
+function value is constructed, so no `ClosureFrame` is owed, at a closed type argument
+or at a type parameter of the verified function, as a body's call owes none.
+`closureMeaning_closureOfGeneric` relates the two: under coherence the literal's
+invocation is this call. The solver reads it as the call: where a goal owes it, the
+body's call of the target assumes its run and abort (`wp_call_runs`) and, where runs
+agree, the absence of its abort (`wp_call_runs_agree`), at the clause's spelling of the
+type arguments (`frameInstantiation_congr`); as a hypothesis it becomes the call's
+weakest precondition, which the call rule reads. Not served, with the error of a function
+value with type arguments: such a literal as a value (`f == upsert<T>`), one capturing
+values, and a `result_of`, `state_of` or `requires_of` of it. In a unit verified through
+its model the reading is the target's interface contract ([`ghost-fields.md`](ghost-fields.md)).
+
 ## Relation to the Prover's encoding
 
 The Prover represents the function values of a type `τ` by a datatype of the
@@ -506,8 +522,10 @@ one. Three pieces relate them.
   (`TypedAs.subst`). A unit's readings agree when every closed type
   identifier the compiler reads natively (`ntyOf`) is `TypedAs` its
   semantic type, and every function's signature is, over its generic
-  environment; decided once per unit by evaluation. A unit whose readings
-  do not agree is reported as not memory-typed.
+  environment; decided once per unit by evaluation, each table once: a
+  namespace holding the first namespace's types and names takes its verdicts
+  (`everyNamespaceType`). A unit whose readings do not agree is reported as
+  not memory-typed.
 - *Faithful closures.* `HasType.closure` types a closure only under an
   instantiation faithful to its arguments (`FrameInstantiation`), which
   the native typing also checks in its decidable form; a closure the

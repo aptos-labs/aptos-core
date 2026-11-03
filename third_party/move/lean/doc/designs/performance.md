@@ -61,7 +61,11 @@ certificate. Use all of these.
 5. **One target on its own.** `scripts/isolate-target.py <file> <module>
    <target> -o <out> [--option name=value]` keeps one target verified
    (every other specification block gets `pragma verify = false`) with the
-   options set after the import, so a module extract runs in seconds.
+   options set after the import, so a module extract runs in seconds. Run it
+   with `verex-move elaborate <out>`: the verifier is native there, and its
+   heartbeats compare with the driver's, where `lake env lean` interprets it.
+   The profile of a target stopped by its budget reports what it spent up to
+   there; `step statement` is what it spent before its first tactic.
 6. **The benchmark problems.** `scripts/verex-bench.py run [--only …]`
    measures the standard problems natively by phase and prints each
    problem's change against the previous local run
@@ -145,6 +149,13 @@ never the checked environment.
   unnamed; positions reading a name are unnamed after normalization
   (`verex_unname_positions`, `verex_unname`). `sqrt` from over 1.5G to 5 s
   at +1.7% on the benchmark.
+- **`isDefEq` does not see that a term is shared.** Where two terms differ in
+  an argument that converts only under its application, it fails on the
+  argument at every enclosing application and unfolds instead. A respelling of
+  families is compared by congruence, `isDefEq` only on the smallest
+  application that converts, each pair once per target (`convertsAtSites`):
+  on `coin::name` one hypothesis of 1.76M tree nodes, 867 distinct, differing
+  at one site, from 14.7M to 1.0M; `version::on_new_epoch` from 50.4M to 22.9M.
 - **Rewriting with hypotheses must terminate.** `verex_simp_all` admits an
   equation as a rule only if its right side reaches no admitted left side
   leading back to it.
@@ -212,11 +223,60 @@ native ones; most act on the normalization of encoded terms.
   (`native-verification.md`): the call stage is 5–12% of automatic and
   20–28% of authored targets; a declaration costs 0.3–3M. Open: declared
   once per module, or cached proofs as the contract normal forms
-  (`verex.contractLemmas`, off: typed −3.3%, authored +0.3%) are.
-- **The call's `post` subgoal carries the continuation** (190k–480k nodes
-  against 2k–25k of contract), walked by the `call-contract` simp at every
-  call. Folding it into a local definition before `wp_call` cut the stage
-  to two thirds but broke the scripts that read the continuation.
+  (`verex.contractLemmas`, on by default: typed −3.3%, authored +0.3%) are.
+- **The call's subgoals carry the continuations** (190k–480k nodes against
+  2k–25k of contract): `wp_call` applies them to the callee's fresh result,
+  error and final state, and `instantiateMVars` beta-reduces the application,
+  so a simp over the subgoal walks the whole continuation. The solver holds
+  both continuations as local definitions before the call rules
+  (`holdContinuations`) and puts them back after the `call-contract` simp,
+  reduced at their arguments (`releaseContinuations`): applied to variables
+  only, the body is normal as it was; otherwise the released goal is
+  normalized again in full, as every call was before. The hold precedes
+  `wp_specialized`, whose premise reads the result through its transport
+  (`ensures (ResultShape.toSkolem θ shape result)`): that read must reach
+  the leaf reduced, so the rule's wrapper is never what is held. The inline
+  steps normalize the whole goal, continuations included: a continuation is
+  normal only as far as the walk has unfolded it (`wp_bind` and `wp_callAt`
+  build new structure in it), so walking around it changes what a leaf
+  receives. The default call path is `wp_call_normal`
+  (`verex.contractLemmas` is on by default), which this version does not
+  hold on, so `call-contract` on `multisig_account::can_execute` stays 328M.
+  Measured in the next version, not landed: held there too, that step is
+  20M and the call stage 174M (385M), with 27 leaves reached instead of 18.
+  A continuation's read of the result, `(shape.subst θ).toBody r`, is
+  normal under its own binder and reduces once the rule's premise states
+  the result, so a release by beta alone leaves it unreduced; that version
+  holds the continuation abstracted over its reads of its parameters (the
+  maximal subterms mentioning a parameter and no other local, a bare
+  occurrence among them) and normalizes the released goal only along the
+  paths to the released arguments (marked; a memoized check stops every
+  subterm without a mark), which restores the read at the same cost, and
+  names the call's premises after the callee as its clauses are
+  (`back_key_ensures`, `back_key_frame`, `back_key_returns`) where the full
+  walk had left simp's artifact `x` on every binder. Open there: the eager
+  walk also unfolded the program text after a call and normalized it with
+  the call's facts in context. Unfolding at the release along the paths to
+  the denotation functions restores the first, not the second, so leaves'
+  facts differ: `SharedBehaviorJoins`, `StateLabelCallObservations` and
+  `computed_call_range_results::repeated_choices` fail, as do 13
+  `big_ordered_map` targets.
+
+### Splits
+
+- **A conditional under `wp` split by `split`**: on `stake::leave_validator_set`
+  one `wp` of `ite` costs 420M of the 590M split stage: `verex_split` fails
+  after 197M (97M of it the context normalization before the `split`
+  tactic, which abstracts the conditional over the whole goal and fails
+  here), and `verex_prepare_leaf` then prepares the goal as a leaf for
+  222M. The other 150 splits cost 0.6M together plus 84M of normalization
+  after them. The dependent conditional already splits by its own rule
+  (`wp_dite_rule`); splitting the plain one by `wp_ite` the same way, at the
+  goal's own instance, takes the split stage from 590M to 277M, with 14
+  leaves reached instead of 3, and the target still exceeds 1G. Measured on
+  the isolated target with `verex.solverProfile`; the branch hypothesis is
+  then named `h`, as
+  after a dependent split, where `split` named it `h✝`.
 
 ### Leaf engine
 

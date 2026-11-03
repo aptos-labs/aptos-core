@@ -871,15 +871,15 @@ private theorem closureRun_ok_agree {executable : ExecutableUnit unit}
   rw [← resolved, ← resolved₂]
   simp only [RuntimeState.resolveReturned, renamed, globals, tableHandles, and_self]
 
-/-- An invocation that returns from `state` does not abort from it, on
+/-- A closure's run that returns from `state` excludes an abort from it, on
 arguments of the same entry values. -/
-theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
-    {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
-    {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
+private theorem closureRun_not_aborts_of_ok {executable : ExecutableUnit unit}
+    (agrees : RunsAgree executable) {closure : ClosureValue} {σs : NRow}
+    (flat : σs.lentFlat = true) {shape : ResultShape}
     {args args' : HList σs} (same : HList.settle σs args = HList.settle σs args')
     {state post : Memory unit} {result : shape.carrier}
-    (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
-    ¬AbortsOf (closureMeaning executable) σs shared shape function args' state := by
+    (ok : (closureRun executable closure σs shape args).ok state result post) :
+    ¬∃ error, (closureRun executable closure σs shape args').aborts state error := by
   rintro ⟨error, start', loans', supplied', arguments', encodes', admissible', lends', composes',
     aborted⟩
   obtain ⟨start, loans, supplied, arguments, results, exit, -, -, encodes, admissible, lends,
@@ -888,11 +888,43 @@ theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgre
   obtain ⟨lentRow', lendsRow', rfl⟩ := lendArguments_lentFlat flat lends'
   rw [entries_of_settle same] at lendsRow'
   obtain ⟨_, aborted⟩ := aborted
-  obtain ⟨_, _, -, -, renamed, -⟩ := lentRuns_agree agrees
-    ((Carriers.functions σs shared shape.row).closure function).plain
+  obtain ⟨_, _, -, -, renamed, -⟩ := lentRuns_agree agrees closure.plain
     (HList.entries_plain σs args) encodes encodes' admissible admissible' lendsRow lendsRow'
     composes composes' runs aborted
   simp [Outcome.rename_returned, Outcome.rename_threw] at renamed
+
+/-- An invocation that returns from `state` does not abort from it, on
+arguments of the same entry values. -/
+theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
+    {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
+    {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
+    {args args' : HList σs} (same : HList.settle σs args = HList.settle σs args')
+    {state post : Memory unit} {result : shape.carrier}
+    (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
+    ¬AbortsOf (closureMeaning executable) σs shared shape function args' state :=
+  closureRun_not_aborts_of_ok agrees flat same ok
+
+/-- A call that returns from `state` does not abort from it. -/
+theorem not_callAborts_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
+    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
+    (flat : full.lentFlat = true) {shape : ResultShape} {args : HList full}
+    {state post : Memory unit} {result : shape.carrier}
+    (ok : CallEnsures (propheticMeaning executable typeInstantiation handle full shape args) result
+      state post) :
+    ¬CallAborts (propheticMeaning executable typeInstantiation handle full shape args) state := by
+  have closed := closureRun_closureOf executable handle (Weave.supplying full) rfl
+    typeInstantiation () shape args
+  rw [Weave.compose_supplying] at closed
+  rintro ⟨error, -, aborted⟩
+  have run : (closureRun executable (closureOf handle (Weave.supplying full).mask typeInstantiation
+      (σs := .nil) ()) full shape args).ok state result post := by
+    rw [closed]
+    exact ok.2
+  have failed : (closureRun executable (closureOf handle (Weave.supplying full).mask
+      typeInstantiation (σs := .nil) ()) full shape args).aborts state error := by
+    rw [closed]
+    exact aborted
+  exact closureRun_not_aborts_of_ok agrees flat rfl run ⟨error, failed⟩
 
 /-- `result_of` is the settled result of every run from `state` on
 arguments of the same entry values. -/
@@ -1382,6 +1414,30 @@ theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
       (fun settled default => resultOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled
         default)
       (fun settled => stateOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled),
+    continued.2.1, continued.2.2⟩
+
+/-- `wp_call_runs` where runs agree: the call's run also rules out its abort. -/
+theorem wp_call_runs_agree {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (agrees : RunsAgree executable)
+    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
+    {shape : ResultShape} (flat : full.lentFlat = true) {args : HList full}
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    {initial : Memory unit}
+    (continued : wp (propheticMeaning executable typeInstantiation handle full shape args)
+      (fun result final =>
+        CallEnsures (propheticMeaning executable typeInstantiation handle full shape args) result
+          initial final →
+        ¬CallAborts (propheticMeaning executable typeInstantiation handle full shape args) initial →
+        ensures result final)
+      (fun error =>
+        CallAborts (propheticMeaning executable typeInstantiation handle full shape args) initial →
+          aborts error)
+      initial) :
+    wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts
+      initial :=
+  wp_call_runs ⟨fun result final execution run => continued.1 result final execution run
+      (not_callAborts_of_ok agrees flat run),
     continued.2.1, continued.2.2⟩
 
 /-- Runs of the unit's functions end, at a family: an invocation of a typed

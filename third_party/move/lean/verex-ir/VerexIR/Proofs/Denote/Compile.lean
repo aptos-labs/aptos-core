@@ -300,6 +300,10 @@ def literalValue : (τ : NTy) → ConstValue → Except String τ.groundCarrier
   | .string, .string value => .ok value
   | .bytes, .bytes value => .ok value
   | .tuple elements, .tuple values => literalRow elements values.toList
+  | .vector element, .vector values => do
+      let values := (← values.toList.mapM (literalValue element)).toArray
+      if bounded : values.size < 2 ^ 64 then .ok ⟨values, bounded⟩
+      else .error "a vector literal is out of range"
   | _, _ => notCarried "a literal of this type"
 
 def literalRow : (row : NRow) → List ConstValue → Except String (@HList Carriers.ground row)

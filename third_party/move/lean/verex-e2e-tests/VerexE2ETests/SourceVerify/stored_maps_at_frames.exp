@@ -1,0 +1,16 @@
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:84:9: error: the specification clause `ensures result` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:82:5: error: verex verification failed: the automatic verification of `registered_false` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_maps_at_frames.proof.lean`:
+  verify registered_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:142:9: error: the specification clause `ensures result == 0` is not established
+VerexE2ETests/SourceVerify/stored_maps_at_frames.move:139:5: error: verex verification failed: the automatic verification of `proposal_count_false` failed; provide a proof in `VerexE2ETests/SourceVerify/stored_maps_at_frames.proof.lean`:
+  verify proposal_count_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
