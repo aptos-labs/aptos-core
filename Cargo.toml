@@ -545,8 +545,8 @@ ark-std = { version = "0.5.0", features = ["getrandom"] }
 arr_macro = "0.2.1"
 assert_approx_eq = "1.1.0"
 async-mutex = "1.4.0"
-async-recursion = "1.0.5"
-async-trait = "0.1.53"
+async-recursion = "1.2.0"
+async-trait = "0.1.92"
 axum = "0.7.5"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.77"
