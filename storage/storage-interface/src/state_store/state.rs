@@ -235,7 +235,7 @@ impl State {
                 |(cache, overlay, hot_metadata, batched_updates, per_version)| {
                     let mut lru = HotStateLRU::new(
                         NonZeroUsize::new(self.hot_state_config.max_items_per_shard).unwrap(),
-                        self.hot_state_config.max_value_bytes_per_shard,
+                        self.hot_state_config.max_bytes_per_shard,
                         Arc::clone(&persisted_hot_state),
                         overlay,
                         hot_metadata.latest,
@@ -585,7 +585,7 @@ mod tests {
 
     const TEST_CONFIG: HotStateConfig = HotStateConfig {
         max_items_per_shard: 100,
-        max_value_bytes_per_shard: 10_000,
+        max_bytes_per_shard: 10_000,
         refresh_interval_versions: 100,
         delete_on_restart: false,
     };

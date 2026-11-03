@@ -706,7 +706,7 @@ mod tests {
 
     const TEST_CONFIG: HotStateConfig = HotStateConfig {
         max_items_per_shard: 100,
-        max_value_bytes_per_shard: 10_000,
+        max_bytes_per_shard: 10_000,
         refresh_interval_versions: 100,
         delete_on_restart: false,
     };

@@ -13,8 +13,8 @@ use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 pub(crate) struct HotStateLRU<'a> {
     /// Max total number of items in the cache.
     capacity: NonZeroUsize,
-    /// Max sum of `StateSlot::size()` across all entries in the cache.
-    max_value_bytes: usize,
+    /// Max of `total_bytes()`.
+    max_bytes: usize,
     /// The entire committed hot state. While this contains all the shards, this struct is supposed
     /// to handle a single shard.
     committed: Arc<dyn HotStateView>,
@@ -35,7 +35,7 @@ pub(crate) struct HotStateLRU<'a> {
 impl<'a> HotStateLRU<'a> {
     pub fn new(
         capacity: NonZeroUsize,
-        max_value_bytes: usize,
+        max_bytes: usize,
         committed: Arc<dyn HotStateView>,
         overlay: &'a LayeredMap<HashValue, StateSlot>,
         head: Option<HashValue>,
@@ -45,7 +45,7 @@ impl<'a> HotStateLRU<'a> {
     ) -> Self {
         Self {
             capacity,
-            max_value_bytes,
+            max_bytes,
             committed,
             overlay,
             pending: HashMap::new(),
@@ -107,10 +107,9 @@ impl<'a> HotStateLRU<'a> {
     /// Returns the list of entries evicted, beginning from the LRU.
     pub fn maybe_evict(&mut self) -> Vec<(HashValue, StateSlot)> {
         let mut evicted = Vec::new();
-        // n.b. If the newest entry alone exceeds `max_value_bytes`, it gets evicted too, leaving
-        // the cache empty.
-        while self.num_items > self.capacity.get() || self.total_value_bytes > self.max_value_bytes
-        {
+        // n.b. If the newest entry alone exceeds `max_bytes`, it gets evicted too, leaving the
+        // cache empty.
+        while self.num_items > self.capacity.get() || self.total_bytes() > self.max_bytes {
             let tail = self
                 .tail
                 .expect("There must be entries to evict when current size is above limit.");
@@ -121,6 +120,12 @@ impl<'a> HotStateLRU<'a> {
             self.num_items -= 1;
         }
         evicted
+    }
+
+    /// Sum of key and value sizes, counting each key as its hash since that's all the hot state
+    /// base keeps.
+    fn total_bytes(&self) -> usize {
+        self.num_items * HashValue::LENGTH + self.total_value_bytes
     }
 
     /// Returns the deleted slot, or `None` if the key doesn't exist or is not hot.
@@ -350,12 +355,13 @@ mod tests {
         })
     }
 
-    /// Values are at most `ARB_STATE_VALUE_MAX_SIZE` bytes, so the byte limit often kicks in before
-    /// the item limit, and can be below the size of a single value.
-    fn arb_max_value_bytes() -> impl Strategy<Value = usize> {
+    /// Each entry is a 32-byte key hash plus a value of at most `ARB_STATE_VALUE_MAX_SIZE` bytes, so
+    /// the byte limit often kicks in before the item limit, and can be below the size of a single
+    /// entry.
+    fn arb_max_bytes() -> impl Strategy<Value = usize> {
         prop_oneof![
             1 => Just(usize::MAX),
-            3 => 0..=ARB_STATE_VALUE_MAX_SIZE * 5,
+            3 => 0..=(HashValue::LENGTH + ARB_STATE_VALUE_MAX_SIZE) * 5,
         ]
     }
 
@@ -379,12 +385,12 @@ mod tests {
     }
 
     /// Runs one block against a fresh `HotStateLRU` built from `committed` and `overlay`: applies
-    /// `updates`, evicts down to `capacity` and `max_value_bytes`, and checks every step against
-    /// the `naive_lru` oracle. Returns `into_updates()` so the caller can commit or stack the
-    /// result per its own model.
+    /// `updates`, evicts down to `capacity` and `max_bytes`, and checks every step against the
+    /// `naive_lru` oracle. Returns `into_updates()` so the caller can commit or stack the result
+    /// per its own model.
     fn run_block(
         capacity: NonZeroUsize,
-        max_value_bytes: usize,
+        max_bytes: usize,
         committed: Arc<dyn HotStateView>,
         overlay: &LayeredMap<HashValue, StateSlot>,
         head: Option<HashValue>,
@@ -402,7 +408,7 @@ mod tests {
     ) {
         let mut lru = HotStateLRU::new(
             capacity,
-            max_value_bytes,
+            max_bytes,
             committed,
             overlay,
             head,
@@ -424,7 +430,9 @@ mod tests {
         let actual_evicted = lru.maybe_evict();
         let mut expected_evicted = Vec::new();
         let mut naive_value_bytes: usize = naive_lru.iter().map(|(_, s)| s.size()).sum();
-        while naive_lru.len() > capacity.get() || naive_value_bytes > max_value_bytes {
+        while naive_lru.len() > capacity.get()
+            || naive_lru.len() * HashValue::LENGTH + naive_value_bytes > max_bytes
+        {
             let (key_hash, slot) = naive_lru.pop_lru().unwrap();
             naive_value_bytes -= slot.size();
             expected_evicted.push((key_hash, slot));
@@ -602,6 +610,109 @@ mod tests {
         assert_eq!(jmt_updates.len(), 2);
     }
 
+    fn hot_occupied(value_len: usize) -> StateSlotKind {
+        StateSlotKind::HotOccupied {
+            value_version: 0,
+            value: StateValue::new_legacy(vec![0; value_len].into()),
+            hot_since_version: 0,
+            lru_info: LRUEntry::uninitialized(),
+        }
+    }
+
+    fn hot_vacant() -> StateSlotKind {
+        StateSlotKind::HotVacant {
+            hot_since_version: 0,
+            lru_info: LRUEntry::uninitialized(),
+        }
+    }
+
+    /// Inserts `kinds` from oldest to newest into an empty LRU with room for plenty of items, then
+    /// evicts down to `max_bytes`. Returns the indices of the evicted and the remaining entries,
+    /// both from oldest to newest.
+    fn evict_by_bytes(max_bytes: usize, kinds: Vec<StateSlotKind>) -> (Vec<usize>, Vec<usize>) {
+        let test_obj = LRUTest::new_empty();
+        let mut lru = HotStateLRU::new(
+            NonZeroUsize::new(100).unwrap(),
+            max_bytes,
+            Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
+            &test_obj.overlay,
+            None,
+            None,
+            0,
+            0,
+        );
+        let keys: Vec<_> = (0..kinds.len())
+            .map(|i| StateKey::raw(format!("key{i}").as_bytes()))
+            .collect();
+        for (key, kind) in keys.iter().zip(kinds) {
+            lru.insert(key, StateSlot::new(key.clone(), kind));
+        }
+        let index_of = |key_hash: HashValue| {
+            keys.iter()
+                .position(|k| *k.crypto_hash_ref() == key_hash)
+                .unwrap()
+        };
+
+        let evicted = lru
+            .maybe_evict()
+            .into_iter()
+            .map(|(key_hash, _)| index_of(key_hash))
+            .collect();
+        lru.validate();
+        // `iter()` starts from the newest.
+        let mut remaining: Vec<_> = lru.iter().map(|(key_hash, _)| index_of(key_hash)).collect();
+        remaining.reverse();
+        (evicted, remaining)
+    }
+
+    #[test]
+    fn test_max_bytes_counts_key_hashes() {
+        // Each entry takes 32 + 10 = 42 bytes, so 3 entries take 126 bytes. The values alone
+        // (30 bytes) would fit any of these limits.
+        let entries = || vec![hot_occupied(10), hot_occupied(10), hot_occupied(10)];
+        assert_eq!(evict_by_bytes(126, entries()), (vec![], vec![0, 1, 2]));
+        assert_eq!(evict_by_bytes(125, entries()), (vec![0], vec![1, 2]));
+        assert_eq!(evict_by_bytes(84, entries()), (vec![0], vec![1, 2]));
+        assert_eq!(evict_by_bytes(83, entries()), (vec![0, 1], vec![2]));
+    }
+
+    #[test]
+    fn test_max_bytes_counts_vacant_entries() {
+        let entries = || vec![hot_vacant(), hot_vacant(), hot_vacant(), hot_vacant()];
+        assert_eq!(evict_by_bytes(128, entries()), (vec![], vec![0, 1, 2, 3]));
+        assert_eq!(evict_by_bytes(64, entries()), (vec![0, 1], vec![2, 3]));
+    }
+
+    #[test]
+    fn test_max_bytes_mixed_entries() {
+        // Sizes from oldest to newest: 32, 132, 32, 42.
+        let entries = || {
+            vec![
+                hot_vacant(),
+                hot_occupied(100),
+                hot_vacant(),
+                hot_occupied(10),
+            ]
+        };
+        assert_eq!(evict_by_bytes(238, entries()), (vec![], vec![0, 1, 2, 3]));
+        // Evicting the oldest vacant entry alone frees enough.
+        assert_eq!(evict_by_bytes(206, entries()), (vec![0], vec![1, 2, 3]));
+        assert_eq!(evict_by_bytes(205, entries()), (vec![0, 1], vec![2, 3]));
+    }
+
+    #[test]
+    fn test_max_bytes_below_one_key_hash() {
+        // Even a vacant entry doesn't fit, so the cache ends up empty.
+        assert_eq!(
+            evict_by_bytes(31, vec![hot_vacant(), hot_occupied(0)]),
+            (vec![0, 1], vec![])
+        );
+        assert_eq!(
+            evict_by_bytes(32, vec![hot_vacant(), hot_occupied(0)]),
+            (vec![0], vec![1])
+        );
+    }
+
     proptest! {
         #[test]
         fn test_empty_overlay(
@@ -616,7 +727,7 @@ mod tests {
                     blocks
                 }),
             capacity in (1..10usize).prop_map(|n| NonZeroUsize::new(n).unwrap()),
-            max_value_bytes in arb_max_value_bytes(),
+            max_bytes in arb_max_bytes(),
         ) {
             let test_obj = LRUTest::new_empty();
             let mut head = None;
@@ -631,7 +742,7 @@ mod tests {
                 let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
                     run_block(
                         capacity,
-                        max_value_bytes,
+                        max_bytes,
                         Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
                         &test_obj.overlay,
                         head,
@@ -666,7 +777,7 @@ mod tests {
                     (blocks, vec(any::<bool>(), num_blocks))
                 }),
             capacity in (1..10usize).prop_map(|n| NonZeroUsize::new(n).unwrap()),
-            max_value_bytes in arb_max_value_bytes(),
+            max_bytes in arb_max_bytes(),
         ) {
             let (blocks, flushes) = blocks_and_flushes;
             let mut test_obj = OverlayTest::new_empty();
@@ -681,7 +792,7 @@ mod tests {
                 let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
                     run_block(
                         capacity,
-                        max_value_bytes,
+                        max_bytes,
                         test_obj.committed_view(),
                         &test_obj.overlay,
                         head,
