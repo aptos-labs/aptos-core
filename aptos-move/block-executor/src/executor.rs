@@ -1546,6 +1546,7 @@ where
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            module_cache_manager_guard.environment().hot_state_config(),
             num_txns,
         ));
         let block_epilogue_txn_idx = ExplicitSyncWrapper::new(None);
@@ -1743,6 +1744,7 @@ where
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            module_cache_manager_guard.environment().hot_state_config(),
             num_txns + 1,
         ));
         let shared_maybe_error = AtomicBool::new(false);
@@ -2063,6 +2065,7 @@ where
         let mut block_limit_processor = BlockGasLimitProcessor::<E::Key, E::Tag>::new(
             self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
+            environment.hot_state_config(),
             num_txns + 1,
         );
 
