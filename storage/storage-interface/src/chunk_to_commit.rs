@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
+    collateral::CollateralOverlay,
     orders::OrderOverlay,
     positions::PositionOverlay,
     sharded_jmt_state::PositionStateWithSummary,
@@ -44,6 +45,10 @@ pub struct ChunkToCommit<'a> {
     /// Order writes since the base, published by commit as the order tip
     /// as `positions` is. `None` when trading-native storage is off.
     pub orders: Option<&'a OrderOverlay>,
+    /// Collateral writes since the base, published by commit as the
+    /// collateral tip as `orders` is. `None` when trading-native storage is
+    /// off.
+    pub collateral: Option<&'a CollateralOverlay>,
     pub is_reconfig: bool,
 }
 

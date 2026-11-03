@@ -4,7 +4,7 @@
 use crate::{
     metrics,
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
-    workflow::{do_orders::DoOrders, do_positions::DoPositions},
+    workflow::{do_collateral::DoCollateral, do_orders::DoOrders, do_positions::DoPositions},
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -25,6 +25,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
+    collateral::CollateralParent,
     orders::OrderParent,
     positions::PositionParent,
     state::LedgerState,
@@ -66,6 +67,7 @@ impl DoGetExecutionOutput {
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -79,6 +81,7 @@ impl DoGetExecutionOutput {
                     parent_state,
                     parent_positions,
                     parent_orders,
+                    parent_collateral,
                     state_view,
                     onchain_config,
                     transaction_slice_metadata,
@@ -91,6 +94,7 @@ impl DoGetExecutionOutput {
                 parent_state,
                 parent_positions,
                 parent_orders,
+                parent_collateral,
                 state_view,
                 onchain_config,
                 transaction_slice_metadata.append_state_checkpoint_to_block(),
@@ -119,6 +123,7 @@ impl DoGetExecutionOutput {
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -168,6 +173,7 @@ impl DoGetExecutionOutput {
             .parent_state(parent_state)
             .maybe_parent_positions(parent_positions)
             .maybe_parent_orders(parent_orders)
+            .maybe_parent_collateral(parent_collateral)
             .base_state_view(state_view)
             .prime_state_cache(false)
             .is_block(
@@ -187,6 +193,7 @@ impl DoGetExecutionOutput {
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
@@ -221,6 +228,7 @@ impl DoGetExecutionOutput {
             .parent_state(parent_state)
             .maybe_parent_positions(parent_positions)
             .maybe_parent_orders(parent_orders)
+            .maybe_parent_collateral(parent_collateral)
             .base_state_view(state_view)
             .prime_state_cache(false)
             .is_block(append_state_checkpoint_to_block.is_some())
@@ -243,6 +251,7 @@ impl DoGetExecutionOutput {
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ExecutionOutput> {
@@ -254,6 +263,7 @@ impl DoGetExecutionOutput {
             .parent_state(parent_state)
             .maybe_parent_positions(parent_positions)
             .maybe_parent_orders(parent_orders)
+            .maybe_parent_collateral(parent_collateral)
             .base_state_view(state_view)
             .prime_state_cache(true)
             .is_block(false)
@@ -374,6 +384,7 @@ impl Parser {
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         parent_orders: Option<OrderParent<'_>>,
+        parent_collateral: Option<CollateralParent<'_>>,
         base_state_view: CachedStateView,
         prime_state_cache: bool,
         is_block: bool,
@@ -457,6 +468,7 @@ impl Parser {
         // and the same split at the inner state checkpoint.
         let positions = DoPositions::run(&to_commit, first_version, parent_positions)?;
         let orders = DoOrders::run(&to_commit, first_version, parent_orders)?;
+        let collateral = DoCollateral::run(&to_commit, first_version, parent_collateral)?;
 
         let out = ExecutionOutput::builder()
             .is_block(is_block)
@@ -468,6 +480,7 @@ impl Parser {
             .result_state(result_state)
             .maybe_positions(positions)
             .maybe_orders(orders)
+            .maybe_collateral(collateral)
             .state_reads(state_reads)
             .hot_state_updates(hot_state_updates)
             .maybe_block_end_info(block_end_info)

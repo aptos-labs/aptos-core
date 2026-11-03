@@ -1783,11 +1783,13 @@ mod reopen {
         let collateral = db.collateral.as_ref().expect("collateral store attached");
         let tip = db.get_synced_version().unwrap().expect("synced version");
         let snapshot = collateral
+            .store
             .merkle_db
             .latest_snapshot_version_at_or_before(tip)
             .unwrap();
         assert_eq!(snapshot, Some(tip), "collateral snapshot at the tip");
         collateral
+            .store
             .snapshot_rows(tip)
             .unwrap()
             .map(|row| {
@@ -1913,7 +1915,7 @@ mod reopen {
             )]);
 
             let collateral = db.collateral.as_ref().unwrap();
-            let committer = NativeStateCommitter::new(Arc::clone(&collateral.kv_db));
+            let committer = NativeStateCommitter::new(Arc::clone(&collateral.store.kv_db));
             let mut batches = new_sharded_kv_batches();
             let mut in_chunk_prior = InChunkPriorVersions::new();
             let ahead = WriteOp::legacy_modification(collateral_value(b'x').into());
@@ -1925,19 +1927,20 @@ mod reopen {
                     &mut in_chunk_prior,
                 )
                 .unwrap();
-            collateral.kv_db.commit(2, None, batches).unwrap();
+            collateral.store.kv_db.commit(2, None, batches).unwrap();
             assert_eq!(
-                get_native_commit_progress(&collateral.kv_db).unwrap(),
+                get_native_commit_progress(&collateral.store.kv_db).unwrap(),
                 Some(2)
             );
         }
         let db = open(&dir, true);
         let collateral = db.collateral.as_ref().unwrap();
         assert_eq!(
-            get_native_commit_progress(&collateral.kv_db).unwrap(),
+            get_native_commit_progress(&collateral.store.kv_db).unwrap(),
             Some(1)
         );
         let (version, value) = collateral
+            .store
             .kv_db
             .get_value(collateral_key(1).hash(), 2)
             .unwrap()
@@ -1998,11 +2001,12 @@ mod reopen {
         )]);
 
         let collateral = db.collateral.as_ref().unwrap();
-        let value_pruner = &collateral.pruner.as_ref().unwrap().value_pruner;
+        let value_pruner = &collateral.store.pruner.as_ref().unwrap().value_pruner;
         value_pruner.wait_for_pruner().unwrap();
         assert_eq!(value_pruner.get_min_readable_version(), 2);
         assert!(
             collateral
+                .store
                 .kv_db
                 .get_value(collateral_key(1).hash(), 0)
                 .unwrap()
@@ -2010,6 +2014,7 @@ mod reopen {
             "the superseded v0 row is pruned"
         );
         let (version, _) = collateral
+            .store
             .kv_db
             .get_value(collateral_key(1).hash(), 2)
             .unwrap()
@@ -2033,11 +2038,73 @@ mod reopen {
         let collateral = db.collateral.as_ref().expect("collateral store attached");
         assert_eq!(
             collateral
+                .store
                 .merkle_db
                 .latest_snapshot_version_at_or_before(Version::MAX)
                 .unwrap(),
             Some(2),
         );
+    }
+
+    /// The collateral index follows commits through the published tip, folds
+    /// into its base, and cold-loads the same collateral from the collateral
+    /// JMT on reopen.
+    #[test]
+    fn collateral_index_follows_commits_and_cold_loads() {
+        use aptos_storage_interface::{state_store::collateral::CollateralKey, DbWriter};
+        use aptos_types::state_store::{
+            native_collateral::NativeCollateral, state_key::inner::CollateralScope,
+        };
+
+        fn key(account: u8) -> CollateralKey {
+            CollateralKey {
+                exchange: exchange(1),
+                account: super::account(account),
+                scope: CollateralScope::Cross,
+            }
+        }
+        fn read(db: &AptosDB, account: u8) -> Option<NativeCollateral> {
+            let bundle = db.collateral().expect("collateral store attached");
+            let tip = bundle.collateral.lock().clone();
+            bundle
+                .collateral_base
+                .with_view(&tip, |view| view.get(&key(account)))
+        }
+        fn decoded(tag: u8) -> NativeCollateral {
+            NativeCollateral::deserialize(&collateral_value(tag)).unwrap()
+        }
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[
+                (collateral_key(1), Some(&collateral_value(b'a'))),
+                (collateral_key(2), Some(&collateral_value(b'b'))),
+            ]);
+            commit_collateral(&db, 1, &[], &[
+                (collateral_key(1), None),
+                (collateral_key(3), Some(&collateral_value(b'c'))),
+            ]);
+            assert_eq!(read(&db, 1), None);
+            assert_eq!(read(&db, 2), Some(decoded(b'b')));
+            assert_eq!(read(&db, 3), Some(decoded(b'c')));
+
+            let bundle = db.collateral().unwrap();
+            let tip = bundle.collateral.lock().clone();
+            db.advance_collateral_base(Some(&tip)).unwrap();
+            assert_eq!(bundle.collateral_base.version(), Some(1));
+            bundle
+                .collateral_base
+                .read(|view| assert_eq!(view.num_entries(), 2));
+        }
+        let db = open(&dir, true);
+        let bundle = db.collateral().unwrap();
+        bundle.collateral_base.read(|view| {
+            assert_eq!(view.version(), Some(1), "cold-loaded at the snapshot");
+            assert_eq!(view.num_entries(), 2);
+        });
+        assert_eq!(read(&db, 2), Some(decoded(b'b')));
+        assert_eq!(read(&db, 3), Some(decoded(b'c')));
     }
 
     /// The order index follows commits through the published tip, folds into

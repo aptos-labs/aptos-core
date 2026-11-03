@@ -27,6 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
+        collateral::CollateralParent,
         orders::OrderParent,
         positions::PositionParent,
         state::State,
@@ -406,11 +407,14 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         // is being executed or applied.
         let committed_positions = chunk.output.result_positions().cloned();
         let committed_orders = chunk.output.result_orders().cloned();
+        let committed_collateral = chunk.output.result_collateral().cloned();
 
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
-        self.commit_queue
-            .lock()
-            .dequeue_committed(committed_positions, committed_orders)?;
+        self.commit_queue.lock().dequeue_committed(
+            committed_positions,
+            committed_orders,
+            committed_collateral,
+        )?;
 
         Ok(chunk)
     }
@@ -444,6 +448,12 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .writer
             .advance_order_base(committed_orders.as_ref())
             .map_err(anyhow::Error::from)?;
+        let committed_collateral = self.commit_queue.lock().committed_collateral();
+        let collateral_floor = self
+            .db
+            .writer
+            .advance_collateral_base(committed_collateral.as_ref())
+            .map_err(anyhow::Error::from)?;
 
         let first_version = chunk.first_version;
         let expecting_version = self.commit_queue.lock().expecting_version();
@@ -467,6 +477,11 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .as_ref()
             .zip(order_floor.as_ref())
             .map(|(overlay, floor)| OrderParent { overlay, floor });
+        let latest_collateral = self.commit_queue.lock().latest_collateral();
+        let parent_collateral = latest_collateral
+            .as_ref()
+            .zip(collateral_floor.as_ref())
+            .map(|(overlay, floor)| CollateralParent { overlay, floor });
 
         // Hold back partial blocks until the next chunk completes them. The one in the queue is only
         // replaced once enqueued, so it survives failures.
@@ -483,8 +498,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let chunk_verifier = chunk_verifier.filter(|_| !chunk.is_empty());
 
         let transaction_infos = std::mem::take(&mut chunk.transaction_infos);
-        let execution_output =
-            chunk.into_output::<V>(&parent_state, parent_positions, parent_orders, state_view)?;
+        let execution_output = chunk.into_output::<V>(
+            &parent_state,
+            parent_positions,
+            parent_orders,
+            parent_collateral,
+            state_view,
+        )?;
         let output = PartialStateComputeResult::new(execution_output);
 
         // Enqueue for next stage.
@@ -888,6 +908,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             auxiliary_info,
             &parent_state,
             // Verification only; nothing here is committed.
+            None,
             None,
             None,
             state_view,

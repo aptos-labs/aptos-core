@@ -10,8 +10,8 @@ use crate::{
 use aptos_config::config::HotStateConfig;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    orders::OrderOverlay, positions::PositionOverlay, state::LedgerState,
-    state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
+    collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
+    state::LedgerState, state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -42,6 +42,7 @@ impl ExecutionOutput {
         result_state: LedgerState,
         positions: Option<PositionOverlay>,
         orders: Option<OrderOverlay>,
+        collateral: Option<CollateralOverlay>,
         state_reads: ShardedStateCache,
         hot_state_updates: HotStateUpdates,
         block_end_info: Option<BlockEndInfo>,
@@ -72,6 +73,7 @@ impl ExecutionOutput {
             result_state,
             positions,
             orders,
+            collateral,
             state_reads,
             hot_state_updates,
             block_end_info,
@@ -87,6 +89,7 @@ impl ExecutionOutput {
         state: LedgerState,
         positions: Option<PositionOverlay>,
         orders: Option<OrderOverlay>,
+        collateral: Option<CollateralOverlay>,
     ) -> Self {
         Self::new_impl(Inner {
             is_block: false,
@@ -99,6 +102,7 @@ impl ExecutionOutput {
             result_state: state,
             positions,
             orders,
+            collateral,
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
@@ -122,6 +126,7 @@ impl ExecutionOutput {
             result_state: LedgerState::new_empty(HotStateConfig::default()),
             positions: None,
             orders: None,
+            collateral: None,
             state_reads: ShardedStateCache::new_empty(None),
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
@@ -149,6 +154,7 @@ impl ExecutionOutput {
             // No writes in a reconfig suffix, so the overlays are unchanged.
             positions: self.positions.clone(),
             orders: self.orders.clone(),
+            collateral: self.collateral.clone(),
             state_reads: ShardedStateCache::new_empty(self.next_version().checked_sub(1)),
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
@@ -199,6 +205,9 @@ pub struct Inner {
     /// Native order index after this chunk. `None` when trading-native
     /// storage is off.
     pub orders: Option<OrderOverlay>,
+    /// Native collateral index after this chunk. `None` when trading-native
+    /// storage is off.
+    pub collateral: Option<CollateralOverlay>,
     /// State items read during execution, useful for calculating the state storge usage and
     /// indices used by the db pruner.
     pub state_reads: ShardedStateCache,

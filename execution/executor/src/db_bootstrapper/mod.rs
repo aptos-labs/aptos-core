@@ -12,7 +12,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
     state_store::{
-        orders::OrderParent, positions::PositionParent,
+        collateral::CollateralParent, orders::OrderParent, positions::PositionParent,
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter, DbWriter, LedgerSummary,
@@ -176,6 +176,12 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         .as_ref()
         .zip(order_floor.as_ref())
         .map(|(overlay, floor)| OrderParent { overlay, floor });
+    let collateral_floor = db.writer.advance_collateral_base(None)?;
+    let parent_collateral = ledger_summary
+        .collateral
+        .as_ref()
+        .zip(collateral_floor.as_ref())
+        .map(|(overlay, floor)| CollateralParent { overlay, floor });
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         &V::new(),
         vec![genesis_txn.clone().into()].into(),
@@ -185,6 +191,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         &ledger_summary.state,
         parent_positions,
         parent_orders,
+        parent_collateral,
         base_state_view,
         onchain_config,
         TransactionSliceMetadata::unknown(),
