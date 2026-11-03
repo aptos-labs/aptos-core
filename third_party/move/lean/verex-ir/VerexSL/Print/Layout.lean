@@ -1456,7 +1456,8 @@ import, and address aliases) and one rendering per namespace, in order;
 comments discarded as trivia by Lean's parser; the source backend uses these
 for explicit unsupported-declaration notices. -/
 def formatParts (unit : CompilationUnit) (width : Nat := 80)
-    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[])
+    (imports : Array Lean.Name := #[]) :
     Except String (String × Array String) := do
   let namespaces ← unit.namespaces.mapM fun ns => do
     let uses := ns.uses.map fun path => text s!"use {pathText path}"
@@ -1505,7 +1506,8 @@ def formatParts (unit : CompilationUnit) (width : Nat := 80)
       text s!"address_alias {identifier name} = {address}") ++ hard ++ hard
   let prelude := text "-- Copyright © Aptos Foundation" ++ hard ++
     text "-- SPDX-License-Identifier: Apache-2.0" ++ hard ++ hard ++
-    text "import VerexSL" ++ hard ++ hard ++ aliasDeclarations
+    vcat (#[text "import VerexSL"] ++ imports.map fun name => text s!"import {name}") ++ hard ++
+    hard ++ aliasDeclarations
   pure (renderDoc prelude width, namespaces.map (renderDoc · width))
 
 /-- The file of a prelude and its namespaces: the namespaces separated by a
@@ -1557,9 +1559,11 @@ def formatSource (environment : Environment) (source : String) (width : Nat := 8
 /-- Lay out several semantic sources, one namespace each, as one file with
 their namespaces in the given order. -/
 def formatSourceParts (environment : Environment) (sources : Array String) (width : Nat := 80)
-    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[]) :
+    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[])
+    (imports : Array Name := #[]) :
     Except String (String × Array String) := do
   let units ← sources.mapM (parseSource environment · sourceName)
   formatParts { sourceName, namespaces := units.flatMap (·.namespaces) } width #[] declaredAliases
+    imports
 
 end VerexSL.Print.Layout

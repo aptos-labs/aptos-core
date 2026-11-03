@@ -42,8 +42,9 @@ structure BuildState where
   /-- Whether the encoder is inside specification content, where local
   occurrences arrive projected and may name executable locals. -/
   logical : Bool := false
-  /-- Hidden temporaries the encoder introduced, named `$t<n>` like the
-  VerexSL lowering's, so the two lowerings of one element access agree. -/
+  /-- Hidden temporaries the encoder introduced in the current declaration,
+  named `$t<n>` like the VerexSL lowering's, so the two lowerings of one element
+  access agree; a declaration's numbers do not depend on what else is exported. -/
   temporaryLocals : Nat := 0
   /-- The one lifetime the unit's references are inferred at: Move
   references carry no lifetimes, so a call's result borrows from every
@@ -471,7 +472,7 @@ private def withMutablyBorrowedLocals (expressionsBefore : Nat)
     | none => parameter
 
 private def resetLocals : BuildM Unit := modify fun state => {
-  state with sourceLocals := #[], locals := #[] }
+  state with sourceLocals := #[], locals := #[], temporaryLocals := 0 }
 
 /-- Names a `std::vector` native, whose semantics VIR owns directly.
 
@@ -526,10 +527,10 @@ private def isSignerAddressOf (name : Xast.QualifiedName) : Bool :=
     (name.name == "address_of" || name.name == "$address_of")
 
 /-- The name a state label of the exchange is in VIR. -/
-private def virLabel (label : Nat) : BuildM Nat := do
+private def virLabel (label : Nat) : BuildM VerexIR.NameId := do
   let some (_, name) := (← get).stateLabels.find? (·.1 == label)
     | throw s!"state label {label} has no name"
-  return name.index
+  return name
 
 private def virRange (range : Xast.MemoryRange) : BuildM VerexIR.MemoryRange := do
   return { pre := ← range.pre.mapM virLabel, post := ← range.post.mapM virLabel }

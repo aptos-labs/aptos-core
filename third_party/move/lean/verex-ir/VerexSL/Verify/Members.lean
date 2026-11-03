@@ -3,6 +3,7 @@
 
 import VerexSL.Verify.FunctionValues
 import VerexIR.Proofs.Denote.Authored
+import VerexIR.Proofs.IndexedTyping
 
 /-!
 # Verification: targets, cycles, and lemmas
@@ -43,7 +44,7 @@ private def fieldNames (unit : ValidatedUnit) (source : VerexIR.StructHandle)
   let declared : Option (List String) := do
     let (targetNs, fields) ← VerexIR.SemanticOperations.handleFields? unit source variant
     fields.toList.mapM fun (field : VerexIR.FieldDecl) =>
-      (targetNs.tables.names[field.name.index]?).map (·.name)
+      (targetNs.nameOf field.name).map (·.name)
   match declared with
   | some names => if names.length == count then names else (List.range count).map toString
   | none => (List.range count).map toString
@@ -63,7 +64,7 @@ def componentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle) (base 
         else if canonical.dummy then [s!"{base}_dummy"] else []) ++
       (if canonical.length then [s!"{base}_length"] else [])
     let ghosts ← declaration.ghosts.toList.mapM fun ghost =>
-      (ns.tables.names[ghost.name.index]?).map fun name => s!"{base}_{name.name}"
+      (ns.nameOf ghost.name).map fun name => s!"{base}_{name.name}"
     let names := leading ++ ghosts ++ [base]
     guard (names.length == count)
     pure names
@@ -144,6 +145,8 @@ through. A name given twice is an error. -/
 def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (withResult := false) :
     Except String (Array (String × String × Bool)) := do
+  -- The declaration in the unit's numbering, as the printing reads it.
+  let declaration := ns.relocate declaration
   let generics := declaration.signature.generics
   let printing ← Print.PrintNamespace.of unit ns
   let mutableReference (typeId : VerexIR.TypeId) : Bool :=
@@ -169,8 +172,8 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     let some expression := ns.expressions[id.index]? | continue
     if expanded then
       let .operation (.call (.function reference)) _ _ _ := expression.kind | continue
-      let some callee := unit.tables.names[reference.name.index]? | continue
-      calls := calls.push (callee.name, expression.typeId)
+      let some callee := ns.nameOf reference.name | continue
+      calls := calls.push (callee.name, ns.typeId expression.typeId)
     else
       work := ((VerexIR.Validation.expressionChildren expression.kind).toList.map (·, false)) ++
         (id, true) :: work
@@ -313,27 +316,74 @@ entries with its declarations. -/
 private initialize usedConstantsExt : EnvExtension (NameMap (Array Name)) ←
   registerEnvExtension (pure {})
 
-/-- The unit definitions whose value the audit compared with the registered
-unit's quotation (`auditedUnit`). An environment extension, as
-`usedConstantsExt`. -/
+/-- The unit and relocatable-namespace definitions whose value the audit
+compared with the quotation of what is registered (`auditedUnit`). An
+environment extension, as `usedConstantsExt`. -/
 private initialize auditedUnitsExt : EnvExtension NameSet ← registerEnvExtension (pure {})
 
 /-- The unit definition of a registered unit, its value compared once per
-environment with the unit's quotation: the audit states a target's theorem
-over the definition, as the theorem does, instead of quoting the unit and
-unfolding the definition at every target. -/
+environment with the unit's quotation, and the value of each relocatable
+namespace definition that quotation refers to compared once with the
+quotation of the namespace registered at its path: the audit states a target's
+theorem over the definition, as the theorem does, instead of quoting the unit
+and unfolding the definition at every target. -/
 private def auditedUnit (segments : Array String) (unit : ValidatedUnit) : TermElabM Lean.Expr := do
   let name := unitName segments
   if (auditedUnitsExt.getState (← getEnv)).contains name then return mkConst name
   let some (.defnInfo info) := (← getEnv).find? name
     | throwError m!"the unit `{name}` has no definition"
-  unless info.value == (← VerexSL.Quote.quoteUnit unit) do
+  let quoted ← VerexSL.Quote.quoteUnit unit (VerexSL.registeredObject? (← getEnv))
+  unless info.value == quoted do
     throwError m!"the definition of the unit `{name}` is not the registered unit"
+  for ns in unit.namespaces do
+    let path := (ns.localTables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+    let objectName := VerexSL.Quote.objectName path
+    if (auditedUnitsExt.getState (← getEnv)).contains objectName then continue
+    let some registered := VerexSL.registeredObject? (← getEnv) path
+      | throwError m!"the namespace of `{objectName}` is not registered"
+    let some (.defnInfo object) := (← getEnv).find? objectName
+      | throwError m!"the namespace `{objectName}` has no definition"
+    unless object.value == toExpr registered do
+      throwError m!"the definition `{objectName}` is not the registered namespace"
+    modifyEnv fun env => auditedUnitsExt.modifyState env (·.insert objectName)
   modifyEnv fun env => auditedUnitsExt.modifyState env (·.insert name)
   return mkConst name
 
-/-- The constants `name` uses (`usedConstantsExt`), and whether it is an
-axiom. -/
+/-- Collect constant names reachable from the initial stack of expressions,
+    deduplicating by structural equality (`Lean.ExprSet = Std.HashSet Lean.Expr`,
+    keyed by content hash). Unlike `Lean.Expr.getUsedConstants`, which uses a
+    `PtrSet` (pointer identity), this collapses freshly-allocated but
+    structurally-identical nodes — a pattern that arises when `quoteUnit`
+    builds the unit literal, creating a new allocation for every occurrence
+    of a constructor such as `VerexIR.Type.U64` or `VerexIR.Instruction.Assign`.
+    With pointer dedup every copy is visited; with content-hash dedup only one
+    is, cutting traversal cost 6–14× on measured unit literals.
+    Accepts multiple root expressions so that type and value share one pass. -/
+private partial def getUsedConstantsDedup (initStack : Array Lean.Expr) : Array Name :=
+  let rec go (stack : Array Lean.Expr) (seen : Lean.ExprSet) (namesSeen : Lean.NameHashSet)
+      (consts : Array Name) : Array Name :=
+    match stack.back? with
+    | none => consts
+    | some (e : Lean.Expr) =>
+      let stack := stack.pop
+      if seen.contains e then go stack seen namesSeen consts
+      else
+        let seen := seen.insert e
+        match e with
+        | Lean.Expr.const c _ =>
+          if namesSeen.contains c then go stack seen namesSeen consts
+          else go stack seen (namesSeen.insert c) (consts.push c)
+        | Lean.Expr.app e1 e2       => go (stack.push e1 |>.push e2) seen namesSeen consts
+        | Lean.Expr.lam _ d b _     => go (stack.push d |>.push b) seen namesSeen consts
+        | Lean.Expr.forallE _ d b _ => go (stack.push d |>.push b) seen namesSeen consts
+        | Lean.Expr.letE _ t v b _  => go (stack.push t |>.push v |>.push b) seen namesSeen consts
+        | Lean.Expr.mdata _ inner   => go (stack.push inner) seen namesSeen consts
+        | Lean.Expr.proj _ _ inner  => go (stack.push inner) seen namesSeen consts
+        | _ => go stack seen namesSeen consts
+  go initStack {} {} #[]
+
+/-- The constants `name` uses (`usedConstantsExt`), and whether it is an axiom. -/
+
 private def usedConstantsOf (name : Name) : CommandElabM (Array Name × Bool) := do
   let env ← getEnv
   let some info := env.find? name | return (#[], false)
@@ -342,8 +392,10 @@ private def usedConstantsOf (name : Name) : CommandElabM (Array Name × Bool) :=
   let constructors := match info with
     | .inductInfo declaration => declaration.ctors.toArray
     | _ => #[]
-  let used := info.type.getUsedConstants ++
-    ((info.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[] ++ constructors
+  let initStack : Array Lean.Expr := match info.value? (allowOpaque := true) with
+    | some v => #[info.type, v]
+    | none   => #[info.type]
+  let used := getUsedConstantsDedup initStack ++ constructors
   modifyEnv fun env => usedConstantsExt.modifyState env (·.insert name used)
   return (used, isAxiom)
 
@@ -425,8 +477,10 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
     visited := visited.insert name
     let some declaration := env.find? name
       | throwError m!"missing artifact `{name}`"
-    let constants := declaration.type.getUsedConstants ++
-      ((declaration.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[]
+    let initStack : Array Lean.Expr := match declaration.value? (allowOpaque := true) with
+      | some v => #[declaration.type, v]
+      | none   => #[declaration.type]
+    let constants := getUsedConstantsDedup initStack
     for dependency in constants do
       -- Rule 1 of the design: a verified function reasons over values,
       -- never over frames or loan bookkeeping.
@@ -448,8 +502,10 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
   let some publicInfo := env.find? (base ++ `verified)
     | throwError m!"`{function}` has no public verification certificate"
   let namespaceName := artifacts.getPrefix
-  let some unit := VerexSL.registeredUnit? env namespaceName
-    | throwError m!"unknown Verex namespace `{namespaceName}`"
+  let unit ← match VerexSL.registeredUnitResult env namespaceName with
+    | .ok (some unit) => pure unit
+    | .ok none => throwError m!"unknown Verex namespace `{namespaceName}`"
+    | .error message => throwError message
   let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
     | throwError m!"unknown function `{function}` in `{namespaceName}`"
   let some (params, result) := nativeSignature? unit ⟨namespaceIndex⟩ declaration
@@ -705,7 +761,7 @@ def contractDirectTargets (unit : ValidatedUnit) (namespaceId : NamespaceId)
     visited := visited.push id.index
     let some expression := ns.expressions[id.index]? | continue
     if let .operation (.call (.closure reference 0)) instantiations #[] _ := expression.kind then
-      let typeArgs := instantiations.filterMap fun argument => match argument with
+      let typeArgs := (ns.genericArguments instantiations).filterMap fun argument => match argument with
         | .typeArg value => some { value with loc := ⟨0⟩ }
         | _ => none
       if let some target := VerexIR.SemanticOperations.resolveFunction? unit namespaceId reference then
@@ -730,6 +786,78 @@ where
           requires || domain.isAppOf ``VerexIR.Proofs.RequiresMeaning)
     | _ => (false, false)
 
+deriving instance ToExpr for VerexIR.Validation.TableLayout
+deriving instance ToExpr for VerexIR.Validation.OwnerShape
+deriving instance ToExpr for VerexIR.Validation.OwnerLayout
+deriving instance ToExpr for VerexIR.Proofs.DeclarationView
+
+/-- An indexed arena as a literal, its entries quoted by `quote`. -/
+private def quoteArena {α : Type} (type : Lean.Expr) (quote : α → Lean.Expr) :
+    VerexIR.Validation.IndexedArena α → Lean.Expr
+  | .empty => mkApp (mkConst ``VerexIR.Validation.IndexedArena.empty) type
+  | .leaf value => mkApp2 (mkConst ``VerexIR.Validation.IndexedArena.leaf) type (quote value)
+  | .branch leftSize left right =>
+      mkApp4 (mkConst ``VerexIR.Validation.IndexedArena.branch) type (toExpr leftSize)
+        (quoteArena type quote left) (quoteArena type quote right)
+
+/-- The declarations of a typing view as a literal: equal links, which every
+declaration of a namespace carries, are quoted once and shared. -/
+private def quoteDeclarations
+    (declarations : VerexIR.Validation.IndexedArena
+      (VerexIR.Validation.IndexedArena VerexIR.Proofs.DeclarationView)) : Lean.Expr := Id.run do
+  let rec entries {α : Type} : VerexIR.Validation.IndexedArena α → List α
+    | .empty => []
+    | .leaf value => [value]
+    | .branch _ left right => entries left ++ entries right
+  let mut quoted : Array (VerexIR.Validation.Links × Lean.Expr) := #[]
+  for view in (entries declarations).flatMap entries do
+    unless quoted.any (·.1 == view.links) do quoted := quoted.push (view.links, toExpr view.links)
+  let linksOf (links : VerexIR.Validation.Links) : Lean.Expr :=
+    ((quoted.find? (·.1 == links)).map (·.2)).getD (toExpr links)
+  let declarationType := toTypeExpr VerexIR.Proofs.DeclarationView
+  let quoteView (view : VerexIR.Proofs.DeclarationView) : Lean.Expr :=
+    mkAppN (mkConst ``VerexIR.Proofs.DeclarationView.mk) #[toExpr view.declaration,
+      linksOf view.links, toExpr view.layout, toExpr view.isTable]
+  return quoteArena (mkApp (mkConst ``VerexIR.Validation.IndexedArena) declarationType)
+    (quoteArena declarationType quoteView) declarations
+
+/-- The indexed view the unit's whole-unit checks read, as a literal, and the
+kernel's certificates that it is the unit's view and that the unit's namespaces
+hold its tables: `none` for a unit whose namespaces do not. -/
+private def publishTypingView (segments : Array String) (unit : ValidatedUnit)
+    (unitDefinition : Name) : TermElabM (Option (Name × Name × Name)) := do
+  unless unit.namespaces.all (·.tables == unit.tables) do return none
+  let name := Name.str (semanticsName segments) "typingView"
+  let viewEq := name ++ `eq
+  let shared := name ++ `shared
+  let semantics := mkConst unitDefinition
+  unless (← getEnv).contains viewEq do
+    let view := VerexIR.Proofs.TypingView.of unit
+    addDecl (.defnDecl {
+      name, levelParams := [], type := mkConst ``VerexIR.Proofs.TypingView
+      value := mkAppN (mkConst ``VerexIR.Proofs.TypingView.mk) #[toExpr view.namespaceCount,
+        toExpr view.tableNamespaces, toExpr view.types, toExpr view.names, toExpr view.canonical,
+        toExpr view.nominals, quoteDeclarations view.declarations, toExpr view.parameterNodes,
+        toExpr view.parameterLimit, toExpr view.typeCount,
+        toExpr view.fuel]
+      hints := .abbrev, safety := .safe })
+    addDecl (.thmDecl {
+      name := viewEq, levelParams := []
+      type := ← mkEq (mkApp (mkConst ``VerexIR.Proofs.TypingView.of) semantics) (mkConst name)
+      value := ← mkEqRefl (mkConst name) })
+    let tables := mkApp (mkConst ``VerexIR.Validation.ValidatedUnit.tables) semantics
+    let replicated ← mkAppM ``List.replicate #[toExpr unit.namespaces.toList.length, tables]
+    addDecl (.thmDecl {
+      name := shared, levelParams := []
+      type := mkApp (mkConst ``VerexIR.Proofs.TablesShared) semantics
+      value := ← mkEqRefl replicated })
+  return some (name, viewEq, shared)
+
+/-- A proof that a closed Boolean check holds, the kernel evaluating it: no
+elaborator reads the unit. -/
+private def checkedByKernel (check : Lean.Expr) : MetaM Lean.Expr := do
+  mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq check (mkConst ``Bool.true))
+
 /-- Prove once per unit, by evaluation, that its native and semantic readings
 agree (`TypesAgree`), where they do: a function value is then typed by its
 carrier. -/
@@ -739,9 +867,20 @@ def ensureTypesAgree (segments : Array String) (unit : ValidatedUnit) :
   if (← getEnv).contains name then return some name
   unless VerexIR.Proofs.typesAgreeCheck unit do return none
   let unitDefinition ← ensureUnitInstance segments unit
-  elabCommand (← `(command|
-    theorem $(rootIdent name) : VerexIR.Proofs.TypesAgree $(rootIdent unitDefinition) :=
-      VerexIR.Proofs.TypesAgree.ofCheck (by decide +kernel)))
+  match ← liftTermElabM (publishTypingView segments unit unitDefinition) with
+  | some (view, viewEq, shared) => liftTermElabM do
+      let semantics := mkConst unitDefinition
+      let check ← checkedByKernel
+        (mkApp2 (mkConst ``VerexIR.Proofs.TypingView.typesAgree) (mkConst view) semantics)
+      addDecl (.thmDecl {
+        name, levelParams := []
+        type := mkApp (mkConst ``VerexIR.Proofs.TypesAgree) semantics
+        value := mkApp5 (mkConst ``VerexIR.Proofs.TypesAgree.ofIndexed) semantics (mkConst view)
+          (mkConst shared) (mkConst viewEq) check })
+  | none =>
+      elabCommand (← `(command|
+        theorem $(rootIdent name) : VerexIR.Proofs.TypesAgree $(rootIdent unitDefinition) :=
+          VerexIR.Proofs.TypesAgree.ofCheck (by decide +kernel)))
   return some name
 
 /-- Prove once per unit, by evaluation, that its resource types correspond
@@ -752,14 +891,30 @@ def ensureResourcesTyped (segments : Array String) (unit : ValidatedUnit) : Comm
   if (← getEnv).contains name then return name
   let agreement ← ensureTypesAgree segments unit
   let unitDefinition ← ensureUnitInstance segments unit
-  let check ← match agreement with
-    | some agreement => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := true)
-        (fun _ => $(rootIdent agreement)) (by decide +kernel))
-    | none => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := false)
-        (fun absurd => by cases absurd) (by decide +kernel))
-  elabCommand (← `(command|
-    theorem $(rootIdent name) : VerexIR.Proofs.ResourcesTyped $(rootIdent unitDefinition) :=
-      $check))
+  match ← liftTermElabM (publishTypingView segments unit unitDefinition) with
+  | some (view, viewEq, shared) => liftTermElabM do
+      let semantics := mkConst unitDefinition
+      let agree := mkConst (if agreement.isSome then ``Bool.true else ``Bool.false)
+      let check ← checkedByKernel
+        (mkApp2 (mkConst ``VerexIR.Proofs.TypingView.resourcesTyped) (mkConst view) agree)
+      let value := match agreement with
+        | some agreement => mkApp6 (mkConst ``VerexIR.Proofs.ResourcesTyped.ofIndexedAgreeing)
+            semantics (mkConst view) (mkConst shared) (mkConst viewEq) (mkConst agreement) check
+        | none => mkApp5 (mkConst ``VerexIR.Proofs.ResourcesTyped.ofIndexedDisagreeing)
+            semantics (mkConst view) (mkConst shared) (mkConst viewEq) check
+      addDecl (.thmDecl {
+        name, levelParams := []
+        type := mkApp (mkConst ``VerexIR.Proofs.ResourcesTyped) semantics
+        value })
+  | none =>
+      let check ← match agreement with
+        | some agreement => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := true)
+            (fun _ => $(rootIdent agreement)) (by decide +kernel))
+        | none => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := false)
+            (fun absurd => by cases absurd) (by decide +kernel))
+      elabCommand (← `(command|
+        theorem $(rootIdent name) : VerexIR.Proofs.ResourcesTyped $(rootIdent unitDefinition) :=
+          $check))
   return name
 
 /-- The module's unit, the constant a theorem's frames and memory are at. -/
@@ -1029,6 +1184,7 @@ private partial def lemmaInstancesOf (ns : ValidatedNamespace) (id : VerexIR.Exp
         work := rest
         let some expression := ns.expressions[current.index]? | continue
         if let .operation (.specification (.lemma reference _)) _ _ _ := expression.kind then
+          let reference := ns.qualifiedRef reference
           unless found.contains reference do found := found.push reference
         work := work ++ (VerexIR.Validation.expressionChildren expression.kind).toList
   return found
@@ -2555,7 +2711,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
       calleeNs.functions.flatMap fun function =>
         if index == namespaceIndex && function.name == declaration.name then #[]
         else
-          let callee := ((calleeNs.tables.names[function.name.index]?).map (·.name)).getD "callee"
+          let callee := ((calleeNs.nameOf function.name).map (·.name)).getD "callee"
           (clauseNames unit calleeNs function).map fun (range, name) =>
             (range, s!"{callee}_{name}")).flatten
   let names ← (clauseNames unit ns declaration ++ calleeNames).mapM fun (range, name) =>
@@ -2564,7 +2720,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
   -- Every function's preconditions are numbered, its own for its recursive
   -- calls.
   let numbered := (unit.namespaces.map fun calleeNs =>
-    calleeNs.functions.flatMap fun function => preconditionNumbers unit function).flatten
+    calleeNs.functions.flatMap fun function => preconditionNumbers calleeNs function).flatten
   let numbers ← numbered.mapM fun (range, number) =>
     `(preconditionNumber| ($(Syntax.mkNumLit (toString number)), $(Syntax.mkStrLit range.file),
       $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
@@ -2580,10 +2736,10 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
       -- A data invariant numbered by its position in its type's spec block.
       (declaration.contract.conditions.filter (·.kind == .structInvariant)).zipIdx.map
         fun (condition, position) =>
-          (s!"data invariant_{position + 1}@{((unit.tables.names[declaration.name.index]?).map (·.name)).getD ""}",
-            Contract.locRange unit condition.loc)) ++
+          (s!"data invariant_{position + 1}@{((invariantNs.nameOf declaration.name).map (·.name)).getD ""}",
+            Contract.locRange invariantNs condition.loc)) ++
     (invariantNs.invariants.map fun invariant =>
-      ("module invariant", Contract.locRange unit invariant.condition.loc))).flatten
+      ("module invariant", Contract.locRange invariantNs invariant.condition.loc))).flatten
   let keyed ← invariantClauses.mapM fun (kind, range) =>
     `(invariantClause| ($(Syntax.mkStrLit kind), $(Syntax.mkStrLit range.file),
       $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
@@ -3026,13 +3182,14 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let ignoring := verex.ignoreProofs.get (← getOptions)
   let script? := if ignoring then none else script?
   let namespaceName := pathName segments
-  let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
-    | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
   let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
     | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
   let unitDefinition ← ensureUnitInstance segments unit
   let unitTerm ← unitTermOf segments unit
   discard <| ensureUnitDefinitions segments unit
+  if let some script := script? then
+    SpecTypes.ensureNamedTwins segments unit script.tactic.raw
   stageLog s!"{function}: semantics"
   let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
   -- A unit declaring ghost fields is verified through its model
@@ -3154,7 +3311,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     let name := (do
       let calleeNs ← unit.namespaces[cycle.namespaceId.index]?
       let declaration ← calleeNs.functions[cycle.functionId.index]?
-      let name ← calleeNs.tables.names[declaration.name.index]?
+      let name ← calleeNs.nameOf declaration.name
       pure name.name).getD "a callee"
     throwErrorAt reference m!"`{function}` reaches `{name}` again through callees that are \
       inlined; only a function calling itself directly is verified by induction, so specify \
@@ -3221,8 +3378,7 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
     (scripts : String → Option AuthoredScript) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
     (prepare : Bool) : CommandElabM PendingVerification := do
   let namespaceName := pathName segments
-  let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
-    | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
   let unitDefinition ← ensureUnitInstance segments unit
   let unitTerm ← unitTermOf segments unit
   discard <| ensureUnitDefinitions segments unit
@@ -3461,8 +3617,7 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
     (opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := #[]) (prepare : Bool := false) :
     CommandElabM PendingVerification := do
   let namespaceName := pathName segments
-  let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
-    | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
   let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
     | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
   -- A body reading an intrinsic map's representation has no denotation: the
@@ -3488,7 +3643,7 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
       | throwErrorAt reference "a callee's namespace is out of range"
     let some memberDeclaration := memberNs.functions[member.functionId.index]?
       | throwErrorAt reference "a callee is out of range"
-    let some name := memberNs.tables.names[memberDeclaration.name.index]?
+    let some name := memberNs.nameOf memberDeclaration.name
       | throwErrorAt reference "a callee has no name"
     if member != handle then
       unless member.namespaceId == handle.namespaceId do

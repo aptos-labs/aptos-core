@@ -663,8 +663,7 @@ relies on, becomes `lemma_vector_index_push_back`, applied by the proof or kept 
 
 User `spec lemma`s and recursive specification functions are reached the
 same way: a recursive specification function's definition is a lemma of it
-(`apply spec_test_sum_upto.unfold(v, n)` for today's
-`spec_test_sum_upto.spec.unfold`).
+(`apply spec_test_sum_upto.unfold(v, n)` for `spec_test_sum_upto.spec.unfold`).
 
 Lemmas of function values come after step 3 of
 [`native-function-values.md`](native-function-values.md), when a closure
@@ -1533,9 +1532,9 @@ theorem as the map lemma `lemma_<has_key>_<len>_search_absurd(m, keys, k)`
 (`lemma_contains_key_len_search_absurd` for `simple_map`); the lemmas of the
 maps of the modules a module uses; `ring`. A lemma's conjunction is given as
 one fact per part, and a premise owed at a point reads the bounds of the
-values in scope. Open: `on ensures k` inside a lemma item (its block runs
-over all its clauses); the unfolding of a recursive specification function
-as a lemma; a division lemma meets the body's Euclidean quotient only after
+values in scope. A recursive specification function's unfolding is a lemma of it
+(`apply f.unfold(a)`, lowered as the application `f(a)`). Open: `on ensures k`
+inside a lemma item (its block runs over all its clauses); a division lemma meets the body's Euclidean quotient only after
 N2's one spelling of a quotient. A point binds the locals the body has
 bound there (the slots of the environment the walk carries, a reference's
 current value), each under a binder of its name with its equation; a slot

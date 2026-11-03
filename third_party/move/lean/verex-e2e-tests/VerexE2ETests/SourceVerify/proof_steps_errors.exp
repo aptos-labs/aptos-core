@@ -140,10 +140,10 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:53:5: error: the step's
   assumed : True
   permitted : x + 2 ≤ 18446744073709551615
   old_inc_result : inc.shape.carrier
-  a✝³ : x + 1 ≤ 18446744073709551615
+  inc_ensures✝ : x + 1 ≤ 18446744073709551615
   inc_result : inc.shape.carrier
   final : Proofs.Denote.Memory unit
-  a✝² : old_inc_result + 1 ≤ 18446744073709551615
+  inc_ensures : old_inc_result + 1 ≤ 18446744073709551615
   old_inc_ensures_1 : x < old_inc_result
   old_inc_ensures_2 : old_inc_result ≤ x + 1
   inc_ensures_1 : old_inc_result < inc_result

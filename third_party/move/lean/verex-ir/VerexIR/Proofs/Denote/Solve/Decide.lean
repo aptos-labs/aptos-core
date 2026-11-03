@@ -17,7 +17,7 @@ open Lean Elab Tactic Meta
 /-- The unfolding theorem (`f.spec.unfold`) of a full application of a
 recursive specification function: the definition's leading parameters
 (what its body reads besides its arguments), then the bundled arguments. -/
-private def specUnfolding? (env : Environment) (e : Lean.Expr) : Option Name :=
+def specUnfolding? (env : Environment) (e : Lean.Expr) : Option Name :=
   match e.getAppFn with
   | .const name _ =>
       if name matches .str _ "spec" then
@@ -31,6 +31,34 @@ where
   arity : Lean.Expr → Nat
     | .forallE _ _ body _ => arity body + 1
     | _ => 0
+
+/-- The unfolding theorem at an application, and its statement: the instance
+reads its arguments, not projections of their bundle, a definitional reduction
+that keeps each argument once per use. -/
+def specUnfoldingInstance (unfold : Name) (application : Lean.Expr) :
+    MetaM (Lean.Expr × Lean.Expr) := do
+  let proof := mkAppN (mkConst unfold) application.getAppArgs
+  let type ← Meta.transform (← inferType proof) (post := fun e => do
+    match ← reduceProjection? e with
+    | some reduced => return .visit reduced
+    | none => return .continue)
+  return (proof, type)
+
+/-- An unfolding `f a = if c then t else e` rewritten to the branch `decided`
+takes: the proof and the statement. -/
+def unfoldingBranch (equation decided : Lean.Expr) (holds : Bool) :
+    MetaM (Lean.Expr × Lean.Expr) := do
+  let type ← instantiateMVars (← inferType equation)
+  let some (_, lhs, rhs) := type.eq? | throwError "an unfolding is an equation"
+  let arguments := rhs.getAppArgs
+  let rule := if rhs.isAppOf ``ite then (if holds then ``if_pos else ``if_neg)
+    else (if holds then ``dif_pos else ``dif_neg)
+  let branch ← mkAppOptM rule #[arguments[1]!, arguments[2]!, decided, arguments[0]!,
+    arguments[3]!, arguments[4]!]
+  let proof ← mkEqTrans equation branch
+  let some (_, _, taken) := (← instantiateMVars (← inferType proof)).eq?
+    | throwError "a branch is an equation"
+  return (proof, ← mkEq lhs taken.headBeta)
 
 /-- Instances of the unfolding theorems of the recursive specification
 functions (`f.spec.unfold`) at the applications a leaf holds, once, kept
@@ -60,14 +88,8 @@ private def unfoldSpecsOnce (goal : MVarId) (groundOnly := false) :
   let mut facts := #[]
   for application in applications do
     let some unfold := unfolding? application | continue
-    let proof := mkAppN (mkConst unfold) application.getAppArgs
-    -- The instance reads its arguments, not projections of their bundle:
-    -- a definitional reduction that keeps each argument once per use.
     let (fact, next) ← goal.withContext do
-      let type ← Meta.transform (← inferType proof) (post := fun e => do
-        match ← reduceProjection? e with
-        | some reduced => return .visit reduced
-        | none => return .continue)
+      let (proof, type) ← specUnfoldingInstance unfold application
       (← goal.assert `unfolded type proof).intro1P
     goal := next
     facts := facts.push fact
@@ -153,17 +175,8 @@ private def unfoldSpecsOnce (goal : MVarId) (groundOnly := false) :
         let mut current := fact
         for (decided, holds) in decisions do
           let (branched, next) ← goal.withContext do
-            let type ← instantiateMVars (← current.getType)
-            let some (_, lhs, rhs) := type.eq? | throwError "an unfolding is an equation"
-            let arguments := rhs.getAppArgs
-            let rule := if rhs.isAppOf ``ite then (if holds then ``if_pos else ``if_neg)
-              else (if holds then ``dif_pos else ``dif_neg)
-            let branch ← mkAppOptM rule #[arguments[1]!, arguments[2]!, decided, arguments[0]!,
-              arguments[3]!, arguments[4]!]
-            let proof ← mkEqTrans (.fvar current) branch
-            let some (_, _, taken) := (← instantiateMVars (← inferType proof)).eq?
-              | throwError "a branch is an equation"
-            (← goal.assert `unfolded (← mkEq lhs taken.headBeta) proof).intro1P
+            let (proof, statement) ← unfoldingBranch (.fvar current) decided holds
+            (← goal.assert `unfolded statement proof).intro1P
           goal ← next.clear current
           current := branched
         kept := kept.push current
@@ -3688,7 +3701,7 @@ macro_rules
   | verex_timed "w-trivial" verex_trivial
   -- A conjunction, such as a clause with an abort code, conjunct by
   -- conjunct.
-  | (apply And.intro <;> verex_decide_written)
+  | verex_timed "w-and" (apply And.intro <;> verex_decide_written)
   | (verex_timed "w-lookups" verex_lookups_after_writes
      first
      | done
@@ -4417,9 +4430,30 @@ def decidePreparedCases (goals : List MVarId) (attempt : TacticM Unit → Tactic
       setGoals [goal]
       Lean.Elab.Tactic.withoutRecover (evalTactic preparation)
       let prepared ← getUnsolvedGoals
-      attempt do
-        setGoals prepared
-        Lean.Elab.Tactic.withoutRecover (evalTactic step)
+      let decided ← saveState
+      let failed ← tryCatch
+        (do
+          attempt do
+            setGoals prepared
+            Lean.Elab.Tactic.withoutRecover (evalTactic step)
+          pure none)
+        (fun failure => pure (some failure))
+      if let some failure := failed then
+        -- The refuted alternatives of an abort condition left undecided:
+        -- each one source clause, a case of its own over the context
+        -- prepared once.
+        decided.restore
+        let cases ← if tag == preparationTag then
+            prepared.foldlM (fun cases goal => return cases ++ (← negatedAlternatives goal)) []
+          else pure prepared
+        if cases.length == prepared.length then throw failure
+        let mut left := []
+        for case in cases do
+          attempt do
+            setGoals [case]
+            Lean.Elab.Tactic.withoutRecover (evalTactic step)
+          left := left ++ (← getUnsolvedGoals)
+        setGoals left
     catch failure =>
       -- Under `verex.solverDebug`, the prepared goal the attempt failed on.
       if verex.solverDebug.get (← getOptions) then
@@ -4885,6 +4919,15 @@ macro_rules
           -- by the hypothesis, the bound decided as the prepared leaf would.
           | verex_timed "range" verex_range_instance
           | verex_timed "cheap cases" (verex_function_budgeted (verex_cheap_cases 3))
+          -- The refuted alternatives of an abort condition the deciders
+          -- leave, each by the cheap deciders.
+          | (verex_timed "negated alternatives" verex_split_negated_goal
+             all_goals (first
+               | verex_timed "witnesses" verex_goal_witnesses
+               | verex_timed "cheap" (verex_function_budgeted verex_decide_cheap)
+               | verex_timed "instance" verex_instance
+               | verex_timed "range" verex_range_instance)
+             done)
           -- The prepared form, an attempt of its own.
           | verex_timed "prepared" (verex_function_budgeted verex_open_prepared)
           | verex_leaf_fallbacks)

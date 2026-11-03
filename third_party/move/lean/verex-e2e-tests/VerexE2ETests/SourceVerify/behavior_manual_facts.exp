@@ -10,7 +10,7 @@ verexResources : Proofs.ResourcesTyped unit
 addr : Proofs.Denote.NTy.address.carrier
 initialState✝ : Proofs.Denote.Memory unit
 assumed permitted : True
-a✝⁹ :
+increment_returns :
   ¬(initialState✝
           {
             type :=
@@ -29,12 +29,12 @@ a✝⁹ :
                     (StorageKey.address addr)).getD
                 ({ val := 0, fits := ⋯ }, ())).fst.val +
           1)
-a✝⁸ :
+a✝⁷ :
   ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
       (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
       { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
       initialState✝
-a✝⁷ :
+a✝⁶ :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
@@ -54,7 +54,7 @@ a✝⁷ :
                 (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil }
           key
-a✝⁶ :
+a✝⁵ :
   ∀ (resource : Proofs.Denote.ResourceType),
     ¬resource =
           {
@@ -67,7 +67,7 @@ a✝⁶ :
           { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
           initialState✝ resource =
         initialState✝ resource
-a✝⁵ :
+a✝⁴ :
   Proofs.Denoted
     (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
       (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
@@ -77,7 +77,7 @@ a✝⁵ :
         (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
         { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
         initialState✝))
-a✝⁴ :
+flip_flag_returns :
   (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
         (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
         { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())

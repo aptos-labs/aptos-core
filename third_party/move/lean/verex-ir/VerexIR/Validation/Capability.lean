@@ -10,6 +10,7 @@ import VerexIR.Validation.Eliminate
 import VerexIR.Validation.IndexedArena
 import VerexIR.Validation.StaticTyping
 import VerexIR.Validation.TableRoles
+import VerexIR.Relocate
 
 /-!
 # VIR semantic capability preparation
@@ -4328,11 +4329,9 @@ does. -/
 private def stateLabelDiagnostics (ns : ValidatedNamespace) (contract : FunctionContract) :
     Array Diagnostic := Id.run do
   let mut ds : Array Diagnostic := #[]
-  let mut bound : Array Nat := #[]
-  let mut defined : Array Nat := #[]
-  let mut used : Array (Nat × LocId) := #[]
-  let labelName (label : Nat) : String :=
-    (ns.tables.names[label]?.map (·.name)).getD s!"{label}"
+  let mut bound : Array NameId := #[]
+  let mut defined : Array NameId := #[]
+  let mut used : Array (NameId × LocId) := #[]
   for condition in contract.conditions do
     let mut pending := #[condition.expression]
     let mut fuel := ns.expressions.size + 1
@@ -4373,12 +4372,15 @@ private def stateLabelDiagnostics (ns : ValidatedNamespace) (contract : Function
               if let some label := range.post then defined := defined.push label
       | _ => pure ()
   for (label, loc) in used do
-    if label ≥ ns.tables.names.size then
-      ds := ds.push (.at "VIR-SEMANTIC-STATE-LABEL" s!"state label {label} is not a name of the unit" loc)
-    else if !bound.contains label && !defined.contains label then
+    match ns.nameOf label with
+    | none =>
       ds := ds.push (.at "VIR-SEMANTIC-STATE-LABEL"
-        s!"state label `{labelName label}` is neither bound by a quantifier over the state domain nor defined by a state-change predicate"
-        loc)
+        s!"state label {label.index} is not a name of the unit" loc)
+    | some name =>
+      if !bound.contains label && !defined.contains label then
+        ds := ds.push (.at "VIR-SEMANTIC-STATE-LABEL"
+          s!"state label `{name.name}` is neither bound by a quantifier over the state domain nor defined by a state-change predicate"
+          loc)
   return ds
 
 private def scanContract (registry : SemanticsRegistry) (unit : ValidatedUnit)
@@ -4679,8 +4681,11 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
   functionErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
     implementationErrors ++ logicalDeclErrors ++ intrinsicErrors ++ metadataErrors
 
+/-- Preparation's diagnostics. The scan reads one table space, so it runs over
+the unit with every body numbered in the unit's tables. -/
 private def prepareDiagnostics (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) : Array Diagnostic :=
+  let unit := unit.inUnitIds
   dedupDiagnostics <| unit.namespaces.foldl (fun ds ns =>
       ds ++ scanNamespace registry unit mode ns)
     (registryDiagnostics registry unit) ++
@@ -4717,7 +4722,7 @@ def sharedOperand (ns : ValidatedNamespace) (expressionAt : Nat → Option Expr)
     (typeAt : Nat → Option Ty) (arguments : Array ExprId) : Bool :=
   match arguments[0]? with
   | some id => match expressionAt id.index with
-    | some expression => isSharedReferenceType ns expression.typeId typeAt
+    | some expression => isSharedReferenceType ns (ns.typeId expression.typeId) typeAt
     | none => false
   | none => false
 
@@ -5075,8 +5080,8 @@ def sharedDereferenceSites (unit : ValidatedUnit) (ns : ValidatedNamespace)
 
 /-- The places of a namespace that dereference a shared reference, indexed. -/
 def sharedDereferenceIndex (unit : ValidatedUnit) (namespaceId : NamespaceId) : KeyTree Unit :=
-  let places := unit.borrowCertificates.toList.foldl (init := []) fun places certificate =>
-    if certificate.namespaceId != namespaceId then places else
+  let certificates := ((unit.namespaces[namespaceId.index]?).map (·.borrowCertificates)).getD #[]
+  let places := certificates.toList.foldl (init := []) fun places certificate =>
     certificate.sharedDereferences.toList.foldl (init := places) fun places place =>
       (place.index, ()) :: places
   let distinct := (sortByIndex places).foldl (init := []) fun distinct entry =>

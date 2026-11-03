@@ -11,6 +11,7 @@ import VerexIR.Validation.Link
 import VerexIR.Validation.SemanticTypes
 import VerexIR.Validation.StaticTyping
 import VerexIR.Validation.RequiredTypes
+import VerexIR.Validation.ClosureTemplates
 import VerexIR.Validation.StaticTypingSubst
 import VerexIR.Semantics.Runtime
 import VerexIR.Semantics.Operations
@@ -39,4 +40,5 @@ import VerexIR.Proofs.Contract
 import VerexIR.Proofs.Typed
 import VerexIR.Proofs.Meaning
 import VerexIR.Proofs.GlobalTyping
+import VerexIR.Proofs.IndexedTyping
 import VerexIR.Proofs.ClosureTyping

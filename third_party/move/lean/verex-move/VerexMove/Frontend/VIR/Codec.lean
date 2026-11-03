@@ -87,11 +87,9 @@ def primitiveXastOperation : VerexIR.PrimitiveOperation → Except String Xast.O
   | .identical => pure .identical
   | operation => .error s!"primitive {repr operation} cannot be projected as Move XAST"
 
-private def virMemoryRange (range : Xast.MemoryRange) : VerexIR.MemoryRange :=
-  { pre := range.pre, post := range.post }
-
-private def xastMemoryRange (range : VerexIR.MemoryRange) : Xast.MemoryRange :=
-  { pre := range.pre, post := range.post }
+/-- A memory range as the exchange spells it: each label by its name's index. -/
+def xastMemoryRange (range : VerexIR.MemoryRange) : Xast.MemoryRange :=
+  { pre := range.pre.map (·.index), post := range.post.map (·.index) }
 
 def virBehaviorKind : Xast.BehaviorKind → VerexIR.BehaviorKind
   | .requiresOf => .requiresOf
@@ -111,15 +109,17 @@ private def xastBehaviorKind : VerexIR.BehaviorKind → Xast.BehaviorKind
   | .foldsOf => .foldsOf
   | .writeOf index => .writeOf index
 
+/-- The specification operation of an exchange operation that reads no state
+label; a labeled one names its labels by the module's names, which the encoder
+holds. -/
 def specOperation? : Xast.Operation → Option VerexIR.SpecOperation
-  | .behavior kind range => some (.behavior (virBehaviorKind kind) (virMemoryRange range))
   | .result index => some (.result index)
   | .typeValue => some .typeValue
   | .typeDomain => some .typeDomain
   | .resourceDomain => some .resourceDomain
   | .stateDomain => some .stateDomain
-  | .global label => some (.global label)
-  | .exists label => some (.exists label)
+  | .global none => some (.global none)
+  | .exists none => some (.exists none)
   | .canModify => some .canModify
   | .old => some .old
   | .saveStateAnchor label => some (.saveStateAnchor label)
@@ -129,9 +129,6 @@ def specOperation? : Xast.Operation → Option VerexIR.SpecOperation
   | .trace .user => some (.trace .user)
   | .trace .auto => some (.trace .automatic)
   | .trace .subAuto => some (.trace .subAutomatic)
-  | .specPublish range => some (.publish (virMemoryRange range))
-  | .specRemove range => some (.remove (virMemoryRange range))
-  | .specUpdate range => some (.update (virMemoryRange range))
   | .emptyVec => some .emptyVector
   | .singleVec => some .singletonVector
   | .updateVec => some .updateVector
@@ -173,8 +170,8 @@ def specXastOperation : VerexIR.SpecOperation → Except String Xast.Operation
   | .typeDomain => pure .typeDomain
   | .resourceDomain => pure .resourceDomain
   | .stateDomain => pure .stateDomain
-  | .global label => pure (.global label)
-  | .exists label => pure (.exists label)
+  | .global label => pure (.global (label.map (·.index)))
+  | .exists label => pure (.exists (label.map (·.index)))
   | .canModify => pure .canModify
   | .old => pure .old
   | .final => .error "`final` has no Move specification form"

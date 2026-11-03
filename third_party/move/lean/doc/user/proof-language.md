@@ -532,7 +532,11 @@ lemma_vector_ext(v, w): len(v) == len(w)
 ```
 
 A recursive specification function's unfolding is a lemma of it
-(`apply spec_sum_upto.unfold(m, n)`).
+(`apply spec_sum_upto.unfold(m, n)`): the fact `spec_sum_upto(m, n) = …`, at the
+branch `decide` settles for the guard the body branches on first, with the
+arguments in the function's domain. `decide` settling neither the guard nor its
+negation is an error; state one of them. A specialization the compiler generated
+(`«spec_fold$lambda$24»`) has no name in the source, so it does not unfold by `apply`.
 
 ### Lemma items
 

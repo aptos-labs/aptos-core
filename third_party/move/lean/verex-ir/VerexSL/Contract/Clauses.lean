@@ -316,7 +316,7 @@ private partial def Context.bindLet (context : Context) (pattern : VerexIR.Patte
   match patternNode.kind with
   | .wildcard => pure context
   | .variable localId =>
-      let some patternType := context.valueTypeOf? patternNode.typeId
+      let some patternType := context.valueTypeOf? (context.ns.typeId patternNode.typeId)
         | throwError "specification binding pattern has an unknown type"
       context.bindLocal localId patternType
         (← decidedAt patternType (← translate context initializer))
@@ -364,9 +364,10 @@ private partial def Context.bindLet (context : Context) (pattern : VerexIR.Patte
       throwError "generated contracts require a variable or wildcard binding pattern"
 
 /-- The state a label denotes in this clause. -/
-private partial def Context.labelState (context : Context) (label : Nat) : MetaM LabelState := do
+private partial def Context.labelState (context : Context) (label : VerexIR.NameId) :
+    MetaM LabelState := do
   if let some (_, state) := context.stateLabels.find? (·.1 == label) then return state
-  let name := (context.unit.tables.names[label]?.map (·.name)).getD s!"{label}"
+  let name := (context.ns.nameOf label |>.map (·.name)).getD s!"{label.index}"
   if context.resolvingLabels.contains label then
     throwError "cyclic definition of state label `{name}`"
   let some definition := context.labelDefinitions.find? (·.label == label)
@@ -427,7 +428,7 @@ private partial def translateStateChange (context : Context)
     | throwError "a state-change predicate needs one resource type"
   let some key := arguments[0]? | throwError "a state-change predicate needs an address"
   let keyValue := mkApp (mkConst ``VerexIR.StorageKey.address) (← translate context key)
-  let (slot, resource, nativeType) ← context.slot pre resourceUse.typeId keyValue
+  let (slot, resource, nativeType) ← context.slot pre (context.ns.typeId resourceUse.typeId) keyValue
   let present ← slotPresent slot
   let condition := if operation matches .publish _ then mkNot present else present
   let frame ← context.frame
@@ -464,7 +465,7 @@ private partial def translateStateChange (context : Context)
 or, without one, at its entry value (`entry`) or its current one: an
 invocation reads the references it lends at its pre-state, as the Prover
 reads `old` of them, and `ensures_of` their final values at its post-state. -/
-private partial def Context.mutableAt (context : Context) (label : Option Nat) (entry : Bool) :
+private partial def Context.mutableAt (context : Context) (label : Option VerexIR.NameId) (entry : Bool) :
     MetaM Context := do
   let values ← match label with
     | some label => pure (← context.labelState label).locals
@@ -488,7 +489,7 @@ private partial def translateInvocation (context : Context) (range : VerexIR.Mem
     | throwError "a behavioral predicate names a function value"
   let some callableExpression := context.ns.expressions[callable.index]?
     | throwError "a behavioral predicate's function value is out of range"
-  let some (.function parameters _ _) := context.valueTypeOf? callableExpression.typeId
+  let some (.function parameters _ _) := context.valueTypeOf? (context.ns.typeId callableExpression.typeId)
     | throwError "a behavioral predicate's operand is not a function value"
   let .function row shared results ← context.exprType callable
     | throwError "a behavioral predicate's function value has no native function type"
@@ -582,7 +583,8 @@ private partial def directTarget? (context : Context) (executable frame : Lean.E
   if instantiations.isEmpty then
     let some contractOf := context.directContract | return none
     return some { reading := .contract (← contractOf handle frame none), θ? := none, full, shape }
-  let some typeArgs := instantiations.mapM fun argument => match argument with
+  let some typeArgs := (context.ns.genericArguments instantiations).mapM fun argument =>
+      match argument with
       | .typeArg value => some value
       | _ => none
     | return none
@@ -625,6 +627,12 @@ private partial def functionLiteral (context : Context) (reference : VerexIR.Qua
   let some handle := VerexIR.SemanticOperations.resolveFunction? context.unit
       context.namespaceId reference
     | throwError "a function value's target does not resolve"
+  let some targetNs := context.unit.namespaces[handle.namespaceId.index]?
+    | throwError "a function value's target does not resolve"
+  let some target := targetNs.functions[handle.functionId.index]?
+    | throwError "a function value's target does not resolve"
+  if let some refusal := VerexIR.Proofs.Denote.closureTargetRefusal targetNs target then
+    throwError refusal
   let some (parameters, _) := VerexIR.Proofs.Denote.closureSignature? context.unit handle
     | throwError "a function value's target has no native signature"
   let captured := VerexIR.Proofs.Denote.NRow.ofList (VerexIR.ClosureMask.extract mask true parameters)
@@ -681,17 +689,17 @@ range builds no value. -/
 partial def translate (context : Context) (id : ExprId) : MetaM Lean.Expr := do
   let term ← translateExpression context id
   let some expression := context.ns.expressions[id.index]? | return term
-  let some ty := context.valueTypeOf? expression.typeId | return term
+  let some ty := context.valueTypeOf? (context.ns.typeId expression.typeId) | return term
   if domainOf ty == .boolean then bindCuts term else return term
 
 /-- `translate` but for binding the cuts. -/
 partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.Expr := do
   let some expression := context.ns.expressions[id.index]?
     | throwError "specification expression {id.index} is out of range"
-  let some ty := context.valueTypeOf? expression.typeId
+  let some ty := context.valueTypeOf? (context.ns.typeId expression.typeId)
     | throwError "specification expression {id.index} has an unknown type"
   match expression.kind with
-  | .value literal _ => translateLiteral literal ty expression.typeId
+  | .value literal _ => translateLiteral literal ty (context.ns.typeId expression.typeId)
   | .constant reference =>
       -- A named constant denotes its defining literal, translated in the
       -- declaring namespace.  The definition is executable-typed, so the
@@ -719,9 +727,9 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
         translate { (← context.atRange range) with rangeApplied := some id } id
       else
         let .operation operation instantiations arguments _ := expression.kind | unreachable!
-        translateOperation operation instantiations arguments ty expression.typeId
+        translateOperation operation instantiations arguments ty (context.ns.typeId expression.typeId)
   | .operation operation instantiations arguments _ =>
-      translateOperation operation instantiations arguments ty expression.typeId
+      translateOperation operation instantiations arguments ty (context.ns.typeId expression.typeId)
   | .quantifier kind binders triggers condition body =>
       unless triggers.isEmpty do
         throwError "quantifier triggers are not supported in generated contracts"
@@ -734,9 +742,9 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
             | throwError "generated contracts currently require a variable quantifier pattern"
           let some domainExpression := active.ns.expressions[binder.domain.index]?
             | throwError "quantifier domain {binder.domain.index} is out of range"
-          let some patternType := active.valueTypeOf? pattern.typeId
+          let some patternType := active.valueTypeOf? (active.ns.typeId pattern.typeId)
             | throwError "quantifier pattern type {pattern.typeId.index} is out of range"
-          let some domainType := active.valueTypeOf? domainExpression.typeId
+          let some domainType := active.valueTypeOf? (active.ns.typeId domainExpression.typeId)
             | throwError "quantifier domain type {domainExpression.typeId.index} is out of range"
           let domain := domainOf patternType
           let binderName := match active.localNames[localId.index]? with
@@ -877,12 +885,8 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
               throwError "a wildcard arm in a specification match must be last"
             hasWildcard := true
         | .constructor owner _ (some variant) _ =>
-            let some qualified := context.unit.tables.names[owner.index]?
-              | throwError "specification match constructor has an unknown owner"
-            let reference : VerexIR.QualifiedRef := {
-              namespaceId := qualified.namespaceId, name := owner }
-            let some handle := VerexIR.SemanticOperations.resolveStruct?
-                context.unit context.namespaceId reference
+            let some handle := VerexIR.SemanticOperations.resolveNominal?
+                context.unit context.ns (context.ns.nameId owner)
               | throwError "specification match constructor does not resolve"
             if let some previous := owner? then
               unless previous == handle do
@@ -894,7 +898,7 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
               let some declaration := targetNs.structs[handle.structId]?
                 | throwError "specification match constructor declaration is out of range"
               declaredVariants := declaration.variants.filterMap fun declaration =>
-                (context.unit.tables.names[declaration.name.index]?).map (·.name)
+                (targetNs.nameOf declaration.name).map (·.name)
             unless declaredVariants.contains variant do
               throwError "specification match names unknown variant `{variant}`"
             coveredVariants := coveredVariants.push variant
@@ -917,12 +921,8 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
         let (condition?, armContext, universal) ← match pattern.kind with
           | .wildcard => pure (none, context, #[])
           | .constructor owner _ (some variant) fields => do
-              let some qualified := context.unit.tables.names[owner.index]?
-                | throwError "specification match constructor has an unknown owner"
-              let reference : VerexIR.QualifiedRef := {
-                namespaceId := qualified.namespaceId, name := owner }
-              let some handle := VerexIR.SemanticOperations.resolveStruct?
-                  context.unit context.namespaceId reference
+              let some handle := VerexIR.SemanticOperations.resolveNominal?
+                  context.unit context.ns (context.ns.nameId owner)
                 | throwError "specification match constructor does not resolve"
               let condition ← nativeVariantTest carriers enumType scrutineeValue handle #[variant]
               let mut armLocals := context.locals
@@ -934,7 +934,7 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
                 match child.kind with
                 | .wildcard => pure ()
                 | .variable localId =>
-                    let some childType := context.valueTypeOf? child.typeId
+                    let some childType := context.valueTypeOf? (context.ns.typeId child.typeId)
                       | throwError "specification match child has an unknown type"
                     if let some (_, selected) ← typedVariantField? enum #[(variant, index)] carriers
                         enumType scrutineeValue then
@@ -1108,7 +1108,7 @@ where
   /-- The native type of an operand's value. -/
   operandNty? (id : ExprId) : Option VerexIR.Proofs.Denote.NTy := do
     let expression ← context.ns.expressions[id.index]?
-    context.ntyOf? (specTypeId context.unit expression.typeId)
+    context.ntyOf? (specTypeId context.unit (context.ns.typeId expression.typeId))
   /-- Whether equality reads an operand's value through its identity
   (`holdsContents`). -/
   holdsIdentity (id : ExprId) : Bool :=
@@ -1227,7 +1227,7 @@ where
   /-- The resource type a global operation is instantiated at. -/
   resourceType (instantiations : Array VerexIR.GenericArgument) : MetaM TypeId := do
     match instantiations.toList with
-    | [.typeArg resource] => return resource.typeId
+    | [.typeArg resource] => return context.ns.typeId resource.typeId
     | _ => throwError "a global specification operation needs one resource type"
   /-- The state a storage read observes: `spec.old` reads the entry state,
   every other position the clause's own state. -/
@@ -1248,7 +1248,7 @@ where
   definitionTypeArguments (instantiations : Array VerexIR.GenericArgument) :
       MetaM (Array (Option VerexIR.Proofs.Denote.NTy)) :=
     instantiations.mapM fun
-      | .typeArg argument => pure (context.ntyOf? argument.typeId)
+      | .typeArg argument => pure (context.ntyOf? (context.ns.typeId argument.typeId))
       | _ => throwError "a specification function call takes only type arguments in \
           generated contracts"
   /-- The shape of a definition at resolved type arguments: a native
@@ -1283,18 +1283,19 @@ where
     let mut domains := #[]
     let mut natives := #[]
     for parameter in declaration.signature.parameters do
-      let domain ← domainAt parameter.typeUse.typeId "a specification function parameter"
+      let domain ← domainAt (targetNs.typeId parameter.typeUse.typeId)
+        "a specification function parameter"
       domains := domains.push domain
-      natives := natives.push (← nativeAt domain parameter.typeUse.typeId false)
+      natives := natives.push (← nativeAt domain (targetNs.typeId parameter.typeUse.typeId) false)
     let localTypes ← declaration.locals.mapM fun localDecl => do
-      let some localType := probe.typeOf? localDecl.type.typeId
+      let some localType := probe.typeOf? (targetNs.typeId localDecl.type.typeId)
         | throwError "a specification function local has an unknown type"
       pure localType
     let [result] := declaration.signature.results.toList
       | throwError "a recursive specification function returns one value"
-    let resultDomain ← domainAt result.typeId "a specification function result"
+    let resultDomain ← domainAt (targetNs.typeId result.typeId) "a specification function result"
     -- A definition's value is its body's, which a tuple types logically.
-    let valueTypeId := (do
+    let valueTypeId := targetNs.typeId <| (do
       let root ← declaration.body
       let expression ← targetNs.expressions[root.index]?
       pure expression.typeId).getD result.typeId
@@ -1400,7 +1401,7 @@ where
       let .typeArg argument := instantiation
         | throwError "a specification function call takes only type arguments in \
             generated contracts"
-      let some nty := context.ntyOf? argument.typeId
+      let some nty := context.ntyOf? (context.ns.typeId argument.typeId)
         | throwError m!"a type argument of a recursive specification function has no \
             native type ({repr instantiation})"
       let quoted ← quoteNTy nty
@@ -1889,10 +1890,10 @@ where
     | none => {}
   /-- The parameter domains of a lemma, as its definitions take them. -/
   lemmaDomains (reference : VerexIR.QualifiedRef) : MetaM (Array Domain) := do
-    let some (_, declaration) := lemmaOf? context.unit reference
+    let some (lemmaNs, declaration) := lemmaOf? context.unit reference
       | throwError "lemma `{repr reference}` does not resolve"
     declaration.signature.parameters.mapM fun parameter =>
-      signatureDomain context.unit parameter.typeUse.typeId "a lemma parameter"
+      signatureDomain context.unit (lemmaNs.typeId parameter.typeUse.typeId) "a lemma parameter"
   /-- The arguments of a lemma instance as the bundle its definitions take:
   a native parameter's native value, any other's clause value. -/
   lemmaBundle (reference : VerexIR.QualifiedRef) (arguments : Array ExprId)
@@ -1980,7 +1981,7 @@ where
       (mkConst ``Unit)
     let mut localTypes : Array IrTy := #[]
     for localDecl in declaration.locals do
-      let some localType := context.unit.tables.types[localDecl.type.typeId.index]?
+      let some localType := targetNs.typeOf localDecl.type.typeId
         | throwError "a lemma local has an unknown type"
       localTypes := localTypes.push localType
     let bodyContext (bundle : Lean.Expr) : MetaM Context := do
@@ -2013,7 +2014,7 @@ where
     let clauses (kind : VerexIR.ConditionKind) (bundle : Lean.Expr) : MetaM (Array Lean.Expr) := do
       let active ← bodyContext bundle
       (declaration.contract.conditions.filter (·.kind == kind)).mapM fun condition =>
-        markObligation (conditionRange context.unit condition) <$>
+        markObligation (conditionRange targetNs condition) <$>
           translate active condition.expression
     define names.requires (mkSort .zero) fun bundle => do
       let bounds ← parameterBounds bundle domains localTypes
@@ -2021,14 +2022,14 @@ where
     define names.ensures (mkSort .zero) fun bundle => do
       conjunction (← clauses .ensures bundle)
     for (condition, name) in declaration.proof.zip names.steps do
-      define name (mkSort .zero) fun bundle => markObligation (conditionRange context.unit condition) <$> do
+      define name (mkSort .zero) fun bundle => markObligation (conditionRange targetNs condition) <$> do
         let active ← bodyContext bundle
         match condition.kind with
         | .split =>
             -- A split on a Boolean directs the cases; one on an enum is no step.
             let some expression := targetNs.expressions[condition.expression.index]?
               | throwError "a split's expression is out of range"
-            if context.unit.tables.types[expression.typeId.index]? == some .bool then
+            if context.ns.typeOf expression.typeId == some .bool then
               mkAppM ``VerexIR.Proofs.CaseSplit #[← translate active condition.expression]
             else pure (mkConst ``True)
         | _ => translate active condition.expression
@@ -2057,6 +2058,7 @@ where
       (ty : IrTy) (resultTypeId : TypeId) : MetaM Lean.Expr := do
     match operation with
     | .specification (.lemma reference _) =>
+        let reference := context.ns.qualifiedRef reference
         let names ← ensureLemmaDefinitions reference
         -- A generic lemma's instance is at the frame its type arguments
         -- induce over the position's; at the position's own type parameters
@@ -2079,6 +2081,7 @@ where
         mkAppM (if context.lemmaQuantified then ``VerexIR.Proofs.LemmaInstance
           else ``VerexIR.Proofs.LemmaApplication) #[owes, gives]
     | .specification (.functionCall reference _) =>
+        let reference := context.ns.qualifiedRef reference
         if let some definition := context.definition then
           if let some member := definition.members.find? (·.reference == reference) then
             -- A recursive call: the bundled arguments, at a smaller measure.
@@ -2152,7 +2155,7 @@ where
             `{specFunctionSpelling context.unit reference}` needs a `decreases` measure"
         -- A generic function is expanded at its arguments' native types.
         let typeArgumentTypes ← instantiations.mapM fun
-          | .typeArg argument => pure (context.ntyOf? argument.typeId)
+          | .typeArg argument => pure (context.ntyOf? (context.ns.typeId argument.typeId))
           | _ => throwError "a specification function call takes only type arguments in \
               generated contracts"
         let some qualified := context.unit.tables.names[reference.name.index]?
@@ -2237,7 +2240,7 @@ where
               let some nty := nty?
                 | match instantiation with
                   | .typeArg argument =>
-                      match context.typeOf? argument.typeId with
+                      match context.typeOf? (context.ns.typeId argument.typeId) with
                       | some (.integer .unbounded _) =>
                           return mkConst ``VerexSL.Contract.SpecTypeArgument.integer
                       | _ => throwError m!"a type argument of the specification function \
@@ -2254,12 +2257,12 @@ where
           let (parameterTypeIds, resultTypeIds) : Array TypeId × Array TypeId :=
             match context.unit.resolution.specFunction? reference.name with
             | some id => ((targetNs.specFunctions[id.index]?).map fun declaration =>
-                (declaration.signature.parameters.map (·.typeUse.typeId),
-                  declaration.signature.results.map (·.typeId))).getD (#[], #[])
+                (declaration.signature.parameters.map (targetNs.typeId ·.typeUse.typeId),
+                  declaration.signature.results.map (targetNs.typeId ·.typeId))).getD (#[], #[])
             | none => match context.unit.resolution.function? reference.name with
               | some id => ((targetNs.functions[id.index]?).map fun declaration =>
-                  (declaration.signature.parameters.map (·.typeUse.typeId),
-                    declaration.signature.results.map (·.typeId))).getD (#[], #[])
+                  (declaration.signature.parameters.map (targetNs.typeId ·.typeUse.typeId),
+                    declaration.signature.results.map (targetNs.typeId ·.typeId))).getD (#[], #[])
               | none => (#[], #[])
           let callee : Context := { context with
             namespaceId := reference.namespaceId, ns := targetNs, typeArgumentTypes }
@@ -2355,7 +2358,7 @@ where
           Array.replicate declaration.locals.size none
         let mut targetTypes : Array IrTy := #[]
         for localDecl in declaration.locals do
-          let some localType := callee.valueTypeOf? localDecl.type.typeId
+          let some localType := callee.valueTypeOf? (targetNs.typeId localDecl.type.typeId)
             | throwError "specification function local has an unknown type"
           targetTypes := targetTypes.push localType
         let mut values : Array Lean.Expr := #[]
@@ -2363,7 +2366,7 @@ where
         for (argument, index) in arguments.zipIdx do
           let some parameter := declaration.signature.parameters[index]?
             | throwError "specification function parameter is out of range"
-          let some parameterType := callee.valueTypeOf? parameter.typeUse.typeId
+          let some parameterType := callee.valueTypeOf? (targetNs.typeId parameter.typeUse.typeId)
             | throwError "specification function parameter has an unknown type"
           let value ← translate context argument
           let value ← match domainOf parameterType with
@@ -2375,7 +2378,7 @@ where
                 | some argumentType =>
                     if domainOf argumentType == .native then pure value
                     else do
-                      let τ ← callee.nativeType parameter.typeUse.typeId
+                      let τ ← callee.nativeType (targetNs.typeId parameter.typeUse.typeId)
                       nativeOfClause (← context.carriers) τ value
                 | none => pure value
             | _ => pure value
@@ -2391,8 +2394,8 @@ where
           let some result := declaration.signature.results[0]? | return value
           unless domainOf ty == .native do
             -- A type parameter's value is native, read at the call's domain.
-            if (callee.valueTypeOf? result.typeId).map domainOf == some .native then
-              return ← clauseOfNative (← callee.nativeType result.typeId) value
+            if (callee.valueTypeOf? (targetNs.typeId result.typeId)).map domainOf == some .native then
+              return ← clauseOfNative (← callee.nativeType (targetNs.typeId result.typeId)) value
             return value
           let σ ← callee.exprType body
           let τ ← context.nativeType resultTypeId
@@ -2587,7 +2590,7 @@ where
           else do
             -- Each variant's slot follows its own fields.
             let some choices := declaration.variants.toList.mapM fun (variant : VerexIR.VariantDecl) => do
-                let named : VerexIR.QualifiedName ← owner.tables.names[variant.name.index]?
+                let named : VerexIR.QualifiedName ← owner.nameOf variant.name
                 let name := named.name
                 let index ← VerexIR.SemanticOperations.handleGhostIndex? context.unit handle
                   (some name) field
@@ -2627,7 +2630,7 @@ where
             | throwError "specification field `{field}` does not resolve in generated contracts"
           return ← nativeFieldUpdate carriers built index baseValue replacementValue
         let variants : Array String := declaration.variants.filterMap fun variant =>
-          (owner.tables.names[variant.name.index]?).map (·.name)
+          (owner.nameOf variant.name).map (·.name)
         let choices := variants.toList.filterMap fun variant =>
           (VerexIR.SemanticOperations.handleFieldIndex? context.unit handle (some variant) field).map
             (variant, ·)
@@ -2681,7 +2684,7 @@ where
     | .ensuresOf =>
         let some callableExpression := context.ns.expressions[arguments[0]!.index]?
           | throwError "a behavioral predicate's function value is out of range"
-        let some (.function parameters _ _) := context.valueTypeOf? callableExpression.typeId
+        let some (.function parameters _ _) := context.valueTypeOf? (context.ns.typeId callableExpression.typeId)
           | throwError "a behavioral predicate's operand is not a function value"
         let outputs := arguments.extract (parameters.size + 1) arguments.size
         let count := (invocation.row.toList.filter (· matches .ref _)).length

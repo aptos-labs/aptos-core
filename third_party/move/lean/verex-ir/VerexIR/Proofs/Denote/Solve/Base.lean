@@ -554,6 +554,11 @@ structure TargetState where
   /-- The statement of each closure site's generated `closure` equation over
 its captures, its literals unfolded (`literalValue?`), by constructor. -/
   siteClosureTypes : IO.Ref (NameMap Lean.Expr)
+  /-- The terms a simp context left unchanged without reading the local
+  context, by the context's stamp (`FixedPoints`). -/
+  fixedPoints : IO.Ref (Std.HashMap Name (IO.Ref (Std.HashSet Lean.Expr)))
+  /-- The fixed-point lookups that hit and missed, and the terms recorded. -/
+  fixedPointCounts : IO.Ref (Array Nat)
 
 /-- The state a target begins with. -/
 def TargetState.new : IO TargetState := do
@@ -611,6 +616,8 @@ def TargetState.new : IO TargetState := do
     pathRouted := ← IO.mkRef true
     stepMode := ← IO.mkRef {}
     siteClosureTypes := ← IO.mkRef {}
+    fixedPoints := ← IO.mkRef {}
+    fixedPointCounts := ← IO.mkRef #[0, 0, 0]
   }
 
 /-- The state of the target being proved, in its elaboration branch's
@@ -3268,6 +3275,27 @@ elab "verex_split_conjunction_goal" : tactic => focusGoal do
   if goals.length ≤ 1 then throwError "the goal states no conjunction"
   replaceMainGoal goals
 
+/-- The alternatives a successful path refutes: `¬(A ∨ B)` as `¬A` and `¬B`,
+through clause markers; the goal itself where it negates no disjunction. -/
+partial def negatedAlternatives (goal : MVarId) : MetaM (List MVarId) :=
+  goal.withContext do
+    let target := (← instantiateMVars (← goal.getType)).consumeMData
+    let some inner := target.not? | return [goal]
+    let inner := inner.consumeMData
+    let inner := if inner.isAppOfArity ``VerexIR.Proofs.Obligation 4 then inner.getArg! 3 else inner
+    let some (left, right) := inner.app2? ``Or | return [goal]
+    let goal ← goal.replaceTargetDefEq (mkNot (mkOr left right))
+    let parts ← goal.apply (mkApp2 (mkConst ``not_or_intro) left right)
+    parts.foldlM (fun goals part => do return goals ++ (← negatedAlternatives part)) []
+
+/-- Split a negated disjunction goal into the negations of its alternatives.
+Fails when the goal negates no disjunction. -/
+elab "verex_split_negated_goal" : tactic => focusGoal do
+  if (← getGoals).isEmpty then return
+  let goals ← negatedAlternatives (← getMainGoal)
+  if goals.length ≤ 1 then throwError "the goal negates no disjunction"
+  replaceMainGoal goals
+
 /-- `verex_intro` where the goal may state nothing to introduce. -/
 elab "verex_intro_any" : tactic => focusGoal do
   if (← getGoals).isEmpty then return
@@ -5052,11 +5080,164 @@ private def normalKey (type : Lean.Expr) : MetaM (Lean.Expr × Array Lean.Expr) 
 conditional rules of the pass (a conditional's branch, a truncating
 division's form, a cut integer's named local) read the context, so such a
 hypothesis may normalize further where more is known. -/
+private def contextDependentHeadName (name : Name) : Bool :=
+  name == ``ite || name == ``dite || name == ``Int.tmod || name == ``Int.tdiv ||
+    name == ``VerexIR.SpecInt.ofInt || name == ``VerexIR.SpecInt.ofSize ||
+    name == ``VerexIR.SpecVector.append || name == ``VerexIR.SpecVector.push
+
 private def contextDependent (type : Lean.Expr) : Bool :=
-  (type.find? fun e => e.isAppOf ``ite || e.isAppOf ``dite || e.isAppOf ``Int.tmod ||
-    e.isAppOf ``Int.tdiv || e.isAppOf ``VerexIR.SpecInt.ofInt ||
-    e.isAppOf ``VerexIR.SpecInt.ofSize || e.isAppOf ``VerexIR.SpecVector.append ||
-    e.isAppOf ``VerexIR.SpecVector.push).isSome
+  (type.find? fun e => match e.getAppFn with
+    | .const name _ => contextDependentHeadName name
+    | _ => false).isSome
+
+/-! ## Fixed points across normalizations
+
+A term a simp context left unchanged is unchanged wherever it recurs, as
+long as its traversal read nothing of the local context: no discharger
+call, no simproc searching the hypotheses, no subterm taken as normal
+without traversal. Such terms are recorded per target and context stamp,
+and a later traversal of the context skips them (`.done`, no proof). -/
+
+/-- Whether simp may read the local context at a term: a
+`contextDependent` shape, or one of a simproc searching the hypotheses
+(`existsNamedValue`, `givenClosureFrame`, `invokeGenericClosure`). -/
+private def contextReadingHead (e : Lean.Expr) : Bool :=
+  match e.getAppFn with
+  | .const name _ =>
+      contextDependentHeadName name || name == ``VerexIR.Proofs.Spec.given ||
+        name == ``VerexIR.Proofs.Denote.closureMeaning ||
+        (name == ``Exists && e.getAppNumArgs == 2 && (e.getArg! 0).isAppOf ``VerexIR.SpecInt)
+  | _ => false
+
+/-- A term being traversed: simp's recursion depth there and the context
+reads before it. -/
+private structure FixedPointFrame where
+  term : Lean.Expr
+  depth : Nat
+  reads : Nat
+  deriving Inhabited
+
+/-- A traversal's view of the fixed points of one simp context. -/
+structure FixedPoints where
+  /-- The fixed points of the context. -/
+  known : IO.Ref (Std.HashSet Lean.Expr)
+  /-- The context reads so far. -/
+  reads : IO.Ref Nat
+  frames : IO.Ref (Array FixedPointFrame)
+  /-- The terms whose traversal read the context; simp's own cache returns
+  them without a traversal. -/
+  tainted : IO.Ref (Std.HashSet Lean.Expr)
+  /-- Hits, misses, and terms recorded. -/
+  counts : IO.Ref (Array Nat)
+
+/-- The stamp of the walk's normalization (`normalization`). -/
+def walkFixedPoints : Option Name := some `walk
+
+/-- The fixed points of the context stamped `stamp`, if any. -/
+def FixedPoints.new? (stamp : Option Name) : CoreM (Option FixedPoints) := do
+  let some stamp := stamp | return none
+  let state ← targetState
+  let known ← match (← state.fixedPoints.get)[stamp]? with
+    | some known => pure known
+    | none => do
+      let known ← IO.mkRef {}
+      state.fixedPoints.modify (·.insert stamp known)
+      pure known
+  let reads ← IO.mkRef 0
+  let frames ← IO.mkRef #[]
+  let tainted ← IO.mkRef {}
+  return some { known, reads, frames, tainted, counts := state.fixedPointCounts }
+
+/-- Whether a term is worth recording: no metavariables, not small. -/
+private def fixedPointCandidate (e : Lean.Expr) : Bool :=
+  !e.hasMVar && e.approxDepth ≥ 3
+
+/-- End the traversals deeper than `depth`; those that read the context
+are tainted. -/
+private def FixedPoints.closeAbove (fp : FixedPoints) (depth : Nat) : IO Unit := do
+  let mut frames ← fp.frames.swap #[]
+  if frames.size > 0 && frames.back!.depth > depth then
+    let reads ← fp.reads.get
+    while frames.size > 0 && frames.back!.depth > depth do
+      let frame := frames.back!
+      frames := frames.pop
+      if reads != frame.reads then fp.tainted.modify (·.insert frame.term)
+  fp.frames.set frames
+
+/-- Whether a child simp visits of `e` was tainted. -/
+private def childTainted (tainted : Std.HashSet Lean.Expr) (e : Lean.Expr) : Bool :=
+  match e with
+  | .app f a => tainted.contains a || spine f
+  | .forallE _ d b _ => tainted.contains d || (!b.hasLooseBVars && tainted.contains b)
+  | .letE _ t v _ _ => tainted.contains t || tainted.contains v
+  | .mdata _ b | .proj _ _ b => tainted.contains b
+  | _ => false
+where
+  spine : Lean.Expr → Bool
+    | .app f a => tainted.contains a || spine f
+    | f => tainted.contains f
+
+/-- `methods` skipping the recorded fixed points and recording new ones;
+a term `assumed` holds is taken as normal, which taints its ancestors. -/
+def FixedPoints.wrap (fp : FixedPoints) (methods : Simp.Methods)
+    (assumed : Lean.Expr → SimpM Bool := fun _ => pure false) : Simp.Methods :=
+  { methods with
+    pre := fun e => do
+      -- An atom reads no context in its own traversal.
+      if e.isAtomic then
+        if ← assumed e then
+          fp.reads.modify (· + 1)
+          return .done { expr := e }
+        return ← methods.pre e
+      let depth ← MonadRecDepth.getRecDepth
+      fp.closeAbove (depth - 1)
+      if fixedPointCandidate e then
+        if (← fp.known.get).contains e then
+          fp.counts.modify (·.modify 0 (· + 1))
+          return .done { expr := e }
+        fp.counts.modify (·.modify 1 (· + 1))
+      let before ← fp.reads.get
+      if contextReadingHead e then fp.reads.set (before + 1)
+      if ← assumed e then
+        fp.reads.modify (· + 1)
+        return .done { expr := e }
+      let step ← methods.pre e
+      fp.closeAbove depth
+      match step with
+      | .continue _ => fp.frames.modify (·.push { term := e, depth, reads := before })
+      | _ => if (← fp.reads.get) != before then fp.tainted.modify (·.insert e)
+      return step
+    dpre := fun e => do
+      if ← assumed e then
+        fp.reads.modify (· + 1)
+        return .done e
+      methods.dpre e
+    post := fun e => do
+      if e.isAtomic then return ← methods.post e
+      let depth ← MonadRecDepth.getRecDepth
+      if contextReadingHead e then fp.reads.modify (· + 1)
+      let step ← methods.post e
+      fp.closeAbove depth
+      let frames ← fp.frames.swap #[]
+      unless frames.size > 0 && frames.back!.depth == depth do
+        fp.frames.set frames
+        return step
+      let frame := frames.back!
+      fp.frames.set frames.pop
+      if (← fp.reads.get) != frame.reads then
+        fp.tainted.modify (·.insert frame.term)
+        return step
+      let unchanged := match step with
+        | .done r | .visit r | .continue (some r) => r.proof?.isNone && r.expr == e
+        | .continue none => true
+      if unchanged && fixedPointCandidate e && frame.term == e &&
+          !childTainted (← fp.tainted.get) e then
+        fp.known.modify (·.insert e)
+        fp.counts.modify (·.modify 2 (· + 1))
+      return step
+    discharge? := fun condition => do
+      fp.reads.modify (· + 1)
+      methods.discharge? condition }
 
 private def contextDischargeCore (context : LocalContext) (condition : Lean.Expr)
     (atoms : FVarIdSet) : MetaM (Option Lean.Expr) := do

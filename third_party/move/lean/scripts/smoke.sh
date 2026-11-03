@@ -26,6 +26,7 @@ fi
 LEAN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$LEAN_ROOT/../../.." && pwd)"
 MVP_DIR="$REPO_ROOT/third_party/move/move-prover"
+COMPILED_NAMESPACES="$LEAN_ROOT/verex-e2e-tests/VerexE2ETests/CompiledNamespaces"
 
 # Check fixtures of verex-e2e-tests (VerexE2ETests/Check/<name>.lean), each
 # elaborated as the Check driver elaborates it.
@@ -40,6 +41,7 @@ CHECKS=(
   Specifications/OptionalMapResults
   Specifications/AbstractOwners
   Closures/InvariantBehavior
+  Closures/TupleTargets
   Calls/TrustedGeneric
 )
 # Shared replay of generic family conversion and independent stored invariants.
@@ -330,6 +332,18 @@ else
         index=$((index + 1))
       done
     }
+    # A package over compiled namespaces: a clause of `base` fails where `client`
+    # inlines it, and is reported in `base.move`.
+    compiled_namespaces() {
+      local start; start=$(now_ms)
+      python3 "$LEAN_ROOT/scripts/verify-modules.py" "$COMPILED_NAMESPACES" \
+        --modules fixture::client --no-build --jobs 2 --namespaces "$TMP/namespaces" \
+        --logs "$TMP/namespaces-logs" 2>/dev/null \
+        | grep -Ev '^(module |fixture::|verify-modules:)' >"$TMP/namespaces.out"
+      publish "$TMP/namespaces.ms" $(( $(now_ms) - start ))
+    }
+    compiled_namespaces &
+    namespaces_pid=$!
     verify_sources &
     verify_pid=$!
     if [ $run_mvp = 1 ]; then
@@ -341,6 +355,9 @@ else
       step mvp mvp_tests
     fi
     wait "$verify_pid"
+    wait "$namespaces_pid"
+    compare "compiled namespaces" "$TMP/namespaces.out" "$COMPILED_NAMESPACES/client.exp" \
+      "$(cat "$TMP/namespaces.ms")"
     index=0
     for source in "${SOURCE_VERIFY[@]}"; do
       compare "verify $source" "$TMP/verify-$index.out" \

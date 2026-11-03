@@ -128,8 +128,9 @@ def ValidatedUnit.internRequiredTypes (unit : ValidatedUnit) : ValidatedUnit := 
       break
   if !closed || types.size == unit.tables.types.size then return unit
   let tables := { unit.tables with types }
-  Internal.mkValidatedUnit tables unit.profiles (unit.namespaces.map ({ · with tables }))
-    unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses unit.resolution
-    unit.initializationCertificates unit.borrowCertificates unit.borrowRejections
+  -- Appended types are reachable by unit identifiers alone: every link
+  -- stays, and the unit places past its grown tables what none covers.
+  Internal.mkValidatedUnit tables unit.profiles unit.namespaces
+    unit.dependencies unit.evidence unit.indexes unit.resolution
 
 end VerexIR.Validation

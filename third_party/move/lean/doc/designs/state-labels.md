@@ -72,7 +72,7 @@ spelled by its source name too.
 **VIR.** `MemoryRange` and the labeled operations (`behavior`,
 `functionCall`, `lemma`, `publish`, `remove`, `update`, `global` and
 `exists` with an optional label). A `QuantifierBinder` over the
-`stateDomain` domain carries the label it binds (`label : Option Nat`,
+`stateDomain` domain carries the label it binds (`label : Option NameId`,
 present exactly for a state-domain binder). Validation (`Capability`)
 checks that every label a function's specification reads is bound by a
 state-domain binder or defined by a two-state operation of the same

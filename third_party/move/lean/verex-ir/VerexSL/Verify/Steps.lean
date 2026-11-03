@@ -326,7 +326,7 @@ def builtinLemmaItem (lemma : BuiltinLemma) : String :=
 `SpecMap` theorem: those whose roles an owner binds. -/
 def namespaceMapLemmaNames (ns : ValidatedNamespace) : Array (String × Name) := Id.run do
   let nameOf (reference : VerexIR.QualifiedRef) : Option String :=
-    (ns.tables.names[reference.name.index]?).map (·.name)
+    (ns.nameOf reference.name).map (·.name)
   let mut found := #[]
   for intrinsic in ns.intrinsics do
     unless intrinsic.model == "map" do continue
@@ -348,7 +348,7 @@ def specRoles (unit : ValidatedUnit) : String := Id.run do
     for intrinsic in ns.intrinsics do
       unless intrinsic.model == "map" do continue
       for binding in intrinsic.specBindings do
-        let some name := (ns.tables.names[binding.target.name.index]?).map (·.name) | continue
+        let some name := (ns.nameOf binding.target.name).map (·.name) | continue
         if conflicting.contains binding.role then continue
         match bound.find? (·.1 == binding.role) with
         | none => bound := bound.push (binding.role, name)
@@ -366,7 +366,7 @@ def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (printing : ValidatedNamespace := ns) (included : VerexIR.NameId → Bool := fun _ => true) :
     Except String (Array (String × Name × String)) := do
   let nameOf (reference : VerexIR.QualifiedRef) : Option String :=
-    (ns.tables.names[reference.name.index]?).map (·.name)
+    (ns.nameOf reference.name).map (·.name)
   let mut found := #[]
   for intrinsic in ns.intrinsics do
     unless intrinsic.model == "map" && included intrinsic.owner do continue
@@ -376,15 +376,15 @@ def namespaceMapLemmas (unit : ValidatedUnit) (ns : ValidatedNamespace)
     -- The map, key and value types, from the reading of a value.
     let some get := bound .get | continue
     let some getFunction := ns.specFunctions.find? fun declaration =>
-        (ns.tables.names[declaration.name.index]?.map (·.name)) == some get | continue
+        ((ns.nameOf declaration.name).map (·.name)) == some get | continue
     let generics := getFunction.signature.generics
     let typeText (id : VerexIR.TypeId) := Print.specificationTypeText unit printing generics id
     let some mapParameter := getFunction.signature.parameters[0]? | continue
     let some keyParameter := getFunction.signature.parameters[1]? | continue
     let some valueResult := getFunction.signature.results[0]? | continue
-    let mapType ← typeText mapParameter.typeUse.typeId
-    let keyType ← typeText keyParameter.typeUse.typeId
-    let valueType ← typeText valueResult.typeId
+    let mapType ← typeText (ns.typeId mapParameter.typeUse.typeId)
+    let keyType ← typeText (ns.typeId keyParameter.typeUse.typeId)
+    let valueType ← typeText (ns.typeId valueResult.typeId)
     let typeOf : LemmaParameterKind → String
       | .map => mapType | .key | .element => keyType | .value => valueType | .int => "Int"
       | .vector => s!"Vector<{keyType}>"
@@ -482,15 +482,48 @@ def quantifiedFormula? (formula : Syntax) : Option (Array (String × Syntax) × 
   guard (!typed.isEmpty)
   pure (typed, formula[formula.getNumArgs - 1])
 
+/-- The function `f` of `f.unfold(a)`, an `apply` of the unfolding of a
+recursive specification function. -/
+def unfoldedFunction? (application : Syntax) : Option Name := do
+  guard (application.isOfKind ``verexPrimitiveExpr ||
+    application.isOfKind ``verexDirectGenericCallExpr)
+  let path := application[0]
+  guard (path.isOfKind ``verexPathSyntax)
+  let last := match path[1].getArgs.back? with
+    | some segment => segment[1]
+    | none => path[0]
+  let .str function "unfold" := last.getId | none
+  guard (!function.isAnonymous)
+  pure function
+
+/-- `f.unfold(a)` as the application `f(a)` it unfolds, at the same range. -/
+private def unfoldedCall (application : Syntax) (function : Name) : Syntax :=
+  let path := application[0]
+  let rename (ident : Syntax) := match ident with
+    | .ident info raw _ preresolved => .ident info raw function preresolved
+    | other => other
+  let renamed := if path[1].getNumArgs > 0 then
+      let segments := path[1].getArgs
+      let last := segments.size - 1
+      path.setArg 1 (path[1].setArgs (segments.set! last (segments[last]!.setArg 1
+        (rename segments[last]![1]))))
+    else path.setArg 0 (rename path[0])
+  application.setArg 0 renamed
+
 /-- The expressions of an `apply` formula: its guards, Boolean, and the
-lemma application they guard. -/
+lemma application they guard, or the application an unfolding is of, lowered
+for its type. -/
 private def applyExpressions (lets : Array (Name × Syntax)) (binders : Array (String × Syntax))
     (formula : Syntax) : Array StepExpression :=
   let (introduced, formula) := (quantifiedFormula? formula).getD (#[], formula)
   let binders := binders ++ introduced
   let (guards, application) := formulaGuards formula
-  guards.map (fun guard => { expression := stepExpression lets guard, binders }) |>.push
-    { expression := stepExpression lets application, binders, apply := true }
+  guards.map (fun guard => { expression := stepExpression lets guard, binders }) |>.push <|
+    match unfoldedFunction? application with
+    | some function =>
+        { expression := stepExpression lets (unfoldedCall application function), binders,
+          type := none }
+    | none => { expression := stepExpression lets application, binders, apply := true }
 
 /-- The steps of a block or of a nested block. -/
 def blockSteps (block : Syntax) : Array Syntax :=
@@ -689,7 +722,7 @@ def calleeDeclaration? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Valid
       if let some handle := VerexIR.SemanticOperations.resolveFunction? unit ⟨namespaceIndex⟩ reference then
         if let some calleeNs := unit.namespaces[handle.namespaceId.index]? then
           if let some callee := calleeNs.functions[handle.functionId.index]? then
-            if (calleeNs.tables.names[callee.name.index]?).map (·.name) == some name then
+            if (calleeNs.nameOf callee.name).map (·.name) == some name then
               return some (calleeNs, callee)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return none
@@ -706,16 +739,16 @@ def clauseOf? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : ValidatedNames
   let index ← key.index
   if key.kind == "requires" then
     let (calleeNs, callee) ← calleeDeclaration? unit namespaceIndex ns declaration (← key.callee)
-    let (range, _) ← (preconditionNumbers unit callee).find? (·.2 == index)
+    let (range, _) ← (preconditionNumbers calleeNs callee).find? (·.2 == index)
     let condition ← callee.contract.conditions.find? fun condition =>
-      condition.kind == .requires && Contract.locRange unit condition.loc == range
+      condition.kind == .requires && Contract.locRange calleeNs condition.loc == range
     return (calleeNs, callee, condition.expression)
   let (range, _) ← (clauseNames unit ns declaration).find? (·.2 == s!"{key.kind}_{index}")
   let inBody := match declaration.body with
     | .structured root => (bodySpecifications ns root fun _ => true).flatMap (·.2.conditions)
     | _ => #[]
   let condition ← (declaration.contract.conditions ++ inBody).find? fun condition =>
-    Contract.locRange unit condition.loc == range
+    Contract.locRange ns condition.loc == range
   pure (ns, declaration, condition.expression)
 
 /-- Whether an expression reads a map: it or a subexpression has an intrinsic
@@ -729,7 +762,7 @@ def readsMapValue (unit : ValidatedUnit) (ns : ValidatedNamespace) (root : Verex
       if visited.contains id.index then continue
       visited := visited.insert id.index
       let some expression := ns.expressions[id.index]? | continue
-      if let some type := unit.tables.types[expression.typeId.index]? then
+      if let some type := ns.typeOf expression.typeId then
         if (Contract.mapModel? unit type).isSome then return true
       pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
     return false
@@ -780,7 +813,7 @@ partial def stateBinders (ns : ValidatedNamespace) (clause : VerexIR.ExprId) : A
   | some { kind := .quantifier .forall binders _ _ body, .. } =>
       let names := binders.filterMap fun binder => do
         let label ← binder.label
-        (ns.tables.names[label]?).map (·.name)
+        (ns.nameOf label).map (·.name)
       names ++ stateBinders ns body
   | some { kind := .operation (.primitive .implies) _ #[_, body] _, .. } => stateBinders ns body
   | _ => #[]
@@ -805,7 +838,7 @@ def dataInvariantBinderTypes (unit : ValidatedUnit) : CommandElabM (Array (Strin
           let text := if (stateBinders ns condition.expression).contains localDecl.name then
               some "StateDomain"
             else printing.bind fun printing => (printing.specificationTypeText unit
-              declaration.generics localDecl.type.typeId).toOption
+              declaration.generics (ns.typeId localDecl.type.typeId)).toOption
           let some text := text | continue
           let .ok type := Parser.runParserCategory (← getEnv) `verexType text | continue
           found := found.push (name, type)
@@ -850,7 +883,7 @@ where
       | return #[]
     let types ← binders.mapM fun binder => do
       let some pattern := ns.patterns[binder.pattern.index]? | throw "a binder has no pattern"
-      typeText pattern.typeId
+      typeText (ns.typeId pattern.typeId)
     return types ++ (← existentials body)
 
 /-- The type arguments of the `call`-th call of `callee` in a function's body,
@@ -872,11 +905,11 @@ def calleeTypeArguments? (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Val
       if let some handle := VerexIR.SemanticOperations.resolveFunction? unit ⟨namespaceIndex⟩ reference then
         if let some calleeNs := unit.namespaces[handle.namespaceId.index]? then
           if let some decl := calleeNs.functions[handle.functionId.index]? then
-            if (calleeNs.tables.names[decl.name.index]?).map (·.name) == some callee then
-              let arguments := instantiations.filterMap fun
+            if (calleeNs.nameOf decl.name).map (·.name) == some callee then
+              let arguments := (ns.genericArguments instantiations).filterMap fun
                 | .typeArg typeUse => some typeUse.typeId
                 | _ => none
-              found := found.push ((Contract.locRange unit expression.loc).startByte, arguments)
+              found := found.push ((Contract.locRange ns expression.loc).startByte, arguments)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   let ordered := found.qsort (·.1 < ·.1)
   match call with
@@ -999,9 +1032,10 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
         for (_, callee, _, _) in (match declaration.body with
             | .structured root => callSites unit ns namespaceIndex root
             | _ => #[]) do
-          let some (_, calleeDeclaration) := calleeDeclaration? unit namespaceIndex ns declaration callee
+          let some (calleeNs, calleeDeclaration) :=
+              calleeDeclaration? unit namespaceIndex ns declaration callee
             | continue
-          for (_, index) in preconditionNumbers unit calleeDeclaration do
+          for (_, index) in preconditionNumbers calleeNs calleeDeclaration do
             let key : VerexIR.Proofs.Denote.ObligationKey :=
               { kind := "requires", index := some index, callee := some callee }
             table := table.push (key, clauseNeeds unit namespaceIndex ns declaration key)
@@ -1069,7 +1103,7 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
   -- arithmetic and vector lemmas; a name the module declares stays its own.
   let some own := unit.namespaces[0]? | return
   let declared := (own.lemmas.map (·.name) ++ own.specFunctions.map (·.name) ++
-    own.functions.map (·.name)).filterMap fun name => (unit.tables.names[name.index]?).map (·.name)
+    own.functions.map (·.name)).filterMap fun name => (own.nameOf name).map (·.name)
   let nominalOf? (type : VerexIR.TypeId) : Option VerexIR.NameId :=
     match unit.tables.types[type.index]? with
     | some (.nominal name _) => some name
@@ -1078,11 +1112,11 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
       | _ => none
     | _ => none
   let held (owner : VerexIR.NameId) : Bool :=
-    own.expressions.any fun expression => nominalOf? expression.typeId == some owner
+    own.expressions.any fun expression => nominalOf? (own.typeId expression.typeId) == some owner
   let mut moduleLemmas : Array (String × Name × String) := #[]
   for ns in unit.namespaces do
     let found ← match namespaceMapLemmas unit ns own
-        (if ns.identity == own.identity then fun _ => true else held) with
+        (if ns.unitIdentity == own.unitIdentity then fun _ => true else held ∘ ns.nameId) with
       | .ok found => pure found
       | .error message => throwErrorAt moduleCommand message
     for entry@(name, _, _) in found do
@@ -1162,13 +1196,14 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     let at? := ((pending.find? fun (step, _, _) => holds step.expression range).map
       (·.1.expression)) <|> ((lemmaDeclarations.find? fun (_, item, _) => holds item range).map (·.2.1))
     logAt (at?.getD moduleCommand) message severity
-  let some (copy, _, _) := lowered | return
+  let some (copy, _, _, _) := lowered | return
   let some ns := copy.namespaces[0]? | return
-  let nameOf (name : VerexIR.NameId) := (copy.tables.names[name.index]?).map (·.name)
+  let nameOf (name : VerexIR.NameId) := (ns.nameOf name).map (·.name)
   let mut recorded := #[]
   -- What each lemma item's steps apply: its recursion group.
   let lemmaReference (name : String) : Option VerexIR.QualifiedRef :=
-    (ns.lemmas.find? (nameOf ·.name == some name)).map fun lemma => { namespaceId := ⟨0⟩, name := lemma.name }
+    (ns.lemmas.find? (nameOf ·.name == some name)).map fun lemma =>
+      { namespaceId := ns.unitIdentity, name := ns.nameId lemma.name }
   let mut stepApplications : StepApplications := #[]
   for ((step : StepExpression), (name : String), (file : String)) in lowerable do
     let some key := stepKey file step.expression | continue
@@ -1371,13 +1406,13 @@ def stepContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Conte
     if entries.any (·.1 == localDecl.name) then continue
     let some carriers ← leafCarriers? | continue
     if (← partsValue (some step.unit) carriers localDecl.name
-        (← base.nativeType localDecl.type.typeId)).isNone then
+        (← base.nativeType (base.ns.typeId localDecl.type.typeId))).isNone then
       throwErrorAt reference m!"`{localDecl.name}` is not in scope at this obligation; in scope: \
         {", ".intercalate ((entries.map (·.1)).filter (!·.contains '$')).toList}"
   let mut locals := #[]
   let mut localTypes := #[]
   for localDecl in step.locals do
-    let some type := base.valueTypeOf? localDecl.type.typeId
+    let some type := base.valueTypeOf? (base.ns.typeId localDecl.type.typeId)
       | throwErrorAt reference m!"the type of `{localDecl.name}` is unknown"
     localTypes := localTypes.push type
     -- An entry holds a leaf's native value, or a binder's value of its
@@ -1387,7 +1422,7 @@ def stepContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Conte
       | some (_, value) => pure (some (pairProjections value))
       | none => do
           let some carriers ← leafCarriers? | pure none
-          partsValue (some step.unit) carriers localDecl.name (← base.nativeType localDecl.type.typeId)
+          partsValue (some step.unit) carriers localDecl.name (← base.nativeType (base.ns.typeId localDecl.type.typeId))
     let value? ← native?.mapM fun value => do
       if ← isDefEq (← inferType value) (mkConst ``Int) then pure value
       else (Contract.domainOf type).binderOfNative value
@@ -1398,13 +1433,14 @@ def stepContext (step : LoweredStep) (reference : Syntax) : MetaM Contract.Conte
   let oldState := (entries.find? (·.1 == "old_" ++ stateScopeName)).map (·.2) <|> state
   -- A name in scope holding a memory, a data invariant's binder over the
   -- state domain, is the state label of its name (`S |~ e`).
-  let mut stateLabels : List (Nat × Contract.LabelState) := []
+  let mut stateLabels : List (VerexIR.NameId × Contract.LabelState) := []
   for localDecl in step.locals, value? in locals do
     let some value := value? | continue
     unless (← whnfR (← inferType value)).isAppOf ``VerexIR.Proofs.Denote.Memory do continue
-    let some label := step.unit.tables.names.findIdx? (·.name == localDecl.name) | continue
+    -- A label is a name of the step's namespace, as its body spells it.
+    let some label := base.ns.localTables.names.findIdx? (·.name == localDecl.name) | continue
     let labelState : Contract.LabelState := { memory := value, locals }
-    stateLabels := (label, labelState) :: stateLabels
+    stateLabels := (⟨label⟩, labelState) :: stateLabels
   return { base with
     locals, localTypes, oldLocals := locals, localNames := step.locals.map (·.name),
     state, oldState, stateLabels }
@@ -3190,7 +3226,7 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
     let owner ← Contract.nativeOwner (← context.carriers) (← context.exprType mapArgument)
       (← Contract.translate context mapArgument)
     let some ownerType := (context.ns.expressions[mapArgument.index]?).bind fun expression =>
-        context.valueTypeOf? expression.typeId
+        context.valueTypeOf? (context.ns.typeId expression.typeId)
       | throwErrorAt reference "the lemma's map has no type"
     let some model := Contract.mapModel? step.unit ownerType
       | throwErrorAt reference "the lemma's map is not an intrinsic map"
@@ -3299,9 +3335,9 @@ def blockScope (file : String) (block : Syntax) :
       let some localDecl := step.locals[index]? | continue
       if names.any (·.1 == localDecl.name) || expression.binders.any (·.1 == localDecl.name) then
         continue
-      let some type := base.valueTypeOf? localDecl.type.typeId | continue
+      let some type := base.valueTypeOf? (base.ns.typeId localDecl.type.typeId) | continue
       names := names.push (localDecl.name, Contract.domainOf type,
-        ← base.nativeType localDecl.type.typeId)
+        ← base.nativeType (base.ns.typeId localDecl.type.typeId))
   return names
 
 /-- A step's lowered expression, as `loweredStepsExtension` records it. -/
@@ -3468,6 +3504,61 @@ private def frameConclusion (application : Syntax) (closer : TSyntax `tactic) (g
     throwErrorAt application "the frame lemma does not match the obligation"
   return (proof, target)
 
+/-- `f.unfold(a)` at the goal: `f`'s unfolding equation at the arguments, its
+domain and the condition its body branches on first decided by `closer`, the
+equation at the branch taken. A name the compiler generated (`$`) has no
+source to be stated against, so it is no valid `f`. -/
+private def unfoldConclusion (application : Syntax) (function : Name) (closer : TSyntax `tactic)
+    (goal : MVarId) (rules : BlockRules) : TacticM (Lean.Expr × Lean.Expr) := do
+  if (toString function).contains '$' then
+    throwErrorAt application m!"`{function}` is a specialization the compiler generated; \
+      only a recursive specification function named in the source unfolds by `apply`"
+  let lowered ← loweredAt application
+  let (site, unfold) ← goal.withContext do
+    let translated ← translateStep lowered application
+    let env ← getEnv
+    let sites := sitesWhere (fun e => (specUnfolding? env e).isSome && !e.hasLooseBVars) #[translated]
+    let some site := sites[0]?
+      | throwErrorAt application m!"`{function}` is no recursive specification function"
+    let some unfold := specUnfolding? env site
+      | throwErrorAt application m!"`{function}` is no recursive specification function"
+    return (site, unfold)
+  let (proof, statement) ← goal.withContext (specUnfoldingInstance unfold site)
+  -- A condition proved by the closer, one attempt per reading, its failure kept.
+  let decided (condition : Lean.Expr) : TacticM (Option Lean.Expr) := do
+    let saved ← saveState
+    try
+      let (_, owed, equality?) ← proveNormal application goal condition (evalTactic closer) rules
+      goal.withContext do
+        match equality? with
+        | some equality => return some (← mkEqMPR equality owed)
+        | none => return some owed
+    catch _ =>
+      saved.restore
+      return none
+  let branches (e : Lean.Expr) := e.isAppOfArity ``ite 5 || e.isAppOfArity ``dite 5
+  let mut proof := proof
+  let mut statement := statement
+  repeat
+    let some (_, _, rhs) := statement.eq? | break
+    unless branches rhs do break
+    let condition := rhs.getArg! 1
+    let domain := rhs.isAppOfArity ``dite 5 &&
+      (match rhs.getArg! 3 with | .lam name .. => name == `bounds | _ => false)
+    let held ← decided condition
+    let (certificate, holds) ← match held with
+      | some certificate => pure (certificate, true)
+      | none =>
+          let refuted ← if domain then pure none else decided (mkNot condition)
+          let some certificate := refuted
+            | goal.withContext <| withSpecForm <| throwErrorAt application
+                m!"`decide` does not settle the guard of `{function}`'s unfolding; state it or its \
+                  negation:{indentExpr condition}"
+          pure (certificate, false)
+    (proof, statement) ← goal.withContext (unfoldingBranch proof certificate holds)
+    unless domain do break
+  return (proof, statement)
+
 /-- A lemma application's conclusion at the goal, in its context: the
 application translated (`LemmaApplication owes gives`). A map lemma's
 conclusion is proved by its theorem, its premises by `closer`; a declared
@@ -3475,6 +3566,8 @@ lemma's premise is proved by `closer` and its theorem gives its conclusion
 (`lemmaFacts`). The proof and the conclusion. -/
 private def lemmaConclusion (application : Syntax) (closer : TSyntax `tactic) (goal : MVarId)
     (rules : BlockRules) : TacticM (Lean.Expr × Lean.Expr) := do
+  if let some function := unfoldedFunction? application then
+    return ← unfoldConclusion application function closer goal rules
   let lowered ← loweredAt application
   match lowered.builtin with
   | some ``VerexIR.Proofs.Denote.StepLemmas.stored_invariants_frame =>
@@ -3555,8 +3648,8 @@ private def quantifiedConclusion (formula : Syntax) (closer : TSyntax `tactic) (
     let types ← binders.mapM fun (name, _) => do
       let some localDecl := lowered.locals.findRev? (·.name == name)
         | throwErrorAt formula m!"the binder `{name}` is not lowered"
-      return (name, ← context.binderType localDecl.type.typeId,
-        context.valueTypeOf? localDecl.type.typeId)
+      return (name, ← context.binderType (context.ns.typeId localDecl.type.typeId),
+        context.valueTypeOf? (context.ns.typeId localDecl.type.typeId))
     -- A binder of a bounded integer type ranges over its type's values.
     let rangeOf (type : Option VerexIR.Ty) (x : Lean.Expr) : MetaM (Option Lean.Expr) := do
       let some (.integer (.bits width) signed) := type | return none
@@ -3876,7 +3969,7 @@ no cases. -/
 private def splitKind? (lowered : LoweredStep) : Option SplitKind := do
   let ns ← lowered.unit.namespaces[0]?
   let expression ← ns.expressions[lowered.expression.index]?
-  match ← lowered.unit.tables.types[(Contract.specTypeId lowered.unit expression.typeId).index]? with
+  match ← lowered.unit.tables.types[(Contract.specTypeId lowered.unit (ns.typeId expression.typeId)).index]? with
   | .bool => some .boolean
   | .nominal name _ =>
       let handle ← VerexIR.SemanticOperations.resolveNominal? lowered.unit ns name
@@ -4211,9 +4304,9 @@ partial def guardedStatement (guarded : GuardedBlock) : TacticM (Option (Lean.Ex
   let types ← guarded.binders.mapM fun (name, _) => do
     let some localDecl := lowered.locals.findRev? (·.name == name)
       | throwErrorAt guarded.reference m!"the binder `{name}` is not lowered"
-    let some type := context.valueTypeOf? localDecl.type.typeId
+    let some type := context.valueTypeOf? (context.ns.typeId localDecl.type.typeId)
       | throwErrorAt guarded.reference m!"the type of `{name}` is unknown"
-    return (name, ← context.binderType localDecl.type.typeId, type)
+    return (name, ← context.binderType (context.ns.typeId localDecl.type.typeId), type)
   let rec bind (index : Nat) (bound : Array Lean.Expr) (ranges : Array Lean.Expr) :
       TacticM (Option (Lean.Expr × Nat)) := do
     if h : index < types.size then
@@ -4320,7 +4413,7 @@ private def coerceWitness (goal : MVarId) (α value : Lean.Expr) (lowered : Lowe
     let context ← stepContext lowered witness
     let some expression := context.ns.expressions[lowered.expression.index]?
       | throwErrorAt witness "the witness is not lowered"
-    return (← context.carriers, ← context.nativeType expression.typeId)
+    return (← context.carriers, ← context.nativeType (context.ns.typeId expression.typeId))
   let typed? ← goal.withContext do
     let some view ← NativeMaps.typedView? carriers (← Contract.quoteNTy τ) | return none
     unless ← isDefEq view.type α do return none

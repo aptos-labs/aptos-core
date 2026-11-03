@@ -521,11 +521,11 @@ def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) : Nat → StructHa
       let declaration ← targetNs.structs[handle.structId]?
       let row := fun (fields : Array FieldDecl) =>
         NRow.ofList <$> fields.toList.mapM fun field =>
-          ntyOfFuel types unit fuel handle.namespaceId field.type.typeId
+          ntyOfFuel types unit fuel handle.namespaceId (targetNs.typeId field.type.typeId)
       let arguments := NRow.ofList ((List.range declaration.generics.size).map .param)
       -- After the declared fields, a slot per ghost field (`doc/designs/ghost-fields.md`).
       let ghosts ← NRow.ofList <$> declaration.ghosts.toList.mapM fun ghost =>
-        NTy.ghost <$> ntyOfFuel types unit fuel handle.namespaceId ghost.type.typeId
+        NTy.ghost <$> ntyOfFuel types unit fuel handle.namespaceId (targetNs.typeId ghost.type.typeId)
       let withGhosts := fun (fields : NRow) =>
         if declaration.ghosts.isEmpty then fields else fields ++ ghosts
       -- An intrinsic map owner's native type is its abstract map: its
@@ -541,7 +541,7 @@ def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) : Nat → StructHa
         some (.struct handle arguments (withGhosts (← row declaration.fields)))
       else
         let names ← declaration.variants.toList.mapM fun variant =>
-          (targetNs.tables.names[variant.name.index]?).map (·.name)
+          (targetNs.nameOf variant.name).map (·.name)
         let rows ← NRows.ofList <$> declaration.variants.toList.mapM fun variant =>
           withGhosts <$> row variant.fields
         if distinct : names.Nodup then some (.enum handle arguments names rows distinct)
@@ -626,20 +626,62 @@ theorem ntyOf_paramNode {unit : ValidatedUnit} {namespaceId : NamespaceId} {inde
   show ntyOfFuel (unitTypes unit) unit (2 * _ + 1 + 1) namespaceId ⟨position⟩ = _
   simp only [ntyOfFuel, ns_eq, entry, Option.bind_eq_bind, Option.bind_some]
 
+mutual
+/-- Whether a semantic type states a shared reference, outside a function
+type, whose own sharing marks say where its references are. -/
+def _root_.VerexIR.SemTy.holdsShared : SemTy → Bool
+  | .reference .shared _ => true
+  | .reference .mutable referent => referent.holdsShared
+  | .tuple elements => SemTy.holdsSharedList elements
+  | .vector element _ => element.holdsShared
+  | .nominal _ arguments => SemArg.holdsSharedList arguments
+  | .ghost slot => slot.holdsShared
+  | .unit | .never | .bool | .character | .string | .bytes | .address | .signer | .integer _ _
+  | .function _ _ | .profile _ | .param _ => false
+
+def _root_.VerexIR.SemTy.holdsSharedList : List SemTy → Bool
+  | [] => false
+  | type :: types => type.holdsShared || SemTy.holdsSharedList types
+
+def _root_.VerexIR.SemArg.holdsSharedList : List SemArg → Bool
+  | [] => false
+  | .type type :: rest => type.holdsShared || SemArg.holdsSharedList rest
+  | _ :: rest => SemArg.holdsSharedList rest
+end
+
+/-- Whether a type states a shared reference only at its top level, where a
+function type's sharing marks can say so. -/
+def _root_.VerexIR.SemTy.sharingAtTop : SemTy → Bool
+  | .reference .shared type => !type.holdsShared
+  | type => !type.holdsShared
+
+/-- Whether a function's signature states shared references only at the top
+level of its parameters and results. -/
+def signatureSharingAtTop (targetNs : ValidatedNamespace)
+    (declaration : FunctionDecl FunctionBody) : Bool :=
+  match StaticTyping.signatureTypes? targetNs declaration
+      (StaticTyping.staticEnv declaration.signature.generics) with
+  | some (parameterTypes, resultTypes) => (parameterTypes ++ resultTypes).all SemTy.sharingAtTop
+  | none => true
+
 /-- A closure target's own parameter and result types, as the compiler
-reads its signature. -/
+reads its signature; `none` for a function that is not a closure target. A
+target stating a shared reference below the top level of a parameter or result
+is not one: a native type erases the reference there, so no sharing mark can
+record it. -/
 def closureSignature? (unit : ValidatedUnit) (function : FunctionHandle) :
     Option (List NTy × List NTy) := do
   let targetNs ← unit.namespaces[function.namespaceId.index]?
   let declaration ← targetNs.functions[function.functionId.index]?
   let parameters ← declaration.signature.parameters.toList.mapM fun parameter =>
-    ntyOf unit function.namespaceId parameter.typeUse.typeId
+    ntyOf unit function.namespaceId (targetNs.typeId parameter.typeUse.typeId)
   let results ← declaration.signature.results.toList.mapM fun result =>
-    ntyOf unit function.namespaceId result.typeId
+    ntyOf unit function.namespaceId (targetNs.typeId result.typeId)
   -- Its types mention only its own type parameters, each read at its node.
   guard ((parameters ++ results).all fun τ => τ.paramsAll fun index =>
     (declaration.signature.generics[index]?.any fun binder => binder.kind matches .typeArg) &&
       (paramNodeIn? unit function.namespaceId index).isSome)
+  guard (signatureSharingAtTop targetNs declaration)
   some (parameters, results)
 
 /-! ### Native and semantic readings -/
@@ -670,19 +712,19 @@ def declarationVariants? (unit : ValidatedUnit) (source : StructHandle) : Option
   let ns ← unit.namespaces[source.namespaceId.index]?
   let declaration ← ns.structs[source.structId]?
   declaration.variants.toList.mapM fun variant =>
-    (ns.tables.names[variant.name.index]?).map (·.name)
+    (ns.nameOf variant.name).map (·.name)
 
 /-- The field types of a declaration under semantic arguments, by
 evaluation. -/
 def declaredTypes? (ns : ValidatedNamespace) (arguments : List SemArg)
     (declared : Array FieldDecl) : Option (List SemTy) :=
-  (declared.toList.map (·.type.typeId)).mapM (StaticTyping.resolveIn ns arguments.toArray)
+  (declared.toList.map (ns.typeId ·.type.typeId)).mapM (StaticTyping.resolveAt ns arguments.toArray)
 
 /-- The ghost field types of a declaration under semantic arguments, by
 evaluation. -/
 def ghostDeclaredTypes? (ns : ValidatedNamespace) (arguments : List SemArg)
     (ghosts : List TypeId) : Option (List SemTy) :=
-  ghosts.mapM (StaticTyping.resolveIn ns arguments.toArray)
+  ghosts.mapM (StaticTyping.resolveAt ns arguments.toArray)
 
 mutual
 /-- Whether a native type reads as a semantic type that is not a shared
@@ -790,14 +832,16 @@ def NTy.typedAsCheck (unit : ValidatedUnit) (τ : NTy) (type : SemTy) : Bool :=
 /-- Which of a closure target's supplied parameters, split by its mask, and
 which of its results are shared references. -/
 def closureShared (unit : ValidatedUnit) (function : FunctionHandle) (mask : Nat) : Sharing :=
-  match (unit.namespaces[function.namespaceId.index]?).bind
-      (·.functions[function.functionId.index]?) with
-  | some declaration =>
-      { parameters := ClosureMask.extract mask false
-          (declaration.signature.parameters.toList.map fun parameter =>
-            sharedReference (unitTypes unit) function.namespaceId parameter.typeUse.typeId)
-        results := declaration.signature.results.toList.map fun result =>
-          sharedReference (unitTypes unit) function.namespaceId result.typeId }
+  match unit.namespaces[function.namespaceId.index]? with
+  | some targetNs => match targetNs.functions[function.functionId.index]? with
+    | some declaration =>
+        { parameters := ClosureMask.extract mask false
+            (declaration.signature.parameters.toList.map fun parameter =>
+              sharedReference (unitTypes unit) function.namespaceId
+                (targetNs.typeId parameter.typeUse.typeId))
+          results := declaration.signature.results.toList.map fun result =>
+            sharedReference (unitTypes unit) function.namespaceId (targetNs.typeId result.typeId) }
+    | none => ⟨[], []⟩
   | none => ⟨[], []⟩
 
 /-- A closure target's own rows: the parameters it captures and those it is
@@ -902,7 +946,7 @@ def closureFaithful (unit : ValidatedUnit) (function : FunctionHandle)
         typeInstantiation ==
             SemanticOperations.invocationTypeInstantiation targetNs #[] arguments &&
           arguments.all (fun argument => match argument with
-            | .typeArg value => match StaticTyping.resolveIn targetNs #[] value.typeId with
+            | .typeArg value => match StaticTyping.resolveAt targetNs #[] value.typeId with
               | some type => type.referenceFree &&
                   (ntyOf unit function.namespaceId value.typeId).any
                     fun τ => τ.paramFree && τ.refFree

@@ -23,7 +23,7 @@ def nominalIdentity? (unit : ValidatedUnit) (source : StructHandle) :
   let ns ← unit.namespaces[source.namespaceId.index]?
   let path ← unit.tables.namespaces[source.namespaceId.index]?
   let declaration ← ns.structs[source.structId]?
-  let name ← ns.tables.names[declaration.name.index]?
+  let name ← (ns.nameOf declaration.name)
   match path.segments.toList with
   | [address, module] => some (address, module, name.name)
   | _ => none

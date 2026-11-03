@@ -14,12 +14,17 @@ its own to prove (`pragma verify = false`, natives only).
 scripts/verify-modules.py <package> --jobs 7 --timeout 300 --logs <dir>
 ```
 
-`<dir>/<module>.stages` holds one `theorem done` line per target with its
+The driver first compiles the package's namespaces to `.olean` files under
+`build/verex/namespaces` of the package (`relocatable-namespaces.md`, "Compiled
+namespaces"). `<dir>/<module>.stages` holds one `theorem done` line per target with its
 heartbeats, its outcome (`verified`, `failed`, `budget`) and whether its proof is
 authored or automatic; `<module>.out` holds the messages. A module that hit the
 timeout keeps the stage lines of what finished.
 
 ## Inventory
+
+Do not cap `LEAN_NUM_THREADS` for a sweep: at 8 processes a cap of 4 took the framework from
+717 s to 1,001 s on the same code.
 
 Measured with `--heartbeats 300 --timeout 600` on an otherwise idle machine, so a
 target over 300M heartbeats counts as over budget here even where the default
@@ -29,15 +34,24 @@ what needs work, and a module's count is complete unless it timed out.
 | Package | Modules | Fully verified | Timed out | Targets verified | Failed | Over 300M | Verified |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | `move-stdlib` | 13 | 13 | 0 | 71 | 0 | 0 | 100% |
-| `aptos-stdlib` | 38 | 33 | 0 | 225 | 2 | 31 | 87% |
-| `aptos-framework` | 78 | 35 | 1 | 524 | 48 | 209 | 67% |
-| `aptos-trading` | 3 | 2 | 0 | 8 | 0 | 2 | 80% |
-| Total | 132 | 83 | 1 | 828 | 50 | 242 | 74% |
+| `aptos-stdlib` | 38 | 32 | 0 | 224 | 3 | 31 | 87% |
+| `aptos-framework` | 78 | 34 | 0 | 521 | 49 | 211 | 67% |
+| `aptos-trading` | 3 | 1 | 0 | 7 | 0 | 3 | 70% |
+| Total | 132 | 80 | 0 | 823 | 52 | 245 | 73% |
 
-One module stops at the timeout with targets unreached: `multisig_account`. Targets that a
-timeout hid before now count, so the total grew; 20 failed targets now run out of budget instead.
+No module stops at the timeout. Several targets sit just above the 300M cap, such as
+`big_ordered_map::test_verify_iter_next`, so a small cost change moves them.
 
 No module is blocked by another's rendering any more: each runs its own targets.
+
+### Regressions on this base
+
+Verified targets cost about 3% more heartbeats than at the checkpoint before the Rust stack;
+not traced. `pool_u64::buy_in`, `big_ordered_map::test_verify_iter_next`,
+`hot_state_config::on_new_epoch` and `order_match_types::validate_single_order_reinsertion_request`
+sit just above the 300M cap. `confidential_balance::add_mut_base` fails with a kernel type
+mismatch: a proof reads `named.val` where the statement has the value it names.
+`staking_contract::update_distribution_pool` went from over budget to failed, not diagnosed.
 
 ### Over budget
 
@@ -168,19 +182,27 @@ by the kernel over the whole unit, once per unit, at the first such target, outs
 Their statements must cover the whole unit, since an unseen invocation may run any function.
 `TypesAgree` is proved once and `ResourcesTyped` takes its verdict; a literal read through its
 contract no longer needs either, which leaves function-typed parameters, `result_of`, and
-non-generic `aborts_of` in executable units. Open: run the checks over `IndexedArena` lookups,
-proved equal to `unitTypes`, as `CompileNamespace.nty` does, and measure on an idle machine.
+non-generic `aborts_of` in executable units. The checks read a once-per-unit view of the tables
+(`TypingView`, `VerexIR/Proofs/IndexedTyping.lean`); each reader is proved equal to the
+array-reading original, and the array-reading checks stay the statement.
+Five functions returning a tuple with a shared reference (`borrow_front` and `borrow_back` of
+`ordered_map` and `big_ordered_map`, and `internal_leaf_iter_borrow_entries_and_next_leaf_index`)
+stopped `TypesAgree` on every unit holding those modules; they are not closure targets now
+(`higher-order-functions.md`), and no rendering compiled for the runs above constructs a function
+value of one.
 
-On `version`'s unit (70 namespaces sharing tables, 992 types, 3097 names, 1369 functions), at
-load 50–60, one `decide +kernel` each: `signatureAgrees` about 0.55 s per function, about 750 s
-in all by extrapolation; one `sameTables` 83 ms for types and 51 ms for names; a pointer `rfl`
-that all namespaces share the tables about 100 ms; the resource loop over the first table with
-the verdict fixed more than 230 s (cut off); `everyNamespaceType` with a trivial check more
-than 440 s (cut off), which its first 8 namespaces at 67 ms do not explain. `typeAgrees` is
-unmeasured. On `chunky_dkg_config_seqnum`'s unit (14 namespaces, 109 types, 537 names, 303
-functions), at load 30–60: the resource check with the verdict fixed 34 s, `typesAgreeCheck` more
-than 490 s (cut off). A kernel walk costs 10–25 µs per list or array element, which fits
-`ntyOfFuel` re-expanding structs through linear table reads, but no run has separated that cost.
+Measured on `version`'s unit (70 namespaces sharing tables, 988 types, 2854 names, 1369
+functions), one run at moderate load, through an interpreted harness, so these overstate the
+kernel: `TypesAgree` 39.5 s and `ResourcesTyped` 8.7 s. Over the arrays, the resource loop over
+the first table alone did not end in 840 s (RSS about 18 GB), a signature cost about 1 s, and 20
+type identifiers cost 1.2 s near the start of the table and 12.5 s near its end. On
+`chunky_dkg_config_seqnum`'s unit (14 namespaces, 109 types, 526 names, 303 functions) the array
+checks took 4.1 s for resources, 4.4 s for signatures and 4.6 s for types.
+
+The stage gap to `unit facts` before and after, one run each, under different load: `chunky_dkg_config_seqnum`
+15.8 s to 3.8 s (46% to 10% of the module), `randomness_config` 18.3 s to 2.7 s (47% to 8%),
+`stake::initialize_owner` 9.2 s both (2.5% before), not attributed. `version`'s targets assume no
+typing, so only the harness above reaches its unit's proof.
 
 `decryption::on_new_epoch` no longer leaves clauses open, but stops at `maximum recursion
 depth has been reached`, not diagnosed.
@@ -271,3 +293,15 @@ longer script. `big_vector` needs authored proofs: nonlinear arithmetic over
 - **Inlined callees' ghost reads.** `frameUses` walks callee contracts, not inlined
   bodies. It no longer matters for existence, and a read of an unlisted instance
   stays sound.
+
+## Debt: what a module is verified against
+
+A target's rendering imports every namespace rendered before it in its own export,
+because those decide which modules' invariants its unit links
+(`invariantRelatedModules`). So what a module is verified against depends on the
+export's module set and its dependency order, not on what the module reaches: a
+module rendered after it, whose invariant reads memory it writes, is not linked, and
+verifies the function against that invariant in its own command instead, which the
+rendering must therefore elaborate. Compiled namespaces keep this as it was. The fix is a package-level memory
+summary, computed before any target, that makes the related set a function of the
+package; a separate change.

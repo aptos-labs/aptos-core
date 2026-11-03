@@ -248,7 +248,12 @@ A specification is established in one of three ways, tried in this order:
    does: theorems, then lemmas, then the targets, callees first, the
    functions no item names automatically. A proof file sees its module and
    the modules rendered before it, not another proof file's theorems.
-   Theorems and tactics see `VerexIR` opened. A proof file accompanies a
+   Theorems and tactics see `VerexIR` opened. The typed twins of the
+   module's structs and enums (`SpecTypes`), a Lean structure or inductive
+   per declaration with its `erase`/`decode?` codec, are display artifacts
+   built on demand: verification never reads them, so they are generated
+   only where asked for, by `#verex_unit`, or by a theorem or authored proof
+   that names one. A proof file accompanies a
    source file that declares one module. A Rust file's `.spec.lean`,
    spliced into its namespace, carries its `verify` items too.
 3. **By raising the budget.** `pragma heartbeats = N` on the spec block,

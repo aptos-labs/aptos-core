@@ -27,7 +27,7 @@ def specsFor (unit : VerexIR.Validation.ValidatedUnit) (source : System.FilePath
   let path := named.getD (source.withExtension "spec.lean")
   let some ns := unit.namespaces.back? | return #[]
   let text ← if ← path.pathExists then some <$> IO.FS.readFile path else pure none
-  return #[{ path, namespaceId := ns.identity, text }]
+  return #[{ path, namespaceId := ns.unitIdentity, text }]
 
 /-- Verify a Rust file against its specification file, writing the
 VerexSL rendering to `output`. -/

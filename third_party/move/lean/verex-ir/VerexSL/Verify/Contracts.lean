@@ -765,35 +765,143 @@ partial def _root_.VerexIR.Proofs.Denote.NRows.heldFunctionTypes (found : Array 
   | .cons fields rest => rest.heldFunctionTypes (fields.heldFunctionTypes found)
 end
 
-/-- The function body a link set's sites are read from: its model in a unit
-declaring ghost fields. -/
-private def siteBody? (unit : ValidatedUnit) (handle : FunctionHandle) : Option (Function unit) :=
-  match (if declaresGhosts unit then compileModelFunction unit handle
-      else compileFunction unit handle) with
-  | .ok compiled => some compiled
-  | .error _ => none
+/-- Where each entry of a type table is, by its erasure (`Ty.eraseLocs`):
+the first entry, as a scan of the table finds it. -/
+private def typePositions (types : Array VerexIR.Ty) : Std.HashMap VerexIR.Ty Nat := Id.run do
+  let mut positions : Std.HashMap VerexIR.Ty Nat := {}
+  for type in types, index in [0:types.size] do
+    unless positions.contains type.eraseLocs do
+      positions := positions.insert type.eraseLocs index
+  return positions
 
-/-- A closure's site in a body run at the closed instantiation `outer`, whose
-runtime type instantiation is `outerRuntime`. -/
+/-- `instantiatePlaceFieldTypeFuel?` locating each instantiated node through
+`typePositions` of the namespace's table instead of scanning it: a scan
+matches a nominal candidate by its erasure and any other by equality, which
+for a query other than a nominal type is equality of erasures too. -/
+private def instantiateIndexed? (ns : ValidatedNamespace) (positions : Std.HashMap VerexIR.Ty Nat)
+    (instantiations : Array VerexIR.GenericArgument) : Nat → VerexIR.TypeId → Option VerexIR.TypeId
+  | 0, _ => none
+  | fuel + 1, typeId => do
+      let locate := fun (type : VerexIR.Ty) => (positions[type.eraseLocs]?).map (⟨·⟩)
+      let type ← ns.tables.types[typeId.index]?
+      match type with
+      | .typeParameter index => match instantiations[index]? with
+          | some (.typeArg value) => some value.typeId
+          | _ => none
+      | .tuple elements =>
+          locate (.tuple (← elements.mapM (instantiateIndexed? ns positions instantiations fuel)))
+      | .vector element length =>
+          locate (.vector (← instantiateIndexed? ns positions instantiations fuel element) length)
+      | .typeDomain nested =>
+          locate (.typeDomain (← instantiateIndexed? ns positions instantiations fuel nested))
+      | .resourceDomain resource arguments =>
+          locate (.resourceDomain resource (← arguments.mapM fun arguments =>
+            arguments.mapM (instantiateIndexed? ns positions instantiations fuel)))
+      | .nominal name arguments =>
+          locate (.nominal name (← arguments.mapM fun argument => match argument with
+            | .typeArg value => do
+                let typeId ← instantiateIndexed? ns positions instantiations fuel value.typeId
+                some (.typeArg { value with typeId })
+            | .lifetime value =>
+                .lifetime <$> VerexIR.Validation.instantiateLifetime? ns instantiations value
+            | .const value => some (.const value)
+            | .evidence value => some (.evidence value)))
+      | .function arguments result abilities =>
+          locate (.function (← arguments.mapM (instantiateIndexed? ns positions instantiations fuel))
+            (← instantiateIndexed? ns positions instantiations fuel result) abilities)
+      | .reference reference => do
+          let referent ← instantiateIndexed? ns positions instantiations fuel reference.referent
+          let lifetime ← VerexIR.Validation.instantiateLifetime? ns instantiations reference.lifetime
+          locate (.reference { reference with referent, lifetime })
+      | _ => some typeId
+
+/-- The callee frames of a unit's closure-site join (`frameInstantiation`),
+each computed once per callee namespace and instantiated type arguments,
+locating instantiated types through each namespace's `typePositions`. -/
+private structure FrameInstantiations where
+  positions : Std.HashMap Nat (Std.HashMap VerexIR.Ty Nat) := {}
+  frames : Std.HashMap (Nat × Array Nat) (Array (VerexIR.TypeId × VerexIR.TypeId)) := {}
+
+/-- `frameInstantiation unit handle outer typeArgs`, through and into the
+cache. -/
+private def FrameInstantiations.frame (cache : FrameInstantiations) (unit : ValidatedUnit)
+    (handle : FunctionHandle) (outer : Array (VerexIR.TypeId × VerexIR.TypeId))
+    (typeArgs : Array VerexIR.TypeUse) :
+    Array (VerexIR.TypeId × VerexIR.TypeId) × FrameInstantiations := Id.run do
+  if typeArgs.isEmpty then return (#[], cache)
+  let some ns := unit.namespaces[handle.namespaceId.index]? | return (#[], cache)
+  let arguments := VerexIR.SemanticOperations.instantiateGenericArguments outer
+    (typeArgs.map .typeArg)
+  let key := (handle.namespaceId.index, arguments.map fun
+    | .typeArg value => value.typeId.index
+    | _ => 0)
+  if let some frame := cache.frames[key]? then return (frame, cache)
+  let types := ns.tables.types
+  let (positions, cache) := match cache.positions[handle.namespaceId.index]? with
+    | some positions => (positions, cache)
+    | none =>
+        let positions := typePositions types
+        (positions, { cache with
+          positions := cache.positions.insert handle.namespaceId.index positions })
+  let frame := (Array.range types.size).foldl (init := #[]) fun result index =>
+    let symbolic : VerexIR.TypeId := ⟨index⟩
+    match instantiateIndexed? ns positions arguments (types.size + 1) symbolic with
+    | some concrete => if concrete == symbolic then result else result.push (symbolic, concrete)
+    | none => result
+  return (frame, { cache with frames := cache.frames.insert key frame })
+
+/-- A closure's site in a body run at the closed instantiation `outer`, its
+frame `typeInstantiation` (`frameInstantiation`). -/
 private def closureSiteAt? (unit : ValidatedUnit) (outer : NRow)
-    (outerRuntime : Array (VerexIR.TypeId × VerexIR.TypeId)) (target : FunctionHandle) (mask : Nat)
-    (typeArgs : Array VerexIR.TypeUse) (θ : Option TypeArgs) : Option ClosureSite := do
+    (typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)) (target : FunctionHandle)
+    (mask : Nat) (θ : Option TypeArgs) : Option ClosureSite := do
   let instantiation := match θ with
     | some θ => NRow.subst outer θ.1
     | none => .nil
   let (captured, supplied, results) ← closureRows? unit target mask
-  some { target, instantiation, mask
-         typeInstantiation := frameInstantiation unit target outerRuntime typeArgs
+  some { target, instantiation, mask, typeInstantiation
          captured := NRow.subst instantiation captured
          type := { parameters := NRow.subst instantiation supplied
                    shared := closureShared unit target mask
                    results := NRow.subst instantiation results } }
 
-/-- The closure sites of a unit's link set, once each: those of every
+/-- A template's call or closure in a unit (`ClosureTemplates`): its
+target, its type arguments in the unit's identifiers, and their native row,
+open in the enclosing function's type parameters, as the compiled call or
+closure carries them; none where the compiler carries no such node. -/
+private def templateTarget? (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) (reference : VerexIR.QualifiedRef)
+    (instantiations : Array VerexIR.GenericArgument) :
+    Option (FunctionHandle × Array VerexIR.TypeUse × Option TypeArgs) := do
+  let handle ← VerexIR.SemanticOperations.resolveFunction? unit namespaceId reference
+  if instantiations.isEmpty then return (handle, #[], none)
+  let typeArgs ← (ns.genericArguments instantiations).toList.mapM fun
+    | .typeArg value => some value
+    | _ => none
+  let θ := NRow.ofList (← typeArgs.mapM fun value => ntyOf unit namespaceId value.typeId)
+  guard θ.refFree
+  if inhabitable : θ.inhabitable = true then
+    return (handle, typeArgs.toArray, some ⟨θ, inhabitable⟩)
+  else none
+
+/-- The closure templates of a unit's namespaces, as registered with each;
+a namespace registered elsewhere, or not at all, has those of its body,
+the same function of the same namespace. -/
+def unitClosureTemplates (environment : Environment) (unit : ValidatedUnit) :
+    Array VerexIR.Validation.ClosureTemplates :=
+  unit.namespaces.map fun ns =>
+    let path := (unit.tables.namespaces[ns.unitIdentity.index]?).map (·.segments)
+    match path.bind (VerexSL.registeredClosureTemplates? environment) with
+    | some templates => templates
+    | none => VerexIR.Validation.closureTemplates ns.toNamespace
+
+/-- The closure sites of a unit's link set, once each, joined from its
+namespaces' closure templates (`unitClosureTemplates`): those of every
 function without type parameters and, transitively, of each callee and
 closure target at the closed instantiation the link set uses it at; and
 the literal function values its specifications write. -/
-def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
+def closureSites (unit : ValidatedUnit) (templates : Array VerexIR.Validation.ClosureTemplates) :
+    Array ClosureSite := Id.run do
   let mut pending : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId)) := #[]
   for ns in unit.namespaces, index in [0:unit.namespaces.size] do
     for declaration in ns.functions, functionIndex in [0:ns.functions.size] do
@@ -802,22 +910,30 @@ def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
   let mut seen : Std.HashSet SiteInstance := Std.HashSet.ofArray (pending.map SiteInstance.mk)
   let mut sites : Array ClosureSite := #[]
   let mut known : Std.HashSet ClosureSite := {}
+  let mut frames : FrameInstantiations := {}
   let mut next := 0
   while h : next < pending.size do
     let (handle, outer, outerRuntime) := pending[next]
     next := next + 1
-    let some compiled := siteBody? unit handle | continue
-    let (instances, found) := compiled.body.foldNodes
-      (fun callee typeArgs θ (instances, found) =>
-        let called := (callee, (θ.map fun θ => NRow.subst outer θ.1).getD .nil,
-          frameInstantiation unit callee outerRuntime typeArgs)
-        (if instances.contains called then instances else instances.push called, found))
-      (fun _ _ found => found)
-      (fun target mask typeArgs θ (instances, found) =>
-        match closureSiteAt? unit outer outerRuntime target mask typeArgs θ with
-        | some site => (instances, found.push site)
-        | none => (instances, found))
-      ((#[] : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId))), #[])
+    let some ns := unit.namespaces[handle.namespaceId.index]? | continue
+    let some nodes := templates[handle.namespaceId.index]? >>= (·.functions[handle.functionId.index]?)
+      | continue
+    let mut instances : Array (FunctionHandle × NRow × Array (VerexIR.TypeId × VerexIR.TypeId)) := #[]
+    let mut found : Array ClosureSite := #[]
+    for node in nodes do
+      let (reference, instantiations, mask?) := match node with
+        | .call callee instantiations => (callee, instantiations, none)
+        | .closure target mask instantiations => (target, instantiations, some mask)
+      let some (target, typeArgs, θ) :=
+          templateTarget? unit handle.namespaceId ns reference instantiations | continue
+      let (frame, cache) := frames.frame unit target outerRuntime typeArgs
+      frames := cache
+      -- A closure runs its target, as a call does.
+      let called := (target, (θ.map fun θ => NRow.subst outer θ.1).getD .nil, frame)
+      unless instances.contains called do instances := instances.push called
+      if let some mask := mask? then
+        if let some site := closureSiteAt? unit outer frame target mask θ then
+          found := found.push site
     for site in found do
       unless known.contains site do
         known := known.insert site
@@ -829,14 +945,11 @@ def closureSites (unit : ValidatedUnit) : Array ClosureSite := Id.run do
   -- A literal function value a specification writes, of a target without
   -- type parameters capturing no function value, is a site at the base
   -- frame as well.
-  for ns in unit.namespaces, index in [0:unit.namespaces.size] do
-    for expression in ns.expressions do
-      let .operation (.call (.closure reference mask)) instantiations _ _ := expression.kind
-        | continue
-      unless instantiations.isEmpty do continue
+  for owned in templates, index in [0:templates.size] do
+    for (reference, mask) in owned.literals do
       let some target := VerexIR.SemanticOperations.resolveFunction? unit ⟨index⟩ reference
         | continue
-      let some site := closureSiteAt? unit .nil #[] target mask #[] none | continue
+      let some site := closureSiteAt? unit .nil #[] target mask none | continue
       unless site.captured.closureFree && site.captured.paramFree && site.type.parameters.paramFree &&
           site.type.results.paramFree do continue
       unless known.contains site do
@@ -853,7 +966,7 @@ private initialize closureSitesCache : EnvExtension (Std.HashMap (Array String) 
 def closureSitesOf (segments : Array String) (unit : ValidatedUnit) :
     CommandElabM (Array ClosureSite) := do
   if let some sites := (closureSitesCache.getState (← getEnv)).get? segments then return sites
-  let sites := closureSites unit
+  let sites := closureSites unit (unitClosureTemplates (← getEnv) unit)
   modifyEnv (closureSitesCache.modifyState · (·.insert segments sites))
   return sites
 
@@ -996,11 +1109,12 @@ the declaration alone so a contract can exist for an unverified function. -/
 def nativeSignature? (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
     Option (NRow × ResultShape) := do
+  let ns ← unit.namespaces[namespaceId.index]?
   let params ← declaration.signature.parameters.toList.mapM fun parameter =>
-    ntyOf unit namespaceId parameter.typeUse.typeId
+    ntyOf unit namespaceId (ns.typeId parameter.typeUse.typeId)
   let result ← match declaration.signature.results.toList with
     | [] => some ResultShape.none
-    | [result] => (ntyOf unit namespaceId result.typeId).map ResultShape.one
+    | [result] => (ntyOf unit namespaceId (ns.typeId result.typeId)).map ResultShape.one
     | _ => none
   some (NRow.ofList params, result)
 
@@ -1800,15 +1914,15 @@ def clauseNames (unit : ValidatedUnit) (ns : ValidatedNamespace)
   let mut clauses : Array (String × VerexIR.Proofs.ObligationRange) := #[]
   for condition in declaration.contract.conditions do
     if let some kind := kindName condition.kind then
-      clauses := clauses.push (kind, Contract.locRange unit condition.loc)
+      clauses := clauses.push (kind, Contract.locRange ns condition.loc)
   for target in declaration.contract.modifies do
     if let some expression := ns.expressions[target.index]? then
-      clauses := clauses.push ("modifies", Contract.locRange unit expression.loc)
+      clauses := clauses.push ("modifies", Contract.locRange ns expression.loc)
   if let .structured root := declaration.body then
     for (_, block) in bodySpecifications ns root fun _ => true do
       for condition in block.conditions do
         if let some kind := kindName condition.kind then
-          clauses := clauses.push (kind, Contract.locRange unit condition.loc)
+          clauses := clauses.push (kind, Contract.locRange ns condition.loc)
   let ordered := clauses.qsort fun (_, a) (_, b) =>
     a.file < b.file || (a.file == b.file && a.startByte < b.startByte)
   let mut counts : Std.HashMap String Nat := {}
@@ -1822,11 +1936,11 @@ def clauseNames (unit : ValidatedUnit) (ns : ValidatedNamespace)
 
 /-- A function's preconditions, each by its number among them in source
 order: what a key names a callee's precondition by (`requires 1 of g`). -/
-def preconditionNumbers (unit : ValidatedUnit)
+def preconditionNumbers (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
     Array (VerexIR.Proofs.ObligationRange × Nat) :=
   let ranges := (declaration.contract.conditions.filter (·.kind == .requires)).map
-    fun condition => Contract.locRange unit condition.loc
+    fun condition => Contract.locRange ns condition.loc
   let ordered := ranges.qsort fun a b =>
     a.file < b.file || (a.file == b.file && a.startByte < b.startByte)
   ordered.zipIdx.map fun (range, index) => (range, index + 1)
@@ -1850,8 +1964,8 @@ def callSites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
       if let some handle := VerexIR.SemanticOperations.resolveFunction? unit ⟨namespaceIndex⟩ reference then
         let name := ((unit.namespaces[handle.namespaceId.index]?).bind fun calleeNs =>
           (calleeNs.functions[handle.functionId.index]?).bind fun callee =>
-            (calleeNs.tables.names[callee.name.index]?).map (·.name)).getD "callee"
-        found := found.push (Contract.locRange unit expression.loc, id.index, name)
+            (calleeNs.nameOf callee.name).map (·.name)).getD "callee"
+        found := found.push (Contract.locRange ns expression.loc, id.index, name)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   let ordered := found.qsort fun (a, i, _) (b, j, _) =>
     a.startByte < b.startByte || (a.startByte == b.startByte && i < j)
@@ -1892,10 +2006,10 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
     visited := visited.insert id.index
     let some expression := ns.expressions[id.index]? | continue
     if expression.kind matches .spec _ then continue
-    let range := Contract.locRange unit expression.loc
+    let range := Contract.locRange ns expression.loc
     match kinds[loopSite namespaceIndex id.index]?, expression.origin with
     | some "if", some (.matchArm site variant last) =>
-        arms := arms.push (Contract.locRange unit site, id.index, variant, last)
+        arms := arms.push (Contract.locRange ns site, id.index, variant, last)
     | some "abort", some (.matchMismatch _) => pure ()
     | some kind, _ => found := found.push (kind, range, id.index)
     | none, _ => pure ()
@@ -1933,11 +2047,11 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
 
 /-- The types a clause reads the locals of a function at: a reference local
 at its referent. -/
-private def clauseLocalTypes (unit : ValidatedUnit)
+private def clauseLocalTypes (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
     MetaM (Array VerexIR.Ty) :=
   declaration.locals.mapM fun localDecl => do
-    let some ty := unit.tables.types[localDecl.type.typeId.index]?
+    let some ty := ns.typeOf localDecl.type.typeId
       | throwError "a local has an unknown type"
     match ty with
     | .reference reference =>
@@ -2010,7 +2124,7 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
   let argumentsType ← mkAppM ``HList #[← quoteRow params]
   let parameterTypes := params.toList
   let row := row.toList
-  let localTypes ← clauseLocalTypes unit declaration
+  let localTypes ← clauseLocalTypes unit ns declaration
   let mut invariants := #[]
   let kept := loopKeptParameters ns root declaration params
   for (site, block) in loopSpecifications ns root do
@@ -2234,7 +2348,7 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
   let stateType ← memoryAt outer
   let parameterTypes := params.toList
   let row := row.toList
-  let localTypes ← clauseLocalTypes unit declaration
+  let localTypes ← clauseLocalTypes unit ns declaration
   let mut conditions := #[]
   for (site, block) in bodySpecifications ns root (· matches .assertion | .apply | .split) do
     -- A step of an inlined callee's proof states nothing in its caller.
@@ -2295,7 +2409,7 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
                           types (declaration.locals.map (·.name)) oldLocals startState
                           (state := some state) (executable := executable)
                           (kind := asserted.kind) (labeledAnchors := labeled)
-                return Contract.markCondition unit asserted (← overAnchors 0 #[])
+                return Contract.markCondition ns asserted (← overAnchors 0 #[])
               let conjunction ← clauses.foldrM (init := mkConst ``True)
                 fun clause rest => mkAppM ``And #[clause, rest]
               mkLambdaFVars (bound ++ #[env, state]) conjunction
@@ -2321,7 +2435,7 @@ def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceI
   let argumentsType ← mkAppM ``HList #[← quoteRow params]
   let stateType ← memoryAt outer
   let parameterTypes := params.toList
-  let localTypes ← clauseLocalTypes unit declaration
+  let localTypes ← clauseLocalTypes unit ns declaration
   let condition ← overExecutable outer readsUnit fun executable =>
     withLocalDeclD `start argumentsType fun start =>
     withLocalDeclD `startState stateType fun startState => do
@@ -2375,7 +2489,7 @@ def assumptionTable (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Na
   let stateType ← memoryAt outer
   let parameterTypes := params.toList
   let rowTypes := row.toList
-  let localTypes ← clauseLocalTypes unit declaration
+  let localTypes ← clauseLocalTypes unit ns declaration
   let entryType ← withLocalDeclD `Γ (mkConst ``NRow) fun context => do
     mkLambdaFVars #[context]
       (← mkArrow (← mkAppM ``HEnv #[context]) (← mkArrow stateType (mkSort .zero)))
@@ -2466,7 +2580,7 @@ def ghostWriteSites (unit : ValidatedUnit)
       for condition in block.conditions do
         if condition.kind == .update then
           sites := sites.push (loopSite owner.namespaceId.index condition.expression.index,
-            Contract.locRange unit condition.loc)
+            Contract.locRange ns condition.loc)
   return sites
 
 /-- The ghost tables of a model's bodies (`Meanings.ghost`,
@@ -2501,7 +2615,7 @@ def ghostTables (unit : ValidatedUnit) (outer : Lean.Expr)
       let some view := compileNamespaceAt? unit owner.namespaceId | continue
       let row := compiled.params ++ compiled.locals
       let rowTypes := row.toList
-      let localTypes ← clauseLocalTypes unit declaration
+      let localTypes ← clauseLocalTypes unit ns declaration
       for id in bodyExpressionIds ns root do
         let some expression := ns.expressions[id.index]? | continue
         match expression.kind with
@@ -2520,7 +2634,7 @@ def ghostTables (unit : ValidatedUnit) (outer : Lean.Expr)
                       (ns.expressions[base.index]?).map (·.kind)
                     match baseKind with
                     | some (.operation (.specification (.global none)) #[.typeArg resource] _ _) =>
-                        match view.resource unit owner.namespaceId resource.typeId with
+                        match view.resource unit owner.namespaceId (ns.typeId resource.typeId) with
                         | some (.struct _ _ (.cons τ .nil), _) => some τ
                         | _ => none
                     | _ => none
@@ -2548,8 +2662,8 @@ def ghostTables (unit : ValidatedUnit) (outer : Lean.Expr)
             let some handle := VerexIR.SemanticOperations.resolveStruct? unit owner.namespaceId
                 reference | continue
             let ghostDecls := VerexIR.SemanticOperations.nominalGhosts unit handle
-            let some τ := view.nty unit owner.namespaceId expression.typeId | continue
-            let some ty := unit.tables.types[expression.typeId.index]? | continue
+            let some τ := view.nty unit owner.namespaceId (ns.typeId expression.typeId) | continue
+            let some ty := ns.typeOf expression.typeId | continue
             let fields : Option NRow := match τ, variant with
               | .struct _ _ fields, none => some fields
               | .enum _ _ names rows _, some name => match Which.ofName names rows name with
@@ -2607,7 +2721,7 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
   let envType ← mkAppM ``HEnv #[rowType]
   let argumentsType ← mkAppM ``HList #[← quoteRow params]
   let stateType ← memoryAt outer
-  let localTypes ← clauseLocalTypes unit declaration
+  let localTypes ← clauseLocalTypes unit ns declaration
   let readsUnit := Contract.storedInvariantReadsUnit unit
   let block : VerexIR.SpecBlock := { loc := ⟨0⟩ }
   let mut conditions := #[]
@@ -2648,9 +2762,9 @@ def constructionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : 
   for id in bodyExpressionIds ns root do
     let some expression := ns.expressions[id.index]? | continue
     unless expression.kind matches .operation (.call (.constructor _ _)) _ _ _ do continue
-    let .ok (some τ) := typeOf? unit view namespaceId expression.typeId | continue
+    let .ok (some τ) := typeOf? unit view namespaceId (ns.typeId expression.typeId) | continue
     unless view.carriesInvariant τ do continue
-    let some ty := ns.tables.types[expression.typeId.index]? | continue
+    let some ty := ns.typeOf expression.typeId | continue
     let condition ← overExecutable outer readsUnit fun executable =>
       withLocalDeclD `start argumentsType fun start =>
       withLocalDeclD `startState stateType fun startState => do
@@ -2690,7 +2804,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
     let .operation (.global kind) instantiations _ _ := expression.kind | continue
     unless kind matches .publish | .take | .borrow .mutable do continue
     let some (VerexIR.GenericArgument.typeArg resource) := instantiations[0]? | continue
-    let some ty := unit.tables.types[resource.typeId.index]? | continue
+    let some ty := ns.typeOf resource.typeId | continue
     let some (written, _, _) := Contract.nominalDeclaration? unit ty | continue
     let site := loopSite namespaceId.index id.index
     let anchorType ← anchorOfType site rowType
@@ -2702,7 +2816,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
       withLocalDeclD `state stateType fun state => do
         let before := mkApp3 (mkConst ``Prod.snd [.zero, .zero]) envType stateType anchor
         let owed ← Contract.memoryWriteInvariants unit namespaceId ns declaration types
-          written state before executable (writtenType := some resource.typeId)
+          written state before executable (writtenType := some (ns.typeId resource.typeId))
         mkLambdaFVars #[start, startState, anchor, env, state] owed
     conditions := conditions.push (site, condition, readsUnit)
   -- A spec variable's write is a write of its memory.
@@ -2716,7 +2830,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
       let baseKind : Option VerexIR.ExprKind := (ns.expressions[base.index]?).map (·.kind)
       let some (.operation (.specification (.global none)) #[.typeArg resource] _ _) := baseKind
         | continue
-      let some ty := unit.tables.types[resource.typeId.index]? | continue
+      let some ty := ns.typeOf resource.typeId | continue
       let some (written, _, _) := Contract.nominalDeclaration? unit ty | continue
       let site := loopSite namespaceId.index update.expression.index
       let anchorType ← anchorOfType site rowType
@@ -2728,7 +2842,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
         withLocalDeclD `state stateType fun state => do
           let before := mkApp3 (mkConst ``Prod.snd [.zero, .zero]) envType stateType anchor
           let owed ← Contract.memoryWriteInvariants unit namespaceId ns declaration types
-            written state before executable (writtenType := some resource.typeId)
+            written state before executable (writtenType := some (ns.typeId resource.typeId))
           mkLambdaFVars #[start, startState, anchor, env, state] owed
       conditions := conditions.push (site, condition, readsUnit)
   return conditions
@@ -2756,6 +2870,7 @@ def afterCallConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Fun
   for id in bodyExpressionIds ns root do
     let some expression := ns.expressions[id.index]? | continue
     let .operation (.call (.function reference)) _ _ _ := expression.kind | continue
+    let reference := ns.qualifiedRef reference
     let some functionId := unit.resolution.function? reference.name | continue
     let some (_, written) := callees.find? (·.1 == { namespaceId := reference.namespaceId, functionId })
       | continue

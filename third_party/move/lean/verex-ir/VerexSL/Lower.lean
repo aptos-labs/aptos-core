@@ -2160,15 +2160,15 @@ private def addArbitrarySpecValue (context : ExprContext) (typeId : TypeId)
 
 /-- The name a state label is in VIR: interned in the unit's names, under the
 namespace of the specification. -/
-private def labelName (name : String) : LowerM Nat := do
+private def labelName (name : String) : LowerM NameId := do
   let state ← get
   let (tables, id) := internName state.tables state.namespaceId name
   set { state with tables }
-  return id.index
+  return id
 
 /-- The state a one-state read under the enclosing labels reads: the
 post-state's label, else the pre-state's. -/
-private def stateLabel (context : ExprContext) : Option Nat :=
+private def stateLabel (context : ExprContext) : Option NameId :=
   context.stateRange.post <|> context.stateRange.pre
 
 private def runtimeIndexType : LowerM TypeId := do

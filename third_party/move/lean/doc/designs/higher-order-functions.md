@@ -522,9 +522,12 @@ one. Three pieces relate them.
   (`TypedAs.subst`). A unit's readings agree when every closed type
   identifier the compiler reads natively (`ntyOf`) is `TypedAs` its
   semantic type, and every function's signature is, over its generic
-  environment; decided once per unit by evaluation, each table once: a
-  namespace holding the first namespace's types and names takes its verdicts
-  (`everyNamespaceType`). A unit whose readings do not agree is reported as
+  environment; decided once per unit by evaluation over indexed tables
+  (`TypingView`, `doc/designs/performance.md`): a unit whose namespaces hold
+  its tables checks them once, and the result gives the array-reading check
+  (`typesAgreeCheck`), so the fact states what it did. A function that is not
+  a closure target (`closureSignature?` is `none`) agrees vacuously, as no
+  function value holds it. A unit whose readings do not agree is reported as
   not memory-typed.
 - *Faithful closures.* `HasType.closure` types a closure only under an
   instantiation faithful to its arguments (`FrameInstantiation`), which
@@ -549,6 +552,25 @@ frame's transport, where the readings agree), and its arguments' semantic types 
 resolves to scalars (`ScalarAt`); a generic function whose function-typed
 parameter's rows mention its type parameters assumes that its frame
 resolves them to scalars, which a call discharges at its type arguments.
+
+## Function values of tuple-returning functions
+
+A function type states its results as a row (`|&T|(K, &V)` has the results `K`
+and `&V`, each with a sharing mark), a function declares one tuple-typed result,
+and a `ResultShape` is none or one type, so a target's one-element row of a tuple
+never equals the row of the type. Such a function is therefore not carried as a
+closure target; a function value of one is refused at its construction: "a
+function value of `f` is not supported: `f` returns a tuple" (`closureTargetRefusal`),
+naming a reference it holds. Calling it directly is unaffected. Move allows these
+values, so this is a gap of Verex, not a rule of the language.
+
+A target stating a shared reference below the top level of a parameter or result
+is, besides, not a closure target at all (`closureSignature?` is `none`): the
+native type erases the reference, so no sharing mark records it, and `TypedAs`
+could not read it without losing `TypedAs.unique`.
+
+Open: results as rows, where `ResultShape` gains a row case, a function's
+tuple result reads as its elements with their marks, and the refusal goes.
 
 ## Non-goals
 

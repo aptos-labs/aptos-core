@@ -78,6 +78,23 @@ def ghostInitSite (namespaceIndex expressionIndex k : Nat) : Nat :=
 def notCarried (what : String) : Except String α :=
   .error s!"{what} is not carried by the denotation"
 
+/-- Why a function cannot be the target of a function value: its result is
+a tuple, which a function type states as a row of results and a result shape as
+one type (`doc/designs/higher-order-functions.md`, "Function values of
+tuple-returning functions"). -/
+def closureTargetRefusal (targetNs : ValidatedNamespace)
+    (target : FunctionDecl FunctionBody) : Option String :=
+  match target.signature.results.toList with
+  | [result] => match (targetNs.typeOf result.typeId) with
+    | some (.tuple elements) =>
+        let name := ((targetNs.nameOf target.name).map (·.name)).getD "?"
+        let holdsReference := elements.any fun element =>
+          targetNs.tables.types[element.index]? matches some (.reference _)
+        some s!"a function value of `{name}` is not supported: `{name}` returns a tuple\
+          {if holdsReference then " holding a reference" else ""}"
+    | _ => none
+  | _ => none
+
 /-- A namespace as a compilation reads it. The kernel evaluates a
 compilation and reads a plain array in time linear in the index, so the
 arenas and the type table are viewed as balanced trees, built once per
@@ -107,7 +124,7 @@ unless explicitly declared. Only a function type at the field has one, not an
 arbitrary function nested in a vector or supplied as a type argument. -/
 def fieldKeepsMemory (ns : ValidatedNamespace) (field : FieldDecl) : Bool :=
   ns.profile == some .move &&
-    (ns.tables.types[field.type.typeId.index]?).any fun ty => ty matches .function ..
+    (ns.typeOf field.type.typeId).any fun ty => ty matches .function ..
 
 /-- A declaration whose fields have closure frames. The compiler's
 invariant checkpoints and contract generation use the same criterion. -/
@@ -190,7 +207,7 @@ def CompileNamespace.place? (ns : CompileNamespace) (place : PlaceId) : Option P
 /-- Whether an operand is a shared reference, by its recorded type. -/
 def CompileNamespace.sharedAt (ns : CompileNamespace) (operand : ExprId) : Bool :=
   match ns.expressions.get? operand.index with
-  | some expression => isSharedReferenceType ns.source expression.typeId ns.types.get?
+  | some expression => isSharedReferenceType ns.source (ns.source.typeId expression.typeId) ns.types.get?
   | none => false
 
 /-- The native type a type identifier denotes, read through the view's type
@@ -388,7 +405,7 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
           let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
           match component, path with
           | .struct source _ fields, path =>
-              let some handle := resolveStruct? unit ns.source.identity owner
+              let some handle := resolveStruct? unit ns.source.unitIdentity owner
                 | .error "a field place does not resolve"
               unless handle = source do .error "a field place's declaration differs from its type"
               let some name := sourceFieldName? ns.source field | .error "a field place has no name"
@@ -398,7 +415,7 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
                 | .error "a field place is out of range"
               .ok ⟨root, σ, x, path.append (.field position .nil)⟩
           | .enum source _ names rows _, path =>
-              let some handle := resolveStruct? unit ns.source.identity owner
+              let some handle := resolveStruct? unit ns.source.unitIdentity owner
                 | .error "a variant field place does not resolve"
               unless handle = source do .error "a variant field place's declaration differs from its type"
               let some name := sourceFieldName? ns.source field | .error "a variant field place has no name"
@@ -428,7 +445,7 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
             | some (.downcast inner variant) => (inner, some variant)
             | _ => (base, none)
           let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
-          let some handle := resolveStruct? unit ns.source.identity owner
+          let some handle := resolveStruct? unit ns.source.unitIdentity owner
             | .error "a ghost field place does not resolve"
           let some name := sourceFieldName? ns.source field
             | .error "a ghost field place has no name"
@@ -506,11 +523,7 @@ def ResultShape.lendable : ResultShape → Bool
 compiled function: the kernel evaluates the compilation, so a loan death
 reads its loan from these rather than searching every certificate. -/
 def loanFactsOf (unit : ValidatedUnit) (handle : FunctionHandle) : Array CheckedLoanFact :=
-  -- A list search: the kernel searches an array by reading each element
-  -- through the array's list.
-  ((unit.borrowCertificates.toList.find? fun certificate =>
-    certificate.namespaceId == handle.namespaceId &&
-      certificate.functionId == handle.functionId).map (·.loans)).getD #[]
+  ((unit.namespaces[handle.namespaceId.index]?).map (·.loanFacts handle.functionId)).getD #[]
 
 /-- The effect of ending loans, `none` when it resolves nothing. A loan's
 death resolves the reference wherever it is held; a holder whose slot is
@@ -672,7 +685,7 @@ mutual
     | fuel + 1, id => do
         let some expression := ns.expressions.get? id.index
           | .error "an expression is out of range"
-        let τ? ← typeOf? unit ns namespaceId expression.typeId
+        let τ? ← typeOf? unit ns namespaceId (ns.source.typeId expression.typeId)
         match expression.kind with
         | .value literal _ =>
             let some τ := τ? | notCarried "a literal of type never"
@@ -708,13 +721,13 @@ mutual
             let some callee := calleeNs.functions[handle.functionId.index]?
               | .error "a callee is out of range"
             let some parameters := callee.signature.parameters.toList.mapM fun parameter =>
-                ns.nty unit handle.namespaceId parameter.typeUse.typeId
+                ns.nty unit handle.namespaceId (calleeNs.typeId parameter.typeUse.typeId)
               | notCarried "the type of a callee parameter"
             unless parameters.all NTy.lendable do notCarried "a reference inside an aggregate"
             let parameters := NRow.ofList parameters
             let shape ← match callee.signature.results.toList with
               | [] => .ok ResultShape.none
-              | [result] => match ns.nty unit handle.namespaceId result.typeId with
+              | [result] => match ns.nty unit handle.namespaceId (calleeNs.typeId result.typeId) with
                   | some τ => .ok (ResultShape.one τ)
                   | none => notCarried "the type of a callee result"
               | _ => notCarried "a callee with several results"
@@ -728,7 +741,8 @@ mutual
               | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
               | none => notCarried "a call of type never"
             else
-              let some typeArgs := instantiations.toList.mapM fun argument => match argument with
+              let some typeArgs := (ns.source.genericArguments instantiations).toList.mapM
+                  fun argument => match argument with
                   | .typeArg value => some value
                   | _ => none
                 | notCarried "a generic argument that is not a type"
@@ -757,8 +771,9 @@ mutual
               | .error "a closure target's namespace is out of range"
             let some target := targetNs.functions[handle.functionId.index]?
               | .error "a closure's target is out of range"
+            if let some refusal := closureTargetRefusal targetNs target then throw refusal
             let some targetParameters := target.signature.parameters.toList.mapM fun parameter =>
-                ns.nty unit handle.namespaceId parameter.typeUse.typeId
+                ns.nty unit handle.namespaceId (targetNs.typeId parameter.typeUse.typeId)
               | notCarried "the type of a closure target's parameter"
             let ⟨captured, supplied, weave⟩ := Weave.ofMask mask targetParameters
             unless weave.mask == mask do notCarried "a mask beyond its target's parameters"
@@ -781,7 +796,8 @@ mutual
                 else notCarried "a closure whose shared parameters are not its target's"
               else notCarried "a closure whose rows are not its target's"
             else
-              let some typeArgs := instantiations.toList.mapM fun argument => match argument with
+              let some typeArgs := (ns.source.genericArguments instantiations).toList.mapM
+                  fun argument => match argument with
                   | .typeArg value => some value
                   | _ => none
                 | notCarried "a generic argument that is not a type"
@@ -794,7 +810,7 @@ mutual
                 | notCarried "a type argument without values"
               let shape ← match target.signature.results.toList with
                 | [] => .ok ResultShape.none
-                | [result] => match ns.nty unit handle.namespaceId result.typeId with
+                | [result] => match ns.nty unit handle.namespaceId (targetNs.typeId result.typeId) with
                     | some σ => .ok (ResultShape.one σ)
                     | none => notCarried "the type of a closure target's result"
                 | _ => notCarried "a closure target with several results"
@@ -823,7 +839,7 @@ mutual
             let some callableExpression := ns.expressions.get? callable.index
               | .error "an invocation's function value is out of range"
             let some (.function parameters shared results) :=
-                ns.nty unit namespaceId callableExpression.typeId
+                ns.nty unit namespaceId (ns.source.typeId callableExpression.typeId)
               | notCarried "an invocation of a value that is not a function"
             unless parameters.toList.all NTy.lendable do
               notCarried "a reference inside an aggregate"
@@ -851,7 +867,7 @@ mutual
             let some τ := τ? | notCarried "a storage operation of type never"
             let #[.typeArg resource] := instantiations
               | notCarried "a storage operation without one resource type"
-            let some (native, typeArguments) := ns.resource unit namespaceId resource.typeId
+            let some (native, typeArguments) := ns.resource unit namespaceId (ns.source.typeId resource.typeId)
               | notCarried "a storage operation on a type without a native resource type"
             match kind, arguments.toList with
             | .contains, [key] => do
@@ -1122,7 +1138,7 @@ mutual
                     (·.structs[handle.structId]?)).any (·.isGhostMemory)
                   unless ghostMemory do
                     notCarried "an update of memory other than a spec variable's"
-                  let some (native, typeArguments) := ns.resource unit namespaceId resource.typeId
+                  let some (native, typeArguments) := ns.resource unit namespaceId (ns.source.typeId resource.typeId)
                     | notCarried "a spec variable's memory without a native resource type"
                   let .struct source arguments (.cons τ .nil) := native
                     | notCarried "a spec variable's memory with other than one field"
@@ -1672,22 +1688,25 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
   let .structured root := declaration.body | notCarried "a function without a body"
   -- A specification local (a quantifier's binder) keeps an empty slot.
   let some allLocals := declaration.locals.toList.mapM fun localDecl =>
-      match view.nty unit handle.namespaceId localDecl.type.typeId with
+      match view.nty unit handle.namespaceId (view.source.typeId localDecl.type.typeId) with
       | some τ => some τ
-      | none => if logicalOnly unit handle.namespaceId localDecl.type.typeId then some .unit else none
+      | none =>
+          if logicalOnly unit handle.namespaceId (view.source.typeId localDecl.type.typeId) then
+            some .unit
+          else none
     | notCarried "the type of a local"
   let paramCount := declaration.signature.parameters.size
   if paramCount > allLocals.length then .error "fewer locals than parameters" else
   let params := NRow.ofList (allLocals.take paramCount)
   let locals := NRow.ofList (allLocals.drop paramCount)
   let some paramTypes := declaration.signature.parameters.toList.mapM fun parameter =>
-      view.nty unit handle.namespaceId parameter.typeUse.typeId
+      view.nty unit handle.namespaceId (view.source.typeId parameter.typeUse.typeId)
     | notCarried "the type of a parameter"
   if NRow.ofList paramTypes != params then
     .error "parameter types differ from the leading locals" else
   let result ← match declaration.signature.results.toList with
     | [] => .ok ResultShape.none
-    | [result] => match view.nty unit handle.namespaceId result.typeId with
+    | [result] => match view.nty unit handle.namespaceId (view.source.typeId result.typeId) with
         | some τ => .ok (ResultShape.one τ)
         | none => notCarried "the type of the result"
     | _ => notCarried "several results"

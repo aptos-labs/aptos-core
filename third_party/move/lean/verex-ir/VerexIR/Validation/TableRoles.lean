@@ -224,7 +224,7 @@ def tableLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : 
     intrinsic.model == "map" && intrinsic.owner == declaration.name
   guard (declaration.variants.isEmpty && declaration.generics.size == 2)
   let fieldTypes : List Ty ← declaration.fields.toList.mapM fun field =>
-    unit.tables.types[field.type.typeId.index]?
+    unit.tyAt (ns.typeId field.type.typeId)
   let (handle, length, dummy) ← match fieldTypes with
     | [] => some (false, false, false)
     -- The Boolean placeholder Move's compilers give an empty struct.
@@ -241,7 +241,7 @@ map a conversion role (`map_to_ordered_map`) builds. -/
 def resultLayout? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : FunctionDecl FunctionBody) : Option TableLayout := do
   let result ← declaration.signature.results[0]?
-  let .nominal name _ ← ns.tables.types[result.typeId.index]? | none
+  let .nominal name _ ← ns.typeOf result.typeId | none
   let (namespaceId, structId) ← nominalDeclarationId? unit ns name
   tableLayout? unit namespaceId structId
 
@@ -251,7 +251,7 @@ def tableRoleOf? (unit : ValidatedUnit) (namespaceId : NamespaceId) (functionId 
     Option (String × TableLayout) := do
   let ns ← unit.namespaces[namespaceId.index]?
   let declaration ← ns.functions[functionId.index]?
-  let target : QualifiedRef := { namespaceId, name := declaration.name }
+  let target : QualifiedRef := { namespaceId := ns.identity, name := declaration.name }
   ns.intrinsics.findSome? fun intrinsic => do
     guard (intrinsic.model == "map")
     let binding ← intrinsic.executableBindings.find? (·.target == target)

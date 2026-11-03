@@ -125,6 +125,51 @@ the command prepares all targets first and elaborates everything else with
 `Elab.async`; the audit walks dependencies through `Environment.find?`,
 never the checked environment.
 
+## Compiled namespaces
+
+`scripts/verify-modules.py` compiles a package's namespaces to `.olean` files
+first ([`relocatable-namespaces.md`](relocatable-namespaces.md)), so a module's
+process elaborates only its own namespace and imports the rest. `aptos-framework`
+at `--heartbeats 300`, 8 processes, one run of each: 10,235 s summed over 78 module
+processes and 1,289 s wall when each elaborates what it uses, 6,476 s and 869 s
+compiled, the pass being 172 s summed and 60 s wall over 155 namespaces (42 MB of
+`.olean` files, the largest 3.3 MB). Rendering and lowering fall from 1,873 s to
+71 s; what stays is a module's own unit, certificates and proofs, so `stake` gains
+7% and a module without targets 80%. Heartbeats do not change. The `.olean` files
+hold relocatable namespaces, not linked units, so their size is linear in the
+package.
+
+## Fixed points across normalizations
+
+The walk's normalization (`normalizeAround`, inline and the release of held
+continuations) records, per target, the terms it left unchanged without
+reading the local context, and a later traversal returns them at once
+(`FixedPoints` in `Solve.Base`). A traversal is tainted by a discharger call, a subterm taken as
+normal without traversal (the `normal` arguments), and a head at which a
+simproc reads the hypotheses (`contextDependent`'s shapes, `existsNamedValue`,
+`givenClosureFrame`, `invokeGenericClosure`); the taint is tracked by a frame
+per term at simp's recursion depth, and the terms simp's own cache returns
+without a traversal are checked against the tainted ones of the call. Terms
+with metavariables and below depth 3 are not recorded. Leaf preparation was
+measured with its own stamp and gained nothing.
+
+On the isolated `primary_fungible_store::deposit` (budget-stopped, so per
+run): bind −29%, split −12%, inline −19%, exit −34%, release −11%, 31% of
+lookups hit. `multisig_account::can_execute`: bind −51%, exit −52%, inline
+−36%, release −37%. Inside `normalizeAround`, `instantiateMVars` and
+`applySimpResultToTarget` cost 0.05% of `Simp.main`, and only 1–2% of the
+misses are terms seen before and tainted: what is left is the traversal of
+terms the steps create. `scripts/verify-modules.py` at `--heartbeats 300`,
+targets with the same outcome that do not reach the budget: `big_ordered_map`
+−2.8% (43 targets), `multisig_account` −6.0% (19), `primary_fungible_store`
+−18.8% (5); `create_primary_store` and `ensure_primary_store_exists` verify
+within the budget, two budget-stopped targets of `multisig_account` now fail
+before it. `DenotePerformance` run natively (`verex-move elaborate`): no
+target above +0.1%, `record` −7.8%, `return_in_loop` −6.6%, `at_most` −5.8%.
+Interpreted (`lake env lean`), where the wrapper's own code is counted,
+`return_in_loop` is +5% and `increment` +2%. Hashing the leaves of the smoke
+fixtures, the cache changes no leaf goal.
+
 ## What was learned
 
 - **An array read in a kernel-evaluated computation is a list walk**:
@@ -133,6 +178,13 @@ never the checked environment.
   arenas through an `IndexedArena`, and count sizes once; `_eq` lemmas
   connect the indexed forms to the native ones. One checksum over a big
   structure with `Array.foldl` in the kernel ran out of memory at 13.6 GB.
+  The whole-unit typing facts read one literal view of the tables
+  (`TypingView`), walk functions in lockstep, and prove in a pointer `Eq.refl`
+  that every namespace holds the unit's tables: on a unit of 70 namespaces,
+  under a minute where the array-reading resource loop over one table did not
+  end in 840 s. `#kdiag` on the array-reading check showed three-quarters of its
+  unfolds in list walks, and a cost nobody had listed: comparing two tables'
+  names decides `String` equality, about 2 s per namespace there.
 - **Unfolding a big recursive definition makes the kernel redo it.**
   `simp` unfolding `Term.denote` records no steps, so the kernel re-reduces
   its 61-way matcher. The equation lemmas (`vir_denote_equations`) make
@@ -225,42 +277,21 @@ native ones; most act on the normalization of encoded terms.
   once per module, or cached proofs as the contract normal forms
   (`verex.contractLemmas`, on by default: typed −3.3%, authored +0.3%) are.
 - **The call's subgoals carry the continuations** (190k–480k nodes against
-  2k–25k of contract): `wp_call` applies them to the callee's fresh result,
-  error and final state, and `instantiateMVars` beta-reduces the application,
-  so a simp over the subgoal walks the whole continuation. The solver holds
-  both continuations as local definitions before the call rules
-  (`holdContinuations`) and puts them back after the `call-contract` simp,
-  reduced at their arguments (`releaseContinuations`): applied to variables
-  only, the body is normal as it was; otherwise the released goal is
-  normalized again in full, as every call was before. The hold precedes
-  `wp_specialized`, whose premise reads the result through its transport
-  (`ensures (ResultShape.toSkolem θ shape result)`): that read must reach
-  the leaf reduced, so the rule's wrapper is never what is held. The inline
-  steps normalize the whole goal, continuations included: a continuation is
-  normal only as far as the walk has unfolded it (`wp_bind` and `wp_callAt`
-  build new structure in it), so walking around it changes what a leaf
-  receives. The default call path is `wp_call_normal`
-  (`verex.contractLemmas` is on by default), which this version does not
-  hold on, so `call-contract` on `multisig_account::can_execute` stays 328M.
-  Measured in the next version, not landed: held there too, that step is
-  20M and the call stage 174M (385M), with 27 leaves reached instead of 18.
-  A continuation's read of the result, `(shape.subst θ).toBody r`, is
-  normal under its own binder and reduces once the rule's premise states
-  the result, so a release by beta alone leaves it unreduced; that version
-  holds the continuation abstracted over its reads of its parameters (the
-  maximal subterms mentioning a parameter and no other local, a bare
-  occurrence among them) and normalizes the released goal only along the
-  paths to the released arguments (marked; a memoized check stops every
-  subterm without a mark), which restores the read at the same cost, and
-  names the call's premises after the callee as its clauses are
-  (`back_key_ensures`, `back_key_frame`, `back_key_returns`) where the full
-  walk had left simp's artifact `x` on every binder. Open there: the eager
-  walk also unfolded the program text after a call and normalized it with
-  the call's facts in context. Unfolding at the release along the paths to
-  the denotation functions restores the first, not the second, so leaves'
-  facts differ: `SharedBehaviorJoins`, `StateLabelCallObservations` and
-  `computed_call_range_results::repeated_choices` fail, as do 13
-  `big_ordered_map` targets.
+  2k–25k of contract): the call rules apply them to the callee's fresh
+  result, error and final state, so a simp over a subgoal walks the whole
+  continuation. The solver holds each continuation abstracted over its reads
+  of its parameters on both call paths (`wp_call_normal` is the default), so
+  the contract's normalization walks the contract only, and names the call's
+  premises after the callee (`<callee>_ensures`, `_frame`, `_returns`). The
+  release introduces the goal's leading binders, puts the held values back,
+  normalizes along the paths to non-variable arguments, the body's structure
+  outside its lambdas and the premises a rule put over the body, then
+  reverts the binders and normalizes only the logical connectives. Everything
+  else is taken as normal: a continuation whose nested lambdas the walk built
+  and never normalized would pass unnormalized; none measured does. On
+  `multisig_account::can_execute`: call stage 384M → 186M (12 calls),
+  `call-contract` 353M → 20M, release 135M, 27 leaves instead of 17.
+  The release is now the largest call step.
 
 ### Splits
 
@@ -308,7 +339,12 @@ native ones; most act on the normalization of encoded terms.
   (`Lean.ofReduceBool`) was measured slower than the kernel and is not
   pursued; certificates stay kernel-checked.
 - **Per process**, 18–27% of wall time is export, load and certificates
-  (2–4 s); bounded by `scripts/verify-modules.py` and `verex.jobs`.
+  (2–4 s); bounded by `scripts/verify-modules.py` and `verex.jobs`. Elaborating
+  what a module uses is not among them: it is compiled once per package (see
+  "Compiled namespaces").
+- **A module's own unit**, once per process: quoting it and defining its instance
+  on the first target, its unit facts, and the audit after the proofs (for
+  `stake`, 14 s, 12 s and 15 s of its 50 s of certification).
 - **Wall time beside heartbeats** in the stage logs, so kernel checks show.
 
 ### Authored proof interface

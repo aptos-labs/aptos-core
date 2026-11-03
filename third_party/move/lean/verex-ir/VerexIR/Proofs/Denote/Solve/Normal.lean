@@ -2095,7 +2095,7 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.Denote.Var.update_here VerexIR.Proofs.Denote.Var.update_there
   List.map_toArray List.map_cons List.map_nil List.push_toArray
   List.size_toArray List.length_cons List.length_nil List.getElem?_eq_some_iff
-  Array.getElem?_eq_none_iff Array.size_setIfInBounds Array.getElem?_map
+  List.getElem?_eq_none_iff Array.getElem?_eq_none_iff Array.size_setIfInBounds Array.getElem?_map
   -- The transport of a value at the identity instantiation.
   Option.map_id' Array.map_id' Int.sub_add_cancel
   Option.map_map Function.comp_def Array.set!_eq_setIfInBounds List.setIfInBounds_toArray

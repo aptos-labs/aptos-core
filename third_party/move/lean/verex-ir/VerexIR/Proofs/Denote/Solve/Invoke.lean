@@ -39,7 +39,7 @@ continuation is applied to, are normal already; traversing them again would
 cost as much as normalizing them, while only the structure the step created
 changes. A target nothing rewrites is left as it is. -/
 def normalizeAround (normalization : Simp.Context × Simp.SimprocsArray)
-    (normal : Array Lean.Expr) : TacticM Unit := do
+    (normal : Array Lean.Expr) (fixedPoints : Option Name := none) : TacticM Unit := do
   let goal ← getMainGoal
   let saved ← saveState
   try
@@ -47,8 +47,11 @@ def normalizeAround (normalization : Simp.Context × Simp.SimprocsArray)
       let (ctx, simprocs) := normalization
       let known : Std.HashSet Lean.Expr := normal.foldl (·.insert ·) {}
       let target ← instantiateMVars (← goal.getType)
-      let (result, _) ← Simp.main target ctx
-        (methods := stoppingMethods simprocs fun e => pure (known.contains e))
+      let stop := fun e => pure (known.contains e)
+      let methods := match ← FixedPoints.new? fixedPoints with
+        | some fp => fp.wrap (Simp.mkDefaultMethodsCore simprocs) stop
+        | none => stoppingMethods simprocs stop
+      let (result, _) ← Simp.main target ctx (methods := methods)
       if result.expr == target then return
       if result.expr.isTrue then
         goal.assign (← match result.proof? with
@@ -469,57 +472,237 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
     if head.isFVar && callees.any (·.1 == head) then return some (head, action)
     return none
 
-/-- The main goal with the continuations of its weakest precondition, the
-postcondition and the failure continuation, as local definitions, so that a
-rule applying them to fresh variables leaves them unreduced and a step's
-simp does not walk them: they are normal, and normal at fresh variables.
-The definitions with their values. -/
-def holdContinuations : TacticM (Array (FVarId × Lean.Expr)) := do
+/-- The reads of `params` in `body`: its maximal subterms that mention one
+of them and no other local, closed under the body's own binders. A bare
+occurrence is a read of its own. -/
+private def readsOf (body : Lean.Expr) (params : Array FVarId) : Array Lean.Expr := Id.run do
+  let mentions (e : Lean.Expr) : Bool := e.hasAnyFVar (params.contains ·)
+  let mentionsOther (e : Lean.Expr) : Bool := e.hasAnyFVar (!params.contains ·)
+  let mut reads : Array Lean.Expr := #[]
+  let mut pending : Array Lean.Expr := #[body]
+  while let some e := pending.back? do
+    pending := pending.pop
+    unless mentions e do continue
+    if !e.hasLooseBVars && !mentionsOther e then
+      unless reads.contains e do reads := reads.push e
+      continue
+    match e with
+    | .app f a => pending := pending.push a |>.push f
+    | .lam _ t b _ | .forallE _ t b _ => pending := pending.push b |>.push t
+    | .letE _ t v b _ => pending := pending.push b |>.push v |>.push t
+    | .mdata _ b | .proj _ _ b => pending := pending.push b
+    | _ => pure ()
+  return reads
+
+/-- A continuation `fun rs => B` abstracted over its reads of `rs`: the
+value `fun vs => B[vs/reads]`, and the continuation again as that value
+applied to the reads, `fun rs => h reads`, with `h` the placeholder for the
+value's name. None where a read's type depends on the parameters. -/
+private def abstractReads (continuation : Lean.Expr) :
+    MetaM (Option (Lean.Expr × FVarId × Lean.Expr)) :=
+  lambdaTelescope continuation fun rs body => do
+    let params := rs.map (·.fvarId!)
+    let reads := readsOf body params
+    let types ← reads.mapM fun read => do instantiateMVars (← inferType read)
+    if types.any (·.hasAnyFVar (params.contains ·)) then return none
+    let declarations := types.zipIdx.map fun (type, i) =>
+      (Name.mkSimple s!"read{i}", fun (_ : Array Lean.Expr) => pure type)
+    withLocalDeclsD declarations fun vs => do
+      let abstracted := body.replace fun e =>
+        (reads.findIdx? (· == e)).map fun i => vs[i]!
+      let value ← mkLambdaFVars vs abstracted
+      withLocalDeclD `held (← inferType value) fun h => do
+        let wrapper ← mkLambdaFVars rs (mkAppN h reads)
+        return some (value, h.fvarId!, wrapper)
+
+/-- The main goal with the continuations `parts`, lambdas of its weakest
+precondition, as local definitions abstracted over their reads of their
+parameters (`abstractReads`), wherever they occur: a rule applying a
+continuation to fresh variables, or to a transport of the result, then
+substitutes into a visible read, which a step's simp normalizes without
+walking the body, normal as it was. The definitions with their values. -/
+def holdContinuations (parts : Array Lean.Expr) : TacticM (Array (FVarId × Lean.Expr)) := do
   let mut goal ← getMainGoal
   let mut held := #[]
-  for index in [4, 5] do
+  for part in parts do
+    unless part.consumeMData.isLambda do continue
     let (next, entry) ← goal.withContext do
       let target ← instantiateMVars (← goal.getType)
-      unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return (goal, none)
-      let part := target.getArg! index
-      unless part.isLambda do return (goal, none)
-      let defined ← goal.define `verexHeld (← inferType part) part
+      unless (target.find? (· == part)).isSome do return (goal, none)
+      let some (value, placeholder, wrapper) ← abstractReads part.consumeMData
+        | return (goal, none)
+      let defined ← goal.define `verexHeld (← inferType value) value
       let (local_, folded) ← defined.intro1P
       folded.withContext do
+        let wrapper := wrapper.replaceFVarId placeholder (mkFVar local_)
         let target ← instantiateMVars (← folded.getType)
         let folded ← folded.replaceTargetDefEq
-          (mkAppN target.getAppFn (target.getAppArgs.set! index (mkFVar local_)))
-        return (folded, some (local_, part))
+          (target.replace fun e => if e == part then some wrapper else none)
+        return (folded, some (local_, value))
     goal := next
     if let some entry := entry then held := held.push entry
   replaceMainGoal [goal]
   return held
 
+/-- The subterms of `e`, without those that hold one of `values`. -/
+private def subtermsWithout (e : Lean.Expr) (values : Std.HashSet Lean.Expr) :
+    Std.HashSet Lean.Expr := Id.run do
+  let mut holds : Std.HashMap Lean.Expr Bool := {}
+  let mut pending : Array (Lean.Expr × Bool) := #[(e, false)]
+  while let some (e, visited) := pending.back? do
+    pending := pending.pop
+    if holds.contains e then continue
+    let children := match e with
+      | .app f a => #[f, a]
+      | .lam _ t b _ | .forallE _ t b _ => #[t, b]
+      | .letE _ t v b _ => #[t, v, b]
+      | .mdata _ b | .proj _ _ b => #[b]
+      | _ => #[]
+    if values.contains e then
+      holds := holds.insert e true
+    else if visited || children.isEmpty then
+      holds := holds.insert e (children.any fun c => holds.getD c false)
+    else
+      pending := pending.push (e, true) ++ children.map (·, false)
+  return holds.fold (init := {}) fun known e held => if held then known else known.insert e
+
+/-- Whether `e` is built by a logical connective or quantifier. -/
+private def isConnective (e : Lean.Expr) : Bool :=
+  e.isForall || e.isAppOfArity ``And 2 || e.isAppOfArity ``Or 2 || e.isAppOfArity ``Not 1 ||
+    e.isAppOfArity ``Iff 2 || e.isAppOfArity ``Exists 2 || e.isConstOf ``True || e.isConstOf ``False
+
+/-- Normalize the main goal's propositional structure, taking every
+proposition that is no connective as it is. -/
+def normalizeConnectives (normalization : Simp.Context × Simp.SimprocsArray) : TacticM Unit := do
+  let goal ← getMainGoal
+  let saved ← saveState
+  try
+    goal.withContext do
+      let (ctx, simprocs) := normalization
+      let target ← instantiateMVars (← goal.getType)
+      let (result, _) ← Simp.main target ctx (methods := stoppingMethods simprocs fun e =>
+        return !isConnective e.consumeMData && (← inferType e).isProp)
+      if result.expr == target then return
+      if result.expr.isTrue then
+        goal.assign (← match result.proof? with
+          | some proof => mkOfEqTrue proof
+          | none => pure (mkConst ``True.intro))
+        replaceMainGoal []
+      else
+        replaceMainGoal [← applySimpResultToTarget goal target result]
+  catch _ =>
+    saved.restore
+
 /-- The goals with the continuations `holdContinuations` set aside back in
-place, reduced at their arguments. Applied to variables only, a continuation
-is normal as it was; otherwise the goal is normalized again. -/
+place, reduced at their arguments. The goal's leading binders, the call's
+result, final state and premises, are introduced, so that the continuation's
+body is closed: a variable argument leaves it normal, so the goal is
+normalized along the paths to the other arguments, everything else taken as
+it is. -/
 def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
-    (held : Array (FVarId × Lean.Expr)) : TacticM Unit := do
+    (held : Array (FVarId × Lean.Expr)) (fixedPoints : Option Name := none) : TacticM Unit := do
   if held.isEmpty then return
   let lookup (e : Lean.Expr) : Option Lean.Expr :=
     match e.getAppFn with
     | .fvar id => (held.find? (·.1 == id)).map (·.2)
     | _ => none
+  let (ctx, simprocs) := normalization
   let mut released := #[]
   for goal in ← getGoals do
-    let (next, atVariables) ← goal.withContext do
-      let target ← instantiateMVars (← goal.getType)
-      let atVariables := (target.find? fun e =>
-        (lookup e).isSome && !e.getAppArgs.all fun a => a.isBVar || a.isFVar).isNone
-      let restored := target.replace fun e => (lookup e).map (·.beta e.getAppArgs)
-      let next ← if restored == target then pure goal else goal.replaceTargetDefEq restored
-      return (next, atVariables)
-    let mut next := next
-    for (local_, _) in held.reverse do
-      next ← next.tryClear local_
-    setGoals [next]
-    unless atVariables do normalizeAround normalization #[]
-    released := released ++ (← getGoals).toArray
+    let target ← goal.withContext do instantiateMVars (← goal.getType)
+    unless (target.find? fun e => (lookup e).isSome).isSome do
+      let mut next := goal
+      for (local_, _) in held.reverse do
+        next ← next.tryClear local_
+      released := released.push next
+      continue
+    let rec binders : Lean.Expr → Nat
+      | .forallE _ _ b _ => binders b + 1
+      | .mdata _ b => binders b
+      | _ => 0
+    let saved ← saveState
+    try
+      let (introduced, inner) ← goal.introNP (binders target)
+      let next ← inner.withContext do
+        let target ← instantiateMVars (← inner.getType)
+        -- The arguments other than variables: a read a value stands in
+        -- may reduce with what surrounds it.
+        let mut arguments : Array Lean.Expr := #[]
+        let applications := Id.run do
+          let mut found : Array Lean.Expr := #[]
+          let mut pending := #[target]
+          while let some e := pending.back? do
+            pending := pending.pop
+            if (lookup e).isSome then found := found.push e; continue
+            match e with
+            | .app f a => pending := pending.push a |>.push f
+            | .lam _ t b _ | .forallE _ t b _ => pending := pending.push b |>.push t
+            | .letE _ t v b _ => pending := pending.push b |>.push v |>.push t
+            | .mdata _ b | .proj _ _ b => pending := pending.push b
+            | _ => pure ()
+          return found
+        for e in applications do
+          for a in e.getAppArgs do
+            unless a.isFVar || arguments.contains a do arguments := arguments.push a
+        let mut substituted : Std.HashSet Lean.Expr := arguments.foldl (·.insert ·) {}
+        -- What the call assigned, such as a generic callee's instantiation,
+        -- stands in the held values like an argument.
+        for (_, value) in held do
+          for mvar in (value.collectMVars {}).result do
+            if ← mvar.isAssigned then
+              substituted := substituted.insert (← instantiateMVars (mkMVar mvar))
+        let restored ← instantiateMVars
+          (target.replace fun e => (lookup e).map (·.beta e.getAppArgs))
+        let mut next ← inner.replaceTargetDefEq restored
+        for (local_, _) in held.reverse do
+          next ← next.tryClear local_
+        -- Premises over the continuation's body are a rule's, as
+        -- `wp_named` adds them, and normalized in full.
+        let rec conclusion : Lean.Expr → Lean.Expr
+          | .forallE _ _ b _ => conclusion b
+          | .mdata _ b => conclusion b
+          | e => e
+        -- The structure outside the continuation's lambdas is a rule's, as
+        -- `wp_bind` builds it, and normalized too.
+        let top := Id.run do
+          let mut found : Std.HashSet Lean.Expr := {}
+          let mut pending := #[conclusion restored]
+          while let some e := pending.back? do
+            pending := pending.pop
+            if found.contains e then continue
+            found := found.insert e
+            match e with
+            | .app f a => pending := pending.push a |>.push f
+            | .mdata _ b | .proj _ _ b => pending := pending.push b
+            | _ => pure ()
+          return found
+        let normal := (subtermsWithout (conclusion restored) substituted).filter (!top.contains ·)
+        next.withContext do
+          let stop := fun e => pure (normal.contains e)
+          let methods := match ← FixedPoints.new? fixedPoints with
+            | some fp => fp.wrap (Simp.mkDefaultMethodsCore simprocs) stop
+            | none => stoppingMethods simprocs stop
+          let (result, _) ← Simp.main restored ctx (methods := methods)
+          if result.expr == restored then return next
+          applySimpResultToTarget next restored result
+      let (_, next) ← next.revert introduced (preserveOrder := true)
+      -- What the body became may restructure the binders over it, as
+      -- `forall_and` does; the propositions below them are normal.
+      setGoals [next]
+      normalizeConnectives normalization
+      released := released ++ (← getGoals).toArray
+    catch _ =>
+      saved.restore
+      -- Unreleased, the goal is put back in full and normalized again.
+      let next ← goal.withContext do
+        let restored := target.replace fun e => (lookup e).map (·.beta e.getAppArgs)
+        let mut next ← goal.replaceTargetDefEq restored
+        for (local_, _) in held.reverse do
+          next ← next.tryClear local_
+        pure next
+      setGoals [next]
+      normalizeAround normalization #[] fixedPoints
+      released := released ++ (← getGoals).toArray
   setGoals released.toList
 
 /-- The contract constants a callee theorem speaks about, to unfold at a
@@ -889,7 +1072,7 @@ macro_rules
       | (refine VerexIR.HasType.integer _ _ _ ?_
          first | exact VerexIR.Proofs.holdsAt_val _ _ | decide)
       | (refine VerexIR.HasType.nominal _ _ _ _ [] _ _ _ rfl rfl
-           (VerexIR.Proofs.ResolvesAll.ofResolveIn rfl) ?_
+           (VerexIR.Proofs.ResolvesAll.ofResolveAt rfl) ?_
          verex_has_types)))
 macro_rules
   | `(tactic| verex_has_types) => `(tactic| verex_focus ( first

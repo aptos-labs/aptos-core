@@ -2207,8 +2207,7 @@ def elaborateCheck : CommandElab := fun stx => do
     | .ok value => pure value
     | .error message => throwErrorAt pathSyntax message
   let name := pathName path
-  let some unit := registeredUnit? (← getEnv) name
-    | throwErrorAt pathSyntax s!"unknown Verex namespace `{name}`"
+  let unit ← registeredUnitAt pathSyntax name
   logInfoAt pathSyntax s!"Verex namespace `{name}`: {unit.namespaces.size} namespace(s), \
     {unit.indexes.functionCounts.foldl (· + ·) 0} executable function(s)"
 

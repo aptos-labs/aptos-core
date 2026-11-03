@@ -199,8 +199,14 @@ private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
               | verex_leaf_attempt)
           else `(tactic| verex_leaf_attempt)
         let decideOne (goal : MVarId) : TacticM Unit := do
-          -- The clauses' defined integers, at the locals the path named.
+          -- A goal its context states closes before any preparation,
+          -- observation or decider spends the allowance.
           setGoals [goal]
+          if ← (do evalTactic (← `(tactic| first | verex_assumption | verex_stated)); pure true)
+              <|> pure false then
+            if (← getGoals).isEmpty then return
+          setGoals [goal]
+          -- The clauses' defined integers, at the locals the path named.
           evalTactic (← `(tactic| verex_defined_values))
           let some goal := (← getGoals).head? | return
           -- The call rule already supplies its result and contract. Many
@@ -692,7 +698,7 @@ private def sharedExitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
     return true
   let goal ← SharedContinuations.unfold region.node goal
   setGoals [goal]
-  normalizeAround ctx.normalization #[]
+  normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
   queue (← getGoals) provenance clauses
   charge "abrupt join exit" stageStart
   return true
@@ -815,13 +821,13 @@ private def resumeShared (ctx : SolveContext) : SolveM Bool := do
     let (_, goal) ← summary.introNP (node.summaryArguments.size + 1)
     let goal ← SharedContinuations.unfold node goal
     setGoals [goal]
-    normalizeAround ctx.normalization #[]
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
     queue (← getGoals) region.provenance region.clauses
   else if single then
     let goal := node.arrivals[0]!.goal
     let goal ← SharedContinuations.unfold node goal
     setGoals [goal]
-    normalizeAround ctx.normalization #[]
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
     queue (← getGoals) region.provenance region.clauses
   charge (if single then "single predecessor" else "join summary") start
   return true
@@ -872,7 +878,7 @@ private def exitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   setGoals [goal]
   -- The values the continuation is applied to, and the conditions it
   -- passes on, are normal already.
-  normalizeAround ctx.normalization values
+  normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization values
   if ctx.debug then
     let head := match unfolded.getAppFn with
       | .const name _ => toString name
@@ -1126,7 +1132,7 @@ private def bindStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       let post ← goal.withContext do return (← instantiateMVars (← goal.getType)).getArg! 4
       pure (normal.push post)
     else pure normal
-  normalizeAround ctx.normalization normal
+  normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization normal
   let changed := (← getGoals) != beforeNormal
   if ctx.debug then
     let target ← instantiateMVars (← goal.getType)
@@ -1168,7 +1174,7 @@ private def unrollStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
   setGoals next
   if remaining > 0 then
     evalTactic (← `(tactic| intro verexLoopFuel))
-    normalizeAround ctx.normalization (#[arguments[9]!] ++ conditions)
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization (#[arguments[9]!] ++ conditions)
     queue (← getGoals) provenance clauses
   else
     let site ← (evalNat arguments[5]!).run
@@ -1336,7 +1342,7 @@ private def assertionStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool 
         -- The continuation is normalized where it is applied, as after
         -- a step; the row and state it is applied to are normal.
         let cut ← cutHypothesis? `assertionHolds
-        normalizeAround ctx.normalization #[arguments[6]!, arguments[9]!]
+        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[arguments[6]!, arguments[9]!]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         renormalizeCut ctx.normalization cut
@@ -1393,7 +1399,7 @@ private def memoryWrittenStep (ctx : SolveContext) (step : SolveStep) : SolveM B
       evalTactic (← `(tactic| try verex_normalize at invariantHolds))
       unless (← getGoals).isEmpty do
         let cut ← cutHypothesis? `invariantHolds
-        normalizeAround ctx.normalization #[arguments[6]!, arguments[9]!]
+        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[arguments[6]!, arguments[9]!]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         renormalizeCut ctx.normalization cut
@@ -1417,7 +1423,7 @@ private def ghostWriteStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
       evalTactic (← `(tactic| intro ghostValue ghostChosen))
       evalTactic (← `(tactic| try verex_normalize at ghostChosen))
       unless (← getGoals).isEmpty do
-        normalizeAround ctx.normalization #[arguments[8]!, arguments[11]!]
+        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[arguments[8]!, arguments[11]!]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         queue (← getGoals) provenance clauses
@@ -1458,7 +1464,7 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
       evalTactic (← `(tactic| try verex_normalize at invariantHolds))
       unless (← getGoals).isEmpty do
         let cut ← cutHypothesis? `invariantHolds
-        normalizeAround ctx.normalization #[entry, initial]
+        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[entry, initial]
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         renormalizeCut ctx.normalization cut
@@ -1483,7 +1489,7 @@ private def anchorStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
     let (_, recorded) ← (← continues.assert `verexAnchor (← inferType proof) proof).intro1P
     pure recorded
   setGoals [recorded]
-  normalizeAround ctx.normalization #[arguments[6]!, arguments[9]!]
+  normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[arguments[6]!, arguments[9]!]
   queue (← getGoals) provenance clauses
   charge "anchor" stageStart
   return true
@@ -1581,6 +1587,15 @@ private def enterCallee (ctx : SolveContext) (step : SolveStep) (handle : Lean.E
     if (← getGoals).isEmpty then return false
   return true
 
+/-- `verex_normalize` on each goal, by the walk's normalization. -/
+private def normalizeGoals (ctx : SolveContext) : TacticM Unit := do
+  let mut normalized := #[]
+  for goal in ← getGoals do
+    setGoals [goal]
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
+    normalized := normalized ++ (← getGoals).toArray
+  setGoals normalized.toList
+
 /-- Under a model an inlined callee's meaning refines its body under the
 same meanings (`doc/designs/ghost-fields.md`): the body replaces the call. -/
 private def inlineRefinement (ctx : SolveContext) (step : SolveStep) (refinesProof : Lean.Expr)
@@ -1615,7 +1630,7 @@ private def inlineRefinement (ctx : SolveContext) (step : SolveStep) (refinesPro
       return
   evalTactic (← `(tactic| try simp only [$lemmas,*, VerexIR.Proofs.Denote.Function.denoteWith,
     VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
-  evalTactic (← `(tactic| try verex_normalize))
+  normalizeGoals ctx
   queue (← rewriteEquations ctx.equations (← getGoals)) provenance clauses
   charge "inline" stageStart
 
@@ -1654,7 +1669,7 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
   evalTactic (← `(tactic| try simp only [$lemmas,*, VerexIR.Proofs.Denote.Function.denote,
     VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
   let normalizeStart ← IO.getNumHeartbeats
-  evalTactic (← `(tactic| try verex_normalize))
+  normalizeGoals ctx
   if ctx.debug then
     let sizeAfter ← (← getGoals).foldlM (init := 0) fun total goal => do
       pure (total + (← goal.withContext do
@@ -1864,6 +1879,23 @@ private partial def markConclusion (site : Nat) : Lean.Expr → Lean.Expr
   | .mdata data body => .mdata data (markConclusion site body)
   | conclusion => mkApp2 (mkConst ``AfterAt) (mkNatLit site) conclusion
 
+/-- The goal with the premises after its first `skip` binders named, in
+order, as far as the names reach. -/
+-- Only propositions are premises; the values and states between them
+-- keep their names.
+private partial def namePropositions (e : Lean.Expr) : List Name → MetaM Lean.Expr
+  | [] => pure e
+  | names@(name :: rest) => match e with
+    | .forallE n d b i =>
+        withLocalDecl n i d fun x => do
+          let (n, rest) := if ← isProp d then (name, rest) else (n, names)
+          pure (.forallE n d ((← namePropositions (b.instantiate1 x) rest).abstract #[x]) i)
+    | _ => pure e
+
+private def namePremises (goal : MVarId) (names : List Name) : MetaM MVarId :=
+  goal.withContext do
+    goal.replaceTargetDefEq (← namePropositions (← instantiateMVars (← goal.getType)) names)
+
 /-- A call by the callee's theorem: what the theorem assumes and its
 precondition, then the continuation and the failures. A generic call meets
 the callee's contract specialized at its type arguments, where one is
@@ -1882,9 +1914,15 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
       if action.isApp then discard <| isDefEq meaning action.appFn!
   -- The call's continuations are normal; the rules apply them to the
   -- callee's fresh result, error and final state, a specialized rule
-  -- through the result's transport, so the contract's normalization walks
-  -- the contract and that transport only.
-  let held ← if verex.contractLemmas.get (← getOptions) then pure #[] else holdContinuations
+  -- through the result's transport, so held wherever they occur, the
+  -- contract's normalization walks the contract and that transport only.
+  let parts ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    pure (if target.isAppOfArity ``VerexIR.Proofs.wp 7 then #[target.getArg! 4, target.getArg! 5]
+      else #[])
+  let heldRef ← IO.mkRef #[]
+  timedStep "call-hold" do heldRef.set (← holdContinuations parts)
+  let held ← heldRef.get
   let goal ← getMainGoal
   let specialized? ← goal.withContext do
     specializedCall? ctx.specializations theoremProof (← instantiateMVars proofType)
@@ -1996,17 +2034,23 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         -- In a step proof, the result's scope entry comes with it.
         let index := max (← nextScopeIndex) (← get).scopeIndex
         modify fun s => { s with scopeIndex := index + 1 }
-        scopedBinderGoal subgoal name domain body info index
+        let subgoal ← scopedBinderGoal subgoal name domain body info index
+        -- The call's premises are named after the callee, as its clauses
+        -- are: the ensures, the frame, and that the call returned.
+        let part := identifierPart calleeName
+        let premises := [s!"{part}_ensures", s!"{part}_frame", s!"{part}_returns"].map Name.mkSimple
+        namePremises subgoal (if strict || contractForms then
+          [premises[2]!, premises[0]!, premises[1]!] else premises)
       else pure subgoal
     setGoals [subgoal]
     -- Unfold and normalize the contract in one pass, around the continuations.
     -- Normal forms of the contract are normalized again where the call's
     -- values instantiate them.
     if contractForms then
-      normalizeAround ctx.normalization #[]
+      timedStep "call-contract" (normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[])
     else
       timedStep "call-contract" (normalizeAround contractNormalization #[])
-      releaseContinuations ctx.normalization held
+    timedStep "call-release" (releaseContinuations ctx.normalization held walkFixedPoints)
     -- Speculative range search belongs to automatic verification. An authored
     -- proof receives the contract directly instead of paying for normalization
     -- and failed case enumeration before its first tactic runs.
@@ -2287,7 +2331,7 @@ private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := d
             affected := affected.insert decl.fvarId
             affected := (collectFVars { fvarSet := affected } (← instantiateMVars decl.type)).fvarSet
           return unaffectedParts parentTarget affected
-        normalizeAround ctx.normalization normal
+        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization normal
     queue (← getGoals) provenance clauses prepared
   let finished ← IO.getNumHeartbeats
   if let some target := splitTarget then
@@ -2729,6 +2773,8 @@ private def reportProfile (ctx : SolveContext) (state : SolveState) (stopped : B
     | none => stages := stages.push (stage, 1, cost)
   for (stage, count, sum) in stages do
     lines := lines.push s!"  stage {stage} ×{count} {sum / 1000}k"
+  let counts ← (← targetState).fixedPointCounts.get
+  lines := lines.push s!"  fixed points: hits {counts[0]!}, misses {counts[1]!}, recorded {counts[2]!}"
   let steps := (← (← targetState).stepProfile.get).toArray.qsort fun a b =>
     a.2.2.2.1 + a.2.2.2.2 > b.2.2.2.1 + b.2.2.2.2
   for (label, runs, failures, succeeding, failing) in steps do
@@ -2834,6 +2880,8 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   (← targetState).assumedClauses.set #[]
   (← targetState).normalHypotheses.set {}
   (← targetState).normalForms.set {}
+  (← targetState).fixedPoints.set {}
+  (← targetState).fixedPointCounts.set #[0, 0, 0]
   (← targetState).familyProofs.set {}
   (← targetState).contextRules.set {}
   (← targetState).stageNormalHypotheses.set {}
