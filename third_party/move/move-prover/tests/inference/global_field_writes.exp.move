@@ -69,15 +69,11 @@ module 0x42::global_field_writes {
         pragma opaque = true;
         modifies Versioned[signer::address_of(s)];
         modifies Versioned[@0x42];
-        ensures [inferred] (S2 |~ !exists<Versioned>(@0x42)) ==> {
-            let a = signer::address_of(s);
-            let b = Versioned::V1{a: ..S1 |~ result_of<checked>(u), b: S1..S2 |~ result_of<checked>(v)};
-            S2.. |~ publish<Versioned>(a, b)
-        };
-        ensures [inferred] (S2 |~ exists<Versioned>(@0x42)) ==> Versioned[@0x42].a == (..S1 |~ result_of<checked>(u)) && Versioned[@0x42].b == (S1..S2 |~ result_of<checked>(v));
-        aborts_if [inferred] S1 |~ (aborts_of<checked>(v));
+        ensures [inferred] !old(exists<Versioned>(@0x42)) ==> publish<Versioned>(signer::address_of(s), Versioned::V1{a: result_of<checked>(u), b: result_of<checked>(v)});
+        ensures [inferred] old(exists<Versioned>(@0x42)) ==> update<Versioned>(@0x42, update_field(update_field(old(Versioned[@0x42]), a, result_of<checked>(u)), b, result_of<checked>(v)));
+        aborts_if [inferred] aborts_of<checked>(v);
         aborts_if [inferred] aborts_of<checked>(u);
-        aborts_if [inferred] (S2 |~ !exists<Versioned>(@0x42)) && (S2 |~ exists<Versioned>(signer::address_of(s)));
+        aborts_if [inferred] !exists<Versioned>(@0x42) && exists<Versioned>(signer::address_of(s));
     }
 
 

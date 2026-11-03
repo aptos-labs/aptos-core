@@ -131,7 +131,7 @@ use move_stackless_bytecode::{
     dataflow_analysis::{BlockState, DataflowAnalysis, StateMap, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
     graph::{DomRelation, Graph},
     stackless_bytecode::{
         AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind, Label,
@@ -819,6 +819,79 @@ struct BranchInfo {
 // =================================================================================================
 // Spec Inference Processor
 
+/// Functions that neither read nor write global memory, directly or in a
+/// callee, and invoke no function value whose effect the summary does not
+/// bound. A read alone disqualifies: a call's behavioral predicates name the
+/// state it reads, and without a label of its own a later write would move
+/// that state. A function taking a function value is excluded outright, since
+/// what it may touch is its argument's. Usage analysis reads code, so for a
+/// native its spec stands in: no declared `modifies` and no condition reading
+/// memory. Every function a qualifying function calls must qualify in turn.
+pub struct MemoryFreeFunctions(BTreeSet<QualifiedId<FunId>>);
+
+fn compute_memory_free_functions(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
+    let locally_free = |fun| is_locally_memory_free(&env.get_function(fun), targets);
+    let mut free = BTreeSet::new();
+    for (fun, variant) in targets.get_funs_and_variants() {
+        if variant != FunctionVariant::Baseline || !locally_free(fun) {
+            continue;
+        }
+        let callees = env
+            .get_function(fun)
+            .get_transitive_closure_of_called_functions();
+        if callees
+            .iter()
+            .all(|callee| *callee == fun || locally_free(*callee))
+        {
+            free.insert(fun);
+        }
+    }
+    env.set_extension(MemoryFreeFunctions(free));
+}
+
+/// Whether a function's own code and declared contract permit memory freedom.
+fn is_locally_memory_free(fun_env: &FunctionEnv<'_>, targets: &FunctionTargetsHolder) -> bool {
+    // Frames and spec-variable updates can declare effects absent from
+    // executable code. Generic resource reads also have no concrete
+    // footprint until instantiation; use their recorded spec footprint,
+    // rather than the type parameter's ability bound.
+    if fun_env
+        .get_parameter_types()
+        .iter()
+        .any(|ty| ty.skip_reference().is_function())
+        || fun_env
+            .get_frame_spec()
+            .is_some_and(|fs| fs.modifies_all || !fs.modifies_targets.is_empty())
+        || !fun_env.get_spec().update_map.is_empty()
+        || !fun_env.get_spec_generic_used_memory().is_empty()
+    {
+        return false;
+    }
+    if fun_env.is_native() {
+        return fun_env.get_spec().conditions.iter().all(|cond| {
+            cond.exp.used_memory(fun_env.module_env.env).is_empty()
+                && cond
+                    .additional_exps
+                    .iter()
+                    .all(|exp| exp.used_memory(fun_env.module_env.env).is_empty())
+        });
+    }
+    let Some(data) = targets.get_data(&fun_env.get_qualified_id(), &FunctionVariant::Baseline)
+    else {
+        return false;
+    };
+    let Some(usage) = data
+        .annotations
+        .get::<move_stackless_bytecode::usage_analysis::UsageState>()
+    else {
+        return false;
+    };
+    usage.accessed.all.is_empty()
+        && usage.invoke_frame.all.is_empty()
+        && !usage.invoke_frame_wildcard
+        && !usage.unbounded_invoke
+}
+
 /// A processor that infers specifications for functions with empty spec blocks.
 pub struct SpecInferenceProcessor {
     /// Whether to store the WPAnnotation in the function data for dump output.
@@ -837,6 +910,7 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
     }
 
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        compute_memory_free_functions(env, targets);
         let mut inferred = ContractInferenceTargets::default();
         for (fun, variant) in targets.get_funs_and_variants() {
             let fun_env = env.get_function(fun);
@@ -1467,6 +1541,10 @@ impl LambdaSpecInferenceProcessor {
 impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
     fn name(&self) -> String {
         "lambda_spec_inference".to_string()
+    }
+
+    fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        compute_memory_free_functions(env, targets);
     }
 
     fn process(
@@ -4552,12 +4630,18 @@ impl StateBoundaryAnalysis<'_, '_> {
                     // vector::length (or similar) before a behavioral call would
                     // create a spurious label boundary even though the
                     // underlying memory state is unchanged.
-                    let is_vector = self
-                        .analyzer
-                        .global_env()
-                        .get_module(*module_id)
-                        .is_std_vector();
+                    let env = self.analyzer.global_env();
+                    let is_vector = env.get_module(*module_id).is_std_vector();
+                    // Likewise a callee that writes no global memory leaves the
+                    // state as it was. A label there would name an unchanged
+                    // memory, and at a join one branch's such label meets the
+                    // other branch's earlier one, which the merge cannot tell
+                    // apart from a real write.
+                    let writes_no_memory = env
+                        .get_extension::<MemoryFreeFunctions>()
+                        .is_some_and(|free| free.0.contains(&module_id.qualified(*fun_id)));
                     !(is_vector
+                        || writes_no_memory
                         || dests.len() == 1
                             && self
                                 .analyzer
@@ -6259,6 +6343,15 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             .unwrap_or(self.at_entry_label)
     }
 
+    /// Use the same boundary decision in both analysis directions. Missing
+    /// forward information conservatively retains a boundary.
+    fn is_state_changing_at(&self, offset: CodeOffset) -> bool {
+        self.forward_label_map
+            .borrow()
+            .get(&offset)
+            .is_none_or(|(before, after)| before != after)
+    }
+
     /// Shared WP logic for function calls (direct) and closure invocations.
     /// Substitutes `dest_i ↦ result_of<f>(args)[i]` and
     /// `&mut src_j ↦ write_of<f, j>(args)`. For caller-`&mut`-param
@@ -6280,21 +6373,23 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         // it does not make the caller's conditions solver-hard. An incomplete
         // callee contract is handled where it matters: a partial abort
         // characterization propagates `aborts_if_is_partial` to the caller.
+        let changes_memory = self.is_state_changing_at(offset);
         let pre_label = self.forward_label_at(offset);
         let call_post = state.post;
 
         // `aborts_of` has no post-state — aborts don't produce state.
-        let behavior_pre = Some(pre_label);
+        let behavior_pre = changes_memory.then_some(pre_label);
         // Source-level state ranges use an omitted post label for the ambient
         // function post-state.  A repeated `S..S` range is both redundant and
         // rejected as a cyclic label definition on reparse.  The same label can
         // arise when a call is observationally state-preserving.
-        let behavior_post = if call_post == self.at_end_label.get() || call_post == pre_label {
-            None
-        } else {
-            Some(call_post)
-        };
-        let aborts_pre = Some(pre_label);
+        let behavior_post =
+            if !changes_memory || call_post == self.at_end_label.get() || call_post == pre_label {
+                None
+            } else {
+                Some(call_post)
+            };
+        let aborts_pre = behavior_pre;
         let aborts_post: Option<MemoryLabel> = None;
 
         let num_declared_results = result_type.clone().flatten().len();
@@ -6439,8 +6534,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 ));
         }
 
-        // Update post-state for predecessor: they see this call's pre-state
-        state.post = pre_label;
+        // Memory-free calls change values but leave the ambient memory alone.
+        if changes_memory {
+            state.post = pre_label;
+        }
     }
 
     /// Return whether a call is provably unable to abort from information
@@ -6718,7 +6815,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         }
 
         state.add_aborts(wp.aborts);
-        state.post = self.forward_label_at(offset);
+        if self.is_state_changing_at(offset) {
+            state.post = self.forward_label_at(offset);
+        }
         true
     }
 
@@ -6775,7 +6874,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         }
         *state = self.substitute_borrow_index(state, *dest, &borrow.index);
         state.add_aborts(borrow.aborts);
-        state.post = self.forward_label_at(offset);
+        if self.is_state_changing_at(offset) {
+            state.post = self.forward_label_at(offset);
+        }
         true
     }
 
@@ -6853,7 +6954,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         }
 
         state.add_aborts(wp.aborts);
-        state.post = self.forward_label_at(offset);
+        if self.is_state_changing_at(offset) {
+            state.post = self.forward_label_at(offset);
+        }
         true
     }
 
@@ -9247,6 +9350,88 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn memory_free_classification_respects_declared_effects() {
+        let dir = tempfile::tempdir().expect("temporary source directory");
+        let path = dir.path().join("effects.move");
+        std::fs::write(
+            &path,
+            r#"
+            module 0x2::object {
+                spec fun spec_exists_at<T: key>(a: address): bool;
+            }
+            module 0x42::effects {
+                spec module { global flag: num; }
+                native fun pure_key<T: key>();
+                native fun plain();
+                native fun native_probe<T>(a: address): bool;
+                spec native_probe {
+                    ensures result ==> 0x2::object::spec_exists_at<T>(a);
+                }
+                fun move_probe<T>(a: address): bool { false }
+                spec move_probe {
+                    ensures result ==> 0x2::object::spec_exists_at<T>(a);
+                }
+                native fun update_flag();
+                spec update_flag { update flag = 1; }
+            }
+        "#,
+        )
+        .expect("write source");
+        let env = move_model::run_model_builder_in_compiler_mode(
+            move_model::PackageInfo {
+                sources: vec![path.to_string_lossy().into_owned()],
+                address_map: BTreeMap::new(),
+            },
+            move_model::PackageInfo {
+                sources: vec![],
+                address_map: BTreeMap::new(),
+            },
+            vec![],
+            true,
+            &BTreeSet::new(),
+            move_model::metadata::LanguageVersion::latest(),
+            false,
+            true,
+        )
+        .expect("build model");
+        assert!(!env.has_errors(), "{}", env.dump_env());
+        let functions: BTreeMap<_, _> = env
+            .get_modules()
+            .flat_map(|m| m.into_functions())
+            .map(|f| (f.get_name_str(), f))
+            .collect();
+        let mut targets = FunctionTargetsHolder::default();
+        for fun in functions.values() {
+            // Mirror the compiler's spec-memory summary finalization. The
+            // bare-type footprint is computed from source, not the key bound.
+            let (used, generic, old, generic_old, uses_old) = fun.compute_spec_memory_usage();
+            fun.set_spec_memory_usage(used, generic, old, generic_old, uses_old);
+            let mut data = FunctionData::new_empty(fun);
+            data.annotations.set(
+                move_stackless_bytecode::usage_analysis::UsageState::default(),
+                true,
+            );
+            targets.insert_target_data(&fun.get_qualified_id(), FunctionVariant::Baseline, data);
+        }
+        assert!(is_locally_memory_free(&functions["pure_key"], &targets));
+        for name in ["native_probe", "move_probe", "update_flag"] {
+            assert!(
+                !is_locally_memory_free(&functions[name], &targets),
+                "{name}"
+            );
+        }
+        let plain = &functions["plain"];
+        assert!(is_locally_memory_free(plain, &targets));
+        // Wildcard frames are normalized model metadata, not plain
+        // `modifies *` syntax. They must not look like an empty frame.
+        plain.get_mut_spec().frame_spec = Some(move_model::ast::FrameSpec {
+            modifies_all: true,
+            ..Default::default()
+        });
+        assert!(!is_locally_memory_free(plain, &targets));
+    }
 
     #[test]
     fn join_propagates_partial_abort_reasons_without_condition_changes() {
