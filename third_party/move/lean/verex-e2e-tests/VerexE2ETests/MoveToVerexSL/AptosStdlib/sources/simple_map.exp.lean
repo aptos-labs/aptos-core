@@ -174,7 +174,7 @@ verex module aptos_std::simple_map where
     self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
     v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(69)
+    spec assume folds_capture_anchor!(73)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
@@ -195,15 +195,15 @@ verex module aptos_std::simple_map where
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(69, old(self')).length >= len
+      invariant with_state_anchor!(73, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(69, old(self')).length
-        == with_state_anchor!(69, old(v2)).length
+      invariant with_state_anchor!(73, old(self')).length
+        == with_state_anchor!(73, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(69, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(69, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(69, old(self')).length), true
+        self'[j] == with_state_anchor!(73, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(73, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(73, old(self')).length), true
       invariant true
     core.prim.destroyEmptyVector(self')
     core.prim.destroyEmptyVector(v2)
@@ -262,10 +262,10 @@ verex module aptos_std::simple_map where
   ) -> Vector<«Key»> := do
     let self := &self.data
     spec assume spec.inlineCallSummary(
-      «spec_map_ref$lambda$0»(self, self.length),
-      «spec_map_ref_aborts$lambda$1»(self, self.length)
+      «spec_map_ref$lambda$2»(self, self.length),
+      «spec_map_ref_aborts$lambda$3»(self, self.length)
     )
-    let _inline_summary_result_77 :=
+    let _inline_summary_result_81 :=
       do
         let mut result := vector<«Key»>[]
         let i := 0
@@ -280,14 +280,14 @@ verex module aptos_std::simple_map where
         where
           invariant i <= len
           invariant result.length == i
-          invariant result == «spec_map_ref$lambda$0»(self, i)
-          invariant !«spec_map_ref_aborts$lambda$1»(self, i)
+          invariant result == «spec_map_ref$lambda$2»(self, i)
+          invariant !«spec_map_ref_aborts$lambda$3»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].key
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_77
-      == «spec_map_ref$lambda$0»(self, self.length)
-    _inline_summary_result_77
+    spec assert _inline_summary_result_81
+      == «spec_map_ref$lambda$2»(self, self.length)
+    _inline_summary_result_81
 
   spec keys where
     pragma verify = false
@@ -300,10 +300,10 @@ verex module aptos_std::simple_map where
   ) -> Vector<Value> := do
     let self := &self.data
     spec assume spec.inlineCallSummary(
-      «spec_map_ref$lambda$2»(self, self.length),
-      «spec_map_ref_aborts$lambda$3»(self, self.length)
+      «spec_map_ref$lambda$4»(self, self.length),
+      «spec_map_ref_aborts$lambda$5»(self, self.length)
     )
-    let _inline_summary_result_82 :=
+    let _inline_summary_result_86 :=
       do
         let mut result := vector<Value>[]
         let i := 0
@@ -318,14 +318,14 @@ verex module aptos_std::simple_map where
         where
           invariant i <= len
           invariant result.length == i
-          invariant result == «spec_map_ref$lambda$2»(self, i)
-          invariant !«spec_map_ref_aborts$lambda$3»(self, i)
+          invariant result == «spec_map_ref$lambda$4»(self, i)
+          invariant !«spec_map_ref_aborts$lambda$5»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].value
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_82
-      == «spec_map_ref$lambda$2»(self, self.length)
-    _inline_summary_result_82
+    spec assert _inline_summary_result_86
+      == «spec_map_ref$lambda$4»(self, self.length)
+    _inline_summary_result_86
 
   spec values where
     pragma verify = false
@@ -343,8 +343,8 @@ verex module aptos_std::simple_map where
     let mut self := data
     self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
-    spec assume folds_capture_anchor!(84)
-    spec assume folds_capture_anchor!(83)
+    spec assume folds_capture_anchor!(88)
+    spec assume folds_capture_anchor!(87)
     let len := self.length
     while len > 0 do
       let e :=
@@ -360,19 +360,23 @@ verex module aptos_std::simple_map where
       values := core.prim.pushVector(values, value)
       len := len - 1
     where
-      invariant with_state_anchor!(83, old(self)).length >= len
+      invariant with_state_anchor!(87, old(self)).length >= len
       invariant len == self.length
       invariant ∀ (j in 0 .. len),
-        self[j] == with_state_anchor!(83, old(self))[j]
-      invariant ∀ (j in len .. with_state_anchor!(83, old(self)).length), true
-      invariant (keys, values)
-        == «spec_fold$gen$1»(
-          with_state_anchor!(
-            84, old(keys)
-          ), with_state_anchor!(84, old(values)),
-          with_state_anchor!(83, old(self)).length - len,
-          with_state_anchor!(83, old(self))
+        self[j] == with_state_anchor!(87, old(self))[j]
+      invariant ∀ (j in len .. with_state_anchor!(87, old(self)).length), true
+      invariant keys
+        == «spec_fold_idx$lambda$6»(
+          with_state_anchor!(88, old(keys)),
+          with_state_anchor!(87, old(self)).length - len,
+          with_state_anchor!(87, old(self))
         )
+        && values
+          == «spec_fold_idx$lambda$7»(
+            with_state_anchor!(88, old(values)),
+            with_state_anchor!(87, old(self)).length - len,
+            with_state_anchor!(87, old(self))
+          )
     core.prim.destroyEmptyVector(self)
     (keys, values)
 
@@ -465,33 +469,6 @@ verex module aptos_std::simple_map where
   -- This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
   -- while remove would continue from the identified index to the end of the vector.
   -- We need to reverse the vector to consume it efficiently
-  @[weight = 50]
-  spec fun «spec_fold$gen$1» {T0} {T1}(
-    «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : u64,
-    _fold_anchor_ctx_0 : Vector<Element<T0, T1> >
-  ) : (Vector<T0>, Vector<T1>) :=
-    if _end == 0 then («keys$init», «values$init»)
-    else
-      let («keys$acc», «values$acc») :=
-        «spec_fold$gen$1»(
-          «keys$init», «values$init», _end
-            - 1, _fold_anchor_ctx_0
-        )
-      (concat(
-          «keys$acc»,
-          vec(
-            _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
-              - (_end - 1)].key
-          )
-        ),
-        concat(
-          «values$acc»,
-          vec(
-            _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
-              - (_end - 1)].value
-          )
-        ))
-
   -- We need to reverse the vectors to consume it efficiently
   -- We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
   -- due to how inline functions work.
@@ -508,30 +485,58 @@ verex module aptos_std::simple_map where
   -- Module Specification
   -- Switch to module documentation context
   /--
-  The result of mapping `f` over the prefix `v[0..end]`.
+  `t` folded over indices `0..end`, starting from `init`.
   -/
-  spec fun «spec_map_ref$lambda$0» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : u64
+  @[weight = 49]
+  spec fun «spec_fold_idx$lambda$6» {T0} {T1}(
+    init : Vector<T0>, end : u64,
+    _fold_anchor_ctx_0 : Vector<Element<T0, T1> >
   ) : Vector<T0> :=
-    if end == 0 then vec::<T0>()
-    else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
+    if end == 0 then init
+    else
+      let (_acc_90, j) :=
+        («spec_fold_idx$lambda$6»(init, end - 1, _fold_anchor_ctx_0), end - 1)
+      concat(
+        _acc_90, vec(
+          _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
+            - j].key
+        )
+      )
+
+  /--
+  `t` folded over indices `0..end`, starting from `init`.
+  -/
+  @[weight = 49]
+  spec fun «spec_fold_idx$lambda$7» {T0} {T1}(
+    init : Vector<T1>, end : u64,
+    _fold_anchor_ctx_0 : Vector<Element<T0, T1> >
+  ) : Vector<T1> :=
+    if end == 0 then init
+    else
+      let (_acc_92, j) :=
+        («spec_fold_idx$lambda$7»(init, end - 1, _fold_anchor_ctx_0), end - 1)
+      concat(
+        _acc_92,
+        vec(_fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1 - j].value)
+      )
 
   /--
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
     v : Vector<Element<T0, T1> >, end : u64
-  ) : Vector<T1> :=
-    if end == 0 then vec::<T1>()
-    else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
+  ) : Vector<T0> :=
+    if end == 0 then vec::<T0>()
+    else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].key))
 
   /--
-  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  The result of mapping `f` over the prefix `v[0..end]`.
   -/
-  spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
+  spec fun «spec_map_ref$lambda$4» {T0} {T1}(
     v : Vector<Element<T0, T1> >, end : u64
-  ) : Bool :=
-    end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
+  ) : Vector<T1> :=
+    if end == 0 then vec::<T1>()
+    else concat(«spec_map_ref$lambda$4»(v, end - 1), vec(v[end - 1].value))
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
@@ -540,3 +545,11 @@ verex module aptos_std::simple_map where
     v : Vector<Element<T0, T1> >, end : u64
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)
+
+  /--
+  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  -/
+  spec fun «spec_map_ref_aborts$lambda$5» {T0} {T1}(
+    v : Vector<Element<T0, T1> >, end : u64
+  ) : Bool :=
+    end > 0 && («spec_map_ref_aborts$lambda$5»(v, end - 1) || false)

@@ -3712,16 +3712,12 @@ enum FoldsOfResolution {
 struct FoldsOfDirect {
     /// The surface form: how the iterations' arguments are obtained.
     form: FoldsOfForm,
-    /// The lambda's mutated captures with their snapshot symbols, in stable
-    /// symbol order (the order of the fold recursion's `init` slots). Empty
-    /// for a lambda without captures, which degenerates to the prefix
-    /// no-abort condition alone.
-    captures: Vec<FoldsOfCapture>,
-    /// The specialization of the fold recursion over the lambda's derived
-    /// accumulator transformer; `None` iff there are no captures.
-    spec: Option<SpecFunSpecialization>,
-    /// Anchored reads lifted into recursion context parameters.
-    anchored_ctx_values: BTreeMap<Symbol, Exp>,
+    /// The lambda's mutated captures, partitioned into fold groups: a group
+    /// is closed under the captures its members' updates read, so it folds
+    /// on its own. Captures within a group are in stable symbol order (the
+    /// order of that group's fold `init` slots). Empty for a lambda without
+    /// captures, which degenerates to the prefix no-abort condition alone.
+    groups: Vec<FoldsOfGroup>,
     /// The lambda's abort disjuncts, phrased in lambda scope over the
     /// iteration's pre-state: lambda parameters and captures appear as
     /// plain variables.
@@ -3729,6 +3725,18 @@ struct FoldsOfDirect {
     /// The lambda's parameter symbols, substituted by the iteration's
     /// arguments in the abort disjuncts.
     param_syms: Vec<Symbol>,
+}
+
+/// A group of captures that fold together: no member's update reads a
+/// capture outside the group.
+struct FoldsOfGroup {
+    captures: Vec<FoldsOfCapture>,
+    /// Anchored reads lifted into this group's recursion context parameters.
+    anchored_ctx_values: BTreeMap<Symbol, Exp>,
+    /// The fold recursion over the group's transformer: the generic
+    /// `spec_fold` for a single capture, a generated tuple recursion for
+    /// several.
+    spec: SpecFunSpecialization,
 }
 
 /// A `folds_of` occurrence deferred through a pure forwarding lambda. Its
@@ -4752,11 +4760,56 @@ fn resolve_folds_of_occurrence(
     }
     // The transformer and the abort conditions must be pure and
     // single-state: their per-iteration evaluation points are not
-    // expressible in a loop invariant.
-    if !spec_derivation::exps_are_pure_single_state_for_folds(
-        env,
-        capture_values.iter().map(|(_, e)| e).chain(&derived.aborts),
-    ) {
+    // expressible in a loop invariant. An impure capture update or abort
+    // condition is dropped from the invariant on its own (a loop invariant
+    // may always say less), together with every capture whose update reads
+    // it; the remaining equations and no-abort facts stay exact.
+    let impure_captures: BTreeSet<Symbol> = capture_values
+        .iter()
+        .filter(|(_, e)| !spec_derivation::exps_are_pure_single_state_for_folds(env, iter::once(e)))
+        .map(|(sym, _)| *sym)
+        .collect();
+    let (pure_aborts, impure_aborts): (Vec<Exp>, Vec<Exp>) =
+        derived.aborts.iter().cloned().partition(|a| {
+            spec_derivation::exps_are_pure_single_state_for_folds(env, iter::once(a))
+        });
+    // The transformer material per form: for the element form the derived
+    // capture values as-is (over the lambda's element parameter); for the
+    // general form with the index lambda's argument components composed in
+    // (over its index binder).
+    let (transformer_params, transformer_values): (Vec<Symbol>, Vec<(Symbol, Exp)>) = match &form {
+        FoldsOfForm::Element => (param_syms.clone(), capture_values.clone()),
+        FoldsOfForm::General { j_sym, args } => {
+            let comp_map: BTreeMap<Symbol, Exp> = param_syms
+                .iter()
+                .zip(args)
+                .map(|(sym, comp)| (*sym, comp.clone()))
+                .collect();
+            let composed = capture_values
+                .iter()
+                .map(|(sym, value)| (*sym, substitute_free_locals(value, &comp_map)))
+                .collect();
+            (vec![*j_sym], composed)
+        },
+    };
+    // Filter transitive impurity before deciding whether any invariant survives.
+    let capture_syms: Vec<Symbol> = mutated_captures.iter().map(|c| c.sym).collect();
+    let partition = fold_capture_groups(&capture_syms, &transformer_values, &impure_captures);
+    let bound: BTreeSet<Symbol> = partition
+        .iter()
+        .flatten()
+        .map(|&idx| capture_syms[idx])
+        .collect();
+    let aborts: Vec<Exp> = pure_aborts
+        .into_iter()
+        .filter(|a| {
+            !a.free_vars()
+                .iter()
+                .any(|sym| capture_syms.contains(sym) && !bound.contains(sym))
+        })
+        .collect();
+    let partially_impure = !impure_captures.is_empty() || !impure_aborts.is_empty();
+    if partially_impure && partition.is_empty() && aborts.is_empty() {
         weaken(
             env,
             "the lambda combines captured-variable writes or abort \
@@ -4765,6 +4818,7 @@ fn resolve_folds_of_occurrence(
         );
         return None;
     }
+    let derived = spec_derivation::DerivedSpec { aborts, ..derived };
     let inferred = env.symbol_pool().make(CONDITION_INFERRED_PROP);
     let capture_names: BTreeSet<_> = mutated_captures
         .iter()
@@ -4811,6 +4865,15 @@ fn resolve_folds_of_occurrence(
     let transformer_has_underivable_behavior = capture_values
         .iter()
         .any(|(_, value)| underivable_concrete_behavior(env, value).is_some());
+    if !fold_summary_is_used && !transformer_depends_on_fun_param && partially_impure {
+        weaken(
+            env,
+            "the lambda combines captured-variable writes or abort \
+             conditions with global state access, whose per-iteration \
+             evaluation state is not expressible in a loop invariant",
+        );
+        return None;
+    }
     if !fold_summary_is_used && !transformer_depends_on_fun_param {
         let reason = if transformer_has_underivable_behavior {
             "the capture transformer contains behavior which cannot be \
@@ -4825,11 +4888,18 @@ fn resolve_folds_of_occurrence(
     // A lambda without captures degenerates to the prefix no-abort
     // condition; no snapshots, transformer, or recursion needed.
     if mutated_captures.is_empty() {
+        if partially_impure {
+            weaken(
+                env,
+                "the lambda combines captured-variable writes or abort \
+                 conditions with global state access, whose per-iteration \
+                 evaluation state is not expressible in a loop invariant; \
+                 those parts are dropped from it",
+            );
+        }
         return Some(FoldsOfResolution::Direct(FoldsOfDirect {
             form,
-            captures: vec![],
-            spec: None,
-            anchored_ctx_values: BTreeMap::new(),
+            groups: vec![],
             aborts: derived.aborts,
             param_syms,
         }));
@@ -4846,140 +4916,243 @@ fn resolve_folds_of_occurrence(
             (capture.sym, capture.ty.skip_reference().clone(), ref_ty)
         })
         .collect();
-    // The transformer material per form: for the element form the derived
-    // capture values as-is (over the lambda's element parameter); for the
-    // general form with the index lambda's argument components composed in
-    // (over its index binder).
-    let (transformer_params, transformer_values): (Vec<Symbol>, Vec<(Symbol, Exp)>) = match &form {
-        FoldsOfForm::Element => (param_syms.clone(), capture_values.clone()),
-        FoldsOfForm::General { j_sym, args } => {
-            let comp_map: BTreeMap<Symbol, Exp> = param_syms
-                .iter()
-                .zip(args)
-                .map(|(sym, comp)| (*sym, comp.clone()))
-                .collect();
-            let composed = capture_values
-                .iter()
-                .map(|(sym, value)| (*sym, substitute_free_locals(value, &comp_map)))
-                .collect();
-            (vec![*j_sym], composed)
-        },
-    };
-    // Recursive spec functions receive anchored reads as context parameters;
-    // `old(..)` itself is meaningful only at the loop invariant.
-    let (transformer_values, anchored_ctx_values) =
-        abstract_fold_anchored_values(env, loc, transformer_values);
-
-    // Resolve the recursion: a single capture specializes the generic
-    // `spec_fold` (element form) resp. `spec_fold_idx` (general form)
-    // declaration — restatable by callers — while multiple captures get a
-    // bespoke generated recursion returning the capture tuple (tuples are
-    // not expressible as spec type arguments).
-    let spec = if accumulators.len() == 1 {
-        let (capture_sym, acc_ty, _) = accumulators[0].clone();
-        let (name, signature, inst) = match &form {
-            FoldsOfForm::Element => (
-                well_known::VECTOR_SPEC_FOLD,
-                "spec fun spec_fold<T, Acc>(f: |Acc, &T| Acc, v: vector<T>, \
-                 init: Acc, end: u64): Acc",
-                vec![param_tys[0].skip_reference().clone(), acc_ty],
-            ),
-            FoldsOfForm::General { .. } => (
-                well_known::VECTOR_SPEC_FOLD_IDX,
-                "spec fun spec_fold_idx<Acc>(t: |Acc, u64| Acc, init: Acc, \
-                 end: u64): Acc",
-                vec![acc_ty],
-            ),
-        };
-        let Some(fold_qid) = find_fold_recursion(env, target_fun, name) else {
-            cannot_resolve(
-                env,
-                &format!(
-                    "no `{}` declaration available: declare `{}` in this module",
-                    name, signature
-                ),
-            );
-            return None;
-        };
-        let shape_ok = match &form {
-            FoldsOfForm::Element => has_spec_fold_shape(env, fold_qid),
-            FoldsOfForm::General { .. } => has_spec_fold_idx_shape(env, fold_qid),
-        };
-        if !shape_ok {
-            cannot_resolve(
-                env,
-                &format!(
-                    "the resolved `{}` declaration does not have the expected \
-                     signature `{}`",
-                    name, signature
-                ),
-            );
-            return None;
-        }
-        let transformer_ty = env.get_spec_fun(fold_qid).params[0].1.instantiate(&inst);
-        let acc_sym = env
-            .symbol_pool()
-            .make(&format!("$acc_{}", env.new_global_id().as_usize()));
-        let transformer =
-            build_fold_transformer(env, loc, &transformer_ty, acc_sym, &transformer_params, &[
-                (capture_sym, transformer_values[0].1.clone()),
-            ])?;
-        let mut specializer = SpecFunSpecializer::new(env, target_fun, unifier);
-        specializer.bp_context = BpContext::FoldTransformer;
-        let Some(spec) = specializer.specialize(loc, fold_qid, inst, vec![(0, transformer)], None)
-        else {
-            weaken(
-                env,
-                "the capture transformer contains behavior which cannot be \
-                 summarized as a value",
-            );
-            return None;
-        };
-        spec
-    } else {
-        let elem_ty = match &form {
-            FoldsOfForm::Element => Some(param_tys[0].skip_reference().clone()),
-            FoldsOfForm::General { .. } => None,
-        };
-        generate_multi_capture_recursion(
-            env,
-            target_fun,
-            loc,
-            elem_ty.as_ref(),
-            &accumulators,
-            &transformer_values,
-            transformer_params[0],
-            folds_of_unifier,
-        )?
-    };
-    // Deferred occurrences retain their original capture anchor.
-    let snapshot_label = anchor.unwrap_or_else(|| {
-        *deferral
-            .entry_label
-            .get_or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()))
-    });
+    // Each pure read closure folds from its own pre-states. A singleton
+    // specializes the generic fold; a larger group gets a tuple recursion.
     let capture_currents: BTreeMap<Symbol, Exp> = mutated_captures
         .iter()
         .map(|capture| (capture.sym, capture.current.clone()))
         .collect();
-    let captures = accumulators
-        .into_iter()
-        .map(|(sym, ty, ref_ty)| FoldsOfCapture {
-            sym,
-            ty,
-            ref_ty,
-            current: capture_currents[&sym].clone(),
-            snapshot_label,
-        })
-        .collect();
+    // How many groups hold each capture: a capture shared with a larger
+    // group is unfolded by that group's step, so its own fold stays
+    // unweighted.
+    let mut holders: BTreeMap<usize, usize> = BTreeMap::new();
+    for members in &partition {
+        for &idx in members {
+            *holders.entry(idx).or_default() += 1;
+        }
+    }
+    let multi_capture = accumulators.len() > 1;
+    let mut groups = vec![];
+    for members in partition {
+        let group_accs: Vec<(Symbol, Type, Option<Type>)> = members
+            .iter()
+            .map(|&idx| accumulators[idx].clone())
+            .collect();
+        let group_values: Vec<(Symbol, Exp)> = members
+            .iter()
+            .map(|&idx| transformer_values[idx].clone())
+            .collect();
+        // Number anchored reads within each group, so projected transformers
+        // unify with equivalent standalone single-capture transformers.
+        let (group_values, anchored_ctx_values) =
+            abstract_fold_anchored_values(env, loc, group_values);
+        let spec = if group_accs.len() == 1 {
+            let (capture_sym, acc_ty, _) = group_accs[0].clone();
+            let (name, signature, inst) = match &form {
+                FoldsOfForm::Element => (
+                    well_known::VECTOR_SPEC_FOLD,
+                    "spec fun spec_fold<T, Acc>(f: |Acc, &T| Acc, v: vector<T>, \
+                     init: Acc, end: u64): Acc",
+                    vec![param_tys[0].skip_reference().clone(), acc_ty],
+                ),
+                FoldsOfForm::General { .. } => (
+                    well_known::VECTOR_SPEC_FOLD_IDX,
+                    "spec fun spec_fold_idx<Acc>(t: |Acc, u64| Acc, init: Acc, \
+                     end: u64): Acc",
+                    vec![acc_ty],
+                ),
+            };
+            let Some(fold_qid) = find_fold_recursion(env, target_fun, name) else {
+                cannot_resolve(
+                    env,
+                    &format!(
+                        "no `{}` declaration available: declare `{}` in this module",
+                        name, signature
+                    ),
+                );
+                return None;
+            };
+            let shape_ok = match &form {
+                FoldsOfForm::Element => has_spec_fold_shape(env, fold_qid),
+                FoldsOfForm::General { .. } => has_spec_fold_idx_shape(env, fold_qid),
+            };
+            if !shape_ok {
+                cannot_resolve(
+                    env,
+                    &format!(
+                        "the resolved `{}` declaration does not have the expected \
+                         signature `{}`",
+                        name, signature
+                    ),
+                );
+                return None;
+            }
+            let transformer_ty = env.get_spec_fun(fold_qid).params[0].1.instantiate(&inst);
+            let acc_sym = env
+                .symbol_pool()
+                .make(&format!("$acc_{}", env.new_global_id().as_usize()));
+            let transformer = build_fold_transformer(
+                env,
+                loc,
+                &transformer_ty,
+                acc_sym,
+                &transformer_params,
+                &[(capture_sym, group_values[0].1.clone())],
+            )?;
+            let mut specializer = SpecFunSpecializer::new(env, target_fun, unifier);
+            specializer.bp_context = BpContext::FoldTransformer;
+            specializer.weight_fold = multi_capture && holders.get(&members[0]) == Some(&1);
+            let Some(spec) =
+                specializer.specialize(loc, fold_qid, inst, vec![(0, transformer)], None)
+            else {
+                weaken(
+                    env,
+                    "the capture transformer contains behavior which cannot be \
+                     summarized as a value",
+                );
+                return None;
+            };
+            spec
+        } else {
+            let elem_ty = match &form {
+                FoldsOfForm::Element => Some(param_tys[0].skip_reference().clone()),
+                FoldsOfForm::General { .. } => None,
+            };
+            generate_multi_capture_recursion(
+                env,
+                target_fun,
+                loc,
+                elem_ty.as_ref(),
+                &group_accs,
+                &group_values,
+                transformer_params[0],
+                folds_of_unifier,
+            )?
+        };
+        // Allocate a snapshot only once an equation has been resolved.
+        let snapshot_label = anchor.unwrap_or_else(|| {
+            *deferral
+                .entry_label
+                .get_or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()))
+        });
+        let captures = group_accs
+            .into_iter()
+            .map(|(sym, ty, ref_ty)| FoldsOfCapture {
+                sym,
+                ty,
+                ref_ty,
+                current: capture_currents[&sym].clone(),
+                snapshot_label,
+            })
+            .collect();
+        groups.push(FoldsOfGroup {
+            captures,
+            anchored_ctx_values,
+            spec,
+        });
+    }
+    if partially_impure {
+        weaken(
+            env,
+            "the lambda combines captured-variable writes or abort \
+             conditions with global state access, whose per-iteration \
+             evaluation state is not expressible in a loop invariant; \
+             those parts are dropped from it",
+        );
+    }
     Some(FoldsOfResolution::Direct(FoldsOfDirect {
         form,
-        captures,
-        spec: Some(spec),
-        anchored_ctx_values,
+        groups,
         aborts: derived.aborts,
         param_syms,
     }))
+}
+
+/// The fold groups of a lambda's captures, as index lists in capture order.
+/// Capture `i` reads capture `j` when `i`'s derived update mentions `j` (its
+/// pre-state `old(j)`). A capture's read closure is everything its update
+/// reads, transitively; it folds from its own pre-states, so its equation is
+/// inductive on its own. Every capture that reads no other capture is a
+/// group of one, folding through the generic `spec_fold` (the fact a caller
+/// can name), even when another capture reads it. The other groups are the
+/// maximal read closures of the remaining captures; such a closure keeps
+/// the self-contained captures it reads, so its tuple recursion is
+/// self-sufficient. Closures holding an `impure` capture form no group.
+fn fold_capture_groups(
+    captures: &[Symbol],
+    values: &[(Symbol, Exp)],
+    impure: &BTreeSet<Symbol>,
+) -> Vec<Vec<usize>> {
+    let n = captures.len();
+    let index_of: BTreeMap<Symbol, usize> = captures
+        .iter()
+        .enumerate()
+        .map(|(i, sym)| (*sym, i))
+        .collect();
+    // Direct reads, then their transitive closure (n is at most
+    // `MAX_FOLD_CAPTURES`, so a fixpoint over the matrix is cheap).
+    let mut reads: Vec<BTreeSet<usize>> = (0..n).map(|i| BTreeSet::from([i])).collect();
+    for (sym, value) in values {
+        let Some(&i) = index_of.get(sym) else {
+            continue;
+        };
+        // Any mention of another capture counts, under `old` or not:
+        // reading more than needed is sound, missing a read is not.
+        value.visit_pre_order(&mut |exp| {
+            if let ExpData::LocalVar(_, read) = exp {
+                if let Some(&j) = index_of.get(read) {
+                    reads[i].insert(j);
+                }
+            }
+            true
+        });
+    }
+    loop {
+        let mut changed = false;
+        for i in 0..n {
+            let extra: BTreeSet<usize> = reads[i]
+                .iter()
+                .flat_map(|&j| reads[j].iter().copied())
+                .filter(|k| !reads[i].contains(k))
+                .collect();
+            if !extra.is_empty() {
+                reads[i].extend(extra);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    // A closure holding an impure capture gets no equation, so it is left out
+    // before maximality: otherwise it would absorb a pure closure inside it
+    // and that pure closure's captures would lose their equation too.
+    let pure = |closure: &BTreeSet<usize>| !closure.iter().any(|&k| impure.contains(&captures[k]));
+    let mut groups: Vec<Vec<usize>> = (0..n)
+        .filter(|&i| reads[i].len() == 1 && pure(&reads[i]))
+        .map(|i| vec![i])
+        .collect();
+    // The maximal closures of the rest: a closure inside another adds no
+    // fact, since the larger recursion already computes it.
+    let mut closures: Vec<BTreeSet<usize>> = (0..n)
+        .filter(|&i| reads[i].len() > 1 && pure(&reads[i]))
+        .map(|i| reads[i].clone())
+        .collect();
+    closures.sort_by(|a, b| b.len().cmp(&a.len()).then_with(|| a.cmp(b)));
+    closures.dedup();
+    let mut maximal: Vec<BTreeSet<usize>> = vec![];
+    for closure in closures {
+        if !maximal.iter().any(|m| closure.is_subset(m)) {
+            maximal.push(closure);
+        }
+    }
+    groups.extend(
+        maximal
+            .into_iter()
+            .map(|c| c.into_iter().collect::<Vec<_>>()),
+    );
+    groups.sort();
+    groups
 }
 
 /// Lifts anchored fold-transformer reads into recursion context parameters.
@@ -5190,6 +5363,11 @@ const MAX_FOLD_CAPTURES: usize = 8;
 /// prover's eager instantiation threshold of 100 this weight admits about two
 /// unfoldings, which the loop invariants over the fold need.
 const GENERATED_FOLD_WEIGHT: u32 = 50;
+
+/// Two unfoldings of a projected singleton fold must stay strictly below
+/// the default eager-instantiation threshold (100). At weight 50, nested
+/// callers such as multisig validation can fail the fold's induction step.
+const PROJECTED_FOLD_WEIGHT: u32 = GENERATED_FOLD_WEIGHT - 1;
 
 /// Generates (or reuses) the bespoke fold recursion of a multi-capture
 /// `folds_of` resolution over captures `c1..ck` with accumulator value
@@ -5653,43 +5831,34 @@ fn build_folds_of_invariant(
     let mk_var = |sym: Symbol, ty: &Type| -> Exp {
         ExpData::LocalVar(env.new_node(loc.clone(), ty.clone()), sym).into_exp()
     };
-    let fold_call = |end: Exp| -> Exp {
-        let spec = resolution
-            .spec
-            .as_ref()
-            .expect("fold specialization present with captures");
+    let fold_call = |group: &FoldsOfGroup, end: Exp| -> Exp {
         let mut args = vec![];
         if matches!(resolution.form, FoldsOfForm::Element) {
             args.push(v_arg.clone());
         }
-        args.extend(
-            resolution
-                .captures
-                .iter()
-                .map(|c| c.snapshot_value(env, loc)),
-        );
+        args.extend(group.captures.iter().map(|c| c.snapshot_value(env, loc)));
         args.push(end);
-        spec.make_call_with_context_values(
+        group.spec.make_call_with_context_values(
             env,
             loc.clone(),
             &MemoryRange::default(),
             args,
             &BTreeMap::new(),
-            &resolution.anchored_ctx_values,
+            &group.anchored_ctx_values,
         )
     };
     let mut conjuncts = vec![];
-    if !resolution.captures.is_empty() {
-        // The equation: the captures' current values are the fold of the
-        // first `i` elements from their entry values.
-        let lhs = if let [capture] = resolution.captures.as_slice() {
+    for group in &resolution.groups {
+        // The equation per group: the captures' current values are the
+        // group's fold of the first `i` elements from their entry values.
+        let lhs = if let [capture] = group.captures.as_slice() {
             capture.current_value(env, loc)
         } else {
-            let tuple_ty = Type::Tuple(resolution.captures.iter().map(|c| c.ty.clone()).collect());
+            let tuple_ty = Type::Tuple(group.captures.iter().map(|c| c.ty.clone()).collect());
             ExpData::Call(
                 env.new_node(loc.clone(), tuple_ty),
                 Operation::Tuple,
-                resolution
+                group
                     .captures
                     .iter()
                     .map(|c| c.current_value(env, loc))
@@ -5699,7 +5868,7 @@ fn build_folds_of_invariant(
         };
         let eq = ExpData::Call(env.new_bool_node(loc), Operation::Eq, vec![
             lhs,
-            fold_call(i_arg.clone()),
+            fold_call(group, i_arg.clone()),
         ])
         .into_exp();
         conjuncts.push(eq);
@@ -5756,47 +5925,57 @@ fn build_folds_of_invariant(
                 false,
             )
         };
-        let no_abort_j = if resolution.captures.len() > 1 {
-            // Thread the recursion's accumulator tuple through a `let`,
-            // binding fresh components for the captures' values at the
-            // start of iteration `j`.
-            let it_syms: Vec<Symbol> = resolution
-                .captures
-                .iter()
-                .map(|c| {
-                    env.symbol_pool()
-                        .make(&format!("{}$it", c.sym.display(env.symbol_pool())))
-                })
-                .collect();
-            for (capture, it_sym) in resolution.captures.iter().zip(&it_syms) {
-                subst.insert(capture.sym, mk_var(*it_sym, &capture.ty));
+        // Prefer a capture's projected singleton fold, which callers can name
+        // in abort contracts. Tuple groups supply only the remaining captures;
+        // all groups holding a capture compute the same value at iteration j.
+        let j_var = mk_var(j_sym, &u64_ty);
+        let mut lets: Vec<(Pattern, Exp)> = vec![];
+        let singleton_groups = resolution.groups.iter().filter(|g| g.captures.len() == 1);
+        let tuple_groups = resolution.groups.iter().filter(|g| g.captures.len() > 1);
+        for group in singleton_groups.chain(tuple_groups) {
+            if group.captures.iter().all(|c| subst.contains_key(&c.sym)) {
+                continue;
             }
-            let not_abort = ExpData::Call(env.new_bool_node(loc), Operation::Not, vec![mk_abort(
-                &subst,
-            )])
-            .into_exp();
-            let it_pats: Vec<Pattern> = it_syms
-                .iter()
-                .zip(&resolution.captures)
-                .map(|(sym, c)| Pattern::Var(env.new_node(loc.clone(), c.ty.clone()), *sym))
-                .collect();
-            let tuple_ty = Type::Tuple(resolution.captures.iter().map(|c| c.ty.clone()).collect());
-            ExpData::Block(
-                env.new_bool_node(loc),
-                Pattern::Tuple(env.new_node(loc.clone(), tuple_ty), it_pats),
-                Some(fold_call(mk_var(j_sym, &u64_ty))),
-                not_abort,
-            )
-            .into_exp()
-        } else {
-            for capture in &resolution.captures {
-                subst.insert(capture.sym, fold_call(mk_var(j_sym, &u64_ty)));
+            if let [capture] = group.captures.as_slice() {
+                subst.insert(capture.sym, fold_call(group, j_var.clone()));
+            } else {
+                let group_id = env.new_global_id().as_usize();
+                let it_syms: Vec<Symbol> = group
+                    .captures
+                    .iter()
+                    .map(|c| {
+                        env.symbol_pool().make(&format!(
+                            "{}$it{}",
+                            c.sym.display(env.symbol_pool()),
+                            group_id
+                        ))
+                    })
+                    .collect();
+                for (capture, it_sym) in group.captures.iter().zip(&it_syms) {
+                    subst
+                        .entry(capture.sym)
+                        .or_insert_with(|| mk_var(*it_sym, &capture.ty));
+                }
+                let it_pats: Vec<Pattern> = it_syms
+                    .iter()
+                    .zip(&group.captures)
+                    .map(|(sym, c)| Pattern::Var(env.new_node(loc.clone(), c.ty.clone()), *sym))
+                    .collect();
+                let tuple_ty = Type::Tuple(group.captures.iter().map(|c| c.ty.clone()).collect());
+                lets.push((
+                    Pattern::Tuple(env.new_node(loc.clone(), tuple_ty), it_pats),
+                    fold_call(group, j_var.clone()),
+                ));
             }
-            ExpData::Call(env.new_bool_node(loc), Operation::Not, vec![mk_abort(
-                &subst,
-            )])
-            .into_exp()
-        };
+        }
+        let mut no_abort_j = ExpData::Call(env.new_bool_node(loc), Operation::Not, vec![mk_abort(
+            &subst,
+        )])
+        .into_exp();
+        for (pat, binding) in lets.into_iter().rev() {
+            no_abort_j =
+                ExpData::Block(env.new_bool_node(loc), pat, Some(binding), no_abort_j).into_exp();
+        }
         let zero = ExpData::Value(
             env.new_node(loc.clone(), u64_ty.clone()),
             Value::Number(BigInt::from(0)),
@@ -6367,6 +6546,9 @@ struct SpecFunUnifierEntry {
     /// (an error has been reported). Spec-equivalent requests from any
     /// context then fail without a new attempt or a repeated error.
     spec: Option<SpecFunSpecialization>,
+    /// A single-capture or shared-capture induction step needs this fold
+    /// unthrottled. Ordinary specification references impose no preference.
+    requires_unweighted_fold: bool,
 }
 
 /// A context argument of a specialized spec function: a free variable of the
@@ -6499,6 +6681,10 @@ struct SpecFunSpecializer<'env, 'unifier> {
     /// Context used when behavioral predicates in the specialized body are
     /// resolved. Fold-transformer failures are reported by `folds_of`.
     bp_context: BpContext,
+    /// Whether a fold specialization gets the generated fold weight: set
+    /// for a capture projected out of a multi-capture lambda, which `main`
+    /// folded inside the weighted tuple recursion.
+    weight_fold: bool,
     /// Parameters of the enclosing function, for resolving temporaries in
     /// lambda material.
     enclosing_params: Vec<Parameter>,
@@ -6521,6 +6707,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             env,
             target_fun,
             bp_context: BpContext::SpecFunBody,
+            weight_fold: false,
             enclosing_params,
             cache: BTreeMap::new(),
             unifier,
@@ -6604,7 +6791,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         // from another context, making both contexts refer to the same
         // specialized function.
         let env: &GlobalEnv = self.env;
-        if let Some(entry) = self.unifier.iter().find(|e| {
+        if let Some(entry) = self.unifier.iter_mut().find(|e| {
             e.target == qid
                 && e.inst == inst
                 && e.bindings.len() == bindings.len()
@@ -6620,6 +6807,34 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
                 // been reported.
                 return None;
             };
+            // Induction steps win over the generated throttle in either
+            // processing order. Ordinary spec references have no preference.
+            entry.requires_unweighted_fold |=
+                self.bp_context == BpContext::FoldTransformer && !self.weight_fold;
+            let weight = self.env.symbol_pool().make(WEIGHT_PROP);
+            let decl = self.env.get_spec_fun(spec.qid);
+            let mut properties = decl.spec.borrow_mut();
+            if entry.requires_unweighted_fold {
+                // Restore explicit user weights rather than removing them.
+                let original = self
+                    .env
+                    .get_spec_fun(qid)
+                    .spec
+                    .borrow()
+                    .properties
+                    .get(&weight)
+                    .cloned();
+                if let Some(value) = original {
+                    properties.properties.insert(weight, value);
+                } else {
+                    properties.properties.remove(&weight);
+                }
+            } else if self.weight_fold {
+                properties.properties.entry(weight).or_insert_with(|| {
+                    PropertyValue::Value(Value::Number(BigInt::from(PROJECTED_FOLD_WEIGHT)))
+                });
+            }
+            drop(properties);
             if let Some(key) = cache_key {
                 self.cache.insert(key, spec.clone());
             }
@@ -6782,7 +6997,22 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             is_recursive: RefCell::new(None),
             insts_using_generic_type_reflection: RefCell::new(BTreeMap::new()),
             spec: RefCell::new(Spec {
-                properties: decl.spec.borrow().properties.clone(),
+                properties: {
+                    let mut properties = decl.spec.borrow().properties.clone();
+                    // A projected fold is throttled like the tuple recursion
+                    // it replaces: unbounded unfolding of it costs the solver,
+                    // and callers reach it through its equation.
+                    if self.weight_fold {
+                        properties
+                            .entry(self.env.symbol_pool().make(WEIGHT_PROP))
+                            .or_insert_with(|| {
+                                PropertyValue::Value(Value::Number(BigInt::from(
+                                    PROJECTED_FOLD_WEIGHT,
+                                )))
+                            });
+                    }
+                    properties
+                },
                 ..Spec::default()
             }),
             uses_old: false,
@@ -6801,6 +7031,8 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             inst: inst.clone(),
             bindings: bindings.clone(),
             spec: Some(specialization.clone()),
+            requires_unweighted_fold: self.bp_context == BpContext::FoldTransformer
+                && !self.weight_fold,
         });
         if let Some(key) = &cache_key {
             self.cache.insert(key.clone(), specialization.clone());
@@ -7794,6 +8026,180 @@ mod tests {
                 || result == vec![8, 7, 6, 5, 4, 3, 2, 1]
                 || result == vec![8, 6, 7, 5, 4, 3, 2, 1]
                 || result == vec![6, 8, 7, 5, 4, 3, 2, 1]
+        );
+    }
+
+    /// An update reading the given captures.
+    fn reads_of(env: &GlobalEnv, syms: &[Symbol]) -> Exp {
+        let ty = Type::new_prim(PrimitiveType::U64);
+        let reads = syms
+            .iter()
+            .map(|sym| ExpData::LocalVar(env.new_node(Loc::default(), ty.clone()), *sym).into_exp())
+            .collect();
+        ExpData::Sequence(env.new_node(Loc::default(), ty), reads).into_exp()
+    }
+
+    #[test]
+    fn projected_anchored_folds_share_standalone_specialization() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let env = crate::run_move_compiler_to_model(crate::Options {
+            compile_verify_code: true,
+            sources: vec![root.join(
+                "../move-prover/tests/sources/functional/closures/inline/folds_of_projection_anchors.move",
+            ).to_string_lossy().into_owned()],
+            sources_deps: vec![root.join("../move-stdlib/sources").to_string_lossy().into_owned()],
+            named_address_mapping: vec!["std=0x1".to_owned()],
+            language_version: Some(move_model::metadata::LanguageVersion::V2_4),
+            ..crate::Options::default()
+        }).expect("build model");
+        assert!(!env.has_errors());
+        let specializations: Vec<_> = env
+            .get_modules()
+            .flat_map(|m| {
+                m.get_spec_funs()
+                    .map(|(_, d)| d.clone())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|d| {
+                d.name
+                    .display(env.symbol_pool())
+                    .to_string()
+                    .starts_with("spec_fold_idx$lambda$")
+            })
+            .collect();
+        assert_eq!(
+            specializations.len(),
+            1,
+            "both projected captures and the standalone capture must share their recursion"
+        );
+    }
+
+    #[test]
+    fn fold_specialization_weight_is_order_independent() {
+        for order in [
+            [Some(true), None, Some(false)],
+            [Some(false), None, Some(true)],
+            [None, Some(true), Some(false)],
+            [None, Some(false), Some(true)],
+            [None, Some(true), None],
+            [Some(true), None, None],
+        ] {
+            for explicit_weight in [false, true] {
+                let dir = tempfile::tempdir().expect("temporary source directory");
+                let source = dir.path().join("fold.move");
+                std::fs::write(
+                    &source,
+                    r#"
+                    module 0x42::test {
+                        spec fun spec_fold_idx(f: |u64, u64| u64, init: u64, end: u64): u64 {
+                            if (end == 0) init
+                            else result_of<f>(spec_fold_idx(f, init, end - 1), end - 1)
+                        }
+                    }
+                "#,
+                )
+                .expect("write source");
+                let mut env = crate::run_checker(crate::Options {
+                    compile_verify_code: true,
+                    sources: vec![source.to_string_lossy().into_owned()],
+                    ..crate::Options::default()
+                })
+                .expect("build model");
+                assert!(!env.has_errors());
+                let qid = {
+                    let module = env.get_modules().next().expect("module");
+                    let (id, _) = module.get_spec_funs().next().expect("fold declaration");
+                    module.get_id().qualified(*id)
+                };
+                if explicit_weight {
+                    env.get_spec_fun(qid).spec.borrow_mut().properties.insert(
+                        env.symbol_pool().make(WEIGHT_PROP),
+                        PropertyValue::Value(Value::Number(BigInt::from(7))),
+                    );
+                }
+                let ty = Type::new_prim(PrimitiveType::U64);
+                let fun_ty = env.get_spec_fun(qid).params[0].1.clone();
+                let [capture, acc, index] =
+                    ["capture", "acc", "index"].map(|s| env.symbol_pool().make(s));
+                let value = ExpData::Call(
+                    env.new_node(Loc::default(), ty.clone()),
+                    Operation::Old,
+                    vec![ExpData::LocalVar(env.new_node(Loc::default(), ty), capture).into_exp()],
+                )
+                .into_exp();
+                let transformer =
+                    build_fold_transformer(&env, &Loc::default(), &fun_ty, acc, &[index], &[(
+                        capture, value,
+                    )])
+                    .expect("transformer");
+                let mut unifier = vec![];
+                let mut shared = None;
+                for weighted in order {
+                    let mut specializer = SpecFunSpecializer::new(&mut env, None, &mut unifier);
+                    if let Some(weighted) = weighted {
+                        specializer.bp_context = BpContext::FoldTransformer;
+                        specializer.weight_fold = weighted;
+                    }
+                    let spec = specializer
+                        .specialize(
+                            &Loc::default(),
+                            qid,
+                            vec![],
+                            vec![(0, transformer.clone())],
+                            None,
+                        )
+                        .expect("specialization");
+                    if let Some(previous) = shared {
+                        assert_eq!(previous, spec.qid);
+                    }
+                    shared = Some(spec.qid);
+                }
+                let weight = env.symbol_pool().make(WEIGHT_PROP);
+                let decl = env.get_spec_fun(shared.expect("shared specialization"));
+                let original = env
+                    .get_spec_fun(qid)
+                    .spec
+                    .borrow()
+                    .properties
+                    .get(&weight)
+                    .cloned();
+                let expected = if order.contains(&Some(false)) || explicit_weight {
+                    original
+                } else {
+                    Some(PropertyValue::Value(Value::Number(BigInt::from(
+                        PROJECTED_FOLD_WEIGHT,
+                    ))))
+                };
+                assert_eq!(decl.spec.borrow().properties.get(&weight), expected.as_ref(),
+                    "induction steps require the source weight; ordinary spec references are neutral");
+            }
+        }
+    }
+
+    #[test]
+    fn fold_groups_keep_pure_closure_read_by_impure_capture() {
+        // `a` reads itself, `b` reads `a`, `c` reads `b`; `c` is impure.
+        let env = fwd_test_env();
+        let [a, b, c] = ["a", "b", "c"].map(|s| env.symbol_pool().make(s));
+        let values = vec![
+            (a, reads_of(&env, &[a])),
+            (b, reads_of(&env, &[b, a])),
+            (c, reads_of(&env, &[c, b])),
+        ];
+        let captures = [a, b, c];
+        assert_eq!(
+            fold_capture_groups(&captures, &values, &BTreeSet::new()),
+            vec![vec![0], vec![0, 1, 2]]
+        );
+        // `c`'s closure gets no equation; `b`'s pure closure keeps one.
+        assert_eq!(
+            fold_capture_groups(&captures, &values, &BTreeSet::from([c])),
+            vec![vec![0], vec![0, 1]]
+        );
+        // An impure self-contained capture forms no group of one.
+        assert_eq!(
+            fold_capture_groups(&captures, &values, &BTreeSet::from([a])),
+            Vec::<Vec<usize>>::new()
         );
     }
 }
