@@ -67,8 +67,8 @@ impl<'a> HotStateLRU<'a> {
             slot.state_key().is_none_or(|sk| key == sk),
             "Map key and embedded state_key must match."
         );
-        // Ensure state_key is populated. Slots loaded from the hot state DB don't carry
-        // the full key (only the hash), so patch it here while we have the key available.
+        // Ensure state_key is populated. Slots from the hot state base don't carry the full key
+        // (only the hash), so patch it here while we have the key available.
         if slot.state_key().is_none() {
             slot.set_state_key(key.clone());
         }
@@ -253,8 +253,10 @@ impl Iterator for Iter<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::HotStateLRU;
-    use crate::state_store::state_view::hot_state_view::HotStateView;
-    use aptos_crypto::HashValue;
+    use crate::state_store::{
+        leaf_entry::leaf_entry_to_jmt_update, state_view::hot_state_view::HotStateView,
+    };
+    use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_experimental_layered_map::{LayeredMap, MapLayer};
     use aptos_types::{
         state_store::{
@@ -318,8 +320,10 @@ mod tests {
             // in the overlay, so we just merge everything directly to committed state, and keep
             // the overlay empty.
             let mut locked = self.hot_state.lock().unwrap();
-            for (key_hash, slot) in updates {
+            for (key_hash, mut slot) in updates {
                 if slot.is_hot() {
+                    // Like the real hot state base, keep only the key hash.
+                    slot.clear_state_key();
                     locked.inner.insert(key_hash, slot);
                 } else {
                     locked.inner.remove(&key_hash);
@@ -494,13 +498,14 @@ mod tests {
             self.overlay = self.top.view_layers_after(&self.base);
         }
 
-        /// Collapses the overlay into the committed base. Hot slots are persisted; cold (evicted)
-        /// slots are dropped, matching how the base only retains hot entries. The overlay carries
-        /// the latest slot per key, so it is the flush set directly.
+        /// Collapses the overlay into the committed base. Hot slots are persisted without their
+        /// `StateKey`; cold (evicted) slots are dropped, matching how the base only retains hot
+        /// entries. The overlay carries the latest slot per key, so it is the flush set directly.
         fn flush(&mut self) {
             let mut committed = self.committed.lock().unwrap();
-            for (key_hash, slot) in self.overlay.iter() {
+            for (key_hash, mut slot) in self.overlay.iter() {
                 if slot.is_hot() {
+                    slot.clear_state_key();
                     committed.inner.insert(key_hash, slot);
                 } else {
                     committed.inner.remove(&key_hash);
@@ -509,6 +514,92 @@ mod tests {
             self.base = self.top.clone();
             self.overlay = self.top.view_layers_after(&self.base);
         }
+    }
+
+    /// Slots from the base carry no `StateKey`, and are never newer than the persisted snapshot.
+    /// Touching them as LRU neighbors or evicting them must not produce JMT updates that need the
+    /// full key, and re-inserting them must restore the key.
+    #[test]
+    fn test_slots_from_base_without_state_key() {
+        let key_a = StateKey::raw(b"a");
+        let key_b = StateKey::raw(b"b");
+        let key_c = StateKey::raw(b"c");
+        let key_d = StateKey::raw(b"d");
+        let [a, b, c, d] = [&key_a, &key_b, &key_c, &key_d].map(|k| *k.crypto_hash_ref());
+        let value = |s: &[u8]| StateValue::new_legacy(s.to_vec().into());
+        let occupied = |version, value| StateSlotKind::HotOccupied {
+            value_version: version,
+            value,
+            hot_since_version: version,
+            lru_info: LRUEntry::uninitialized(),
+        };
+
+        // Persisted snapshot at version 9. Base from newest to oldest: a, b, c (vacant).
+        let min_version = 10;
+        let base_slot = |kind: StateSlotKind, prev, next| {
+            StateSlot::new_without_state_key(kind.with_lru_info(LRUEntry { prev, next }))
+        };
+        let slot_a = base_slot(occupied(7, value(b"va")), None, Some(b));
+        let slot_b = base_slot(occupied(8, value(b"vb")), Some(a), Some(c));
+        let slot_c = base_slot(
+            StateSlotKind::HotVacant {
+                hot_since_version: 9,
+                lru_info: LRUEntry::uninitialized(),
+            },
+            Some(b),
+            None,
+        );
+        let total_value_bytes = slot_a.size() + slot_b.size();
+        let test_obj = LRUTest::new_empty();
+        test_obj.hot_state.lock().unwrap().inner =
+            HashMap::from([(a, slot_a), (b, slot_b), (c, slot_c)]);
+
+        let mut lru = HotStateLRU::new(
+            NonZeroUsize::new(3).unwrap(),
+            usize::MAX,
+            Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
+            &test_obj.overlay,
+            Some(a),
+            Some(c),
+            3,
+            total_value_bytes,
+        );
+        // Writing d touches a as the old head.
+        let value_d = value(b"vd");
+        lru.insert(
+            &key_d,
+            StateSlot::new(key_d.clone(), occupied(10, value_d.clone())),
+        );
+        // Refresh b the way `State::apply_one_update` does, starting from the slot in the base.
+        let mut refreshed_b = lru.get_slot(&b).unwrap();
+        assert!(refreshed_b.state_key().is_none());
+        refreshed_b.refresh(11);
+        lru.insert(&key_b, refreshed_b);
+        // c is the oldest, so it gets evicted.
+        let evicted = lru.maybe_evict();
+        assert_eq!(evicted.len(), 1);
+        assert_eq!(evicted[0].0, c);
+        lru.validate();
+        let (updates, ..) = lru.into_updates();
+
+        let jmt_updates: HashMap<_, _> = updates
+            .iter()
+            .filter(|(_, slot)| slot.passes_jmt_filter(min_version))
+            .map(|(key_hash, slot)| leaf_entry_to_jmt_update(*key_hash, slot))
+            .collect();
+        // a: only its LRU pointers changed.
+        assert!(updates[&a].state_key().is_none());
+        assert!(!jmt_updates.contains_key(&a));
+        // b: gets its key back, but the value didn't change.
+        assert_eq!(updates[&b].state_key(), Some(&key_b));
+        assert!(!jmt_updates.contains_key(&b));
+        // c: the JMT deletion only needs the hash.
+        assert!(updates[&c].is_cold());
+        assert!(updates[&c].state_key().is_none());
+        assert_eq!(jmt_updates[&c], None);
+        // d: newly written.
+        assert_eq!(jmt_updates[&d], Some((CryptoHash::hash(&value_d), key_d)));
+        assert_eq!(jmt_updates.len(), 2);
     }
 
     proptest! {
