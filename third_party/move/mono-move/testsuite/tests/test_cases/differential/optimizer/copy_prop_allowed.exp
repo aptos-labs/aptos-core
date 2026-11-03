@@ -59,7 +59,7 @@ fun scalar_copy(r0): u64 {
     r1: u64
   code:
   L0:
-    0: [x0] := call bump, [r0] @1
+    0: [x0] := call_exempt bump, [r0] @1
     1: r1 := add x0, r0 @3
     2: ret [r1] @4
 }
@@ -73,7 +73,7 @@ fun struct_copy(r0): u64 {
   L0:
     0: r2 := ld_u64 2 @1
     1: r1 := pack 0x42::copy_prop_allowed::Pair, [r0, r2] @2
-    2: [x0] := call pair_sum, [r1] @5
+    2: [x0] := call_exempt pair_sum, [r1] @5
     3: r2 := read_loc_field Pair::a, r1 @6
     4: r2 := add x0, r2 @9
     5: ret [r2] @10
@@ -84,7 +84,7 @@ fun vector_move(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call make, [r0] @1
-    1: [x0] := call consume_len, [x0] @2
+    0: [x0] := call_exempt make, [r0] @1
+    1: [x0] := call_exempt consume_len, [x0] @2
     2: ret [x0] @3
 }

@@ -281,12 +281,20 @@ fn function_param_tags_of(types: InternedTypeList) -> Option<Vec<FunctionParamOr
 /// name is always a valid identifier.
 pub fn module_id_of(module_id: InternedModuleId) -> language_storage::ModuleId {
     let module_id = view_module_id(module_id);
-    let name = view_name(module_id.name());
+    language_storage::ModuleId::new(*module_id.address(), identifier_of(module_id.name()))
+}
+
+/// The owned [`Identifier`] for an interned name.
+///
+/// Every interning entry point takes an [`IdentStr`], so an interned name is
+/// always a valid identifier.
+pub fn identifier_of(name: InternedIdentifier) -> Identifier {
+    let name = view_name(name);
     debug_assert!(
         Identifier::is_valid(name),
-        "interned module name is not a valid identifier"
+        "interned name is not a valid identifier"
     );
-    language_storage::ModuleId::new(*module_id.address(), Identifier::new_unchecked(name))
+    Identifier::new_unchecked(name)
 }
 
 /// The name of a script's one function, and of the module a script is loaded

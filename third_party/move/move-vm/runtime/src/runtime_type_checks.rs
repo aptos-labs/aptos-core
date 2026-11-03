@@ -179,11 +179,7 @@ pub(crate) fn create_function_type(
         .iter()
         .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
         .collect::<PartialVMResult<Vec<_>>>()?;
-    Ok(Type::Function {
-        args,
-        results,
-        abilities,
-    })
+    Ok(Type::function(args, results, abilities))
 }
 
 pub fn verify_pack_closure(

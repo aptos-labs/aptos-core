@@ -478,6 +478,9 @@ impl AptosDB {
             if self.order.is_some() {
                 s.spawn(|_| self.commit_native_order(chunk, sync_commit).unwrap());
             }
+            if self.collateral.is_some() {
+                s.spawn(|_| self.commit_native_collateral(chunk, sync_commit).unwrap());
+            }
         });
 
         Ok(new_root_hash)
@@ -569,6 +572,19 @@ impl AptosDB {
         // Orders have no consensus-committed root yet, so the store always
         // computes its own summary.
         bundle.store.advance_pipeline(chunk, None, sync_commit)
+    }
+
+    fn commit_native_collateral(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_collateral"]);
+        let Some(collateral) = self.collateral.as_ref() else {
+            return Ok(());
+        };
+        if collateral.commit_kv(chunk)?.is_none() {
+            return Ok(());
+        }
+        // The collateral root is not computed yet, so the store always
+        // computes its own summary.
+        collateral.advance_pipeline(chunk, None, sync_commit)
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
@@ -900,6 +916,9 @@ impl AptosDB {
             }
             if let Some(order) = self.order.as_ref() {
                 order.store.wake_value_pruner(version);
+            }
+            if let Some(collateral) = self.collateral.as_ref() {
+                collateral.wake_value_pruner(version);
             }
         }
 

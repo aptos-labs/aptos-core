@@ -5,9 +5,9 @@ use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
-    gas_algebra::NumBytes,
-    language_storage::{StructTag, TypeTag},
+    account_address::AccountAddress, gas_algebra::NumBytes, identifier::Identifier,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -15,23 +15,18 @@ use move_vm_types::{
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Write};
+use std::collections::VecDeque;
 
-fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {
-    let mut name = struct_tag.name.to_string();
-    if let Some(first_ty) = struct_tag.type_args.first() {
-        write!(name, "<")?;
-        write!(name, "{}", first_ty.to_canonical_string())?;
-        for ty in struct_tag.type_args.iter().skip(1) {
-            write!(name, ", {}", ty.to_canonical_string())?;
-        }
-        write!(name, ">")?;
-    }
-
+/// Builds the returned `TypeInfo` value from a pre-rendered canonical name.
+fn type_of_internal(
+    address: AccountAddress,
+    module_name: &Identifier,
+    canonical_name: &str,
+) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {
     let struct_value = Struct::pack(vec![
-        Value::address(struct_tag.address),
-        Value::vector_u8(struct_tag.module.as_bytes().to_vec()),
-        Value::vector_u8(name.as_bytes().to_vec()),
+        Value::address(address),
+        Value::vector_u8(module_name.as_bytes().to_vec()),
+        Value::vector_u8(canonical_name.as_bytes().to_vec()),
     ]);
     Ok(smallvec![Value::struct_(struct_value)])
 }
@@ -54,26 +49,32 @@ fn native_type_of(
 
     context.charge(TYPE_INFO_TYPE_OF_BASE)?;
 
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
-
+    let canonical_str = context.type_to_canonical_string(&ty_args[0])?;
+    // A zero charge would still show up in gas-profiling traces.
     if context.eval_gas(TYPE_INFO_TYPE_OF_PER_BYTE_IN_STR) > 0.into() {
-        let type_tag_str = type_tag.to_canonical_string();
-        // Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
-        // But there are other limits in place that prevent this native from being called with too much work.
-        context
-            .charge(TYPE_INFO_TYPE_OF_PER_BYTE_IN_STR * NumBytes::new(type_tag_str.len() as u64))?;
+        context.charge(
+            TYPE_INFO_TYPE_OF_PER_BYTE_IN_STR * NumBytes::new(canonical_str.len() as u64),
+        )?;
     }
 
-    if let TypeTag::Struct(struct_tag) = type_tag {
-        Ok(type_of_internal(&struct_tag).expect("type_of should never fail."))
-    } else {
-        Err(SafeNativeError::abort_with_message(
+    match context.struct_address_and_name(&ty_args[0])? {
+        Some((address, module_name)) => {
+            // The name is everything after the second `::`.
+            let canonical_name = canonical_str.splitn(3, "::").nth(2).ok_or_else(|| {
+                SafeNativeError::InvariantViolation(PartialVMError::new_invariant_violation(
+                    format!("Malformed canonical struct type name: {}", canonical_str),
+                ))
+            })?;
+            Ok(type_of_internal(address, &module_name, canonical_name)
+                .expect("type_of should never fail."))
+        },
+        None => Err(SafeNativeError::abort_with_message(
             super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
             format!(
                 "Expected a struct type, found: {}",
-                type_tag.to_short_string()
+                ty_args[0].to_short_string()
             ),
-        ))
+        )),
     }
 }
 
@@ -95,10 +96,8 @@ fn native_type_name(
 
     context.charge(TYPE_INFO_TYPE_NAME_BASE)?;
 
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
-    let type_name = type_tag.to_canonical_string();
+    let type_name = context.type_to_canonical_string(&ty_args[0])?;
 
-    // TODO: Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
     context.charge(TYPE_INFO_TYPE_NAME_PER_BYTE_IN_STR * NumBytes::new(type_name.len() as u64))?;
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
@@ -151,7 +150,11 @@ pub fn make_all(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+    use move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
+    };
     use move_vm_types::values::VMValueCast;
 
     #[test]
@@ -165,7 +168,17 @@ mod tests {
 
         let dummy_as_strings = dummy_st.to_canonical_string();
         let mut dummy_as_strings = dummy_as_strings.split("::");
-        let dummy_as_type_of = type_of_internal(&dummy_st).unwrap().pop().unwrap();
+        // The name part: everything after the second `::`, as the native passes it.
+        let dummy_as_name = {
+            let mut parts = dummy_as_strings.clone();
+            parts.next();
+            parts.next();
+            parts.next().unwrap().to_owned()
+        };
+        let dummy_as_type_of = type_of_internal(dummy_st.address, &dummy_st.module, &dummy_as_name)
+            .unwrap()
+            .pop()
+            .unwrap();
         let dummy_as_type_of: Struct = dummy_as_type_of.cast().unwrap();
         let mut dummy_as_type_of = dummy_as_type_of.unpack().unwrap();
 

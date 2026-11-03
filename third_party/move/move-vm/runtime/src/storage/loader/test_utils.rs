@@ -67,12 +67,12 @@ pub(crate) fn struct_ty(idx: StructNameIndex) -> Type {
 
 /// Creates a dummy generic struct (or enum) type.
 pub(crate) fn generic_struct_ty(idx: StructNameIndex, ty_args: Vec<Type>) -> Type {
-    Type::StructInstantiation {
+    Type::struct_instantiation(
         idx,
-        ty_args: triomphe::Arc::new(ty_args),
+        ty_args,
         // Below is irrelevant for tests.
-        ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-    }
+        AbilityInfo::struct_(AbilitySet::EMPTY),
+    )
 }
 
 /// Mocks struct definition loading, by holding a cache of [StructType]s and runtime environment.
@@ -91,7 +91,17 @@ impl MockStructDefinitionLoader {
 
     /// Returns an index for a struct name. The struct name is added to the environment.
     pub(crate) fn get_struct_identifier(&self, struct_name: &str) -> StructNameIndex {
-        let module_id = ModuleId::from_str("0x1::foo").unwrap();
+        self.get_struct_identifier_in_module("0x1::foo", struct_name)
+    }
+
+    /// Returns an index for a struct name defined in the specified module. The struct name is
+    /// added to the environment.
+    pub(crate) fn get_struct_identifier_in_module(
+        &self,
+        module_id: &str,
+        struct_name: &str,
+    ) -> StructNameIndex {
+        let module_id = ModuleId::from_str(module_id).unwrap();
         let struct_identifier = StructIdentifier::new(
             self.runtime_environment.module_id_pool(),
             module_id,
@@ -108,6 +118,16 @@ impl MockStructDefinitionLoader {
         struct_name: &str,
         field_struct_names: impl IntoIterator<Item = (&'a str, Type)>,
     ) {
+        self.add_struct_in_module("0x1::foo", struct_name, field_struct_names)
+    }
+
+    /// Adds a dummy struct defined in the specified module to the mock cache.
+    pub(crate) fn add_struct_in_module<'a>(
+        &self,
+        module_id: &str,
+        struct_name: &str,
+        field_struct_names: impl IntoIterator<Item = (&'a str, Type)>,
+    ) {
         let fields = field_struct_names
             .into_iter()
             .map(|(name, field_ty)| {
@@ -116,7 +136,7 @@ impl MockStructDefinitionLoader {
             })
             .collect();
 
-        let idx = self.get_struct_identifier(struct_name);
+        let idx = self.get_struct_identifier_in_module(module_id, struct_name);
         let struct_definition = struct_definition(idx, fields);
 
         assert_none!(self

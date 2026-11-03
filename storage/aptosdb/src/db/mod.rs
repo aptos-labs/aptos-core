@@ -8,7 +8,7 @@ use crate::{
     native_store::{
         kv_db::{NativeKvDb, PositionDb},
         merkle_db::{NativeMerkleDb, PositionMerkleDb},
-        OrderStore,
+        CollateralStore, OrderStore,
     },
     pruner::LedgerPrunerManager,
     rocksdb_property_reporter::RocksdbPropertyReporter,
@@ -49,6 +49,7 @@ pub struct AptosDB {
     update_subscriber: Option<Sender<(Instant, Version)>>,
     pub(crate) position: Option<Arc<PositionBundle>>,
     pub(crate) order: Option<Arc<OrderBundle>>,
+    pub(crate) collateral: Option<Arc<CollateralBundle>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -64,6 +65,9 @@ pub(crate) use aptosdb_native_position::PositionBundle;
 // Native-order store: `OrderBundle` + `init_native_order()`.
 mod aptosdb_native_order;
 pub(crate) use aptosdb_native_order::OrderBundle;
+// Native-collateral store: `CollateralBundle` + `init_native_collateral()`.
+mod aptosdb_native_collateral;
+pub(crate) use aptosdb_native_collateral::CollateralBundle;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 mod aptosdb_testonly;
@@ -255,6 +259,8 @@ impl AptosDB {
         PositionMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         NativeKvDb::<OrderStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         NativeMerkleDb::<OrderStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeKvDb::<CollateralStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        NativeMerkleDb::<CollateralStore>::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
 
         info!(
             db_path = db_path.as_ref(),

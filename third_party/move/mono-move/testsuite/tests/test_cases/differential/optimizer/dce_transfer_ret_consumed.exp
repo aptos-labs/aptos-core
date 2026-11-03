@@ -17,7 +17,7 @@ fun overwrite_with_call(): u64 {
   code:
   L0:
     0: r0 := ld_u64 5 @0
-    1: [x0] := call one, [] @2
+    1: [x0] := call_exempt one, [] @2
     2: r1 := move r0 @3
     3: r0 := move x0 @5
     4: ret [r1] @7

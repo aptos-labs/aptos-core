@@ -24,6 +24,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
+use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_rest_client::AptosBaseUrl;
 use aptos_transaction_simulation::{
     DeltaStateStore, EitherStateView, EmptyStateView, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
@@ -66,7 +67,6 @@ use aptos_validator_interface::{DebuggerStateView, RestDebuggerInterface};
 use aptos_vm::{
     block_executor::AptosVMBlockExecutorWrapper,
     data_cache::AsMoveResolver,
-    gas::make_prod_gas_meter,
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM, VMValidator,
 };
@@ -1396,15 +1396,16 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
             let (mut regular, mut unmetered) = match gas_meter_type {
                 GasMeterType::RegularGasMeter => (
-                    Some(make_prod_gas_meter(
-                        env.gas_feature_version(),
-                        env.gas_params().as_ref().unwrap().vm.clone(),
-                        env.storage_gas_params().as_ref().unwrap().clone(),
-                        None,
-                        1_000_000_000_000_000.into(),
-                        &NoopBlockSynchronizationKillSwitch {},
-                        true,
-                    )),
+                    Some(MemoryTrackedGasMeter::new(StandardGasMeter::new(
+                        StandardGasAlgebra::new(
+                            env.gas_feature_version(),
+                            env.gas_params().as_ref().unwrap().vm.clone(),
+                            env.storage_gas_params().as_ref().unwrap().clone(),
+                            None,
+                            1_000_000_000_000_000,
+                            &NoopBlockSynchronizationKillSwitch {},
+                        ),
+                    ))),
                     None,
                 ),
                 GasMeterType::UnmeteredGasMeter => (None, Some(UnmeteredGasMeter)),
@@ -1515,20 +1516,17 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 &fun_name,
                 type_params,
                 args,
-                &mut StandardGasMeter::new(
-                    CalibrationAlgebra {
-                        base: StandardGasAlgebra::new(
-                            env.gas_feature_version(),
-                            env.gas_params().as_ref().unwrap().vm.clone(),
-                            env.storage_gas_params().as_ref().unwrap().clone(),
-                            None,
-                            10_000_000_000_000,
-                            &NoopBlockSynchronizationKillSwitch {},
-                        ),
-                        shared_buffer: Arc::clone(&a1),
-                    },
-                    true,
-                ),
+                &mut StandardGasMeter::new(CalibrationAlgebra {
+                    base: StandardGasAlgebra::new(
+                        env.gas_feature_version(),
+                        env.gas_params().as_ref().unwrap().vm.clone(),
+                        env.storage_gas_params().as_ref().unwrap().clone(),
+                        None,
+                        10_000_000_000_000,
+                        &NoopBlockSynchronizationKillSwitch {},
+                    ),
+                    shared_buffer: Arc::clone(&a1),
+                }),
                 &mut traversal_context,
                 &module_storage,
             );

@@ -54,6 +54,7 @@ fn minimal_func() -> Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: test_module_id(),
         def_idx: FunctionDefinitionIndex(0),
+        has_module_lock: false,
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],

@@ -5,13 +5,26 @@ use crate::{
     ability::AbilitySet,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::{MoveTypeLayout, MoveValue},
+    value::{MoveTypeLayout, MoveValue, ValueDepth, ValueSeed},
 };
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
 
 /// Version number for the serialization format of function data.
 pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V1: u16 = 1;
+
+/// Why a function named at runtime cannot be turned into a function value.
+/// Shared by V1 MoveVM and MonoMove.
+///
+/// The discriminants must stay in sync with `std::reflect::ReflectionError`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionResolutionError {
+    Reserved = 0x0,
+    FunctionNotFound = 0x1,
+    FunctionNotAccessible = 0x2,
+    FunctionIncompatibleType = 0x3,
+    FunctionNotInstantiated = 0x4,
+}
 
 //===========================================================================================
 
@@ -261,7 +274,8 @@ pub struct MoveClosure {
     pub captured: Vec<(MoveTypeLayout, MoveValue)>,
 }
 
-pub(crate) struct ClosureVisitor;
+/// Visitor for a closure whose captured values are at the given depth.
+pub(crate) struct ClosureVisitor(pub(crate) ValueDepth);
 
 impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
     type Value = MoveClosure;
@@ -288,7 +302,10 @@ impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
         let mut captured = vec![];
         for _ in 0..mask.captured_count() {
             let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
-            match seq.next_element_seed(&layout)? {
+            match seq.next_element_seed(ValueSeed {
+                layout: &layout,
+                depth: self.0,
+            })? {
                 Some(v) => captured.push((layout, v)),
                 None => return Err(A::Error::invalid_length(captured.len(), &self)),
             }

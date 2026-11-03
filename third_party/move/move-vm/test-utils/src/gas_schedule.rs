@@ -365,6 +365,13 @@ impl GasMeter for GasStatus {
         )
     }
 
+    fn charge_pack_closure_captured_values(
+        &mut self,
+        _args: impl Iterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
     fn charge_read_ref(&mut self, ref_val: impl ValueView) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::READ_REF, ref_val.legacy_abstract_memory_size())
     }
