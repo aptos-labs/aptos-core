@@ -4,6 +4,7 @@
 pub mod account_index;
 pub mod collateral;
 mod hot_state;
+pub mod hot_state_config;
 pub mod leaf_entry;
 pub mod native_overlay;
 pub mod orders;
