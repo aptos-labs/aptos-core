@@ -33,9 +33,10 @@ impl OnChainConfig for OnChainHotStateConfig {
 pub struct HotStateConfigV1 {
     /// Max number of items in each shard, indexed by shard id.
     pub max_items_per_shard: Vec<u64>,
-    /// Max sum of value sizes in each shard, indexed by shard id. Values vary a lot in size, so
-    /// capping the item count alone doesn't bound memory usage.
-    pub max_value_bytes_per_shard: Vec<u64>,
+    /// Max sum of key and value sizes in each shard, indexed by shard id. Each key counts as its
+    /// 32-byte hash, which is all the hot state keeps. Values vary a lot in size, so capping the
+    /// item count alone doesn't bound memory usage.
+    pub max_bytes_per_shard: Vec<u64>,
     /// Refresh `hot_since_version` of a hot item when it's accessed again after this many
     /// versions, to keep frequently read items from being evicted.
     pub refresh_interval_versions: u64,
@@ -57,7 +58,7 @@ mod tests {
     fn test_config_onchain_payload() {
         let config = OnChainHotStateConfig::V1(HotStateConfigV1 {
             max_items_per_shard: vec![250_000; NUM_STATE_SHARDS],
-            max_value_bytes_per_shard: vec![1 << 30; NUM_STATE_SHARDS],
+            max_bytes_per_shard: vec![1 << 30; NUM_STATE_SHARDS],
             refresh_interval_versions: 100_000,
             max_promotions_per_block: 10_240,
         });

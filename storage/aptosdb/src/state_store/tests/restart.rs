@@ -27,12 +27,12 @@ use std::path::Path;
 fn open_db<P: AsRef<Path>>(
     path: P,
     max_items_per_shard: usize,
-    max_value_bytes_per_shard: usize,
+    max_bytes_per_shard: usize,
     buffered_state_target_items: usize,
 ) -> AptosDB {
     let hot_state_config = HotStateConfig {
         max_items_per_shard,
-        max_value_bytes_per_shard,
+        max_bytes_per_shard,
         refresh_interval_versions: 1_000,
         delete_on_restart: false,
     };
@@ -68,7 +68,7 @@ fn test_restart_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures, bool)>,
     split_at: usize,
     max_items_per_shard: usize,
-    max_value_bytes_per_shard: usize,
+    max_bytes_per_shard: usize,
     buffered_state_target_items: usize,
 ) {
     let (first_half, second_half) = input.split_at(split_at);
@@ -81,7 +81,7 @@ fn test_restart_impl(
         let db = open_db(
             tmp_dir.path(),
             max_items_per_shard,
-            max_value_bytes_per_shard,
+            max_bytes_per_shard,
             buffered_state_target_items,
         );
         commit_batches(&db, first_half, 0)
@@ -91,7 +91,7 @@ fn test_restart_impl(
     let db = open_db(
         tmp_dir.path(),
         max_items_per_shard,
-        max_value_bytes_per_shard,
+        max_bytes_per_shard,
         buffered_state_target_items,
     );
     assert_eq!(db.expect_synced_version(), version - 1);
@@ -124,7 +124,7 @@ proptest! {
 
     #[test]
     fn test_restart(
-        (input, split_at, max_items_per_shard, max_value_bytes_per_shard, buffered_state_target_items)
+        (input, split_at, max_items_per_shard, max_bytes_per_shard, buffered_state_target_items)
             in any::<bool>().prop_flat_map(|make_hot_in_epilogue| {
                 arb_blocks_to_commit_with_params(
                     10, /* num_accounts */
@@ -139,18 +139,19 @@ proptest! {
                         proptest::collection::vec(any::<bool>(), len),
                         1usize..len,
                         1usize..10,
-                        // Values are `AccountResource`s (147 bytes) and `CoinStoreResource`s
-                        // (105 bytes), so this ranges from fitting no value to a few.
+                        // Entries are a 32-byte key hash plus an `AccountResource` (147 bytes) or a
+                        // `CoinStoreResource` (105 bytes), so this ranges from fitting no entry to
+                        // a few.
                         prop_oneof![Just(usize::MAX), 0..=450usize],
                         1usize..1000,
                     )
-                }).prop_map(|(blocks, sync_flags, split_at, max_items_per_shard, max_value_bytes_per_shard, buffered_state_target_items)| {
+                }).prop_map(|(blocks, sync_flags, split_at, max_items_per_shard, max_bytes_per_shard, buffered_state_target_items)| {
                     let input = blocks
                         .into_iter()
                         .zip(sync_flags)
                         .map(|((txns, li), sync)| (txns, li, sync))
                         .collect::<Vec<_>>();
-                    (input, split_at, max_items_per_shard, max_value_bytes_per_shard, buffered_state_target_items)
+                    (input, split_at, max_items_per_shard, max_bytes_per_shard, buffered_state_target_items)
                 })
             }),
     ) {
@@ -158,7 +159,7 @@ proptest! {
             input,
             split_at,
             max_items_per_shard,
-            max_value_bytes_per_shard,
+            max_bytes_per_shard,
             buffered_state_target_items,
         );
     }
