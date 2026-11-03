@@ -835,7 +835,6 @@ impl LiveState {
             latest_snapshot_version,
             SparseMerkleTree::new(hot_state_root_hash),
             SparseMerkleTree::new(latest_snapshot_root_hash),
-            hot_state_config,
         );
         let last_snapshot = StateWithSummary::new(hot_state.state().clone(), summary.clone());
         let persisted_state = PersistedState::new(hot_state, summary);
