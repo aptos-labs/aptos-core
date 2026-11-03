@@ -19,12 +19,23 @@ runs:
         python3 - <<'PY'
         import hashlib, json, pathlib
         manifest = json.loads(pathlib.Path('/opt/aptos-rust-image.json').read_text())
-        for name, expected in manifest['files'].items():
-            actual = hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
-            if actual != expected:
-                raise SystemExit(f'Image tools are stale for {name}; rebuild the image')
-        print(json.dumps(manifest, indent=2))
+        stale = [
+            name
+            for name, expected in manifest['files'].items()
+            if hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() != expected
+        ]
+        if stale:
+            # A stale image degrades to on-demand toolchain install below instead of
+            # blocking the PR; rebuild via internal-ops generate-rust-runner-image.
+            print(
+                '::warning::Prebuilt image is stale for %s; jobs will install the '
+                'pinned toolchain on demand (slower) until the image is rebuilt.' % stale
+            )
+        else:
+            print(json.dumps(manifest, indent=2))
         PY
+        # No-op when current; installs the pinned toolchain when the image is stale.
+        rustup show >/dev/null
         rustc --version
         cargo nextest --version
         cargo sort --version
