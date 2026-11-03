@@ -19,7 +19,10 @@ use aptos_jellyfish_merkle::{
 };
 use aptos_storage_interface::{DbReader, DbWriter, StateKind, StateSnapshotReceiver};
 use aptos_temppath::TempPath;
-use aptos_types::nibble::nibble_path::NibblePath;
+use aptos_types::{
+    nibble::nibble_path::NibblePath,
+    on_chain_config::{HotStateConfigV1, OnChainHotStateConfig},
+};
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::BTreeMap;
 
@@ -185,6 +188,52 @@ pub fn test_get_state_snapshot_before() {
             .unwrap(),
         Some(0)
     );
+}
+
+#[test]
+fn test_load_on_chain_hot_state_config() {
+    let tmp_dir = TempPath::new();
+    let current_config = |db: &AptosDB| {
+        db.state_store
+            .live()
+            .unwrap()
+            .current_state_locked()
+            .ledger_state()
+            .hot_state_config()
+    };
+    let on_chain = OnChainHotStateConfig::V1(HotStateConfigV1 {
+        max_items_per_shard: vec![3; NUM_STATE_SHARDS],
+        max_bytes_per_shard: vec![5_000; NUM_STATE_SHARDS],
+        refresh_interval_versions: 7,
+        max_promotions_per_block: 0,
+    });
+    let value = StateValue::new_legacy(
+        bcs::to_bytes(&bcs::to_bytes(&on_chain).unwrap())
+            .unwrap()
+            .into(),
+    );
+
+    let config = {
+        let db = AptosDB::new_for_test(&tmp_dir);
+        let local = HotStateConfig::default();
+        assert_eq!(
+            current_config(&db).max_items(0).get(),
+            local.max_items_per_shard
+        );
+        assert_eq!(current_config(&db).max_bytes(0), local.max_bytes_per_shard);
+
+        let key = StateKey::on_chain_config::<OnChainHotStateConfig>().unwrap();
+        db.state_store
+            .commit_block_for_test(0, [vec![(key, Some(value))]]);
+        let config = current_config(&db);
+        assert_eq!(config.max_items(0).get(), 3);
+        assert_eq!(config.max_bytes(0), 5_000);
+        assert_eq!(config.refresh_interval_versions(), 7);
+        config
+    };
+
+    let db = AptosDB::new_for_test(&tmp_dir);
+    assert_eq!(current_config(&db), config);
 }
 
 proptest! {
