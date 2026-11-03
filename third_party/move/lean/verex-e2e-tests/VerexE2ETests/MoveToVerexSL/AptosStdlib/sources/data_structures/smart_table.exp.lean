@@ -249,7 +249,7 @@ verex module aptos_std::smart_table where
     self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
     v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(91)
+    spec assume folds_capture_anchor!(99)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
@@ -270,15 +270,15 @@ verex module aptos_std::smart_table where
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(91, old(self')).length >= len
+      invariant with_state_anchor!(99, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(91, old(self')).length
-        == with_state_anchor!(91, old(v2)).length
+      invariant with_state_anchor!(99, old(self')).length
+        == with_state_anchor!(99, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(91, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(91, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(91, old(self')).length), true
+        self'[j] == with_state_anchor!(99, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(99, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(99, old(self')).length), true
       invariant true
     core.prim.destroyEmptyVector(self')
     core.prim.destroyEmptyVector(v2)
@@ -302,7 +302,7 @@ verex module aptos_std::smart_table where
           let mut keys := vector<K>[]
           let mut values := vector<V>[]
           let self := entries
-          spec assume folds_capture_anchor!(95)
+          spec assume folds_capture_anchor!(103)
           let i := 0
           let len := self.length
           while i < len do
@@ -314,11 +314,14 @@ verex module aptos_std::smart_table where
           where
             invariant i <= len
             invariant ∀ (j in 0 .. i), true
-            invariant (keys, values)
-              == «spec_fold$gen$0»(
-                self, with_state_anchor!(95, old(keys)),
-                with_state_anchor!(95, old(values)), i
+            invariant keys
+              == «spec_fold$lambda$0»(
+                self, with_state_anchor!(103, old(keys)), i
               )
+              && values
+                == «spec_fold$lambda$1»(
+                  self, with_state_anchor!(103, old(values)), i
+                )
             invariant ∀ (j in i .. len), true
             invariant ∀ (x : Entry<K, V>),
               ∀ (j in 0 .. i), x != self[j] ==> true
@@ -709,18 +712,6 @@ verex module aptos_std::smart_table where
   -- This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
   -- while remove would continue from the identified index to the end of the vector.
   -- We need to reverse the vector to consume it efficiently
-  @[weight = 50]
-  spec fun «spec_fold$gen$0» {T0} {T1}(
-    _v : Vector<Entry<T0, T1> >, «keys$init» : Vector<T0>,
-    «values$init» : Vector<T1>, _end : u64
-  ) : (Vector<T0>, Vector<T1>) :=
-    if _end == 0 then («keys$init», «values$init»)
-    else
-      let («keys$acc», «values$acc») :=
-        «spec_fold$gen$0»(_v, «keys$init», «values$init», _end - 1)
-      (concat(«keys$acc», vec(_v[_end - 1].key)),
-        concat(«values$acc», vec(_v[_end - 1].value)))
-
   -- We need to reverse the vectors to consume it efficiently
   -- We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
   -- due to how inline functions work.
@@ -736,3 +727,26 @@ verex module aptos_std::smart_table where
   -- =================================================================
   -- Module Specification
   -- Switch to module documentation context
+  /--
+  `f` folded over `v[0..end]`, starting from `init`.
+  -/
+  @[weight = 49]
+  spec fun «spec_fold$lambda$0» {T0} {T1}(
+    v : Vector<Entry<T0, T1> >, init : Vector<T0>, end : u64
+  ) : Vector<T0> :=
+    if end == 0 then init
+    else
+      let (_acc_53, e) := («spec_fold$lambda$0»(v, init, end - 1), v[end - 1])
+      concat(_acc_53, vec(e.key))
+
+  /--
+  `f` folded over `v[0..end]`, starting from `init`.
+  -/
+  @[weight = 49]
+  spec fun «spec_fold$lambda$1» {T0} {T1}(
+    v : Vector<Entry<T0, T1> >, init : Vector<T1>, end : u64
+  ) : Vector<T1> :=
+    if end == 0 then init
+    else
+      let (_acc_56, e) := («spec_fold$lambda$1»(v, init, end - 1), v[end - 1])
+      concat(_acc_56, vec(e.value))
