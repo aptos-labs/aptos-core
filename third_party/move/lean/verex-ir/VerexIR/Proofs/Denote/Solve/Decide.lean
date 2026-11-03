@@ -4027,31 +4027,47 @@ def conjuncts (proof : Lean.Expr) : MetaM (Array Lean.Expr) :=
 /-- A proof of the stored invariants of a memory from the context: a
 hypothesis or a conjunct of one stating them, or an implication concluding
 them whose premise has such a proof, as a function preserving them states. -/
-private partial def storedInvariantsProof? (memory : Lean.Expr) (fuel : Nat := 8) :
-    MetaM (Option Lean.Expr) := do
-  if fuel == 0 then return none
-  let rec conjunct (proof type : Lean.Expr) : Nat → MetaM (Option Lean.Expr)
-    | 0 => pure none
-    | depth + 1 => do
-      if type.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
-          type.getArg! 3 == memory then
-        return some proof
-      if let some (left, right) := type.and? then
-        if let some found ← conjunct (mkApp3 (mkConst ``And.left) left right proof) left depth then
-          return some found
-        return ← conjunct (mkApp3 (mkConst ``And.right) left right proof) right depth
-      if type.isArrow && type.bindingBody!.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
-          type.bindingBody!.getArg! 3 == memory then
-        let premise := type.bindingDomain!
-        if premise.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4 &&
-            premise.getArg! 3 != memory then
-          if let some held ← storedInvariantsProof? (premise.getArg! 3) (fuel - 1) then
-            return some (mkApp proof held)
-      return none
+private partial def storedInvariantsProof? (memory : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  -- Index the finite context once. A fixed recursion depth loses preservation
+  -- chains after enough calls; revisiting the context recursively also repeats
+  -- work on shared predecessors. Key by the whole proposition, so different
+  -- invariant predicates at the same memory cannot be mixed.
+  let known ← IO.mkRef ({} : Std.HashMap Lean.Expr Lean.Expr)
+  let edges ← IO.mkRef ({} : Std.HashMap Lean.Expr (Array (Lean.Expr × Lean.Expr)))
+  let roots ← IO.mkRef (#[] : Array Lean.Expr)
+  let isInvariant (type : Lean.Expr) :=
+    type.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4
+  let rec collect (proof type : Lean.Expr) : MetaM Unit := do
+    checkSystem "stored invariants"
+    if isInvariant type then
+      known.modify (·.insert type proof)
+      if type.getArg! 3 == memory then roots.modify (·.push type)
+    else if let some (left, right) := type.and? then
+      collect (mkApp3 (mkConst ``And.left) left right proof) left
+      collect (mkApp3 (mkConst ``And.right) left right proof) right
+    else if type.isArrow && isInvariant type.bindingDomain! && isInvariant type.bindingBody! then
+      let premise := type.bindingDomain!
+      let conclusion := type.bindingBody!
+      edges.modify fun index => index.insert conclusion
+        ((index[conclusion]?.getD #[]).push (proof, premise))
+      if conclusion.getArg! 3 == memory then roots.modify (·.push conclusion)
   for declaration in ← getLCtx do
-    if declaration.isImplementationDetail then continue
-    if let some proof ← conjunct declaration.toExpr (← instantiateMVars declaration.type) 32 then
-      return some proof
+    unless declaration.isImplementationDetail do
+      collect declaration.toExpr (← instantiateMVars declaration.type)
+  let rec prove (statement : Lean.Expr) (visiting : Std.HashSet Lean.Expr) :
+      MetaM (Option Lean.Expr) := do
+    checkSystem "stored invariants"
+    if let some proof := (← known.get)[statement]? then return some proof
+    if visiting.contains statement then return none
+    let visiting := visiting.insert statement
+    for (implication, premise) in (← edges.get)[statement]?.getD #[] do
+      if let some held ← prove premise visiting then
+        let proof := mkApp implication held
+        known.modify (·.insert statement proof)
+        return some proof
+    return none
+  for statement in ← roots.get do
+    if let some proof ← prove statement {} then return some proof
   return none
 
 /-- That a stored value's resource arguments are inhabitable, as the case of

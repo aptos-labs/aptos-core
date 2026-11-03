@@ -1261,13 +1261,18 @@ def framework_overview(point):
     selection, sweep = point["selection"], point["sweep"]
     counts = {}
     rows = []
-    for module in sweep["modules"]:
-        for target in module["targets"]:
-            status = target["status"]
-            counts[status] = counts.get(status, 0) + 1
-            rows.append(f'<tr><td>{html.escape(module["module"])}</td>'
-                        f'<td>{html.escape(target["target"])}</td><td>{html.escape(status)}</td>'
-                        f'<td>{beat_count(target.get("heartbeats"))}</td></tr>')
+    targets = sorted(
+        ((module["module"], target) for module in sweep["modules"] for target in module["targets"]),
+        key=lambda item: (item[1].get("heartbeats") is None,
+                          -item[1].get("heartbeats", 0), item[0], item[1]["target"]))
+    for rank, (module, target) in enumerate(targets, 1):
+        status = target["status"]
+        counts[status] = counts.get(status, 0) + 1
+        beats = target.get("heartbeats")
+        measured_rank = str(rank) if beats is not None else "–"
+        rows.append(f'<tr><td>{measured_rank}</td><td>{html.escape(module)}</td>'
+                    f'<td>{html.escape(target["target"])}</td><td>{html.escape(status)}</td>'
+                    f'<td>{f"{beats:,}" if beats is not None else "–"}</td></tr>')
     summary = ", ".join(f"{counts.get(status, 0)} {status}"
                         for status in ("verified", "budget", "failed", "interrupted"))
     modules = ", ".join(html.escape(name) for name in selection["modules"])
@@ -1286,7 +1291,9 @@ def framework_overview(point):
             'Module wall times include export and elaboration; their sum is not elapsed wall time. '
             'Namespace preparation has no heartbeat measurement here.</p>'
             f'<details><summary>Selected modules</summary><p>{modules}</p></details>'
-            f'<details><summary>All observed targets</summary><table><tr><th>Module</th>'
+            f'<details id="ranked-targets"><summary>All targets ranked by heartbeats (highest first)</summary>'
+            '<p>Targets without a completed heartbeat measurement appear last, unranked.</p>'
+            '<table><tr><th>Rank</th><th>Module</th>'
             f'<th>Target</th><th>Status</th><th>Heartbeats</th></tr>{"".join(rows)}</table></details>'
             '</section>')
 

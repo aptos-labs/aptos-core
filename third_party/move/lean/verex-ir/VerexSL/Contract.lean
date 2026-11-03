@@ -3375,7 +3375,10 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes
             arguments
           let permitted := (← modelAborts (contextOf state bound) bound).getD
-            (if isStrict then mkConst ``False else mkConst ``True)
+            -- Strictness supplies an implicit `aborts_if false`. In partial
+            -- mode it is sufficient only, just like an explicit clause;
+            -- it imposes no coverage requirement on an actual abort.
+            (if isStrict && !isPartial then mkConst ``False else mkConst ``True)
           mkLambdaFVars #[arguments, state, failureBinder] permitted
         else
           let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments

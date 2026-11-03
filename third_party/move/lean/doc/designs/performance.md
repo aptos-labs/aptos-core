@@ -463,6 +463,30 @@ increased verified-target heartbeats by 0.77%. The original single-arrival
 proposal therefore remains unresolved; do not infer the predicted 50M saving
 from its earlier leaf profile.
 
+### Staking-contract aborts and invariant preservation
+
+`new_staking_contracts_holder` exposed two completeness problems. Its module
+sets strict abort checking, but the function sets partial checking with no
+abort clauses. Strictness supplies an implicit `aborts_if false`; partial
+mode makes it sufficient only. Treating the empty list as an unconditional
+no-abort requirement produced false obligations at event-handle calls.
+The contract translation now follows the Move Prover's partial semantics,
+while retaining explicit abort-code checks and native/map models.
+
+After correcting that, the final memory invariant still failed: nine event
+handle calls give nine preservation implications, but `storedInvariantsProof?`
+stopped after eight links. It now indexes context facts and searches their
+implications with cycle detection and successful-proof memoization, matching
+whole invariant propositions rather than mixing predicates at a memory.
+
+Whole-module `staking_contract` runs at `--heartbeats 300`, with shared
+continuations enabled, improve from 7 verified / 11 budget / 2 failed to
+9 verified / 10 budget / 1 failed. The holder verifies at 240.22M heartbeats
+(previously budget-stopped at 347.32M recorded work); `update_distribution_pool`
+verifies at 42.81M (previously failed at 275.96M). The seven targets already
+verified retain essentially identical cost. The remaining ten budget stops
+and one failed target are unresolved.
+
 ## What cannot change
 
 Every step is a kernel-checked term, so rewriting costs in proportion to
