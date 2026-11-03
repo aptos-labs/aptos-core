@@ -7,6 +7,7 @@ pub mod chunky_dkg;
 pub mod dummy_dkg;
 pub mod randomness_dkg;
 pub mod real_dkg;
+pub mod recovery;
 
 pub use randomness_dkg::{
     DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGState, DKGTrait, DKGTranscript,
