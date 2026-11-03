@@ -1,0 +1,12 @@
+module 0xe1::clospackbad
+
+fun add(x: u64, y: u64): u64
+    move_loc x
+    move_loc y
+    add
+    ret
+
+fun f(): |u64|u64 has drop
+    ld_u8 1
+    pack_closure add, 1
+    ret

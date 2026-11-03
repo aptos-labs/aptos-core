@@ -1,0 +1,13 @@
+module 0xfa::genvariantsame
+
+enum E<A, B> has drop
+  V1
+    x: A
+  V2
+    x: B
+
+fun f(e: &E<u64, u64>): u64
+    move_loc e
+    borrow_variant_field E<u64, u64>, V1::x, V2::x
+    read_ref
+    ret

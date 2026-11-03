@@ -1,0 +1,8 @@
+module 0xb1::acqextra
+
+struct R has key
+  v: u64
+
+fun f(): u64 acquires R
+    ld_u64 1
+    ret

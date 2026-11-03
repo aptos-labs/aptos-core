@@ -1,0 +1,5 @@
+module 0xac::deeptype
+
+fun f(x: vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>>): u64
+    ld_u64 1
+    ret

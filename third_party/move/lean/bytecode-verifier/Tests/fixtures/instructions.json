@@ -1,0 +1,245 @@
+{
+  "format": "move-bytecode-lean/1",
+  "instructions": [
+    "Pop",
+    "Ret",
+    {
+      "BrTrue": 1
+    },
+    {
+      "BrFalse": 2
+    },
+    {
+      "Branch": 3
+    },
+    {
+      "LdU8": "255"
+    },
+    {
+      "LdU64": "18446744073709551615"
+    },
+    {
+      "LdU128": "340282366920938463463374607431768211455"
+    },
+    "CastU8",
+    "CastU64",
+    "CastU128",
+    {
+      "LdConst": 4
+    },
+    "LdTrue",
+    "LdFalse",
+    {
+      "CopyLoc": 5
+    },
+    {
+      "MoveLoc": 6
+    },
+    {
+      "StLoc": 7
+    },
+    {
+      "Call": 8
+    },
+    {
+      "CallGeneric": 9
+    },
+    {
+      "Pack": 10
+    },
+    {
+      "PackGeneric": 11
+    },
+    {
+      "PackVariant": 12
+    },
+    {
+      "PackVariantGeneric": 13
+    },
+    {
+      "Unpack": 14
+    },
+    {
+      "UnpackGeneric": 15
+    },
+    {
+      "UnpackVariant": 16
+    },
+    {
+      "UnpackVariantGeneric": 17
+    },
+    {
+      "TestVariant": 18
+    },
+    {
+      "TestVariantGeneric": 19
+    },
+    "ReadRef",
+    "WriteRef",
+    "FreezeRef",
+    {
+      "MutBorrowLoc": 20
+    },
+    {
+      "ImmBorrowLoc": 21
+    },
+    {
+      "MutBorrowField": 22
+    },
+    {
+      "MutBorrowVariantField": 23
+    },
+    {
+      "MutBorrowFieldGeneric": 24
+    },
+    {
+      "MutBorrowVariantFieldGeneric": 25
+    },
+    {
+      "ImmBorrowField": 26
+    },
+    {
+      "ImmBorrowVariantField": 27
+    },
+    {
+      "ImmBorrowFieldGeneric": 28
+    },
+    {
+      "ImmBorrowVariantFieldGeneric": 29
+    },
+    {
+      "MutBorrowGlobal": 30
+    },
+    {
+      "MutBorrowGlobalGeneric": 31
+    },
+    {
+      "ImmBorrowGlobal": 32
+    },
+    {
+      "ImmBorrowGlobalGeneric": 33
+    },
+    "Add",
+    "Sub",
+    "Mul",
+    "Mod",
+    "Div",
+    "BitOr",
+    "BitAnd",
+    "Xor",
+    "Or",
+    "And",
+    "Not",
+    "Eq",
+    "Neq",
+    "Lt",
+    "Gt",
+    "Le",
+    "Ge",
+    "Abort",
+    "Nop",
+    {
+      "Exists": 34
+    },
+    {
+      "ExistsGeneric": 35
+    },
+    {
+      "MoveFrom": 36
+    },
+    {
+      "MoveFromGeneric": 37
+    },
+    {
+      "MoveTo": 38
+    },
+    {
+      "MoveToGeneric": 39
+    },
+    "Shl",
+    "Shr",
+    {
+      "VecPack": [
+        40,
+        "18446744073709551615"
+      ]
+    },
+    {
+      "VecLen": 41
+    },
+    {
+      "VecImmBorrow": 42
+    },
+    {
+      "VecMutBorrow": 43
+    },
+    {
+      "VecPushBack": 44
+    },
+    {
+      "VecPopBack": 45
+    },
+    {
+      "VecUnpack": [
+        46,
+        "47"
+      ]
+    },
+    {
+      "VecSwap": 48
+    },
+    {
+      "PackClosure": [
+        49,
+        "18446744073709551615"
+      ]
+    },
+    {
+      "PackClosureGeneric": [
+        50,
+        "5"
+      ]
+    },
+    {
+      "CallClosure": 51
+    },
+    {
+      "LdU16": "65535"
+    },
+    {
+      "LdU32": "4294967295"
+    },
+    {
+      "LdU256": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+    },
+    "CastU16",
+    "CastU32",
+    "CastU256",
+    {
+      "LdI8": "-128"
+    },
+    {
+      "LdI16": "-32768"
+    },
+    {
+      "LdI32": "-2147483648"
+    },
+    {
+      "LdI64": "-9223372036854775808"
+    },
+    {
+      "LdI128": "-170141183460469231731687303715884105728"
+    },
+    {
+      "LdI256": "-57896044618658097711785492504343953926634992332820282019728792003956564819968"
+    },
+    "CastI8",
+    "CastI16",
+    "CastI32",
+    "CastI64",
+    "CastI128",
+    "CastI256",
+    "Negate",
+    "AbortMsg"
+  ]
+}

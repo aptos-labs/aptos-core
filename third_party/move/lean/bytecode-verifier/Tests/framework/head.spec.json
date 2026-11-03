@@ -1,0 +1,5 @@
+{
+ "bundles": ["../../../../../../aptos-move/framework/cached-packages/src/head.mrb"],
+ "inputs": [],
+ "calls": []
+}

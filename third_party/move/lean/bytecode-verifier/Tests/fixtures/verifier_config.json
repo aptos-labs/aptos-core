@@ -1,0 +1,37 @@
+{
+  "format": "move-bytecode-lean-config/1",
+  "inputs": {
+    "gas_feature_version": 54,
+    "features": "default",
+    "timed_features_chain": "mainnet",
+    "timed_features_timestamp_micros": "1790812800000000"
+  },
+  "verifier_config": {
+    "scope": "Everything",
+    "max_loop_depth": 5,
+    "max_function_parameters": 128,
+    "max_generic_instantiation_length": 32,
+    "max_basic_blocks": 1024,
+    "max_value_stack_size": 1024,
+    "max_type_nodes": 128,
+    "max_push_size": 10000,
+    "max_struct_definitions": 1100,
+    "max_struct_variants": 127,
+    "max_fields_in_struct": 64,
+    "max_function_definitions": 1000,
+    "max_back_edges_per_function": null,
+    "max_back_edges_per_module": null,
+    "max_basic_blocks_in_script": 1024,
+    "max_per_fun_meter_units": "80000000",
+    "max_per_mod_meter_units": "80000000",
+    "use_signature_checker_v2": true,
+    "sig_checker_v2_fix_script_ty_param_count": true,
+    "enable_enum_types": true,
+    "enable_resource_access_control": false,
+    "enable_function_values": true,
+    "max_function_return_values": 128,
+    "max_type_depth": 20,
+    "sig_checker_v2_fix_function_signatures": true,
+    "check_function_type_abilities": true
+  }
+}

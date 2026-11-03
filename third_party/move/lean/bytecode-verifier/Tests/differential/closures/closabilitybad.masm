@@ -1,0 +1,7 @@
+module 0xe3::closabilitybad
+
+fun g(f: |u64|u64 has drop, y: u64): u64
+    move_loc y
+    move_loc f
+    call_closure <|u64|u64 has copy + drop>
+    ret

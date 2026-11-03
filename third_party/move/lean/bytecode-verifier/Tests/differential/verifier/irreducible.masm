@@ -1,0 +1,9 @@
+module 0x94::irreducible
+
+fun f()
+    ld_true
+    br_true l2
+l1: nop
+    branch l2
+l2: nop
+    branch l1

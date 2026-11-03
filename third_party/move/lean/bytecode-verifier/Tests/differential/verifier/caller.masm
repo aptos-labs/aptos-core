@@ -1,0 +1,6 @@
+module 0x9e::caller
+use 0x9d::callee as c
+
+fun f(): u64
+    call c::hidden
+    ret

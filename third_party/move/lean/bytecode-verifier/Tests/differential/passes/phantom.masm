@@ -1,0 +1,8 @@
+module 0xa9::phantom
+
+struct S<phantom T> has drop
+  f: T
+
+fun f(): u64
+    ld_u64 1
+    ret

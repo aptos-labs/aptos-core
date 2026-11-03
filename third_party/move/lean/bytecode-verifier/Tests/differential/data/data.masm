@@ -1,0 +1,124 @@
+module 0x88::data
+
+struct Pair has copy + drop
+  a: u64
+  b: u64
+
+struct Coin
+  value: u64
+
+enum Shape has copy + drop
+  Circle
+    r: u64
+  Rect
+    w: u64
+    h: u64
+
+public fun pair_sum(x: u64, y: u64): u64
+    move_loc x
+    move_loc y
+    pack Pair
+    unpack Pair
+    add
+    ret
+
+public fun make(x: u64, y: u64): Pair
+    move_loc x
+    move_loc y
+    pack Pair
+    ret
+
+public fun sum(p: Pair): u64
+    move_loc p
+    unpack Pair
+    add
+    ret
+
+public fun copy_pair(x: u64): u64
+    local p: Pair
+    copy_loc x
+    move_loc x
+    pack Pair
+    st_loc p
+    copy_loc p
+    unpack Pair
+    add
+    move_loc p
+    unpack Pair
+    add
+    add
+    ret
+
+public fun area(w: u64, h: u64): u64
+    move_loc w
+    move_loc h
+    pack_variant Shape, Rect
+    unpack_variant Shape, Rect
+    mul
+    ret
+
+public fun wrong_variant(r: u64): u64
+    move_loc r
+    pack_variant Shape, Circle
+    unpack_variant Shape, Rect
+    add
+    ret
+
+public fun same_circle(a: u64, b: u64): bool
+    move_loc a
+    pack_variant Shape, Circle
+    move_loc b
+    pack_variant Shape, Circle
+    eq
+    ret
+
+public fun coin_roundtrip(v: u64): u64
+    move_loc v
+    pack Coin
+    unpack Coin
+    ret
+
+public fun vec3(a: u64, b: u64, c: u64): vector<u64>
+    move_loc a
+    move_loc b
+    move_loc c
+    vec_pack <u64>, 3
+    ret
+
+public fun vec_sum(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    vec_pack <u64>, 2
+    vec_unpack <u64>, 2
+    add
+    ret
+
+public fun vec_bad_len(a: u64): u64
+    move_loc a
+    vec_pack <u64>, 1
+    vec_unpack <u64>, 2
+    add
+    ret
+
+public fun vec_eq(a: u64, b: u64): bool
+    move_loc a
+    vec_pack <u64>, 1
+    move_loc b
+    vec_pack <u64>, 1
+    eq
+    ret
+
+public fun const_vec(): vector<u8>
+    ld_const<vector<u8>> [1, 2, 3]
+    ret
+
+public fun nested(): vector<vector<u8>>
+    ld_const<vector<u8>> [7]
+    ld_const<vector<u8>> []
+    vec_pack <vector<u8>>, 2
+    ret
+
+public fun msg(code: u64)
+    move_loc code
+    ld_const<vector<u8>> [104, 105]
+    abort_msg

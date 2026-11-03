@@ -1,0 +1,13 @@
+module 0xe6::clostorebad
+
+struct S has store + drop
+  f: |u64|u64 has store + drop
+
+fun id(x: u64): u64
+    move_loc x
+    ret
+
+fun f(): S
+    pack_closure id, 0
+    pack S
+    ret

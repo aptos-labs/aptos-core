@@ -1,0 +1,52 @@
+module 0xc0::refok
+
+fun pick(a: &u64, b: &u64): &u64
+    move_loc a
+    ret
+
+fun call_pick(x: &mut u64, y: &u64): &u64
+    copy_loc y
+    copy_loc y
+    eq
+    pop
+    copy_loc y
+    copy_loc y
+    call pick
+    move_loc x
+    pop
+    ret
+
+fun loop_copy(x: &mut u64, n: u64): &mut u64
+    local y: &mut u64
+    copy_loc x
+    st_loc y
+l1: copy_loc n
+    ld_u64 0
+    eq
+    br_true l2
+    move_loc n
+    ld_u64 1
+    sub
+    st_loc n
+    copy_loc x
+    st_loc y
+    branch l1
+l2: move_loc x
+    ret
+
+fun take(x: &mut u64)
+    move_loc x
+    pop
+    ret
+
+fun join_release(x: &mut u64, c: bool)
+    local y: &mut u64
+    copy_loc x
+    st_loc y
+    copy_loc c
+    br_false l1
+    move_loc y
+    pop
+l1: move_loc x
+    call take
+    ret

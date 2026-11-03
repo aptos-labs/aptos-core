@@ -1,0 +1,22 @@
+name = "bytecode-verifier"
+defaultTargets = ["Spec", "Model", "Proofs", "Import"]
+testDriver = "Tests"
+
+# TRUSTED: syntax, reference semantics, and property statements (plan §5–§7).
+[[lean_lib]]
+name = "Spec"
+
+# UNTRUSTED: the transcription of the Rust verifier, bugs included (plan §9.1).
+[[lean_lib]]
+name = "Model"
+
+# UNTRUSTED: proofs, checked by the kernel against `Spec`.
+[[lean_lib]]
+name = "Proofs"
+
+# Decoding of the exporter's JSON into `Spec.Syntax` (deliverable A4).
+[[lean_lib]]
+name = "Import"
+
+[[lean_lib]]
+name = "Tests"

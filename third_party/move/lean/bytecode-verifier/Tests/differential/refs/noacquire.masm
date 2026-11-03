@@ -1,0 +1,11 @@
+module 0xdc::noacquire
+
+struct R has key
+  v: u64
+
+fun f(a: address): u64
+    move_loc a
+    borrow_global R
+    borrow_field R, v
+    read_ref
+    ret

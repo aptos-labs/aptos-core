@@ -1,0 +1,9 @@
+module 0xf1::genpackbad
+
+struct S<A> has drop
+  a: A
+
+fun f(): S<u64>
+    ld_u8 1
+    pack S<u64>
+    ret

@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    "verifier/fallthrough.masm",
+    "verifier/underflow.masm",
+    "verifier/leftover.masm",
+    "verifier/irreducible.masm",
+    "verifier/deep6.masm",
+    "verifier/deep5.masm",
+    "verifier/brtype.masm",
+    "verifier/badadd.masm",
+    "verifier/unassigned.masm",
+    "verifier/movetwice.masm",
+    "verifier/maybe.masm",
+    "verifier/rettype.masm",
+    "verifier/callee.masm",
+    "verifier/caller.masm"
+  ],
+  "calls": []
+}

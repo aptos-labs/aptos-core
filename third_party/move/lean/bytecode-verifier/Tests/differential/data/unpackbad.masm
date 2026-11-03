@@ -1,0 +1,15 @@
+module 0x89::unpackbad
+
+struct Pair has drop
+  a: u64
+  b: u64
+
+struct One has drop
+  a: u64
+
+fun f(): u64
+    ld_u64 1
+    ld_u64 2
+    pack Pair
+    unpack One
+    ret

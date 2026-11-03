@@ -53,6 +53,7 @@ verex-rust verify bounds.rs      # specifications in bounds.spec.lean
 | [`verex-move`](verex-move/) | The Move semantic profile and intrinsic registry, the Move exchange frontend (`VerexMove/Frontend`), and the XIR backend (`VerexMove/Xir`) through which compiler-v2 compiles `.lean` sources to Move bytecode. |
 | [`verex-rust`](verex-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](verex-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. |
 | [`verex-e2e-tests`](verex-e2e-tests/) | Move-to-VerexSL and Rust-to-VerexSL baselines, verification of Move and Rust sources, and the verification check fixtures under `VerexE2ETests/Check/`. |
+| [`bytecode-verifier`](bytecode-verifier/) | Independent of the Verex stack: a reference semantics of Move bytecode and soundness proofs for the bytecode verifier ([`doc/designs/bytecode-verifier-soundness.md`](doc/designs/bytecode-verifier-soundness.md)), with a Rust exporter of compiled bytecode. |
 
 [`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
 and `transpiler`; nothing links them. Documentation is under [`doc/`](doc/): designs, the plan
@@ -76,6 +77,7 @@ own directory:
 (cd verex-move       && lake build && lake test)
 (cd verex-rust       && lake build && lake test)
 (cd verex-e2e-tests && lake build && lake test)
+(cd bytecode-verifier && lake build && lake test)
 ```
 
 The core libraries need no Aptos CLI. The end-to-end driver builds the

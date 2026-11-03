@@ -1,0 +1,5 @@
+module 0x91::fallthrough
+
+fun f()
+    ld_true
+    pop
