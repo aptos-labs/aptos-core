@@ -1,0 +1,9 @@
+[package]
+name = "paranoid_type_check_cost"
+version = "0.0.0"
+
+[addresses]
+attacker = "0xcafe"
+
+[dependencies]
+MoveStdlib = { local = "../../../../../framework/move-stdlib" }

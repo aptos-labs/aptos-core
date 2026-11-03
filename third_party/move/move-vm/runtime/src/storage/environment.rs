@@ -38,6 +38,7 @@ use move_vm_types::{
     ty_interner::InternedTypePool,
 };
 use std::sync::Arc;
+use triomphe::Arc as TriompheArc;
 
 const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
 const MEM_MODULE_BYTES: &[u8] = include_bytes!("mem.mv");
@@ -343,17 +344,28 @@ impl RuntimeEnvironment {
         ty_tag_builder.ty_to_ty_tag(ty)
     }
 
+    /// Canonical string of the type's tag, cached per interned type in [TypeTagCache].
+    pub fn ty_to_canonical_string(&self, ty: &Type) -> PartialVMResult<TriompheArc<str>> {
+        let ty_id = self.interned_ty_pool.intern_ty(ty);
+        if let Some(name) = ty_id.and_then(|id| self.ty_tag_cache.get_canonical_name(id)) {
+            return Ok(name);
+        }
+        let name: TriompheArc<str> =
+            TriompheArc::from(self.ty_to_ty_tag(ty)?.to_canonical_string().as_str());
+        if let Some(id) = ty_id {
+            self.ty_tag_cache.insert_canonical_name(id, name.clone());
+        }
+        Ok(name)
+    }
+
     /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
     /// [None].
     pub fn get_struct_name(&self, ty: &Type) -> PartialVMResult<Option<(ModuleId, Identifier)>> {
         use Type::*;
 
-        Ok(match ty {
-            Struct { idx, .. } | StructInstantiation { idx, .. } => {
-                let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                let (module, name) = struct_identifier.into_module_and_name();
-                Some((module, name))
-            },
+        let idx = match ty {
+            Struct { idx, .. } => *idx,
+            StructInstantiation(node) => node.idx(),
             Bool
             | U8
             | U16
@@ -373,8 +385,11 @@ impl RuntimeEnvironment {
             | Vector(_)
             | Reference(_)
             | MutableReference(_)
-            | Function { .. } => None,
-        })
+            | Function { .. } => return Ok(None),
+        };
+        let struct_identifier = self.struct_name_index_map().idx_to_struct_name(idx)?;
+        let (module, name) = struct_identifier.into_module_and_name();
+        Ok(Some((module, name)))
     }
 
     /// Returns the size of the struct name re-indexing cache. Can be used to bound the size of the
@@ -383,8 +398,9 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.checked_len()
     }
 
-    /// Flushes the global caches with struct name indices and struct tags. Note that when calling
-    /// this function, modules that still store indices into struct name cache must also be flushed.
+    /// Flushes the struct name, type and type tag caches. Loaded modules hold struct name
+    /// indices and interned type ids, so the module cache must be flushed with this, and never
+    /// during execution (callers hold the module cache manager).
     pub fn flush_all_caches(&self) {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();

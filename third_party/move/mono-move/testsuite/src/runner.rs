@@ -836,7 +836,7 @@ impl PrimitiveKind {
         // `vector<u8>` renders as a hex byte dump (distinct from `String`);
         // `vector<u64>` as a decimal list.
         if let Type::Vector(elem) = ty {
-            match &**elem {
+            match elem.ty() {
                 Type::U8 => return PrimitiveKind::ByteVector,
                 Type::U64 => return PrimitiveKind::U64Vector,
                 _ => {},

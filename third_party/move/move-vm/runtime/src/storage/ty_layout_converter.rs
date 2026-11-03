@@ -547,17 +547,16 @@ where
                 depth + 1,
                 struct_layout_cache,
             )?,
-            Type::StructInstantiation { idx, ty_args, .. } => self
-                .struct_to_type_layout::<ANNOTATED>(
-                    gas_meter,
-                    traversal_context,
-                    modules,
-                    idx,
-                    ty_args,
-                    count,
-                    depth + 1,
-                    struct_layout_cache,
-                )?,
+            Type::StructInstantiation(node) => self.struct_to_type_layout::<ANNOTATED>(
+                gas_meter,
+                traversal_context,
+                modules,
+                &node.idx(),
+                node.ty_args(),
+                count,
+                depth + 1,
+                struct_layout_cache,
+            )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1040,7 +1039,7 @@ mod tests {
 
     /// Wraps `ty` in `n` nested vectors.
     fn vec_ty(ty: Type, n: usize) -> Type {
-        (0..n).fold(ty, |ty, _| Type::Vector(triomphe::Arc::new(ty)))
+        (0..n).fold(ty, |ty, _| Type::vector(ty))
     }
 
     /// Asserts that every key in `keys` is distinct from every other.
@@ -1111,13 +1110,9 @@ mod tests {
             Type::I256,
             Type::Address,
             Type::Signer,
-            Type::Function {
-                args: vec![Type::U8],
-                results: vec![Type::U256],
-                abilities: AbilitySet::EMPTY,
-            },
-            Type::Reference(Box::new(Type::U8)),
-            Type::MutableReference(Box::new(Type::U8)),
+            Type::function(vec![Type::U8], vec![Type::U256], AbilitySet::EMPTY),
+            Type::reference(Type::U8),
+            Type::mut_reference(Type::U8),
             Type::TyParam(0),
         ];
         for ty in &uncacheable {
@@ -1327,15 +1322,11 @@ mod tests {
             (Type::Address, MoveTypeLayout::Address),
             (Type::Signer, MoveTypeLayout::Signer),
             (
-                Type::Vector(triomphe::Arc::new(Type::U8)),
+                Type::vector(Type::U8),
                 MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
             ),
             (
-                Type::Function {
-                    args: vec![Type::U8],
-                    results: vec![Type::U256],
-                    abilities: AbilitySet::EMPTY,
-                },
+                Type::function(vec![Type::U8], vec![Type::U256], AbilitySet::EMPTY),
                 MoveTypeLayout::Function,
             ),
         ];
@@ -1362,14 +1353,14 @@ mod tests {
         let loader = MockStructDefinitionLoader::new_with_config(vm_config);
         let layout_converter = LayoutConverter::new(&loader);
 
-        let vec_u8_ty = Type::Vector(triomphe::Arc::new(Type::U8));
+        let vec_u8_ty = Type::vector(Type::U8);
         assert_ok!(construct_layout_for_test(
             &layout_converter,
             &vec_u8_ty,
             annotated
         ));
 
-        let vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_u8_ty));
+        let vec_vec_u8_ty = Type::vector(vec_u8_ty);
         let result = construct_layout_for_test(&layout_converter, &vec_vec_u8_ty, annotated);
         if enable_lazy_loading {
             let err = assert_err!(result);
@@ -1378,7 +1369,7 @@ mod tests {
             assert_ok!(result);
         }
 
-        let vec_vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_vec_u8_ty));
+        let vec_vec_vec_u8_ty = Type::vector(vec_vec_u8_ty);
         let err = assert_err!(construct_layout_for_test(
             &layout_converter,
             &vec_vec_vec_u8_ty,
@@ -1397,14 +1388,14 @@ mod tests {
         let loader = MockStructDefinitionLoader::new_with_config(vm_config);
         let layout_converter = LayoutConverter::new(&loader);
 
-        let vec_u8_ty = Type::Vector(triomphe::Arc::new(Type::U8));
+        let vec_u8_ty = Type::vector(Type::U8);
         assert_ok!(construct_layout_for_test(
             &layout_converter,
             &vec_u8_ty,
             annotated
         ));
 
-        let vec_vec_u8_ty = Type::Vector(triomphe::Arc::new(vec_u8_ty));
+        let vec_vec_u8_ty = Type::vector(vec_u8_ty);
         let err = assert_err!(construct_layout_for_test(
             &layout_converter,
             &vec_vec_u8_ty,
@@ -1526,10 +1517,7 @@ mod tests {
         let f = loader.get_struct_identifier("F");
         let g = loader.get_struct_identifier("G");
         loader.add_enum("F", vec![("V0", vec![("g", struct_ty(g))])]);
-        loader.add_enum("G", vec![("V0", vec![(
-            "fs",
-            Type::Vector(triomphe::Arc::new(struct_ty(f))),
-        )])]);
+        loader.add_enum("G", vec![("V0", vec![("fs", Type::vector(struct_ty(f)))])]);
 
         let layout_converter = LayoutConverter::new(&loader);
         for idx in [a, b] {
@@ -1622,7 +1610,7 @@ mod tests {
         ]);
         loader.add_enum("E", vec![("V0", vec![(
             "ds",
-            Type::Vector(triomphe::Arc::new(generic_struct_ty(d, vec![Type::U8]))),
+            Type::vector(generic_struct_ty(d, vec![Type::U8])),
         )])]);
 
         let layout_converter = LayoutConverter::new(&loader);
