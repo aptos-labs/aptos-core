@@ -46,7 +46,7 @@ impl Sampling {
 
     fn sample_frequency(rate: u64, count: &AtomicU64) -> bool {
         let previous_count = count
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
                 let new_count = if count == 0 {
                     rate.saturating_sub(1)
                 } else {
@@ -68,7 +68,7 @@ impl Sampling {
             .as_secs();
 
         last_sample
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |last_sample| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |last_sample| {
                 if now.saturating_sub(last_sample) >= rate {
                     Some(now)
                 } else {
