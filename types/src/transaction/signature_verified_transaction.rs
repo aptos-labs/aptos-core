@@ -134,6 +134,10 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
         Transaction::block_epilogue_v2(block_id, block_end_info, fee_distribution, to_make_hot)
             .into()
     }
+
+    fn promoted_key_size(key: &StateKey) -> usize {
+        key.size()
+    }
 }
 
 impl From<Transaction> for SignatureVerifiedTransaction {

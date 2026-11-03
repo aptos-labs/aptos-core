@@ -2282,8 +2282,10 @@ where
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
                     if !has_reconfig {
-                        let block_end_info = block_limit_processor
-                            .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
+                        let block_end_info = block_limit_processor.get_block_end_info(
+                            |k| executor.materialize_storage_key(k.clone()),
+                            T::promoted_key_size,
+                        )?;
                         block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
                             signature_verified_block,
@@ -2447,9 +2449,10 @@ where
         // like state sync or replay, the BlockEpilogue txn should already in the input
         // and we don't need to add one here.
         if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
-            let block_end_info = block_limit_processor
-                .acquire()
-                .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
+            let block_end_info = block_limit_processor.acquire().get_block_end_info(
+                |k| executor.materialize_storage_key(k.clone()),
+                T::promoted_key_size,
+            )?;
             let epilogue_txn = self.gen_block_epilogue(
                 block_id,
                 block,

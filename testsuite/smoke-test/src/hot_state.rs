@@ -709,7 +709,7 @@ async fn test_hot_state_on_chain_config() {
     wait_for_all_nodes(&mut swarm).await;
 
     let max_hot_items = (TINY_HOT_STATE_ITEMS_PER_SHARD * NUM_STATE_SHARDS) as i64;
-    let max_promotions_per_block = 2;
+    let max_promotion_bytes_per_block = 100;
     let validator = swarm.validator(validator_peer_id).unwrap();
     wait_for_metric(validator, HOT_STATE_ITEMS_METRIC, |n| {
         n.is_some_and(|n| n > max_hot_items)
@@ -724,7 +724,7 @@ async fn test_hot_state_on_chain_config() {
         max_items_per_shard: vec![TINY_HOT_STATE_ITEMS_PER_SHARD as u64; NUM_STATE_SHARDS],
         max_bytes_per_shard: vec![u64::MAX; NUM_STATE_SHARDS],
         refresh_interval_versions: 10,
-        max_promotions_per_block,
+        max_promotion_bytes_per_block,
     });
     set_hot_state_config_via_governance(&mut swarm, &mut cli, &validator_client, &config).await;
 
