@@ -1,5 +1,5 @@
-VerexE2ETests/SourceVerify/fold_captures.move:43:9: error: the specification clause `ensures result == 1` is not established
-VerexE2ETests/SourceVerify/fold_captures.move:41:5: error: verex verification failed: the automatic verification of `count_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/fold_captures.proof.lean`:
+VerexE2ETests/SourceVerify/fold_captures.move:47:9: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/fold_captures.move:45:5: error: verex verification failed: the automatic verification of `count_wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/fold_captures.proof.lean`:
   verify count_wrong by lean =>
     verex_obligations
     verex_on

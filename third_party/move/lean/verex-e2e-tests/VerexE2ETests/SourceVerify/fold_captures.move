@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// A fold over two captures generates a specification function returning both,
-// which the loop invariant binds with a tuple `let` under a quantifier.
+// Independent captures specialize the module's fold recursion separately.
 module 0x42::fold_captures {
+    spec fun spec_fold<T, Acc>(f: |Acc, &T| Acc, v: vector<T>, init: Acc, end: u64): Acc {
+        if (end == 0) init
+        else result_of<f>(spec_fold(f, v, init, end - 1), v[end - 1])
+    }
+
     inline fun each<E>(v: &vector<E>, f: |&E|) {
         let i = 0;
         let len = std::vector::length(v);
