@@ -6,12 +6,12 @@ use crate::{
     state_kv_db::LoadedHotStateShard,
 };
 use anyhow::{ensure, Result};
-use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
+    hot_state_config::EffectiveHotStateConfig,
     state::{HotStateMetadata, State},
     state_delta::StateDelta,
     state_view::hot_state_view::HotStateView,
@@ -162,7 +162,7 @@ impl LoadedHotState {
     pub(crate) fn new(
         version: Version,
         usage: StateStorageUsage,
-        config: HotStateConfig,
+        config: EffectiveHotStateConfig,
         loaded: [LoadedHotStateShard; NUM_STATE_SHARDS],
     ) -> Self {
         let metadata = std::array::from_fn(|i| {
@@ -561,8 +561,11 @@ impl Committer {
 
         let delta = target.make_delta(&self.merged_state);
         for shard_id in 0..NUM_STATE_SHARDS {
-            for (key_hash, slot) in delta.shards[shard_id].iter() {
+            for (key_hash, mut slot) in delta.shards[shard_id].iter() {
                 if slot.is_hot() {
+                    // Saves memory. The full key is only needed to build JMT updates, which skip
+                    // anything not newer than the persisted snapshot that the base reflects.
+                    slot.clear_state_key();
                     if self.base.shards[shard_id].insert(key_hash, slot).is_some() {
                         n_update += 1;
                     } else {
@@ -703,6 +706,7 @@ mod tests {
 
     const TEST_CONFIG: HotStateConfig = HotStateConfig {
         max_items_per_shard: 100,
+        max_bytes_per_shard: 10_000,
         refresh_interval_versions: 100,
         delete_on_restart: false,
     };
@@ -763,8 +767,58 @@ mod tests {
             Arc::new(shards),
             Default::default(),
             StateStorageUsage::zero(),
-            TEST_CONFIG,
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
         )
+    }
+
+    /// Builds a descendant of `root` at `version` whose hot state is exactly `slot` (a single entry,
+    /// so its uninitialized LRU pointers are valid).
+    fn build_descendant_with_hot_slot(
+        root: &State,
+        key: &StateKey,
+        slot: StateSlot,
+        version: Version,
+    ) -> State {
+        let key_hash = *key.crypto_hash_ref();
+        let shard_id = key.get_shard_id();
+        let mut metadata: [HotStateMetadata; NUM_STATE_SHARDS] = Default::default();
+        metadata[shard_id] = HotStateMetadata::new(Some(key_hash), Some(key_hash), 1, slot.size());
+        let shards = std::array::from_fn(|i| {
+            let entries = if i == shard_id {
+                vec![(key_hash, slot.clone())]
+            } else {
+                vec![]
+            };
+            root.shards()[i]
+                .view_layers_after(&root.shards()[i])
+                .new_layer(&entries)
+        });
+        State::new_with_updates(
+            Some(version),
+            Arc::new(shards),
+            metadata,
+            StateStorageUsage::zero(),
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
+        )
+    }
+
+    #[test]
+    fn test_merge_drops_state_key() {
+        let state0 = State::new_empty(TEST_CONFIG);
+        let hot_state = HotState::new(LoadedHotState::empty(state0.clone()));
+
+        let key = StateKey::raw(b"key");
+        let slot = make_hot_slot(&key, 0, b"value");
+        assert_eq!(slot.state_key(), Some(&key));
+        let state1 = build_descendant_with_hot_slot(&state0, &key, slot.clone(), 0);
+        hot_state.enqueue_commit(state1);
+        hot_state.wait_for_merge(1);
+
+        let entries = hot_state.get_all_entries(key.get_shard_id());
+        assert_eq!(entries.len(), 1);
+        let merged = &entries[key.crypto_hash_ref()];
+        assert!(merged.state_key().is_none());
+        assert_eq!(merged.kind(), slot.kind());
     }
 
     // ===== LayeredHotStateView tests =====

@@ -206,8 +206,6 @@ impl MerklePrunerSchema for OrderEpochSnapshot {
 }
 
 /// Native-collateral regular merkle pruner.
-// Used once the collateral store is attached to AptosDB.
-#[allow(dead_code)]
 pub(crate) enum CollateralStateMerkle {}
 impl MerklePrunerSchema for CollateralStateMerkle {
     type StaleIndexSchema = StaleNodeIndexSchema;
@@ -230,8 +228,6 @@ impl MerklePrunerSchema for CollateralStateMerkle {
 }
 
 /// Native-collateral epoch-snapshot merkle pruner.
-// Used once the collateral store is attached to AptosDB.
-#[allow(dead_code)]
 pub(crate) enum CollateralEpochSnapshot {}
 impl MerklePrunerSchema for CollateralEpochSnapshot {
     type StaleIndexSchema = StaleNodeIndexCrossEpochSchema;

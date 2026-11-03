@@ -1016,7 +1016,7 @@ mod reopen {
             BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
             TransactionToCommit, Version,
         },
-        write_set::{NativeOrderOp, NativePositionOp, WriteOp, WriteSet},
+        write_set::{NativeCollateralOp, NativeOrderOp, NativePositionOp, WriteOp, WriteSet},
     };
     use std::collections::BTreeMap;
 
@@ -1081,6 +1081,51 @@ mod reopen {
                     .collect(),
             );
         }
+        TransactionToCommit::new(
+            Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
+            txn_info,
+            write_set,
+            vec![],
+            false,
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    /// As [`block_with_orders`], writing each `(collateral key, value)`
+    /// instead of orders; `None` deletes.
+    fn block_with_collateral(
+        writes: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+    ) -> TransactionToCommit {
+        let txn_info = TransactionInfo::builder_v1()
+            .transaction_hash(HashValue::random())
+            .state_change_hash(HashValue::random())
+            .event_root_hash(HashValue::random())
+            .state_checkpoint_hash(HashValue::random())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .build();
+        let positions: BTreeMap<_, _> = writes
+            .iter()
+            .map(|(key, tag)| {
+                let op = WriteOp::legacy_modification(position_bytes(*tag).into());
+                (key.clone(), NativePositionOp::from_write_op(op))
+            })
+            .collect();
+        let mut write_set = WriteSet::default().into_v1();
+        write_set.add_native_positions(positions);
+        write_set.add_native_collateral(
+            collateral
+                .iter()
+                .map(|(key, value)| {
+                    let op = match value {
+                        Some(bytes) => WriteOp::legacy_modification(bytes.to_vec().into()),
+                        None => WriteOp::legacy_deletion(),
+                    };
+                    (key.clone(), NativeCollateralOp::from_write_op(op))
+                })
+                .collect(),
+        );
         TransactionToCommit::new(
             Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
             txn_info,
@@ -1693,6 +1738,301 @@ mod reopen {
         assert_eq!(
             order
                 .store
+                .merkle_db
+                .latest_snapshot_version_at_or_before(Version::MAX)
+                .unwrap(),
+            Some(2),
+        );
+    }
+
+    /// A serialized collateral entry, told apart by `tag`.
+    fn collateral_value(tag: u8) -> Vec<u8> {
+        use aptos_types::state_store::native_collateral::NativeCollateral;
+        NativeCollateral::V1 {
+            primary_offset: 1 << 63,
+            secondaries: vec![],
+            reserved: u64::from(tag),
+        }
+        .serialize()
+        .unwrap()
+    }
+
+    fn collateral_key(account: u8) -> StateKey {
+        use aptos_types::state_store::state_key::inner::CollateralScope;
+        StateKey::collateral(exchange(1), super::account(account), CollateralScope::Cross)
+    }
+
+    fn commit_collateral(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+    ) {
+        db.save_transactions_for_test(
+            &[block_with_collateral(positions, collateral)],
+            version,
+            None,
+            true,
+        )
+        .expect("commit");
+    }
+
+    /// The collateral store's live rows at its latest JMT snapshot, which
+    /// must be at the ledger tip.
+    fn collateral_rows(db: &AptosDB) -> BTreeMap<StateKey, Vec<u8>> {
+        let collateral = db.collateral.as_ref().expect("collateral store attached");
+        let tip = db.get_synced_version().unwrap().expect("synced version");
+        let snapshot = collateral
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap();
+        assert_eq!(snapshot, Some(tip), "collateral snapshot at the tip");
+        collateral
+            .snapshot_rows(tip)
+            .unwrap()
+            .map(|row| {
+                let (key, value) = row.unwrap();
+                (key, value.bytes().to_vec())
+            })
+            .collect()
+    }
+
+    /// Collateral writes land in the collateral store, latest-wins with
+    /// deletes, and a reopen sees them from the JMT; positions in the same
+    /// blocks stay in the position store.
+    #[test]
+    fn collateral_commits_to_its_own_store_and_survives_reopen() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[(position_key(1), 10)], &[
+                (collateral_key(1), Some(&collateral_value(b'a'))),
+                (collateral_key(2), Some(&collateral_value(b'b'))),
+            ]);
+            commit_collateral(&db, 1, &[], &[
+                (collateral_key(1), None),
+                (collateral_key(3), Some(&collateral_value(b'c'))),
+            ]);
+            commit_collateral(&db, 2, &[(position_key(2), 20)], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'B')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([
+                (collateral_key(2), collateral_value(b'B')),
+                (collateral_key(3), collateral_value(b'c')),
+            ])
+        );
+        let positions = position_row_keys(&db);
+        assert_eq!(positions.len(), 2, "{positions:?}");
+        assert!(order_rows(&db).is_empty(), "no order was ever written");
+        assert_eq!(size_of(&db, 1), Some(10));
+        assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// Flag on through v0, off for v1..=v2, on again: the reopen replays the
+    /// gap into the collateral store.
+    #[test]
+    fn reenabling_replays_the_gap_into_the_collateral_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+        }
+        {
+            let db = open(&dir, false);
+            assert!(db.collateral.as_ref().is_none());
+            commit_collateral(&db, 1, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'b')),
+            )]);
+            commit_collateral(&db, 2, &[], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'c')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([
+                (collateral_key(1), collateral_value(b'b')),
+                (collateral_key(2), collateral_value(b'c')),
+            ])
+        );
+    }
+
+    /// Position and order writes leave the collateral store empty.
+    #[test]
+    fn other_native_writes_never_reach_the_collateral_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_orders(&db, 0, &[(position_key(1), 10)], &[(
+                order_key(1),
+                Some(&order_value(b'a')),
+            )]);
+        }
+        let db = open(&dir, true);
+        assert!(
+            collateral_rows(&db).is_empty(),
+            "no collateral was ever written"
+        );
+        assert_eq!(order_rows(&db).len(), 1);
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// A crash between the collateral commit and the ledger's progress write
+    /// leaves collateral rows above the chain; the reopen truncates them.
+    #[test]
+    fn reopening_truncates_collateral_rows_ahead_of_the_ledger() {
+        use crate::{
+            native_state_committer::{
+                new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter,
+            },
+            utils::truncation_helper::get_native_commit_progress,
+        };
+        use aptos_crypto::hash::CryptoHash;
+        use std::sync::Arc;
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            commit_collateral(&db, 1, &[], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'b')),
+            )]);
+
+            let collateral = db.collateral.as_ref().unwrap();
+            let committer = NativeStateCommitter::new(Arc::clone(&collateral.kv_db));
+            let mut batches = new_sharded_kv_batches();
+            let mut in_chunk_prior = InChunkPriorVersions::new();
+            let ahead = WriteOp::legacy_modification(collateral_value(b'x').into());
+            committer
+                .apply(
+                    2,
+                    std::iter::once((&collateral_key(1), &ahead)),
+                    &mut batches,
+                    &mut in_chunk_prior,
+                )
+                .unwrap();
+            collateral.kv_db.commit(2, None, batches).unwrap();
+            assert_eq!(
+                get_native_commit_progress(&collateral.kv_db).unwrap(),
+                Some(2)
+            );
+        }
+        let db = open(&dir, true);
+        let collateral = db.collateral.as_ref().unwrap();
+        assert_eq!(
+            get_native_commit_progress(&collateral.kv_db).unwrap(),
+            Some(1)
+        );
+        let (version, value) = collateral
+            .kv_db
+            .get_value(collateral_key(1).hash(), 2)
+            .unwrap()
+            .expect("v0 row survives");
+        assert_eq!(version, 0, "the row ahead of the ledger is gone");
+        assert_eq!(value.bytes().as_ref(), collateral_value(b'a'));
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([
+                (collateral_key(1), collateral_value(b'a')),
+                (collateral_key(2), collateral_value(b'b')),
+            ])
+        );
+    }
+
+    /// Commits wake the collateral value pruner, so superseded collateral
+    /// rows are pruned while the node stays up, not only after a restart.
+    #[test]
+    fn commits_drive_the_collateral_value_pruner() {
+        use crate::pruner::PrunerManager;
+        use aptos_config::config::{LedgerPrunerConfig, PrunerConfig};
+        use aptos_crypto::hash::CryptoHash;
+
+        let dir = TempPath::new();
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            PrunerConfig {
+                ledger_pruner_config: LedgerPrunerConfig {
+                    enable: true,
+                    prune_window: 0,
+                    batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+                ..NO_OP_STORAGE_PRUNER_CONFIG
+            },
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("open");
+        commit_collateral(&db, 0, &[], &[(
+            collateral_key(1),
+            Some(&collateral_value(b'a')),
+        )]);
+        commit_collateral(&db, 1, &[], &[(
+            collateral_key(1),
+            Some(&collateral_value(b'b')),
+        )]);
+        commit_collateral(&db, 2, &[], &[(
+            collateral_key(2),
+            Some(&collateral_value(b'c')),
+        )]);
+
+        let collateral = db.collateral.as_ref().unwrap();
+        let value_pruner = &collateral.pruner.as_ref().unwrap().value_pruner;
+        value_pruner.wait_for_pruner().unwrap();
+        assert_eq!(value_pruner.get_min_readable_version(), 2);
+        assert!(
+            collateral
+                .kv_db
+                .get_value(collateral_key(1).hash(), 0)
+                .unwrap()
+                .is_none(),
+            "the superseded v0 row is pruned"
+        );
+        let (version, _) = collateral
+            .kv_db
+            .get_value(collateral_key(1).hash(), 2)
+            .unwrap()
+            .expect("live row kept");
+        assert_eq!(version, 1);
+    }
+
+    /// The collateral tree follows the chain through blocks with no
+    /// collateral writes, so it persists snapshots and a reopen replays only
+    /// past the latest.
+    #[test]
+    fn collateral_snapshots_track_the_chain_without_collateral_writes() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[]);
+            commit(&db, 2, &[]);
+        }
+        let db = open(&dir, true);
+        let collateral = db.collateral.as_ref().expect("collateral store attached");
+        assert_eq!(
+            collateral
                 .merkle_db
                 .latest_snapshot_version_at_or_before(Version::MAX)
                 .unwrap(),

@@ -68,6 +68,9 @@ pub struct VerifierConfig {
     /// Rejects function types whose abilities are not a subset of
     /// `AbilitySet::PUBLIC_FUNCTIONS` when enabled.
     pub check_function_type_abilities: bool,
+    /// Requires every variant field handle to list distinct variants that all
+    /// declare the field with the same (uninstantiated) type.
+    pub uniform_variant_field_handles: bool,
 }
 
 /// Scope of verification.
@@ -149,7 +152,7 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
         })?;
         FeatureVerifier::verify_module(config, module)?;
         LimitsVerifier::verify_module(config, module)?;
-        DuplicationChecker::verify_module(module)?;
+        DuplicationChecker::verify_module(config, module)?;
 
         signature_v2::verify_module(config, module)?;
 
@@ -279,6 +282,8 @@ impl VerifierConfig {
 
         max_function_return_values: None,
         max_type_depth: None,
+
+        uniform_variant_field_handles: true,
     };
 }
 
@@ -328,6 +333,8 @@ impl VerifierConfig {
 
             max_function_return_values: Some(128),
             max_type_depth: Some(20),
+
+            uniform_variant_field_handles: true,
         }
     }
 

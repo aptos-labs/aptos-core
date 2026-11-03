@@ -1684,6 +1684,7 @@ pub(crate) fn try_map_slots<FromForm, ToForm, E>(
                 function_handle,
                 ty_args,
                 args,
+                reentrancy_check,
             } = *data;
             Instr::Call {
                 data: Box::new(CallData {
@@ -1691,6 +1692,7 @@ pub(crate) fn try_map_slots<FromForm, ToForm, E>(
                     function_handle,
                     ty_args,
                     args: try_map_slot_box(args, &mut f)?,
+                    reentrancy_check,
                 }),
             }
         },

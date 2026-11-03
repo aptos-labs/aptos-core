@@ -312,7 +312,10 @@ where
         current_frame: &Frame,
         fh_idx: FunctionHandleIndex,
     ) -> VMResult<LoadedFunction> {
-        let ty_args_id = self.ty_pool.intern_ty_args(&[]);
+        let ty_args_id = self
+            .ty_pool
+            .intern_ty_args(&[])
+            .map_err(|e| self.set_location(e))?;
         let function = current_frame
             .build_loaded_function_from_handle_and_ty_args(
                 self.loader,
@@ -411,8 +414,13 @@ where
                         return Err(set_err_info!(current_frame, err));
                     }
 
+                    let ty_pool = self.loader.runtime_environment().ty_pool();
                     self.call_stack
-                        .type_check_return::<RTTCheck>(&mut self.operand_stack, &mut current_frame)
+                        .type_check_return::<RTTCheck>(
+                            &mut self.operand_stack,
+                            &mut current_frame,
+                            ty_pool,
+                        )
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
@@ -747,11 +755,9 @@ where
 
                     // Validate that the closure signature matches the signature of the loaded
                     // callee and has the right number of parameter and return values.
-                    if let Type::Function { args, results, .. } =
-                        current_frame.single_type_at(sig_idx)
-                    {
-                        let num_expected_params = args.len();
-                        let num_expected_results = results.len();
+                    if let Type::Function(node) = current_frame.single_type_at(sig_idx) {
+                        let num_expected_params = node.args().len();
+                        let num_expected_results = node.results().len();
                         let num_actual_results = callee.return_tys().len();
 
                         if num_expected_params != num_actual_params
@@ -874,6 +880,7 @@ impl CallStack {
         &self,
         operand_stack: &mut Stack,
         current_frame: &mut Frame,
+        ty_pool: &InternedTypePool,
     ) -> PartialVMResult<()>
     where
         RTTCheck: RuntimeTypeCheck,
@@ -896,7 +903,7 @@ impl CallStack {
                 return Err(current_frame
                     .stack_size_mismatch_error(actual_type_stack_size, expected_type_stack_size));
             }
-            self.check_return_tys::<RTTCheck>(operand_stack, current_frame)?;
+            self.check_return_tys::<RTTCheck>(operand_stack, current_frame, ty_pool)?;
             if !caller_has_rt_checks {
                 // The callee has pushed return types, but they aren't used by
                 // the caller, so need to be removed.
@@ -920,11 +927,11 @@ impl CallStack {
                     operand_stack.push_ty(ret_ty.clone())?
                 }
             } else {
-                for ret_ty in current_frame.function.return_tys() {
-                    let ret_ty = current_frame
-                        .ty_builder()
-                        .create_ty_with_subst(ret_ty, ty_args)?;
-                    operand_stack.push_ty(ret_ty)?
+                for ret_ty in current_frame
+                    .function
+                    .instantiated_return_tys(current_frame.ty_builder())?
+                {
+                    operand_stack.push_ty(ret_ty.clone())?
                 }
             }
         }
@@ -932,27 +939,27 @@ impl CallStack {
     }
 
     // Check whether the values on the operand stack have the expected return types.
+    // Intern both sides so deep-type equality short-circuits on ids.
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_return_tys<RTTCheck: RuntimeTypeCheck>(
         &self,
         operand_stack: &mut Stack,
         current_frame: &mut Frame,
+        ty_pool: &InternedTypePool,
     ) -> PartialVMResult<()> {
         let expected_ret_tys = current_frame.function.return_tys();
         if expected_ret_tys.is_empty() {
             return Ok(());
         }
         let given_ret_tys = operand_stack.last_n_tys(expected_ret_tys.len())?;
-        for (expected, given) in expected_ret_tys.iter().zip(given_ret_tys) {
-            let ty_args = current_frame.function.ty_args();
-            if ty_args.is_empty() {
-                given.paranoid_check_assignable(expected)?;
-            } else {
-                let expected_inst = current_frame
-                    .ty_builder
-                    .create_ty_with_subst(expected, ty_args)?;
-                given.paranoid_check_assignable(&expected_inst)?;
-            }
+        // Memoized for generic callees; the definition signature otherwise.
+        let expected_tys = current_frame
+            .function
+            .instantiated_return_tys(&current_frame.ty_builder)?;
+        for (expected, given) in expected_tys.iter().zip(given_ret_tys) {
+            ty_pool.warm_ty(expected);
+            ty_pool.warm_ty(given);
+            given.paranoid_check_assignable(expected)?;
         }
 
         Ok(())
@@ -1045,20 +1052,10 @@ where
             if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
                 // Captured arguments are already verified against function signature.
-                let ty_args = function.ty_args();
+                // Inside the check, so unchecked trusted calls do zero type work.
                 let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &function.local_tys()[i];
-                if !ty_args.is_empty() {
-                    let expected_ty = self
-                        .vm_config
-                        .ty_builder
-                        .create_ty_with_subst(expected_ty, ty_args)?;
-                    // For parameter to argument, use assignability
-                    ty.paranoid_check_assignable(&expected_ty)?;
-                } else {
-                    // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_assignable(expected_ty)?;
-                }
+                let expected_tys = function.instantiated_param_tys(&self.vm_config.ty_builder)?;
+                ty.paranoid_check_assignable(&expected_tys[i])?;
             }
         }
         RTRCheck::core_call_transition(&function, mask, &mut self.ref_state)?;
@@ -1148,22 +1145,17 @@ where
         let mut arg_tys = VecDeque::new();
         let ty_args = function.ty_args();
         if RTTCheck::should_perform_checks(&current_frame.function.function) {
+            // Memoized on the resolved function (natives have no frame to amortize over).
+            let expected_tys = function.instantiated_param_tys(ty_builder)?;
             for i in (0..num_param_tys).rev() {
-                let expected_ty = &function.param_tys()[i];
+                let expected_ty = &expected_tys[i];
                 let arg_ty = if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
                     // For param type to argument, use assignability
-                    if ty_args.is_empty() {
-                        ty.paranoid_check_assignable(expected_ty)?;
-                    } else {
-                        let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        ty.paranoid_check_assignable(&expected_ty)?;
-                    }
+                    ty.paranoid_check_assignable(expected_ty)?;
                     ty
-                } else if ty_args.is_empty() {
-                    expected_ty.clone()
                 } else {
-                    ty_builder.create_ty_with_subst(expected_ty, ty_args)?
+                    expected_ty.clone()
                 };
                 arg_tys.push_front(arg_ty);
             }
@@ -1231,15 +1223,8 @@ where
                 // If the caller requires checks, push return types of native function to
                 // satisfy runtime check protocol.
                 if RTTCheck::should_perform_checks(&current_frame.function.function) {
-                    if function.ty_args().is_empty() {
-                        for ty in function.return_tys() {
-                            self.operand_stack.push_ty(ty.clone())?;
-                        }
-                    } else {
-                        for ty in function.return_tys() {
-                            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
-                            self.operand_stack.push_ty(ty)?;
-                        }
+                    for ty in function.instantiated_return_tys(ty_builder)? {
+                        self.operand_stack.push_ty(ty.clone())?;
                     }
 
                     // Stack balance check after pushing return types.
@@ -1295,7 +1280,7 @@ where
             } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
 
-                let ty_args_id = self.ty_pool.intern_ty_args(&ty_args);
+                let ty_args_id = self.ty_pool.intern_ty_args(&ty_args)?;
                 let target_func = current_frame.build_loaded_function_from_name_and_ty_args(
                     self.loader,
                     gas_meter,
@@ -1520,7 +1505,7 @@ where
     ) -> PartialVMResult<()> {
         let struct_idx = match ty {
             Type::Struct { idx, .. } => *idx,
-            Type::StructInstantiation { idx, .. } => *idx,
+            Type::StructInstantiation(node) => node.idx(),
             _ => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1847,17 +1832,70 @@ where
     ///
     /// The check uses `max_depth - 1` because the closure being packed adds one additional level
     /// of nesting on top of its captured values.
-    fn check_depth_of_closure_captured_values(&self, captured: &[Value]) -> PartialVMResult<()> {
+    ///
+    /// Values whose type bounds their depth within the limit are not traversed. Traversed values
+    /// are charged for.
+    fn meter_and_check_depth_of_closure_captured_values(
+        &self,
+        gas_meter: &mut impl GasMeter,
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        captured: &[Value],
+    ) -> PartialVMResult<()> {
         if !self.vm_config.enable_closure_depth_check {
             return Ok(());
         }
         if let Some(max_depth) = self.vm_config.max_value_nest_depth {
             let limit = max_depth.saturating_sub(1);
-            for v in captured.iter() {
+            let captured_tys = mask.extract(function.param_tys(), true);
+            if captured_tys.len() != captured.len() {
+                return Err(PartialVMError::new_invariant_violation(
+                    "number of captured values does not match closure mask",
+                ));
+            }
+            let traversed = captured
+                .iter()
+                .zip(captured_tys)
+                .filter(|(_, ty)| {
+                    plain_value_depth(ty, function.ty_args()).is_none_or(|depth| depth > limit)
+                })
+                .map(|(v, _)| v);
+            gas_meter.charge_pack_closure_captured_values(traversed.clone())?;
+            for v in traversed {
                 v.check_depth_of_value(limit)?;
             }
         }
         Ok(())
+    }
+}
+
+/// Returns the depth of the deepest value of `ty` (0 for a primitive) if the type determines it,
+/// i.e., values cannot contain structs or closures. Otherwise returns `None`.
+fn plain_value_depth(ty: &Type, ty_args: &[Type]) -> Option<u64> {
+    match ty {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address => Some(0),
+        Type::Vector(elem_ty) => plain_value_depth(elem_ty, ty_args)?.checked_add(1),
+        Type::TyParam(idx) => plain_value_depth(ty_args.get(*idx as usize)?, &[]),
+        // Signer values are enum variants holding addresses.
+        Type::Signer
+        | Type::Struct { .. }
+        | Type::StructInstantiation { .. }
+        | Type::Function { .. }
+        | Type::Reference(_)
+        | Type::MutableReference(_) => None,
     }
 }
 
@@ -2702,7 +2740,7 @@ impl Frame {
                                 .last_n(mask.captured_count() as usize)?,
                         )?;
 
-                        let ty_args_id = interpreter.ty_pool.intern_ty_args(&[]);
+                        let ty_args_id = interpreter.ty_pool.intern_ty_args(&[])?;
                         let function = self
                             .build_loaded_function_from_handle_and_ty_args(
                                 interpreter.loader,
@@ -2733,7 +2771,9 @@ impl Frame {
                         }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        interpreter.meter_and_check_depth_of_closure_captured_values(
+                            gas_meter, &function, *mask, &captured,
+                        )?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
@@ -2788,7 +2828,9 @@ impl Frame {
                         }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        interpreter.meter_and_check_depth_of_closure_captured_values(
+                            gas_meter, &function, *mask, &captured,
+                        )?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,

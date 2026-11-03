@@ -35,11 +35,12 @@ use move_vm_profiler::ProfilerFunction;
 use move_vm_types::{
     gas::DependencyGasMeter,
     instr::Instruction,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{Type, TypeBuilder},
     module_id_interner::InternedModuleId,
-    ty_interner::TypeVecId,
+    ty_interner::{InternedTypePool, TypeVecId},
     values::{AbstractFunction, SerializedFunctionData},
 };
+use once_cell::unsync::OnceCell;
 use std::{
     cell::RefCell,
     cmp::Ordering,
@@ -50,6 +51,7 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 lazy_static! {
     /// List of native functions that perform a dynamic dispatch via reflection. This was a hack
@@ -157,12 +159,53 @@ impl LoadedFunctionOwner {
 pub struct LoadedFunction {
     pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
-    // function is not generic, an empty vector.
-    pub ty_args: Vec<Type>,
+    // function is not generic, an empty vector. Private: the instantiated parameter and return
+    // types below are derived from it, so it must not change after construction.
+    ty_args: Vec<Type>,
     // Unique identifier for type arguments.
     pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
     pub function: Arc<Function>,
+    // Parameter/return types with `ty_args` applied, computed once so call checks never
+    // re-substitute.
+    cached_instantiated_param_tys: OnceCell<TriompheArc<[Type]>>,
+    cached_instantiated_return_tys: OnceCell<TriompheArc<[Type]>>,
+}
+
+impl LoadedFunction {
+    /// Creates a loaded function, interning `ty_args` in `ty_pool`.
+    pub fn new(
+        owner: LoadedFunctionOwner,
+        ty_args: Vec<Type>,
+        function: Arc<Function>,
+        ty_pool: &InternedTypePool,
+    ) -> PartialVMResult<Self> {
+        let ty_args_id = ty_pool.intern_ty_args(&ty_args)?;
+        Ok(Self::new_with_ty_args_id(
+            owner, ty_args, ty_args_id, function,
+        ))
+    }
+
+    /// Creates a loaded function whose `ty_args` are already interned as `ty_args_id`.
+    pub(crate) fn new_with_ty_args_id(
+        owner: LoadedFunctionOwner,
+        ty_args: Vec<Type>,
+        ty_args_id: TypeVecId,
+        function: Arc<Function>,
+    ) -> Self {
+        Self {
+            owner,
+            ty_args,
+            ty_args_id,
+            function,
+            cached_instantiated_param_tys: OnceCell::new(),
+            cached_instantiated_return_tys: OnceCell::new(),
+        }
+    }
+
+    pub(crate) fn owner(&self) -> &LoadedFunctionOwner {
+        &self.owner
+    }
 }
 
 impl ProfilerFunction for LoadedFunction {
@@ -173,10 +216,6 @@ impl ProfilerFunction for LoadedFunction {
 }
 
 impl LoadedFunction {
-    pub(crate) fn owner(&self) -> &LoadedFunctionOwner {
-        &self.owner
-    }
-
     /// Returns a reference to parent [Script] owning the script's entrypoint function. Returns an
     /// invariant violation error if the function comes from a module.
     pub fn owner_as_script(&self) -> VMResult<&Script> {
@@ -251,6 +290,9 @@ pub(crate) struct LazyLoadedFunction {
     /// reading it never takes a borrow: values are visited while `as_resolved` may hold a mutable
     /// one. Re-resolution reuses the same type argument tags, so the memo stays valid.
     pub(crate) ty_args_pseudo_gas_cost: u64,
+    /// Number of bytes the captured layouts serialize to, or 0 if not metered. Kept outside the
+    /// `RefCell` for the same reason. Resolution keeps the captured layouts, so it stays valid.
+    pub(crate) captured_layouts_size: u64,
 }
 
 #[derive(Clone)]
@@ -299,10 +341,12 @@ impl LazyLoadedFunction {
     pub(crate) fn new_unresolved(
         data: SerializedFunctionData,
         ty_args_pseudo_gas_cost: u64,
+        captured_layouts_size: u64,
     ) -> Self {
         Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved { data })),
             ty_args_pseudo_gas_cost,
+            captured_layouts_size,
         }
     }
 
@@ -325,7 +369,7 @@ impl LazyLoadedFunction {
         // arguments. This way layouts always exist for storable closures and there is no need to
         // construct them at serialization time. This makes loading and metering logic much simpler
         // while adding layout construction overhead only for storable closures.
-        let captured_layouts = fun
+        let captured = fun
             .function
             .is_persistent()
             .then(|| {
@@ -344,6 +388,10 @@ impl LazyLoadedFunction {
                 })
             })
             .transpose()?;
+        let (captured_layouts, captured_layouts_size) = match captured {
+            Some((layouts, size)) => (Some(layouts), size),
+            None => (None, 0),
+        };
 
         // Record the version (hash) of the defining module so that later calls can detect if the
         // module was republished within the same transaction, and re-resolve. Only needed for
@@ -370,6 +418,7 @@ impl LazyLoadedFunction {
                 module_hash,
             })),
             ty_args_pseudo_gas_cost,
+            captured_layouts_size,
         })
     }
 
@@ -396,49 +445,53 @@ impl LazyLoadedFunction {
                 module_hash,
             })),
             ty_args_pseudo_gas_cost,
+            captured_layouts_size: 0,
         })
     }
 
-    /// For a given function and a mask, constructs a vector of layouts for the captured arguments.
-    /// Returns [None] if there are any captured delayed fields in the layouts (i.e., the captured
-    /// values are not serializable not "displayable"). For all other failures, an error is
-    /// returned.
+    /// For a given function and a mask, constructs a vector of layouts for the captured arguments,
+    /// together with the number of bytes they serialize to if closures are metered by it (0
+    /// otherwise). Returns [None] if there are any captured delayed fields in the layouts (i.e.,
+    /// the captured values are not serializable not "displayable"). For all other failures, an
+    /// error is returned.
     pub(crate) fn construct_captured_layouts(
         layout_converter: &LayoutConverter<impl Loader>,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         fun: &LoadedFunction,
         mask: ClosureMask,
-    ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
-        let ty_builder = &layout_converter
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        mask.extract(fun.param_tys(), true)
-            .into_iter()
-            .map(|ty| {
-                let layout = if fun.ty_args.is_empty() {
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        ty,
-                    )?
-                } else {
-                    let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        &ty,
-                    )?
-                };
+    ) -> PartialVMResult<Option<(Vec<MoveTypeLayout>, u64)>> {
+        let vm_config = layout_converter.runtime_environment().vm_config();
+        let ty_builder = &vm_config.ty_builder;
+        let mut layouts = vec![];
+        let mut size = 0u64;
+        for ty in mask.extract(fun.param_tys(), true) {
+            let (layout, layout_size) = if fun.ty_args.is_empty() {
+                layout_converter.type_to_type_layout_with_delayed_fields_and_size(
+                    gas_meter,
+                    traversal_context,
+                    ty,
+                )?
+            } else {
+                let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                layout_converter.type_to_type_layout_with_delayed_fields_and_size(
+                    gas_meter,
+                    traversal_context,
+                    &ty,
+                )?
+            };
+            if vm_config.meter_closure_captured_layouts {
+                size = size.saturating_add(layout_size);
+            }
 
-                // Do not allow delayed fields to be serialized.
-                // TODO(layouts): consider not cloning layouts for captured arguments.
-                Ok(layout
-                    .into_layout_when_has_no_delayed_fields()
-                    .map(|l| l.as_ref().clone()))
-            })
-            .collect::<PartialVMResult<Option<Vec<_>>>>()
+            // Do not allow delayed fields to be serialized.
+            // TODO(layouts): consider not cloning layouts for captured arguments.
+            match layout.into_layout_when_has_no_delayed_fields() {
+                Some(layout) => layouts.push(layout.as_ref().clone()),
+                None => return Ok(None),
+            }
+        }
+        Ok(Some((layouts, size)))
     }
 
     pub(crate) fn expect_this_impl(
@@ -643,6 +696,10 @@ impl AbstractFunction for LazyLoadedFunction {
         self.ty_args_pseudo_gas_cost
     }
 
+    fn captured_layouts_size(&self) -> u64 {
+        self.captured_layouts_size
+    }
+
     fn to_canonical_string(&self) -> String {
         self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
             let prefix = if let Some(m) = module_id {
@@ -737,6 +794,43 @@ impl LoadedFunction {
     /// Returns return types from the function's definition signature.
     pub fn return_tys(&self) -> &[Type] {
         self.function.return_tys()
+    }
+
+    /// The parameter types with `ty_args` applied, for checking arguments.
+    pub(crate) fn instantiated_param_tys(
+        &self,
+        ty_builder: &TypeBuilder,
+    ) -> PartialVMResult<&[Type]> {
+        if self.ty_args.is_empty() {
+            return Ok(self.function.param_tys());
+        }
+        Ok(self
+            .cached_instantiated_param_tys
+            .get_or_try_init(|| self.instantiate(ty_builder, self.function.param_tys()))?)
+    }
+
+    /// The return types with `ty_args` applied, for checking results.
+    pub(crate) fn instantiated_return_tys(
+        &self,
+        ty_builder: &TypeBuilder,
+    ) -> PartialVMResult<&[Type]> {
+        if self.ty_args.is_empty() {
+            return Ok(self.function.return_tys());
+        }
+        Ok(self
+            .cached_instantiated_return_tys
+            .get_or_try_init(|| self.instantiate(ty_builder, self.function.return_tys()))?)
+    }
+
+    fn instantiate(
+        &self,
+        ty_builder: &TypeBuilder,
+        tys: &[Type],
+    ) -> PartialVMResult<TriompheArc<[Type]>> {
+        tys.iter()
+            .map(|ty| ty_builder.create_ty_with_subst(ty, &self.ty_args))
+            .collect::<PartialVMResult<Vec<_>>>()
+            .map(TriompheArc::from)
     }
 
     /// Returns abilities of type parameters from the function's definition signature.

@@ -18,6 +18,7 @@ fn function(code: Vec<MicroOp>, frame_size: usize, pointer_slots: Vec<FO>) -> Fu
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
         def_idx: FunctionDefinitionIndex(0),
+        has_module_lock: false,
         code: Code::from_vec(code),
         entry_gas: 0,
         param_slots: vec![],

@@ -447,13 +447,15 @@ impl StateApi {
 
         match accept_type {
             AcceptType::Json => {
+                // The client chose the value type, so failing to decode under it is a client
+                // error.
                 let move_value = converter
                     .try_into_move_value(&value_type, &bytes)
-                    .context("Failed to deserialize table item retrieved from DB")
+                    .context("Failed to deserialize table item under the given value_type")
                     .map_err(|err| {
-                        BasicErrorWith404::internal_with_code(
+                        BasicErrorWith404::bad_request_with_code(
                             err,
-                            AptosErrorCode::InternalError,
+                            AptosErrorCode::InvalidInput,
                             &ledger_info,
                         )
                     })?;

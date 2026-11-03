@@ -3,7 +3,9 @@
 
 use std::path::Path;
 
-datatest_stable::harness!(serde_round_trip, "tests", r".*\.toml$");
+datatest_stable::harness! {
+    { test = serde_round_trip, root = "tests", pattern = r".*\.toml$" },
+}
 
 fn serde_round_trip(path: &Path) -> datatest_stable::Result<()> {
     let content = std::fs::read_to_string(path)?;

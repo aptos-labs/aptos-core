@@ -53,7 +53,7 @@ impl LedgerSummary {
 
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         let state = LedgerState::new_empty(hot_state_config);
-        let state_summary = LedgerStateSummary::new_empty(hot_state_config);
+        let state_summary = LedgerStateSummary::new_empty();
         Self::new(
             state,
             state_summary,

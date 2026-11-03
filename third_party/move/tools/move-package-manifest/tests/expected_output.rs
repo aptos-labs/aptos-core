@@ -3,7 +3,9 @@
 
 use std::{fmt::Write, path::Path};
 
-datatest_stable::harness!(expected_output_tests, "tests", r".*\.toml$");
+datatest_stable::harness! {
+    { test = expected_output_tests, root = "tests", pattern = r".*\.toml$" },
+}
 
 fn expected_output_tests(path: &Path) -> datatest_stable::Result<()> {
     let content = std::fs::read_to_string(path)?;
