@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
@@ -52,10 +51,7 @@ impl StateCheckpointOutput {
     }
 
     pub fn new_dummy() -> Self {
-        Self::new_empty(
-            LedgerStateSummary::new_empty(HotStateConfig::default()),
-            None,
-        )
+        Self::new_empty(LedgerStateSummary::new_empty(), None)
     }
 
     fn new_impl(inner: Inner) -> Self {

@@ -71,6 +71,18 @@ pub enum TimedFeatureFlag {
     /// Include the cost of a closure's type arguments in its abstract value
     /// size, instead of charging a flat amount for any closure.
     MeterClosureTypeArguments,
+
+    /// Charge closure packing per abstract value unit of the captured values,
+    /// which the closure depth check traverses.
+    MeterPackClosureCapturedValues,
+
+    /// Requires variant field handles to list distinct variants that declare the field with
+    /// the same type, so the verifier checks each borrow against one variant.
+    UniformVariantFieldHandles,
+
+    /// Include the serialized size of a closure's captured layouts in its
+    /// abstract value size, since serialization writes them in full.
+    MeterClosureCapturedLayouts,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -102,6 +114,8 @@ impl TimedFeatureOverride {
             // Add overrides for replay here.
             (Replay, _LimitTypeTagSize) => Some(true),
             (Replay, _ModuleComplexityCheck) => Some(true),
+            // TODO: we may want to remove this before merging, but keep it for replay run.
+            (Replay, UniformVariantFieldHandles) => Some(true),
             // Add overrides for testing here.
             (Testing, EntryCompatibility) => Some(true),
 
@@ -132,7 +146,10 @@ impl TimedFeatureOverride {
                 | RevalidateResolvedClosures
                 | MeterBcsByValueSize
                 | MeterValueNodesOnDeserialize
-                | MeterClosureTypeArguments,
+                | MeterClosureTypeArguments
+                | MeterPackClosureCapturedValues
+                | UniformVariantFieldHandles
+                | MeterClosureCapturedLayouts,
             ) => None,
         }
     }
@@ -329,6 +346,44 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (MeterClosureTypeArguments, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 9, 18, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: Set to a future date so forge's framework-upgrade compat test runs
+            // with this feature off (see MeterClosureTypeArguments).
+            (MeterPackClosureCapturedValues, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 11, 9, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterPackClosureCapturedValues, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 28, 18, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterPackClosureCapturedValues, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 31, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (UniformVariantFieldHandles, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 28, 18, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (UniformVariantFieldHandles, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 31, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Rolls out with MeterPackClosureCapturedValues.
+            (MeterClosureCapturedLayouts, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 11, 9, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterClosureCapturedLayouts, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 28, 18, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterClosureCapturedLayouts, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 31, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
@@ -544,5 +599,39 @@ mod test {
             mainnet_nov_15_2024.is_enabled(EntryCompatibility),
             "EntryCompatibility should be enabled on Nov 15, 2024 on mainnet"
         );
+    }
+
+    #[test]
+    fn test_v1_49_hotfix_activation_times() {
+        use TimedFeatureFlag::*;
+
+        let flags = [
+            MeterPackClosureCapturedValues,
+            UniformVariantFieldHandles,
+            MeterClosureCapturedLayouts,
+        ];
+        for (chain_id, activation_time) in [
+            (ChainId::testnet(), (2026, 10, 28, 18)),
+            (ChainId::mainnet(), (2026, 10, 31, 12)),
+        ] {
+            let activation_micros = Los_Angeles
+                .with_ymd_and_hms(
+                    activation_time.0,
+                    activation_time.1,
+                    activation_time.2,
+                    activation_time.3,
+                    0,
+                    0,
+                )
+                .unwrap()
+                .timestamp_micros() as u64;
+            let before = TimedFeaturesBuilder::new(chain_id, activation_micros - 1);
+            let at = TimedFeaturesBuilder::new(chain_id, activation_micros);
+
+            for flag in flags {
+                assert!(!before.is_enabled(flag), "{flag:?} activated early");
+                assert!(at.is_enabled(flag), "{flag:?} did not activate on time");
+            }
+        }
     }
 }

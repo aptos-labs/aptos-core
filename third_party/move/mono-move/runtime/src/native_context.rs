@@ -10,41 +10,62 @@ use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
-        heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
+        alloc_obj, alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc,
+        deserialize_or_gc, heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
+    interpreter::saved_return_pc,
     memory::{
-        read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_enum_tag,
-        write_ptr, write_u64, MemoryRegion,
+        read_descriptor, read_obj_size, read_ptr, read_vec_len, write_closure_func_ref_and_mask,
+        write_enum_tag, write_ptr, write_u64, MemoryRegion,
     },
-    types::{
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
-    },
+    types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    interner::{view_module_id, InternedIdentifier, InternedModuleId},
+    interner::{view_module_id, InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{
-        native_invariant_violation, Boxed, Dispatch, NativeABI, NativeContext, NativeContextFamily,
-        NativeExtension, NativeExtensions, NativeFunction, NativeIdx, NativeName, NativeResolver,
-        Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
+        native_invariant_violation, Boxed, Dispatch, FunctionResolutionError, NativeABI,
+        NativeContext, NativeContextFamily, NativeExtension, NativeExtensions, NativeFunction,
+        NativeIdx, NativeName, NativeResolver, Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
-    DescriptorId, DescriptorProvider, ExecutionErrorKind, FormatOptions, Function, GasMeter,
-    LayoutKind, LayoutProvider, MicroOp, ObjectDescriptorInner, ResourceProvider, VMResult,
-    ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID,
-    TRIVIAL_DESCRIPTOR_ID,
+    ClosureFuncRef, DescriptorId, DescriptorProvider, ExecutionErrorKind, FormatOptions, Function,
+    GasMeter, Interner, LayoutKind, LayoutProvider, MicroOp, ObjectDescriptorInner,
+    ResourceProvider, VMResult, CLOSURE_DESCRIPTOR_ID, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE,
+    OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_global_context::ExecutionGuard;
-use move_core_types::account_address::AccountAddress;
-use shared_dsa::UnorderedMap;
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use shared_dsa::{UnorderedMap, UnorderedSet};
 use std::{
     cell::{Cell, RefMut, UnsafeCell},
     cmp::Ordering,
     mem::MaybeUninit,
     ptr::NonNull,
 };
+
+/// The loader access a native call needs, with the loader's own lifetimes
+/// erased.
+///
+/// [`ProductionNativeContext`] carries a single lifetime parameter, so it
+/// cannot name a `&mut ModuleReadSet<'guard>`: `&mut T` is invariant in `T`,
+/// and `'guard` strictly outlives any borrow taken at the dispatch site. A
+/// trait object hides `'guard` and restores the variance.
+pub trait LoaderAccess {
+    /// The resource-group container `ty` belongs to, or [`None`] if it lives in
+    /// its own storage slot.
+    fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>>;
+
+    /// Resolves `module_id::func_name` at the function type `expected_ty` into
+    /// the symbolic identity of the instantiation to call.
+    fn resolve_function(
+        &self,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>>;
+}
 
 /// Concrete [`NativeContext`] used by the production runtime.
 ///
@@ -80,7 +101,6 @@ pub struct ProductionNativeContext<'a> {
     /// Gas meter for the current transaction.
     ///
     /// TODO(completeness): Expose to native functions.
-    #[allow(dead_code)]
     gas: UnsafeCell<&'a mut GasMeter>,
     /// The VM's heap -- used by the natives to allocate new heap objects.
     heap: UnsafeCell<&'a mut Heap>,
@@ -88,12 +108,12 @@ pub struct ProductionNativeContext<'a> {
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
     /// Resource provider backing global-storage reads on a read-set cache miss.
     resource_provider: &'a dyn ResourceProvider,
-    /// Resolves a resource type's group container (returns [`None`] if not a
-    /// group member).
-    resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
-    /// Per-transaction native extensions, shared across native calls. Accessed
-    /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
-    /// the interior mutability.
+    /// Loader and module read-set access, for natives whose behaviour depends
+    /// on a module's declarations.
+    loader: &'a dyn LoaderAccess,
+    /// Per-transaction native extensions, shared across native calls. Only ever
+    /// borrowed shared — each extension's own [`RefCell`](std::cell::RefCell)
+    /// provides the interior mutability.
     extensions: &'a NativeExtensions,
     /// GC roots backing the references and heap objects the native holds.
     pool: RootPool,
@@ -112,7 +132,7 @@ impl<'a> ProductionNativeContext<'a> {
         gas_meter: &'a mut GasMeter,
         guard: &'a ExecutionGuard<'a>,
         resource_provider: &'a dyn ResourceProvider,
-        resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
+        loader: &'a dyn LoaderAccess,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
@@ -122,7 +142,7 @@ impl<'a> ProductionNativeContext<'a> {
             ty_args,
             guard,
             resource_provider,
-            resource_group_of,
+            loader,
             frame_ptr,
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
@@ -134,7 +154,7 @@ impl<'a> ProductionNativeContext<'a> {
     }
 
     /// The caller of the Move function invoking this native, and its saved return PC.
-    fn caller_frame(&self) -> Option<(&Function, u64)> {
+    fn caller_frame(&self) -> Option<(&Function, usize)> {
         // SAFETY: native dispatch and Move calls write these metadata fields. The native's
         // saved FP names its live caller frame, whose saved function is either null (entry)
         // or an arena-owned function that remains alive throughout execution.
@@ -146,7 +166,8 @@ impl<'a> ProductionNativeContext<'a> {
             let metadata = caller_fp.sub(FRAME_METADATA_SIZE);
             let caller =
                 (read_ptr(metadata, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()?;
-            Some((caller, read_u64(metadata, META_SAVED_PC_OFFSET)))
+            let (return_pc, _) = saved_return_pc(caller_fp);
+            Some((caller, return_pc))
         }
     }
 
@@ -410,12 +431,16 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn direct_caller_module(&self) -> Option<InternedModuleId> {
         let (caller, return_pc) = self.caller_frame()?;
-        let call_pc = usize::try_from(return_pc.checked_sub(1)?).ok()?;
-        // CallIndirect is a statically named Move call resolved by the loader; function
-        // values use CallClosure. The saved return PC is one past the call micro-op.
+        let call_pc = return_pc.checked_sub(1)?;
+        // Only statically named Move calls count; function values use
+        // `CallClosure`. The saved return PC is one past the calling op.
+        let call_op = caller.code.ops().get(call_pc)?;
         if matches!(
-            caller.code.ops().get(call_pc),
-            Some(MicroOp::CallDirect { .. } | MicroOp::CallIndirect { .. })
+            call_op,
+            MicroOp::CallByName { .. }
+                | MicroOp::CallByNameExempt { .. }
+                | MicroOp::CallByPtr { .. }
+                | MicroOp::CallByPtrExempt { .. }
         ) {
             Some(caller.module_id)
         } else {
@@ -892,7 +917,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
         // Resolved before the `rws` reborrow; the resolver reads the module
         // read-set, disjoint from the read-write set.
-        let group = (self.resource_group_of)(ty)?;
+        let group = self.loader.resource_group_of(ty)?;
 
         // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
         let rws = unsafe { &mut **self.rws.get() };
@@ -908,7 +933,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     ) -> VMResult<Option<Ref<'_, Opaque>>> {
         // Resolved before the `rws` reborrow; the resolver reads the module
         // read-set, disjoint from the read-write set.
-        let group = (self.resource_group_of)(ty)?;
+        let group = self.loader.resource_group_of(ty)?;
         self.borrow_entry(&InMemoryStorageKey::resource(address, ty), group, mutable)
     }
 
@@ -930,11 +955,64 @@ impl NativeContext for ProductionNativeContext<'_> {
     fn return_type(&self, i: usize) -> VMResult<InternedType> {
         self.abi.return_type(i).ok_or_else(|| {
             native_invariant_violation(format!(
-                "return index {} out of bounds (num_returns={})",
+                "Return index {} out of bounds (num_returns={})",
                 i,
                 self.abi.returns().len(),
             ))
         })
+    }
+
+    fn enum_descriptor(&self, ty: InternedType) -> Option<DescriptorId> {
+        self.guard.enum_descriptor(ty)
+    }
+
+    fn resolve_function<'a>(
+        &'a self,
+        address: AccountAddress,
+        module_name: &IdentStr,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<Boxed<'a, Opaque>, FunctionResolutionError>> {
+        // TODO(security): the caller-supplied address and module name are
+        // interned before the load, even if no such module exists, and nothing
+        // charges for it.
+        let module_id = self.guard.module_id_of(&address, module_name);
+
+        // SAFETY: `gas` is reborrowed exclusively here; the callee borrows the
+        // loader and the module read-set, both disjoint from it.
+        let gas = unsafe { &mut **self.gas.get() };
+        let func_ref = match self
+            .loader
+            .resolve_function(gas, module_id, func_name, expected_ty)?
+        {
+            Ok(func_ref) => func_ref,
+            Err(err) => return Ok(Err(err)),
+        };
+
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        let obj = alloc_obj(
+            heap,
+            self.guard,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            CLOSURE_DESCRIPTOR_ID,
+        )?;
+        // A resolved function captures nothing, so the mask is empty and the
+        // captured-data pointer stays at the null `alloc_obj` zeroed it to.
+        //
+        // SAFETY: `obj` is a freshly allocated closure object.
+        unsafe {
+            write_closure_func_ref_and_mask(obj, &ClosureFuncRef::Unresolved(func_ref), 0);
+        }
+        // SAFETY: `obj` is a live heap object.
+        Ok(Ok(Boxed::from_handle(unsafe {
+            self.pool.root_object(obj)
+        })))
     }
 
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>> {
@@ -1156,6 +1234,12 @@ pub struct ProductionNativeRegistry {
     funcs: Vec<ProductionNativeFunction>,
     names: Vec<NativeName>,
     by_name: UnorderedMap<NativeName, NativeIdx>,
+    /// `(address, module, function)` of every registered native, across all
+    /// dispatches.
+    // TODO(cleanup): only serves the loader's native-shadowing check. Remove it
+    // with `is_registered` once lowering chooses `CallNative` from the callee
+    // definition's `is_native` flag.
+    qualified_names: UnorderedSet<(AccountAddress, &'static str, &'static str)>,
 }
 
 impl ProductionNativeRegistry {
@@ -1169,6 +1253,7 @@ impl ProductionNativeRegistry {
         let mut funcs = Vec::with_capacity(entries.len());
         let mut names = Vec::with_capacity(entries.len());
         let mut by_name = UnorderedMap::with_capacity(entries.len());
+        let mut qualified_names = UnorderedSet::with_capacity(entries.len());
         for (position, (name, func)) in entries.into_iter().enumerate() {
             let idx = NativeIdx(position as u32);
             if by_name.insert(name, idx).is_some() {
@@ -1177,6 +1262,7 @@ impl ProductionNativeRegistry {
                     name.module, name.function
                 );
             }
+            qualified_names.insert((name.address, name.module, name.function));
             funcs.push(func);
             names.push(name);
         }
@@ -1184,6 +1270,7 @@ impl ProductionNativeRegistry {
             funcs,
             names,
             by_name,
+            qualified_names,
         }
     }
 
@@ -1193,6 +1280,7 @@ impl ProductionNativeRegistry {
             funcs: vec![],
             names: vec![],
             by_name: UnorderedMap::new(),
+            qualified_names: UnorderedSet::new(),
         }
     }
 
@@ -1256,5 +1344,14 @@ impl NativeResolver for ProductionNativeRegistry {
                 ..query
             })
             .copied()
+    }
+
+    fn is_registered(&self, module: InternedModuleId, function: InternedIdentifier) -> bool {
+        let module_id = view_module_id(module);
+        self.qualified_names.contains(&(
+            *module_id.address(),
+            view_name(module_id.name()),
+            view_name(function),
+        ))
     }
 }

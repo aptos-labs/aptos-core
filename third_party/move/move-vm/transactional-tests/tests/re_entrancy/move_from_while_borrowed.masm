@@ -1,0 +1,77 @@
+// A closure re-enters `a` and moves out a resource the caller still borrows.
+
+//# publish --verbose
+module 0x66::a
+
+struct S has store
+    y: u64
+
+struct R has key
+    x: u64
+
+struct Outer has key
+    inner: S
+
+fun init(s: &signer)
+    copy_loc s
+    ld_u64 1
+    pack R
+    move_to R
+    move_loc s
+    ld_u64 1
+    pack S
+    pack Outer
+    move_to Outer
+    ret
+
+public fun take_r(a: address) acquires R
+    move_loc a
+    move_from R
+    unpack R
+    pop
+    ret
+
+public fun take_outer(a: address) acquires Outer
+    move_loc a
+    move_from Outer
+    unpack Outer
+    unpack S
+    pop
+    ret
+
+// Borrows `R` itself.
+public fun hold_whole(a: address) acquires R
+    local r: &mut R
+    copy_loc a
+    mut_borrow_global R
+    st_loc r
+    copy_loc a
+    pack_closure take_r, 0
+    call_closure<|address|>
+    ld_u64 2
+    move_loc r
+    mut_borrow_field R, x
+    write_ref
+    ret
+
+// Borrows only a nested struct of `Outer`.
+public fun hold_nested(a: address) acquires Outer
+    local inner: &mut S
+    copy_loc a
+    mut_borrow_global Outer
+    mut_borrow_field Outer, inner
+    st_loc inner
+    copy_loc a
+    pack_closure take_outer, 0
+    call_closure<|address|>
+    ld_u64 2
+    move_loc inner
+    mut_borrow_field S, y
+    write_ref
+    ret
+
+//# run 0x66::a::init --signers 0x66 --verbose
+
+//# run 0x66::a::hold_whole --args @0x66 --verbose
+
+//# run 0x66::a::hold_nested --args @0x66 --verbose

@@ -549,7 +549,7 @@ async-recursion = "1.0.5"
 async-trait = "0.1.53"
 axum = "0.7.5"
 backoff = { version = "0.4.0", features = ["tokio"] }
-backtrace = "0.3.76"
+backtrace = "0.3.77"
 base64 = "0.13.0"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = { version = "0.2.1", features = ["derive"] }
@@ -605,7 +605,7 @@ csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
 dashmap = { version = "7.0.0-rc2", features = ["inline-more"] }
-datatest-stable = "0.1.1"
+datatest-stable = "0.3.3"
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivation-path = "0.2.0"
@@ -675,7 +675,7 @@ hmac = "0.12.0"
 hostname = "0.4.2"
 http = "0.2.9"
 http-body-util = "0.1.1"
-httpmock = "0.6.8"
+httpmock = "0.9.0"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-util = { version = "0.1.3", features = ["client-legacy"] }
 image = "0.24.5"
@@ -686,7 +686,7 @@ indoc = "2.0.8"
 inferno = "0.12.8"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
-itertools = "0.13"
+itertools = "0.15.0"
 jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
 jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
 jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
@@ -698,13 +698,13 @@ jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
-lazy_static = "1.4.0"
-libc = "0.2.147"
+lazy_static = "1.5.1"
+libc = "0.2.191"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
-libtest-mimic = "0.5.2"
+libtest-mimic = "0.8.2"
 log = "0.4.17"
-lru = "0.18.0"
+lru = "0.19.0"
 lz4 = "1.28.0"
 maplit = "1.0.2"
 memchr = "2.7.4"
@@ -725,9 +725,9 @@ ntest = "0.10.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num-derive = "0.5.1"
-num-integer = "0.1.42"
+num-integer = "0.1.47"
 num-traits = "0.2.19"
-num_cpus = "1.13.1"
+num_cpus = "1.17.0"
 once_cell = "1.21.4"
 open = "5.3.1"
 opentelemetry = { version = "0.27.0", features = ["trace"] }
@@ -757,7 +757,7 @@ pretty = "0.12.5"
 pretty_assertions = "1.2.1"
 prettydiff = "0.9.0"
 primitive-types = { version = "0.12.2" }
-proc-macro2 = "1.0.38"
+proc-macro2 = "1.0.107"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
 processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.1", default-features = false }
@@ -765,7 +765,7 @@ procfs = "0.18.0"
 project-root = "0.2.2"
 prometheus = { version = "0.14.0", default-features = false }
 prometheus-http-query = "0.5.2"
-proptest = "1.4.0"
+proptest = "1.12.0"
 proptest-derive = "0.9.0"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
 prost-types = "0.13.3"
@@ -774,8 +774,8 @@ quick_cache = "0.7.0"
 quote = "1.0.18"
 rand = "0.7.3"
 random_word = { version = "0.5.3", features = ["en"] }
-rapidhash = "1.4.0"
-rayon = "1.5.2"
+rapidhash = "4.5.1"
+rayon = "1.12.0"
 redis = { version = "0.22.3", features = [
     "tokio-comp",
     "script",
@@ -824,12 +824,12 @@ sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 shadow-rs = { version = "0.36.1", default-features = false, features = ["tzdb"] }
-shell-words = "1.0.0"
+shell-words = "1.1.1"
 signature = "2.1.0"
 siphasher = "1.0.4"
 slh-dsa = "=0.2.0-rc.4"
-smallbitvec = "2.5.1"
-smallvec = "1.8.0"
+smallbitvec = "2.6.1"
+smallvec = "1.16.4"
 specializer = { path = "third_party/move/mono-move/specializer" }
 static_assertions = "1.1.0"
 status-line = "0.2.0"
@@ -838,10 +838,10 @@ strum_macros = "0.28.0"
 sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = { version = "0.39.6", features = ["multithread"] }
-tar = "0.4.40"
+tar = "0.4.46"
 tempfile = "3.27.0"
 tera = "1.16.0"
-termcolor = "1.1.2"
+termcolor = "1.4.1"
 test-case = "3.1.0"
 textwrap = "0.16.0"
 thiserror = "2.0.21"
@@ -855,7 +855,7 @@ tokio-io-timeout = "1.2.0"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.19", features = ["fs"] }
-tokio-test = "0.4.1"
+tokio-test = "0.4.6"
 tokio-util = { version = "0.7.20", features = ["compat", "codec"] }
 toml = "0.7.4"
 tonic = { version = "0.12.3", features = [
@@ -878,20 +878,20 @@ tracing-subscriber = { version = "0.3.17", features = [
 ] }
 triomphe = "0.1.14"
 try_match = "0.4.2"
-trybuild = "1.0.80"
+trybuild = "1.0.122"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
 ], default-features = false }
-url = { version = "2.4.0", features = ["serde"] }
+url = { version = "2.5.8", features = ["serde"] }
 usdt = "0.6.0"
-uuid = { version = "1.0.0", features = ["v4", "serde"] }
-variant_count = "1.1.0"
+uuid = { version = "1.29.0", features = ["v4", "serde"] }
+variant_count = "1.2.1"
 version-compare = "0.2.1"
 vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
-walkdir = "2.3.3"
+walkdir = "2.5.0"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 wasm-bindgen = "0.2.100"

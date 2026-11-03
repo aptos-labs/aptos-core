@@ -15,10 +15,10 @@ fun assign_through_call(r0): u64 {
     r9: &u64
   code:
   L0:
-    0: [r1] := call make, [r0] @1
+    0: [r1] := call_exempt make, [r0] @1
     1: x0 := add r0, #10 @5
-    2: [r3] := call make, [x0] @6
-    3: [r0] := call consume_len, [r1] @8
+    2: [r3] := call_exempt make, [x0] @6
+    3: [r0] := call_exempt consume_len, [r1] @8
     4: r1 := move r3 @10
     5: r3 := copy r1 @11
     6: r2 := pack 0x42::recycled_slot_identity_copy::Wrap, [r3] @12

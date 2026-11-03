@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
+    hot_state_config::EffectiveHotStateConfig,
     state::{HotStateMetadata, LedgerState, State},
     state_summary::{LedgerStateSummary, StateSummary},
 };
@@ -46,7 +47,7 @@ impl StateWithSummary {
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self::new(
             State::new_empty(hot_state_config),
-            StateSummary::new_empty(hot_state_config),
+            StateSummary::new_empty(),
         )
     }
 
@@ -55,7 +56,7 @@ impl StateWithSummary {
         hot_state_root_hash: HashValue,
         global_state_root_hash: HashValue,
         usage: StateStorageUsage,
-        hot_state_config: HotStateConfig,
+        hot_state_config: EffectiveHotStateConfig,
     ) -> Self {
         Self::new_at_version_with_hot_state_metadata(
             version,
@@ -72,7 +73,7 @@ impl StateWithSummary {
         hot_state_root_hash: HashValue,
         global_state_root_hash: HashValue,
         usage: StateStorageUsage,
-        hot_state_config: HotStateConfig,
+        hot_state_config: EffectiveHotStateConfig,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     ) -> Self {
         Self::new(
@@ -86,7 +87,6 @@ impl StateWithSummary {
                 version,
                 SparseMerkleTree::new(hot_state_root_hash),
                 SparseMerkleTree::new(global_state_root_hash),
-                hot_state_config,
             ),
         )
     }

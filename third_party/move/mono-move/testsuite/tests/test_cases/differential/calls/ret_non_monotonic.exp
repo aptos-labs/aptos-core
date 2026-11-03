@@ -31,9 +31,9 @@ fun caller(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: [x2, r2] := call A, [] @2
+    0: [x2, r2] := call_exempt A, [] @2
     1: r2 := add r2, #1 @4
-    2: [x0] := call B, [r0, r1, x2] @6
+    2: [x0] := call_exempt B, [r0, r1, x2] @6
     3: ret [x0] @7
 }
 === micro-ops ===
@@ -61,13 +61,13 @@ fun caller() {
   frame_data_size: 24
   entry_gas: 183
   code:
-    0: CallIndirect 0x66::ret_non_monotonic::A @2
+    0: CallByNameExempt 0x66::ret_non_monotonic::A @2
     1: Move8 [16] <- [56] @2
     2: AddU64Imm [16] <- [16] + #1 @4
     3: Move8 [64] <- [48] @6
     4: Move8 [56] <- [8] @6
     5: Move8 [48] <- [0] @6
-    6: CallIndirect 0x66::ret_non_monotonic::B @6
+    6: CallByNameExempt 0x66::ret_non_monotonic::B @6
     7: Move8 [0] <- [48] @7
     8: Return @7
 }

@@ -19,7 +19,7 @@ fun churn(r0): u64 {
     4: r4 := copy r1 @12
     5: [x0] := call_closure [|u64|(vector<u64>) has copy + drop], [r3, r4] @13
     6: x1 := vec_pack u64, 4, [r3, r3, r3, r3] @18
-    7: [x0] := call combine, [x0, x1] @19
+    7: [x0] := call_exempt combine, [x0, x1] @19
     8: r2 := add r2, x0 @20
     9: r3 := add r3, #1 @24
     10: branch L2 @26
@@ -73,7 +73,7 @@ fun churn() {
     5: DeepCopyHeapPtrs [32] deep-copy ptrs at [0] @12
     6: CallClosure closure=[32], provided_args=[[24](8)] @13
     7: VecPack [72] <- [[24], [24], [24], [24]] (size=8, desc=0) @18
-    8: CallIndirect 0x42::closure_ret_transfer_gc::combine @19
+    8: CallByNameExempt 0x42::closure_ret_transfer_gc::combine @19
     9: AddU64 [16] <- [16] + [64] @20
     10: AddU64Imm [24] <- [24] + #1 @24
     11: Jump @3 gas=3 @26

@@ -66,7 +66,7 @@ fun use_borrow_chain(r0): u64 {
     r1: u64
   code:
   L0:
-    0: [x0] := call borrow_chain, [r0] @1
+    0: [x0] := call_exempt borrow_chain, [r0] @1
     1: r1 := read_ref x0 @2
     2: ret [r1] @3
 }
@@ -93,8 +93,8 @@ fun test_read_by_value(r0): u64 {
   code:
   L0:
     0: x1 := ld_u64 0 @1
-    1: [r1] := call mk, [r0, x1] @2
-    2: [x0] := call read_by_value, [r1] @5
+    1: [r1] := call_exempt mk, [r0, x1] @2
+    2: [x0] := call_exempt read_by_value, [r1] @5
     3: ret [x0] @6
 }
 
@@ -105,9 +105,9 @@ fun test_read_by_ref(r0): u64 {
   code:
   L0:
     0: x1 := ld_u64 0 @1
-    1: [r1] := call mk, [r0, x1] @2
+    1: [r1] := call_exempt mk, [r0, x1] @2
     2: x0 := imm_borrow_loc r1 @4
-    3: [x0] := call read_by_ref, [x0] @5
+    3: [x0] := call_exempt read_by_ref, [x0] @5
     4: ret [x0] @6
 }
 
@@ -119,10 +119,10 @@ fun test_write_by_ref(r0, r1): u64 {
   code:
   L0:
     0: x1 := ld_u64 0 @1
-    1: [r2] := call mk, [r0, x1] @2
+    1: [r2] := call_exempt mk, [r0, x1] @2
     2: x0 := mut_borrow_loc r2 @4
-    3: [] := call write_by_ref, [x0, r1] @6
-    4: [x0] := call read_by_value, [r2] @8
+    3: [] := call_exempt write_by_ref, [x0, r1] @6
+    4: [x0] := call_exempt read_by_value, [r2] @8
     5: ret [x0] @9
 }
 
@@ -133,9 +133,9 @@ fun test_borrow_chain(r0): u64 {
   code:
   L0:
     0: x1 := ld_u64 0 @1
-    1: [r1] := call mk, [r0, x1] @2
+    1: [r1] := call_exempt mk, [r0, x1] @2
     2: x0 := imm_borrow_loc r1 @4
-    3: [x0] := call use_borrow_chain, [x0] @5
+    3: [x0] := call_exempt use_borrow_chain, [x0] @5
     4: ret [x0] @6
 }
 
@@ -146,9 +146,9 @@ fun test_read_shared(r0, r1): u64 {
     r2: 0x66::chained_field_fusion::S
   code:
   L0:
-    0: [r2] := call mk, [r0, r1] @2
+    0: [r2] := call_exempt mk, [r0, r1] @2
     1: x0 := imm_borrow_loc r2 @4
-    2: [x0] := call read_shared, [x0] @5
+    2: [x0] := call_exempt read_shared, [x0] @5
     3: ret [x0] @6
 }
 === micro-ops ===
@@ -210,7 +210,7 @@ fun use_borrow_chain() {
   entry_gas: 140
   code:
     0: Move(16) [48] <- [0] @1
-    1: CallIndirect 0x66::chained_field_fusion::borrow_chain @1
+    1: CallByNameExempt 0x66::chained_field_fusion::borrow_chain @1
     2: ReadRef [16] <- *[48] (size=8) @2
     3: Move8 [0] <- [16] @3
     4: Return @3
@@ -234,10 +234,10 @@ fun test_read_by_value() {
   code:
     0: StoreImm8 [72] <- #0 @1
     1: Move8 [64] <- [0] @2
-    2: CallIndirect 0x66::chained_field_fusion::mk @2
+    2: CallByNameExempt 0x66::chained_field_fusion::mk @2
     3: Move(32) [8] <- [64] @2
     4: Move(32) [64] <- [8] @5
-    5: CallIndirect 0x66::chained_field_fusion::read_by_value @5
+    5: CallByNameExempt 0x66::chained_field_fusion::read_by_value @5
     6: Move8 [0] <- [64] @6
     7: Return @6
 }
@@ -248,10 +248,10 @@ fun test_read_by_ref() {
   code:
     0: StoreImm8 [72] <- #0 @1
     1: Move8 [64] <- [0] @2
-    2: CallIndirect 0x66::chained_field_fusion::mk @2
+    2: CallByNameExempt 0x66::chained_field_fusion::mk @2
     3: Move(32) [8] <- [64] @2
     4: SlotBorrow [64] <- &[8] @4
-    5: CallIndirect 0x66::chained_field_fusion::read_by_ref @5
+    5: CallByNameExempt 0x66::chained_field_fusion::read_by_ref @5
     6: Move8 [0] <- [64] @6
     7: Return @6
 }
@@ -262,13 +262,13 @@ fun test_write_by_ref() {
   code:
     0: StoreImm8 [80] <- #0 @1
     1: Move8 [72] <- [0] @2
-    2: CallIndirect 0x66::chained_field_fusion::mk @2
+    2: CallByNameExempt 0x66::chained_field_fusion::mk @2
     3: Move(32) [16] <- [72] @2
     4: SlotBorrow [72] <- &[16] @4
     5: Move8 [88] <- [8] @6
-    6: CallIndirect 0x66::chained_field_fusion::write_by_ref @6
+    6: CallByNameExempt 0x66::chained_field_fusion::write_by_ref @6
     7: Move(32) [72] <- [16] @8
-    8: CallIndirect 0x66::chained_field_fusion::read_by_value @8
+    8: CallByNameExempt 0x66::chained_field_fusion::read_by_value @8
     9: Move8 [0] <- [72] @9
     10: Return @9
 }
@@ -279,10 +279,10 @@ fun test_borrow_chain() {
   code:
     0: StoreImm8 [72] <- #0 @1
     1: Move8 [64] <- [0] @2
-    2: CallIndirect 0x66::chained_field_fusion::mk @2
+    2: CallByNameExempt 0x66::chained_field_fusion::mk @2
     3: Move(32) [8] <- [64] @2
     4: SlotBorrow [64] <- &[8] @4
-    5: CallIndirect 0x66::chained_field_fusion::use_borrow_chain @5
+    5: CallByNameExempt 0x66::chained_field_fusion::use_borrow_chain @5
     6: Move8 [0] <- [64] @6
     7: Return @6
 }
@@ -293,10 +293,10 @@ fun test_read_shared() {
   code:
     0: Move8 [80] <- [8] @2
     1: Move8 [72] <- [0] @2
-    2: CallIndirect 0x66::chained_field_fusion::mk @2
+    2: CallByNameExempt 0x66::chained_field_fusion::mk @2
     3: Move(32) [16] <- [72] @2
     4: SlotBorrow [72] <- &[16] @4
-    5: CallIndirect 0x66::chained_field_fusion::read_shared @5
+    5: CallByNameExempt 0x66::chained_field_fusion::read_shared @5
     6: Move8 [0] <- [72] @6
     7: Return @6
 }

@@ -58,6 +58,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
+        hot_state_config::EffectiveHotStateConfig,
         state::{LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
@@ -502,7 +503,6 @@ impl StateStore {
             state_pruner,
             skip_usage,
         });
-        // TODO(HotState): probably fetch onchain config from storage.
         let live = match mode {
             StateStoreMode::ReadWrite => Some(
                 LiveState::load_and_catch_up(
@@ -788,6 +788,15 @@ impl LiveState {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
+        let effective_hot_state_config = EffectiveHotStateConfig::read_at(
+            hot_state_config,
+            state_db.as_ref(),
+            latest_snapshot_version,
+        )?;
+        info!(
+            effective_hot_state_config = ?effective_hot_state_config,
+            "Loaded hot state config at latest snapshot version."
+        );
         // TODO(HotState): honor restored snapshots even when delete_on_restart is enabled.
         let (hot_state, hot_state_root_hash) = if !hot_state_config.delete_on_restart
             && let Some(version) = latest_snapshot_version
@@ -819,7 +828,7 @@ impl LiveState {
             let hot_state = LoadedHotState::new(
                 version,
                 usage,
-                hot_state_config,
+                effective_hot_state_config,
                 state_db.hot_state_kv_db.load_hot_state_kvs(version)?,
             );
             (hot_state, hot_state_root_hash)
@@ -827,7 +836,7 @@ impl LiveState {
             let hot_state = LoadedHotState::empty(State::new_at_version(
                 latest_snapshot_version,
                 usage,
-                hot_state_config,
+                effective_hot_state_config,
             ));
             (hot_state, *SPARSE_MERKLE_PLACEHOLDER_HASH)
         };
@@ -835,7 +844,6 @@ impl LiveState {
             latest_snapshot_version,
             SparseMerkleTree::new(hot_state_root_hash),
             SparseMerkleTree::new(latest_snapshot_root_hash),
-            hot_state_config,
         );
         let last_snapshot = StateWithSummary::new(hot_state.state().clone(), summary.clone());
         let persisted_state = PersistedState::new(hot_state, summary);
@@ -1093,7 +1101,7 @@ impl StateStore {
         let base = State::new_at_version(
             base_version,
             self.get_usage(base_version)?,
-            HotStateConfig::default(),
+            EffectiveHotStateConfig::from_local(HotStateConfig::default()),
         );
         let (new_state, reads, _hot_state_updates) = LedgerState::new(base.clone(), base.clone())
             .update_with_db_reader(

@@ -58,7 +58,7 @@ fun runner(): u8 * i8 * u16 * u16 * bool {
     3: [r3] := call_closure [|u16, i8|(0x42::m::S)], [r0, r1, r2] @3
     4: r4 := pack_closure observe, 0, [] @4
     5: [r5, r1, r0, r6, r7] := call_closure [|0x42::m::S|(u8, i8, u16, u16, bool)], [r3, r4] @5
-    6: [] := call tick, [] @6
+    6: [] := call_exempt tick, [] @6
     7: ret [r5, r1, r0, r6, r7] @7
 }
 === micro-ops ===
@@ -116,7 +116,7 @@ fun runner() {
     9: Move(2) [0] <- [66] @5
     10: Move(2) [34] <- [68] @5
     11: Move(1) [36] <- [70] @5
-    12: CallIndirect 0x42::m::tick @6
+    12: CallByNameExempt 0x42::m::tick @6
     13: Move(2) [4] <- [34] @7
     14: Move(1) [6] <- [36] @7
     15: Move(2) [72] <- [0] @7

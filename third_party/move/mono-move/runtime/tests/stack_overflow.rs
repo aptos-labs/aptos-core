@@ -19,6 +19,7 @@ fn function(code: Vec<MicroOp>, locals_size: usize) -> Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
         def_idx: FunctionDefinitionIndex(0),
+        has_module_lock: false,
         code: Code::from_vec(code),
         entry_gas: 0,
         param_slots: vec![],
@@ -65,7 +66,7 @@ fn assert_stack_overflow(err: Option<VMInternalError>) {
 fn call_with_a_frame_larger_than_the_stack() {
     let callee = FunctionPtr::new(Box::new(unfittable(vec![MicroOp::Return])));
     let entry = function(
-        vec![MicroOp::CallDirect { ptr: callee }, MicroOp::Return],
+        vec![MicroOp::CallByPtrExempt { ptr: callee }, MicroOp::Return],
         8,
     );
     let err = call_error(&entry);

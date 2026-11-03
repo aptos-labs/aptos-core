@@ -37,6 +37,9 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
     /// Deliberately has no default, so that a new implementation has to make a choice instead of
     /// silently reporting no cost.
     fn ty_args_pseudo_gas_cost(&self) -> u64;
+    /// Number of bytes the layouts of the captured arguments serialize to. Like
+    /// `ty_args_pseudo_gas_cost`, deliberately has no default.
+    fn captured_layouts_size(&self) -> u64;
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
@@ -334,6 +337,10 @@ pub(crate) mod mock {
         }
 
         fn ty_args_pseudo_gas_cost(&self) -> u64 {
+            0
+        }
+
+        fn captured_layouts_size(&self) -> u64 {
             0
         }
     }

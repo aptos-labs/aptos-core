@@ -10,9 +10,9 @@ fun bump_via_mut_ref(r0, r1): u8 {
     r4: u8
   code:
   L0:
-    0: [r2] := call mk, [r0, r1] @2
+    0: [r2] := call_exempt mk, [r0, r1] @2
     1: x0 := mut_borrow_loc r2 @4
-    2: [r3] := call mut_ref, [x0] @5
+    2: [r3] := call_exempt mut_ref, [x0] @5
     3: r4 := read_ref r3 @8
     4: r4 := add r4, #1u8 @10
     5: write_ref r3, r4 @12
@@ -78,9 +78,9 @@ fun read_via_imm_ref(r0, r1): u8 {
     r3: u8
   code:
   L0:
-    0: [r2] := call mk, [r0, r1] @2
+    0: [r2] := call_exempt mk, [r0, r1] @2
     1: x0 := imm_borrow_loc r2 @4
-    2: [x0] := call imm_ref, [x0] @5
+    2: [x0] := call_exempt imm_ref, [x0] @5
     3: r3 := read_ref x0 @6
     4: ret [r3] @7
 }
@@ -93,10 +93,10 @@ fun bump_via_mut_ref() {
   code:
     0: Move(1) [80] <- [8] @2
     1: Move8 [72] <- [0] @2
-    2: CallIndirect 0x77::variant_field_tail_borrows::mk @2
+    2: CallByNameExempt 0x77::variant_field_tail_borrows::mk @2
     3: Move8 [16] <- [72] @2
     4: SlotBorrow [72] <- &[16] @4
-    5: CallIndirect 0x77::variant_field_tail_borrows::mut_ref @5
+    5: CallByNameExempt 0x77::variant_field_tail_borrows::mut_ref @5
     6: Move(16) [24] <- [72] @5
     7: ReadRef [40] <- *[24] (size=1) @8
     8: IntAdd [40] <- [40] + u8 #1 @10
@@ -160,10 +160,10 @@ fun read_via_imm_ref() {
   code:
     0: Move(1) [64] <- [8] @2
     1: Move8 [56] <- [0] @2
-    2: CallIndirect 0x77::variant_field_tail_borrows::mk @2
+    2: CallByNameExempt 0x77::variant_field_tail_borrows::mk @2
     3: Move8 [16] <- [56] @2
     4: SlotBorrow [56] <- &[16] @4
-    5: CallIndirect 0x77::variant_field_tail_borrows::imm_ref @5
+    5: CallByNameExempt 0x77::variant_field_tail_borrows::imm_ref @5
     6: ReadRef [24] <- *[56] (size=1) @6
     7: Move(1) [0] <- [24] @7
     8: Return @7

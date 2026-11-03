@@ -342,22 +342,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/no-v1-comparison/closures/persistent.move",
         "function values in resources",
     ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/closures/reentrancy.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/closures/reentrancy_local.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/closures/reentrancy_module_lock.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/closures/reentrancy_nested.move",
-        "no reentrancy checks",
-    ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/registry.move",
         "function values in resources",
@@ -373,26 +357,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/fv_as_keys.move",
         "function values in resources",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/inlining_optimization/locked_caller_inlined_helper.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/inlining_optimization/module_lock_wrapper.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/inlining_optimization/pure_helper_under_lock.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/inlining_optimization/resource_lock_wrapper.move",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/no-v1-comparison/inlining_optimization/unlocked_caller_locked_helper.move",
-        "no reentrancy checks",
     ),
 ];
 
