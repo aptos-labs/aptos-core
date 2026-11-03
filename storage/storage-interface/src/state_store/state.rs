@@ -390,7 +390,11 @@ impl State {
         if let Some(mut slot) = lru.get_slot(&key_hash) {
             let mut refreshed = true;
             let slot_to_insert = if slot.is_hot() {
-                if slot.expect_hot_since_version() + refresh_interval <= update.version {
+                if slot
+                    .expect_hot_since_version()
+                    .saturating_add(refresh_interval)
+                    <= update.version
+                {
                     slot.refresh(update.version);
                 } else {
                     refreshed = false;
@@ -962,6 +966,22 @@ mod tests {
         let result = State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(1, &op), 0)
             .expect("zero interval always refreshes");
         assert_eq!(result.value.hot_since_version(), 1);
+    }
+
+    #[test]
+    fn test_make_hot_max_interval_never_refreshes() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        seed_hot(&mut lru, &overlay, &cache, &k, 1);
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(100, &op), Version::MAX);
+        assert!(result.is_none());
     }
 
     // ===== usage accounting =====
