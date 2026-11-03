@@ -1,11 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-#![allow(clippy::new_without_default)]
-
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
 use aptos_metrics_core::IntCounterVecHelper;
-use aptos_types::error::PanicError;
+use aptos_types::{error::PanicError, on_chain_config::OnChainHotStateConfig};
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 pub struct BlockHotStateOpAccumulator<Key> {
@@ -29,12 +27,16 @@ impl<Key> BlockHotStateOpAccumulator<Key>
 where
     Key: Send + Sync + Clone + Hash + Eq + Debug,
 {
-    /// TODO(HotState): make on-chain config. Also consider capping by total key size instead of
-    /// number.
-    const MAX_PROMOTIONS_PER_BLOCK: usize = 1024 * 10;
+    /// Used when the on-chain config doesn't exist.
+    /// TODO(HotState): consider capping by total key size instead of number.
+    const DEFAULT_MAX_PROMOTIONS_PER_BLOCK: usize = 1024 * 10;
 
-    pub fn new() -> Self {
-        Self::new_with_config(Self::MAX_PROMOTIONS_PER_BLOCK)
+    pub fn new(on_chain_config: Option<&OnChainHotStateConfig>) -> Self {
+        let max_promotions_per_block = match on_chain_config {
+            Some(OnChainHotStateConfig::V1(config)) => config.max_promotions_per_block as usize,
+            None => Self::DEFAULT_MAX_PROMOTIONS_PER_BLOCK,
+        };
+        Self::new_with_config(max_promotions_per_block)
     }
 
     pub fn new_with_config(max_promotions_per_block: usize) -> Self {
@@ -100,6 +102,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_types::on_chain_config::HotStateConfigV1;
 
     fn read(accu: &mut BlockHotStateOpAccumulator<u64>, keys: &[u64]) {
         accu.add_transaction(std::iter::empty(), keys.iter());
@@ -150,5 +153,23 @@ mod tests {
         read(&mut accu, &[1, 2]);
         write(&mut accu, &[1]);
         assert_eq!(accu.get_keys_to_make_hot(|k| Ok(*k)).unwrap(), set(&[2]));
+    }
+
+    #[test]
+    fn cap_from_on_chain_config() {
+        let on_chain = OnChainHotStateConfig::V1(HotStateConfigV1 {
+            max_items_per_shard: vec![],
+            max_bytes_per_shard: vec![],
+            refresh_interval_versions: 0,
+            max_promotions_per_block: 2,
+        });
+        let default_cap = BlockHotStateOpAccumulator::<u64>::DEFAULT_MAX_PROMOTIONS_PER_BLOCK;
+        let keys: Vec<_> = (0..default_cap as u64 + 1).collect();
+        for (config, expected_cap) in [(Some(&on_chain), 2), (None, default_cap)] {
+            let mut accu = BlockHotStateOpAccumulator::<u64>::new(config);
+            read(&mut accu, &keys);
+            let promoted = accu.get_keys_to_make_hot(|k| Ok(*k)).unwrap();
+            assert_eq!(promoted.len(), expected_cap);
+        }
     }
 }
