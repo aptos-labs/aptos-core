@@ -436,7 +436,7 @@ impl<
     fn acknowledge_storage_data_error(&self) {
         if self
             .pending_data_errors
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |count| {
                 count.checked_sub(1)
             })
             .is_err()
