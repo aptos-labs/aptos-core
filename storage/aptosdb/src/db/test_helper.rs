@@ -16,12 +16,17 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::{native_position::NativePosition, state_key::StateKey, state_value::StateValue},
+    state_store::{
+        native_collateral::NativeCollateral,
+        native_position::NativePosition,
+        state_key::{inner::CollateralScope, StateKey},
+        state_value::StateValue,
+    },
     transaction::{
         AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionInfo, TransactionToCommit, Version,
     },
-    write_set::{NativePositionOp, TransactionWrite, WriteOp},
+    write_set::{NativeCollateralOp, NativePositionOp, TransactionWrite, WriteOp},
 };
 use itertools::Itertools;
 use proptest::{
@@ -143,6 +148,7 @@ prop_compose! {
         max_blocks: usize,
         make_hot_in_epilogue: bool,
         with_positions: bool,
+        with_collateral: bool,
     )(
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
         block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
@@ -151,6 +157,7 @@ prop_compose! {
         let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);
         let mut smt = root_smt.clone();
         let mut position_smt = root_smt.clone();
+        let mut collateral_smt = root_smt.clone();
 
         let mut result = Vec::new();
 
@@ -166,6 +173,15 @@ prop_compose! {
                 add_block_positions(checkpoint, block_idx);
                 position_smt = update_in_memory_positions(&position_smt, &root_smt, checkpoint);
                 position_smt.root_hash()
+            });
+            let collateral_root_hash = with_collateral.then(|| {
+                let checkpoint = txns_to_commit
+                    .last_mut()
+                    .expect("a block ends with its checkpoint");
+                add_block_collateral(checkpoint, block_idx);
+                collateral_smt =
+                    update_in_memory_collateral(&collateral_smt, &root_smt, checkpoint);
+                collateral_smt.root_hash()
             });
 
             // make real txn_info's
@@ -185,8 +201,8 @@ prop_compose! {
 
                 let auxiliary_info = AuxiliaryInfo::new(PersistedAuxiliaryInfo::V1 { transaction_index: idx as u32 }, None);
 
-                let txn_info = match position_root_hash {
-                    None => TransactionInfo::builder_v0()
+                let txn_info = match (position_root_hash, collateral_root_hash) {
+                    (None, None) => TransactionInfo::builder_v0()
                         .transaction_hash(txn.transaction().committed_hash())
                         .state_change_hash(txn.write_set().hash())
                         .event_root_hash(event_root_hash)
@@ -195,8 +211,8 @@ prop_compose! {
                         .status(placeholder_txn_info.status().clone())
                         .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
                         .build(),
-                    // The position root rides with the state checkpoint, as in execution.
-                    Some(position_root_hash) => TransactionInfo::builder_v1()
+                    // The native roots ride with the state checkpoint, as in execution.
+                    (position_root_hash, collateral_root_hash) => TransactionInfo::builder_v1()
                         .transaction_hash(txn.transaction().committed_hash())
                         .state_change_hash(txn.write_set().hash())
                         .event_root_hash(event_root_hash)
@@ -205,7 +221,10 @@ prop_compose! {
                         .status(placeholder_txn_info.status().clone())
                         .maybe_auxiliary_info_hash(auxiliary_info.persisted_info_hash())
                         .maybe_position_state_checkpoint_hash(
-                            state_checkpoint_hash.map(|_| position_root_hash),
+                            state_checkpoint_hash.and(position_root_hash),
+                        )
+                        .maybe_collateral_state_checkpoint_hash(
+                            state_checkpoint_hash.and(collateral_root_hash),
                         )
                         .build(),
                 };
@@ -254,6 +273,7 @@ pub fn arb_blocks_to_commit_with_params(
         max_blocks,
         make_hot_in_epilogue,
         false, /* with_positions */
+        false, /* with_collateral */
     )
 }
 
@@ -269,6 +289,22 @@ pub fn arb_blocks_to_commit_with_positions(
         10,    /* max_blocks */
         false, /* make_hot_in_epilogue */
         true,  /* with_positions */
+        false, /* with_collateral */
+    )
+}
+
+/// Like [`arb_blocks_to_commit_with_positions`], but for native collateral:
+/// checkpoint transaction infos commit the collateral root.
+pub fn arb_blocks_to_commit_with_collateral(
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        5,     /* num_accounts */
+        2,     /* max_user_txns_per_block */
+        1,     /* min_blocks */
+        10,    /* max_blocks */
+        false, /* make_hot_in_epilogue */
+        false, /* with_positions */
+        true,  /* with_collateral */
     )
 }
 
@@ -881,4 +917,61 @@ pub fn test_sync_transactions_impl(
             .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
             .collect(),
     );
+}
+
+fn test_collateral_key(account: u8) -> StateKey {
+    let address = |byte: u8| {
+        let mut bytes = [0u8; AccountAddress::LENGTH];
+        bytes[AccountAddress::LENGTH - 1] = byte;
+        AccountAddress::new(bytes)
+    };
+    StateKey::collateral(address(1), address(account), CollateralScope::Cross)
+}
+
+/// As [`add_block_positions`]: block `block_idx` sets accounts
+/// `0..=max(1, block_idx % 7)` and deletes account 3 on every fourth block.
+fn add_block_collateral(checkpoint: &mut TransactionToCommit, block_idx: usize) {
+    let mut collateral = BTreeMap::new();
+    for account in 0..=(block_idx % 7).max(1) as u8 {
+        let value = NativeCollateral::V1 {
+            primary_offset: (1 << 63) + block_idx as u64 * 100 + account as u64,
+            secondaries: vec![],
+            reserved: 0,
+        };
+        let bytes = value.serialize().expect("NativeCollateral serialize");
+        collateral.insert(
+            test_collateral_key(account),
+            NativeCollateralOp::from_write_op(WriteOp::legacy_modification(bytes.into())),
+        );
+    }
+    if block_idx % 4 == 3 {
+        collateral.insert(
+            test_collateral_key(3),
+            NativeCollateralOp::from_write_op(WriteOp::legacy_deletion()),
+        );
+    }
+    let mut write_set = std::mem::take(&mut checkpoint.write_set).into_v1();
+    write_set.add_native_collateral(collateral);
+    checkpoint.write_set = write_set;
+}
+
+fn update_in_memory_collateral(
+    smt: &SparseMerkleTree,
+    root_smt: &SparseMerkleTree,
+    checkpoint: &TransactionToCommit,
+) -> SparseMerkleTree {
+    let updates = checkpoint
+        .write_set
+        .native_collateral_iter()
+        .map(|(k, op)| {
+            (
+                k.hash(),
+                op.as_write_op().as_state_value_opt().map(CryptoHash::hash),
+            )
+        })
+        .collect_vec();
+    smt.freeze(root_smt)
+        .batch_update(updates.iter(), &())
+        .unwrap()
+        .unfreeze()
 }

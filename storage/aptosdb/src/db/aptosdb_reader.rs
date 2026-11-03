@@ -97,6 +97,54 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_persisted_collateral_state_summary(&self) -> Result<NativeStateWithSummary> {
+        gauged_api("get_persisted_collateral_state_summary", || {
+            self.collateral
+                .as_ref()
+                .and_then(|bundle| bundle.store.persisted.as_ref())
+                .map(|persisted| persisted.get())
+                .ok_or_else(|| self.collateral_storage_unavailable())
+        })
+    }
+
+    fn get_pre_committed_collateral_state_summary(&self) -> Result<NativeLedgerStateWithSummary> {
+        gauged_api("get_pre_committed_collateral_state_summary", || {
+            self.collateral
+                .as_ref()
+                .and_then(|bundle| bundle.store.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone())
+                .ok_or_else(|| self.collateral_storage_unavailable())
+        })
+    }
+
+    fn get_collateral_state_proof_by_version_ext(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<SparseMerkleProofExt> {
+        gauged_api("get_collateral_state_proof_by_version_ext", || {
+            let bundle = self.collateral.as_ref().ok_or_else(|| {
+                AptosDbError::Other("native collateral is not enabled".to_string())
+            })?;
+            // As for positions: the requested version tracks the merkle
+            // pruner's target, but a pruned version must not panic in the JMT.
+            if let Some(pruner) = bundle.store.pruner.as_ref() {
+                let min_readable = pruner.state_merkle_pruner.get_min_readable_version();
+                ensure!(
+                    version >= min_readable,
+                    "collateral state merkle at version {version} is pruned, \
+                     min available version is {min_readable}",
+                );
+            }
+            let (_value, proof) = bundle
+                .store
+                .merkle_db
+                .get_with_proof_ext(key_hash, version, root_depth)?;
+            Ok(proof)
+        })
+    }
+
     fn get_position_state_proof_by_version_ext(
         &self,
         key_hash: &HashValue,
@@ -715,11 +763,17 @@ impl DbReader for AptosDB {
                 .collateral
                 .as_ref()
                 .map(|bundle| bundle.collateral.lock().clone());
+            let collateral_state_summary = self
+                .collateral
+                .as_ref()
+                .and_then(|bundle| bundle.store.state_store.as_ref())
+                .map(|store| store.current_state().lock().clone());
             Ok(LedgerSummary {
                 state,
                 state_summary,
                 transaction_accumulator,
                 position_state_summary,
+                collateral_state_summary,
                 positions,
                 orders,
                 collateral,

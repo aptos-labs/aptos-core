@@ -626,9 +626,11 @@ impl AptosDB {
             },
         }
 
-        // The collateral root is not computed yet, so the store always
-        // computes its own summary.
-        bundle.store.advance_pipeline(chunk, None, sync_commit)
+        // With the roots on, the summary comes from execution on the chunk;
+        // off, the store computes it so the tree still tracks forward.
+        bundle
+            .store
+            .advance_pipeline(chunk, chunk.collateral_state_summary, sync_commit)
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {

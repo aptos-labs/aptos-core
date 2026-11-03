@@ -407,6 +407,22 @@ pub trait DbReader: Send + Sync {
         /// but native-position storage is absent.
         fn get_pre_committed_positions(&self) -> Result<PositionOverlay>;
 
+        /// Collateral analog of `get_persisted_position_state_summary`.
+        fn get_persisted_collateral_state_summary(&self) -> Result<NativeStateWithSummary>;
+
+        /// Collateral analog of `get_pre_committed_position_state_summary`.
+        fn get_pre_committed_collateral_state_summary(
+            &self,
+        ) -> Result<LedgerWithSummary<NativeStateWithSummary>>;
+
+        /// Collateral analog of `get_position_state_proof_by_version_ext`.
+        fn get_collateral_state_proof_by_version_ext(
+            &self,
+            key_hash: &HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<SparseMerkleProofExt>;
+
         /// Native-position analog of `get_state_proof_by_version_ext`: a
         /// cold-key proof from the persisted position JMT at `version`.
         fn get_position_state_proof_by_version_ext(

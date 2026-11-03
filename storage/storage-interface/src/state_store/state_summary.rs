@@ -392,23 +392,53 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
     }
 }
 
-/// The merklized position snapshot (freeze base + `ProofRead` for
-/// `ShardedJmtState::extend`, read at `version()`), paired with the
-/// pre-committed position tip used to seed the in-memory parent when no
-/// block parent is available. The async merkle committer can lag the tip,
-/// so the two differ and must not be conflated.
-pub struct ProvablePositionStateSummary<'db> {
+/// Reads a native tree's proof at a version: the tree's analog of
+/// `DbReader::get_state_proof_by_version_ext`.
+type NativeProofFn = fn(
+    &(dyn DbReader + Sync),
+    &HashValue,
+    Version,
+    usize,
+) -> Result<SparseMerkleProofExt, crate::AptosDbError>;
+
+/// A native tree's merklized snapshot (freeze base + `ProofRead` for
+/// `ShardedJmtState::extend`, read at `version()`), paired with its
+/// pre-committed tip used to seed the in-memory parent when no block parent
+/// is available. The async merkle committer can lag the tip, so the two
+/// differ and must not be conflated.
+pub struct ProvableNativeStateSummary<'db> {
     persisted: NativeStateWithSummary,
     pre_committed: LedgerWithSummary<NativeStateWithSummary>,
     db: &'db (dyn DbReader + Sync),
+    proof: NativeProofFn,
 }
 
-impl<'db> ProvablePositionStateSummary<'db> {
-    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+/// The position tree's provable summary.
+pub type ProvablePositionStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
+/// The collateral tree's provable summary.
+pub type ProvableCollateralStateSummary<'db> = ProvableNativeStateSummary<'db>;
+
+impl<'db> ProvableNativeStateSummary<'db> {
+    pub fn new_persisted_position(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
         Ok(Self {
             persisted: db.get_persisted_position_state_summary()?,
             pre_committed: db.get_pre_committed_position_state_summary()?,
             db,
+            proof: |db, key, version, root_depth| {
+                db.get_position_state_proof_by_version_ext(key, version, root_depth)
+            },
+        })
+    }
+
+    pub fn new_persisted_collateral(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
+        Ok(Self {
+            persisted: db.get_persisted_collateral_state_summary()?,
+            pre_committed: db.get_pre_committed_collateral_state_summary()?,
+            db,
+            proof: |db, key, version, root_depth| {
+                db.get_collateral_state_proof_by_version_ext(key, version, root_depth)
+            },
         })
     }
 
@@ -416,15 +446,15 @@ impl<'db> ProvablePositionStateSummary<'db> {
         self.persisted.summary()
     }
 
-    /// The persisted position state: the floor new layers are built over.
+    /// The persisted state: the floor new layers are built over.
     pub fn persisted(&self) -> &NativeStateWithSummary {
         &self.persisted
     }
 
-    /// The pre-committed position tip — seeds the in-memory parent at genesis
-    /// or the first block after the feature is enabled. It includes committed
-    /// writes the merklized snapshot may not yet reflect, so the computed root
-    /// covers all prior position writes.
+    /// The pre-committed tip — seeds the in-memory parent at genesis or the
+    /// first block after the feature is enabled. It includes committed writes
+    /// the merklized snapshot may not yet reflect, so the computed root covers
+    /// all prior writes.
     pub fn base(&self) -> &LedgerWithSummary<NativeStateWithSummary> {
         &self.pre_committed
     }
@@ -434,12 +464,11 @@ impl<'db> ProvablePositionStateSummary<'db> {
     }
 }
 
-impl ProofRead for ProvablePositionStateSummary<'_> {
+impl ProofRead for ProvableNativeStateSummary<'_> {
     fn get_proof(&self, key: &HashValue, root_depth: usize) -> Option<SparseMerkleProofExt> {
         self.version().map(|version| {
-            self.db
-                .get_position_state_proof_by_version_ext(key, version, root_depth)
-                .expect("Failed to get position state proof by version.")
+            (self.proof)(self.db, key, version, root_depth)
+                .expect("Failed to get native state proof by version.")
         })
     }
 }
