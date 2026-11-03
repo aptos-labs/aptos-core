@@ -439,6 +439,30 @@ per-leaf preparation sharing.
 | Scoping split and substitution to a memory write's new hypotheses | the cost was a non-terminating injection loop, fixed at its cause |
 | `Memory.set` spine as skeleton | no effect on `bump_resource` |
 
+### Follow-up measurement after the compiler restack
+
+On the whole `coin`, `primary_fungible_store`, and `randomness` modules at
+`--heartbeats 300`, ignoring source-location markers when matching stated
+facts and filtering variant readers before definitional abstraction retain
+51 verified / 25 budget / 4 failed. The 51 verified targets fall from
+3,555,636,546 to 3,531,735,616 raw heartbeats (0.67%). Mint/burn copy-ref
+fall from 177.47M/179.00M to 175.14M/175.93M. This is a small saving, not a
+resolution of the extra shared-mode leaves or the completeness gap.
+
+The reader filter first checks for an exact occurrence of the tested term;
+variant observations and constructor equations retain the transparent
+fallback for terms spelled at another family. Marker-aware assumption
+matching alone saves about 0.1% on this sample and closes the shared-call
+abort test before entering the leaf pipeline.
+
+Rejected on the same module sample: an assumption retry after substitution,
+early pin substitution retaining the later whole-context substitution, and
+literal simplification before the speculative passes gave negligible gains.
+Moving the full cheap decider before those passes retained coverage but
+increased verified-target heartbeats by 0.77%. The original single-arrival
+proposal therefore remains unresolved; do not infer the predicted 50M saving
+from its earlier leaf profile.
+
 ## What cannot change
 
 Every step is a kernel-checked term, so rewriting costs in proportion to

@@ -5385,8 +5385,12 @@ private def determinedTerms (goal : MVarId) (decide : Simp.Context × Simp.Simpr
       -- fact guarded by a test of the term computes in its case.
       let readers ← goal.withContext do
         hyps.filterMapM fun (hyp, type) => do
-          let abstracted ← withTransparency .instances do kabstractShared type subject
-          if abstracted.hasLooseBVars then return some (hyp, type, abstracted)
+          -- Most hypotheses do not read this term. Avoid definitional
+          -- abstraction over their large types; observations still get the
+          -- transparent fallback for terms spelled at another family.
+          if (type.find? (· == subject)).isSome then
+            let abstracted ← withTransparency .instances do kabstractShared type subject
+            if abstracted.hasLooseBVars then return some (hyp, type, abstracted)
           unless mayDetermineVariant type do return none
           let abstracted ← withTransparency .default do kabstractShared type subject
           return if abstracted.hasLooseBVars &&
@@ -5555,17 +5559,23 @@ def goalContent (goal : MVarId) : MetaM (Lean.Expr × Array Lean.Expr) := goal.w
 /-- A goal some hypothesis states, or reflexivity, up to reducible
 unfolding. Plain `assumption` compares at default transparency, which
 unfolds large verification conditions at length before failing on the
-leaves nothing closes. -/
+leaves nothing closes. Source-location markers do not change a proposition:
+compare their contents, retaining the markers when the attempt fails. -/
 elab "verex_assumption" : tactic => focusGoal do
   let goal ← getMainGoal
   if ← closeReflexive goal then
     replaceMainGoal []
     return
   goal.withContext do
-    let target ← instantiateMVars (← goal.getType)
+    let statement (type : Lean.Expr) : Lean.Expr := Id.run do
+      let mut type := type.consumeMData
+      while type.isAppOfArity ``VerexIR.Proofs.Obligation 4 do
+        type := (type.getArg! 3).consumeMData
+      return type
+    let target := statement (← instantiateMVars (← goal.getType))
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
-      if ← withReducible (isDefEq target (← instantiateMVars decl.type)) then
+      if ← withReducible (isDefEq target (statement (← instantiateMVars decl.type))) then
         goal.assign decl.toExpr
         replaceMainGoal []
         return

@@ -22,6 +22,7 @@ import argparse
 import datetime
 import hashlib
 import html
+import importlib.util
 import json
 import math
 import os
@@ -47,6 +48,7 @@ LOCAL_RESULT = LEAN_DIR / "local_benchmark.json"
 LOCAL_HISTORY = LEAN_DIR / "local_benchmark_history.jsonl"
 LOCAL_LOGS = LEAN_DIR / "local_benchmark_logs"
 LOCAL_KEEP = 100
+FX_PREFIX = LEAN_DIR / "local_fx_benchmark"
 SCHEMA = "verex-bench"
 STATUSES = ("verified", "expected rejection", "unexpected acceptance", "failed", "timeout",
             "crashed")
@@ -518,7 +520,7 @@ def result_of(point, name):
 def suite_value(point, measure):
     """The total measured work, including verification rejections; none for
     a run of a subset, whose total compares with no other."""
-    if point.get("subset"):
+    if point.get("subset") and point.get("flavor") != "framework":
         return None
     return sum(problem.get(measure, {}).get("total", 0) for problem in point["problems"])
 
@@ -991,7 +993,7 @@ def problem_section(points, name):
     targets = sorted((latest or {}).get("targets", []), key=lambda t: -t["heartbeats"])[:8]
     target_rows = "".join(
         f"<tr><td>{html.escape(target['target'])}</td><td>{beat_count(target['heartbeats'])}</td>"
-        f"<td>{target['wall_ms'] / 1000:.1f}</td>"
+        f"<td>{seconds(target.get('wall_ms'))}</td>"
         f"<td>{html.escape(target_status(latest, target['target']))}</td></tr>" for target in targets)
     errors = "".join(f"<li>{html.escape(message)}</li>"
                      for message in (latest or {}).get("error_messages", []))
@@ -1030,9 +1032,10 @@ def suite_section(points):
     if all(value is None for value in totals + wall_totals):
         return ('<section id="suite"><h2>Suite</h2><p class="meta">No full run in this '
                 "window: the suite total compares full runs only.</p></section>")
+    scope = ("fixed framework sample" if points[-1].get("flavor") == "framework" else "full runs")
     return (
         '<section id="suite"><h2>Suite<span class="status">all measured work, including rejections, '
-        'full runs</span></h2>'
+        f'{scope}</span></h2>'
         '<div class="charts">'
         f'{chart("Suite", f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, [("Overall", beats)], {})}'
         "</div>" + value_table(labels, rows)
@@ -1222,10 +1225,143 @@ def compare(args):
           f"{percent(change(beats[1], beats[0])):>9}")
 
 
+def framework_selection(corpus, durations, fraction):
+    """Rank measured modules first, resolving address aliases by module name."""
+    def duration(name):
+        if name in durations:
+            return durations[name]
+        return max((value for key, value in durations.items()
+                    if key.rsplit("::", 1)[-1] == name.rsplit("::", 1)[-1]), default=-1)
+    ranked = sorted(corpus, key=lambda name: (-duration(name), name))
+    if not ranked or duration(ranked[0]) < 0:
+        fail("no measured framework modules to rank; run verify-modules.py first")
+    selected = ranked[:max(1, math.ceil(len(ranked) * fraction))]
+    return {"fraction": fraction, "corpus_modules": len(corpus),
+            "ranking": "prior module wall seconds", "modules": selected,
+            "ranking_seconds": {name: duration(name) for name in selected}}
+
+
+def framework_problems(sweep):
+    problems = []
+    for module in sweep["modules"]:
+        targets = module["targets"]
+        measured = [target for target in targets if "heartbeats" in target]
+        problems.append({
+            "name": module["module"], "kind": "move", "group": "Aptos Framework",
+            "status": module["outcome"],
+            "heartbeats": {"total": sum(target["heartbeats"] for target in measured)},
+            "wall_ms": {"total": round(module["wall"] * 1000)},
+            "cpu_ms": round(module["cpu"] * 1000),
+            "targets": measured, "outcomes": targets,
+        })
+    return problems
+
+
+def framework_overview(point):
+    selection, sweep = point["selection"], point["sweep"]
+    counts = {}
+    rows = []
+    for module in sweep["modules"]:
+        for target in module["targets"]:
+            status = target["status"]
+            counts[status] = counts.get(status, 0) + 1
+            rows.append(f'<tr><td>{html.escape(module["module"])}</td>'
+                        f'<td>{html.escape(target["target"])}</td><td>{html.escape(status)}</td>'
+                        f'<td>{beat_count(target.get("heartbeats"))}</td></tr>')
+    summary = ", ".join(f"{counts.get(status, 0)} {status}"
+                        for status in ("verified", "budget", "failed", "interrupted"))
+    modules = ", ".join(html.escape(name) for name in selection["modules"])
+    return (f'<section id="local"><h2>Framework sample</h2><p>'
+            f'{len(selection["modules"])} of {selection["corpus_modules"]} modules with specifications, '
+            f'selected by {html.escape(selection["ranking"])}. Selection is frozen between runs.</p>'
+            f'<p>{summary}. Counts cover observed targets only; crashed or timed-out modules '
+            'may leave additional targets unstarted.</p>'
+            f'<p>Namespace compilation failures: {len(sweep.get("namespace_failures", []))}. '
+            f'Modules timed out or crashed: {sum(module["outcome"] in ("timeout", "crashed") for module in sweep["modules"])}.</p>'
+            f'<p>Whole-run wall: {sweep["wall"]:.1f}s; namespace preparation: '
+            f'{sweep["namespace_wall"]:.1f}s; module CPU total: '
+            f'{sum(module["cpu"] for module in sweep["modules"]):.1f}s; '
+            f'{sweep["jobs"]} module workers; 300M raw heartbeats per target.</p>'
+            '<p>Charts show theorem heartbeats, including failed and budget-stopped attempts. '
+            'Module wall times include export and elaboration; their sum is not elapsed wall time. '
+            'Namespace preparation has no heartbeat measurement here.</p>'
+            f'<details><summary>Selected modules</summary><p>{modules}</p></details>'
+            f'<details><summary>All observed targets</summary><table><tr><th>Module</th>'
+            f'<th>Target</th><th>Status</th><th>Heartbeats</th></tr>{"".join(rows)}</table></details>'
+            '</section>')
+
+
+def framework(args):
+    """A local, fixed expensive-module sample, separate from nightly problems."""
+    if not 0 < args.fraction <= 1 or args.jobs < 1 or args.timeout <= 0:
+        fail("framework requires 0 < fraction <= 1, jobs >= 1, and timeout > 0")
+    spec = importlib.util.spec_from_file_location("verify_modules", LEAN_DIR / "scripts/verify-modules.py")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    package = REPO / "aptos-move/framework/aptos-framework"
+    corpus = runner.modules_of(package, None)
+    selection_path = FX_PREFIX.with_name("local_fx_selection.json")
+    if selection_path.exists() and not args.refresh_selection:
+        selection = json.loads(selection_path.read_text())
+        missing = set(selection["modules"]) - set(corpus)
+        if missing:
+            fail(f"selected modules disappeared: {sorted(missing)}; use --refresh-selection")
+    else:
+        durations = (json.loads(runner.DURATIONS.read_text()).get(str(package), {})
+                     if runner.DURATIONS.exists() else {})
+        selection = framework_selection(corpus, durations, args.fraction)
+        selection_path.write_text(json.dumps(selection, indent=2) + "\n")
+    logs = FX_PREFIX.with_name("local_fx_benchmark_logs") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    logs.mkdir(parents=True, exist_ok=True)
+    raw = logs / "sweep.json"
+    command = [sys.executable, str(LEAN_DIR / "scripts/verify-modules.py"), str(package),
+               "--modules", ",".join(selection["modules"]), "--heartbeats", "300",
+               "--jobs", str(args.jobs), "--timeout", str(args.timeout),
+               "--logs", str(logs), "--json", str(raw)]
+    if args.no_build:
+        command.append("--no-build")
+    started = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    print(f"verex-bench: framework sample: {len(selection['modules'])}/{len(corpus)} modules; "
+          f"logs {logs}", file=sys.stderr, flush=True)
+    with (logs / "driver.out").open("w") as output:
+        completed = subprocess.run(command, cwd=LEAN_DIR, stdout=output,
+                                   env=runner.with_option(os.environ.copy(), "verex.jobs=1"))
+    if completed.returncode not in (0, 1) or not raw.exists():
+        fail(f"framework runner failed ({completed.returncode}); see {logs}")
+    sweep = json.loads(raw.read_text())
+    point = {"schema": SCHEMA, "version": VERSION, "flavor": "framework",
+             "commit": git("rev-parse", "HEAD"), "dirty": bool(git("status", "--porcelain")),
+             "date": started, "branch": current_branch(), "runner": platform.node(),
+             "toolchain": (LEAN_DIR / "lean-toolchain").read_text().strip(),
+             "threads": args.jobs, "subset": True, "selection": selection, "sweep": sweep,
+             "problems": framework_problems(sweep)}
+    history_path = FX_PREFIX.with_name("local_fx_benchmark_history.jsonl")
+    history = [json.loads(line) for line in history_path.read_text().splitlines()] if history_path.exists() else []
+    history = (history + [point])[-LOCAL_KEEP:]
+    history_path.write_text("".join(json.dumps(item) + "\n" for item in history))
+    FX_PREFIX.with_suffix(".json").write_text(json.dumps(point, indent=2) + "\n")
+    # Never mix changing samples or branches in a chart's comparison window.
+    comparable = [item for item in history if item["branch"] == point["branch"]
+                  and item["selection"]["modules"] == selection["modules"]]
+    rendered = page(comparable, framework_overview(point))
+    rendered = rendered.replace("Verex verification benchmark", "Verex Aptos Framework sample")
+    Path(args.html).write_text(rendered)
+    print(f"verex-bench: wrote {args.html}", file=sys.stderr)
+
+
 def parser():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
+
+    fx = commands.add_parser("framework", help="benchmark a frozen expensive-module framework sample")
+    fx.add_argument("--fraction", type=float, default=0.3, help="fraction selected when refreshing (default: 0.3)")
+    fx.add_argument("--refresh-selection", action="store_true", help="rank modules again using prior measured runtimes")
+    fx.add_argument("--jobs", type=int, default=8)
+    fx.add_argument("--timeout", type=float, default=1200, help="seconds per module")
+    fx.add_argument("--no-build", action="store_true")
+    fx.add_argument("--html", default=LEAN_DIR / "local_fx_bechmark.html")
+    fx.set_defaults(action=framework)
 
     run_parser = commands.add_parser("run", help="measure the problems")
     run_parser.add_argument("--out", help="a results file to write; a local run is also "

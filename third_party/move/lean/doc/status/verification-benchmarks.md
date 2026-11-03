@@ -27,6 +27,42 @@ default, comparing with the Boogie backend.
 
 ## Problems
 
+### Local Aptos Framework sample
+
+From the Lean directory, run:
+
+```sh
+python3 scripts/verex-bench.py framework
+```
+
+This writes `local_fx_bechmark.html`, with separate results in
+`local_fx_benchmark.json`, history in `local_fx_benchmark_history.jsonl`,
+and per-module logs under `local_fx_benchmark_logs/`. These local artifacts
+are git-ignored. The filename of the HTML page can be changed with `--html`.
+
+The first run selects the most expensive 30% of framework modules with
+specifications, ranked by prior module wall times recorded by
+`verify-modules.py`. It stores that selection in `local_fx_selection.json`;
+later runs reuse it. `--refresh-selection --fraction 0.3` reranks the sample.
+Without prior measurements, run `verify-modules.py` on the framework first.
+Only runs of the same branch and identical selection share a chart.
+
+Each selected module is verified whole, at `--heartbeats 300`, with one
+target worker per process and eight module processes by default (`--jobs`).
+`--timeout` bounds each module's wall time (1200 seconds by default).
+`--no-build` uses the existing verifier. Do not build or change verifier
+sources during a measurement.
+
+The page reports observed verified, budget-stopped, failed, and interrupted
+targets, including all measured attempts in its heartbeat totals. It labels
+the selection as a sample; modules that crash or time out may have unstarted
+targets, so the observed-target count is not whole-framework coverage.
+Namespace preparation and whole-run elapsed time are reported separately
+from the sum of module times. These results do not mix with nightly benchmark
+history.
+
+### Standard problems
+
 A problem is one verification input in the tree: Move modules of an
 in-tree package, a VerexSL file, or a Rust file with its specification.
 The manifest `bench/problems.toml` (under `third_party/move/lean`) names

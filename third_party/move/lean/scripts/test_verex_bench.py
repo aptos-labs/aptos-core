@@ -78,5 +78,42 @@ class BenchmarkOutcomeTest(unittest.TestCase):
         self.assertAlmostEqual(changes["heartbeats"], -93.33333333333333)
 
 
+class FrameworkBenchmarkTest(unittest.TestCase):
+    def test_selection_is_cost_ranked_and_resolves_address_aliases(self):
+        selected = bench.framework_selection(
+            ["aptos_framework::a", "aptos_framework::b", "aptos_framework::c", "aptos_framework::d"],
+            {"0x1::a": 20, "aptos_framework::b": 90, "aptos_framework::c": 10}, 0.3)
+        self.assertEqual(selected["modules"], ["aptos_framework::b", "aptos_framework::a"])
+        self.assertEqual(selected["corpus_modules"], 4)
+
+    def test_stage_results_preserve_budget_failure_and_interruption(self):
+        spec = importlib.util.spec_from_file_location(
+            "verify_modules", Path(__file__).with_name("verify-modules.py"))
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        targets = runner.targets_of("""1 good: semantics
+10 good: theorem start
+20 good: theorem done, 100 heartbeats, verified, automatic
+21 costly: theorem start
+31 costly: theorem done, 300000001 heartbeats, budget, automatic
+32 wrong: theorem start
+36 wrong: theorem done, 20 heartbeats, failed, authored
+37 unfinished: theorem start
+""")
+        self.assertEqual([target["status"] for target in targets],
+                         ["verified", "budget", "failed", "interrupted"])
+        self.assertEqual(targets[0]["wall_ms"], 10)
+        self.assertNotIn("heartbeats", targets[-1])
+        sweep = {"modules": [{"module": "a::m", "outcome": "timeout", "wall": 2,
+                              "cpu": 1, "targets": targets}]}
+        problem = bench.framework_problems(sweep)[0]
+        self.assertEqual(problem["status"], "timeout")
+        self.assertEqual(problem["heartbeats"]["total"], 300000121)
+        self.assertEqual(len(problem["outcomes"]), 4)
+        self.assertEqual(len(problem["targets"]), 3)
+        point = {"subset": True, "flavor": "framework", "problems": [problem]}
+        self.assertEqual(bench.suite_value(point, "heartbeats"), 300000121)
+
+
 if __name__ == "__main__":
     unittest.main()

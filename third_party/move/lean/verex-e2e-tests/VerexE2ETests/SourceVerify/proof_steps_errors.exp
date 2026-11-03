@@ -42,12 +42,12 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:29:12: error: the step'
   initialState✝ : Proofs.Denote.Memory unit
   assumed permitted : True
   x_upper : x ≤ 10
-  x_lower : 0 ≤ x
-  right✝ : x ≤ 18446744073709551615
   i : Int
-  a✝¹ : 0 ≤ i
-  a✝ : i ≤ 18446744073709551615
+  i_lower : 0 ≤ i
+  i_upper : i ≤ 18446744073709551615
   x✝ : 10 < i
+  x_lower : 0 ≤ x
+  right✝ : x ≤ 2 ^ 64 - 1
   fact_0_0 : 10 < x → 12 ≤ x
   «fact_0.1_guard_0» : x ≤ 10
   ⊢ x ≤ 9

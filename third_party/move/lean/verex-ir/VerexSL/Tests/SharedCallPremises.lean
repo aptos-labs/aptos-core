@@ -10,6 +10,24 @@ leaf that opens the entry relations to prove an arrival-independent fact. -/
 
 set_option Elab.async false
 
+-- The same fact can reach a leaf from a different source clause. Its
+-- location, including nested markers, does not change its proposition.
+open VerexIR.Proofs in
+example (p : Prop) (h : Obligation "callee" 1 2 (Obligation "inner" 3 4 p)) :
+    Obligation "caller" 5 6 p := by
+  verex_assumption
+
+-- Different propositions still do not match, and a failed attempt leaves
+-- the original marker intact for diagnostics.
+open Lean Meta Elab Tactic VerexIR.Proofs in
+example (p q : Prop) (_h : Obligation "callee" 1 2 p) (hq : q) :
+    Obligation "caller" 5 6 q := by
+  fail_if_success (clear hq; verex_assumption)
+  run_tac
+    unless (← (← getMainGoal).getType).isAppOfArity ``Obligation 4 do
+      throwError "failed assumption matching removed the source marker"
+  exact Obligation.intro hq
+
 open Lean Elab Command in
 /-- The target verifies with the given number of leaves and no opened entry
 relation, its join sharing one summary. -/
@@ -69,6 +87,7 @@ verify 0x42::shared_call_premises::ordered
 #guard_held 0 in
 verify 0x42::shared_call_premises::after_join
 
--- The abort clause's leaf closes from the stated `False` without an arrival.
-#guard_held 1 in
+-- The abort clause closes from the stated `False` through its source marker,
+-- before reaching the leaf pipeline or opening an arrival.
+#guard_held 0 in
 verify 0x42::shared_call_premises::after_join_aborts

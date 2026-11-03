@@ -401,6 +401,32 @@ def reports_of(stdout):
     return pieces
 
 
+def targets_of(stages):
+    """Completed target measurements, plus started but interrupted targets.
+
+    Stage timestamps are milliseconds. Use theorem start, not the earlier
+    preparation, which can interleave with preparation of other targets.
+    """
+    starts, targets = {}, {}
+    for line in stages.splitlines():
+        match = re.fullmatch(r"(\d+) (.+): theorem start", line)
+        if match:
+            starts[match[2]] = int(match[1])
+            continue
+        match = re.fullmatch(
+            r"(\d+) (.+): theorem done, (\d+) heartbeats, (\w+), (.+)", line)
+        if match:
+            end, name, beats, status, mode = match.groups()
+            targets[name] = {"target": name, "heartbeats": int(beats),
+                             "status": status, "mode": mode}
+            if name in starts:
+                targets[name]["wall_ms"] = int(end) - starts[name]
+            starts.pop(name, None)
+    for name in starts:
+        targets[name] = {"target": name, "status": "interrupted"}
+    return list(targets.values())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("package", type=Path)
@@ -414,6 +440,7 @@ def main():
     parser.add_argument("--dev", action="store_true", help="passed to verex-move verify")
     parser.add_argument("--no-build", action="store_true", help="use the built verex-move as it is")
     parser.add_argument("--logs", type=Path, help="keep each module's output and rendering here")
+    parser.add_argument("--json", type=Path, help="write module and target measurements as JSON")
     parser.add_argument("--namespaces", type=Path, help="where the compiled namespaces are "
                         "(default: build/verex/namespaces of the package)")
     parser.add_argument("--no-namespaces", action="store_true",
@@ -534,6 +561,21 @@ def main():
                 print(report)
     total = sum(result["wall"] for result in results.values())
     failed = [name for name, result in results.items() if result["outcome"] != "verified"]
+    if args.json:
+        modules = []
+        for name in sorted(results):
+            result = {key: value for key, value in results[name].items()
+                      if key not in ("stdout", "stderr")}
+            stages = logs / f"{name.replace('::', '__')}.stages"
+            result["targets"] = targets_of(stages.read_text() if stages.exists() else "")
+            modules.append(result)
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps({
+            "schema": "verex-module-sweep", "version": 1,
+            "package": str(package), "jobs": jobs, "heartbeats": args.heartbeats,
+            "wall": wall, "namespace_wall": prepared, "modules": modules,
+            "namespace_failures": sorted(failed_namespaces) if not args.no_namespaces else [],
+        }, indent=2) + "\n")
     print(f"verify-modules: {len(results)} modules, {len(failed)} not verified; wall {wall:.1f}s "
           f"(namespaces {prepared:.1f}s), "
           f"modules' sum {total:.1f}s ({total / wall:.1f}× parallel), {jobs} jobs; logs in {logs}")
