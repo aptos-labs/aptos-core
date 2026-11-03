@@ -98,6 +98,12 @@ register_option verex.keepObligationMarkers : Bool := {
   descr := "preserve clause locations during shared authored preparation"
 }
 
+register_option verex.keepTargetLocals : Bool := {
+  defValue := false
+  descr := "substitute only the locals the goal does not read, as a path's preparation \
+    leaves its clauses to their leaves"
+}
+
 /-- Show the residual goal of a clause the solver cannot establish. -/
 register_option verex.certifyDebug : Bool := {
   defValue := false
@@ -355,6 +361,18 @@ structure StepMode where
   pointFacts : Bool := false
   blockReads : Option (Array String) := none
 
+/-- Where the budget stopped on `isMaxHeartbeat`: the position the walker was
+at when heartbeats ran out. -/
+structure BudgetStop where
+  /-- Leaves decided before the budget ran out. -/
+  leavesDecided : Nat := 0
+  /-- The callee being stepped into and the call's number among its calls in
+  this target, if the step was at or under a call. -/
+  callee : Option String := none
+  callNumber : Option Nat := none
+  /-- The last stage charged before the budget ran out. -/
+  lastStage : Option String := none
+
 /-- The solver's state of one target. -/
 structure TargetState where
   /-- The name of each clause of the target by its source range
@@ -415,6 +433,11 @@ structure TargetState where
   stays undecided, and every later call would ask it again. Emptied for
   every target. -/
   undecidedPremises : IO.Ref (Std.HashSet (Lean.Expr × Array Lean.Expr))
+  /-- The goals the ground evaluation failed on, by content, with the
+  heartbeats left when it failed (`none`: unbounded): with no more left, it
+  fails again, as the cheap deciders would retry it right after the leaf's
+  own attempt. Emptied for every target. -/
+  groundFailures : IO.Ref (Std.HashMap (Lean.Expr × Array Lean.Expr) (Option Nat))
   /-- The integer locals substituted by their pinned values so far, which a
   step reads to see whether it fixed one. -/
   pinnedCount : IO.Ref (Nat)
@@ -444,6 +467,17 @@ structure TargetState where
   while that context decides none of the conditions left undecided. Emptied
   for every target. -/
   normalForms : IO.Ref (Std.HashMap (Lean.Expr × Array Lean.Expr) NormalForm)
+  /-- The rewrites of hypotheses by the memory reads a leaf fixes
+  (`verex_context_memory_reads`), as `normalForms`, by the hypothesis
+  together with the reads. Emptied for every target. -/
+  readForms : IO.Ref (Std.HashMap (Lean.Expr × Array Lean.Expr) NormalForm)
+  /-- The propositions the theorem binds (`verex_proof`): facts of the
+  unit, the same at every leaf, which no leaf's facts connect through. -/
+  moduleFacts : IO.Ref (Std.HashSet FVarId)
+  /-- Whether a hypothesis type reads the slot a read equates, by both
+  (`mentionsRead`): the leaves restate one context and its reads, and the
+  comparison unfolds well-formedness proofs. Emptied for every target. -/
+  readMentions : IO.Ref (Std.HashMap (Lean.Expr × Lean.Expr) Bool)
   /-- The hypotheses the family normalization of selected cases already left
   normal, by shape. Emptied for every target. -/
   familyNormalHypotheses : IO.Ref (Std.HashSet (Lean.Expr × Array Lean.Expr))
@@ -559,6 +593,9 @@ its captures, its literals unfolded (`literalValue?`), by constructor. -/
   fixedPoints : IO.Ref (Std.HashMap Name (IO.Ref (Std.HashSet Lean.Expr)))
   /-- The fixed-point lookups that hit and missed, and the terms recorded. -/
   fixedPointCounts : IO.Ref (Array Nat)
+  /-- Where the budget stopped when the last target hit `isMaxHeartbeat`,
+  populated by `traverse` and read via `ProofReport`. -/
+  budgetStop : IO.Ref (Option BudgetStop)
 
 /-- The state a target begins with. -/
 def TargetState.new : IO TargetState := do
@@ -580,12 +617,16 @@ def TargetState.new : IO TargetState := do
     reducedBounds := ← IO.mkRef {}
     projectionFreeTypes := ← IO.mkRef {}
     undecidedPremises := ← IO.mkRef {}
+    groundFailures := ← IO.mkRef {}
     pinnedCount := ← IO.mkRef 0
     assertedBounds := ← IO.mkRef {}
     normalHypotheses := ← IO.mkRef {}
     dischargeLog := ← IO.mkRef (0, 0, #[])
     stageNormalHypotheses := ← IO.mkRef {}
     normalForms := ← IO.mkRef {}
+    readForms := ← IO.mkRef {}
+    moduleFacts := ← IO.mkRef {}
+    readMentions := ← IO.mkRef {}
     familyNormalHypotheses := ← IO.mkRef {}
     contextRules := ← IO.mkRef {}
     leafReports := ← IO.mkRef (#[], #[])
@@ -618,6 +659,7 @@ def TargetState.new : IO TargetState := do
     siteClosureTypes := ← IO.mkRef {}
     fixedPoints := ← IO.mkRef {}
     fixedPointCounts := ← IO.mkRef #[0, 0, 0]
+    budgetStop := ← IO.mkRef none
   }
 
 /-- The state of the target being proved, in its elaboration branch's
@@ -2338,6 +2380,15 @@ private partial def mentionsRead (lhs : Lean.Expr) (e : Lean.Expr) : MetaM Bool 
   | .mdata _ b | .proj _ _ b => mentionsRead lhs b
   | _ => pure false
 
+/-- `mentionsRead`, remembered for terms without metavariables. -/
+private def mentionsReadCached (lhs : Lean.Expr) (e : Lean.Expr) : MetaM Bool := do
+  if lhs.hasMVar || e.hasMVar then return ← mentionsRead lhs e
+  let state ← targetState
+  if let some known := (← state.readMentions.get)[(lhs, e)]? then return known
+  let result ← mentionsRead lhs e
+  state.readMentions.modify (·.insert (lhs, e) result)
+  return result
+
 /-- Read memory as the leaf's case splits fixed it: a slot a hypothesis
 equates to a value (`memory r k = some v`, from a program read's split) is
 that value wherever the goal reads it, in normal form, so that a clause's
@@ -2355,7 +2406,7 @@ elab "verex_memory_reads" : tactic => focusGoal do
       let head := lhs.getAppFn
       unless head.isFVar && lhs.getAppNumArgs == 2 do continue
       unless (← whnfR (← inferType head)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do continue
-      unless ← mentionsRead lhs target do continue
+      unless ← mentionsReadCached lhs target do continue
       found := found.push decl.fvarId
     pure found
   if reads.isEmpty then throwError "the goal reads no memory the leaf fixes"
@@ -2406,11 +2457,13 @@ spend at most five percent of the target's budget, capped at two million raw
 heartbeats. A large target budget should not multiply the cost of unsuccessful
 search on every leaf. Read the target's option rather than a temporary nested
 solver cap. -/
-elab "verex_residual_budgeted " step:tactic : tactic => do
+def residualAllowance : CoreM Nat := do
   let targetBudget := Core.getMaxHeartbeats (← getOptions)
-  let allowance := if targetBudget == 0 then 2000000
-    else min 2000000 (targetBudget / 20)
-  evalBudgeted allowance step
+  return if targetBudget == 0 then 2000000 else min 2000000 (targetBudget / 20)
+
+/-- Run a speculative residual attempt within `residualAllowance`. -/
+elab "verex_residual_budgeted " step:tactic : tactic => do
+  evalBudgeted (← residualAllowance) step
 
 /-- Whether the goal or a hypothesis has a subterm satisfying `p`. -/
 def mentionsAnywhere (goal : MVarId) (p : Lean.Expr → Bool) (skipLets := false) :
@@ -3015,7 +3068,7 @@ private def identifyReads (goal : MVarId) : TacticM MVarId := do
           for decl in ← getLCtx do
             if decl.isImplementationDetail then continue
             let type ← instantiateMVars decl.type
-            unless ordered[deeper]!.occurs type && (← isProp type) do continue
+            unless ← (pure (ordered[deeper]!.occurs type) <&&> isProp type) do continue
             try
               let rewritten ← goal.rewrite type proof
               goal := (← goal.replaceLocalDecl decl.fvarId rewritten.eNew rewritten.eqProof).mvarId
@@ -3315,6 +3368,16 @@ elab "verex_intro_negation" : tactic => focusGoal do
     replaceMainGoal [next]
   else replaceMainGoal [goal]
 
+/-- The propositions of a goal's context with their variables, but the
+unit's facts the theorem binds (`TargetState.moduleFacts`): they share the
+unit's variables with every leaf fact, and connect nothing of the leaf. -/
+def leafPropositions (goal : MVarId) : MetaM (Array (Lean.Expr × FVarIdSet)) := goal.withContext do
+  let moduleFacts ← (← targetState).moduleFacts.get
+  (← goal.getNondepPropHyps).filterMapM fun fvarId => do
+    if moduleFacts.contains fvarId then return none
+    let type ← instantiateMVars (← fvarId.getType)
+    return some (type, (collectFVars {} type).fvarSet)
+
 /-- The propositions of the context connected to a type through shared
 variables, transitively. -/
 private def connectedPropositions (propositions : Array (Lean.Expr × FVarIdSet)) (type : Lean.Expr) :
@@ -3328,9 +3391,7 @@ fails, the allowance ends, or the same question failed before under the
 same connected facts. -/
 private def connectedOmega? (goal : MVarId) (premise : Lean.Expr) : TacticM (Option Lean.Expr) :=
   goal.withContext do
-    let propositions ← (← goal.getNondepPropHyps).mapM fun fvarId => do
-      let type ← instantiateMVars (← fvarId.getType)
-      return (type, (collectFVars {} type).fvarSet)
+    let propositions ← leafPropositions goal
     let connected := connectedPropositions propositions premise
     let key := (premise, connected)
     if (← (← targetState).undecidedPremises.get).contains key then return none
@@ -3833,7 +3894,8 @@ elab "verex_split_hypotheses" : tactic => focusGoal do
           return some decl.fvarId
         let stated := if ty.isAppOfArity ``VerexIR.Proofs.Obligation 4 then ty.appArg! else ty
         if stated.isAppOfArity ``Iff 2 then
-          if (← decidedSide? (stated.getArg! 0)).isSome || (← decidedSide? (stated.getArg! 1)).isSome then
+          if ← ((Option.isSome <$> decidedSide? (stated.getArg! 0)) <||>
+              (Option.isSome <$> decidedSide? (stated.getArg! 1))) then
             return some decl.fvarId
         if let some (range, _) := markedClause? ty then
           -- A clause the registry names, not yet named so.
@@ -4030,7 +4092,7 @@ private partial def proofsMentioning (x : FVarId) (e : Lean.Expr) :
     match e with
     | .app function argument => do
         let some found ← visit function found | return none
-        if argument.containsFVar x && !argument.hasLooseBVars && (← Meta.isProof argument) then
+        if ← (pure (argument.containsFVar x && !argument.hasLooseBVars) <&&> Meta.isProof argument) then
           let .forallE _ proposition _ _ ← whnf (← inferType function) | return none
           let proposition ← instantiateMVars proposition
           if proposition.containsFVar x || proposition.hasLooseBVars then return some found
@@ -4413,6 +4475,31 @@ elab "verex_cases " values:ident,+ : tactic => focusGoal do
   evalTactic (← `(tactic| all_goals verex_type_bounds))
 
 
+/-- Close a goal that holds by reflexivity: an equation, equivalence or
+heterogeneous equation whose sides agree up to reducible unfolding, under
+its clause marker if it has one. -/
+def closeReflexive (goal : MVarId) : MetaM Bool := goal.withContext do
+  let mut target := (← instantiateMVars (← goal.getType)).consumeMData
+  while target.isAppOfArity ``VerexIR.Proofs.Obligation 4 do
+    target := (target.getArg! 3).consumeMData
+  let reflexive (a b : Lean.Expr) : MetaM Bool := withReducible (isDefEq a b)
+  if target.isAppOfArity ``Eq 3 then
+    let a := target.getArg! 1
+    unless ← reflexive a (target.getArg! 2) do return false
+    goal.assign (← mkEqRefl a)
+  else if target.isAppOfArity ``Iff 2 then
+    let a := target.getArg! 0
+    unless ← reflexive a (target.getArg! 1) do return false
+    goal.assign (mkApp (mkConst ``Iff.refl) a)
+  else if target.isAppOfArity ``HEq 4 then
+    let a := target.getArg! 1
+    unless ← reflexive (target.getArg! 0) (target.getArg! 2) do return false
+    unless ← reflexive a (target.getArg! 3) do return false
+    goal.assign (← mkHEqRefl a)
+  else
+    return false
+  return true
+
 /-- Substitute every hypothesis equating a local variable to a term, by
 syntactic shape alone: no hypothesis is unfolded to find one. -/
 elab "verex_subst_vars" : tactic => focusGoal do
@@ -4421,8 +4508,14 @@ elab "verex_subst_vars" : tactic => focusGoal do
   let mut progress := true
   let mut attempted : Array FVarId := #[]
   let mut pinned : Array FVarId := #[]
+  -- A path's preparation leaves the locals its clauses read to their leaves:
+  -- the clauses reach the walker and the leaves' deciders as they would.
+  let keepTarget := verex.keepTargetLocals.get (← getOptions)
   while progress do
     progress := false
+    let read ← if keepTarget then goal.withContext do
+        pure (collectFVars {} (← instantiateMVars (← goal.getType))).fvarSet
+      else pure {}
     let equation ← goal.withContext do
       (← getLCtx).findDeclM? fun decl => do
         if decl.isImplementationDetail then return none
@@ -4432,14 +4525,14 @@ elab "verex_subst_vars" : tactic => focusGoal do
         let rhs := ty.getArg! 2
         let substitutable (x : Lean.Expr) (other : Lean.Expr) : Bool :=
           match x with
-          | .fvar id => !other.containsFVar id
+          | .fvar id => !other.containsFVar id && !read.contains id
           | _ => false
         if substitutable lhs rhs || substitutable rhs lhs then return some (decl.fvarId, none)
         -- The local occurs on the other side, perhaps only inside proofs.
         if attempted.contains decl.fvarId then return none
         match rhs, lhs with
-        | .fvar x, _ => return some (decl.fvarId, some x)
-        | _, .fvar x => return some (decl.fvarId, some x)
+        | .fvar x, _ => if read.contains x then return none else return some (decl.fvarId, some x)
+        | _, .fvar x => if read.contains x then return none else return some (decl.fvarId, some x)
         | _, _ => return none
     match equation with
     | some (fvarId, none) =>
@@ -4453,7 +4546,8 @@ elab "verex_subst_vars" : tactic => focusGoal do
     | none =>
         -- A vector local whose elements are fixed, a caller's value fixed in
         -- a callee's view, and an integer pinned by its bounds are known
-        -- wherever they occur.
+        -- wherever they occur, the clauses included.
+        if keepTarget then break
         if let some (equation, vector) ← vectorEquation? goal then
           goal ← substituteVector goal equation vector
           progress := true
@@ -4471,6 +4565,8 @@ elab "verex_subst_vars" : tactic => focusGoal do
   -- A match's fall-through case whose discriminant the substitutions have
   -- fixed to a constructor is refuted.
   if ← refuteFallthrough goal then replaceMainGoal []; return
+  -- A target the substitutions left reflexive is closed.
+  if ← closeReflexive goal then replaceMainGoal []; return
   replaceMainGoal [goal]
 
 /-- The locals whose variant a term tests: by its name, or by a projection
@@ -4899,7 +4995,8 @@ private def determinedTerms (goal : MVarId) (decide : Simp.Context × Simp.Simpr
                 (isVariantObservation type || statesConstructor abstracted) then
               some abstracted else none
       let type ← goal.withContext do instantiateMVars (← inferType subject)
-      if observations.isEmpty || (← goal.withContext (survivingCases type observations)) > 1 then
+      if ← (pure observations.isEmpty <||>
+          goal.withContext do return (← survivingCases type observations) > 1) then
         stuck := stuck.push subject
         continue
       let saved ← saveState
@@ -5044,12 +5141,15 @@ def goalContent (goal : MVarId) : MetaM (Lean.Expr × Array Lean.Expr) := goal.w
       hypotheses := hypotheses.push (← instantiateMVars decl.type)
   return (← instantiateMVars (← goal.getType), hypotheses.qsort (·.lt ·))
 
-/-- A goal some hypothesis states, up to reducible unfolding. Plain
-`assumption` compares at default transparency, which unfolds large
-verification conditions at length before failing on the leaves nothing
-closes. -/
+/-- A goal some hypothesis states, or reflexivity, up to reducible
+unfolding. Plain `assumption` compares at default transparency, which
+unfolds large verification conditions at length before failing on the
+leaves nothing closes. -/
 elab "verex_assumption" : tactic => focusGoal do
   let goal ← getMainGoal
+  if ← closeReflexive goal then
+    replaceMainGoal []
+    return
   goal.withContext do
     let target ← instantiateMVars (← goal.getType)
     for decl in ← getLCtx do
@@ -5379,9 +5479,10 @@ def goalDischarge (goal : MVarId) (arithmetic : Bool := true) : MetaM Simp.Disch
 /-- Record the normal form `result` of a hypothesis of type `type`, if its
 proof reads only the hypothesis's variables and facts of the context whose
 types they determine. -/
-private def recordNormalForm (key : Lean.Expr × Array Lean.Expr) (type : Lean.Expr)
+private def recordNormalForm (forms : IO.Ref (Std.HashMap (Lean.Expr × Array Lean.Expr) NormalForm))
+    (key : Lean.Expr × Array Lean.Expr) (scope : Lean.Expr)
     (result : Simp.Result) (undecided : Array Lean.Expr) : MetaM Unit := do
-  let variables := (collectFVars {} type).fvarIds.map mkFVar
+  let variables := (collectFVars {} scope).fvarIds.map mkFVar
   let expr ← instantiateMVars result.expr
   let proof? ← result.proof?.mapM instantiateMVars
   if expr.hasMVar || proof?.any (·.hasMVar) then return
@@ -5409,17 +5510,18 @@ private def recordNormalForm (key : Lean.Expr × Array Lean.Expr) (type : Lean.E
     if condition.hasFVar || condition.hasMVar then return
     conditions := conditions.push condition
   let owners ← (← targetState).preparationOwners.get
-  (← targetState).normalForms.modify (·.insert key { owners, facts := factTypes, expr, proof?, undecided := conditions })
+  forms.modify (·.insert key { owners, facts := factTypes, expr, proof?, undecided := conditions })
 
 /-- The recorded normal form of a hypothesis of type `type`, over its
 variables and the facts of this context its proof reads, given by type
 (`contextFactsByType`). -/
-private def normalFormOf? (facts : Std.HashMap Lean.Expr Lean.Expr)
-    (key : Lean.Expr × Array Lean.Expr) (type : Lean.Expr) (decides : Lean.Expr → MetaM Bool) :
+private def normalFormOf? (forms : IO.Ref (Std.HashMap (Lean.Expr × Array Lean.Expr) NormalForm))
+    (facts : Std.HashMap Lean.Expr Lean.Expr)
+    (key : Lean.Expr × Array Lean.Expr) (scope : Lean.Expr) (decides : Lean.Expr → MetaM Bool) :
     MetaM (Option Simp.Result) := do
-  let some form := (← (← targetState).normalForms.get)[key]? | return none
+  let some form := (← forms.get)[key]? | return none
   unless PreparationCache.paidBy form.owners (← (← targetState).preparationOwners.get) do return none
-  let mut all := (collectFVars {} type).fvarIds.map mkFVar
+  let mut all := (collectFVars {} scope).fvarIds.map mkFVar
   for factType in form.facts do
     let some fact := facts[factType.instantiateRev all]? | return none
     all := all.push fact
@@ -5434,13 +5536,18 @@ private def contextFactsByType : MetaM (Std.HashMap Lean.Expr Lean.Expr) := do
     if decl.isImplementationDetail then return facts
     return facts.insertIfNew (← instantiateMVars decl.type) decl.toExpr
 
-/-- `simpGoal` with each hypothesis's normal form taken from `normalForms`
-where known and still normal, and recorded otherwise. -/
-private def simpGoalRecorded (goal : MVarId) (ctx : Simp.Context) (simprocs : Simp.SimprocsArray)
-    (discharge : Simp.Discharge) (simplifyTarget : Bool) (fvarIdsToSimp : Array FVarId) :
+/-- `simpGoal` with each hypothesis's normal form taken from `forms` where
+known and still normal, and recorded otherwise, keyed by the hypothesis's
+`scope`: the hypothesis with what else the rewriting reads by its variables.
+With `resultsNormal`, a rewritten hypothesis is recorded normal too. -/
+private def simpGoalRecorded (forms : IO.Ref (Std.HashMap (Lean.Expr × Array Lean.Expr) NormalForm))
+    (goal : MVarId) (ctx : Simp.Context) (simprocs : Simp.SimprocsArray)
+    (discharge : Simp.Discharge) (simplifyTarget : Bool) (fvarIdsToSimp : Array FVarId)
+    (scope : Lean.Expr → Lean.Expr := id) (resultsNormal := false) :
     MetaM (Option MVarId) := goal.withContext do
   let mut next := goal
   let mut toAssert := #[]
+  let mut sources := #[]
   let mut replaced := #[]
   -- Hypotheses repeat the same carrier types and encodings. Their
   -- definitional reductions and congruence lemmas do not depend on which
@@ -5462,8 +5569,8 @@ private def simpGoalRecorded (goal : MVarId) (ctx : Simp.Context) (simprocs : Si
   for fvarId in fvarIdsToSimp do
     let localDecl ← fvarId.getDecl
     let type ← instantiateMVars localDecl.type
-    let key ← normalKey type
-    let result ← match ← normalFormOf? facts key type decides with
+    let key ← normalKey (scope type)
+    let result ← match ← normalFormOf? forms facts key (scope type) decides with
       | some result => pure result
       | none =>
         undecided.set #[]
@@ -5471,13 +5578,24 @@ private def simpGoalRecorded (goal : MVarId) (ctx : Simp.Context) (simprocs : Si
         let (result, state) ← simpCore type ctx simprocs (some counted)
           { simpState with cache := {}, numSteps := 0 }
         simpState := state
-        recordNormalForm key type result (← undecided.get)
+        recordNormalForm forms key (scope type) result (← undecided.get)
+        if resultsNormal && result.proof?.isSome then
+          let normal := scope (← instantiateMVars result.expr)
+          recordNormalForm forms (← normalKey normal) normal { expr := ← instantiateMVars result.expr } #[]
         pure result
     match result.proof? with
-    | some _ =>
+    | some proof =>
+        -- A fact the context implies stays stated, as the deciders read it
+        -- syntactically; a closed evaluation to `True` is cleared.
+        if (← instantiateMVars result.expr).isTrue &&
+            (← instantiateMVars proof).hasAnyFVar (· != fvarId) then
+          replaced := replaced.push fvarId
+          continue
         match ← applySimpResult next (mkFVar fvarId) type result with
         | none => return none
-        | some (value, type) => toAssert := toAssert.push { userName := localDecl.userName, type, value }
+        | some (value, type) =>
+            toAssert := toAssert.push { userName := localDecl.userName, type, value }
+            sources := sources.push fvarId
     | none =>
         if result.expr.isFalse then
           next.assign (← mkFalseElim (← next.getType) (mkFVar fvarId))
@@ -5493,7 +5611,11 @@ private def simpGoalRecorded (goal : MVarId) (ctx : Simp.Context) (simprocs : Si
     match ← simpTarget next ctx simprocs (some discharge) with
     | (none, _) => return none
     | (some target, _) => next := target
-  let (_, asserted) ← next.assertHypotheses toAssert
+  let (introduced, asserted) ← next.assertHypotheses toAssert
+  -- A unit fact rewritten stays one.
+  let moduleFacts ← (← targetState).moduleFacts.get
+  for (source, fvarId) in sources.zip introduced do
+    if moduleFacts.contains source then (← targetState).moduleFacts.modify (·.insert fvarId)
   next := asserted
   next ← next.tryClearMany (fvarIdsToSimp.filter fun fvarId => !replaced.contains fvarId)
   return some next
@@ -5510,31 +5632,42 @@ private def normalCacheKey (type : Lean.Expr) (connected : Lean.Expr → MetaM (
   if contextDependent type then return (abstracted, types ++ (← connected type))
   return (abstracted, types)
 
+/-- Record the unit's facts (`TargetState.moduleFacts`) normal, once at the
+solver's start: they are the same at every leaf, and no rollback forgets them. -/
+def recordModuleFactsNormal (goal : MVarId) : MetaM Unit := goal.withContext do
+  let state ← targetState
+  let propositions ← leafPropositions goal
+  let connected (type : Lean.Expr) : MetaM (Array Lean.Expr) :=
+    return connectedPropositions propositions type
+  for fvarId in ← state.moduleFacts.get do
+    let some decl := (← getLCtx).find? fvarId | continue
+    let type ← instantiateMVars decl.type
+    state.normalHypotheses.modify (·.insert (← normalCacheKey type connected))
+
 /-- Normalize the goal and the hypotheses a cache does not know normal, and
 record every hypothesis of the result normal; with a discharger, each
 hypothesis's normal form is taken from and recorded in `normalForms`.
 Returns the hypotheses normalized. -/
 private def normalizeUncached (cache : IO.Ref (Std.HashSet (Lean.Expr × Array Lean.Expr)))
-    (stx : Lean.TSyntax `tactic) (discharge? : Option Simp.Discharge) (target : Bool := true) :
-    TacticM (Array FVarId) := do
+    (stx : Lean.TSyntax `tactic) (discharge? : Option Simp.Discharge) (target : Bool := true)
+    (select : FVarId → Bool := fun _ => true) : TacticM (Array FVarId) := do
   let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
   let known ← cache.get
   let goal ← getMainGoal
-  let propositions ← goal.withContext do
-    (← goal.getNondepPropHyps).mapM fun fvarId => do
-      let type ← instantiateMVars (← fvarId.getType)
-      return (type, (collectFVars {} type).fvarSet)
+  let propositions ← goal.withContext (leafPropositions goal)
   let connected (type : Lean.Expr) : MetaM (Array Lean.Expr) :=
     return connectedPropositions propositions type
   let mut targets := #[]
   for fvarId in ← goal.getNondepPropHyps do
+    unless select fvarId do continue
     let type ← instantiateMVars (← fvarId.getType)
     unless known.contains (← normalCacheKey type connected) do targets := targets.push fvarId
   -- A context already normal is no failure.
   let ctx ← Simp.mkContext { ctx.config with failIfUnchanged := false } ctx.simpTheorems
     ctx.congrTheorems
+  let forms := (← targetState).normalForms
   let simplified ← match discharge? with
-    | some discharge => simpGoalRecorded goal ctx simprocs discharge target targets
+    | some discharge => simpGoalRecorded forms goal ctx simprocs discharge target targets
     | none => do
         let (result, _) ← simpGoal goal ctx simprocs none (simplifyTarget := target)
           (fvarIdsToSimp := targets)
@@ -5543,9 +5676,7 @@ private def normalizeUncached (cache : IO.Ref (Std.HashSet (Lean.Expr × Array L
   | none => replaceMainGoal []
   | some next =>
       next.withContext do
-        let propositions ← (← next.getNondepPropHyps).mapM fun fvarId => do
-          let type ← instantiateMVars (← fvarId.getType)
-          return (type, (collectFVars {} type).fvarSet)
+        let propositions ← leafPropositions next
         let connected (type : Lean.Expr) : MetaM (Array Lean.Expr) :=
           return connectedPropositions propositions type
         for decl in ← getLCtx do
@@ -5578,8 +5709,10 @@ would normalize the whole context: a conditional whose condition omega
 decides, such as a vector's bound after an update, takes its branch, and a
 condition a hypothesis states is proved by that hypothesis, so that the
 branch's proof term mentions nothing a substitution would then have to
-keep. Every hypothesis of the result is recorded normal. -/
-private def normalizeContext (target : Bool) : TacticM Unit := withMainContext do
+keep. Every hypothesis of the result is recorded normal. Only the hypotheses
+`select` accepts are normalized. -/
+def normalizeContext (target : Bool) (select : FVarId → Bool := fun _ => true) :
+    TacticM Unit := withMainContext do
   -- A side condition a hypothesis states is proved by it at reducible
   -- transparency: plain `assumption` would unfold the arithmetic of every
   -- hypothesis it compares against.
@@ -5594,7 +5727,7 @@ private def normalizeContext (target : Bool) : TacticM Unit := withMainContext d
   -- run on it, which would try omega over the whole context for nothing.
   let context ← goal.withContext getLCtx
   let targets ← normalizeUncached (← targetState).normalHypotheses stx
-    (some (contextDischarge context (← IO.mkRef {}))) target
+    (some (contextDischarge context (← IO.mkRef {}))) target select
   if verex.solverDebug.get (← getOptions) then
     let hypotheses ← goal.withContext goal.getNondepPropHyps
     let (calls, cost, failed) ← (← targetState).dischargeLog.get
@@ -5617,6 +5750,9 @@ private def normalizeContext (target : Bool) : TacticM Unit := withMainContext d
           IO.println s!"      dependent conditional hypothesis {decl.userName}: {((toString (← ppExpr type)).replace "\n" " " |>.take 160).toString}"
 
 elab "verex_normalize_context" : tactic => normalizeContext true
+
+/-- `verex_normalize_context` on the hypotheses only, the target left as it is. -/
+elab "verex_normalize_hypotheses" : tactic => normalizeContext false
 
 /-- The role predicates of the context read in their specification forms
 (`vir_denote_spec`), then the normal form of what changed. Only the goal and
@@ -5722,6 +5858,26 @@ def orientedHypothesis (fvarId : FVarId) : MetaM (Lean.Expr × Option (Lean.Expr
   if (← isLiteral lhs) && !(← isLiteral rhs) then return (← mkEqSymm proof, some (rhs, lhs))
   return (proof, some (lhs, rhs))
 
+/-- The simp context of a `simp only` call with the given hypotheses as
+rewrite rules besides its lemmas (`simpAt`), in the main goal's context. -/
+def rulesSimpContext (call : Lean.TSyntax `tactic) (rules : Array FVarId) :
+    TacticM (Simp.Context × Simp.SimprocsArray × Simp.DischargeWrapper) := do
+  let { ctx, simprocs, dischargeWrapper, .. } ← mkSimpContext call (eraseLocal := false)
+  let mut theorems := ctx.simpTheorems
+  unless rules.isEmpty do
+    let mut extra : SimpTheorems := {}
+    -- An equation whose reverse is already a rule is left out.
+    let mut equations : Array (Lean.Expr × Lean.Expr) := #[]
+    for fvarId in rules do
+      let (proof, equation?) ← orientedHypothesis fvarId
+      if let some (lhs, rhs) := equation? then
+        if equations.contains (rhs, lhs) then continue
+        equations := equations.push (lhs, rhs)
+      extra ← extra.add (.fvar fvarId) #[] proof
+    theorems := theorems.push extra
+  let ctx ← Simp.mkContext { ctx.config with failIfUnchanged := false } theorems ctx.congrTheorems
+  return (ctx, simprocs, dischargeWrapper)
+
 /-- Run a `simp only` call at the given hypotheses and, when asked, the
 goal, with the given hypotheses as rewrite rules besides its lemmas. The
 hypotheses are addressed by identity: a name a hypothesis has lost cannot
@@ -5729,20 +5885,7 @@ be spelled in a location. Returns the goal left, `none` when closed. -/
 def simpAt (goal : MVarId) (call : Lean.TSyntax `tactic) (rules : Array FVarId)
     (targets : Array FVarId) (simplifyTarget : Bool) : TacticM (Option MVarId) :=
   goal.withContext do
-    let { ctx, simprocs, dischargeWrapper, .. } ← mkSimpContext call (eraseLocal := false)
-    let mut theorems := ctx.simpTheorems
-    unless rules.isEmpty do
-      let mut extra : SimpTheorems := {}
-      -- An equation whose reverse is already a rule is left out.
-      let mut equations : Array (Lean.Expr × Lean.Expr) := #[]
-      for fvarId in rules do
-        let (proof, equation?) ← orientedHypothesis fvarId
-        if let some (lhs, rhs) := equation? then
-          if equations.contains (rhs, lhs) then continue
-          equations := equations.push (lhs, rhs)
-        extra ← extra.add (.fvar fvarId) #[] proof
-      theorems := theorems.push extra
-    let ctx ← Simp.mkContext { ctx.config with failIfUnchanged := false } theorems ctx.congrTheorems
+    let (ctx, simprocs, dischargeWrapper) ← rulesSimpContext call rules
     let targets := targets.filter (!rules.contains ·)
     let (result, _) ← dischargeWrapper.with fun discharge? =>
       simpGoal goal ctx simprocs discharge? (simplifyTarget := simplifyTarget)
@@ -5850,11 +5993,22 @@ elab "verex_context_memory_reads" : tactic => focusGoal do
       if decl.isImplementationDetail || reads.any (·.1 == decl.fvarId) then continue
       let ty ← instantiateMVars decl.type
       unless ← isProp ty do continue
-      if ← reads.anyM fun (_, lhs) => mentionsRead lhs ty then
+      if ← reads.anyM fun (_, lhs) => mentionsReadCached lhs ty then
         targets := targets.push decl.fvarId
     return (reads.map (·.1), targets)
   if targets.isEmpty then throwError "no hypothesis reads memory the leaf fixes"
-  simpMainAt (← `(tactic| simp only [vir_denote_norm])) reads targets false
+  -- The leaves restate one context and its reads: a hypothesis rewritten
+  -- by the same reads before is taken from `readForms`, as is one the
+  -- rewriting already left alone.
+  let readTypes ← goal.withContext do reads.mapM fun read => do instantiateMVars (← read.getType)
+  let scope (type : Lean.Expr) : Lean.Expr := readTypes.foldl mkAnd type
+  let next ← goal.withContext do
+    let (ctx, simprocs, _) ← rulesSimpContext (← `(tactic| simp only [vir_denote_norm])) reads
+    simpGoalRecorded (← targetState).readForms goal ctx simprocs Simp.dischargeDefault? false
+      targets scope (resultsNormal := true)
+  match next with
+  | none => replaceMainGoal []
+  | some next => replaceMainGoal [next]
 
 /-- The hypotheses whose statement satisfies a predicate. -/
 def hypothesesWhere (goal : MVarId) (predicate : Lean.Expr → Bool) : MetaM (Array FVarId) :=

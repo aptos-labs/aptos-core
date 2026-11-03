@@ -273,11 +273,15 @@ do and where:
 
 ```text
 foo.move:12:5: error: verex verification failed: the automatic verification
-of `f` exceeded its budget of 1000000 maxHeartbeats; provide a proof:
+of `f` exceeded its budget of 1000000 maxHeartbeats after deciding 3 leaves
+at call 2 of `helper` (stage inline); provide a proof:
 `verify f by …` in `sources/foo.proof.lean` (`verify f by lean => verex_obligations`
 lists its obligations), or raise the budget with `pragma heartbeats = N`,
 in thousands of maxHeartbeats
 ```
+
+The position (leaves, call, stage) is omitted when the walker stopped before
+its first step.
 
 An obligation the solver cannot decide reports its clause and the same
 hint without the budget alternative. The file the hint names is the

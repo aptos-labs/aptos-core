@@ -25,14 +25,26 @@ open VerexSL.Contract
 its obligations; an automatic one asks for a proof, including when its
 bounded attempt ran out. -/
 private def failureMessage (ns : ValidatedNamespace) (function : String) (authored : Bool)
-    (overBudget : Bool) (budget : Nat) (leaves : Array String) : MessageData :=
+    (overBudget : Bool) (budget : Nat) (leaves : Array String)
+    (stop : Option BudgetStop := none) : MessageData :=
   if authored then
     m!"verex verification failed: the proof of `{function}` does not establish its \
       specification"
   else
     let attempt := if overBudget then
+        let position : MessageData := match stop with
+          | none => m!""
+          | some s =>
+            let callPart : MessageData := match s.callee, s.callNumber with
+              | some callee, some k => m!" at call {k} of `{callee}`"
+              | some callee, none   => m!" at a call of `{callee}`"
+              | _, _                => m!""
+            let stagePart : MessageData := match s.lastStage with
+              | some stage => m!" (stage {stage})"
+              | none       => m!""
+            m!" after deciding {s.leavesDecided} leaves{callPart}{stagePart}"
         m!"the automatic verification of `{function}` exceeded its budget of {budget} \
-          maxHeartbeats"
+          maxHeartbeats{position}"
       else m!"the automatic verification of `{function}` failed"
     m!"verex verification failed: {attempt}; {proofRequest ns function leaves}"
 
@@ -1553,6 +1565,8 @@ structure ProofReport where
   options: a task's streams are its own, so the command prints it in the
   target's turn. -/
   output : String := ""
+  /-- Where the budget stopped, if the target ran out of heartbeats. -/
+  budgetStop : Option BudgetStop := none
   deriving Inhabited
 
 /-- The reports of the proofs that ended, by theorem, until their targets
@@ -1581,6 +1595,9 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
   state.routedKeys.set none
   VerexIR.Proofs.Denote.recordStatementCost
   let main ← Lean.Elab.Tactic.getMainGoal
+  -- The theorem's binders: the unit's facts, the same at every leaf.
+  let binders ← main.withContext main.getNondepPropHyps
+  state.moduleFacts.set (binders.foldl (·.insert ·) {})
   -- The streams are the thread's: what the proof prints is kept for the
   -- report, as the tactics leave it. An exception passes with the state
   -- the failing tactic left, as it does without the wrapper.
@@ -1599,10 +1616,11 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
     let failedLeaves ← VerexIR.Proofs.Denote.failedLeafNames
     let exhaustedLeaves ← state.exhaustedLeaves.get
     let undecidedLeaves ← state.undecidedLeaves.get
+    let budgetStop ← state.budgetStop.get
     let output := String.fromUTF8! (← printed.get).data
     Perf.chargeHeartbeats .verification heartbeats
     proofReports.modify (·.insert theorem_.getId
-      { heartbeats, elapsedMs, failedLeaves, exhaustedLeaves, undecidedLeaves, output })
+      { heartbeats, elapsedMs, failedLeaves, exhaustedLeaves, undecidedLeaves, output, budgetStop })
 
 /-- A target whose proofs elaborate in tasks, and how to conclude it once
 they ended. -/
@@ -2956,11 +2974,13 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let typedContract := rootIdent (typedContractName segments function)
   let publicContract := rootIdent (contractName segments function)
   let stored ← ensureStoredInvariant segments unit
+  stageLog s!"{function}: stored invariant"
   -- The invariants of the loops and the conditions of the assertions the
   -- proof meets: the function's own and those of its inlined callees, each
   -- keyed by its site and function.
   let owners : Owners unit := #[(handle, ns, declaration, compiled)] ++ inlined
   let (loopPairs, preconditionPairs) ← memberConditions m owners stored
+  stageLog s!"{function}: member conditions"
   liftTermElabM (publishCompiled segments unit function handle compiled)
   let pattern ← argumentPattern unit declaration compiled.params
   let budgetValue := (heartbeatBudget? declaration).getD (verex.verifyHeartbeats.get (← getOptions))
@@ -3000,6 +3020,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let invokeTerm ← if !model then `(term| VerexIR.Proofs.Denote.closureMeaning executable)
     else if family then `(term| ($invokeIdent Θ))
     else `(term| ($invokeIdent ($(mkCIdent ``VerexIR.Proofs.Denote.Skolems.runtime) $unitTerm)))
+  stageLog s!"{function}: ghosts"
   let meanings ← meaningsTerm m routed instantiation ghostTerm initTerm invokeTerm
   let (invokeBinders, routingBinders, routingLemmas) ← if !model then pure (#[], #[], #[]) else
     modelInvokeBinders segments unit unitTerm namespaceName routed family
@@ -3018,6 +3039,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
       m.handle inlinedMember meanings atRuntime
   -- The readings of the function with and without its in-body assumptions,
   -- which the hypothesis that they hold relates.
+  stageLog s!"{function}: meanings"
   let assumptionsIdent := mkIdent (Name.mkSimple s!"assumptions_{function}")
   let assumedIdent := rootIdent (artifacts ++ `assumedMeaning)
   let tableIdent := rootIdent (artifacts ++ `assumptions)
@@ -3026,12 +3048,15 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
       assumedIdent tableIdent
   let (nativeBinders, nativeArgs, assumptionBinders, assumedArgs, assumesTyping) ←
     theoremHypotheses m natives assumptionDeps trustDeps
+  stageLog s!"{function}: hypotheses"
   let specializations ← specializationCertificates m callees routed
+  stageLog s!"{function}: specializations"
   let (solveTactic, obligationsTactic) ←
     solverTactics m owners loopPairs calleePairs instantiationCertificates preconditionPairs
       specializations
   -- The hypotheses the introduction names and the proof below uses share
   -- one spelling across the two quotations.
+  stageLog s!"{function}: solver tactics"
   let permitted := mkIdent `permitted
   let assumed := mkIdent `assumed
   let introduction ← introductionTactic m stored pattern assumed permitted
@@ -3133,7 +3158,8 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
       heartbeats report.elapsedMs
     if failed then
       throwErrorAt reference
-        (failureMessage ns function script?.isSome overBudget budgetValue report.failedLeaves)
+        (failureMessage ns function script?.isSome overBudget budgetValue report.failedLeaves
+          report.budgetStop)
     declareTypedTheorem base attemptFull
     stageLog s!"{function}: typed theorem declared"
     -- A member of a cycle concludes with the whole cycle.

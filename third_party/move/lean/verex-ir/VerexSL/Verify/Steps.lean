@@ -1935,7 +1935,7 @@ where
         return { rules with booleans := rules.booleans.push decl.fvarId }
       -- A term equated to a built value, as a path's split states it (`xs[k]? =
       -- some v`): a rule toward the value.
-      if (localName? lhs).isNone && (← isConstructorApp rhs) && !(← isConstructorApp lhs) then
+      if ← (pure (localName? lhs).isNone <&&> isConstructorApp rhs <&&> (not <$> isConstructorApp lhs)) then
         return { rules with definitionsForward := rules.definitionsForward.push decl.fvarId }
       -- A name or term equated to a literal, as a case split states it: a
       -- rule toward the literal (substitution in a leaf is total).
@@ -2329,7 +2329,7 @@ private def substituteFact (goal : MVarId) (fact : FVarId) : MetaM (Option MVarI
     let rightLater ← if lhs.isFVar && rhs.isFVar then
         pure (decide ((← rhs.fvarId!.getDecl).index > (← lhs.fvarId!.getDecl).index))
       else pure true
-    if rightLater && (← eliminable rhs lhs) then
+    if ← (pure rightLater <&&> eliminable rhs lhs) then
       return (← substCore? goal fact (symm := true)).map (·.2)
     else if ← eliminable lhs rhs then
       return (← substCore? goal fact (symm := false)).map (·.2)
@@ -3047,7 +3047,7 @@ private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MV
 
 @[tactic blockDecideTactic] def evalBlockDecide : Tactic := fun _ => do
   let goal ← getMainGoal
-  if (← closeByStatement goal) || (← statedWitness goal) then
+  if ← (closeByStatement goal <||> statedWitness goal) then
     replaceMainGoal []
     return
   -- A goal read up to negation; a reading that does not close keeps the goal.
@@ -4404,7 +4404,8 @@ private def coerceWitness (goal : MVarId) (α value : Lean.Expr) (lowered : Lowe
   if ← goal.withContext (isDefEq valueType α) then return value
   -- An integer at a bounded integer's carrier needs no frame: a clause's
   -- carriers are read only for the views and native values below.
-  if carrier.isAppOfArity ``VerexIR.SpecInt 2 && (← goal.withContext (isDefEq valueType (mkConst ``Int))) then
+  if ← (pure (carrier.isAppOfArity ``VerexIR.SpecInt 2) <&&>
+      goal.withContext (isDefEq valueType (mkConst ``Int))) then
     let (width, signed) := (carrier.getArg! 0, carrier.getArg! 1)
     let fits ← witnessOwes goal (mkApp3 (mkConst ``VerexIR.IntegerValueFits) width signed value) witness
       "the witness is not in its type's range"

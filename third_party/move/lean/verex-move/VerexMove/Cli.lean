@@ -24,7 +24,8 @@ private def usage : String :=
    [--dev] [--namespaces <directory>]\n\
    verex-move render-namespaces <package directory> <directory> [--dev]\n\
    verex-move compile-namespace <directory> <module> [--heartbeats <thousands>] \
-   [--ignore-proofs]"
+   [--ignore-proofs]\n\
+   verex-move elaborate <file.lean> [--namespaces <directory>]"
 
 private def fail (message : String) : IO α := throw <| IO.userError s!"{message}\n{usage}"
 
@@ -164,6 +165,11 @@ def run (arguments : List String) : IO UInt32 := do
   | ["elaborate", file] => do
       let environment ← VerexMove.SourceVerify.importEnvironment
       let messages ← VerexSL.SourceVerify.elaborateFile environment file
+      for message in messages do IO.print (← message.toString)
+      return if messages.any (·.severity == .error) then 1 else 0
+  | ["elaborate", file, "--namespaces", root] => do
+      let messages ← VerexSL.SourceVerify.elaborateFileOver
+        VerexMove.SourceVerify.compilationLibraries file root
       for message in messages do IO.print (← message.toString)
       return if messages.any (·.severity == .error) then 1 else 0
   | _ => fail "expected a command"

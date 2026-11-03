@@ -150,7 +150,7 @@ private def runAutomatic (ledger : IO.Ref SharedBudgets.Ledger)
   try
     (← targetState).preparationOwners.set (cacheOwners.getD owners)
     let result ← SharedBudgets.run ledger owners work do
-      restore.set (← saveAutomaticCaches)
+      restore.set (← saveWalkCaches)
       action
     if let .done _ := result.1 then committed := true
     return result
@@ -255,7 +255,7 @@ private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
             let mut pending := [alternative]
             if opened then
               let saved ← saveState
-              let restoreCaches ← saveAutomaticCaches
+              let restoreCaches ← saveWalkCaches
               pending ← tryCatchRuntimeEx (do
                 setGoals pending
                 Lean.Elab.Tactic.withoutRecover <| evalTactic
@@ -335,6 +335,9 @@ structure SolveContext where
   specializations : Array Lean.Expr := #[]
   handOver : Bool
   preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none
+  /-- Whether the automatic walk prepares a completed path once, before its
+  clauses and their cases split, for its leaves to share. -/
+  preparesPaths : Bool := false
   /-- The hooks of an authored proof at program points (`verex_obligations
   at …`): each point's pattern, the hook's syntax, and its tactics. -/
   points : Array (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := #[]
@@ -384,6 +387,15 @@ private def SolveContext.siteEntry (ctx : SolveContext) (kind : String) (site : 
 private def SolveContext.callAbortSite (ctx : SolveContext) (site : Nat) : Option AbortSite :=
   (ctx.callSites.find? (·.1 == site)).map fun (_, callee, number, overall) =>
     .call number callee overall
+
+/-- `verex_normalize` on each goal, by the walk's normalization. -/
+private def normalizeGoals (ctx : SolveContext) : TacticM Unit := do
+  let mut normalized := #[]
+  for goal in ← getGoals do
+    setGoals [goal]
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
+    normalized := normalized ++ (← getGoals).toArray
+  setGoals normalized.toList
 
 /-- Invocation-local measurements of the continuations the walker actually
 folds. These are dynamic instances, not static CFG sites: a later diamond
@@ -491,6 +503,9 @@ structure SolveState where
   pointsDone : Array (MVarId × ProgramPointKey) := #[]
   leaves : Nat := 0
   stageCost : Array (String × Nat) := #[]
+  /-- The call site of the step most recently popped from `pending`, for the
+  budget-stop report when `isMaxHeartbeat` fires inside that step. -/
+  stepCallSite : Option Nat := none
 
 /-- The traversal's monad: its state over the tactic monad. -/
 abbrev SolveM := StateRefT SolveState TacticM
@@ -709,7 +724,7 @@ initialize registerTraceClass `verex.joinPruning
 is never unfolded or used as a premise, and no failed proof is admitted. -/
 private def proveUnreachable (goal : MVarId) : TacticM Unit := goal.withContext do
   let saved ← getGoals
-  let restoreCaches ← saveAutomaticCaches
+  let restoreCaches ← saveWalkCaches
   try
     let contradiction ← mkFreshExprMVar (mkConst ``False)
     setGoals [contradiction.mvarId!]
@@ -1048,7 +1063,7 @@ private def callCheckedStep (ctx : SolveContext) (step : SolveStep) : SolveM Boo
       renormalizeCut ctx.normalization cut
       queue (← getGoals) provenance clauses (callSite := step.callSite)
       setGoals [holds]
-      evalTactic (← `(tactic| try verex_normalize))
+      normalizeGoals ctx
       queue (← getGoals) (some .callReturned) #[]
   | _ => throwError "the call check did not produce its two obligations"
   charge "call returned" stageStart
@@ -1276,7 +1291,7 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
         -- row's projections, reduced before the normalization reads them,
         -- which would otherwise derive the row's type at each.
         evalTactic (← `(tactic| verex_reduce_projections))
-        evalTactic (← `(tactic| try verex_normalize))
+        normalizeGoals ctx
       marks := marks.push ("normalize 1", ← IO.getNumHeartbeats)
       -- The invariant's equations on the locals are substituted before
       -- the iteration is traversed, so the traversal sees their values.
@@ -1304,7 +1319,7 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       if let some loop := ctx.siteNumber "loop" site then atPoint ctx (.loopStep loop)
       queue (← getGoals) provenance clauses
       setGoals [entryHolds]
-      evalTactic (← `(tactic| try verex_normalize))
+      normalizeGoals ctx
       queue (← getGoals) (some (.loopEntry (ctx.loopKey site))) #[]
   | _ => throwError "the loop rule did not produce its two obligations"
   charge "loop" stageStart
@@ -1356,12 +1371,12 @@ private def assertionStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool 
         queue (← getGoals) provenance clauses
       -- What a proof step owes: a lemma's premise for each application.
       setGoals [holds]
-      evalTactic (← `(tactic| try verex_normalize))
+      normalizeGoals ctx
       let owed ← (← getGoals).toArray.flatMapM fun goal => liftM (dischargeLemmaSteps goal)
       for (part, premise) in owed do
         setGoals [part]
         -- A premise is unfolded, so normalized again.
-        if premise then evalTactic (← `(tactic| try verex_normalize))
+        if premise then normalizeGoals ctx
         queue (← getGoals) (some (if premise then .lemmaRequirement else .assertion)) #[]
   | _ => throwError "the assertion rule did not produce its two obligations"
   charge "assertion" stageStart
@@ -1405,7 +1420,7 @@ private def memoryWrittenStep (ctx : SolveContext) (step : SolveStep) : SolveM B
         renormalizeCut ctx.normalization cut
         queue (← getGoals) provenance clauses
       setGoals [holds]
-      evalTactic (← `(tactic| try verex_normalize))
+      normalizeGoals ctx
       queue (← getGoals) (some .memoryWritten) #[]
   | _ => throwError "the memory write rule did not produce its two obligations"
   charge "memory" stageStart
@@ -1428,7 +1443,7 @@ private def ghostWriteStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         queue (← getGoals) provenance clauses
       setGoals [defined]
-      evalTactic (← `(tactic| try verex_normalize))
+      normalizeGoals ctx
       let located := (ctx.ghostWrites.filter (·.1 == site)).map (·.2)
       queue (← getGoals) (some .ghostWrite) located
   | _ => throwError "the ghost write rule did not produce its two obligations"
@@ -1470,7 +1485,7 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
         renormalizeCut ctx.normalization cut
         queue (← getGoals) provenance clauses
       setGoals [holds]
-      evalTactic (← `(tactic| try verex_normalize))
+      normalizeGoals ctx
       queue (← getGoals) (some origin) #[]
   | _ => throwError "the data invariant rule did not produce its two obligations"
   charge "invariant" stageStart
@@ -1586,15 +1601,6 @@ private def enterCallee (ctx : SolveContext) (step : SolveStep) (handle : Lean.E
     evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at calleeRequires))
     if (← getGoals).isEmpty then return false
   return true
-
-/-- `verex_normalize` on each goal, by the walk's normalization. -/
-private def normalizeGoals (ctx : SolveContext) : TacticM Unit := do
-  let mut normalized := #[]
-  for goal in ← getGoals do
-    setGoals [goal]
-    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
-    normalized := normalized ++ (← getGoals).toArray
-  setGoals normalized.toList
 
 /-- Under a model an inlined callee's meaning refines its body under the
 same meanings (`doc/designs/ghost-fields.md`): the body replaces the call. -/
@@ -1863,7 +1869,7 @@ private def specializedCall? (specializations : Array Lean.Expr) (theoremProof p
     let_expr VerexIR.Proofs.Contract.Equivalent _ _ _ _ _ read := statement | continue
     let_expr VerexIR.Proofs.Contract.ofSkolem _ _ _ induced _ _ generic := read | continue
     unless generic.getAppFn.constName? == some head do continue
-    if (← isDefEq induced θ) && (← isDefEq generic contract) then
+    if ← (isDefEq induced θ <&&> isDefEq generic contract) then
       let equivalent ← instantiateMVars (mkAppN equivalence arguments)
       let proof ← mkAppOptM ``VerexIR.Proofs.Denote.satisfies_specialized
         #[none, none, some outer, some θ, none, none, none, none, none, some theoremProof,
@@ -1916,10 +1922,14 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
   -- callee's fresh result, error and final state, a specialized rule
   -- through the result's transport, so held wherever they occur, the
   -- contract's normalization walks the contract and that transport only.
-  let parts ← goal.withContext do
+  -- The call's arguments and state are normal too; the contract's
+  -- normalization takes them as they are where its forms are instantiated.
+  let (parts, values) ← goal.withContext do
     let target ← instantiateMVars (← goal.getType)
-    pure (if target.isAppOfArity ``VerexIR.Proofs.wp 7 then #[target.getArg! 4, target.getArg! 5]
-      else #[])
+    pure (if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
+        (#[target.getArg! 4, target.getArg! 5],
+          (target.getArg! 3).consumeMData.getAppArgs.push (target.getArg! 6))
+      else (#[], #[]))
   let heldRef ← IO.mkRef #[]
   timedStep "call-hold" do heldRef.set (← holdContinuations parts)
   let held ← heldRef.get
@@ -2046,10 +2056,11 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
     -- Unfold and normalize the contract in one pass, around the continuations.
     -- Normal forms of the contract are normalized again where the call's
     -- values instantiate them.
+    let values ← values.mapM instantiateMVars
     if contractForms then
-      timedStep "call-contract" (normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[])
+      timedStep "call-contract" (normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization values)
     else
-      timedStep "call-contract" (normalizeAround contractNormalization #[])
+      timedStep "call-contract" (normalizeAround contractNormalization values)
     timedStep "call-release" (releaseContinuations ctx.normalization held walkFixedPoints)
     -- Speculative range search belongs to automatic verification. An authored
     -- proof receives the contract directly instead of paying for normalization
@@ -2109,7 +2120,7 @@ private def callStep (ctx : SolveContext) (step : SolveStep) (isDenoted : Bool) 
 
 /-- The recursive-call leaf of a loop: the invariant at the iteration's
 end, normalized so that its conjunction splits into leaves. -/
-private def recursiveStep (step : SolveStep) : SolveM Bool := do
+private def recursiveStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, stageStart, .. } := step
   -- The loop the back edge is of, by its recursive hypothesis.
   let loop ← goal.withContext do
@@ -2119,7 +2130,7 @@ private def recursiveStep (step : SolveStep) : SolveM Bool := do
     return ((← get).recursiveLoops[recursive]?).getD none
   let some subgoals ← recursiveHypothesis? goal | return false
   setGoals subgoals
-  evalTactic (← `(tactic| all_goals (try verex_normalize)))
+  normalizeGoals ctx
   queue (← getGoals) (some (.loopIteration loop)) #[]
   charge "recursive" stageStart
   return true
@@ -2256,7 +2267,8 @@ clause, since the case analysis of its own conditionals belongs to the
 proof. -/
 private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
-  let prepared := ctx.preparing?.isSome && (← get).prepared.contains goal
+  let prepared := ctx.preparing?.isSome || ctx.preparesPaths
+  let prepared := prepared && (← get).prepared.contains goal
   let owners := (← get).activeOwners
   if !owners.isEmpty then
     let target ← goal.withContext (instantiateMVars (← goal.getType))
@@ -2403,7 +2415,7 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
   -- This attempt and any later preparation share the current owner's cap.
   if observesBehavior then
     let started ← IO.getNumHeartbeats
-    let restoreCaches ← saveAutomaticCaches
+    let restoreCaches ← saveWalkCaches
     let closed ← closesBy goal (← `(tactic| verex_shared_call_observations))
     unless closed do restoreCaches
     charge "early call observations" started
@@ -2482,6 +2494,102 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
       pending := #[]
       regions := s.regions.map fun region =>
         { region with node := { region.node with sealed := true, finished := true } } }
+
+/-- The premise every clause of a conjunction states first, such as the
+continuation's result equation, or `none`. -/
+private partial def sharedPremise? (target : Lean.Expr) : Option Lean.Expr :=
+  let target := target.consumeMData
+  if target.isAppOfArity ``And 2 then do
+    let left ← sharedPremise? (target.getArg! 0)
+    let right ← sharedPremise? (target.getArg! 1)
+    if left == right then some left else none
+  else if target.isArrow then some target.bindingDomain!
+  else none
+
+/-- The conjunction with the shared premise dropped from each clause. -/
+private partial def withoutPremise (target : Lean.Expr) : Lean.Expr :=
+  let target := target.consumeMData
+  if target.isAppOfArity ``And 2 then
+    mkAnd (withoutPremise (target.getArg! 0)) (withoutPremise (target.getArg! 1))
+  else target.bindingBody!
+
+/-- A proof of the clauses from `proof`, a proof of the clauses without
+their shared premise under it. -/
+private partial def underPremise (premise target proof : Lean.Expr) : MetaM Lean.Expr := do
+  let target := target.consumeMData
+  unless target.isAppOfArity ``And 2 do return proof
+  let part (projection : Name) (clause : Lean.Expr) : MetaM Lean.Expr := do
+    let inner ← withLocalDeclD `h premise fun h => do
+      mkLambdaFVars #[h] (← mkAppM projection #[mkApp proof h])
+    underPremise premise clause inner
+  mkAppM ``And.intro #[← part ``And.left (target.getArg! 0), ← part ``And.right (target.getArg! 1)]
+
+/-- The premises every clause of a path states, introduced once into the
+path's context, so that its preparation reads them as each leaf would. -/
+private partial def introSharedPremises (goal : MVarId) : MetaM MVarId := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.consumeMData.isAppOfArity ``And 2 do return goal
+  let some premise := sharedPremise? target | return goal
+  let name := (target.find? (·.isArrow)).map (·.bindingName!) |>.getD `h
+  let hoisted ← mkFreshExprSyntheticOpaqueMVar
+    (.forallE name premise (withoutPremise target) .default) (← goal.getTag)
+  goal.assign (← underPremise premise target hoisted)
+  let (_, next) ← hoisted.mvarId!.intro1P
+  introSharedPremises next
+
+/-- `verex_prepare_path` on `goal` within one leaf allowance, with its
+clauses' markers, or `none`, the state restored, where it fails. -/
+private def preparedPath? (goal : MVarId) : TacticM (Option (List MVarId)) := do
+  let leafBudget := verex.leafHeartbeats.get (← getOptions) * 1000
+  let saved ← saveState
+  let restoreCaches ← saveWalkCaches
+  tryCatchRuntimeEx
+    (do
+      setGoals [← introSharedPremises goal]
+      let prepare : TacticM Unit :=
+        withOptions (fun options => verex.keepTargetLocals.set
+            (verex.keepObligationMarkers.set options true) true) do
+          Lean.Elab.Tactic.withoutRecover (evalTactic (← `(tactic| verex_prepare_path)))
+      if leafBudget == 0 then prepare else withBudget leafBudget prepare
+      pure (some (← getUnsolvedGoals)))
+    fun failure => do
+      if failure.isMaxHeartbeat then throw failure
+      saved.restore
+      restoreCaches
+      pure none
+
+/-- The automatic preparation of a completed path (`preparedPath?`), once,
+before its clauses or a clause's cases split (`splitStep`), after the
+structural steps that read its form; the leaves of the clauses and cases start
+from it. A failed preparation leaves the path as it was. -/
+private def preparePath (ctx : SolveContext) (step : SolveStep) (target : Lean.Expr) :
+    SolveM Bool := do
+  let { goal, provenance, clauses, stageStart, .. } := step
+  unless ctx.preparesPaths && !(← get).prepared.contains goal do return false
+  let target := target.consumeMData
+  -- Only where the split leaves siblings: clauses, or a clause's cases.
+  unless target.isAppOfArity ``And 2 || (target.isAppOfArity ``VerexIR.Proofs.Obligation 4 &&
+      (← goal.withContext (findSplit? target)).isSome) do
+    return false
+  if (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then return false
+  if ← goal.withContext do
+      (collectFVars {} target).fvarIds.anyM fun id => do
+        let declaration ← id.getDecl
+        return declaration.isLet && declaration.userName == continuationName
+    then return false
+  -- An obligation a hypothesis states closes as it is, before preparation
+  -- splits that hypothesis (`splitOnce`).
+  if (← StatedFacts.close goal (exact := true)) ||
+      (← closesBy goal (← `(tactic| verex_assumption))) then
+    charge "stated path" stageStart
+    return true
+  let prepared ← preparedPath? goal
+  let goals ← (prepared.getD [goal]).mapM fun next => next.withContext do
+    let target ← instantiateMVars (← next.getType)
+    if target.isMData then next.replaceTargetDefEq target.consumeMData else pure next
+  queue goals provenance clauses true
+  charge (if prepared.isSome then "path preparation" else "failed path preparation") stageStart
+  return true
 
 /-- Prepare a completed path before splitting its proof-only conjunctions and
 binders. Program steps must still be traversed first. Logical children inherit
@@ -2583,7 +2691,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   let { goal, provenance, clauses, .. } := step
   if ctx.preparing?.isSome && (← prepareObligations ctx step) then return none
   let isDenoted := (← get).denoted.contains goal
-  let prepared := ctx.preparing?.isSome && (← get).prepared.contains goal
+  let prepared := (ctx.preparing?.isSome || ctx.preparesPaths) && (← get).prepared.contains goal
   let (goal, clauses) ← match provenance with
     | some (.loopEntry _) | some (.loopIteration _) | some .assertion | some .mutationEnd
     | some .construction | some .memoryWritten | some .callReturned
@@ -2650,7 +2758,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   if ← anchorStep ctx step then return none
   if ← invocationSteps ctx step then return none
   if ← callStep ctx step isDenoted then return none
-  if ← recursiveStep step then return none
+  if ← recursiveStep ctx step then return none
   if ← storedInvariantsStep step then return none
   -- A literal closure's run is read once for all conjuncts. For completed
   -- obligations, allocation above already includes every benefiting clause.
@@ -2658,6 +2766,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   let target ← goal.withContext (instantiateMVars (← goal.getType))
   if target.isAppOfArity ``And 2 && !(ctx.handOver && !(obligationRanges target).isEmpty) then
     if ← denotedRunStep ctx step then return none
+  if ← preparePath ctx step target then return none
   if ← splitStep ctx step then return none
   if ctx.shared && (← get).activeOwners.isEmpty then
     -- A stalled computation may need proof preparation to expose its next
@@ -2823,6 +2932,7 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
       activeEntryOpened := s.openedEntries.contains goal }
     if ← goal.isAssigned then continue
     let step : SolveStep := { goal, provenance, clauses, stageStart := ← IO.getNumHeartbeats, callSite }
+    modify fun s => { s with stepCallSite := callSite }
     if !ctx.shared then
       if let some leaf ← advance ctx step then decideLeaf ctx leaf
       continue
@@ -2839,10 +2949,19 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
     | .failed failure => throw failure
 
 /-- The traversal, with what it spent reported where the target's budget stops
-it. -/
+it. On `isMaxHeartbeat`, stores the current position in `targetState.budgetStop`
+so the failure message can name it. -/
 private def traverse (ctx : SolveContext) : SolveM Unit :=
   tryCatchRuntimeEx (traverseSteps ctx) fun failure => do
     if ctx.profile && failure.isMaxHeartbeat then reportProfile ctx (← get) true
+    if failure.isMaxHeartbeat then
+      let state ← get
+      let callEntry := state.stepCallSite.bind fun site => ctx.callSites.find? (·.1 == site)
+      (← targetState).budgetStop.set (some {
+        leavesDecided := state.leaves
+        callee := callEntry.map (·.2.1)
+        callNumber := callEntry.map (·.2.2.1)
+        lastStage := state.stageCost.back?.map (·.1) })
     throw failure
 
 /-- Solve every goal: a loop by its invariant, a recursive-call leaf by the
@@ -2874,12 +2993,15 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   (← targetState).failedLeaves.set #[]
   (← targetState).exhaustedLeaves.set 0
   (← targetState).undecidedLeaves.set 0
+  (← targetState).budgetStop.set none
   reportRuntimeMention
   (← targetState).runtimeMention.set .none
   (← targetState).nativeStatements.set {}
   (← targetState).assumedClauses.set #[]
   (← targetState).normalHypotheses.set {}
   (← targetState).normalForms.set {}
+  (← targetState).readForms.set {}
+  (← targetState).readMentions.set {}
   (← targetState).fixedPoints.set {}
   (← targetState).fixedPointCounts.set #[0, 0, 0]
   (← targetState).familyProofs.set {}
@@ -2889,6 +3011,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   (← targetState).projectionFreeTypes.set {}
   (← targetState).reducedBounds.set {}
   (← targetState).undecidedPremises.set {}
+  for goal in ← getGoals do recordModuleFactsNormal goal
   let debug := verex.solverDebug.get (← getOptions)
   if debug then
     IO.println s!"=== solver start {(← Lean.Elab.Term.getDeclName?).getD .anonymous}"
@@ -2910,6 +3033,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     specializations := specializations
     handOver := handOver
     preparing? := if handOver then preparing? else none
+    preparesPaths := !handOver && !verex.sharedContinuations.get (← getOptions)
     points := if handOver then points else #[]
     labeled := labeled
     unrolls := unrolls

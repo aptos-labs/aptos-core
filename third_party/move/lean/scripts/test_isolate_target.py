@@ -21,6 +21,17 @@ class IsolateTargetTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "function.*not found"):
             isolate_target.isolate(source.splitlines(), "example", "missing", [])
 
+    def test_options_follow_namespace_imports(self):
+        source = """import VerexSL
+import VerexNamespaces.«0x1».error
+verex module 0x1::example where
+  fun f() -> Unit := ()
+"""
+        result = isolate_target.isolate(source.splitlines(), "example", "f",
+                                        [("verex.solverProfile", "true")])
+        self.assertTrue(result.startswith(
+            "import VerexSL\nimport VerexNamespaces.«0x1».error\nset_option verex.solverProfile true\n"))
+
     def test_assertion_only_and_authored_targets(self):
         source = """import VerexSL
 verex module 0x1::example where
@@ -47,7 +58,7 @@ verex module 0x1::later where
         self.assertNotIn("pragma verify = true", result)
         self.assertNotIn("verify «other»", result)
         self.assertNotIn("| grind", result)
-        self.assertIn("verify selected by\n    trivial", result)
+        self.assertIn("verify selected by lean =>\n    trivial", result)
         self.assertNotIn("::later", result)
         self.assertNotIn("spec selected where\n    pragma verify = false", result)
 

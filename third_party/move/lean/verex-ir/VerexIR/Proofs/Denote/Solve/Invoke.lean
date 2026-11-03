@@ -277,6 +277,38 @@ partial def resolveAnchors (goal : MVarId) (predicate : Lean.Expr) :
     | throwError m!"the state anchor at site {site} is read where it is not recorded"
   resolveAnchors goal (← whnfR (mkApp predicate (← mkAppM ``Prod.mk #[env, state])))
 
+/-- The cases of a weakest precondition over a match on one discriminant,
+by cases on that discriminant at the goal's own instance: each case states
+the pattern it took (`d = some x`) and runs its alternative. `none` where
+the match has several discriminants or a dependent motive. -/
+def splitMatchAction? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
+  let action := target.getArg! 3
+  let .const name _ := action.getAppFn | return none
+  let some info ← getMatcherInfo? name | return none
+  unless info.numDiscrs == 1 && action.getAppNumArgs == info.arity do return none
+  let arguments := action.getAppArgs
+  let .lam _ _ motive _ := arguments[info.getMotivePos]! | return none
+  if motive.hasLooseBVars then return none
+  let discriminant := arguments[info.getFirstDiscrPos]!
+  let type ← inferType discriminant
+  -- The instance, generalized over its discriminant.
+  let generalized ← withLocalDeclD `x type fun x => do
+    let body := mkAppN target.getAppFn (target.getAppArgs.set! 3
+      (mkAppN action.getAppFn (arguments.set! info.getFirstDiscrPos x)))
+    withLocalDeclD `heq (← mkEq discriminant x) fun heq => mkForallFVars #[x, heq] body
+  let next ← mkFreshExprSyntheticOpaqueMVar generalized (← goal.getTag)
+  goal.assign (mkApp2 next discriminant (← mkEqRefl discriminant))
+  let (introduced, next) ← next.mvarId!.introNP 2
+  let some cases ← observing? (next.cases introduced[0]!) | return none
+  cases.toList.mapM fun case => case.mvarId.withContext do
+    let caseTarget ← instantiateMVars (← case.mvarId.getType)
+    let .reduced alternative ← reduceMatcher? (caseTarget.getArg! 3)
+      | throwError "a match on a constructor does not reduce"
+    case.mvarId.replaceTargetDefEq
+      (mkAppN caseTarget.getAppFn (caseTarget.getAppArgs.set! 3 alternative.headBeta))
+
 /-- Split a binder, conjunction or conditional. Dependent actions introduce
   their branch assumptions before normalization. If a computation cannot be
   split, preparation may expose more program steps for the structural walker.
@@ -336,6 +368,19 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
       evalTactic (← `(tactic| constructor <;> intro h))
       return some (← getGoals, true)
   let saved ← saveState
+  -- A match splits by cases on its discriminant at the goal's own instance,
+  -- not by `split`, which abstracts it over the whole goal; a read of memory
+  -- the context fixes decides it first.
+  let matching ← if target.isAppOfArity ``VerexIR.Proofs.wp 7 then isMatcherApp (target.getArg! 3)
+    else pure false
+  if matching then
+    setGoals [goal]
+    evalTactic (← `(tactic| try verex_memory_reads))
+    if (← getGoals) != [goal] then return some (← getGoals, true)
+    let known ← goal.withContext do return (← getLCtx).getFVarIds
+    if let some cases ← splitMatchAction? goal then
+      return some (← statePatterns known cases, true)
+    saved.restore
   let running := (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome
   -- An obligation a hypothesis states closes before its cases multiply.
   if obligations && !running then
@@ -581,7 +626,7 @@ def normalizeConnectives (normalization : Simp.Context × Simp.SimprocsArray) : 
       let (ctx, simprocs) := normalization
       let target ← instantiateMVars (← goal.getType)
       let (result, _) ← Simp.main target ctx (methods := stoppingMethods simprocs fun e =>
-        return !isConnective e.consumeMData && (← inferType e).isProp)
+        pure !isConnective e.consumeMData <&&> (Lean.Expr.isProp <$> inferType e))
       if result.expr == target then return
       if result.expr.isTrue then
         goal.assign (← match result.proof? with
@@ -592,6 +637,22 @@ def normalizeConnectives (normalization : Simp.Context × Simp.SimprocsArray) : 
         replaceMainGoal [← applySimpResultToTarget goal target result]
   catch _ =>
     saved.restore
+
+/-- The goal without the held definitions `locals`: cleared at once where
+nothing else reads them, else each as far as possible. -/
+private def clearHeld (goal : MVarId) (locals : Array FVarId) : MetaM MVarId :=
+  goal.withContext do
+    if locals.isEmpty then return goal
+    let held (id : FVarId) := locals.contains id
+    let read ← (← getLCtx).anyM fun decl =>
+      if held decl.fvarId then pure false else localDeclDependsOnPred decl held
+    if read || (← dependsOnPred (← goal.getType) held) then
+      return ← goal.tryClearMany locals
+    let lctx := locals.foldl (·.erase ·) (← getLCtx)
+    let next ← mkFreshExprMVarAt lctx (← getLocalInstances) (← goal.getType)
+      .syntheticOpaque (← goal.getTag)
+    goal.assign next
+    return next.mvarId!
 
 /-- The goals with the continuations `holdContinuations` set aside back in
 place, reduced at their arguments. The goal's leading binders, the call's
@@ -607,14 +668,12 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
     | .fvar id => (held.find? (·.1 == id)).map (·.2)
     | _ => none
   let (ctx, simprocs) := normalization
+  let locals := held.map (·.1)
   let mut released := #[]
   for goal in ← getGoals do
     let target ← goal.withContext do instantiateMVars (← goal.getType)
     unless (target.find? fun e => (lookup e).isSome).isSome do
-      let mut next := goal
-      for (local_, _) in held.reverse do
-        next ← next.tryClear local_
-      released := released.push next
+      released := released.push (← clearHeld goal locals)
       continue
     let rec binders : Lean.Expr → Nat
       | .forallE _ _ b _ => binders b + 1
@@ -628,19 +687,24 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
         -- The arguments other than variables: a read a value stands in
         -- may reduce with what surrounds it.
         let mut arguments : Array Lean.Expr := #[]
-        let applications := Id.run do
+        -- The applications, and whether one is under a binder.
+        let (applications, bound) := Id.run do
           let mut found : Array Lean.Expr := #[]
-          let mut pending := #[target]
-          while let some e := pending.back? do
+          let mut bound := false
+          let mut pending := #[(target, false)]
+          while let some (e, under) := pending.back? do
             pending := pending.pop
-            if (lookup e).isSome then found := found.push e; continue
+            if (lookup e).isSome then
+              found := found.push e
+              bound := bound || under
+              continue
             match e with
-            | .app f a => pending := pending.push a |>.push f
-            | .lam _ t b _ | .forallE _ t b _ => pending := pending.push b |>.push t
-            | .letE _ t v b _ => pending := pending.push b |>.push v |>.push t
-            | .mdata _ b | .proj _ _ b => pending := pending.push b
+            | .app f a => pending := pending.push (a, under) |>.push (f, under)
+            | .lam _ t b _ | .forallE _ t b _ => pending := pending.push (b, true) |>.push (t, true)
+            | .letE _ t v b _ => pending := pending.push (b, true) |>.push (v, true) |>.push (t, true)
+            | .mdata _ b | .proj _ _ b => pending := pending.push (b, under)
             | _ => pure ()
-          return found
+          return (found, bound)
         for e in applications do
           for a in e.getAppArgs do
             unless a.isFVar || arguments.contains a do arguments := arguments.push a
@@ -653,9 +717,7 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
               substituted := substituted.insert (← instantiateMVars (mkMVar mvar))
         let restored ← instantiateMVars
           (target.replace fun e => (lookup e).map (·.beta e.getAppArgs))
-        let mut next ← inner.replaceTargetDefEq restored
-        for (local_, _) in held.reverse do
-          next ← next.tryClear local_
+        let next ← clearHeld (← inner.replaceTargetDefEq restored) locals
         -- Premises over the continuation's body are a rule's, as
         -- `wp_named` adds them, and normalized in full.
         let rec conclusion : Lean.Expr → Lean.Expr
@@ -663,9 +725,10 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
           | .mdata _ b => conclusion b
           | e => e
         -- The structure outside the continuation's lambdas is a rule's, as
-        -- `wp_bind` builds it, and normalized too.
-        let top := Id.run do
+        -- `wp_bind` builds it, and normalized too; the binders it reaches.
+        let (top, binders) := Id.run do
           let mut found : Std.HashSet Lean.Expr := {}
+          let mut binders : Std.HashSet Lean.Expr := {}
           let mut pending := #[conclusion restored]
           while let some e := pending.back? do
             pending := pending.pop
@@ -674,11 +737,26 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
             match e with
             | .app f a => pending := pending.push a |>.push f
             | .mdata _ b | .proj _ _ b => pending := pending.push b
+            | .lam .. | .forallE .. | .letE .. => binders := binders.insert e
             | _ => pure ()
-          return found
-        let normal := (subtermsWithout (conclusion restored) substituted).filter (!top.contains ·)
+          return (found, binders)
+        -- With nothing substituted, the binders are as the contract's
+        -- normalization or the continuation left them, normal: only the
+        -- structure, and what a rewrite of it yields, is traversed. The
+        -- subterms taken as they are below a rewrite are found on demand.
+        let direct := substituted.isEmpty && !bound
+        let computed ← IO.mkRef none
+        let normal : IO (Std.HashSet Lean.Expr) := do
+          if let some normal ← computed.get then return normal
+          let normal := (subtermsWithout (conclusion restored) substituted).filter (!top.contains ·)
+          computed.set (some normal)
+          return normal
         next.withContext do
-          let stop := fun e => pure (normal.contains e)
+          let stop := fun e => do
+            if direct then
+              if binders.contains e then return true
+              if top.contains e then return false
+            return (← normal).contains e
           let methods := match ← FixedPoints.new? fixedPoints with
             | some fp => fp.wrap (Simp.mkDefaultMethodsCore simprocs) stop
             | none => stoppingMethods simprocs stop
@@ -696,10 +774,7 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
       -- Unreleased, the goal is put back in full and normalized again.
       let next ← goal.withContext do
         let restored := target.replace fun e => (lookup e).map (·.beta e.getAppArgs)
-        let mut next ← goal.replaceTargetDefEq restored
-        for (local_, _) in held.reverse do
-          next ← next.tryClear local_
-        pure next
+        clearHeld (← goal.replaceTargetDefEq restored) locals
       setGoals [next]
       normalizeAround normalization #[] fixedPoints
       released := released ++ (← getGoals).toArray
@@ -1920,7 +1995,7 @@ private def routesOf? (decl : Lean.LocalDecl) (value : Lean.Expr) : MetaM Lean.E
   let (binders, _, statement) ← forallMetaTelescope (← instantiateMVars decl.type)
   let some (_, lhs, _) := statement.eq? | throwError "a routing hypothesis is no equation"
   let some argsBinder := binders.back? | throwError "a routing hypothesis takes no arguments"
-  unless lhs.getAppNumArgs ≥ 2 && (← isDefEq (lhs.getArg! (lhs.getAppNumArgs - 2)) value) do
+  unless ← (pure (decide (lhs.getAppNumArgs ≥ 2)) <&&> isDefEq (lhs.getArg! (lhs.getAppNumArgs - 2)) value) do
     throwError "another function value"
   withLocalDeclD `args (← instantiateMVars (← inferType argsBinder)) fun args => do
     argsBinder.mvarId!.assign args

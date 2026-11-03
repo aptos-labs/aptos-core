@@ -5,7 +5,7 @@
 
 Every other function of the target's module gets
 `pragma verify = false`, the modules after it are dropped, and the given
-options are set after `import VerexSL`, so one target can be timed or
+options are set after the imports, so one target can be timed or
 debugged on its own. A rendering carries no authored proofs: `--proofs`
 names the module's proof file, whose theorems, `lemma` items, `open` items,
 and proof of the target become items of the module:
@@ -14,7 +14,9 @@ and proof of the target become items of the module:
       --proofs sources/datastructures/ordered_map.proof.lean -o one.lean \\
       --option verex.certifyDebug=true
 
-Run the result natively with `verex-move elaborate one.lean`, whose heartbeats
+Run the result natively with `verex-move elaborate one.lean`, adding
+`--namespaces <directory>` for a rendering over compiled namespaces (it
+imports them), whose heartbeats
 compare with the driver's; `lake env lean` interprets the verifier, and its
 heartbeats do not.
 """
@@ -111,9 +113,14 @@ def isolate(lines, module, target, options, proofs=()):
     if items and items[-1].strip():
         items.append("")
     out[end:end] = items
-    text = "\n".join(out) + "\n"
-    settings = "".join(f"set_option {name} {value}\n" for name, value in options)
-    return text.replace("import VerexSL\n", "import VerexSL\n" + settings, 1)
+    # Options follow the header: a rendering over compiled namespaces imports
+    # them after `VerexSL`.
+    imports = [index for index, line in enumerate(out) if line.startswith("import ")]
+    if not imports:
+        raise ValueError("the source has no imports")
+    settings = [f"set_option {name} {value}" for name, value in options]
+    out[imports[-1] + 1:imports[-1] + 1] = settings
+    return "\n".join(out) + "\n"
 
 
 def main():
@@ -123,7 +130,7 @@ def main():
     parser.add_argument("target", help="the function whose specification stays verified")
     parser.add_argument("-o", "--output", required=True)
     parser.add_argument("--option", action="append", default=[],
-                        help="name=value, set after `import VerexSL`")
+                        help="name=value, set after the imports")
     parser.add_argument("--proofs", help="the module's proof file")
     arguments = parser.parse_args()
     options = []

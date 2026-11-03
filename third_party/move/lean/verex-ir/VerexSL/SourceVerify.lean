@@ -491,6 +491,14 @@ def elaborateFile (environment : Environment) (path : System.FilePath) : IO (Arr
     (← environmentOptions {})
   return commands.foldl (init := messages) (· ++ ·.messages)
 
+/-- Elaborate a rendering over compiled namespaces: imports `libraries` and
+the rendering's own imports, the namespaces found under `root`. -/
+def elaborateFileOver (libraries : Array Name) (path root : System.FilePath) :
+    IO (Array Message) := do
+  let (header, _, _) ← Parser.parseHeader (Parser.mkInputContext (← IO.FS.readFile path) path.toString)
+  let imports := (Elab.headerToImports header (includeInit := false)).map (·.module)
+  elaborateFile (← importLibraries (libraries ++ imports) #[root]) path
+
 /-- Elaborate a proof file over the state its module's command left: its
 messages. Its imports must be loaded already, and it holds its header and
 `verex proofs where`, which verifies the module. -/

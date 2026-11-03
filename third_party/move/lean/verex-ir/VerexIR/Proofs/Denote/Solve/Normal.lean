@@ -774,7 +774,7 @@ simproc ↓ [vir_denote_norm] equalAsEquation
   unless comparesByValueQuoted τ do return .continue
   let built (value : Lean.Expr) : MetaM Bool :=
     return (← isConstructorApp? value.consumeMData).isSome
-  if (← built left) && (← built right) then return .continue
+  if ← (built left <&&> built right) then return .continue
   let plain ← mkExpectedTypeHint (mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true))
     (← mkEq (mkApp (mkConst ``NTy.comparesByValue) τ) (mkConst ``Bool.true))
   let proof := mkAppN (mkConst ``NTy.equal_eq_decide) #[family, τ, plain, left, right]

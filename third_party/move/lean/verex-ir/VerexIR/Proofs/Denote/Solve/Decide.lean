@@ -919,7 +919,7 @@ Substituting those equalities in the target before omega avoids introducing
 a quotient and remainder constraint for every nested modular conversion.
 Only literal equalities are rewrite rules; unrelated hypotheses are not
 simplified. -/
-elab "verex_ground_arithmetic" : tactic => focusGoal do
+private def groundArithmetic : TacticM Unit := do
   let goal ← getMainGoal
   let maps ← goal.withContext do
     let maps ← groundMapDefinitions
@@ -1025,6 +1025,44 @@ elab "verex_ground_arithmetic" : tactic => focusGoal do
           Bool.false_eq_true, Bool.true_eq_false, vir_denote_eval]
          first | done | verex_assumption | (verex_bounds; verex_omega) | verex_decide)))
   evalTactic (← `(tactic| all_goals verex_decide))
+
+/-- What the ground evaluation reads of a goal: its content and the map
+definitions the preparation hid (`groundMapDefinitions`). -/
+private def groundContent (goal : MVarId) : MetaM (Lean.Expr × Array Lean.Expr) := goal.withContext do
+  let (target, hypotheses) ← goalContent goal
+  let mut hidden := #[]
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail && decl.userName.toString.endsWith "_def" then
+      hidden := hidden.push (← instantiateMVars decl.type)
+  return (target, hypotheses ++ hidden.qsort (·.lt ·))
+
+/-- The heartbeats the enclosing budget leaves, `none` when unbounded. -/
+private def heartbeatsLeft : CoreM (Option Nat) := do
+  let context ← readThe Core.Context
+  if context.maxHeartbeats == 0 then return none
+  return some (context.initHeartbeats + context.maxHeartbeats - (← IO.getNumHeartbeats))
+
+/-- The ground evaluation (`groundArithmetic`), not repeated on a goal it
+failed on. -/
+elab "verex_ground_arithmetic" : tactic => focusGoal do
+  let key ← groundContent (← getMainGoal)
+  let left ← heartbeatsLeft
+  let failures := (← targetState).groundFailures
+  -- A goal it failed on with at least as many heartbeats left fails again.
+  if let some before := (← failures.get)[key]? then
+    let noMore := match left, before with
+      | _, none => true
+      | none, some _ => false
+      | some now, some before => now ≤ before
+    if noMore then throwError "the ground evaluation failed on this goal before"
+  try groundArithmetic
+  catch failure =>
+    -- Runtime failures, such as an exhausted budget, propagate unrecorded.
+    failures.modify fun known => match known[key]? with
+      | some none => known
+      | some (some before) => known.insert key (left.map (max before))
+      | none => known.insert key left
+    throw failure
 
 /-- Identify the elements two lookups of one position found: from
 `e = some a` and `e = some b`, `a = b`, which injection then splits. -/
@@ -1449,25 +1487,30 @@ private def comparisons (e : Lean.Expr) : Array Lean.Expr :=
     | _ => pure ()
   ((walk e).run ({}, #[])).2.2
 
-/-- Look for literal bounds before speculative normalization at a call. Keep
-transported views and closed bounds, such as a literal vector's size,
-eligible: normalization can reveal their values. Other cases need some
-literal lower/upper pair close enough for the range splitter. Bounds are
-deliberately collected across expressions, so an arithmetic equality
-connecting two locals does not hide a possible range. -/
-private def callHasLiteralRange (goal : MVarId) : MetaM Bool := goal.withContext do
-  let mut terms := #[← instantiateMVars (← goal.getType)]
-  for declaration in ← getLCtx do
-    unless declaration.isImplementationDetail do
-      terms := terms.push (← instantiateMVars declaration.type)
+/-- Look for literal bounds on the call's result before speculative
+normalization at a call, in the premises the call just introduced
+(`introduced`, with its result). A transport of the result and a closed
+bound on it, such as a literal vector's size, stay eligible: normalization
+can reveal their values. Otherwise some literal lower/upper pair on the
+result must be close enough for the range splitter. -/
+private def callHasLiteralRange (goal : MVarId) (introduced : Array FVarId) : MetaM Bool :=
+    goal.withContext do
+  let mut terms := #[]
+  let mut results := #[]
+  for fvarId in introduced do
+    let declaration ← fvarId.getDecl
+    if declaration.isImplementationDetail then continue
+    let type ← instantiateMVars declaration.type
+    if ← isProp type then terms := terms.push type else results := results.push fvarId
+  let ofResult (expression : Lean.Expr) : Bool := expression.hasAnyFVar results.contains
   let mut lowers : Array Int := #[]
   let mut uppers : Array Int := #[]
   let read (expression : Lean.Expr) : Bool :=
-    expression.isFVar || expression.isAppOfArity ``VerexIR.SpecInt.val 3
+    (expression.isFVar || expression.isAppOfArity ``VerexIR.SpecInt.val 3) && ofResult expression
   let closed (expression : Lean.Expr) : Bool :=
     !expression.hasFVar && !expression.hasMVar && !expression.hasLooseBVars
   for term in terms do
-    if term.hasExprMVar || (term.find? isTransport).isSome then return true
+    if (term.find? fun e => isTransport e.getAppFn && ofResult e).isSome then return true
     let bounds := Id.run <| (comparisons term).foldlM
         (init := ((#[], #[], false) : Array Int × Array Int × Bool))
         fun (lowers, uppers, closedBound) expression => do
@@ -1493,16 +1536,13 @@ private def callHasLiteralRange (goal : MVarId) : MetaM Bool := goal.withContext
     uppers := uppers ++ bounds.2.1
   return lowers.any fun low => uppers.any fun high => low ≤ high && high - low < 16
 
-/-- Save the caches whose entries depend on a leaf's context: an attempt
-that fails, or leaves its goal as it was, restores them with the goal. -/
-def saveAutomaticCaches : CoreM (IO Unit) := do
+/-- Save the caches whose entries depend on a leaf's context or the walk: an
+attempt that fails, or leaves its goal as it was, restores them with the
+goal. The caches keyed by a hypothesis's type (normal forms, read forms,
+projection-free types) hold whatever goal computed them, and are kept. -/
+def saveWalkCaches : CoreM (IO Unit) := do
   let state ← targetState
   let bounds ← state.assertedBounds.get
-  let hypotheses ← state.normalHypotheses.get
-  let stages ← state.stageNormalHypotheses.get
-  let familyNormal ← state.familyNormalHypotheses.get
-  let projectionFree ← state.projectionFreeTypes.get
-  let forms ← state.normalForms.get
   let families ← state.familyProofs.get
   let rules ← state.contextRules.get
   let assumed ← state.assumedClauses.get
@@ -1510,11 +1550,6 @@ def saveAutomaticCaches : CoreM (IO Unit) := do
   let preparation? ← (← state.preparationProofs.get).mapM fun cache => return (cache, ← cache.get)
   return do
     state.assertedBounds.set bounds
-    state.normalHypotheses.set hypotheses
-    state.stageNormalHypotheses.set stages
-    state.familyNormalHypotheses.set familyNormal
-    state.projectionFreeTypes.set projectionFree
-    state.normalForms.set forms
     state.familyProofs.set families
     state.contextRules.set rules
     state.assumedClauses.set assumed
@@ -1530,12 +1565,24 @@ range, leave the continuation untouched. -/
 elab "verex_call_result_cases" : tactic => focusGoal <| withoutRecover do
   let before ← saveState
   let pinnedBefore ← (← targetState).pinnedCount.get
-  let (_, goal) ← (← getMainGoal).intros
-  unless ← callHasLiteralRange goal do
+  let earlier ← withMainContext getLCtx
+  let (introduced, goal) ← (← getMainGoal).intros
+  unless ← callHasLiteralRange goal introduced do
     before.restore
     return
-  let restoreCaches ← saveAutomaticCaches
-  try
+  -- What the step introduces or rewrites; the rest of the context is as the
+  -- walk left it.
+  let fresh (fvarId : FVarId) : Bool := !earlier.contains fvarId
+  let normalizeFresh : TacticM Unit := do
+    let goals ← getGoals
+    let mut next := #[]
+    for goal in goals do
+      setGoals [goal]
+      normalizeContext false fresh
+      next := next ++ (← getGoals).toArray
+    setGoals next.toList
+  let restoreCaches ← saveWalkCaches
+  try withBudget (← residualAllowance) do
     -- The facts the continuation's proof terms depend on, conjunct by
     -- conjunct, as copies the normalization may rewrite.
     let mut goal := goal
@@ -1567,7 +1614,7 @@ elab "verex_call_result_cases" : tactic => focusGoal <| withoutRecover do
       -- The facts' family spellings: the continuation keeps its own until
       -- its leaves are prepared.
       evalTactic (← `(tactic| verex_canonical_hypotheses))
-      evalTactic (← `(tactic| all_goals verex_normalize_hypotheses))
+      normalizeFresh
     let [normal] ← getGoals | return
     -- The results the contract pins are substituted; one in a few values is
     -- split on.
@@ -1592,10 +1639,15 @@ elab "verex_call_result_cases" : tactic => focusGoal <| withoutRecover do
     for case in cases do
       setGoals [case]
       evalTactic (← `(tactic| verex_reduce_projections))
-      evalTactic (← `(tactic| verex_normalize_hypotheses))
-      evalTactic (← `(tactic|
-        all_goals (try (verex_expand_ranges; verex_normalize_hypotheses))))
-      feasible := feasible ++ (← getGoals).toArray
+      normalizeFresh
+      for split in ← getGoals do
+        setGoals [split]
+        let saved ← saveState
+        try
+          evalTactic (← `(tactic| verex_expand_ranges))
+          normalizeFresh
+        catch _ => saved.restore
+        feasible := feasible ++ (← getGoals).toArray
     setGoals feasible.toList
   catch failure =>
     restoreCaches
@@ -1611,18 +1663,28 @@ elab "verex_holds_transport" : tactic => focusGoal do
 
 /-- Substitute and renormalize until a substitution leaves the goal as it
 was: a renormalization exposes equations to substitute, such as the parts
-of a caller's value a transport equation fixes. At most three rounds. -/
-elab "verex_settle" : tactic => do
-  for _ in [0:3] do
-    if (← getGoals).isEmpty then return
-    let before ← (← getGoals).mapM fun goal => goalContent goal
-    -- The normalization spells a transported value's types at the callee's
-    -- family; canonical, they meet the caller's spellings.
-    evalTactic (← `(tactic| verex_canonical_families))
-    evalTactic (← `(tactic| all_goals verex_split_hypotheses))
-    evalTactic (← `(tactic| all_goals verex_subst_vars))
-    if (← (← getGoals).mapM fun goal => goalContent goal) == before then return
-    evalTactic (← `(tactic| all_goals verex_normalize_context))
+of a caller's value a transport equation fixes. At most three rounds, with
+`normalize` the normalization. -/
+syntax "verex_settle " tactic : tactic
+
+elab_rules : tactic
+  | `(tactic| verex_settle $normalize) => do
+    for _ in [0:3] do
+      if (← getGoals).isEmpty then return
+      let before ← (← getGoals).mapM fun goal => goalContent goal
+      -- The normalization spells a transported value's types at the callee's
+      -- family; canonical, they meet the caller's spellings.
+      evalTactic (← `(tactic| verex_canonical_families))
+      evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+      evalTactic (← `(tactic| all_goals verex_subst_vars))
+      if (← (← getGoals).mapM fun goal => goalContent goal) == before then return
+      let mut left := []
+      for goal in ← getGoals do
+        if ← goal.isAssigned then continue
+        setGoals [goal]
+        evalTactic normalize
+        left := left ++ (← getGoals)
+      setGoals left
 
 /-- The first runtime value a prepared goal states, recorded for the
 target's report (`recordRuntimeValues`): the normalization must not
@@ -1630,9 +1692,27 @@ introduce one. -/
 elab "verex_check_native " what:str : tactic => focusGoal do
   recordRuntimeValues what.getString (← getMainGoal)
 
+/-- The preparation steps, with `normalize` the normalization of the context,
+`bounds` the bounds of the obligation and `derive` the facts its terms read. -/
+syntax "verex_prepare_steps " tactic ppSpace tactic ppSpace tactic : tactic
+
 /-- The normalization every leaf receives before a decision: the leaf an
 authored proof takes over is left in this form. -/
-macro "verex_prepare_leaf" : tactic => `(tactic| verex_focus ( (
+macro "verex_prepare_leaf" : tactic => `(tactic| verex_prepare_steps verex_normalize_context
+  (verex_timed "p-bounds" verex_bounds)
+  (verex_lookups_after_writes; verex_timed "p-positions" verex_map_positions))
+
+/-- The preparation a completed path's clauses share: its structural steps,
+which substitute only locals no clause reads (`verex.keepTargetLocals`). The
+rest is each leaf's: the normalization consumes the forms the leaf's cheap
+deciders match syntactically, such as a validity a stored invariant leaves
+that a hypothesis states, and the bounds, lookups and map positions an
+obligation's terms seed would, seeded by all clauses at once, give every leaf
+its siblings' facts. -/
+macro "verex_prepare_path" : tactic => `(tactic| verex_prepare_steps skip skip skip)
+
+macro_rules
+  | `(tactic| verex_prepare_steps $normalize $bounds $derive) => `(tactic| verex_focus ( (
   all_goals verex_canonical_families
   verex_timed "p-clear" verex_clear_computations
   try verex_split_search
@@ -1640,7 +1720,7 @@ macro "verex_prepare_leaf" : tactic => `(tactic| verex_focus ( (
   all_goals verex_timed "p-subst" verex_subst_vars
   all_goals verex_timed "p-proj" verex_reduce_projections
   all_goals try verex_timed "p-reads" verex_context_memory_reads
-  all_goals verex_timed "normalize" verex_normalize_context
+  all_goals verex_timed "normalize" $normalize
   all_goals verex_timed "p-split2" verex_split_hypotheses
   all_goals verex_timed "p-subst2" verex_subst_vars
   all_goals verex_timed "p-maps" verex_subst_maps
@@ -1649,16 +1729,85 @@ macro "verex_prepare_leaf" : tactic => `(tactic| verex_focus ( (
   -- Lookups of one position, once substitution has exposed them.
   all_goals verex_timed "p-merge" verex_merge_lookups
   -- The bounds of the obligation over its settled terms, normalized once.
-  all_goals verex_timed "p-bounds" verex_bounds
+  all_goals $bounds:tactic
   all_goals verex_timed "p-split3" verex_split_hypotheses
   all_goals verex_timed "p-subst3" verex_subst_vars
   -- The terms a substitution brought in, such as a written vector, in
   -- normal form too, and the lookups after writes read.
-  all_goals verex_timed "renormalize" verex_normalize_context
-  all_goals verex_timed "p-settle" verex_settle
-  all_goals verex_lookups_after_writes
-  all_goals verex_timed "p-positions" verex_map_positions
+  all_goals verex_timed "renormalize" $normalize
+  all_goals verex_timed "p-settle" (verex_settle $normalize)
+  -- Write-backs the renormalization exposed, folded before their lookups.
+  all_goals verex_timed "p-maps2" verex_subst_maps
+  all_goals verex_timed "p-written2" verex_written_back
+  all_goals $derive:tactic
   all_goals verex_check_native "a prepared leaf")))
+
+/-- The cases of a split, its refuted fall-throughs dropped. A match on a
+computed discriminant states the pattern it took (`d = some x`): in normal
+form, the value it fixes is substituted. A lookup is not computed: it is the
+read leaves state (`a[i]? = some v`). `known` are the locals before the split. -/
+def statePatterns (known : Array FVarId) (cases : List MVarId) : TacticM (List MVarId) := do
+  let goals ← cases.filterM fun goal => do return !(← refuteFallthrough goal)
+  let mut solved := #[]
+  for goal in goals do
+    let equations ← goal.withContext do
+      (← getLCtx).foldlM (init := #[]) fun found decl => do
+        if decl.isImplementationDetail || known.contains decl.fvarId then return found
+        let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | return found
+        if lhs.isFVar || lhs.isAppOf ``GetElem?.getElem? then return found
+        return if ← isConstructorApp rhs then found.push decl.fvarId else found
+    if equations.isEmpty then
+      solved := solved.push goal
+      continue
+    -- The simp context elaborates in the main goal's context.
+    setGoals [goal]
+    let some next ← simpAt goal (← `(tactic| simp only [vir_denote_norm, Option.some.injEq]))
+        #[] equations false | continue
+    setGoals [next]
+    evalTactic (← `(tactic| (verex_split_hypotheses; all_goals verex_subst_vars)))
+    solved := solved ++ (← getGoals)
+  return solved.toList
+
+/-- The cases of a goal on the condition of `conditional`, an `ite` or
+`dite` in it: each case assumes its decision and takes the branch at every
+closed instance of a conditional on that condition, as `rw [if_pos h]`
+does, instead of `split`'s simp over the whole goal. `none` where no
+instance is closed. -/
+def splitConditionInstances? (goal : MVarId) (conditional : Lean.Expr) :
+    MetaM (Option (List MVarId)) := goal.withContext do
+  unless conditional.isAppOfArity ``ite 5 || conditional.isAppOfArity ``dite 5 do return none
+  let condition := conditional.getArg! 1
+  if condition.hasLooseBVars then return none
+  let onCondition (e : Lean.Expr) :=
+    (e.isAppOfArity ``ite 5 || e.isAppOfArity ``dite 5) && !e.hasLooseBVars &&
+      e.getArg! 1 == condition
+  if ((← instantiateMVars (← goal.getType)).find? onCondition).isNone then return none
+  let (yes, no) ← goal.byCasesDec condition (conditional.getArg! 2) (← mkFreshUserName `h)
+  [(yes, true), (no, false)].mapM fun (case, positive) => do
+    let mut next := case.mvarId
+    let decision := Lean.mkFVar case.fvarId
+    -- A taken branch may hold further instances.
+    repeat
+      let target ← instantiateMVars (← next.getType)
+      let some occurrence := target.find? onCondition | break
+      let dependent := occurrence.isAppOfArity ``dite 5
+      let rule := match dependent, positive with
+        | false, true => ``if_pos | false, false => ``if_neg
+        | true, true => ``dif_pos | true, false => ``dif_neg
+      let arguments := occurrence.getAppArgs
+      let equation := mkAppN (mkConst rule occurrence.getAppFn.constLevels!)
+        #[condition, arguments[2]!, decision, arguments[0]!, arguments[3]!, arguments[4]!]
+      let branch := if positive then arguments[3]! else arguments[4]!
+      let branch := if dependent then (mkApp branch decision).headBeta else branch
+      -- Syntactic occurrences: `kabstract` would unify every conditional.
+      let motive ← next.withContext do
+        withLocalDeclD `x arguments[0]! fun x =>
+          mkLambdaFVars #[x] (target.replace fun e => if e == occurrence then some x else none)
+      unless ← next.withContext (isTypeCorrect motive) do
+        throwError "a conditional's instance cannot be abstracted"
+      next ← next.replaceTargetEq (motive.beta #[branch])
+        (← next.withContext (mkCongrArg motive equation))
+    return next
 
 /-- Split the goal's first conditional or match, after the variants of the
 locals it tests where `variants` holds. A match's fall-through case that its
@@ -1703,28 +1852,12 @@ private def splitFirst (variants : Bool) : TacticM Unit := focusGoal do
   evalTactic (← `(tactic| try verex_memory_reads))
   if (← getGoals).length != 1 || (← getMainGoal) != beforeReads then return
   let known ← (← getMainGoal).withContext do return (← getLCtx).getFVarIds
-  evalTactic (← `(tactic| split))
-  let goals ← (← getGoals).filterM fun goal => do return !(← refuteFallthrough goal)
-  -- A match on a computed discriminant states the pattern it took
-  -- (`d = some x`): in normal form, the value it fixes is substituted. A
-  -- lookup is not computed: it is the read leaves state (`a[i]? = some v`).
-  let mut solved := #[]
-  for goal in goals do
-    let equations ← goal.withContext do
-      (← getLCtx).foldlM (init := #[]) fun found decl => do
-        if decl.isImplementationDetail || known.contains decl.fvarId then return found
-        let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | return found
-        if lhs.isFVar || lhs.isAppOf ``GetElem?.getElem? then return found
-        return if ← isConstructorApp rhs then found.push decl.fvarId else found
-    if equations.isEmpty then
-      solved := solved.push goal
-      continue
-    let some next ← simpAt goal (← `(tactic| simp only [vir_denote_norm, Option.some.injEq]))
-        #[] equations false | continue
-    setGoals [next]
-    evalTactic (← `(tactic| (verex_split_hypotheses; all_goals verex_subst_vars)))
-    solved := solved ++ (← getGoals)
-  setGoals solved.toList
+  let goal ← getMainGoal
+  let found ← goal.withContext do findSplit? (← instantiateMVars (← goal.getType))
+  -- A conditional splits at its instances; a match by `split`.
+  if let some cases ← found.bindM fun e => splitConditionInstances? goal e then setGoals cases
+  else evalTactic (← `(tactic| split))
+  setGoals (← statePatterns known (← getGoals))
 
 /-- Split the goal's first conditional or match, the variants of the locals
 it tests first. -/
@@ -2281,7 +2414,7 @@ private partial def isArithmetic (p : Lean.Expr) : MetaM Bool := do
     unless ← isArithmetic condition do return false
   let numeric (type : Lean.Expr) := type.isConstOf ``Int || type.isConstOf ``Nat
   if p.isAppOfArity ``And 2 || p.isAppOfArity ``Or 2 || p.isAppOfArity ``Iff 2 then
-    return (← isArithmetic (p.getArg! 0)) && (← isArithmetic (p.getArg! 1))
+    return ← (isArithmetic (p.getArg! 0) <&&> isArithmetic (p.getArg! 1))
   if p.isAppOfArity ``Not 1 then return ← isArithmetic (p.getArg! 0)
   if p.isAppOfArity ``Eq 3 || p.isAppOfArity ``Ne 3 then return numeric (p.getArg! 0)
   if p.isAppOfArity ``LE.le 4 || p.isAppOfArity ``LT.lt 4 || p.isAppOfArity ``GE.ge 4 ||
@@ -2356,7 +2489,7 @@ elab "verex_modus_ponens" : tactic => focusGoal do
     (← getLCtx).foldlM (init := #[]) fun found decl => do
       if decl.isImplementationDetail then return found
       let type ← instantiateMVars decl.type
-      unless type.isArrow && (← isProp type) do return found
+      unless ← (pure type.isArrow <&&> isProp type) do return found
       return found.push decl
   -- Omega's decision of each premise, once: the candidates share premises,
   -- such as a position's bounds in the facts about every other position.
@@ -2437,7 +2570,7 @@ private def conclusionDiffers (conclusion target : Lean.Expr) : MetaM Bool := do
   if ← headsDiffer conclusion target then return true
   match conclusion.eq?, target.eq? with
   | some (_, left, right), some (_, goalLeft, goalRight) =>
-      return (← headsDiffer left goalLeft) || (← headsDiffer right goalRight)
+      return ← (headsDiffer left goalLeft <||> headsDiffer right goalRight)
   | _, _ => return false
 
 /-- A hypothesis read up to negation (`doc/plan/proof-language.md`, "Closers"):
@@ -2564,7 +2697,7 @@ elab "verex_map_contradiction" : tactic => focusGoal do
       return (← instantiateMVars (← hyp.getType)).isForall
   if compound.isEmpty then throwError "no guarded facts to omit"
   let saved ← saveState
-  let restore ← saveAutomaticCaches
+  let restore ← saveWalkCaches
   try
     withBudget 4000000 do
       setGoals [← goal.tryClearMany compound]
@@ -2633,7 +2766,7 @@ elab "verex_key_instances" : tactic => focusGoal do
   -- normalization rolls back independently without losing the instance.
   if verex.sharedContinuations.get (← getOptions) then
     let saved ← saveState
-    let restoreCaches ← saveAutomaticCaches
+    let restoreCaches ← saveWalkCaches
     try
       evalTactic (← `(tactic| all_goals try verex_context_memory_reads))
       evalTactic (← `(tactic| all_goals verex_normalize_context))
@@ -3747,7 +3880,7 @@ elab "verex_prepared_applies" : tactic => focusGoal do
     (← getLCtx).anyM fun decl => do
       if decl.isImplementationDetail then return false
       let ty ← instantiateMVars decl.type
-      if ty.isForall && (← isProp ty) then
+      if ← (pure ty.isForall <&&> isProp ty) then
         if (← whnfR ty.bindingDomain!).isConstOf ``Int && !(← rangesOverIntegerType ty) then
           return true
       return (ty.find? needsPreparation).isSome
@@ -4280,7 +4413,7 @@ macro_rules
       first
       | verex_timed "range split" verex_split_range
       | (verex_holds_transport
-         verex_settle
+         verex_settle verex_normalize_context
          verex_timed "range split" verex_split_range)
       all_goals verex_reduce_projections
       all_goals verex_normalize_context
@@ -4291,7 +4424,7 @@ macro_rules
       -- their base cases.
       all_goals (try (verex_timed "range unfold" verex_specs_to_base
                       verex_normalize_context))
-      all_goals verex_settle
+      all_goals verex_settle verex_normalize_context
       all_goals (first
         | done
         | verex_timed "range omega" verex_omega_unsplit
@@ -4762,7 +4895,7 @@ elab "verex_shared_entry" : tactic => focusGoal do
     first | verex_assumption | skip)))
   if (← getUnsolvedGoals).isEmpty then return
   let saved ← saveState
-  let restoreCaches ← saveAutomaticCaches
+  let restoreCaches ← saveWalkCaches
   tryCatchRuntimeEx
     (withBudget 3000000 do
       let some goal ← entryEncodings (← getMainGoal) | return
