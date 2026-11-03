@@ -6,12 +6,12 @@ use crate::{
     state_kv_db::LoadedHotStateShard,
 };
 use anyhow::{ensure, Result};
-use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
+    hot_state_config::EffectiveHotStateConfig,
     state::{HotStateMetadata, State},
     state_delta::StateDelta,
     state_view::hot_state_view::HotStateView,
@@ -162,7 +162,7 @@ impl LoadedHotState {
     pub(crate) fn new(
         version: Version,
         usage: StateStorageUsage,
-        config: HotStateConfig,
+        config: EffectiveHotStateConfig,
         loaded: [LoadedHotStateShard; NUM_STATE_SHARDS],
     ) -> Self {
         let metadata = std::array::from_fn(|i| {
@@ -767,7 +767,7 @@ mod tests {
             Arc::new(shards),
             Default::default(),
             StateStorageUsage::zero(),
-            TEST_CONFIG,
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
         )
     }
 
@@ -798,7 +798,7 @@ mod tests {
             Arc::new(shards),
             metadata,
             StateStorageUsage::zero(),
-            TEST_CONFIG,
+            EffectiveHotStateConfig::from_local(TEST_CONFIG),
         )
     }
 

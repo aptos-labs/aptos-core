@@ -56,6 +56,12 @@ impl<'a> HotStateLRU<'a> {
         }
     }
 
+    /// Takes effect at the next `maybe_evict`.
+    pub fn set_limits(&mut self, capacity: NonZeroUsize, max_bytes: usize) {
+        self.capacity = capacity;
+        self.max_bytes = max_bytes;
+    }
+
     /// Inserts a hot slot as the most recent entry. Returns the old `hot_since_version` if
     /// replacing an existing hot entry.
     pub fn insert(&mut self, key: &StateKey, mut slot: StateSlot) -> Option<Version> {
