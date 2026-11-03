@@ -9,7 +9,7 @@ use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
-    on_chain_config::BlockGasLimitType,
+    on_chain_config::{BlockGasLimitType, OnChainHotStateConfig},
     transaction::block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
 };
 use claims::{assert_le, assert_none};
@@ -44,11 +44,12 @@ where
     pub fn new(
         block_gas_limit_type: BlockGasLimitType,
         block_gas_limit_override: Option<u64>,
+        hot_state_config: Option<&OnChainHotStateConfig>,
         init_size: usize,
     ) -> Self {
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
-            .then(BlockHotStateOpAccumulator::new);
+            .then(|| BlockHotStateOpAccumulator::new(hot_state_config));
         Self {
             block_gas_limit_type,
             block_gas_limit_override,
@@ -371,7 +372,7 @@ mod test {
 
     #[test]
     fn test_output_limit_not_used() {
-        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, 10);
+        let mut processor = TestProcessor::new(DEFAULT_COMPLEX_LIMIT, None, None, 10);
         // Assert passing none here doesn't panic.
         processor.accumulate_fee_statement(FeeStatement::zero(), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -401,7 +402,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -427,7 +428,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), 10);
+        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), None, 10);
 
         processor.accumulate_fee_statement(execution_fee(60), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -451,7 +452,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, Some(50), 10);
+        let mut processor = TestProcessor::new(block_gas_limit, Some(50), None, 10);
 
         processor.accumulate_fee_statement(execution_fee(20), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -463,7 +464,7 @@ mod test {
     fn test_override_when_onchain_is_no_limit() {
         // When the onchain config has no cap, the override applies as given:
         // there is no protocol cap to enforce, and Byzantine-amplification is moot.
-        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), 10);
+        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), None, 10);
 
         processor.accumulate_fee_statement(execution_fee(20), None, None);
         assert!(!processor.should_end_block_parallel());
@@ -485,7 +486,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         processor.accumulate_fee_statement(FeeStatement::zero(), None, Some(10));
         assert_eq!(processor.accumulated_approx_output_size, 10);
@@ -523,7 +524,7 @@ mod test {
             use_granular_resource_group_conflicts: false,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         processor.accumulate_fee_statement(
             execution_fee(10),
@@ -585,7 +586,7 @@ mod test {
             use_granular_resource_group_conflicts: true,
         };
 
-        let mut processor = TestProcessor::new(block_gas_limit, None, 10);
+        let mut processor = TestProcessor::new(block_gas_limit, None, None, 10);
 
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(
