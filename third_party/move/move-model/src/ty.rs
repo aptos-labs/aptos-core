@@ -2040,13 +2040,13 @@ pub trait AbilityContext {
 /// A trait to provide context information for unification.
 pub trait UnificationContext: AbilityContext {
     /// Get information about the given struct field. Returns a list
-    /// of optional variant and type for the field in that variant,
+    /// of optional variant and declared (uninstantiated) type for the field in that variant,
     /// or, if the struct is not a variant, None and type.
     /// If the field is not defined returns an empty list.
     /// The 2nd return value indicates whether the type is a variant struct.
     fn get_struct_field_decls(
         &self,
-        id: &QualifiedInstId<StructId>,
+        id: &QualifiedId<StructId>,
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool);
 
@@ -2102,7 +2102,7 @@ pub struct NoUnificationContext;
 impl UnificationContext for NoUnificationContext {
     fn get_struct_field_decls(
         &self,
-        _id: &QualifiedInstId<StructId>,
+        _id: &QualifiedId<StructId>,
         _field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
         (vec![], false)
@@ -2346,7 +2346,7 @@ impl Substitution {
                     .map(|_| ())
                     .map_err(|e| e.redirect(loc.clone())),
                 (Constraint::SomeStruct(constr_field_map), Type::Struct(mid, sid, inst)) => {
-                    let sid = &mid.qualified_inst(*sid, inst.clone());
+                    let sid = &mid.qualified(*sid);
                     for (field_name, expected_type) in constr_field_map {
                         let (mut field_decls, _) = context.get_struct_field_decls(sid, *field_name);
                         if field_decls.is_empty() {
@@ -2360,13 +2360,13 @@ impl Substitution {
                         {
                             return constraint_unsatisfied_error();
                         }
-                        // The given declared type must unify with the expected type
+                        // The instantiated declared type must unify with the expected type
                         self.unify(
                             context,
                             variance,
                             WideningOrder::RightToLeft,
                             expected_type,
-                            &decl_type,
+                            &decl_type.instantiate(inst),
                         )
                         .map(|_| ())
                         .map_err(|e| e.redirect(loc.clone()))?
@@ -3563,13 +3563,12 @@ impl TypeUnificationError {
                         let name_display =
                             name.display(display_context.env.symbol_pool()).to_string();
                         if let Type::Struct(mid, sid, inst) = ty {
-                            let sid = &mid.qualified_inst(*sid, inst.clone());
-                            let (field_decls, _) =
-                                unification_context.get_struct_field_decls(sid, *name);
+                            let (field_decls, _) = unification_context
+                                .get_struct_field_decls(&mid.qualified(*sid), *name);
                             let field_is_function = !field_decls.is_empty()
-                                && field_decls
-                                    .iter()
-                                    .all(|(_, field_type)| field_type.is_function());
+                                && field_decls.iter().all(|(_, field_type)| {
+                                    field_type.instantiate(inst).is_function()
+                                });
                             if field_is_function {
                                 let hint = format!(
                                     "if you intend to call the closure stored in field `{}`, \
@@ -3664,7 +3663,7 @@ impl TypeUnificationError {
         // Determine why this constraint did not match for better error message
         let msg = if let Type::Struct(mid, sid, inst) = ty {
             let mut errors = vec![];
-            let sid = mid.qualified_inst(*sid, inst.clone());
+            let sid = mid.qualified(*sid);
             for (field_name, expected_type) in field_map {
                 let field_str = field_name
                     .display(display_context.env.symbol_pool())
@@ -3701,25 +3700,41 @@ impl TypeUnificationError {
                             field_str,
                             ty.display(display_context)
                         ));
+                        // Declared types are shown with the enum's own type parameter names,
+                        // scoped by the enum declaration so they are not read as the caller's.
+                        let (_, type_params, _) = unification_context.struct_signature(sid);
+                        let decl_display_context = TypeDisplayContext {
+                            type_param_names: Some(
+                                type_params.iter().map(|param| param.0).collect(),
+                            ),
+                            ..display_context.clone()
+                        };
+                        let decl_ty =
+                            Type::Struct(*mid, sid.id, TypeParameter::vec_to_formals(&type_params));
                         let diff_str = iter::once((variant_opt, decl_type))
                             .chain(different_type_variants)
                             .map(|(variant_opt, decl_type)| {
                                 format!(
                                     "type `{}` in variant `{}`",
-                                    decl_type.display(display_context),
+                                    decl_type.display(&decl_display_context),
                                     variant_opt
                                         .unwrap()
                                         .display(display_context.env.symbol_pool())
                                 )
                             })
                             .join(" and ");
-                        hints.push(format!("field `{}` has {}", field_str, diff_str))
+                        hints.push(format!(
+                            "in `enum {}`, field `{}` has {}",
+                            decl_ty.display(&decl_display_context),
+                            field_str,
+                            diff_str
+                        ))
                     } else {
                         // type error
                         errors.push(format!(
                             "field `{}` has type `{}` instead of expected type `{}`",
                             field_str,
-                            decl_type.display(display_context),
+                            decl_type.instantiate(inst).display(display_context),
                             expected_type.display(display_context)
                         ))
                     }
