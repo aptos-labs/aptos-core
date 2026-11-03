@@ -301,13 +301,15 @@ where
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
-    pub(crate) fn get_block_end_info<O, F>(
+    pub(crate) fn get_block_end_info<O, F, S>(
         &self,
         convert: F,
+        key_size: S,
     ) -> Result<TBlockEndInfoExt<O>, PanicError>
     where
         O: Debug + Ord,
         F: Fn(&K) -> Result<O, PanicError>,
+        S: Fn(&O) -> usize,
     {
         let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
@@ -327,20 +329,25 @@ where
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_keys_to_make_hot(convert)?;
+        let to_make_hot = self.get_keys_to_make_hot(convert, key_size)?;
         if self.hot_state_op_accumulator.is_some() {
             counters::HOT_STATE_PROMOTIONS_PER_BLOCK.observe(to_make_hot.len() as f64);
         }
         Ok(TBlockEndInfoExt::new(inner, to_make_hot))
     }
 
-    fn get_keys_to_make_hot<O, F>(&self, convert: F) -> Result<BTreeSet<O>, PanicError>
+    fn get_keys_to_make_hot<O, F, S>(
+        &self,
+        convert: F,
+        key_size: S,
+    ) -> Result<BTreeSet<O>, PanicError>
     where
         O: Ord,
         F: Fn(&K) -> Result<O, PanicError>,
+        S: Fn(&O) -> usize,
     {
         match self.hot_state_op_accumulator.as_ref() {
-            Some(acc) => acc.get_keys_to_make_hot(convert),
+            Some(acc) => acc.get_keys_to_make_hot(convert, key_size),
             None => {
                 warn!("BlockHotStateOpAccumulator is not set.");
                 Ok(BTreeSet::new())
