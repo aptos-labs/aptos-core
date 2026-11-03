@@ -6890,6 +6890,7 @@ version = "0.1.0"
 dependencies = [
  "datatest-stable",
  "libtest-mimic",
+ "move-bytecode-verifier",
  "move-transactional-test-runner",
  "once_cell",
  "walkdir",

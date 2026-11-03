@@ -181,6 +181,7 @@ pub enum FeatureFlag {
     EnableMonoMove,
     CheckFunctionTypeAbilities,
     DisableEagerModuleInitialization,
+    CheckPhantomParamsBehindReferences,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -473,6 +474,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DisableEagerModuleInitialization => {
                 AptosFeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION
             },
+            FeatureFlag::CheckPhantomParamsBehindReferences => {
+                AptosFeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES
+            },
         }
     }
 }
@@ -691,6 +695,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION => {
                 FeatureFlag::DisableEagerModuleInitialization
+            },
+            AptosFeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES => {
+                FeatureFlag::CheckPhantomParamsBehindReferences
             },
         }
     }

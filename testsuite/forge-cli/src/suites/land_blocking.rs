@@ -52,6 +52,9 @@ fn compatibility_test_features() -> Features {
     // TODO: remove once `CHECK_FUNCTION_TYPE_ABILITIES` is on the newest
     // `aptos-release-v*` branch (v1.50 cut).
     features.disable(FeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES);
+    // TODO: remove once `CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES` is on the
+    // newest `aptos-release-v*` branch.
+    features.disable(FeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES);
     features
 }
 
