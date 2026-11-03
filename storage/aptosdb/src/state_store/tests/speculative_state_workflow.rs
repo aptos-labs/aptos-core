@@ -9,6 +9,7 @@ use aptos_infallible::Mutex;
 use aptos_scratchpad::test_utils::naive_smt::NaiveSmt;
 use aptos_storage_interface::{
     state_store::{
+        leaf_entry::leaf_entry_to_jmt_update,
         state::{LedgerState, State},
         state_summary::{LedgerStateSummary, ProvableStateSummary, StateSummary},
         state_update_refs::StateUpdateRefs,
@@ -387,7 +388,6 @@ impl StateByVersion {
     }
 
     fn assert_state_slot(slot1: &StateSlot, slot2: &StateSlot) {
-        assert_eq!(slot1.state_key(), slot2.state_key());
         match (slot1.kind(), slot2.kind()) {
             (
                 StateSlotKind::HotVacant {
@@ -463,7 +463,8 @@ impl StateByVersion {
             .shards
             .iter()
             .flat_map(|shard| shard.iter())
-            .filter_map(|(_key_hash, slot)| slot.maybe_update_jmt(last_snapshot.next_version()))
+            .filter(|(_key_hash, slot)| slot.passes_jmt_filter(last_snapshot.next_version()))
+            .map(|(key_hash, slot)| leaf_entry_to_jmt_update(key_hash, &slot))
             .map(|(key_hash, value_opt)| (key_hash, value_opt.map(|(val_hash, _key)| val_hash)))
             .collect_vec();
 
@@ -830,6 +831,7 @@ fn commit_state_buffer(
 
             for (key, slot) in naive_hot_state.iter() {
                 let slot2 = all_entries.get(key.crypto_hash_ref()).unwrap();
+                assert!(slot2.state_key().is_none());
                 StateByVersion::assert_state_slot(slot, slot2);
             }
         });
