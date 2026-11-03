@@ -284,7 +284,8 @@ the match has several discriminants or a dependent motive. -/
 def splitMatchAction? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
-  let action := target.getArg! 3
+  -- The action as the walk reads it, under the elaborator's annotations.
+  let action := (target.getArg! 3).consumeMData
   let .const name _ := action.getAppFn | return none
   let some info ← getMatcherInfo? name | return none
   unless info.numDiscrs == 1 && action.getAppNumArgs == info.arity do return none
@@ -312,9 +313,11 @@ def splitMatchAction? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.wit
 /-- Split a binder, conjunction or conditional. Dependent actions introduce
   their branch assumptions before normalization. If a computation cannot be
   split, preparation may expose more program steps for the structural walker.
-  Without `obligations`, a conditional is split only where the goal still
-  runs program: an obligation's own conditionals stay in its leaf. -/
-def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := true) :
+  With `obligations`, an obligation a hypothesis states closes whole, before
+  its parts split. Without `cases`, a conditional is split only where the goal
+  still runs program: an obligation's own conditionals stay in its leaf. -/
+def splitOnce (goal : MVarId) (obligations : Bool := true) (cases : Bool := obligations)
+    (prepare : Bool := true) :
     TacticM (Option (List MVarId × Bool)) := do
   -- The exit binds `result` in a step proof, before the paths split.
   let bound ← IO.mkRef none
@@ -331,6 +334,7 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
     -- A quantified variable keeps its name, for an authored proof; a
     -- borrow's prophecy mark is consumed.
     let (introduced, next) ← goal.intro1P
+    noteKeptPremise next introduced
     if (prophecyMark? target.bindingDomain!).isSome then
       return some ([← consumeProphecy next introduced], false)
     return some ([next], false)
@@ -345,7 +349,7 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   timedStep "split/let" do bound.set (← bindLet goal)
   if let some next ← bound.get then return some ([next], false)
   if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
-    let action := target.getArg! 3
+    let action := (target.getArg! 3).consumeMData
     if action.isAppOfArity ``dite 5 then
       let rule := mkAppN (mkConst ``VerexIR.Proofs.wp_dite_rule)
         #[target.getArg! 0, target.getArg! 1, target.getArg! 2,
@@ -371,7 +375,11 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   -- A match splits by cases on its discriminant at the goal's own instance,
   -- not by `split`, which abstracts it over the whole goal; a read of memory
   -- the context fixes decides it first.
-  let matching ← if target.isAppOfArity ``VerexIR.Proofs.wp 7 then isMatcherApp (target.getArg! 3)
+  -- A match elaborated over a compound discriminant carries the
+  -- elaborator's `save_info` annotation; the walk reads an action under
+  -- its annotations.
+  let matching ← if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
+      isMatcherApp (target.getArg! 3).consumeMData
     else pure false
   if matching then
     setGoals [goal]
@@ -390,7 +398,7 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
       return some ([], true)
     catch _ =>
       saved.restore
-  if obligations || running then
+  if cases || running then
     try
       setGoals [goal]
       timedStep "split/first" (evalTactic (← `(tactic| verex_split)))
@@ -521,14 +529,17 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
 of them and no other local, closed under the body's own binders. A bare
 occurrence is a read of its own. -/
 private def readsOf (body : Lean.Expr) (params : Array FVarId) : Array Lean.Expr := Id.run do
-  let mentions (e : Lean.Expr) : Bool := e.hasAnyFVar (params.contains ·)
-  let mentionsOther (e : Lean.Expr) : Bool := e.hasAnyFVar (!params.contains ·)
+  let (_, mentioned) := (localMentions body (params.contains ·)).run {}
   let mut reads : Array Lean.Expr := #[]
+  let mut visited : Std.HashSet Lean.Expr := {}
   let mut pending : Array Lean.Expr := #[body]
   while let some e := pending.back? do
     pending := pending.pop
-    unless mentions e do continue
-    if !e.hasLooseBVars && !mentionsOther e then
+    if visited.contains e then continue
+    visited := visited.insert e
+    let (mentions, mentionsOther) := mentioned.getD e (false, false)
+    unless mentions do continue
+    if !e.hasLooseBVars && !mentionsOther then
       unless reads.contains e do reads := reads.push e
       continue
     match e with
@@ -691,9 +702,12 @@ def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
         let (applications, bound) := Id.run do
           let mut found : Array Lean.Expr := #[]
           let mut bound := false
+          let mut visited : Std.HashSet (Lean.Expr × Bool) := {}
           let mut pending := #[(target, false)]
           while let some (e, under) := pending.back? do
             pending := pending.pop
+            if visited.contains (e, under) then continue
+            visited := visited.insert (e, under)
             if (lookup e).isSome then
               found := found.push e
               bound := bound || under
@@ -1243,7 +1257,11 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
   -- Substitute using the frame equation itself. Substituting `verexFinal`
   -- by name can select the earlier StateOf equation instead, leaving the
   -- memory hidden behind the invocation's state-label expression.
-  if keeps then next.withContext (Lean.Meta.subst next equation) else pure next
+  -- A frame equation fixing a summary's parameter stays (`substEquation?`).
+  if keeps then return (← substEquation? next equation).getD next
+  -- Any other frame stays a fact, for the leaf and the behavior run.
+  noteKeptFact equation
+  pure next
 
 /-- A row the frame resolves to scalars (`ScalarAt`): a hypothesis of the
 theorem, or by evaluation where the frame is the runtime frame or one a
@@ -1882,8 +1900,12 @@ private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial
     let (equation, next) ← goal.withContext do
       (← goal.assert `verexKept (← whnfR (← inferType kept)).headBeta kept).intro1P
     -- Substituting the final memory ends the run's facts: the other frames
-    -- would speak of a memory no longer named.
-    if keeps then return ← next.withContext (Lean.Meta.subst next equation)
+    -- would speak of a memory no longer named. A substitution refused
+    -- because the equation fixes a summary's parameter keeps the equation
+    -- and the memory named, so the search goes on.
+    if keeps then
+      if let some substituted ← substEquation? next equation then return substituted
+    noteKeptFact equation
     goal := next
   return goal
 
@@ -2528,13 +2550,16 @@ private def findReached? {α : Type} (es : Array Lean.Expr) (continuations : Arr
         pending := pending.push (← instantiateMVars value)
   return none
 
-/-- Whether an expression states a behavioral predicate, also through the
-continuations it reaches (`findReached?`). -/
+/-- The predicates stating a function value's behavior, and the direct
+readings of a call's target (`CallEnsures`, `CallAborts`). -/
+def behaviorPredicates : Array Name :=
+  #[``VerexIR.Proofs.EnsuresOf, ``VerexIR.Proofs.AbortsOf, ``VerexIR.Proofs.ResultOf,
+    ``VerexIR.Proofs.StateOf, ``VerexIR.Proofs.CallEnsures, ``VerexIR.Proofs.CallAborts]
+
+/-- Whether an expression states a behavioral predicate (`behaviorPredicates`),
+also through the continuations it reaches (`findReached?`). -/
 def statesBehavior (es : Array Lean.Expr) (continuations : Array Name := #[]) : MetaM Bool := do
-  let behavioral (sub : Lean.Expr) : Bool :=
-    sub.isConstOf ``VerexIR.Proofs.EnsuresOf || sub.isConstOf ``VerexIR.Proofs.AbortsOf ||
-      sub.isConstOf ``VerexIR.Proofs.ResultOf || sub.isConstOf ``VerexIR.Proofs.StateOf ||
-      sub.isConstOf ``VerexIR.Proofs.CallEnsures || sub.isConstOf ``VerexIR.Proofs.CallAborts
+  let behavioral (sub : Lean.Expr) : Bool := behaviorPredicates.any sub.isConstOf
   return (← findReached? es continuations fun next =>
     pure (if (next.find? behavioral).isSome then some () else none)).isSome
 

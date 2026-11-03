@@ -347,28 +347,39 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
     pure (inTarget, written)
   if !inTarget && written.isEmpty then return
   -- Only where a write is read: the other hypotheses would be traversed
-  -- for nothing.
-  simpMainAt (← `(tactic| simp (disch := omega) only [Array.getElem?_setIfInBounds_ne,
-    Array.getElem?_setIfInBounds_self_of_lt, Array.getElem_setIfInBounds_ne,
-    Array.getElem_setIfInBounds_self, VerexIR.Proofs.Denote.eraseIdxIfInBounds_of_lt,
-    VerexIR.Proofs.Denote.insertIdxIfInBounds_of_le, Array.size_eraseIdx, Array.size_insertIdx,
-    VerexIR.Proofs.Denote.getElem?_eraseIdx_toNat_of_lt,
-    VerexIR.Proofs.Denote.getElem?_eraseIdx_toNat_of_ge,
-    VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_lt,
-    VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_gt, Array.getElem?_insertIdx_self]))
-    #[] written inTarget
+  -- for nothing. The side conditions go to the leaf's bounded discharger:
+  -- normalization only asks for cheap side conditions.
+  let result ← goal.withContext do
+    let (ctx, simprocs, _) ← rulesSimpContext (← `(tactic| simp only
+      [Array.getElem?_setIfInBounds_ne, Array.getElem?_setIfInBounds_self_of_lt,
+      Array.getElem_setIfInBounds_ne, Array.getElem_setIfInBounds_self,
+      VerexIR.Proofs.Denote.eraseIdxIfInBounds_of_lt,
+      VerexIR.Proofs.Denote.insertIdxIfInBounds_of_le, Array.size_eraseIdx, Array.size_insertIdx,
+      VerexIR.Proofs.Denote.getElem?_eraseIdx_toNat_of_lt,
+      VerexIR.Proofs.Denote.getElem?_eraseIdx_toNat_of_ge,
+      VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_lt,
+      VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_gt, Array.getElem?_insertIdx_self])) #[]
+    let (result, _) ← simpGoal goal ctx simprocs (some (← goalDischarge goal))
+      (simplifyTarget := inTarget) (fvarIdsToSimp := written)
+    pure result
+  match result with
+  | none => replaceMainGoal []
+  | some (_, next) => replaceMainGoal [next]
 
 /-- The applications of a constant in a term, closed. -/
-private partial def closedApplications (e : Lean.Expr) (name : Name) (arity : Nat)
-    (found : Array Lean.Expr := #[]) : Array Lean.Expr :=
-  let found := if e.isAppOfArity name arity && !e.hasLooseBVars then found.push e else found
-  match e with
-  | .app f a => closedApplications a name arity (closedApplications f name arity found)
-  | .lam _ d b _ | .forallE _ d b _ => closedApplications b name arity (closedApplications d name arity found)
-  | .letE _ t v b _ =>
-      closedApplications b name arity (closedApplications v name arity (closedApplications t name arity found))
-  | .mdata _ b | .proj _ _ b => closedApplications b name arity found
-  | _ => found
+private def closedApplications (e : Lean.Expr) (name : Name) (arity : Nat) : Array Lean.Expr :=
+  let rec walk (e : Lean.Expr) : StateM (Std.HashSet Lean.Expr × Array Lean.Expr) Unit := do
+    if (← get).1.contains e then return
+    modify fun (seen, found) => (seen.insert e, found)
+    if e.isAppOfArity name arity && !e.hasLooseBVars then
+      modify fun (seen, found) => (seen, found.push e)
+    match e with
+    | .app f a => walk f; walk a
+    | .lam _ d b _ | .forallE _ d b _ => walk d; walk b
+    | .letE _ t v b _ => walk t; walk v; walk b
+    | .mdata _ b | .proj _ _ b => walk b
+    | _ => pure ()
+  ((walk e).run ({}, #[])).2.2
 
 /-- The facts the positions a typed map (`SpecMap`) is read at give, as an
 SMT solver's map axioms would: a key the map has sits at its rank, within
@@ -1280,21 +1291,28 @@ private def literalRangeExistential? (e : Lean.Expr) : Option (Int × Int) := do
   guard (high.isAppOfArity ``LT.lt 4 && high.getArg! 2 == .bvar 0)
   pure (← intLiteral? (low.getArg! 2), ← intLiteral? (high.getArg! 3))
 
-/-- The literal ranges of the existentials a term states. -/
-private partial def literalRangeExistentials (e : Lean.Expr) (found : Array (Int × Int)) :
-    Array (Int × Int) :=
-  let found := match literalRangeExistential? e with
-    | some range => found.push range
-    | none => found
-  match e with
-  | .app f a => literalRangeExistentials a (literalRangeExistentials f found)
-  | .lam _ type body _ | .forallE _ type body _ =>
-      literalRangeExistentials body (literalRangeExistentials type found)
-  | .letE _ type value body _ =>
-      literalRangeExistentials body (literalRangeExistentials value
-        (literalRangeExistentials type found))
-  | .mdata _ body | .proj _ _ body => literalRangeExistentials body found
-  | _ => found
+/-- The existentials over literal ranges a term states, counted at each of
+their occurrences up to `cap`, and whether each range spans at most `width`. -/
+private partial def literalRangeExistentials (e : Lean.Expr) (cap : Nat) (width : Int) :
+    StateM (Std.HashMap Lean.Expr (Nat × Bool)) (Nat × Bool) := do
+  if let some known := (← get)[e]? then return known
+  let own := match literalRangeExistential? e with
+    | some (lo, hi) => (1, decide (hi - lo ≤ width))
+    | none => (0, true)
+  let children := match e with
+    | .app f a => #[f, a]
+    | .lam _ type body _ | .forallE _ type body _ => #[type, body]
+    | .letE _ type value body _ => #[type, value, body]
+    | .mdata _ body | .proj _ _ body => #[body]
+    | _ => #[]
+  let mut count := own.1
+  let mut narrow := own.2
+  for child in children do
+    let (childCount, childNarrow) ← literalRangeExistentials child cap width
+    count := min cap (count + childCount)
+    narrow := narrow && childNarrow
+  modify (·.insert e (count, narrow))
+  return (count, narrow)
 
 /-- An existential goal over integers in small literal ranges, as the
 disjunction of its instances, which the normalization computes: a literal
@@ -1305,8 +1323,8 @@ elab "verex_expand_goal_ranges" : tactic => focusGoal do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
   if (target.find? (literalRangeExistential? · |>.isSome)).isNone then
     throwError "the goal states no existential over a literal range"
-  let ranges := literalRangeExistentials target #[]
-  unless ranges.size ≤ 4 && ranges.all fun (lo, hi) => hi - lo ≤ 8 do
+  let ((count, narrow), _) := (literalRangeExistentials target 5 8).run {}
+  unless count ≤ 4 && narrow do
     throwError "the goal states an existential over a wide literal range"
   -- Each instance a case of its own: the conjunctions and existentials
   -- around an expanded existential distribute over its instances.
@@ -1700,7 +1718,7 @@ syntax "verex_prepare_steps " tactic ppSpace tactic ppSpace tactic : tactic
 authored proof takes over is left in this form. -/
 macro "verex_prepare_leaf" : tactic => `(tactic| verex_prepare_steps verex_normalize_context
   (verex_timed "p-bounds" verex_bounds)
-  (verex_lookups_after_writes; verex_timed "p-positions" verex_map_positions))
+  (verex_timed "p-lookups" verex_lookups_after_writes; verex_timed "p-positions" verex_map_positions))
 
 /-- The preparation a completed path's clauses share: its structural steps,
 which substitute only locals no clause reads (`verex.keepTargetLocals`). The
@@ -2376,19 +2394,21 @@ private def assertFacts (goal : MVarId) (name : Name) (facts : Array Lean.Expr) 
   return goal
 
 /-- The arguments of the storage keys at addresses a term builds. -/
-partial def storageAddresses (e : Lean.Expr) : Array Lean.Expr :=
-  go e #[]
-where
-  go (e : Lean.Expr) (found : Array Lean.Expr) : Array Lean.Expr :=
+def storageAddresses (e : Lean.Expr) : Array Lean.Expr :=
+  let rec walk (e : Lean.Expr) : StateM (Std.HashSet Lean.Expr × Array Lean.Expr) Unit := do
+    if (← get).1.contains e then return
+    modify fun (seen, found) => (seen.insert e, found)
     if e.isAppOfArity ``VerexIR.StorageKey.address 1 then
       let argument := e.appArg!
-      if found.contains argument then found else found.push argument
+      unless (← get).2.contains argument do
+        modify fun (seen, found) => (seen, found.push argument)
     else match e with
-      | .app function argument => go argument (go function found)
-      | .lam _ domain body _ | .forallE _ domain body _ => go body (go domain found)
-      | .letE _ type value body _ => go body (go value (go type found))
-      | .mdata _ inner | .proj _ _ inner => go inner found
-      | _ => found
+      | .app function argument => walk function; walk argument
+      | .lam _ domain body _ | .forallE _ domain body _ => walk domain; walk body
+      | .letE _ type value body _ => walk type; walk value; walk body
+      | .mdata _ inner | .proj _ _ inner => walk inner
+      | _ => pure ()
+  ((walk e).run ({}, #[])).2.2
 
 /-- The conditions of the branches (`if`) among a term's subterms, each once. -/
 private def branchConditions (e : Lean.Expr) : Array Lean.Expr :=
@@ -2764,15 +2784,15 @@ elab "verex_key_instances" : tactic => focusGoal do
   -- A new instance contains concrete reads absent from its quantified
   -- source. Commit it first, then link and normalize those reads. Optional
   -- normalization rolls back independently without losing the instance.
-  if verex.sharedContinuations.get (← getOptions) then
-    let saved ← saveState
-    let restoreCaches ← saveWalkCaches
-    try
-      evalTactic (← `(tactic| all_goals try verex_context_memory_reads))
-      evalTactic (← `(tactic| all_goals verex_normalize_context))
-    catch _ =>
-      saved.restore
-      restoreCaches
+  -- Every leaf's deciders read the linked reads, the tree's own included.
+  let saved ← saveState
+  let restoreCaches ← saveWalkCaches
+  try
+    evalTactic (← `(tactic| all_goals try verex_context_memory_reads))
+    evalTactic (← `(tactic| all_goals verex_normalize_context))
+  catch _ =>
+    saved.restore
+    restoreCaches
 
 /-- The rewrite rules of a hypothesis for `simpByContext`, oriented as
 `orientedHypothesis` does. -/

@@ -1639,6 +1639,9 @@ structure PendingVerification where
   /-- Conclude the target once its tasks ended: report their messages, raise
   its failure, carry and audit its artifacts. -/
   conclude : CommandElabM Unit := pure ()
+  /-- The callees the proof inlines, by key, as the preparation collected
+  them: the module summarizes them before its proofs (`summarizeCallee`). -/
+  inlinedCallees : Array String := #[]
 
 /-- The last component of the next proof attempt of `base`'s typed theorem:
 a proof elaborating in a task is committed whether or not it succeeded, so
@@ -2956,13 +2959,81 @@ private def recordArtifacts (base : Name) (natives assumptionDeps : Array (Funct
   modifyEnv fun env => assumptionDependencies.addEntry env (base, assumptionDeps)
   modifyEnv fun env => lemmaTrustDependencies.addEntry env (base, trustDeps)
 
+/-- The certificate of a callee's compilation under this module, declared
+where it is first inlined (`collectCallees`) or summarized. -/
+private def ensureCompiledCertificate (m : Member) (function : String) (handleTerm : Term) :
+    CommandElabM Name := do
+  let certificate := Name.str (Name.str m.namespaceName function) "compiledSemantics"
+  unless (← getEnv).contains certificate do
+    elabCommand (← `(command|
+      set_option Elab.async false in
+      theorem $(rootIdent certificate) :
+          VerexIR.Proofs.Denote.compileFunction $(m.unitTerm) $handleTerm =
+            .ok $(rootIdent (compiledName m.segments function)) :=
+        $(rootIdent (compiledEqName m.segments function))))
+  return certificate
+
+/-- Derive the summary of the callee `m`, context-free:
+in its own telescope, `binders` after the unit's, the statement of a call's
+shape at its parameters and result is the root of the walk
+(`deriveModuleSummary`), with the unit facts `unitFact` introduces and the
+obligation `arguments` of its own body; the theorem `<namespace>.<callee>.summary`
+is declared once, in the command's environment, and measured as
+`<namespace>::<callee> summary`. A refusal leaves every call inlined. -/
+private def deriveCalleeSummary (m : Member)
+    (binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) (unitFact : TSyntax `tactic)
+    (arguments : TSyntax ``VerexIR.Proofs.Denote.obligationArguments) (paramsTerm shapeTerm : Ident)
+    (atRuntime : Term → CommandElabM Term) : CommandElabM Unit := do
+  let { function, namespaceName, unitTerm, unitDefinition, handleTerm, .. } := m
+  let name := Name.str (Name.str namespaceName function) "summary"
+  if (← getEnv).contains name then return
+  let certificate ← ensureCompiledCertificate m function handleTerm
+  let pair ← `(term| PProd.mk $handleTerm
+    (PProd.mk $(Syntax.mkStrLit function) $(rootIdent certificate)))
+  let statement ← atRuntime (← `(term|
+    ∀ (args : VerexIR.Proofs.Denote.HList $paramsTerm) (ensures : _) (aborts : _) (initial : _),
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.propheticMeaning executable #[] $handleTerm $paramsTerm $shapeTerm args)
+        ensures aborts initial))
+  let telescope : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
+    #[← `(bracketedBinder| {registry : VerexIR.Validation.SemanticsRegistry}),
+      ← `(bracketedBinder| {executable : VerexIR.Validation.ExecutableUnit $unitTerm}),
+      ← `(bracketedBinder| (prepared : VerexIR.Validation.prepareExecution registry
+        $(mkIdent unitDefinition) = .ok executable))] ++ binders
+  let started ← IO.monoNanosNow
+  let startHeartbeats ← IO.getNumHeartbeats
+  let outcome ← IO.mkRef (Except.error "the walk did not run" : Except String Nat)
+  Perf.withPhase .verification <| withScope (fun scope => { scope with opts := Elab.async.set scope.opts false }) <|
+    liftTermElabM <| Term.withDeclName name <| Term.elabBinders telescope fun _ => do
+      let callee ← Term.elabTerm pair none
+      let statement ← Term.elabType statement
+      Term.synthesizeSyntheticMVarsNoPostponing
+      let callee ← instantiateMVars callee
+      let statement ← instantiateMVars statement
+      if callee.hasMVar || statement.hasMVar then
+        throwError m!"the summary statement of `{function}` is not determined: {statement}"
+      let root ← mkFreshExprSyntheticOpaqueMVar statement
+      discard <| Tactic.run root.mvarId! do
+        Tactic.evalTactic unitFact
+        outcome.set (← deriveModuleSummary name arguments callee)
+  let heartbeats := (← IO.getNumHeartbeats) - startHeartbeats
+  let elapsedMs := ((← IO.monoNanosNow) - started) / 1000000
+  match ← outcome.get with
+  | .ok conjuncts =>
+      stageLog s!"{function}: summary derived, {heartbeats} heartbeats, {conjuncts} conjuncts"
+      Perf.recordArtifacts s!"{namespaceName}::{function} summary" #[name] heartbeats elapsedMs
+  | .error reason =>
+      stageLog s!"{function}: summary refused, {heartbeats} heartbeats: {reason}"
+      if verex.solverProfile.get (← getOptions) then
+        logInfo m!"no summary of `{function}`: {reason}"
+
 /-- Proves `m`'s typed theorem, over the callees collected and the frame
 certificates, and carries it to the runtime unless `m` is a member of a
 cycle or verified through a model; returns the dependencies its theorems
 take, for `verifyCycle` to conclude. -/
 private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
     (callees : Callees m.unit) (routed : Array (FunctionHandle × String))
-    (instantiationCertificates : Array Term) (errorsBefore : Nat) (prepare : Bool) :
+    (instantiationCertificates : Array Term) (errorsBefore : Nat) (prepare summary : Bool) :
     CommandElabM (MemberDependencies × PendingVerification) := do
   let { reference, segments, function, script?, cycle, namespaceName, ns, declaration, handle, model, family, generic, framed, arity, ownAssumptions, artifacts, base, unitDefinition, unitTerm, handleTerm, .. } := m
   let unit := m.unit
@@ -3099,7 +3170,13 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   -- obligation is reported at the authored proof.
   -- Prepared: every definition and certificate the proof needs is in the
   -- environment, checked before any proof task runs.
-  if prepare then return ((natives, assumptionDeps, trustDeps), {})
+  if prepare then
+    -- A callee's summary: derived in its own telescope, which its proof as
+    -- a target would have, with the obligations of its own body.
+    if summary then
+      deriveCalleeSummary m (familyBinders ++ nativeBinders ++ assumptionBinders) unitFact
+        ⟨solveTactic.raw[1][0]⟩ paramsTerm shapeTerm atRuntime
+    return ((natives, assumptionDeps, trustDeps), {})
   -- The proof elaborates in a task (`verex_proof`) as an attempt of its
   -- own; the command elaborates the statement and goes on to the next
   -- target. Declared by its name in the module, as the theorems are, under
@@ -3212,7 +3289,8 @@ alone is elaborated, and the natives it assumes returned, for `verifyCycle`
 to conclude. -/
 private def verifyMember (reference : Syntax) (segments : Array String) (function : String)
     (script? : Option AuthoredScript) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
-    (cycle : Array (FunctionHandle × String)) (family : Bool := false) (prepare : Bool := false) :
+    (cycle : Array (FunctionHandle × String)) (family : Bool := false) (prepare : Bool := false)
+    (summary : Bool := false) :
     CommandElabM (MemberDependencies × PendingVerification) := do
   let ignoring := verex.ignoreProofs.get (← getOptions)
   let script? := if ignoring then none else script?
@@ -3244,11 +3322,13 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let family := family || (model && (isGeneric declaration || modelRoutesGeneric unit compiled))
   let artifacts := Name.str namespaceName function
   let base := (← getCurrNamespace) ++ artifacts
-  if (← getEnv).contains (base ++ `typedVerified) then
+  -- A callee is summarized whether or not it is verified: its calls are
+  -- inlined either way.
+  if (← getEnv).contains (base ++ `typedVerified) && !summary then
     -- A colliding name alone is not evidence of a denotation proof.
     withRef reference <| requireNativeArtifacts base (selectsBitVectors declaration) model
     return ((#[], #[], #[]), {})
-  if script?.isNone && requiresAuthoredProof declaration && !ignoring then
+  if script?.isNone && requiresAuthoredProof declaration && !ignoring && !summary then
     throwErrorAt reference m!"verex verification failed: `{function}` sets \
       `pragma verify = manual`; {proofRequest ns function #[]}"
   let handleTerm ← handleSyntax ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
@@ -3370,7 +3450,11 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   -- the target concludes outside this state.
   let saved ← get
   try
-    proveMember m opens callees routed instantiationCertificates errorsBefore prepare
+    let (dependencies, pending) ←
+      proveMember m opens callees routed instantiationCertificates errorsBefore prepare summary
+    let inlinedCallees := if model then #[] else callees.inlined.map fun (callee, _, _, _) =>
+      functionKey unit callee
+    return (dependencies, { pending with inlinedCallees })
   catch failure =>
     modify fun state => { saved with messages := state.messages }
     throw failure
@@ -3631,7 +3715,10 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
           ((declarationOf? unit member).any selectsBitVectors)
         let base := (← getCurrNamespace) ++ artifactsOf name
         modifyEnv fun env => auditedDenotations.tag env (base ++ `typedVerified)
-    return { tasks := pendings.flatMap (·.tasks), conclude }
+    return {
+      tasks := pendings.flatMap (·.tasks)
+      conclude := conclude
+      inlinedCallees := pendings.flatMap (·.inlinedCallees) }
   catch failure =>
     -- A failure before the proofs' tasks began leaves no artifacts behind.
     modify fun state => { saved with messages := state.messages }
@@ -3695,5 +3782,62 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
   covering (members.map (·.2))
   verifyCycle reference segments members (fun name =>
     if name == function then script? else scripts name) opens prepare
+
+/-- Whether a callee's summary may be derived at all: outside a model, off
+every cycle of calls, with no precondition of its own (a call of such a
+callee asserts it, and inlines), and in a form a summary states
+(`summaryForm`): decided once per callee, before its derivation. -/
+private def summarizable (unit : ValidatedUnit) (handle : FunctionHandle)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Bool :=
+  !declaresGhosts unit && (callCycle unit handle).isEmpty &&
+    !(ContractView.interface.of declaration).contract.conditions.any fun condition =>
+      condition.kind == .requires &&
+        !Contract.conditionReadsRequires unit handle.namespaceId condition.expression
+
+/-- Derive the summary of the callee `function` of the module `segments`
+before its proofs run, where one qualifies; a callee that does not is
+inlined at every call. -/
+def summarizeCallee (reference : Syntax) (segments : Array String) (function : String)
+    (opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := #[]) : CommandElabM Unit := do
+  let namespaceName := pathName segments
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
+  let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
+    | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
+  let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
+  unless summarizable unit handle ns declaration do
+    stageLog s!"{function}: summary refused: a model's, a cycle's, or a required callee"
+    return
+  unless ← liftCoreM (summaryForm (compiledName segments function)) do
+    stageLog s!"{function}: summary refused: its form admits none"
+    return
+  discard <| verifyMember reference segments function none opens #[] (prepare := true)
+    (summary := true)
+
+/-- The callees `keys` of the module `segments` ordered after the callees
+they inline among them: a callee's summary applies the summaries of the
+callees its body inlines. -/
+def summaryOrder (reference : Syntax) (segments : Array String) (keys : Array String) :
+    CommandElabM (Array String) := do
+  let unit ← VerexSL.registeredUnitAt reference (pathName segments)
+  let callees (key : String) : Array String :=
+    match findFunction? unit key with
+    | some (namespaceIndex, _, functionIndex, _) =>
+        match compileFunction unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ with
+        | .ok compiled => (compiled.body.callees #[]).map (functionKey unit ·) |>.filter keys.contains
+        | .error _ => #[]
+    | none => #[]
+  let mut ordered : Array String := #[]
+  let mut visiting : Array String := #[]
+  let mut pending : List (String × Bool) := keys.toList.map (·, false)
+  while let (key, leaving) :: rest := pending do
+    pending := rest
+    if leaving then
+      ordered := ordered.push key
+      continue
+    if ordered.contains key || visiting.contains key then continue
+    visiting := visiting.push key
+    pending := (callees key).toList.map (·, false) ++ (key, true) :: pending
+  return ordered
 
 end VerexSL.Verify

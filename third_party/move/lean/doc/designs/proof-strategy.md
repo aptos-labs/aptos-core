@@ -90,10 +90,10 @@ more than checking it ([`performance.md`](performance.md)).
   structured interface, routing source-named alternatives to ordinary Lean
   arguments; `verex_map_simp` evaluates closed map observations directly.
   None adds speculative search.
-- **Join scheduler.** The opt-in `verex.sharedContinuations` shares
+- **Join scheduler.** `verex.sharedContinuations` (on by default) shares
   kernel-checked continuation summaries at joins, with entry decomposition,
   selected cases, certificate bounds and map-position facts shared among
-  clause groups within a bounded preparation slice per owner.
+  clause groups, debited to the leaf allowance of every clause they serve.
 
 ## Measurement
 

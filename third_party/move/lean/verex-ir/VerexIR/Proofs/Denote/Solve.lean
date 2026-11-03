@@ -159,13 +159,75 @@ private def runAutomatic (ledger : IO.Ref SharedBudgets.Ledger)
     (← targetState).preparationOwners.set previousOwners
     unless committed do (← restore.get)
 
+/-- The incoming alternatives of a goal under entry relations, each in the
+walk normal form. Linking an entry row substitutes the arrival's values into
+a target normalized over abstract ones; normalizing it again gives the
+alternative what `exitStep` gives the same path's concrete arrival, where a
+clause every value settles closes to `True` before any decider. -/
+private def exposeNormalEntries (normalization : Simp.Context × Simp.SimprocsArray)
+    (goal : MVarId) (entries : Array Name) : TacticM (List MVarId) := do
+  -- A target the summary's walk settled without its rows, or one its
+  -- context states over the abstract rows, needs no arrival. Stated means
+  -- up to reducible unfolding (`verex_assumption`): a comparison at default
+  -- transparency unfolds the clauses and relations of the goal, and what it
+  -- then unifies is not what the context states.
+  if (← goal.withContext (instantiateMVars (← goal.getType))).isConstOf ``True then
+    goal.assign (mkConst ``True.intro)
+    return []
+  -- A goal its context states, as the tree walk's leaf closes it first
+  -- (`decideOne`): by a hypothesis, or by the stated facts, such as a
+  -- `False` the callee's abort clause states under its marker.
+  if ← closesBy goal (← `(tactic| first | verex_assumption | verex_stated)) then return []
+  -- The stored invariants of a row the summary assumes (`sealNode`), under
+  -- the premise the walk introduced.
+  if (← goal.withContext (instantiateMVars (← goal.getType))).isAppOfArity
+      ``VerexIR.Proofs.Denote.MemoryInvariants 4 then
+    if ← closesBy goal (← `(tactic| verex_memory_invariants)) then return []
+  let exposed ← IO.mkRef [goal]
+  timedStep "join exposure" do
+    exposed.set (← SharedContinuations.exposeEntries goal entries closeFrameWrites)
+  let alternatives ← exposed.get
+  if alternatives == [goal] then return alternatives
+  alternatives.filterMapM fun alternative => do
+    setGoals [alternative]
+    normalizeAround (fixedPoints := walkFixedPoints) normalization #[]
+    return (← getGoals).head?
+
+/-- The arrivals a shared suffix's goals answer for: the suffix was queued
+with `provenance` and the union `clauses` of its arrivals, and each arrival
+owes its own provenance and clauses. A failed leaf of the suffix is reported
+for each arrival, with the clauses the suffix's walk added since
+(`attributed`). -/
+structure OwedAttribution where
+  provenance : Option Provenance
+  clauses : Array ObligationRange
+  arrivals : Array (Option Provenance × Array ObligationRange)
+  deriving Inhabited
+
+/-- Whom a goal with `provenance` and `clauses` answers for under
+`attribution`: each arrival, with the clauses added since the suffix was
+queued, while the goal still carries the suffix's provenance; else the goal
+itself, its obligation being the suffix's own. -/
+private def attributed (attribution : Option OwedAttribution) (provenance : Option Provenance)
+    (clauses : Array ObligationRange) : Array (Option Provenance × Array ObligationRange) :=
+  match attribution with
+  | some owed =>
+      if provenance == owed.provenance then
+        let added := clauses.filter (!owed.clauses.contains ·)
+        owed.arrivals.foldl (init := #[]) fun found (origin, owing) =>
+          let entry := (origin, added.foldl (fun c r => if c.contains r then c else c.push r) owing)
+          if found.contains entry then found else found.push entry
+      else #[(provenance, clauses)]
+  | none => #[(provenance, clauses)]
+
 /-- Decide a leaf within one budget covering call observations and the
 leaf pipeline, or report the clause it owes and admit it. Whether it was
 decided, and the cost of the complete attempt. -/
-private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
+private def solveLeaf (normalization : Simp.Context × Simp.SimprocsArray)
+    (goal : MVarId) (provenance : Option Provenance)
     (clauses : Array ObligationRange) (entries : Array Name := #[])
-    (accounting? : Option (IO.Ref SharedBudgets.Ledger × Array SharedBudgets.OwnerId) := none)
-    (entryOpened : Bool := false) :
+    (owners? : Option (Array SharedBudgets.OwnerId) := none)
+    (entryOpened : Bool := false) (owed : Option OwedAttribution := none) :
     TacticM (Bool × Array (String × Nat)) := do
   let debug := verex.solverDebug.get (← getOptions)
   let mut stageCost : Array (String × Nat) := #[]
@@ -189,7 +251,7 @@ private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
         -- leaf budget, exhausting it is the leaf's failure.
         -- An explicit bit-vector request goes to its decision procedure
         -- after normalization, without trying the general search first.
-        let bitVectors ← if accounting?.isSome then
+        let bitVectors ← if owners?.isSome then
             `(tactic| first | verex_bv_target | verex_bv)
           else `(tactic| verex_bv)
         let fallback ← if (← getOptions).getBool `verex.bitVectors false then
@@ -243,14 +305,14 @@ private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
             if (← IO.getNumHeartbeats) - start >= leafBudget then exhausted.set true
             throw failure
         let decide : TacticM Unit := do
-          -- The existing path has no entry relations or owned residual
-          -- queue. Keep even its bookkeeping out of very small leaf caps.
-          if accounting?.isNone then
-            budgeted (decideOne goal)
+          -- The existing path has no entry relations or owned residual queue.
+          if owners?.isNone then
+            timedStep "leaf decide" (budgeted (decideOne goal))
             setGoals (← decidePreparedCases (← getUnsolvedGoals) budgeted)
             return
-          -- All incoming alternatives consume this one leaf allowance.
-          let alternatives ← SharedContinuations.exposeEntries goal entries closeFrameWrites
+          -- Each attempt within its own allowance, as on the existing path:
+          -- every incoming alternative and every case of its prepared split.
+          let alternatives ← exposeNormalEntries normalization goal entries
           let opened := entryOpened || alternatives != [goal]
           for alternative in alternatives do
             let mut pending := [alternative]
@@ -270,21 +332,20 @@ private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
             -- this same attempt instead of dropping them or renewing caps.
             while let next :: remaining := pending do
               let before ← goalContent next
-              decideOne next
-              let residual ← decidePreparedCases (← getUnsolvedGoals)
+              timedStep "join decide" (budgeted (decideOne next))
+              let residual ← decidePreparedCases (← getUnsolvedGoals) budgeted
               for child in residual do
                 if (← goalContent child) == before then
                   throwError "a shared continuation alternative made no progress"
               pending := residual ++ remaining
           setGoals []
-        if let some (ledger, owners) := accounting? then
-          let (outcome, _) ← runAutomatic ledger owners .leaf decide
-          match outcome with
-          | .done _ => pure ()
-          | .exhausted =>
-              exhausted.set true
-              throwError "the obligation exceeded its automatic allowance"
-          | .failed failure => throw failure
+        -- The leaf's deciders read the preparation its owners shared.
+        if let some owners := owners? then
+          let previous ← (← targetState).preparationOwners.get
+          try
+            (← targetState).preparationOwners.set owners
+            decide
+          finally (← targetState).preparationOwners.set previous
         else decide
         pure (← getGoals).isEmpty)
       fun failure => do
@@ -311,9 +372,11 @@ private def solveLeaf (goal : MVarId) (provenance : Option Provenance)
   unless closed do
     saved.restore
     setGoals [goal]
-    let name := (← leafKey goal provenance clauses (← (← targetState).clauseRanges.get)).tag.toString
-    let reported ← recordAutomaticReports name <|
-      reportObligation goal provenance clauses reported
+    -- A shared suffix's leaf is reported for each arrival it answers for.
+    let mut reported := reported
+    for (origin, owing) in attributed owed provenance clauses do
+      let name := (← leafKey goal origin owing (← (← targetState).clauseRanges.get)).tag.toString
+      reported ← recordAutomaticReports name <| reportObligation goal origin owing reported
     let mut rejectedClauses := rejectedClauses
     for range in ranges do
       unless rejectedClauses.contains (provenance, range) do
@@ -395,14 +458,26 @@ private def SolveContext.callAbortSite (ctx : SolveContext) (site : Nat) : Optio
   (ctx.callSites.find? (·.1 == site)).map fun (_, callee, number, overall) =>
     .call number callee overall
 
-/-- `verex_normalize` on each goal, by the walk's normalization. -/
-private def normalizeGoals (ctx : SolveContext) : TacticM Unit := do
+/-- `verex_normalize` on each goal, by the walk's normalization, around the
+`normal` terms. -/
+private def normalizeGoals (ctx : SolveContext) (normal : Array Lean.Expr := #[]) :
+    TacticM Unit := do
   let mut normalized := #[]
   for goal in ← getGoals do
     setGoals [goal]
-    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
+    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization normal
     normalized := normalized ++ (← getGoals).toArray
   setGoals normalized.toList
+
+/-- An inlined callee's body unfolded in the main goal (`compiledUnfoldLemmas`,
+the hypotheses, `denote`), around the `normal` terms. -/
+private def unfoldInlined (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma))
+    (denote : Ident) (normal : Array Lean.Expr) : TacticM Unit := withMainContext do
+  let { ctx, simprocs, .. } ← mkSimpContext
+    (← `(tactic| simp only [$lemmas,*, $denote:ident, VerexIR.Proofs.Denote.NRow.nil_append,
+      VerexIR.Proofs.Denote.NRow.cons_append]))
+    (eraseLocal := false)
+  normalizeAround (ctx, simprocs) normal
 
 /-- Invocation-local measurements of the continuations the walker actually
 folds. These are dynamic instances, not static CFG sites: a later diamond
@@ -438,6 +513,18 @@ private def ContinuationProfile.report (p : ContinuationProfile) : String :=
   s!"  continuations: branch folds {p.branchFolds}, loop folds {p.loopFolds}, \
     arrivals {p.arrivals}, revisits {p.revisits}, untracked {p.untracked}"
 
+/-- What an arriving step's path queues its successors with: an arrival
+that resumes alone continues that path (`resumeShared`), as the exit rule
+continues it (`exitStep`). -/
+structure ArrivalStep where
+  provenance : Option Provenance
+  clauses : Array ObligationRange
+  owed : Option OwedAttribution := none
+  decisions : Array Decision
+  points : Array ProgramPointKey
+  owners : Array (List Bool × SharedBudgets.OwnerId) := #[]
+  deriving Inhabited
+
 /-- A structured region ends at its named continuation. Its summary resumes
 in the enclosing region, after all of its incoming goals have arrived. -/
 structure SharedRegion where
@@ -445,8 +532,20 @@ structure SharedRegion where
   parent : Option Name
   provenance : Option Provenance
   clauses : Array ObligationRange
+  owed : Option OwedAttribution := none
   owners : Array (List Bool × SharedBudgets.OwnerId) := #[]
   debits : Array SharedBudgets.DebitId := #[]
+  /-- The decisions and pending points of the path at the fold: the common
+  prefix of every arrival's. -/
+  decisions : Array Decision := #[]
+  points : Array ProgramPointKey := #[]
+  /-- The locals of the fold context the node keeps until its arrivals are
+  in (`foldPins`). -/
+  pins : FVarIdSet := {}
+  /-- The normal conditions the folding bind passes on (`foldedNormal`). -/
+  conditions : Array Lean.Expr := #[]
+  /-- The arriving steps, indexed by `Arrival.step`. -/
+  arrivalSteps : Array ArrivalStep := #[]
   deriving Inhabited
 
 /-- The state of the traversal `solveGoals` runs: the goals still to solve,
@@ -479,6 +578,16 @@ structure SolveState where
   needs the ordinary post-entry preparation under its own allowance. -/
   activeEntryOpened : Bool := false
   openedEntries : Std.HashSet MVarId := {}
+  /-- The arrivals the goal being stepped answers for (`OwedAttribution`). -/
+  activeOwed : Option OwedAttribution := none
+  goalOwed : Std.HashMap MVarId OwedAttribution := {}
+  /-- The goal is the suffix of a sealed class of several arrivals, walked
+  once over the class's relation: its clauses share owners and their
+  preparation, and its leaves link the relation's rows. A goal under no
+  summary is the tree's own path and is prepared and decided as without
+  shared continuations. -/
+  activeSummary : Bool := false
+  goalSummaries : Std.HashSet MVarId := {}
   prepaidOwners : Std.HashSet SharedBudgets.OwnerId := {}
   pruningChecks : Nat := 0
   prunedEdges : Nat := 0
@@ -494,6 +603,9 @@ structure SolveState where
   /-- The loop of each iteration's recursive hypothesis, as its keys name it
   (`SolveContext.loopKey`). -/
   recursiveLoops : Std.HashMap FVarId (Option Nat) := {}
+  /-- Local definitions the walk matches by identity, which a shared fold
+  takes as captures rather than closing into its body (`fold?`). -/
+  opaqueDefinitions : Std.HashSet FVarId := {}
   /-- The hooks at program points some path reached, by index. -/
   pointsUsed : Array Nat := #[]
   /-- The points a goal's path passed whose hooks wait for the walker to
@@ -513,6 +625,11 @@ structure SolveState where
   /-- The call site of the step most recently popped from `pending`, for the
   budget-stop report when `isMaxHeartbeat` fires inside that step. -/
   stepCallSite : Option Nat := none
+  /-- The heartbeats when that step began, and the stages charged before it:
+  what the step spent beyond its charged stages is the stage the budget
+  interrupts (`traverse`). -/
+  stepStart : Nat := 0
+  stepStages : Nat := 0
 
 /-- The traversal's monad: its state over the tactic monad. -/
 abbrev SolveM := StateRefT SolveState TacticM
@@ -557,7 +674,12 @@ private def queue (goals : List MVarId) (provenance : Option Provenance)
         if s.activeDebits.isEmpty then debits.erase goal
         else debits.insert goal s.activeDebits) s.goalDebits
       openedEntries := goals.foldl (fun opened goal =>
-        if s.activeEntryOpened then opened.insert goal else opened.erase goal) s.openedEntries }
+        if s.activeEntryOpened then opened.insert goal else opened.erase goal) s.openedEntries
+      goalOwed := goals.foldl (fun owed goal => match s.activeOwed with
+        | some attribution => owed.insert goal attribution
+        | none => owed.erase goal) s.goalOwed
+      goalSummaries := goals.foldl (fun under goal =>
+        if s.activeSummary then under.insert goal else under.erase goal) s.goalSummaries }
 
 /-- Queues `goals` as `queue` does, their path taking `decision` beside the
 decisions of the goal being stepped. -/
@@ -701,7 +823,18 @@ private def sharedExitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
   unless ctx.shared do return false
   let { goal, provenance, clauses, stageStart, .. } := step
   let target ← goal.withContext (instantiateMVars (← goal.getType))
-  let some index := (← get).regions.findIdx? (target.isAppOf ·.node.name) | return false
+  -- The continuation bound at the fold (`bindStep`) is read through its
+  -- definition, one level, as the exit rule reads it (`exitStep`).
+  let regions := (← get).regions
+  let named? ← goal.withContext do
+    let .fvar id := target.getAppFn | pure none
+    let some value ← id.getValue? | pure none
+    unless regions.any ((← instantiateMVars value).isAppOf ·.node.name) do return none
+    pure (some (← zetaDeltaFVars target #[id]).headBeta)
+  let (goal, target) ← match named? with
+    | some unfolded => pure (← goal.replaceTargetDefEq unfolded, unfolded)
+    | none => pure (goal, target)
+  let some index := regions.findIdx? (target.isAppOf ·.node.name) | return false
   let region := (← get).regions[index]!
   -- State-label witnesses need the same program points as the original
   -- exit rule. Branch-local points travel in the entry relation, together
@@ -715,7 +848,12 @@ private def sharedExitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
     modify fun s => { s with regions := s.regions.modify index fun region =>
       { region with
         debits := mergeDebits region.debits s.activeDebits
-        node := { region.node with arrivals := region.node.arrivals.push arrival } } }
+        arrivalSteps := region.arrivalSteps.push
+          { provenance, clauses, owed := s.activeOwed, decisions := s.activeDecisions,
+            points := s.activePoints, owners := s.activeOwners }
+        node := { region.node with arrivals :=
+          region.node.arrivals.push { arrival with summarized := s.activeSummary,
+                                                   step := region.arrivalSteps.size } } } }
     charge "join arrival" stageStart
     return true
   let goal ← SharedContinuations.unfold region.node goal
@@ -724,8 +862,6 @@ private def sharedExitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
   queue (← getGoals) provenance clauses
   charge "abrupt join exit" stageStart
   return true
-
-initialize registerTraceClass `verex.joinPruning
 
 /-- Pruning proves only inconsistency of the incoming context. The suffix
 is never unfolded or used as a premise, and no failed proof is admitted. -/
@@ -748,7 +884,7 @@ private def proveUnreachable (goal : MVarId) : TacticM Unit := goal.withContext 
 
 /-- An inner join's checks also serve the enclosing suffix. Consult the
 live ancestor debits before every attempt: sibling regions must not each
-receive another preparation slice for that same downstream suffix. -/
+receive another allowance for that same downstream suffix. -/
 private def enclosingDebits (regions : Array SharedRegion) (region : SharedRegion) :
     Array SharedBudgets.DebitId := Id.run do
   let mut debits := region.debits
@@ -770,34 +906,80 @@ private def recordRegionDebit (index : Nat) (debit : SharedBudgets.DebitId) : So
     let regions := (← get).regions
     next := parent.bind fun name => regions.findIdx? (·.node.name == name)
 
-/-- Optional incoming-edge proofs use the cumulative preparation slice.
+/-- Optional incoming-edge proofs draw on the downstream leaf allowance.
 Before clause allocation, run against the already inherited debit and record
 the new physical cost once. Every later clause inherits it, on success or
 failure. The temporary ledger is only an accounting view, not a fresh cap. -/
+private def underEdgeAllowance (ctx : SolveContext) (index : Nat) (action : TacticM α) :
+    SolveM (SharedBudgets.Outcome α × Nat) := do
+  let region := (← get).regions[index]!
+  if !region.owners.isEmpty then
+    return ← runAutomatic ctx.budgets (region.owners.map (·.2)) .preparation action
+  let regions := (← get).regions
+  let debits := enclosingDebits regions regions[index]!
+  let limit := verex.leafHeartbeats.get (← getOptions) * 1000
+  let some allowance := (← ctx.budgets.get).afterDebits limit debits
+    | throwError "a join lost its earlier preparation debit"
+  let pending ← IO.mkRef ({ owners := #[allowance] } : SharedBudgets.Ledger)
+  try
+    runAutomatic pending #[0] .preparation action (cacheOwners := some #[])
+  finally
+    let cost := (← pending.get).physical
+    if cost > 0 then
+      let (ledger, debit) := (← ctx.budgets.get).defer .preparation cost
+      ctx.budgets.set ledger
+      recordRegionDebit index debit
+
+/-- The points whose hooks wait at an arrival for the suffix's results
+(`activePoints`). They run on the suffix, so arrivals waiting at different
+points do not share it (`partitionArrivals`). -/
+private def arrivalPoints (region : SharedRegion) (arrival : SharedContinuations.Arrival) :
+    Array ProgramPointKey :=
+  (region.arrivalSteps[arrival.step]?.map (·.points)).getD #[]
+
+/-- What a class's shared suffix owes: the union of the clauses its arrivals
+owe, in order of arrival, and their provenance where they agree, else the
+region's; and, where the arrivals owe differently, whom its leaves answer
+for (`OwedAttribution`). -/
+private def classOwed (region : SharedRegion) (arrivals : Array SharedContinuations.Arrival) :
+    Option Provenance × Array ObligationRange × Option OwedAttribution :=
+  let steps := arrivals.filterMap (region.arrivalSteps[·.step]?)
+  if steps.isEmpty then (region.provenance, region.clauses, region.owed) else
+  let owing := steps.foldl (init := #[]) fun found step =>
+    (attributed step.owed step.provenance step.clauses).foldl
+      (fun found entry => if found.contains entry then found else found.push entry) found
+  let clauses := owing.foldl (init := #[]) fun found (_, clauses) =>
+    clauses.foldl (fun found range => if found.contains range then found else found.push range) found
+  let provenance := match owing[0]? with
+    | some (first, _) => if owing.all (·.1 == first) then first else region.provenance
+    | none => region.provenance
+  let attribution := if owing.size == 1 then none
+    else some { provenance, clauses, arrivals := owing }
+  (provenance, clauses, attribution)
+
+/-- Prepare the region's arrivals for their seal and prune the incoming
+edges of the classes that will share (`partitionArrivals`): an arrival that
+resumes alone walks its suffix as the default walk would, which refutes
+nothing before it. -/
 private def pruneShared (ctx : SolveContext) (index : Nat) : SolveM Unit := do
   let region := (← get).regions[index]!
-  if region.node.arrivals.size < 2 then return
+  let start ← IO.getNumHeartbeats
+  let node ← SharedContinuations.prepareArrivals region.node (← keptFacts)
+  modify fun s => { s with regions := s.regions.modify index ({ · with node }) }
+  charge "join preparation" start
+  if node.arrivals.size < 2 then return
+  let classes ← SharedContinuations.partitionArrivals (arrivalPoints region) node.arrivals
+  trace[verex.joinPruning] "{node.name}: {node.arrivals.size} arrivals in classes of {classes.map (·.size)}"
+  let shared := (classes.filter (·.size ≥ 2)).flatten
+  if shared.isEmpty then return
   let mut retained := #[]
-  for arrival in region.node.arrivals do
+  for arrival in node.arrivals do
+    -- Nothing new to refute since the fold.
+    if !shared.any (·.goal == arrival.goal) || (← node.unchanged arrival.goal) then
+      retained := retained.push arrival
+      continue
     let start ← IO.getNumHeartbeats
-    let (outcome, cost) ← if !region.owners.isEmpty then
-        runAutomatic ctx.budgets (region.owners.map (·.2)) .preparation
-          (proveUnreachable arrival.goal)
-      else do
-        let regions := (← get).regions
-        let debits := enclosingDebits regions regions[index]!
-        let limit := verex.leafHeartbeats.get (← getOptions) * 1000
-        let some allowance := (← ctx.budgets.get).afterDebits limit debits
-          | throwError "a join lost its earlier preparation debit"
-        let pending ← IO.mkRef ({ owners := #[allowance] } : SharedBudgets.Ledger)
-        try
-          runAutomatic pending #[0] .preparation (proveUnreachable arrival.goal) (cacheOwners := some #[])
-        finally
-          let cost := (← pending.get).physical
-          if cost > 0 then
-            let (ledger, debit) := (← ctx.budgets.get).defer .preparation cost
-            ctx.budgets.set ledger
-            recordRegionDebit index debit
+    let (outcome, cost) ← underEdgeAllowance ctx index (proveUnreachable arrival.goal)
     if cost > 0 then
       modify fun s => { s with pruningChecks := s.pruningChecks + 1 }
     match outcome with
@@ -806,32 +988,106 @@ private def pruneShared (ctx : SolveContext) (index : Nat) : SolveM Unit := do
         trace[verex.joinPruning] "removed incoming edge"
     | .exhausted =>
         retained := retained.push arrival
-        trace[verex.joinPruning] "kept incoming edge: preparation slice exhausted"
+        trace[verex.joinPruning] "kept incoming edge: allowance exhausted after {cost / 1000}k"
     | .failed failure =>
         retained := retained.push arrival
-        trace[verex.joinPruning] "kept incoming edge: {failure.toMessageData}"
+        trace[verex.joinPruning] "kept incoming edge after {cost / 1000}k: {failure.toMessageData}"
     charge "join feasibility" start
   modify fun s => { s with regions := s.regions.modify index fun current =>
     { current with node := { current.node with arrivals := retained } } }
 
-/-- The most recently allocated unsealed region has no pending descendants.
-Prove its continuation once, under the disjunction of its incoming contexts. -/
-private def resumeShared (ctx : SolveContext) : SolveM Bool := do
-  let some reverseIndex := (← get).regions.reverse.findIdx? (!·.node.sealed) | return false
-  let index := (← get).regions.size - reverseIndex - 1
+/-- The stored invariants of an arrival's memory, proved in its context by
+`verex_memory_invariants`: from the invariants of the memory the arrival
+wrote from, which the precondition states of the initial memory and an
+enclosing summary states of its memory row (the summary's hypothesis of
+`sealNode`), through the writes. A closed proof per arrival, or none when
+one arrival does not prove them: the summary then states nothing of its
+memory row, as before. -/
+private def proveStoredInvariants (ctx : SolveContext) (index : Nat)
+    (node : SharedContinuations.Node) : SolveM (Array Lean.Expr) := do
+  let shared := (← get).regions.map (·.node.name)
+  let mut proofs := #[]
+  for arrival in node.arrivals do
+    let some invariant ← SharedContinuations.storedInvariantOf? node arrival.arguments shared
+      | return #[]
+    let start ← IO.getNumHeartbeats
+    let (outcome, _) ← underEdgeAllowance ctx index <| arrival.goal.withContext do
+      let saved ← getGoals
+      let restoreCaches ← saveWalkCaches
+      try
+        let statement ← SharedContinuations.storedInvariantStatement invariant arrival.arguments.back!
+        let held ← mkFreshExprSyntheticOpaqueMVar statement
+        setGoals [held.mvarId!]
+        Lean.Elab.Tactic.withoutRecover do
+          evalTactic (← `(tactic| verex_memory_invariants))
+          evalTactic (← `(tactic| all_goals verex_assumption))
+        unless (← getUnsolvedGoals).isEmpty do throwError "the stored invariants are not established"
+        let proof ← instantiateMVars held
+        if proof.hasMVar || proof.hasSorry then throwError "the stored invariants need a closed proof"
+        pure proof
+      finally
+        setGoals saved
+        restoreCaches
+    charge "join invariants" start
+    match outcome with
+    | .done proof => proofs := proofs.push proof
+    | .exhausted => return #[]
+    | .failed failure =>
+        trace[verex.joinPruning] "stored invariants not proved at an arrival: {failure.toMessageData}"
+        return #[]
+  return proofs
+
+/-- The names of the regions enclosing `region`, innermost first. -/
+private def regionAncestors (regions : Array SharedRegion) (region : SharedRegion) :
+    Array Name := Id.run do
+  let mut ancestors := #[]
+  let mut parent := region.parent
+  for _ in [:regions.size] do
+    let some name := parent | break
+    ancestors := ancestors.push name
+    parent := (regions.find? (·.node.name == name)).bind (·.parent)
+  return ancestors
+
+/-- The innermost unsealed region no pending goal lies in, its own or a
+descendant's: all its arrivals are in. -/
+private def completeRegion? (ctx : SolveContext) : SolveM (Option Nat) := do
+  let s ← get
+  unless ctx.shared && s.regions.any (!·.node.sealed) do return none
+  let parents : Std.HashMap Name (Option Name) :=
+    s.regions.foldl (fun parents region => parents.insert region.node.name region.parent) {}
+  let mut busy : Std.HashSet Name := {}
+  for (goal, _) in s.pending do
+    let mut current := s.goalRegions[goal]?
+    for _ in [:s.regions.size] do
+      let some name := current | break
+      -- Its ancestors are busy already.
+      if busy.contains name then break
+      busy := busy.insert name
+      current := parents[name]?.join
+  let reverseIndex? := s.regions.reverse.findIdx? fun region =>
+    !region.node.sealed && !busy.contains region.node.name
+  return reverseIndex?.map (s.regions.size - · - 1)
+
+/-- The region at `index` is complete: no pending goal lies in it
+(`completeRegion?`), and `pruneShared` prepared its arrivals. Each class of
+arrivals agreeing on their ground skeleton (`partitionArrivals`) becomes a
+region of its own: a class of several proves the continuation once, under
+the disjunction of its incoming contexts; a single normal predecessor needs
+no relation or universal proof, and retaining its concrete state also avoids
+artificial joins at reads. -/
+private def resumeShared (ctx : SolveContext) (index : Nat) : SolveM Unit := do
   let region := (← get).regions[index]!
-  let start ← IO.getNumHeartbeats
-  -- A single normal predecessor needs no relation or universal proof.
-  -- Retaining its concrete state also avoids artificial joins at reads.
-  let single := region.node.arrivals.size == 1
-  let node ← if single then pure { region.node with sealed := true, finished := true }
-    else SharedContinuations.sealNode region.node
+  let classes ← SharedContinuations.partitionArrivals (arrivalPoints region) region.node.arrivals
+  let classes := if classes.isEmpty then #[#[]] else classes
   modify fun s => { s with
-    regions := s.regions.set! index { region with node := node }
+    regions := s.regions.extract 0 index ++
+      classes.map (fun arrivals => { region with node := { region.node with arrivals } }) ++
+      s.regions.extract (index + 1) s.regions.size
     activeRegion := region.parent
     activeOwners := region.owners
     activeDebits := region.debits
-    activeEntryOpened := false }
+    activeEntryOpened := false
+    activeOwed := region.owed }
   -- The enclosing continuation also benefits if this region has no normal
   -- exit. Retain its debit even when there will be no arrival to carry it.
   if let some parent := region.parent then
@@ -839,20 +1095,56 @@ private def resumeShared (ctx : SolveContext) : SolveM Bool := do
       if outer.node.name == parent then
         { outer with debits := mergeDebits outer.debits region.debits }
       else outer }
-  if let some summary := node.summary? then
-    let (_, goal) ← summary.introNP (node.summaryArguments.size + 1)
-    let goal ← SharedContinuations.unfold node goal
-    setGoals [goal]
-    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
-    queue (← getGoals) region.provenance region.clauses
-  else if single then
-    let goal := node.arrivals[0]!.goal
-    let goal ← SharedContinuations.unfold node goal
-    setGoals [goal]
-    normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
-    queue (← getGoals) region.provenance region.clauses
-  charge (if single then "single predecessor" else "join summary") start
-  return true
+  for position in [index : index + classes.size] do
+    let start ← IO.getNumHeartbeats
+    let node := (← get).regions[position]!.node
+    let single := node.arrivals.size == 1
+    let node ← if single then pure { node with sealed := true, finished := true }
+      else do
+        let node ← SharedContinuations.closeArrivals node
+        let proofs ← proveStoredInvariants ctx position node
+        SharedContinuations.sealNode node proofs ((← get).regions.map (·.node.name))
+    -- The invariant attempts' deferred debits reach the suffix's goals.
+    modify fun s => { s with
+      regions := s.regions.modify position ({ · with node })
+      activeDebits := s.regions[position]!.debits }
+    if let some summary := node.summary? then
+      let (_, goal) ← summary.introNP (node.summaryArguments.size + node.hypotheses + 1)
+      let goal ← SharedContinuations.unfold node goal
+      setGoals [goal]
+      normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[]
+      -- The suffix of a class of several is shared work: its clauses take
+      -- owners and link the relation's rows at their leaves. It continues
+      -- what every arrival decided before the fold, and owes what its
+      -- arrivals owe, which they share.
+      let points := node.arrivals[0]?.map (arrivalPoints region) |>.getD #[]
+      let (provenance, clauses, owed) := classOwed region node.arrivals
+      modify fun s => { s with activeSummary := true, activeOwners := region.owners,
+                               activeDecisions := region.decisions, activePoints := points,
+                               activeOwed := owed }
+      queue (← getGoals) provenance clauses
+    else if single then
+      -- The exit rule's form: the arguments and the conditions passed on
+      -- are normal already (`exitStep`).
+      let arrival := node.arrivals[0]!
+      let goal ← SharedContinuations.unfoldArrival node arrival
+      let goal ← bindStateEntry goal arrival.arguments.back!
+      setGoals [goal]
+      normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization
+        (arrival.arguments ++ region.conditions)
+      -- The node's pins were just lifted: the equations they held
+      -- substitute once for the suffix, as the default walk substituted
+      -- them where they arose.
+      evalTactic (← `(tactic| all_goals verex_subst_equations))
+      -- The predecessor's own path continues: under a summary where the
+      -- arrival came from inside one, with what it owes and decided.
+      let some step := region.arrivalSteps[arrival.step]?
+        | throwError "an arrival lost its step"
+      modify fun s => { s with activeSummary := arrival.summarized, activeOwners := step.owners,
+                               activeDecisions := step.decisions, activePoints := step.points,
+                               activeOwed := step.owed }
+      queue (← getGoals) step.provenance step.clauses
+    charge (if single then "single predecessor" else "join summary") start
 
 /-- Successor certificates discharge predecessor holes. No open summary may
 be silently dropped, including one containing a reported failed obligation. -/
@@ -1106,6 +1398,30 @@ private def unaffectedParts (target : Lean.Expr) (affected : FVarIdSet) : Array 
     if !read && !children.isEmpty && !e.hasLooseBVars then parts := parts.push e
   return parts
 
+/-- The locals of a fold context that sharing reads, which the walk keeps
+until the node's arrivals are in: the captures the arrivals are compared at
+(`commonCaptures`), and the locals of the facts over a capture or a local
+definition matched by identity, which the seal keeps as common context
+(`commonLocals`). A frame equation between other locals substitutes on the
+walk as without sharing. -/
+private def foldPins (node : SharedContinuations.Node) (definitions : Std.HashSet FVarId) :
+    MetaM FVarIdSet := do
+  let lctx ← getLCtx
+  let read (id : FVarId) : Bool := node.abstracted.contains id || definitions.contains id
+  let mut pins : FVarIdSet := {}
+  for id in node.abstracted do
+    if let some decl := lctx.find? id then
+      unless decl.isLet do pins := pins.insert id
+  for decl in lctx do
+    if decl.isImplementationDetail || decl.isLet then continue
+    unless ← isProp decl.type do continue
+    let type ← instantiateMVars decl.type
+    let mentioned := (collectFVars {} type).fvarIds
+    unless mentioned.any read do continue
+    for id in mentioned do
+      if let some other := lctx.find? id then
+        unless other.isLet do pins := pins.insert id
+  return pins
 /-- A bind rule: a straight-line action keeps its continuation in place,
 since it reaches it on one path; a branching one has it folded. -/
 private def bindStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
@@ -1121,17 +1437,34 @@ private def bindStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
         let post := (← instantiateMVars (← unfolded.getType)).getArg! 4
         return post.isFVar || regions.any (post.isAppOf ·.node.name)
       else pure false
+    -- A node needs two normal exits to join, and a suffix to share.
     let shared ← if ctx.shared && !named then do
-        if ← SharedContinuations.mayJoin normal[0]! then
-          SharedContinuations.fold? unfolded
+        if ← SharedContinuations.mayJoin normal[0]! <&&> unfolded.withContext
+            (SharedContinuations.carriesProgram (regions.map (·.node.name)) normal[1]!) then
+          SharedContinuations.fold? unfolded (← get).opaqueDefinitions
         else pure none
       else pure none
     let (folded, continuation?) ← match shared with
       | some (folded, node) => do
+          -- The application is bound as a local definition, as the default
+          -- walk binds its continuation (`foldContinuation`): normalization
+          -- does not enter it at each step until an arrival reads it.
+          let (folded, named?) ← foldContinuation folded
+          let node ← match named? with
+            | some id => folded.withContext do
+                pure { node with origin := node.origin.insert id (← instantiateMVars (← id.getType)) }
+            | none => pure node
+          -- A branch on the way to the node does not rewrite the context
+          -- the node is folded in: its arrivals then share that context,
+          -- with what each branch decided as an equation.
+          let pins ← unfolded.withContext (foldPins node (← get).opaqueDefinitions)
+          (← targetState).sharedPins.modify fun pinned => pins.foldl (·.insert ·) pinned
           modify fun s => { s with
             regions := s.regions.push
-              { node, parent := s.activeRegion, provenance, clauses,
-                owners := s.activeOwners, debits := s.activeDebits }
+              { node, parent := s.activeRegion, provenance, clauses, owed := s.activeOwed,
+                owners := s.activeOwners, debits := s.activeDebits,
+                decisions := s.activeDecisions, points := s.activePoints, pins,
+                conditions := normal.extract 2 4 }
             activeRegion := some node.name }
           pure (folded, none)
       | none => if named then pure (unfolded, none) else foldContinuation unfolded
@@ -1207,6 +1540,31 @@ private def unrollStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
   charge "unroll step" stageStart
   return true
 
+/-- The propositions of a goal's hypotheses. -/
+private def propositionsOf (goal : MVarId) : MetaM (Std.HashSet Lean.Expr) := goal.withContext do
+  let mut propositions := {}
+  for fvarId in ← goal.getNondepPropHyps do
+    propositions := propositions.insert (← instantiateMVars (← fvarId.getType))
+  return propositions
+
+/-- `normalizeContextStage` on each goal, over its hypotheses whose
+proposition is not among `before`; a goal it fails on stays as it was. -/
+private def normalizeNewHypotheses (before : Std.HashSet Lean.Expr) : TacticM Unit := do
+  let mut normalized := #[]
+  for goal in ← getGoals do
+    setGoals [goal]
+    let current ← goal.withContext do
+      let mut current : FVarIdSet := {}
+      for fvarId in ← goal.getNondepPropHyps do
+        unless before.contains (← instantiateMVars (← fvarId.getType)) do
+          current := current.insert fvarId
+      pure current
+    let saved ← saveState
+    try normalizeContextStage current.contains
+    catch _ => saved.restore
+    normalized := normalized ++ (← getGoals).toArray
+  setGoals normalized.toList
+
 /-- A loop: unrolled where its site has a bound, else by its invariant,
 with the loop hypothesis stating it at each back edge and the iteration
 assuming it. -/
@@ -1258,8 +1616,10 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       if e == ensures then some (mkFVar continuation) else none
     pure (continuation, ← goal.replaceTargetDefEq abstracted)
   let arguments := arguments.set! 8 (mkFVar continuation)
+  modify fun s => { s with opaqueDefinitions := s.opaqueDefinitions.insert continuation }
   if ctx.profile then
     modify fun s => { s with continuations := s.continuations.folded continuation true }
+  let before ← propositionsOf goal
   let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_loopAt)
     (arguments.extract 0 8 ++ #[invariant] ++ arguments.extract 8 11)
   let subgoals ← goal.withContext (goal.apply rule)
@@ -1305,16 +1665,26 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       evalTactic (← `(tactic| all_goals verex_split_hypotheses))
       evalTactic (← `(tactic| all_goals verex_subst_vars))
       marks := marks.push ("split/subst 1", ← IO.getNumHeartbeats)
-      -- The whole context once, so that every leaf of the iteration
-      -- inherits normal hypotheses, with the equations the
-      -- normalization exposes substituted.
-      evalTactic (← `(tactic| all_goals (try verex_normalize_context_stage)))
-      marks := marks.push ("normalize 2", ← IO.getNumHeartbeats)
-      evalTactic (← `(tactic| all_goals verex_split_hypotheses))
-      evalTactic (← `(tactic| all_goals verex_subst_vars))
-      marks := marks.push ("split/subst 2", ← IO.getNumHeartbeats)
-      evalTactic (← `(tactic| all_goals (try verex_normalize_context_stage)))
-      marks := marks.push ("normalize 3", ← IO.getNumHeartbeats)
+      -- The rule's part is charged before the context stage, which an
+      -- exhausted budget would otherwise leave unattributed.
+      charge "loop" stageStart
+      let contextStart ← IO.getNumHeartbeats
+      -- The hypotheses the rule introduced or rewrote, so that every leaf of
+      -- the iteration inherits them normal, with the equations the
+      -- normalization exposes substituted. The others are in the walk's
+      -- form already.
+      let contextMarks ← IO.mkRef marks
+      let mark (label : String) : TacticM Unit := do
+        contextMarks.modify (·.push (label, ← IO.getNumHeartbeats))
+      timedStep "loop context" do
+        normalizeNewHypotheses before
+        mark "normalize 2"
+        evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+        evalTactic (← `(tactic| all_goals verex_subst_vars))
+        mark "split/subst 2"
+        normalizeNewHypotheses before
+        mark "normalize 3"
+      marks ← contextMarks.get
       if ctx.debug then
         let mut previous := stepStart
         let mut report := m!"loop step at site {site}:"
@@ -1328,8 +1698,8 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
       setGoals [entryHolds]
       normalizeGoals ctx
       queue (← getGoals) (some (.loopEntry (ctx.loopKey site))) #[]
+      charge "loop context" contextStart
   | _ => throwError "the loop rule did not produce its two obligations"
-  charge "loop" stageStart
   return true
 
 /-- An assertion, a cut: the condition is owed at its site, and assumed
@@ -1641,9 +2011,12 @@ private def inlineRefinement (ctx : SolveContext) (step : SolveStep) (refinesPro
         (body.getArg! 6) (target.getArg! 6) do
       charge "inline" stageStart
       return
-  evalTactic (← `(tactic| try simp only [$lemmas,*, VerexIR.Proofs.Denote.Function.denoteWith,
-    VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
-  normalizeGoals ctx
+  -- The continuation, state, frame and arguments of the call are normal: only
+  -- the body is new.
+  let normal ← next.withContext do
+    #[target.getArg! 4, target.getArg! 5, target.getArg! 6, body.getArg! 6].mapM instantiateMVars
+  unfoldInlined lemmas (mkIdent ``VerexIR.Proofs.Denote.Function.denoteWith) normal
+  normalizeGoals ctx normal
   queue (← rewriteEquations ctx.equations (← getGoals)) provenance clauses
   charge "inline" stageStart
 
@@ -1679,10 +2052,13 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
       pure (← goal.withContext do pure (treeSize (← instantiateMVars (← goal.getType)) 100000000))
     else pure 0
   let unfoldStart ← IO.getNumHeartbeats
-  evalTactic (← `(tactic| try simp only [$lemmas,*, VerexIR.Proofs.Denote.Function.denote,
-    VerexIR.Proofs.Denote.NRow.nil_append, VerexIR.Proofs.Denote.NRow.cons_append]))
+  -- The continuation, state, frame and arguments of the call are normal: only
+  -- the body is new.
+  let normal ← goal.withContext do
+    #[target.getArg! 4, target.getArg! 5, target.getArg! 6, action.getArg! 8].mapM instantiateMVars
+  unfoldInlined lemmas (mkIdent ``VerexIR.Proofs.Denote.Function.denote) normal
   let normalizeStart ← IO.getNumHeartbeats
-  normalizeGoals ctx
+  normalizeGoals ctx normal
   if ctx.debug then
     let sizeAfter ← (← getGoals).foldlM (init := 0) fun total goal => do
       pure (total + (← goal.withContext do
@@ -2056,6 +2432,8 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         -- are: the ensures, the frame, and that the call returned.
         let part := identifierPart calleeName
         let premises := [s!"{part}_ensures", s!"{part}_frame", s!"{part}_returns"].map Name.mkSimple
+        -- The frame stays a fact (`TargetState.keptFacts`).
+        noteKeptPremiseNames [premises[1]!]
         namePremises subgoal (if strict || contractForms then
           [premises[2]!, premises[0]!, premises[1]!] else premises)
       else pure subgoal
@@ -2086,26 +2464,27 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
 
 A contract-free callee's summary is its weakest-precondition characterisation:
 `∀ args ensures aborts initial, Ψ → wp (call args) ensures aborts initial`,
-where `Ψ` conjoins the leaves the walk leaves on the callee's body with the
-continuations opaque, one per path. The walk's proof term proves it, checked
+where `args` are the scalars the arguments split into and `Ψ` conjoins the
+leaves the walk leaves on the callee's body with the continuations opaque,
+one per path. The walk's proof term proves it, checked
 by the kernel once; a call applies it as `applyCallTheorem` applies a
 contract, and its conjuncts, instantiated at the call, are the leaves an
 inlined body would give. -/
 
-/-- A derived summary: the theorems its proof needs, the hidden theorems it
-uses, then the summary itself, each by name, statement and proof; and its
-number of conjuncts. -/
+/-- A derived summary: its theorem, declared before the module's proofs run
+(`deriveModuleSummary`), and its number of conjuncts. -/
 structure DerivedSummary where
-  declarations : Array (Name × Lean.Expr × Lean.Expr)
+  name : Name
   conjuncts : Nat
 
 /-- The summaries derived in this process, by compiled callee; none where the
-callee's walk does not qualify. Shared by the targets proved at once. -/
+callee's walk does not qualify. Written before any proof of the module runs,
+read by every call. -/
 initialize derivedSummaries : Std.Mutex (Std.HashMap Name (Option DerivedSummary)) ←
   Std.Mutex.new {}
 
 /-- Record what a callee's summary is. -/
-private def recordSummary (compiled : Name) (summary : Option DerivedSummary) : BaseIO Unit :=
+def recordDerivedSummary (compiled : Name) (summary : Option DerivedSummary) : BaseIO Unit :=
   derivedSummaries.atomically (modify (·.insert compiled summary))
 
 /-- The traversal a summary's walk runs from a state to its final state, set
@@ -2115,7 +2494,7 @@ initialize summaryTraversal : IO.Ref (SolveContext → SolveState → TacticM So
 
 /-- Whether a compiled callee's form admits a summary: not generic, without
 a loop, not returning a reference. -/
-private def summaryForm (compiled : Name) : CoreM Bool := do
+def summaryForm (compiled : Name) : CoreM Bool := do
   let env ← getEnv
   let value (part : Name) := (env.find? (compiled.getPrefix ++ part)).bind (·.value?)
   let some row := value `row | return false
@@ -2132,160 +2511,117 @@ private partial def leadingBinders : Lean.Expr → Nat
   | .mdata _ b => leadingBinders b
   | _ => 0
 
-/-- Declare a summary's theorems missing from the environment, checked at
-once, under the theorem being proved, as its auxiliary theorems are: the
-summary as declared here, recorded for the callee `compiled`. -/
-private def declareSummary (compiled : Name) (summary : DerivedSummary) :
-    TacticM DerivedSummary := do
-  let env ← getEnv
-  if summary.declarations.all fun (name, _, _) => env.contains name then return summary
-  let owner := (← Term.getDeclName?).getD .anonymous
-  let mut renamed : Std.HashMap Name Name := {}
-  let mut declared := #[]
-  for (name, type, value) in summary.declarations do
-    let rename (e : Lean.Expr) := e.replace fun
-      | .const constant levels => renamed[constant]?.map (mkConst · levels)
-      | _ => none
-    let (type, value) := (rename type, rename value)
-    if (← getEnv).contains name then
-      declared := declared.push (name, type, value)
-      continue
-    let mut fresh := owner ++ `_summary
-    let mut index := 1
-    while (← getEnv).contains fresh do
-      fresh := (owner ++ `_summary).appendIndexAfter index
-      index := index + 1
-    withOptions (Elab.async.set · false) do
-      addDecl (.thmDecl { name := fresh, levelParams := [], type, value })
-    renamed := renamed.insert name fresh
-    declared := declared.push (fresh, type, value)
-  let summary := { summary with declarations := declared }
-  recordSummary compiled (some summary)
-  return summary
+/-- The scalar locals a callee's arguments are, as the walk splits a
+row-valued local (`verex_split_hypotheses`): a native pair into its
+components, named by position as the walk names them, a unit tail its one
+value, any other value one local; with the arguments they make up. A
+summary is stated over them, so that its conjuncts speak of the arguments
+a call instantiates them with, where a local the walk splits would leave
+its components unrelated to the call. -/
+private partial def withScalarArguments (name : Name) (index : Nat) (type : Lean.Expr)
+    (k : Array Lean.Expr → Lean.Expr → TacticM α) : TacticM α := do
+  let carrier ← whnfD type
+  match carrier with
+  | .const ``PUnit levels => k #[] (mkConst ``PUnit.unit levels)
+  | .app (.app (.const ``Prod levels) head) tail =>
+      unless (runtimeValueMentions carrier).isEmpty do
+        return ← withLocalDeclD name type fun x => k #[x] x
+      let tailUnit := (← whnfD tail).isConstOf ``PUnit
+      let headName := if index == 0 && tailUnit then name else name.appendIndexAfter index
+      withScalarArguments headName 0 head fun headLocals headValue =>
+        withScalarArguments name (index + 1) tail fun tailLocals tailValue =>
+          k (headLocals ++ tailLocals) (mkApp4 (mkConst ``Prod.mk levels) head tail headValue tailValue)
+  | _ => withLocalDeclD name type fun x => k #[x] x
 
-/-- The auxiliary theorems of the theorem being proved that a proof uses,
-those they use first: declared under that theorem, a summary used by
-another one declares them again. -/
-private def auxiliaryTheorems (proof : Lean.Expr) : TacticM (Array (Name × Lean.Expr × Lean.Expr)) := do
-  let owner := (← Term.getDeclName?).getD .anonymous
-  let env ← getEnv
-  let mut found := #[]
-  let mut visited : NameSet := {}
-  let mut pending := proof.getUsedConstants.toList.map (·, false)
-  while let (name, expanded) :: rest := pending do
-    pending := rest
-    if expanded then
-      if let some (.thmInfo info) := env.find? name then
-        found := found.push (name, info.type, info.value)
-      continue
-    if visited.contains name || !owner.isPrefixOf name || name == owner then continue
-    visited := visited.insert name
-    let some (.thmInfo info) := env.find? name | continue
-    pending := info.value.getUsedConstants.toList.map (·, false) ++ [(name, true)] ++ pending
-  return found
-
-/-- Derive the summary of the compiled callee of the call `goal`, whose
-meaning `meaning` reads only the walk's starting context: the walk of its
-body there, with fresh arguments, continuations and state, within
-`verex.summaryHeartbeats`. None where the walk does not end within the
-bounds. -/
-private def deriveSummary (ctx : SolveContext) (base : LocalContext × LocalInstances)
-    (goal : MVarId) (compiled : Name) (handle : Lean.Expr) (calleeName : String)
-    (theoremProof proofType meaning : Lean.Expr) : TacticM (Option DerivedSummary) := do
-  let target ← goal.withContext (instantiateMVars (← goal.getType))
-  let types ← goal.withContext do
-    #[(target.getArg! 3).consumeMData.appArg!, target.getArg! 4, target.getArg! 5,
-      target.getArg! 6].mapM fun e => do instantiateMVars (← inferType e)
-  unless types.all fun type => (collectFVars {} type).fvarIds.all base.1.contains do
-    return none
-  let callerState ← targetState
-  let sctx : SolveContext := { ctx with
-    summarizing := ctx.summarizing.push compiled
-    «profile» := false
-    preparesPaths := false }
-  let derive : TacticM (Option DerivedSummary) :=
-    withLCtx base.1 base.2 do
-    withLocalDeclD `args types[0]! fun args => withLocalDeclD `ensures types[1]! fun ensures =>
-    withLocalDeclD `aborts types[2]! fun aborts => withLocalDeclD `initial types[3]! fun initial => do
-      let statement := mkAppN target.getAppFn
-        ((target.getAppArgs.extract 0 3) ++ #[mkApp meaning args, ensures, aborts, initial])
-      let root ← mkFreshExprSyntheticOpaqueMVar statement
-      let rootContext ← getLCtx
-      setGoals [root.mvarId!]
-      let first : SolveStep :=
-        { goal := root.mvarId!, provenance := none, clauses := #[], stageStart := ← IO.getNumHeartbeats }
-      let ((), entered) ← (inlineCompiled sctx first handle calleeName theoremProof proofType).run
-        ({ pending := #[] } : SolveState)
-      let final ← (← summaryTraversal.get) sctx entered
-      let mut leaves := #[]
-      for (leaf, _) in final.handed do
-        unless (← leaf.isAssigned) || leaves.contains leaf do leaves := leaves.push leaf
-      if leaves.size > verex.summaryLeaves.get (← getOptions) then return none
-      -- Each leaf over the locals its path introduced.
-      let mut conjuncts := #[]
-      let mut introduced := #[]
-      for leaf in leaves do
-        let (conjunct, locals) ← leaf.withContext do
-          let leafTarget ← instantiateMVars (← leaf.getType)
-          if (leafTarget.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then
-            throwError "a summary's path does not end"
-          let locals := (← getLCtx).foldl (init := #[]) fun found decl =>
-            if rootContext.contains decl.fvarId || decl.isImplementationDetail then found
-            else found.push decl.toExpr
-          pure (← instantiateMVars (← mkForallFVars locals leafTarget), locals)
-        unless !conjunct.hasMVar && (collectFVars {} conjunct).fvarIds.all rootContext.contains do
-          return none
-        conjuncts := conjuncts.push conjunct
-        introduced := introduced.push locals
-      let summary := if conjuncts.isEmpty then mkConst ``True
-        else conjuncts.pop.foldr mkAnd conjuncts.back!
-      withLocalDeclD `summary summary fun premise => do
-        -- Each leaf is its conjunct at the locals of its path.
-        let mut rest := premise
-        for (leaf, index) in leaves.zipIdx do
-          let proof ← if index + 1 == leaves.size then pure rest
-            else mkAppM ``And.left #[rest]
-          if index + 1 < leaves.size then rest ← mkAppM ``And.right #[rest]
-          let arguments ← leaf.withContext do
-            introduced[index]!.filterM fun local_ => do return !(← local_.fvarId!.getDecl).isLet
-          leaf.assign (mkAppN proof arguments)
-        let proof ← instantiateMVars root
-        if proof.hasMVar || proof.hasSorry then return none
-        let parameters := #[args, ensures, aborts, initial]
-        let statement ← mkForallFVars parameters (← mkArrow summary statement)
-        let value ← mkLambdaFVars (parameters.push premise) proof
-        let some locals ← closingLocals (mkApp statement value) | return none
-        let type ← mkForallFVars locals statement
-        let value ← mkLambdaFVars locals value
-        if type.hasFVar || value.hasFVar || type.hasLevelParam || value.hasLevelParam then
-          return none
-        let used ← auxiliaryTheorems value
-        -- Named where it is declared.
-        let summary : DerivedSummary := {
-          declarations := used.push (compiled.getPrefix ++ `summary, type, value)
-          conjuncts := conjuncts.size }
-        return some (← declareSummary compiled summary)
-  -- The walk keeps a target state of its own, sharing the caller's hidden
-  -- theorems.
-  let key := (← getEnv).asyncPrefix?.getD .anonymous
-  let fresh ← TargetState.new
-  let fresh : TargetState := { fresh with
-    hiddenTheorems := callerState.hiddenTheorems
-    hiddenCount := callerState.hiddenCount
-    hiddenStatements := callerState.hiddenStatements
-    proofName := callerState.proofName }
-  let goals ← getGoals
-  let saved ← Tactic.saveState
-  let result ← tryCatchRuntimeEx
-    (do
-      modifyEnv (targetStateExt.setState · (some (key, fresh)))
-      withBudget (verex.summaryHeartbeats.get (← getOptions) * 1000) derive)
-    fun _ => pure none
-  match result with
-  | some _ => modifyEnv (targetStateExt.setState · (some (key, callerState)))
-  | none => saved.restore
-  setGoals goals
-  return result
+/-- The walk deriving the summary of the compiled callee `compiled` in the
+current context, the root: its body with fresh arguments
+(`withScalarArguments`), continuations and state, the call's shape being
+`wpHead wpImplicit (meaning args) ensures aborts initial` at the
+`types` of the arguments, continuations and state. The summary's closed
+statement and proof with its number of conjuncts, or why the walk refuses
+one. -/
+private def summaryWalk (ctx : SolveContext) (compiled : Name) (handle : Lean.Expr)
+    (calleeName : String) (theoremProof proofType : Lean.Expr) (types : Array Lean.Expr)
+    (wpHead : Lean.Expr) (wpImplicit : Array Lean.Expr) (meaning : Lean.Expr) :
+    TacticM (Except String (Lean.Expr × Lean.Expr × Nat)) := do
+  withScalarArguments `args 0 types[0]! fun scalars args =>
+  withLocalDeclD `ensures types[1]! fun ensures =>
+  withLocalDeclD `aborts types[2]! fun aborts => withLocalDeclD `initial types[3]! fun initial => do
+    let parameters := scalars ++ #[ensures, aborts, initial]
+    (← targetState).summaryParameters.modify
+      (parameters.foldl (fun found x => found.insert x.fvarId!) ·)
+    let statement := mkAppN wpHead (wpImplicit ++ #[mkApp meaning args, ensures, aborts, initial])
+    let root ← mkFreshExprSyntheticOpaqueMVar statement
+    let rootContext ← getLCtx
+    setGoals [root.mvarId!]
+    let first : SolveStep :=
+      { goal := root.mvarId!, provenance := none, clauses := #[], stageStart := ← IO.getNumHeartbeats }
+    let ((), entered) ← (inlineCompiled ctx first handle calleeName theoremProof proofType).run
+      ({ pending := #[] } : SolveState)
+    let final ← (← summaryTraversal.get) ctx entered
+    let mut leaves := #[]
+    let origins ← (← targetState).leafOrigins.get
+    for (leaf, _) in final.handed do
+      if (← leaf.isAssigned) || leaves.contains leaf then continue
+      -- An open obligation of the callee's own (a precondition of a call it
+      -- makes, a module invariant after its write, an assertion, a loop
+      -- invariant, ...) is named by its provenance and clauses, which the
+      -- call's do not carry: the callee inlines, and the failure keeps its
+      -- name. A summary states only what the callee's return and abort
+      -- continuations owe.
+      if let some (provenance, clauses) := origins[leaf]? then
+        unless (provenance matches none | some .returns) && clauses.isEmpty do
+          return .error "a path owes an obligation of the callee's own"
+      leaves := leaves.push leaf
+    if leaves.size > verex.summaryLeaves.get (← getOptions) then
+      return .error s!"{leaves.size} paths"
+    -- Each leaf over the locals its path introduced.
+    let mut conjuncts := #[]
+    let mut introduced := #[]
+    for leaf in leaves do
+      let (conjunct, locals) ← leaf.withContext do
+        let leafTarget ← instantiateMVars (← leaf.getType)
+        if (leafTarget.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then
+          throwError "a summary's path does not end"
+        let locals := (← getLCtx).foldl (init := #[]) fun found decl =>
+          if rootContext.contains decl.fvarId || decl.isImplementationDetail then found
+          else found.push decl.toExpr
+        pure (← instantiateMVars (← mkForallFVars locals leafTarget), locals)
+      unless !conjunct.hasMVar && (collectFVars {} conjunct).fvarIds.all rootContext.contains do
+        return .error "a path's leaf is not over the root context"
+      -- A conjunct stating a function value's behavior, or reading a
+      -- call's target (`behaviorPredicates`), says nothing a call can use:
+      -- there, the value may be a literal closure whose body the walk
+      -- follows, and a call site does not fall back to inlining.
+      if (conjunct.find? fun e => behaviorPredicates.any e.isConstOf).isSome then
+        return .error "a path states a function value's behavior"
+      conjuncts := conjuncts.push conjunct
+      introduced := introduced.push locals
+    let summary := if conjuncts.isEmpty then mkConst ``True
+      else conjuncts.pop.foldr mkAnd conjuncts.back!
+    withLocalDeclD `summary summary fun premise => do
+      -- Each leaf is its conjunct at the locals of its path.
+      let mut rest := premise
+      for (leaf, index) in leaves.zipIdx do
+        let proof ← if index + 1 == leaves.size then pure rest
+          else mkAppM ``And.left #[rest]
+        if index + 1 < leaves.size then rest ← mkAppM ``And.right #[rest]
+        let arguments ← leaf.withContext do
+          introduced[index]!.filterM fun local_ => do return !(← local_.fvarId!.getDecl).isLet
+        leaf.assign (mkAppN proof arguments)
+      let proof ← instantiateMVars root
+      if proof.hasMVar || proof.hasSorry then return .error "a path's proof is open"
+      let statement ← mkForallFVars parameters (← mkArrow summary statement)
+      let value ← mkLambdaFVars (parameters.push premise) proof
+      let some locals ← closingLocals (mkApp statement value)
+        | return .error "the statement depends on a local definition"
+      -- The root's binders are instantiated here: a theorem's are at its end.
+      let type ← instantiateMVars (← mkForallFVars locals statement)
+      let value ← instantiateMVars (← mkLambdaFVars locals value)
+      if type.hasFVar || value.hasFVar || type.hasLevelParam || value.hasLevelParam then
+        return .error "the statement is not closed"
+      if type.hasMVar || value.hasMVar then return .error "the statement is open"
+      return .ok (type, value, conjuncts.size)
 
 /-- A call of a contract-free callee by its derived summary, where one
 qualifies: the summary's conjuncts at the call's arguments and
@@ -2295,7 +2631,8 @@ private def applyCallSummary (ctx : SolveContext) (step : SolveStep) (handle : L
     (calleeName : String) (theoremProof proofType : Lean.Expr) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
   let some base := ctx.base? | return false
-  if ctx.handOver || ctx.shared || !ctx.unrolls.isEmpty || !ctx.points.isEmpty then return false
+  if ctx.handOver || (← get).activeSummary || !ctx.unrolls.isEmpty || !ctx.points.isEmpty then
+    return false
   let .const compiled _ := (proofType.getArg! 2).appArg! | return false
   if ctx.summarizing.contains compiled then return false
   let target ← goal.withContext (instantiateMVars (← goal.getType))
@@ -2309,60 +2646,43 @@ private def applyCallSummary (ctx : SolveContext) (step : SolveStep) (handle : L
     return false
   if ← goal.withContext (ctx.invariants.anyM fun (_, function, _) => isDefEq function handle) then
     return false
-  let derive : SolveM (Option DerivedSummary) := do
-    let context ← readThe Core.Context
-    let allowance := verex.summaryHeartbeats.get (← getOptions) * 1000
-    let limited := context.maxHeartbeats != 0 &&
-      context.initHeartbeats + context.maxHeartbeats < (← IO.getNumHeartbeats) + allowance
-    let start ← IO.getNumHeartbeats
-    let summary ← deriveSummary ctx base goal compiled handle calleeName theoremProof proofType
-      meaning
-    charge "summarize" start
-    -- A walk the target's own budget stopped says nothing of the callee.
-    if summary.isNone && !limited then recordSummary compiled none
-    return summary
-  let known ← derivedSummaries.atomically get
-  let (summary, fresh) ← match known[compiled]? with
-    | some (some summary) =>
-        try pure (some (← declareSummary compiled summary), false)
-        catch _ => pure (← derive, true)
-    | some none => return false
-    | none =>
-        unless ← summaryForm compiled do
-          recordSummary compiled none
-          return false
-        pure (← derive, true)
-  let some summary := summary | return false
+  -- Derived before the module's proofs (`deriveModuleSummary`); a callee
+  -- without one inlines.
+  let some (some summary) := (← derivedSummaries.atomically get)[compiled]? | return false
   -- The summary at the call: its context's locals by unification with the
   -- call, or the caller's facts.
-  let instantiate (summary : DerivedSummary) : SolveM (Option MVarId) := do
+  let instantiate (summary : DerivedSummary) : SolveM (Except MessageData MVarId) := do
     let saved ← Tactic.saveState
     let goal ← getMainGoal
     let premise? ← goal.withContext do
-      let (arguments, _, conclusion) ← forallMetaTelescope (← inferType (mkConst summary.declarations.back!.1))
-      unless ← isDefEq conclusion (← instantiateMVars (← goal.getType)) do return none
+      let (arguments, _, conclusion) ← forallMetaTelescope (← inferType (mkConst summary.name))
+      unless ← isDefEq conclusion (← instantiateMVars (← goal.getType)) do
+        return .error m!"the summary of `{calleeName}` does not match the call:\n{conclusion}\n\
+          {← instantiateMVars (← goal.getType)}"
       for argument in arguments.pop do
         let .mvar id ← instantiateMVars argument | continue
         let some local_ ← findLocalDeclWithType? (← instantiateMVars (← id.getType))
-          | return none
+          | return .error m!"the summary of `{calleeName}` needs a hypothesis the call lacks: \
+              {← instantiateMVars (← id.getType)}"
         id.assign (mkFVar local_)
       let premise ← mkFreshExprSyntheticOpaqueMVar
         (← instantiateMVars (← inferType arguments.back!))
       arguments.back!.mvarId!.assign premise
-      goal.assign (← instantiateMVars (mkAppN (mkConst summary.declarations.back!.1) arguments))
-      pure (some premise.mvarId!)
-    if premise?.isNone then saved.restore
+      goal.assign (← instantiateMVars (mkAppN (mkConst summary.name) arguments))
+      pure (.ok premise.mvarId!)
+    if premise?.isOk then return premise?
+    saved.restore
     return premise?
   setGoals [goal]
   let values := action.getAppArgs.push (target.getArg! 6)
   let held ← holdContinuations #[target.getArg! 4, target.getArg! 5]
+  -- A call whose telescope lacks a hypothesis of the summary, or whose
+  -- shape is not the statement's, inlines.
   let premise ← match ← instantiate summary with
-    | some premise => pure premise
-    | none =>
-        if fresh then return false
-        let some summary ← derive | return false
-        let some premise ← instantiate summary | return false
-        pure premise
+    | .ok premise => pure premise
+    | .error reason =>
+        if ctx.profile then logInfo reason
+        return false
   -- One goal per conjunct.
   let mut conjuncts := #[]
   let mut rest := premise
@@ -2513,76 +2833,6 @@ private def allocateOwners (ctx : SolveContext) (goal : MVarId)
     prepaidOwners := if debits.isEmpty then s.prepaidOwners
       else owners.foldl (fun found owner => found.insert owner.2) s.prepaidOwners }
 
-/-- Prepare one completed region before its independent clauses split. The
-initial common work is certificate bounds and requested map-position facts.
-It has a cumulative slice of each clause's existing allowance; a failed slice
-is rolled back without refunding its debit. -/
-private def prepareAutomatic (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
-  unless ctx.shared && (← get).activeOwners.isEmpty do return false
-  let { goal, provenance, clauses, stageStart, .. } := step
-  let target ← goal.withContext (instantiateMVars (← goal.getType))
-  -- A write's aggregate expands into independent source invariants. Let
-  -- its structural rule expose them before allocating their owners; a false
-  -- invariant must not exhaust the allowance of the other stored values.
-  if (← writesStoredInvariants goal) ||
-      (target.isArrow && target.bindingBody!.isAppOfArity
-        ``VerexIR.Proofs.Denote.MemoryInvariants 4) then return false
-  if (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then return false
-  let regions := (← get).regions
-  if (target.find? fun term => regions.any (term.isAppOf ·.node.name)).isSome then return false
-  if ← goal.withContext do
-      (collectFVars {} target).fvarIds.anyM fun id => do
-        let decl ← id.getDecl
-        return decl.isLet && decl.userName == continuationName
-    then return false
-  -- A call's result binder can precede several source clauses. Introduce
-  -- that structural binder before assigning their independent owners. A
-  -- quantifier inside a marker remains in its clause's single leaf attempt.
-  if clauses.isEmpty && target.isForall &&
-      (target.find? (·.isAppOf ``VerexIR.Proofs.Obligation)).isSome then return false
-  -- A joined row is abstract: decoding its slots can wrap several source
-  -- clauses in Option.elim. Distribute that structural wrapper over their
-  -- conjunction so a false clause cannot consume its siblings' allowance
-  -- or report them as failed. This does not enumerate incoming paths.
-  let mut goal := goal
-  if clauses.isEmpty && (obligationRanges target).size > 1 then
-    setGoals [goal]
-    evalTactic (← `(tactic| try simp only [optionElim_and]))
-    let some next := (← getGoals).head? | return true
-    goal := next
-  let target ← goal.withContext (instantiateMVars (← goal.getType))
-  let routes := if clauses.isEmpty then obligationRoutes target
-    else Array.replicate clauses.toList.eraseDups.length []
-  allocateOwners ctx goal routes
-  if routes.size < 2 then
-    queue [goal] provenance clauses
-    return true
-  let owners := (← get).activeOwners.map (·.2)
-  let mut goals := [goal]
-  -- Commit each primitive independently. A failed map request must not
-  -- discard certificate bounds already established for the whole group.
-  -- Every stage still consumes the same cumulative preparation slice.
-  for preparation in #[← `(tactic| verex_bounds), ← `(tactic| verex_map_positions)] do
-    if goals.isEmpty then break
-    setGoals goals
-    let (outcome, _) ← runAutomatic ctx.budgets owners .preparation do
-      withOptions (verex.keepObligationMarkers.set · true) do
-        evalTactic preparation
-      let goals ← getGoals
-      unless goals.length <= 1 do throwError "common preparation split the obligation group"
-      if let [next] := goals then
-        let target ← next.withContext (instantiateMVars (← next.getType))
-        if routes.any (!·.isEmpty) && obligationRoutes target != routes then
-          throwError "common preparation changed the clause routes"
-      return goals
-    match outcome with
-    | .done next => goals := next
-    | .exhausted => break
-    | .failed _ => pure ()
-  queue goals provenance clauses
-  charge "automatic preparation" stageStart
-  return true
-
 /-- A structural node, split once: a leaf handed over is one per path and
 clause, since the case analysis of its own conditionals belongs to the
 proof. -/
@@ -2622,16 +2872,17 @@ private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := d
   let splitTarget ← if ctx.debug then goal.withContext do
       pure (some (← instantiateMVars (← goal.getType))) else pure none
   let entries := (← get).regions.filterMap (fun region => region.node.relation?.map (·.constName!))
-  let hasEntry ← if !ctx.shared || owners.isEmpty then pure false
+  let shared := (← get).activeSummary
+  let hasEntry ← if !shared || owners.isEmpty then pure false
     else if (← get).activeEntryOpened then pure true else goal.withContext do
     (← getLCtx).anyM fun decl => do
       let type ← instantiateMVars decl.type
       return type.getAppFn.constName?.any entries.contains
-  let readsMemory ← if !ctx.shared || owners.isEmpty || hasEntry then pure false
+  let readsMemory ← if !shared || owners.isEmpty || hasEntry then pure false
     else goal.withContext do
       let target ← instantiateMVars (← goal.getType)
       return !(storageAddresses target).isEmpty
-  let readsMap ← if !ctx.shared || owners.isEmpty || hasEntry then pure false
+  let readsMap ← if !shared || owners.isEmpty || hasEntry then pure false
     else readsConditionalMap goal
   let (parentTarget, parentLocals) ← goal.withContext do
     return (← instantiateMVars (← goal.getType), (← getLCtx).getFVarIds)
@@ -2639,9 +2890,12 @@ private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := d
     -- Resolve a read across a memory write before general normalization.
     -- Its address cases remain within the existing clause allowance.
     -- Abstract joined values are linked to their incoming rows in
-    -- `solveLeaf` before deciding their variants and conditionals.
-    (obligations := !ctx.handOver && (!ctx.shared || readsMemory || readsMap))
-    (prepare := !ctx.shared || !owners.isEmpty) | return false
+    -- `solveLeaf` before deciding their variants and conditionals. An
+    -- obligation the context states, such as a callee's assumed axiom,
+    -- closes whole under a summary as on the tree walk.
+    (obligations := !ctx.handOver)
+    (cases := !ctx.handOver && (!shared || readsMemory || readsMap))
+    (prepare := !shared || !owners.isEmpty) | return false
   let splitDone ← IO.getNumHeartbeats
   -- Unrolling takes a branch's first case first, a loop's next
   -- iteration, so a path outrunning the bound is met early.
@@ -2685,12 +2939,17 @@ has no theorem and its abort by its body where the proof inlines it, its
 behavior by its target's theorem, then `solveLeaf`, or, with `handOver`,
 the leaf of an authored proof, named by what it owes (`leafName`). -/
 private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Option MVarId) := do
+  let pins ← sharedPins
+  withSharedPinsLifted do
+  let goal ← substitutePinEquations step.goal pins
+  let step := { step with goal }
   let { goal, provenance, clauses, stageStart, .. } := step
-  let observesBehavior ← if !ctx.shared then pure false else goal.withContext do
+  let shared := (← get).activeSummary
+  let observesBehavior ← if !shared then pure false else goal.withContext do
     let target ← instantiateMVars (← goal.getType)
     return (← statesBehavior #[target]) &&
       (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isNone
-  if ctx.labeled || ctx.shared then
+  if ctx.labeled || shared then
     let entries := (← get).regions.filterMap (fun region => region.node.relation?.map (·.constName!))
     let hasEntry ← if (← get).activeEntryOpened then pure true else goal.withContext do
       (← getLCtx).anyM fun decl => do
@@ -2710,7 +2969,7 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
       -- closure's behavior depends on the selected implementation. Expose
       -- these alternatives before deriving behavior or choosing witnesses,
       -- under the same owner used by all of this clause's later decisions.
-      let alternatives ← SharedContinuations.exposeEntries goal entries closeFrameWrites
+      let alternatives ← exposeNormalEntries ctx.normalization goal entries
       let alternatives ← alternatives.mapM fun goal => goal.withContext do
         let points := (← getLCtx).foldl (init := #[]) fun points decl =>
           if decl.type.isAppOf ``ProgramPoint && !decl.isImplementationDetail then
@@ -2788,13 +3047,17 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
     modify fun s => { s with handed := s.handed.push (goal, key) }
     return
   -- Verification is native (`doc/designs/native-verification.md`).
+  let pins ← sharedPins
+  withSharedPinsLifted do
+  let goal ← substitutePinEquations goal pins
+  setGoals [goal]
   if (← (← targetState).runtimeMention.get) matches .none then
     recordRuntimeValues m!"the leaf `{(← leafKey goal provenance clauses ctx.names).text}`" goal
   let entries := (← get).regions.filterMap (fun region => region.node.relation?.map (·.constName!))
   let owners := (← get).activeOwners.map (·.2)
-  let accounting := if ctx.shared then some (ctx.budgets, owners) else none
-  let (closed, costs) ← solveLeaf goal provenance clauses entries accounting
-    (← get).activeEntryOpened
+  let (closed, costs) ← solveLeaf ctx.normalization goal provenance clauses entries
+    (if (← get).activeSummary then some owners else none)
+    (← get).activeEntryOpened (← get).activeOwed
   modify fun s => { s with stageCost := s.stageCost ++ costs }
   if ctx.debug then
     IO.println s!"leaf {(← get).leaves}: {if closed then "closed" else "undecided"}"
@@ -2879,6 +3142,102 @@ private def preparedPath? (goal : MVarId) : TacticM (Option (List MVarId)) := do
       restoreCaches
       pure none
 
+/-- An obligation a hypothesis states closes as it is, before preparation
+splits that hypothesis (`splitOnce`). -/
+private def closesStated (goal : MVarId) : TacticM Bool := do
+  return (← StatedFacts.close goal (exact := true)) ||
+    (← closesBy goal (← `(tactic| verex_assumption)))
+
+/-- Prepare one completed region before its independent clauses split. The
+common work is the path's preparation (`preparedPath?`); bounds and map
+positions stay each leaf's, as on the default walk (`verex_prepare_path`). -/
+private def prepareAutomatic (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
+  unless (← get).activeSummary do return false
+  -- Owners that served the walk before its clauses existed are atomic: a
+  -- completed group splits them, each clause keeping what they spent.
+  let inherited := (← get).activeOwners
+  unless inherited.all (·.1.isEmpty) do return false
+  let { goal, provenance, clauses, stageStart, .. } := step
+  let target ← goal.withContext (instantiateMVars (← goal.getType))
+  -- A write's aggregate expands into independent source invariants. Let
+  -- its structural rule expose them before allocating their owners; a false
+  -- invariant must not exhaust the allowance of the other stored values.
+  if (← writesStoredInvariants goal) ||
+      (target.isArrow && target.bindingBody!.isAppOfArity
+        ``VerexIR.Proofs.Denote.MemoryInvariants 4) then return false
+  if (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then return false
+  let regions := (← get).regions
+  if (target.find? fun term => regions.any (term.isAppOf ·.node.name)).isSome then return false
+  if ← goal.withContext do
+      (collectFVars {} target).fvarIds.anyM fun id => do
+        let decl ← id.getDecl
+        return decl.isLet && decl.userName == continuationName
+    then return false
+  -- A call's result binder can precede several source clauses. Introduce
+  -- that structural binder before assigning their independent owners. A
+  -- quantifier inside a marker remains in its clause's single leaf attempt.
+  if clauses.isEmpty && target.isForall &&
+      (target.find? (·.isAppOf ``VerexIR.Proofs.Obligation)).isSome then return false
+  if !inherited.isEmpty && !(clauses.isEmpty && (obligationRanges target).size > 1 &&
+      (obligationRoutes target).size > 1) then
+    return false
+  -- A joined row is abstract: decoding its slots can wrap several source
+  -- clauses in Option.elim. Distribute that structural wrapper over their
+  -- conjunction so a false clause cannot consume its siblings' allowance
+  -- or report them as failed. This does not enumerate incoming paths.
+  let mut goal := goal
+  if clauses.isEmpty && (obligationRanges target).size > 1 then
+    setGoals [goal]
+    evalTactic (← `(tactic| try simp only [optionElim_and]))
+    let some next := (← getGoals).head? | return true
+    goal := next
+  let target ← goal.withContext (instantiateMVars (← goal.getType))
+  let routes := if clauses.isEmpty then obligationRoutes target
+    else Array.replicate clauses.toList.eraseDups.length []
+  if inherited.isEmpty then allocateOwners ctx goal routes
+  else
+    let (ledger, ids) := (← ctx.budgets.get).split (inherited.map (·.2)) routes.size
+    ctx.budgets.set ledger
+    let owners := routes.zip ids
+    modify fun s => { s with activeOwners := owners, goalOwners := s.goalOwners.insert goal owners }
+  if routes.size < 2 then
+    queue [goal] provenance clauses
+    return true
+  -- The path's preparation precedes the split of its clauses, as on the
+  -- existing path, keeping their routes.
+  if ctx.preparesPaths && !(← get).prepared.contains goal then
+    if ← closesStated goal then
+      charge "stated path" stageStart
+      return true
+    let saved ← (saveState : TacticM Tactic.SavedState)
+    let restoreCaches ← saveWalkCaches
+    let discard : SolveM Unit := do (saved.restore : TacticM Unit); restoreCaches
+    -- The group's common preparation, debited once to each clause's owner.
+    let (outcome, _) ← runAutomatic ctx.budgets ((← get).activeOwners.map (·.2)) .preparation
+      (preparedPath? goal)
+    let prepared := match outcome with
+      | .done prepared => prepared
+      | .exhausted | .failed _ => none
+    let prepared ← prepared.mapM (·.mapM fun next => next.withContext do
+      let target ← instantiateMVars (← next.getType)
+      if target.isMData then next.replaceTargetDefEq target.consumeMData else pure next)
+    let keepsRoutes ← (prepared.getD []).allM fun next => do
+      return !clauses.isEmpty || obligationRoutes (← instantiateMVars (← next.getType)) == routes
+    match prepared with
+    | some [next] =>
+        if keepsRoutes then goal := next else discard
+    | some goals =>
+        if keepsRoutes then
+          queue goals provenance clauses true
+          charge "path preparation" stageStart
+          return true
+        discard
+    | none => pure ()
+    modify fun s => { s with prepared := s.prepared.insert goal }
+  queue [goal] provenance clauses
+  charge "automatic preparation" stageStart
+  return true
+
 /-- The automatic preparation of a completed path (`preparedPath?`), once,
 before its clauses or a clause's cases split (`splitStep`), after the
 structural steps that read its form; the leaves of the clauses and cases start
@@ -2893,15 +3252,20 @@ private def preparePath (ctx : SolveContext) (step : SolveStep) (target : Lean.E
       (← goal.withContext (findSplit? target)).isSome) do
     return false
   if (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome then return false
+  -- An arrival hole at a shared continuation is proved by its summary.
+  let regions := (← get).regions
+  if (target.find? fun term => regions.any (term.isAppOf ·.node.name)).isSome then return false
   if ← goal.withContext do
       (collectFVars {} target).fvarIds.anyM fun id => do
         let declaration ← id.getDecl
         return declaration.isLet && declaration.userName == continuationName
     then return false
-  -- An obligation a hypothesis states closes as it is, before preparation
-  -- splits that hypothesis (`splitOnce`).
-  if (← StatedFacts.close goal (exact := true)) ||
-      (← closesBy goal (← `(tactic| verex_assumption))) then
+  -- A completed path is compared with no arrival: its leaves' form, without
+  -- the shared fold pins (`substitutePinEquations`).
+  let pins ← sharedPins
+  withSharedPinsLifted do
+  let goal ← substitutePinEquations goal pins
+  if ← closesStated goal then
     charge "stated path" stageStart
     return true
   let prepared ← preparedPath? goal
@@ -3089,7 +3453,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
     if ← denotedRunStep ctx step then return none
   if ← preparePath ctx step target then return none
   if ← splitStep ctx step then return none
-  if ctx.shared && (← get).activeOwners.isEmpty then
+  if (← get).activeSummary && (← get).activeOwners.isEmpty then
     -- A stalled computation may need proof preparation to expose its next
     -- step. Allocate before trying that preparation, then resume bounded.
     allocateOwners ctx goal #[[]]
@@ -3149,7 +3513,8 @@ private def splitSharedCase (step : SolveStep) : SolveM Bool := do
         let cases ← step.goal.cases value.fvarId!
         pure ((cases.map (·.mvarId)).toList.reverse, "common variant")
   modify fun s => { s with caseScheduled := owners.foldl (fun found owner => found.insert owner.2) s.caseScheduled }
-  queue goals step.provenance step.clauses
+  -- As a split's cases (`splitStep`), they keep the path's preparation.
+  queue goals step.provenance step.clauses ((← get).prepared.contains step.goal)
   charge stage step.stageStart
   return true
 
@@ -3165,11 +3530,13 @@ private def partitionOwners (ctx : SolveContext) (step : SolveStep) : SolveM Boo
     throwError "an automatic obligation group lost its clause routes"
   let subgoals ← step.goal.apply (mkConst ``And.intro)
   unless subgoals.length == 2 do throwError "an obligation conjunction did not have two children"
+  -- The clauses keep the context their path's preparation left.
+  let prepared := (← get).prepared.contains step.goal
   for (goal, index) in subgoals.zipIdx do
     let selected := (owners.filter (·.1.head? == some (index != 0))).map fun (route, owner) =>
       (route.drop 1, owner)
     modify fun s => { s with activeOwners := selected }
-    queue [goal] step.provenance step.clauses
+    queue [goal] step.provenance step.clauses prepared
   let cost := (← IO.getNumHeartbeats) - start
   ctx.budgets.modify (·.charge (owners.map (·.2)) .leaf cost)
   charge "clause routing" start
@@ -3186,10 +3553,15 @@ private def reportProfile (ctx : SolveContext) (state : SolveState) (stopped : B
     {if stopped then ", stopped by the budget" else ""}; stages",
     state.continuations.report]
   if ctx.shared then
-    lines := lines.push s!"  joins: nodes {state.regions.size}, \
+    -- A node's arrival classes are regions of one name.
+    let nodes := state.regions.foldl (fun names region =>
+      if names.contains region.node.name then names else names.push region.node.name) #[]
+    lines := lines.push s!"  joins: nodes {nodes.size}, \
       edges {state.regions.foldl (fun count r => count + r.node.arrivals.size) 0}, \
       summaries {(state.regions.filter (·.node.summary?.isSome)).size}, \
       proofs {(state.regions.filter (·.node.certified)).size}"
+    lines := lines.push s!"  join facts: invariants \
+      {(state.regions.filter (!·.node.invariantProofs.isEmpty)).size}"
     let ledger ← ctx.budgets.get
     lines := lines.push s!"  automatic owners: {ledger.owners.size}, \
       prepared {(ledger.owners.filter (·.preparationSpent > 0)).size}, \
@@ -3217,15 +3589,21 @@ private def reportProfile (ctx : SolveContext) (state : SolveState) (stopped : B
 it, down to its leaf. -/
 private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
   repeat
-    let some (goal, provenance, clauses, callSite) := (← get).pending.back? | do
-      if !ctx.shared then break
-      let some reverseIndex := (← get).regions.reverse.findIdx? (!·.node.sealed) | do
-        finishShared
-        break
-      let index := (← get).regions.size - reverseIndex - 1
+    -- A complete region resumes before any older pending goal, as the exit
+    -- rule continues a path at its exit: its suffix's goals go on top.
+    if let some index ← completeRegion? ctx then
+      -- Every arrival is in: the node's fold context need no longer stay
+      -- (`bindStep`), except where an enclosing node still collects.
+      let regions := (← get).regions
+      let ancestors := regionAncestors regions regions[index]!
+      (← targetState).sharedPins.modify fun pinned =>
+        regions[index]!.pins.foldl (init := pinned) fun pinned id =>
+          if regions.any fun region => !region.node.sealed &&
+              ancestors.contains region.node.name && region.pins.contains id then pinned
+          else pinned.erase id
       pruneShared ctx index
       let region := (← get).regions[index]!
-      match ← runOwned ctx region.owners (resumeShared ctx) with
+      match ← runOwned ctx region.owners (resumeShared ctx index) with
       | .done _ => pure ()
       | .failed failure => throw failure
       | .exhausted =>
@@ -3233,6 +3611,7 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
           -- under their exhausted owner; no summary certificate is cached.
           modify fun s => { s with activeOwners := region.owners }
           for arrival in region.node.arrivals do
+            modify fun s => { s with activeSummary := arrival.summarized }
             decideLeaf ctx {
               goal := arrival.goal
               provenance := region.provenance
@@ -3241,6 +3620,9 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
           modify fun s => { s with regions := s.regions.modify index fun region =>
             { region with node := { region.node with sealed := true, finished := true } } }
       continue
+    let some (goal, provenance, clauses, callSite) := (← get).pending.back? | do
+      if ctx.shared then finishShared
+      break
     modify fun s => if !ctx.shared then { s with
       pending := s.pending.pop
       activeDecisions := s.goalDecisions[goal]?.getD #[]
@@ -3251,10 +3633,13 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
       activeRegion := s.goalRegions[goal]?
       activeOwners := s.goalOwners[goal]?.getD #[]
       activeDebits := s.goalDebits[goal]?.getD #[]
-      activeEntryOpened := s.openedEntries.contains goal }
+      activeEntryOpened := s.openedEntries.contains goal
+      activeOwed := s.goalOwed[goal]?
+      activeSummary := s.goalSummaries.contains goal }
     if ← goal.isAssigned then continue
     let step : SolveStep := { goal, provenance, clauses, stageStart := ← IO.getNumHeartbeats, callSite }
-    modify fun s => { s with stepCallSite := callSite }
+    modify fun s => { s with stepCallSite := callSite, stepStart := step.stageStart,
+                             stepStages := s.stageCost.size }
     if !ctx.shared then
       if let some leaf ← advance ctx step then decideLeaf ctx leaf
       continue
@@ -3275,6 +3660,12 @@ it. On `isMaxHeartbeat`, stores the current position in `targetState.budgetStop`
 so the failure message can name it. -/
 private def traverse (ctx : SolveContext) : SolveM Unit :=
   tryCatchRuntimeEx (traverseSteps ctx) fun failure => do
+    if failure.isMaxHeartbeat then
+      -- The stage the budget interrupted never reaches its `charge`: the
+      -- step's cost beyond the stages it charged is that stage's.
+      let state ← get
+      let charged := (state.stageCost.extract state.stepStages).foldl (· + ·.2) 0
+      charge "interrupted" (state.stepStart + charged)
     if ctx.profile && failure.isMaxHeartbeat then reportProfile ctx (← get) true
     if failure.isMaxHeartbeat then
       let state ← get
@@ -3328,6 +3719,10 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   (← targetState).normalForms.set {}
   (← targetState).readForms.set {}
   (← targetState).readMentions.set {}
+  (← targetState).summaryParameters.set {}
+  (← targetState).sharedPins.set {}
+  (← targetState).keptFacts.set {}
+  (← targetState).keptPremises.set {}
   (← targetState).fixedPoints.set {}
   (← targetState).dsimpResults.set {}
   (← targetState).fixedPointCounts.set #[0, 0, 0, 0, 0, 0]
@@ -3363,7 +3758,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     specializations := specializations
     handOver := handOver
     preparing? := if handOver then preparing? else none
-    preparesPaths := !handOver && !verex.sharedContinuations.get (← getOptions)
+    preparesPaths := !handOver
     points := if handOver then points else #[]
     labeled := labeled
     unrolls := unrolls
@@ -3533,17 +3928,25 @@ reached, or report the clause it owes: `verex_obligations` followed by
 `verex_solve` on every leaf. -/
 syntax "verex_solve_goals" (obligationArguments)? : tactic
 
-/-- Generate the obligations, handing them over or solving each. -/
-private def obligations (arguments : Option (TSyntax ``obligationArguments)) (handOver : Bool)
-    (preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none)
-    (points : Array (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := #[]) :
-    TacticM Unit := do
-  match arguments with
-  | none =>
-      if handOver then
-        throwError "`verex_obligations` names the obligations of the function a `verify` item proves"
-      solveGoals #[] #[]
-  | some arguments =>
+/-- What a function's obligation arguments state, elaborated. -/
+private structure ObligationData where
+  invariants : Array (Nat × Lean.Expr × Lean.Expr)
+  callees : Array (Lean.Expr × String × Lean.Expr)
+  equations : Array Lean.Expr
+  specializations : Array Lean.Expr
+  labeled : Bool
+  unrolls : Array (Nat × Nat)
+  preconditions : Array (Lean.Expr × Lean.Expr)
+  inlinedHandles : Array (Lean.Expr × Lean.Expr)
+  names : Array (ObligationRange × String)
+  ghostWrites : Array (Nat × ObligationRange)
+  callSites : Array (Nat × String × Nat × Nat)
+  sites : Array (Nat × String × Nat × String)
+
+/-- Elaborate a function's obligation arguments; the precondition numbers
+and invariant keys go to the target's state. -/
+private def elabObligationArguments (arguments : TSyntax ``obligationArguments) :
+    TacticM ObligationData := do
   match arguments with
   | `(obligationArguments| $flags* [$loops:term,*] $[with [$calls:term,*]]?
       $[using [$equations:term,*]]? $[specializing [$specialized:term,*]]?
@@ -3636,10 +4039,140 @@ private def obligations (arguments : Option (TSyntax ``obligationArguments)) (ha
         | `(sourceSite| ($site:num, $kind:str, $number:num, $label:str)) =>
             pure (site.getNat, kind.getString, number.getNat, label.getString)
         | _ => throwError "a site must be `(site, kind, number, label)`"
-      let flagged (kind : Name) := flags.any (·.raw.isOfKind kind)
-      solveGoals invariants callees equations handOver (flagged ``labeledFlag) unrolls
-        preconditions inlinedHandles names ghostWrites preparing? specializations callSites sites points
+      let labeled := flags.any (·.raw.isOfKind ``labeledFlag)
+      return {
+        invariants := invariants
+        callees := callees
+        equations := equations
+        specializations := specializations
+        labeled := labeled
+        unrolls := unrolls
+        preconditions := preconditions
+        inlinedHandles := inlinedHandles
+        names := names
+        ghostWrites := ghostWrites
+        callSites := callSites
+        sites := sites }
   | _ => throwError "unexpected obligation arguments"
+
+/-- Generate the obligations, handing them over or solving each. -/
+private def obligations (arguments : Option (TSyntax ``obligationArguments)) (handOver : Bool)
+    (preparing? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none)
+    (points : Array (ProgramPointKey × Syntax × TSyntax ``Lean.Parser.Tactic.tacticSeq) := #[]) :
+    TacticM Unit := do
+  match arguments with
+  | none =>
+      if handOver then
+        throwError "`verex_obligations` names the obligations of the function a `verify` item proves"
+      solveGoals #[] #[]
+  | some arguments =>
+      let data ← elabObligationArguments arguments
+      solveGoals data.invariants data.callees data.equations handOver data.labeled data.unrolls
+        data.preconditions data.inlinedHandles data.names data.ghostWrites preparing?
+        data.specializations data.callSites data.sites points
+
+/-- Derive the summary of the compiled callee `callee` names (a callee pair,
+`PProd.mk handle (PProd.mk name certificate)`) and declare it as the theorem
+`name`, before any proof of the module runs: the main goal states the
+call's shape in the callee's own telescope,
+`∀ args ensures aborts initial, wp (call args) ensures aborts initial`, and
+the walk of the callee's body runs in that context (`summaryWalk`) with the
+`arguments` of the callee's own obligations, within
+`verex.summaryHeartbeats`, under a target state of its own. The number of
+conjuncts, or why no summary is derived; `derivedSummaries` records
+either. A theorem the kernel rejects is an error. -/
+def deriveModuleSummary (name : Name) (arguments : TSyntax ``obligationArguments)
+    (callee : Lean.Expr) : TacticM (Except String Nat) := do
+  let pair ← whnf (← instantiateMVars callee)
+  unless pair.isAppOfArity ``PProd.mk 4 && (pair.getArg! 3).isAppOfArity ``PProd.mk 4 do
+    throwError m!"a callee must be `PProd.mk handle (PProd.mk name theorem)`, not {pair}"
+  let handle := pair.getArg! 2
+  let inner := pair.getArg! 3
+  let .lit (.strVal calleeName) := inner.getArg! 2
+    | throwError m!"a callee name must be a string literal, not {inner.getArg! 2}"
+  let theoremProof := inner.getArg! 3
+  let proofType ← instantiateMVars (← inferType theoremProof)
+  let some compiled := (do
+      guard (proofType.isAppOfArity ``Eq 3)
+      let .const compiled _ := (proofType.getArg! 2).appArg! | none
+      pure compiled)
+    | throwError m!"a summarized callee's certificate must name its compiled body, not {proofType}"
+  let refuse (reason : String) : TacticM (Except String Nat) := do
+    recordDerivedSummary compiled none
+    return .error reason
+  unless ← summaryForm compiled do return ← refuse "its form admits none"
+  let goal ← getMainGoal
+  -- The call's shape, read off the statement.
+  let target ← goal.withContext (instantiateMVars (← goal.getType))
+  let shape? ← goal.withContext <| forallBoundedTelescope target (some 4) fun xs body => do
+    unless xs.size == 4 && body.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
+    let action := (body.getArg! 3).consumeMData
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 do return none
+    let types ← xs.mapM fun x => do instantiateMVars (← inferType x)
+    let implicit := body.getAppArgs.extract 0 3
+    let meaning := action.appFn!
+    let bound := xs.map (·.fvarId!)
+    if (types ++ implicit ++ #[meaning]).any (·.hasAnyFVar bound.contains) then return none
+    return some (types, body.getAppFn, implicit, meaning)
+  let some (types, wpHead, wpImplicit, meaning) := shape?
+    | throwError m!"a summary's statement must be the shape of a call, not {target}"
+  let data ← elabObligationArguments arguments
+  -- The walk's own target state, named by the theorem for its hidden
+  -- theorems; the command's is restored after it.
+  let env ← getEnv
+  let key := env.asyncPrefix?.getD .anonymous
+  let previous := targetStateExt.getState env
+  let fresh ← TargetState.new
+  fresh.proofName.set name
+  modifyEnv (targetStateExt.setState · (some (key, fresh)))
+  try
+    let result ← goal.withContext do
+      (← targetState).moduleFacts.set ((← goal.getNondepPropHyps).foldl (·.insert ·) {})
+      recordModuleFactsNormal goal
+      let ctx : SolveContext := {
+        invariants := data.invariants
+        callees := data.callees
+        equations := data.equations
+        specializations := data.specializations
+        handOver := false
+        preparesPaths := false
+        labeled := data.labeled
+        unrolls := data.unrolls
+        preconditions := data.preconditions
+        inlinedHandles := data.inlinedHandles
+        names := data.names
+        callSites := data.callSites
+        sites := data.sites
+        ghostWrites := data.ghostWrites
+        debug := verex.solverDebug.get (← getOptions)
+        profile := false
+        -- A summary is collected from open leaves over the callee's
+        -- parameters; a sealed class leaves its leaves over abstract entry
+        -- rows and needs them closed, so the derivation is a tree walk.
+        shared := false
+        budgets := ← IO.mkRef {}
+        normalization := ← normalization
+        startHeartbeats := ← IO.getNumHeartbeats
+        base? := some (← getLCtx, ← getLocalInstances)
+        summarizing := #[compiled] }
+      tryCatchRuntimeEx
+        (withBudget (verex.summaryHeartbeats.get (← getOptions) * 1000)
+          (summaryWalk ctx compiled handle calleeName theoremProof proofType types wpHead
+            wpImplicit meaning))
+        fun failure => do
+          if failure.isMaxHeartbeat then return .error "the walk exceeded its heartbeat budget"
+          return .error s!"the walk failed: {← failure.toMessageData.toString}"
+    match result with
+    | .error reason => refuse reason
+    | .ok (type, value, conjuncts) =>
+        -- Declared once, in the command's environment, for every proof.
+        declareHiddenTheorems value
+        withOptions (Elab.async.set · false) do
+          addDecl (.thmDecl { name, levelParams := [], type, value })
+        recordDerivedSummary compiled (some { name := name, conjuncts := conjuncts })
+        return .ok conjuncts
+  finally
+    modifyEnv (targetStateExt.setState · previous)
 
 elab_rules : tactic
   | `(tactic| verex_obligations $[$arguments]? $hooks:verexPointHook* $[preparing $preparing?]?) => do
@@ -3812,17 +4345,20 @@ elab "verex_group_contexts" : tactic => do
 
 /-- The typed maps a term reads: each `SpecMap.ofEntries key value x` with
 its carrier `x`. -/
-private partial def typedMaps (e : Lean.Expr) (found : Array (Lean.Expr × FVarId) := #[]) :
+private def typedMaps (e : Lean.Expr) (found : Array (Lean.Expr × FVarId) := #[]) :
     Array (Lean.Expr × FVarId) :=
-  let found := match typedMap? e with
-    | some x => if found.any (·.1 == e) then found else found.push (e, x)
-    | none => found
-  match e with
-  | .app f a => typedMaps a (typedMaps f found)
-  | .lam _ d b _ | .forallE _ d b _ => typedMaps b (typedMaps d found)
-  | .letE _ ty v b _ => typedMaps b (typedMaps v (typedMaps ty found))
-  | .mdata _ b | .proj _ _ b => typedMaps b found
-  | _ => found
+  let rec walk (e : Lean.Expr) : StateM (Std.HashSet Lean.Expr × Array (Lean.Expr × FVarId)) Unit := do
+    if (← get).1.contains e then return
+    modify fun (seen, found) => (seen.insert e, found)
+    if let some x := typedMap? e then
+      unless (← get).2.any (·.1 == e) do modify fun (seen, found) => (seen, found.push (e, x))
+    match e with
+    | .app f a => walk f; walk a
+    | .lam _ d b _ | .forallE _ d b _ => walk d; walk b
+    | .letE _ ty v b _ => walk ty; walk v; walk b
+    | .mdata _ b | .proj _ _ b => walk b
+    | _ => pure ()
+  ((walk e).run ({}, found)).2.2
 
 /-- Name the typed maps of a prepared leaf: each `SpecMap.ofEntries key value
 x` with a source-named carrier `x` becomes a map value named `x`, over which
@@ -4115,9 +4651,10 @@ elab "verex_decide" : tactic => focusGoal <| withoutRecover do
 it owes and admit it. -/
 elab "verex_solve" : tactic => focusGoal do
   evalTactic (← `(tactic| verex_paths))
+  let normalization ← normalization
   for goal in ← getGoals do
     let (provenance, clauses) := ((← (← targetState).leafOrigins.get)[goal]?).getD (none, #[])
-    discard <| solveLeaf goal provenance clauses
+    discard <| solveLeaf normalization goal provenance clauses
   setGoals []
 
 /-- An obligation's key (`ObligationKey`), as a proof addresses it:

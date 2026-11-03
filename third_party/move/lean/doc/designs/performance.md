@@ -170,6 +170,36 @@ Interpreted (`lake env lean`), where the wrapper's own code is counted,
 `return_in_loop` is +5% and `increment` +2%. Hashing the leaves of the smoke
 fixtures, the cache changes no leaf goal.
 
+## Shared continuations
+
+The walk is a DAG: a join's continuation is a closed constant over entry
+rows, walked once, and each arrival proves an entry relation. Arrivals share
+only where they agree in constructor shape and points; numerals and strings
+stay parameters. A single arrival takes the tree's route. What the tree walk
+assumed, and what a join must therefore preserve:
+
+- **Facts along a path.** Loop hypotheses and dominating facts must survive
+  the seal: the fold's loop continuation is a capture, and the locals sharing
+  reads are pinned on the walk path, so a branch leaves an equation instead of
+  rewriting them. Pins are lifted at leaves and completed paths, which are
+  never compared with an arrival.
+- **Which equations are substituted.** Frame facts the walk keeps on purpose
+  stay kept at arrivals; substituting one makes `EnsuresOf` relate one memory
+  to itself.
+- **Per-path state.** Provenance, clauses, decisions, points and owners are
+  recorded per arrival, and a shared suffix owes the union of its arrivals'
+  clauses. A failed shared leaf reports per arrival.
+- **Goal shape.** The fold names its application with a `let`: simp otherwise
+  re-enters the constant at every step (per-step cost about 3×).
+- **Order.** A region resumes when no pending goal lies in it, innermost
+  first, which keeps the walk depth-first.
+- **Profitability.** A suffix that only exits is not folded: a sealed class
+  saves only the suffix's rule steps; its leaf work stays per arrival.
+
+A hand-written walk over `Expr` must keep a visited set and check heartbeats:
+terms are DAGs, and a pure walk neither ends on a heavily shared term nor stops
+at the budget. Lean's `kabstract` has the same gap (`kabstractShared`).
+
 ## What was learned
 
 - **An array read in a kernel-evaluated computation is a list walk**:
@@ -225,6 +255,27 @@ fixtures, the cache changes no leaf goal.
 Every lever was measured on encoded leaves and is to be measured again on
 native ones; most act on the normalization of encoded terms.
 
+### Remaining on shared mode and budget stops
+
+In the order of expected gain:
+
+1. **Extra leaves after a single arrival** (coin `get_paired_*_copy_ref`): the
+   tree closes these continuations at exit, here they reach the leaf pipeline.
+   Substitute released pin equations before `normalizeAround`, and retry
+   `verex_assumption` after substitution. Work in progress is untested.
+2. **Targets the walk exhausts with no leaf decided**: about 600 steps at
+   0.2–2M with no blow-up. Release a call's continuation once per call, not per
+   subgoal; cache a compiled callee's unfolded body per target.
+3. **Loop stage before its context stage** (genesis `create_*_validators`).
+4. **Stored invariants** simplified per read, and position instances
+   re-derived per leaf (`storage_gas`).
+5. **Small two-arrival joins** cost more than exits (`dkg::initialize`).
+6. **Leaf fixed points across passes**: they last one pass, since context reads
+   are detected by head name. An explicit read counter bumped by every simproc
+   that consults the context would allow more.
+7. **`move prove --lean` runs modules one after another**, unlike the Prover's
+   parallel Boogie processes; `verify-modules.py` runs them in parallel.
+
 ### Preparation
 
 1. **Prepare once per path.** Keep a path's context prepared as the walker
@@ -244,10 +295,9 @@ native ones; most act on the normalization of encoded terms.
    substitution and normalization at every walker split: the split stage
    is 24% of OrderedMap's automatic cost.
 5. **Delay logical and variant splitting**: keep a region's clauses
-   together through common preparation; unmeasured. The opt-in scheduler
-   (`verex.sharedContinuations`) already shares entry decomposition,
-   cases, certificate bounds and position facts: −30% automatic
-   OrderedMap, 0% authored, +7% micro-targets.
+   together through common preparation; unmeasured. The join scheduler
+   (`verex.sharedContinuations`, on by default) already shares entry
+   decomposition, cases, certificate bounds and position facts.
 6. **Fact dependencies of normalized subterms.** Reusing a normal part of
    the goal is sound only where no fact added since its normalization
    reads what it reads: facts known on an arrival path simplify parts of
@@ -376,6 +426,18 @@ per-leaf preparation sharing.
 | Pruning dead paths at the split | contradictory leaves 3% (BigOrderedMap 21/635, OrderedMap 11/438); 0 of 4 and 2 of 99 branches refutable; `contradiction` exceeds the recursion depth |
 | Proof stubbing for an express build | a tenth saved; undone |
 | A lower automatic leaf cap (75M) | affects only attempts that reach it |
+| Partitioning arrivals by numerals as well as constructors | value-only differences never share |
+| Keying arrival classes on provenance and clauses | classes vanish (`set_frozen_flag` 234M → 358M); the union of clauses kept |
+| RowFacts: a per-arrival disjunction of constructor facts | no target used it once arrivals partition by shape |
+| Substituting without `cases`, opening entry relations on demand | no gain; the cost was premises reaching leaves, not exposure |
+| Cheap closers before exposure | no effect once premises close at the call |
+| Pinning the whole fold context | frame equations reach leaves (coin `get_paired_*` fail) |
+| Refuting an arrival from new facts only | prunes that need old facts are lost |
+| Deferring the fold to the second arrival | pins must hold while the branch is walked |
+| Replacing the whole-context substitution at a single arrival by pin equations | coin +480M; it does real work |
+| A process-wide normal-form map, or waiting on another target's summary | outcomes depend on scheduling; the wait deadlocks |
+| Scoping split and substitution to a memory write's new hypotheses | the cost was a non-terminating injection loop, fixed at its cause |
+| `Memory.set` spine as skeleton | no effect on `bump_resource` |
 
 ## What cannot change
 

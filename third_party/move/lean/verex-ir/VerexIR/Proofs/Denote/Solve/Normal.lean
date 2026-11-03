@@ -2209,6 +2209,48 @@ dsimproc_decl reduceIntShiftLeft (Int.shiftLeft _ _) := shiftLiteralStep Int.shi
 dsimproc_decl reduceIntShiftRight (Int.shiftRight _ _) := shiftLiteralStep Int.shiftRight
 attribute [vir_denote, vir_denote_norm] reduceIntShiftLeft reduceIntShiftRight
 
+/-- A shift right of a multiple of the shift's power of two is the quotient's
+multiple, exactly. -/
+theorem shiftRight_mul_pow {multiplier quotient : Int} (value : Int) (distance : Nat)
+    (isMultiple : multiplier = quotient * 2 ^ distance) :
+    Int.shiftRight (multiplier * value) distance = quotient * value := by
+  subst isMultiple
+  rw [shiftRight_eq_div, Int.mul_right_comm,
+    Int.mul_ediv_cancel _ (Int.ne_of_gt (Int.pow_pos (by decide)))]
+
+/-- A shift right of the shift's power of two times a value is that value:
+`(16 * x) >> 4 = x`. -/
+theorem shiftRight_pow_mul {multiplier : Int} (value : Int) (distance : Nat)
+    (isPower : multiplier = 2 ^ distance) : Int.shiftRight (multiplier * value) distance = value := by
+  rw [shiftRight_mul_pow value distance (quotient := 1) (by rw [isPower, Int.one_mul]), Int.one_mul]
+
+/-- A shift right of a literal multiple of the shift's power of two, as the
+quotient's multiple: `(16 * x) >> 4` is `x`, syntactically, where a product
+with `x` is then one atom to the deciders. The kernel decides the literal
+equation. -/
+simproc_decl reduceShiftRightMul (Int.shiftRight (HMul.hMul _ _) _) := fun e => do
+  let args := e.getAppArgs
+  let product := args[0]!
+  unless product.isAppOfArity ``HMul.hMul 6 do return .continue
+  let (some multiplier, some distance) := (product.getArg! 4 |>.int?, args[1]?.bind Lean.Expr.nat?)
+    | return .continue
+  unless ← checkExponent distance (warning := false) do return .continue
+  let power : Int := 2 ^ distance
+  unless multiplier % power == 0 do return .continue
+  let quotient := multiplier / power
+  let value := product.getArg! 5
+  let powerExpr ← mkAppM ``HPow.hPow #[mkIntLit 2, mkNatLit distance]
+  if quotient == 1 then
+    let isPower ← mkDecideProof (← mkEq (product.getArg! 4) powerExpr)
+    let proof ← mkAppM ``shiftRight_pow_mul #[value, mkNatLit distance, isPower]
+    return .done { expr := value, proof? := some proof }
+  let isMultiple ← mkDecideProof
+    (← mkEq (product.getArg! 4) (← mkAppM ``HMul.hMul #[mkIntLit quotient, powerExpr]))
+  let proof ← mkAppM ``shiftRight_mul_pow #[value, mkNatLit distance, isMultiple]
+  return .done { expr := ← mkAppM ``HMul.hMul #[mkIntLit quotient, value], proof? := some proof }
+
+attribute [vir_denote, vir_denote_norm] reduceShiftRightMul
+
 /-- A bitwise operation on integer literals, evaluated: a value a program
 computes from literals, as `3 & 7`, is a literal to the observations of
 what holds it. The kernel decides the equation by evaluation. -/

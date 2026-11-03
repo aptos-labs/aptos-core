@@ -78,6 +78,7 @@ IR_TESTS=(
   VerexSL/Tests/SharedNativeJoins.lean
   VerexSL/Tests/SharedCases.lean
   VerexSL/Tests/SharedPruning.lean
+  VerexSL/Tests/SharedCallPremises.lean
   VerexSL/Tests/CallRangeResults.lean
 )
 # Existing source fixtures replayed with the development join scheduler.

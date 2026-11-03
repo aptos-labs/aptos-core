@@ -71,9 +71,8 @@ Designs: [`denotation.md`](../designs/denotation.md),
   below roughly 1.9G heartbeats including authored proofs. Then the levers of
   [`performance.md`](../designs/performance.md), "Open levers", in its order,
   postponed for now; the next is fact dependencies of normalized subterms
-  (Preparation, 6), then fail fast and ground evaluation of literal leaves,
-  and the opt-in join scheduler (`verex.sharedContinuations`) enabled for
-  automatic verification or removed. Debts:
+  (Preparation, 6), then fail fast and ground evaluation of literal leaves.
+  Debts:
   [`measurement-debts.md`](../status/measurement-debts.md).
 - **Assumptions.** Discharge the hypotheses in
   [`assumptions.md`](../status/assumptions.md): the compilation agreement

@@ -67,10 +67,13 @@ verex module 0x42::shared_pruning where
     aborts_if false
     ensures result == 1
 
-#guard_pruning 2 removed 1 owners 2 in
+-- Pruning leaves `bounded` one arrival: its suffix is the tree's own path,
+-- with no owners to carry the debit. In `followed` the second join still
+-- shares, and its two clauses inherit the debit.
+#guard_pruning 2 removed 1 owners 0 in
 verify 0x42::shared_pruning::bounded
 
-#guard_pruning 4 removed 1 owners 4 in
+#guard_pruning 4 removed 1 owners 2 in
 verify 0x42::shared_pruning::followed
 
 #guard_pruning 5 removed 2 owners 2 in

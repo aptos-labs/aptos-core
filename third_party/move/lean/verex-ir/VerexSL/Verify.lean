@@ -385,16 +385,41 @@ private def verifyScheduled (unit : ValidatedUnit) (segments : Array String)
     -- is concluded with its messages, and not begun. An error a definition
     -- recovered from is reported with the target's, whose proof goes on as
     -- the definition stands.
+    -- The callees the automatic targets inline, each with the first target
+    -- inlining it; a callee of authored targets alone is not summarized.
+    let mut inlinedCallees : Array (String × Nat) := #[]
     for index in [0:order.size] do
       let (outcome, logged) ← capturingMessages <|
         withScope (fun scope => { scope with opts := Elab.async.set scope.opts asyncBefore })
           (begin order[index]! true)
       messages := messages.modify index (· ++ logged)
-      if outcome matches .failed then
-        begun := begun.set! index true
-        attempted := attempted.set! index true
-        concluded.modify (·.push order[index]!.target.function)
+      match outcome with
+      | .failed =>
+          begun := begun.set! index true
+          attempted := attempted.set! index true
+          concluded.modify (·.push order[index]!.target.function)
+      | .proving pending _ =>
+          if order[index]!.target.script.isNone then
+            for callee in pending.inlinedCallees do
+              unless inlinedCallees.any (·.1 == callee) do
+                inlinedCallees := inlinedCallees.push (callee, index)
+      | .skipped => pure ()
     covered.set #[]
+    -- The inlined callees are summarized once each, before any proof runs,
+    -- after the callees they inline (`summaryOrder`). A summary is optional:
+    -- a derivation that fails leaves the callee inlined and reports nothing
+    -- but a stage-log line.
+    let ordered ← match order[0]? with
+      | some first => summaryOrder first.target.reference segments (inlinedCallees.map (·.1))
+      | none => pure #[]
+    for callee in ordered do
+      let some (_, index) := inlinedCallees.find? (·.1 == callee) | continue
+      let target := order[index]!.target
+      let ((), logged) ← capturingMessages <| inParsedFile target.file <| inModule do
+        try summarizeCallee target.reference segments callee opens
+        catch error =>
+          stageLog s!"summary of {callee} failed: {← error.toMessageData.toString}"
+      messages := messages.modify index (· ++ logged)
     let mut running : Array (Nat × PendingVerification × Array String) := #[]
     repeat
       for index in [0:order.size] do
