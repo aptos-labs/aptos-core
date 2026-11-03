@@ -1,0 +1,69 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/table_key_encoding_kinds.move:36:9
+   │
+36 │         ensures spec_get(result, k1) == spec_get(result, k2); // fails when k1 != k2
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/table_key_encoding_kinds.move:27: struct_keys_fail
+   =         k1 = <redacted>
+   =         k2 = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:28: struct_keys_fail
+   =         t = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:29: struct_keys_fail
+   =         t = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:30: struct_keys_fail
+   =     at tests/sources/regression/table_key_encoding_kinds.move:31: struct_keys_fail
+   =         t = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:33: struct_keys_fail
+   =     at tests/sources/regression/table_key_encoding_kinds.move:27: struct_keys_fail
+   =         result = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:36: struct_keys_fail (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/table_key_encoding_kinds.move:62:9
+   │
+62 │         ensures spec_get(result, k1) == spec_get(result, k2); // fails when k1 != k2
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/table_key_encoding_kinds.move:53: vector_keys_fail
+   =         k1 = <redacted>
+   =         k2 = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:54: vector_keys_fail
+   =         t = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:55: vector_keys_fail
+   =         t = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:56: vector_keys_fail
+   =     at tests/sources/regression/table_key_encoding_kinds.move:57: vector_keys_fail
+   =         t = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:59: vector_keys_fail
+   =     at tests/sources/regression/table_key_encoding_kinds.move:53: vector_keys_fail
+   =         result = <redacted>
+   =     at tests/sources/regression/table_key_encoding_kinds.move:62: vector_keys_fail (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/table_key_encoding_kinds.move:101:9
+    │
+101 │         ensures !result; // fails: the maps are equal
+    │         ^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/table_key_encoding_kinds.move:90: emptied_maps_as_keys_fail
+    =         m1 = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:91: emptied_maps_as_keys_fail
+    =         m1 = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:92: emptied_maps_as_keys_fail
+    =         m1 = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:93: emptied_maps_as_keys_fail
+    =         m2 = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:94: emptied_maps_as_keys_fail
+    =         m2 = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:95: emptied_maps_as_keys_fail
+    =         m2 = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:96: emptied_maps_as_keys_fail
+    =         outer = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:97: emptied_maps_as_keys_fail
+    =         outer = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:98: emptied_maps_as_keys_fail
+    =     at tests/sources/regression/table_key_encoding_kinds.move:89: emptied_maps_as_keys_fail
+    =         result = <redacted>
+    =     at tests/sources/regression/table_key_encoding_kinds.move:101: emptied_maps_as_keys_fail (spec)
