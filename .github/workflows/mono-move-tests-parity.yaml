@@ -40,7 +40,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-tests') &&
         github.event.pull_request.head.repo.full_name == github.repository
       )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +119,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-tests') &&
         github.event.pull_request.head.repo.full_name == github.repository
       )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,7 +139,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-tests') &&
         github.event.pull_request.head.repo.full_name == github.repository
       )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     steps:
       - uses: actions/checkout@v4
         with:
@@ -161,7 +161,7 @@ jobs:
 
   smoke-tests:
     needs: [build-smoke-aptos-node, build-smoke-tests]
-    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: 180
     strategy:
       fail-fast: false

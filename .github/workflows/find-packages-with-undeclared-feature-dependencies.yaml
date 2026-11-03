@@ -7,7 +7,7 @@ permissions:
 
 jobs:
   find-packages-with-undeclared-feature-dependencies:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     steps:
       - uses: actions/checkout@v4
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
