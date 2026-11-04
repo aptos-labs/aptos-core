@@ -445,7 +445,7 @@ impl<'a, T> VMValue<'a> for Boxed<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{align::MAX_ALIGN, memory::Obj};
+    use crate::{align::MAX_ALIGN, memory::Obj, DescriptorId, OBJECT_HEADER_SIZE};
 
     // `#[repr(align(N))]` needs a literal, so the buffers below use `u64`
     // backing to get `MAX_ALIGN`.
@@ -498,38 +498,50 @@ mod tests {
         );
     }
 
-    /// Lays out a `vector<u8>` heap object -- `[len: u64][bytes...]` -- in an
-    /// 8-byte-aligned buffer. The object's data pointer is the buffer's start:
-    /// the length is at `VEC_LENGTH_OFFSET`, the bytes at `VEC_DATA_OFFSET`.
+    /// The data pointer of an object laid out by the helpers below: the word
+    /// after the header at the buffer's start.
+    fn test_obj_data(buf: &mut [u64]) -> MemAddr {
+        // SAFETY: the buffer holds at least the header word.
+        unsafe { MemAddr::from_mut(buf).add(OBJECT_HEADER_SIZE) }
+    }
+
+    /// Writes an object header covering the whole buffer and returns the
+    /// object.
+    fn test_obj(buf: &mut [u64]) -> Obj {
+        let size = (buf.len() * 8) as u32;
+        // SAFETY: the buffer's first word is the header reservation.
+        unsafe { Obj::write_header(test_obj_data(buf), DescriptorId(1), size) }
+    }
+
+    /// Lays out a `vector<u8>` heap object -- `[header][len: u64][bytes...]`
+    /// -- in an 8-byte-aligned buffer. The object's data pointer is
+    /// `test_obj_data`: the length is at `VEC_LENGTH_OFFSET`, the bytes at
+    /// `VEC_DATA_OFFSET`.
     fn byte_vec_object_for_test(bytes: &[u8]) -> Vec<u64> {
-        let mut buf = vec![0u64; 1 + bytes.len().div_ceil(8)];
-        buf[0] = bytes.len() as u64;
+        let mut buf = vec![0u64; 2 + bytes.len().div_ceil(8)];
+        buf[1] = bytes.len() as u64;
         // SAFETY: `buf` has room for `bytes.len()` initialized (zeroed) bytes
-        // after the length word, and nothing else accesses them while the slice
-        // is live. The object has no header, which nothing here reads.
-        let data = unsafe {
-            Obj::new(MemAddr::from_mut(buf.as_mut_slice()))
-                .vec_data()
-                .as_bytes_mut(bytes.len())
-        };
+        // after the header and length words, and nothing else accesses them
+        // while the slice is live.
+        let data = unsafe { test_obj(&mut buf).vec_data().as_bytes_mut(bytes.len()) };
         data.copy_from_slice(bytes);
         buf
     }
 
-    /// Builds a `vector<vector<u8>>` object with layout `[len: u64][inner_ptr...]`.
-    /// The inner buffers must outlive all uses of the returned object.
-    fn nested_byte_vec_object_for_test(inners: &[Vec<u64>]) -> Vec<u64> {
-        let mut outer = vec![0u64; 1 + inners.len()];
-        outer[0] = inners.len() as u64;
-        // SAFETY: `outer` is non-null; it has no header, which nothing here reads.
-        let outer_obj = unsafe { Obj::new(MemAddr::from_mut(outer.as_mut_slice())) };
-        for (slot, inner) in inners.iter().enumerate() {
+    /// Builds a `vector<vector<u8>>` object with layout
+    /// `[header][len: u64][inner_ptr...]`. The inner buffers must outlive all
+    /// uses of the returned object.
+    fn nested_byte_vec_object_for_test(inners: &mut [Vec<u64>]) -> Vec<u64> {
+        let mut outer = vec![0u64; 2 + inners.len()];
+        outer[1] = inners.len() as u64;
+        let outer_obj = test_obj(&mut outer);
+        for (slot, inner) in inners.iter_mut().enumerate() {
             // SAFETY: `outer` has an aligned pointer slot for each inner vector.
             // `store_ptr` preserves each inner buffer's pointer provenance.
             unsafe {
                 outer_obj
                     .vec_elem(slot as u64, 8)
-                    .store_ptr(MemAddr::from_ref(inner.as_slice()))
+                    .store_ptr(test_obj_data(inner.as_mut_slice()))
             };
         }
         outer
@@ -542,14 +554,14 @@ mod tests {
         let pool = RootPool::new();
 
         // Three inner byte vectors, kept alive for the reads below.
-        let inners = [
+        let mut inners = [
             byte_vec_object_for_test(b"hello"),
             byte_vec_object_for_test(b""),
             byte_vec_object_for_test(b"world!!"),
         ];
 
-        let mut outer = nested_byte_vec_object_for_test(&inners);
-        let outer_addr = MemAddr::from_mut(outer.as_mut_slice());
+        let mut outer = nested_byte_vec_object_for_test(&mut inners);
+        let outer_addr = test_obj_data(outer.as_mut_slice());
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
         // buffers outlive the reads.
@@ -572,12 +584,12 @@ mod tests {
         let pool = RootPool::new();
 
         // Outer object holding two inner byte vectors.
-        let inners = [
+        let mut inners = [
             byte_vec_object_for_test(b"a"),
             byte_vec_object_for_test(b"b"),
         ];
-        let mut outer = nested_byte_vec_object_for_test(&inners);
-        let outer_addr = MemAddr::from_mut(outer.as_mut_slice());
+        let mut outer = nested_byte_vec_object_for_test(&mut inners);
+        let outer_addr = test_obj_data(outer.as_mut_slice());
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object.
         let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_addr) });

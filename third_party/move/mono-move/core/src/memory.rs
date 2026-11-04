@@ -11,15 +11,31 @@
 //! the data `MAX_ALIGN`-aligned). [`Obj::header`], [`Obj::write_header`] and
 //! [`Obj::set_descriptor`] are the only places that reach below a data
 //! pointer.
+//!
+//! The types carry the VM-level memory checks (see `mono_move_mem::checks`):
+//! a reference's offset range, an object pointer's shape, an object header's
+//! self-consistency, field and element addresses against the payload, and a
+//! frame's pointer and metadata. Each is attached with `mem_check!` and
+//! compiles to nothing in the production tier.
 
 use crate::{
     ClosureFuncRef, DescriptorId, FrameOffset, Function, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE,
     FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
-    OBJECT_HEADER_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    MAX_ALIGN, OBJECT_HEADER_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 pub use mono_move_alloc::MemoryRegion;
+use mono_move_mem::{
+    checks::{MemFault, MemFaultKind},
+    mem_check,
+};
 pub use mono_move_mem::{MemAddr, Scalar};
+
+/// Marker written into the `descriptor_id` header word of an object the GC
+/// has moved; the object's first data word then holds the forwarding
+/// pointer. A header-format fact: outside a collection no live object
+/// carries it.
+pub const FORWARDED_MARKER: u32 = u32::MAX;
 
 // ---------------------------------------------------------------------------
 // Frame metadata layout
@@ -90,6 +106,19 @@ impl FatRef {
     /// slot `base` points at.
     #[inline(always)]
     pub unsafe fn target(self) -> MemAddr {
+        // Hardened: `base + offset` does not wrap the address space.
+        mem_check!(
+            hardened,
+            (self.base.as_usize() as u64)
+                .checked_add(self.offset)
+                .is_some(),
+            MemFault::new(
+                MemFaultKind::FatRefRange,
+                self.base.as_usize(),
+                0,
+                self.offset as usize
+            )
+        );
         // SAFETY: forwarded to the caller.
         unsafe { self.base.add(self.offset as usize) }
     }
@@ -97,6 +126,21 @@ impl FatRef {
     /// A reference `delta` bytes further into the same object.
     #[inline(always)]
     pub fn with_added_offset(self, delta: u64) -> FatRef {
+        // Hardened: the new offset neither overflows nor exceeds `u32::MAX`
+        // (the verifier bounds static offsets to `u32`, and no object is
+        // larger, so a wider offset cannot name a byte of its object).
+        mem_check!(
+            hardened,
+            self.offset
+                .checked_add(delta)
+                .is_some_and(|o| o <= u32::MAX as u64),
+            MemFault::new(
+                MemFaultKind::FatRefRange,
+                self.base.as_usize(),
+                delta as usize,
+                self.offset as usize
+            )
+        );
         FatRef {
             base: self.base,
             offset: self.offset + delta,
@@ -125,7 +169,12 @@ impl Frame {
     /// within the stack and the call protocol has written its metadata.
     #[inline(always)]
     pub unsafe fn new(fp: MemAddr) -> Frame {
-        debug_assert!(fp.is_aligned_to(crate::MAX_ALIGN));
+        // Hardened: every frame the call protocol places is `MAX_ALIGN`-aligned.
+        mem_check!(
+            hardened,
+            fp.is_aligned_to(MAX_ALIGN),
+            MemFault::new(MemFaultKind::BadFramePointer, fp.as_usize(), 0, MAX_ALIGN)
+        );
         Frame(fp)
     }
 
@@ -186,6 +235,18 @@ impl Frame {
     #[inline(always)]
     pub unsafe fn caller<'a>(self) -> Option<(Frame, &'a Function)> {
         let meta = self.meta();
+        // Exhaustive: a non-root frame's caller sits below it (frames grow
+        // upward), so the saved fp is strictly less than this frame's fp.
+        mem_check!(
+            exhaustive,
+            meta.saved_func_ptr().is_null() || meta.saved_fp().as_usize() < self.0.as_usize(),
+            MemFault::new(
+                MemFaultKind::BadFrameMeta,
+                meta.saved_fp().as_usize(),
+                0,
+                self.0.as_usize()
+            )
+        );
         // SAFETY: forwarded to the caller.
         let func = unsafe { meta.saved_caller()? };
         // SAFETY: a non-null saved function means this is not the root frame,
@@ -214,7 +275,15 @@ impl FrameMeta {
     #[inline(always)]
     pub fn saved_fp(self) -> MemAddr {
         // SAFETY: `Frame::meta` guarantees an initialized, aligned block.
-        unsafe { self.0.add(META_SAVED_FP_OFFSET).load_ptr() }
+        let fp = unsafe { self.0.add(META_SAVED_FP_OFFSET).load_ptr() };
+        // Hardened: the call protocol saves either null (root frame) or an
+        // aligned frame pointer; null is trivially aligned.
+        mem_check!(
+            hardened,
+            fp.is_aligned_to(MAX_ALIGN),
+            MemFault::new(MemFaultKind::BadFrameMeta, fp.as_usize(), 0, MAX_ALIGN)
+        );
+        fp
     }
 
     /// The caller's function pointer, or null for the root frame.
@@ -297,7 +366,19 @@ impl Obj {
     /// `data` must be the data pointer of a live heap object.
     #[inline(always)]
     pub unsafe fn new(data: MemAddr) -> Obj {
-        debug_assert!(!data.is_null());
+        // Hardened: an object's data pointer is non-null and, because the
+        // allocator reserves `OBJECT_HEADER_SIZE == MAX_ALIGN` bytes below
+        // it, `MAX_ALIGN`-aligned.
+        mem_check!(
+            hardened,
+            !data.is_null() && data.is_aligned_to(MAX_ALIGN),
+            MemFault::new(
+                MemFaultKind::BadObjectPointer,
+                data.as_usize(),
+                0,
+                MAX_ALIGN
+            )
+        );
         Obj(data)
     }
 
@@ -324,14 +405,55 @@ impl Obj {
     /// The object's header.
     #[inline(always)]
     pub fn header(self) -> ObjHeader {
+        let header = self.header_or_forwarded();
+        // Hardened: outside a collection no live object is forwarded.
+        mem_check!(
+            hardened,
+            header.descriptor != FORWARDED_MARKER,
+            MemFault::new(
+                MemFaultKind::BadHeader,
+                self.0.as_usize(),
+                header.size as usize,
+                header.descriptor as usize
+            )
+        );
+        header
+    }
+
+    /// The object's header, which may carry the GC's [`FORWARDED_MARKER`].
+    /// For the collector, which legitimately meets forwarded objects while
+    /// it runs; everything else uses [`Obj::header`].
+    #[inline(always)]
+    pub fn header_or_forwarded(self) -> ObjHeader {
         // SAFETY: `Obj::new` guarantees an allocator-written header: both
         // words are initialized and aligned.
-        unsafe {
+        let header = unsafe {
             ObjHeader {
                 descriptor: self.descriptor_slot().load::<u32>(),
                 size: self.size_slot().load::<u32>(),
             }
-        }
+        };
+        // Hardened: the allocator writes the `MAX_ALIGN`-rounded total size,
+        // which covers at least the header itself.
+        mem_check!(
+            hardened,
+            header.size as usize >= OBJECT_HEADER_SIZE
+                && (header.size as usize).is_multiple_of(MAX_ALIGN),
+            MemFault::new(
+                MemFaultKind::BadHeader,
+                self.0.as_usize(),
+                header.size as usize,
+                header.descriptor as usize
+            )
+        );
+        header
+    }
+
+    /// The payload size the header records: the bytes from the data start to
+    /// the end of the object. For the checks below; a header load.
+    #[inline(always)]
+    fn payload_size(self) -> usize {
+        self.header().size as usize - OBJECT_HEADER_SIZE
     }
 
     /// The field at `bytes` from the data start.
@@ -341,8 +463,39 @@ impl Obj {
     /// The field must lie within the object.
     #[inline(always)]
     pub unsafe fn field(self, bytes: usize) -> MemAddr {
+        // Hardened: the address is within, or one past the end of, the
+        // payload.
+        mem_check!(
+            hardened,
+            bytes <= self.payload_size(),
+            MemFault::new(MemFaultKind::FieldOutOfPayload, self.0.as_usize(), 0, bytes)
+        );
         // SAFETY: forwarded to the caller.
         unsafe { self.0.add(bytes) }
+    }
+
+    /// The field of `width` bytes at `off` from the data start; as
+    /// [`Obj::field`], for a site that copies a known number of bytes.
+    ///
+    /// # Safety
+    ///
+    /// The `width` bytes at `off` must lie within the object.
+    #[inline(always)]
+    pub unsafe fn field_range(self, off: usize, width: usize) -> MemAddr {
+        // Hardened: the whole range is within the payload.
+        mem_check!(
+            hardened,
+            off.checked_add(width)
+                .is_some_and(|end| end <= self.payload_size()),
+            MemFault::new(
+                MemFaultKind::FieldOutOfPayload,
+                self.0.as_usize(),
+                width,
+                off
+            )
+        );
+        // SAFETY: forwarded to the caller.
+        unsafe { self.0.add(off) }
     }
 
     /// The start of a vector's element data.
@@ -354,7 +507,26 @@ impl Obj {
     pub unsafe fn vec_data(self) -> MemAddr {
         // SAFETY: forwarded to the caller: a vector's data starts at
         // `VEC_DATA_OFFSET`, within the object.
-        unsafe { self.0.add(VEC_DATA_OFFSET) }
+        unsafe { self.field(VEC_DATA_OFFSET) }
+    }
+
+    /// Hardened: `count` elements of `elem_size` bytes starting at `idx` lie
+    /// within the payload. In `u64` so the check itself cannot overflow.
+    #[inline(always)]
+    fn check_vec_range(self, idx: u64, count: u64, elem_size: u32) {
+        mem_check!(
+            hardened,
+            idx.checked_add(count)
+                .and_then(|end| end.checked_mul(u64::from(elem_size)))
+                .and_then(|bytes| bytes.checked_add(VEC_DATA_OFFSET as u64))
+                .is_some_and(|end| end <= self.payload_size() as u64),
+            MemFault::new(
+                MemFaultKind::VectorOutOfPayload,
+                self.0.as_usize(),
+                elem_size as usize,
+                idx as usize
+            )
+        );
     }
 
     /// The `idx`-th element of a vector with `elem_size`-byte elements; the
@@ -365,8 +537,35 @@ impl Obj {
     /// The object must be such a vector and `idx` within its allocation.
     #[inline(always)]
     pub unsafe fn vec_elem(self, idx: u64, elem_size: u32) -> MemAddr {
+        self.check_vec_range(idx, 1, elem_size);
+        // Two pointer adds rather than `add(vec_elem_offset(..))`: a pointer
+        // add has no overflow check, so this is one `lea` in release.
         // SAFETY: forwarded to the caller.
-        unsafe { self.vec_data().add(idx as usize * elem_size as usize) }
+        unsafe {
+            self.0
+                .add(VEC_DATA_OFFSET)
+                .add(idx as usize * elem_size as usize)
+        }
+    }
+
+    /// The start of the `count` elements at `idx` of a vector with
+    /// `elem_size`-byte elements. Unlike [`Obj::vec_elem`], a `count` of
+    /// zero may name the one-past-the-end position of a full allocation,
+    /// as the empty end of a range copy does.
+    ///
+    /// # Safety
+    ///
+    /// The object must be such a vector and the `count` elements at `idx`
+    /// within its allocation.
+    #[inline(always)]
+    pub unsafe fn vec_range(self, idx: u64, count: u64, elem_size: u32) -> MemAddr {
+        self.check_vec_range(idx, count, elem_size);
+        // SAFETY: forwarded to the caller.
+        unsafe {
+            self.0
+                .add(VEC_DATA_OFFSET)
+                .add(idx as usize * elem_size as usize)
+        }
     }
 
     /// The number of `elem_size`-byte elements a vector's allocation holds:
@@ -396,6 +595,21 @@ impl Obj {
     /// The object must be a vector.
     #[inline(always)]
     pub unsafe fn set_vec_len(self, len: u64) {
+        // Hardened: `len` elements of at least one byte each fit in the
+        // payload. A weak bound (the element size is unknown here), but a
+        // free one.
+        mem_check!(
+            hardened,
+            (VEC_DATA_OFFSET as u64)
+                .checked_add(len)
+                .is_some_and(|end| end <= self.payload_size() as u64),
+            MemFault::new(
+                MemFaultKind::VectorOutOfPayload,
+                self.0.as_usize(),
+                0,
+                len as usize
+            )
+        );
         // SAFETY: forwarded to the caller.
         unsafe { self.0.add(VEC_LENGTH_OFFSET).store::<u64>(len) }
     }
@@ -427,6 +641,9 @@ impl Obj {
     /// A closure's function reference as `(tag, payload)`: the tag is
     /// `FUNC_REF_TAG_RESOLVED` or `FUNC_REF_TAG_UNRESOLVED` and the payload
     /// is the address of the `Function` or interned `FunctionRef`.
+    ///
+    /// No memory check here: the VM validates the tag and a null payload
+    /// itself (`exec_call_closure` reports an invariant violation).
     ///
     /// # Safety
     ///
@@ -598,6 +815,252 @@ pub unsafe fn vec_bytes_or_empty<'a>(ptr: MemAddr) -> &'a [u8] {
         unsafe {
             let vec = Obj::new(ptr);
             vec.vec_data().as_bytes(vec.vec_len() as usize)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mono_move_mem::checks::{take_last_fault, EXHAUSTIVE, HARDENED};
+
+    /// A `MAX_ALIGN`-aligned byte buffer, as every VM region is.
+    #[repr(C, align(8))]
+    struct Buf<const N: usize>([u8; N]);
+
+    impl<const N: usize> Buf<N> {
+        fn zeroed() -> Self {
+            Buf([0; N])
+        }
+
+        fn addr(&mut self) -> MemAddr {
+            MemAddr::from_ptr(self.0.as_mut_ptr())
+        }
+
+        /// An object of total `size` bytes laid out at the start of the
+        /// buffer: the header in the first 8 bytes, the data after it.
+        fn obj(&mut self, size: u32) -> Obj {
+            assert!(OBJECT_HEADER_SIZE + size as usize <= N);
+            // SAFETY: the buffer holds the header bytes and `size` more.
+            unsafe { Obj::write_header(self.addr().add(OBJECT_HEADER_SIZE), DescriptorId(1), size) }
+        }
+    }
+
+    #[test]
+    fn header_round_trip() {
+        let mut buf = Buf::<40>::zeroed();
+        // Payload 24: a vector of two 8-byte elements.
+        let obj = buf.obj(32);
+        assert_eq!(obj.header(), ObjHeader {
+            descriptor: 1,
+            size: 32
+        });
+        assert_eq!(obj.header_or_forwarded(), obj.header());
+        unsafe {
+            obj.set_vec_len(3);
+            assert_eq!(obj.vec_len(), 3);
+            assert_eq!(obj.vec_elem(1, 8), obj.vec_data().add(8));
+            assert_eq!(obj.field(16), obj.addr().add(16));
+            assert_eq!(obj.field_range(8, 8), obj.field(8));
+            assert_eq!(obj.vec_range(1, 0, 8), obj.vec_elem(1, 8));
+        }
+    }
+
+    #[test]
+    fn frame_meta_round_trip() {
+        let mut buf = Buf::<64>::zeroed();
+        let base = buf.addr();
+        unsafe {
+            let fp = base.add(FRAME_METADATA_SIZE);
+            FrameMeta::write_at(base, 7, base, MemAddr::NULL);
+            let frame = Frame::new(fp);
+            assert_eq!(frame.fp(), fp);
+            assert_eq!(frame.meta().saved_pc_word(), 7);
+            assert_eq!(frame.meta().saved_fp(), base);
+            assert!(frame.meta().saved_func_ptr().is_null());
+            assert!(frame.caller().is_none());
+        }
+    }
+
+    // ----- hardened-tier negative tests (no-ops in the production tier) -----
+
+    /// Runs `f` and returns the fault it raised, or `None` if checks are
+    /// not compiled in.
+    fn expect_fault(f: impl FnOnce()) -> Option<MemFaultKind> {
+        if !HARDENED {
+            return None;
+        }
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+        assert!(r.is_err(), "expected a memory fault");
+        Some(take_last_fault().expect("fault recorded").kind)
+    }
+
+    fn assert_fault(expected: MemFaultKind, f: impl FnOnce()) {
+        if let Some(kind) = expect_fault(f) {
+            assert_eq!(kind, expected);
+        }
+    }
+
+    #[test]
+    fn hardened_bad_header_faults() {
+        let mut buf = Buf::<32>::zeroed();
+        // Size zero.
+        let obj = buf.obj(0);
+        assert_fault(MemFaultKind::BadHeader, || {
+            obj.header();
+        });
+        // Size not a multiple of `MAX_ALIGN`.
+        let obj = buf.obj(12);
+        assert_fault(MemFaultKind::BadHeader, || {
+            obj.header();
+        });
+        // Forwarded outside a collection: `header` faults, the GC accessor
+        // does not.
+        let obj = buf.obj(16);
+        unsafe { obj.set_descriptor(FORWARDED_MARKER) };
+        assert_fault(MemFaultKind::BadHeader, || {
+            obj.header();
+        });
+        assert_eq!(obj.header_or_forwarded().descriptor, FORWARDED_MARKER);
+    }
+
+    #[test]
+    fn hardened_vector_out_of_payload_faults() {
+        let mut buf = Buf::<32>::zeroed();
+        // Payload 16: the length word and one 8-byte element.
+        let obj = buf.obj(24);
+        unsafe {
+            obj.vec_elem(0, 8);
+            obj.vec_range(1, 0, 8);
+            obj.set_vec_len(8);
+        }
+        assert_fault(MemFaultKind::VectorOutOfPayload, || unsafe {
+            obj.vec_elem(1, 8);
+        });
+        assert_fault(MemFaultKind::VectorOutOfPayload, || unsafe {
+            obj.vec_elem(0, 9);
+        });
+        assert_fault(MemFaultKind::VectorOutOfPayload, || unsafe {
+            obj.vec_range(0, 2, 8);
+        });
+        assert_fault(MemFaultKind::VectorOutOfPayload, || unsafe {
+            obj.vec_elem(u64::MAX, 8);
+        });
+        assert_fault(MemFaultKind::VectorOutOfPayload, || unsafe {
+            obj.set_vec_len(9);
+        });
+        assert_fault(MemFaultKind::VectorOutOfPayload, || unsafe {
+            obj.set_vec_len(u64::MAX);
+        });
+    }
+
+    #[test]
+    fn hardened_field_out_of_payload_faults() {
+        let mut buf = Buf::<32>::zeroed();
+        // Payload 16.
+        let obj = buf.obj(24);
+        unsafe {
+            obj.field(16);
+            obj.field_range(8, 8);
+            obj.field_range(16, 0);
+        }
+        assert_fault(MemFaultKind::FieldOutOfPayload, || unsafe {
+            obj.field(17);
+        });
+        assert_fault(MemFaultKind::FieldOutOfPayload, || unsafe {
+            obj.field_range(8, 9);
+        });
+        assert_fault(MemFaultKind::FieldOutOfPayload, || unsafe {
+            obj.field_range(usize::MAX, 1);
+        });
+        // A vector's data start inherits the check: payload 0 has no room.
+        let obj = buf.obj(8);
+        assert_fault(MemFaultKind::FieldOutOfPayload, || unsafe {
+            obj.vec_data();
+        });
+    }
+
+    #[test]
+    fn hardened_bad_object_pointer_faults() {
+        let mut buf = Buf::<32>::zeroed();
+        let base = buf.addr();
+        assert_fault(MemFaultKind::BadObjectPointer, || unsafe {
+            Obj::new(MemAddr::NULL);
+        });
+        assert_fault(MemFaultKind::BadObjectPointer, || unsafe {
+            Obj::new(base.add(OBJECT_HEADER_SIZE + 1));
+        });
+        assert_fault(MemFaultKind::BadObjectPointer, || unsafe {
+            Obj::write_header(base.add(OBJECT_HEADER_SIZE + 4), DescriptorId(1), 8);
+        });
+    }
+
+    #[test]
+    fn hardened_fat_ref_range_faults() {
+        let mut buf = Buf::<32>::zeroed();
+        let base = buf.addr();
+        // Offset arithmetic overflows.
+        assert_fault(MemFaultKind::FatRefRange, || {
+            FatRef::new(base, u64::MAX).with_added_offset(1);
+        });
+        // Offset leaves the `u32` range.
+        assert_fault(MemFaultKind::FatRefRange, || {
+            FatRef::new(base, u64::from(u32::MAX)).with_added_offset(1);
+        });
+        FatRef::new(base, u64::from(u32::MAX) - 1).with_added_offset(1);
+        // `base + offset` wraps the address space; the address is only
+        // formed, never dereferenced.
+        let high = MemAddr::from_ptr(std::ptr::without_provenance_mut(usize::MAX - 7));
+        assert_fault(MemFaultKind::FatRefRange, || unsafe {
+            FatRef::new(high, 16).target();
+        });
+    }
+
+    #[test]
+    fn hardened_bad_frame_pointer_faults() {
+        let mut buf = Buf::<64>::zeroed();
+        let base = buf.addr();
+        assert_fault(MemFaultKind::BadFramePointer, || unsafe {
+            Frame::new(base.add(FRAME_METADATA_SIZE + 4));
+        });
+    }
+
+    #[test]
+    fn hardened_bad_frame_meta_faults() {
+        let mut buf = Buf::<64>::zeroed();
+        let base = buf.addr();
+        unsafe {
+            // A misaligned saved fp cannot have been written by the call
+            // protocol.
+            FrameMeta::write_at(base, 0, base.add(4), MemAddr::NULL);
+            let frame = Frame::new(base.add(FRAME_METADATA_SIZE));
+            assert_fault(MemFaultKind::BadFrameMeta, || {
+                frame.meta().saved_fp();
+            });
+        }
+    }
+
+    #[test]
+    fn exhaustive_caller_above_frame_faults() {
+        if !EXHAUSTIVE {
+            return;
+        }
+        let mut buf = Buf::<64>::zeroed();
+        let base = buf.addr();
+        unsafe {
+            let fp = base.add(FRAME_METADATA_SIZE);
+            // A non-root frame (non-null saved function word; the check fires
+            // before the word is turned into a `Function`) whose saved fp is
+            // not below it.
+            FrameMeta::write_at(base, 0, fp, base);
+            let frame = Frame::new(fp);
+            assert_fault(MemFaultKind::BadFrameMeta, || {
+                frame.caller();
+            });
+            FrameMeta::write_at(base, 0, fp.add(8), base);
+            assert_fault(MemFaultKind::BadFrameMeta, || {
+                frame.caller();
+            });
         }
     }
 }

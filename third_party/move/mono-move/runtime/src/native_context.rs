@@ -865,20 +865,30 @@ impl NativeContext for ProductionNativeContext<'_> {
         // grown to hold `required >= 1` elements). The bounds check and grow
         // keep every range in-allocation; no allocation runs past this point.
         unsafe {
+            // Ranges rather than elements: an empty tail starts one past the
+            // last element, which is the end of the allocation when the
+            // vector is full.
             let from_vec = Obj::new(from_ptr);
             let to_vec = Obj::new(to_ptr);
-            to_vec.vec_elem(insert_position, elem_size).copy_to(
-                to_vec.vec_elem(insert_position + length, elem_size),
-                bytes(to_len - insert_position),
-            );
-            from_vec
-                .vec_elem(removal_position, elem_size)
-                .copy_to_nonoverlapping(to_vec.vec_elem(insert_position, elem_size), bytes(length));
-            from_vec
-                .vec_elem(removal_position + length, elem_size)
+            let to_tail = to_len - insert_position;
+            to_vec
+                .vec_range(insert_position, to_tail, elem_size)
                 .copy_to(
-                    from_vec.vec_elem(removal_position, elem_size),
-                    bytes(from_len - removal_position - length),
+                    to_vec.vec_range(insert_position + length, to_tail, elem_size),
+                    bytes(to_tail),
+                );
+            from_vec
+                .vec_range(removal_position, length, elem_size)
+                .copy_to_nonoverlapping(
+                    to_vec.vec_range(insert_position, length, elem_size),
+                    bytes(length),
+                );
+            let from_tail = from_len - removal_position - length;
+            from_vec
+                .vec_range(removal_position + length, from_tail, elem_size)
+                .copy_to(
+                    from_vec.vec_range(removal_position, from_tail, elem_size),
+                    bytes(from_tail),
                 );
             from_vec.set_vec_len(from_len - length);
             to_vec.set_vec_len(to_len + length);

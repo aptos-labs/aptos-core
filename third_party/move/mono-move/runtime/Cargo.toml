@@ -27,6 +27,7 @@ shared-dsa = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+mono-move-mem = { workspace = true }
 move-value-view-derive = { workspace = true }
 num = { workspace = true }
 paste = { workspace = true }

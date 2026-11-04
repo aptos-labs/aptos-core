@@ -35,7 +35,6 @@ impl Heap {
         let ObjHeader { descriptor, size } = src.header();
         let src_size = size as usize;
         let src_desc_id = DescriptorId(descriptor);
-        debug_assert!(src_size >= OBJECT_HEADER_SIZE);
 
         let new = heap_alloc(self, src_size, src_desc_id)?;
 
@@ -71,18 +70,14 @@ impl Heap {
                     // Shared across objects of different `values_size`
                     // (offset-shape dedup), so an offset isn't bounded by this
                     // object's size; the layout guarantees `values_size >=
-                    // offset + 8`. Assert it for this object.
-                    debug_assert!(
-                        CAPTURED_DATA_VALUES_OFFSET + offset as usize + 8
-                            <= src_size - OBJECT_HEADER_SIZE,
-                        "captured-data pointer offset {offset} exceeds object payload"
-                    );
+                    // offset + 8`, which `field_range` checks for this object.
+                    //
                     // SAFETY: the descriptor lists `offset` as a pointer slot
-                    // within the values region (asserted in-bounds above).
+                    // within the values region.
                     unsafe {
                         self.try_deep_copy_slot(
                             descriptors,
-                            new.field(CAPTURED_DATA_VALUES_OFFSET + offset as usize),
+                            new.field_range(CAPTURED_DATA_VALUES_OFFSET + offset as usize, 8),
                         )?
                     };
                 }

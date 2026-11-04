@@ -590,7 +590,7 @@ mod tests {
         memory::{MemAddr, Obj},
         storage::resource_provider::ResourceProviderError,
         types::Type,
-        DescriptorId, ReadPin, ValueLayoutTable, OBJECT_HEADER_SIZE,
+        DescriptorId, ReadPin, ValueLayoutTable, MAX_ALIGN, OBJECT_HEADER_SIZE,
     };
     use move_core_types::account_address::AccountAddress;
     use shared_dsa::UnorderedMap;
@@ -632,15 +632,17 @@ mod tests {
     }
 
     // The map only stores and compares these pointers, never reading through
-    // them, so any distinct non-null address works. Real allocation rather than
-    // an integer cast, which `-Zmiri-strict-provenance` rejects.
+    // them, so any distinct non-null `MAX_ALIGN`-aligned address works. Real
+    // allocation rather than an integer cast, which `-Zmiri-strict-provenance`
+    // rejects.
     fn fake_ptr(n: usize) -> Obj {
-        static BACKING: std::sync::OnceLock<Box<[u8]>> = std::sync::OnceLock::new();
-        let backing = BACKING.get_or_init(|| vec![0u8; 0x10000].into_boxed_slice());
+        static BACKING: std::sync::OnceLock<Box<[u64]>> = std::sync::OnceLock::new();
+        let backing = BACKING.get_or_init(|| vec![0u64; 0x10000].into_boxed_slice());
         assert!(n < backing.len(), "fake_ptr index out of range");
-        // SAFETY: `n` is within the backing allocation, as just asserted. The
-        // address is not a real object, but nothing here reads through it.
-        unsafe { Obj::new(MemAddr::from_const_ptr(backing.as_ptr()).add(n)) }
+        // SAFETY: `n * MAX_ALIGN` is within the backing allocation, as just
+        // asserted. The address is not a real object, but nothing here reads
+        // through it.
+        unsafe { Obj::new(MemAddr::from_const_ptr(backing.as_ptr().cast()).add(n * MAX_ALIGN)) }
     }
 
     // The tests only store and compare read pointers, never dereferencing them,
