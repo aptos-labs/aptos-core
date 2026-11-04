@@ -273,7 +273,7 @@ impl AptosDB {
                 order.store.activate_pruners(synced_version);
             }
             if let Some(collateral) = myself.collateral.as_ref() {
-                collateral.activate_pruners(synced_version);
+                collateral.store.activate_pruners(synced_version);
             }
         }
 

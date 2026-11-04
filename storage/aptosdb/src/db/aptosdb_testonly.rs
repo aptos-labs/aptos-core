@@ -161,6 +161,7 @@ impl AptosDB {
             position_state_summary: None,
             positions: None,
             orders: None,
+            collateral: None,
             is_reconfig: transactions_to_keep.is_reconfig(),
         };
 

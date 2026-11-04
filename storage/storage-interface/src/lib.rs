@@ -45,6 +45,7 @@ pub mod state_store;
 use crate::{
     chunk_to_commit::ChunkToCommit,
     state_store::{
+        collateral::{CollateralOverlay, ShardedCollateralLayers},
         orders::{OrderOverlay, ShardedOrderLayers},
         positions::{PositionOverlay, ShardedPositionLayers},
         sharded_jmt_state::PositionStateWithSummary,
@@ -707,6 +708,15 @@ pub trait DbWriter: Send + Sync {
         &self,
         _target: Option<&OrderOverlay>,
     ) -> Result<Option<ShardedOrderLayers>> {
+        unimplemented!()
+    }
+
+    /// The collateral analog of [`Self::advance_position_base`], under the
+    /// same lock discipline. `None` when trading-native storage is off.
+    fn advance_collateral_base(
+        &self,
+        _target: Option<&CollateralOverlay>,
+    ) -> Result<Option<ShardedCollateralLayers>> {
         unimplemented!()
     }
 }

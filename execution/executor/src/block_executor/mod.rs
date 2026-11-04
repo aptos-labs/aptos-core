@@ -27,6 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
+        collateral::{CollateralParent, ShardedCollateralLayers},
         orders::{OrderParent, ShardedOrderLayers},
         positions::{PositionParent, ShardedPositionLayers},
         state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
@@ -225,6 +226,7 @@ where
         let committed_block_id = self.committed_block_id();
         let position_floor = self.prepare_position_base(block_id, parent_output)?;
         let order_floor = self.prepare_order_base(block_id, parent_output)?;
+        let collateral_floor = self.prepare_collateral_base(block_id, parent_output)?;
 
         // Record ExecutionStart for traced transactions.
         // block_txns is populated at proposal time (round_manager::process_proposal).
@@ -276,6 +278,10 @@ where
                         .result_orders()
                         .zip(order_floor.as_ref())
                         .map(|(overlay, floor)| OrderParent { overlay, floor }),
+                    parent_output
+                        .result_collateral()
+                        .zip(collateral_floor.as_ref())
+                        .map(|(overlay, floor)| CollateralParent { overlay, floor }),
                     state_view,
                     onchain_config,
                     TransactionSliceMetadata::block(parent_block_id, block_id),
@@ -371,6 +377,37 @@ where
                 error: "parent carries orders but trading-native storage is absent".into(),
             })?;
         if !parent_orders.descends_from(&floor) {
+            return Err(ExecutorError::StaleBranch(block_id));
+        }
+        Ok(Some(floor))
+    }
+
+    /// The collateral analog of [`Self::prepare_position_base`], under the
+    /// same lock.
+    fn prepare_collateral_base(
+        &self,
+        block_id: HashValue,
+        parent_output: &PartialStateComputeResult,
+    ) -> ExecutorResult<Option<ShardedCollateralLayers>> {
+        let Some(parent_collateral) = parent_output.result_collateral() else {
+            return Ok(None);
+        };
+        let certified = self.block_tree.root_block();
+        let target = certified
+            .output
+            .result_collateral()
+            .filter(|certified_collateral| {
+                parent_collateral.is_descendant_of(certified_collateral)
+            });
+        let floor = self
+            .db
+            .writer
+            .advance_collateral_base(target)
+            .map_err(anyhow::Error::from)?
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "parent carries collateral but trading-native storage is absent".into(),
+            })?;
+        if !parent_collateral.descends_from(&floor) {
             return Err(ExecutorError::StaleBranch(block_id));
         }
         Ok(Some(floor))
