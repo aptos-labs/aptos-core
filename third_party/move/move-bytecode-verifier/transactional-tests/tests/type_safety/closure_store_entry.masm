@@ -1,0 +1,56 @@
+// `entry` alone does not make a function persistent, and the verifier gives a
+// closure `store` only when its target's handle carries the `persistent` attribute.
+
+//# publish
+// A private `entry` function without the attribute: the closure lacks `store`,
+// so packing it into a field of type `|u64|u64 has store` is rejected.
+module 0x67::private_entry
+
+struct Work has store + key
+  f: |u64|u64 has store
+
+entry fun target(x: u64): u64
+    move_loc x
+    ld_u64 1
+    add
+    ret
+
+entry fun store(s: &signer)
+    move_loc s
+    pack_closure target, 0
+    pack Work
+    move_to Work
+    ret
+
+//# publish
+// The same function with the `persistent` attribute: accepted, stored, loaded
+// and called.
+module 0x68::persistent_entry
+
+struct Work has store + key
+  f: |u64|u64 has store
+
+#[persistent] entry fun target(x: u64): u64
+    move_loc x
+    ld_u64 1
+    add
+    ret
+
+entry fun store(s: &signer)
+    move_loc s
+    pack_closure target, 0
+    pack Work
+    move_to Work
+    ret
+
+entry fun exec(a: address): u64 acquires Work
+    ld_u64 1
+    move_loc a
+    move_from Work
+    unpack Work
+    call_closure <|u64|u64 has store>
+    ret
+
+//# run 0x68::persistent_entry::store --signers 0x68
+
+//# run 0x68::persistent_entry::exec --args @0x68

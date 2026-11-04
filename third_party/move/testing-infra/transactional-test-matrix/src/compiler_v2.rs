@@ -351,6 +351,10 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "function values in resources",
     ),
     MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/storable_entry.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/storage_examples.move",
         "function values in resources",
     ),
