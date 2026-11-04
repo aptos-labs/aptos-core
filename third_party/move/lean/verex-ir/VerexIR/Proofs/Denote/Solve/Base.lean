@@ -1005,7 +1005,7 @@ step proof, the locals' scope entries where the scope names them, then what
 the body owes, which it is by definition. -/
 def bindLet (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
   -- Only a step proof's walk binds a `let` (`bindLetAt`).
-  let some (names, references) ← scopeTable? | return none
+  let some (names, _) ← scopeTable? | return none
   let target := (← instantiateMVars (← goal.getType)).consumeMData
   unless target.isAppOf ``LetIn || target.isAppOf ``LetRowIn do return none
   let goal ← goal.replaceTargetDefEq target.appArg!
@@ -1023,7 +1023,16 @@ def bindLet (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
     unless names.contains name do continue
     -- A mutable reference's entry holds its current value, its prophecy
     -- the value written back, as a binder's does (`scopedBinderGoal`).
-    if references.contains name then
+    -- Names can be reused by inlined helpers for a value of another type.
+    -- The declaration's frame slot, rather than a name used by any reference
+    -- in the function, determines whether this binding has a prophecy.
+    let mut slot := frame
+    for _ in [:index] do
+      slot := (← whnfR slot).appArg!
+    slot ← whnfR slot
+    let reference := slot.isAppOfArity ``NRow.cons 2 &&
+      (← whnfR (slot.getArg! 0)).isAppOf ``NTy.ref
+    if reference then
       entries := entries.push (name, ← mkAppM ``Prod.fst #[value])
       if names.contains (name ++ "'") then
         entries := entries.push (name ++ "'", ← mkAppM ``Prod.snd #[value])

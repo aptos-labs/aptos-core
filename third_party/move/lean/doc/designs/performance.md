@@ -408,6 +408,92 @@ instead of scripts over presented leaves remove that where one fact
 suffices; unmeasured on the corpus, and to be measured before investing in
 per-leaf preparation sharing.
 
+### Authored sharing checkpoint (2026-11-03)
+
+A controlled whole-module `ordered_map` comparison, with shared continuations,
+`verex.jobs=1`, solver profiling, and the unchanged 300M target allowance:
+all nine authored targets verify before and after. The baseline includes the
+proof-language migration helpers but precedes shared path preparation and nested
+`on`; the candidate includes both. Builds were stopped during measurements.
+
+| Target | Before M HB | After M HB | Before CPU s | After CPU s |
+|---|---:|---:|---:|---:|
+| `test_verify_drain_symbolic` | 31.771 | 31.186 | 1.10 | 1.07 |
+| `test_verify_iter_walk_mut_symbolic` | 91.774 | 66.782 | 3.43 | 2.61 |
+| `test_aborts_if_new_from_2` | 6.542 | 5.974 | 0.47 | 0.37 |
+| `test_verify_iter_remove_shift_at_position` | 16.977 | 16.450 | 0.55 | 0.56 |
+| `test_verify_iter_borrow_mut_at_position` | 13.779 | 14.020 | 0.47 | 0.52 |
+| `test_verify_iter_borrow_mut_symbolic` | 26.087 | 24.909 | 0.92 | 0.88 |
+| `test_verify_iter_add_middle_symbolic` | 19.657 | 18.294 | 0.74 | 0.68 |
+| `test_verify_iter_add_append_symbolic` | 28.414 | 24.268 | 0.99 | 0.91 |
+| `ground_enum_123` | 10.306 | 10.511 | 0.35 | 0.41 |
+
+Target CPU is sampled from the verifier process every 20ms, so small differences
+are approximate. The nine targets total 245.306M → 212.394M heartbeats and
+9.02s → 8.01s sampled CPU. Whole-module child CPU is 48.363s → 46.377s.
+The two small heartbeat regressions are included above. These are checkpoint
+measurements; subsequent proof-port changes require another measurement.
+
+The four ostensibly grouped loop-step clauses shared one path, not four.
+Their clause-local binders made the full-context keys differ. Grouping by the
+prepared prefix and retaining the longest common context allows their common
+steps to run together without making clause-local assumptions available to the
+parent block. Shared late premises must remain in that common context.
+
+Three targets remain more expensive authored than automatic: middle insertion
+18.294M versus 12.882M, append 24.268M versus 22.072M, removal at a position
+16.450M versus 10.376M. The authored walk's preparation and block handling remain
+costs even when little work can be shared. Automatic verification of these three
+succeeds at the same allowance; automatic verification of the entire module
+has two other failing targets, so its total is not an equivalent verified result.
+
+### Next measurements after the authored ports
+
+S1 (per-target result reuse and fail-fast solving) is deferred at the user's
+request. Result caching is not a Move Prover feature and does not improve
+fresh CI runs. Prioritize reducing the actual work of verification after
+finishing the authored ports:
+
+1. Share closed normalized call equations across targets, preserving the
+   existing argument-shape and family-transport key. The fallback
+   contract-normalization context is now constructed only when reusable
+   equations cannot apply; equation reuse itself remains target-local.
+   For continuation release, measure substantive releases separately from
+   the existing no-held-head fast path. Share call-owned lookup and dependency
+   analysis, while retaining normalization under each branch's arguments and
+   newly introduced premises; moving the release invocation outside the
+   subgoal loop alone does not eliminate that necessary work.
+2. Profile the successful and failed deciders per leaf before changing their
+   order or adding inexpensive applicability checks.
+3. Trace the commits behind the big-map and staking-config budget regressions
+   before targeting those regressions with optimizations.
+4. Measure relevance-directed preparation. The handoff's proof-term analysis
+   finds only about 20–30% of prepared hypotheses are used; this does not imply
+   a proportional CPU saving. Evaluate a closure from the goal and names the
+   proof reads, preserving explicit access to otherwise omitted facts.
+
+Deferred S1 design notes (retained for reference, not scheduled): the proposal
+keys verified results by declarations used by the
+proof, rather than source files: hash the theorem statement, referenced
+constant types and definition values, toolchain, verifier build, and options.
+Theorem dependencies need their types, not their proof bodies. Dependency
+validation must also account for definitions reached transitively; an unchanged
+wrapper must not conceal a changed definition it unfolds. Compare these keys
+at theorem start, before solving. An opaque callee's body change should leave
+callers cached when its contract is unchanged, while the module audit always
+runs and requires the callee's current verification result. Cache recursive
+cycle groups together.
+
+Failed and budget-stopped targets have no proof term to identify dependencies.
+Use a conservative solver-visible environment key, including namespace hashes,
+attributes and simp sets, and provide `--fresh` to bypass reuse. Proposed storage
+is `build/verex/results/<module>.olean` plus a per-target `.trace` containing
+outcomes, dependency hashes, and failure templates. Before implementation,
+resolve how importing cached results avoids stale or conflicting declarations
+in the current environment; compare import-and-alias with kernel replay of
+stored proof terms. Measure validation, loading and replay costs as well as
+the solving saved. This is a deferred design, not an implemented cache.
+
 ## Tried and rejected
 
 | Experiment | Result |

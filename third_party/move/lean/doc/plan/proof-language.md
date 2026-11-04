@@ -336,7 +336,7 @@ Closers:
 | `arith` | `verex_omega_unsplit` alone: `omega` over the facts it reads without case splits and a few connected facts with one split; never the budgeted residual `omega` over the whole context that `verex_linear` adds, which is search the proof did not ask for | linear arithmetic with the stated bounds |
 | `eval` | `verex_map_simp`, `verex_typed_close`, `verex_goal_witnesses`, `decide` | closed maps, literal vectors, ground arithmetic |
 | `ring` | `grobner` (the `ring` module of `grind` alone: no splits, no instantiation, bounded by `ringSteps` and `ringMaxDegree`) on the goal with the hypotheses hidden | a polynomial identity `e₁ == e₂` over the integers; an equation it depends on is substituted first (`let`, a `calc` step) |
-| `congr` | `lia (splits := 0)`: congruence closure and the linear module of `grind`, nothing else (`grind (splits := 0) (ematch := 0) -ring -linarith` is not this: it keeps the `ac`, `order`, `mbtc`, extensionality and `funext` modules on) | equality through function applications and uninterpreted terms combined with linear arithmetic, `f(a * b) == f(2 * b)` from `a == 2`; no open `if`, no existential |
+| `congr` | bounded rewriting by local equalities and shallow congruence, then `lia (splits := 0)`: congruence closure and the linear module of `grind`, nothing else (`grind (splits := 0) (ematch := 0) -ring -linarith` is not this: it keeps the `ac`, `order`, `mbtc`, extensionality and `funext` modules on) | equality through function applications and uninterpreted terms combined with linear arithmetic, `f(a * b) == f(2 * b)` from `a == 2`; no open `if`, no existential |
 | `solve` | `verex_solve`: the automatic leaf under its cap (`solveLeaf`: call observations, the leaf pipeline, the prepared leaf and each case of its variant split as an attempt of its own, `verex_open_prepared`, `verex_prepared_case`) | an explicit request for automation, charged as automatic work |
 | `lean => tac` | the tactic | anything |
 
@@ -588,13 +588,13 @@ step's closer; its statement, normalized, is the fact. No alias theorem
 and no generic frame is stated for an application.
 
 Of the 25 distinct `SpecMap` lemmas the corpus's proofs apply, the table holds
-eighteen. Three (`keyAt_satisfies`, `keyAt_satisfies_all`,
+nineteen. Three (`keyAt_satisfies`, `keyAt_satisfies_all`,
 `hasKey_satisfies`) are applied only to type bounds of keys, which
-preparation supplies ("Normal-form fixes"). Four (`nextKey_none`,
-`nextKey_some`, `valid_slice`, `keyAt_of_keys`) state the next key, a map's
-validity and its key list, which no role names; only `big_ordered_map`'s
-proofs apply them, and they enter the table with that module's rewrite
-(L4), with the roles or specification functions that state those notions.
+preparation supplies ("Normal-form fixes"). `lemma_valid_slice(parent, offset)`
+uses the validity obligation to infer the slice, independently of the parent's
+value type, and owes the parent's validity, interval bounds, and pointwise
+key correspondence. Three (`nextKey_none`, `nextKey_some`, `keyAt_of_keys`)
+state the next key and a map's key list, which no role names.
 The coverage of a map's keys by a vector (`map_key_search_absurd`,
 `MapCoverage.lean`) is a map lemma of the `has_key` and `len` roles,
 `lemma_contains_key_len_search_absurd(m, keys, k)` for an owner binding
@@ -1423,6 +1423,42 @@ that needs `lean =>`. Each item's rewrite confirms or refutes that; a
 residual escape is a gap recorded in its milestone's gate. `capability` is
 the least certain: whether its obligations, after the splits and witnesses,
 are within `congr` is known only from its goals.
+
+An obligation block can end with `finish by c`, selecting a core closer
+(`decide`, `arith`, `eval`, `solve`, `congr`, or `ring`) for every remaining
+goal. It must close all of them and does not emit a new fact. Program-point
+blocks use assertions instead. The `eval` closer also uses the existing
+ground evaluator to substitute known map definitions into relevant reads.
+
+## Future extensions
+
+### Constructor-specific proof branches
+
+A proof-step `match` would allow separate proof bodies for the constructors
+of an enum. Today, `split e` performs case analysis and runs the subsequent
+steps in every surviving case; `let Variant { fields } := e` destructures a
+known variant. Neither provides a separate authored body for each constructor.
+
+Illustrative syntax (proposed, not implemented):
+
+```text
+match it {
+  End => { /* steps for the end case */ }
+  Node { key, value } => { /* steps using key and value */ }
+}
+/* shared steps for any remaining obligations */
+```
+
+The extension should check exhaustiveness, bind payload names and constructor
+facts only within their branch, and run following shared steps on each
+remaining branch obligation. Facts established in one branch must not leak
+into another. Lowering should reuse preparation before the split and prepare
+only the new branch facts, preserving the language's bounded automation.
+The exact syntax and treatment of impossible constructors remain design work.
+
+This proof construct is distinct from `when match k Variant`, which selects
+verification paths through an existing program match. It introduces proof
+case analysis even when the program has no corresponding match.
 
 ## Migration
 

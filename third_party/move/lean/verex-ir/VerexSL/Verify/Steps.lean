@@ -79,6 +79,11 @@ reported as unsupported until it has a lowering. -/
 syntax (name := stepAssume) &"assume" verexExpr : verexProofStep
 /-- `apply L(a), …` owes each premise by `decide` and gives the conclusions. -/
 syntax (name := stepApply) &"apply" verexExpr,+ : verexProofStep
+/-- Compute vector lengths and reads after updates, where established bounds
+identify the affected position. Leaves unresolved reads unchanged. -/
+syntax (name := stepCompute) &"compute" : verexProofStep
+/-- Close the remaining obligations with a core closer. -/
+syntax (name := stepFinish) &"finish" " by " verexCloser : verexProofStep
 /-- `split e` continues once per case of a Boolean or a variant value. -/
 syntax (name := stepSplit) &"split" verexExpr (&"in" verexExpr)? : verexProofStep
 /-- `calc(e₁ op e₂ op …)` asserts each step of the chain and gives its
@@ -247,6 +252,8 @@ def mapLemmas : Array MapLemma :=
       roles := #[.rank], parameters := #[map, key "a" `a, key "b" `b] },
     { name := fun r => lemmaName [r .keyAt, "lt"], theorem_ := ``VerexIR.SpecMap.keyAt_lt_of_lt
       roles := #[.keyAt], parameters := #[map, int "first" `first, int "second" `second] },
+    { name := fun _ => "lemma_valid_slice", theorem_ := ``VerexIR.SpecMap.valid_slice
+      roles := #[.keyAt, .len], parameters := #[map, int "offset" `offset] },
     { name := fun r => lemmaName [r .keyAt, r .set, "before"],
       theorem_ := ``VerexIR.SpecMap.keyAt_update_before
       roles := #[.keyAt, .set, .rank], parameters := #[map, key "k", value, int "i" `index] },
@@ -528,6 +535,18 @@ private def applyExpressions (lets : Array (Name × Syntax)) (binders : Array (S
 /-- The steps of a block or of a nested block. -/
 def blockSteps (block : Syntax) : Array Syntax :=
   if block.isOfKind ``verexProofBlock then block[0].getArgs else block[1].getArgs
+
+/-- Whether a block continues with clause-specific sub-blocks. -/
+private def hasNestedOn (block : Syntax) : Bool :=
+  (blockSteps block).any fun step => step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault
+
+/-- Obligation blocks at every nesting depth, for lowering their expressions
+and recording the binders each child clause introduces. -/
+private partial def obligationBlocks (block : Syntax) : Array Syntax :=
+  (blockSteps block).flatMap fun step =>
+    if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then
+      #[step] ++ obligationBlocks step[3]
+    else #[]
 
 /-- The relations of a `calc` chain, with their symbols. -/
 private def chainRelations : Array (SyntaxNodeKind × String) := #[
@@ -970,7 +989,7 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
     -- The witnesses of an `on` block's obligation have the types of its
     -- existential's binders.
     let mut witnessed : Array (Nat × Array String) := #[]
-    for step in blockSteps block do
+    for step in obligationBlocks block do
       unless step.isOfKind ``stepOn do continue
       unless (blockSteps step[3]).any (·.isOfKind ``stepWitness) do continue
       let keys := step[1].getSepArgs
@@ -1007,7 +1026,7 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
         | .error message => throwErrorAt keys[0]! message
       if let some position := step.getPos? then witnessed := witnessed.push (position.byteIdx, types)
     -- What each `on` step's obligations need (`OnNeeds`).
-    for step in blockSteps block do
+    for step in obligationBlocks block do
       let some position := step.getPos? | continue
       if step.isOfKind ``stepOn then
         let mut joined : ClauseNeeds := { reads := some false }
@@ -1254,6 +1273,7 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
 /-! ## Steps at a leaf -/
 
 open Meta Tactic VerexIR.Proofs.Denote
+
 
 /-- The carriers the leaf's native values are at: those of a local of a
 native type, else the target's family's, where the leaf holds its values
@@ -1579,12 +1599,39 @@ private def literalBoundForm? (target : Lean.Expr) :
         return mkApp5 (mkConst ``literal_le_of_lt) b (toExpr (k - 1)) a stated (← literal (k - 1) k))
   | _ => return none
 
+/-- Reduce representation definitions while keeping the equation's observed
+functions opaque. Matching their arguments must not evaluate a recursive spec. -/
+private def withEquationHeads {α : Type} (statement : Lean.Expr) (action : MetaM α) : MetaM α := do
+  let some (_, lhs, rhs) := statement.eq? | return ← withReducible action
+  let heads := #[lhs.getAppFn.constName?, rhs.getAppFn.constName?]
+  withDefault <| withCanUnfoldPred (fun cfg info => do
+    if heads.contains (some info.name) then return false
+    canUnfoldDefault cfg info) action
+
 /-- The same statement, up to its instances' and annotations' spelling. -/
 private def sameStatement (type wanted : Lean.Expr) : MetaM Bool := do
   if type == wanted then return true
   unless type.getAppFn == wanted.getAppFn && type.getAppNumArgs == wanted.getAppNumArgs do
     return false
+  if type.isAppOf ``Eq || type.isAppOf ``LE.le || type.isAppOf ``LT.lt then
+    let lhs := type.getArg! (type.getAppNumArgs - 2)
+    let rhs := type.appArg!
+    let lhs' := wanted.getArg! (wanted.getAppNumArgs - 2)
+    let rhs' := wanted.appArg!
+    if lhs.getAppFn == lhs'.getAppFn && rhs.getAppFn == rhs'.getAppFn then
+      -- Compare the arguments and their carrier types, without unfolding
+      -- a symbolic specification function merely to compare two calls.
+      let heads := #[lhs.getAppFn.constName?, rhs.getAppFn.constName?]
+      return ← withDefault <| withCanUnfoldPred (fun cfg info => do
+        if heads.contains (some info.name) then return false
+        canUnfoldDefault cfg info) (isDefEq type wanted)
   withReducible (isDefEq type wanted)
+
+/-- An absent vector element cannot occur at any position, including a
+position outside the vector. -/
+private theorem read_ne_some_of_not_mem {α : Type} (xs : Array α) (i : Nat) (x : α)
+    (missing : ¬x ∈ xs) : xs[i]? ≠ some x :=
+  fun found => missing (Array.mem_of_getElem? found)
 
 /-- Close a goal its context states, by spelling (`doc/plan/proof-language.md`,
 "Closers": the facts decide what they state): a hypothesis of the goal's
@@ -1609,7 +1656,9 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
     -- An equation stated the other way round.
     if let some (_, lhs, rhs) := target.eq? then
       if let some (_, lhs', rhs') := type.eq? then
-        if lhs' == rhs && rhs' == lhs then return some (← mkEqSymm decl.toExpr)
+        if (lhs' == rhs && rhs' == lhs) ||
+            (← sameStatement type (← mkEq rhs lhs)) then
+          return some (← mkEqSymm decl.toExpr)
     -- A disequation stated the other way round.
     if target.isAppOfArity ``Not 1 && type.isAppOfArity ``Not 1 then
       if let some (_, lhs, rhs) := target.appArg!.eq? then
@@ -1666,6 +1715,21 @@ private partial def statedProof? (target : Lean.Expr) : MetaM (Option Lean.Expr)
         let reading ← mkAppM ``VerexIR.Proofs.Denote.mem_iff_exists_int_index #[xs, t]
         let proof ← mkAppM ``Iff.mp #[reading, decl.toExpr]
         return some (← mkExpectedTypeHint proof target)
+  -- A nonmembership fact rules out the optional read directly, without
+  -- an in-bounds premise or speculative positional instantiation.
+  let negativeEquality := if target.isAppOfArity ``Ne 3 then
+    some (target.getArg! 0, target.getArg! 1, target.getArg! 2)
+    else target.not?.bind Lean.Expr.eq?
+  if let some (_, lookup, value) := negativeEquality then
+    if lookup.isAppOfArity ``GetElem?.getElem? 7 && value.isAppOfArity ``Option.some 2 then
+      let xs := lookup.getArg! 5
+      if (← whnfR (← inferType xs)).isAppOf ``Array &&
+          (← whnfR (← inferType (lookup.getArg! 6))).isConstOf ``Nat then
+        let missing := mkNot (← mkAppM ``Membership.mem #[xs, value.appArg!])
+        if let some proof ← statedProof? missing then
+          let proof ← mkAppM ``read_ne_some_of_not_mem
+            #[xs, lookup.getArg! 6, value.appArg!, proof]
+          if ← withReducible (isDefEq (← inferType proof) target) then return some proof
   -- A conjunction part by part, as a disjunct states one.
   if let some (left, right) := target.and? then
     let some first ← statedProof? left | return none
@@ -1705,7 +1769,10 @@ syntax (name := blockRingTactic) "verex_block_ring" : tactic
 def closerTactic (closer : Syntax) : TacticM (TSyntax `tactic) := do
   if closer.isOfKind ``closerDecide then blockDecide
   else if closer.isOfKind ``closerArith then `(tactic| verex_omega_unsplit)
-  else if closer.isOfKind ``closerEval then `(tactic| verex_typed_close)
+  else if closer.isOfKind ``closerEval then `(tactic| first
+    | rfl
+    | verex_ground_arithmetic
+    | verex_typed_close)
   else if closer.isOfKind ``closerSolve then `(tactic| verex_solve)
   else if closer.isOfKind ``closerCongr then `(tactic| verex_block_congr)
   else if closer.isOfKind ``closerRing then `(tactic| verex_block_ring)
@@ -2008,6 +2075,7 @@ private def cachedSimpContext (call : StepCall) : TacticM (Simp.Context × Simp.
     -- Membership an atom (`stepPositional`), a search for an element read
     -- as the atom.
     | .normal => `(tactic| simp only [vir_denote, vir_denote_norm, vir_denote_spec, vir_denote_eval,
+        Int.add_sub_cancel, Int.reduceAdd, Int.reduceSub, Int.reduceMul, Int.reduceTDiv,
         Prod.fst, Prod.snd, reduceStatedIte, VerexIR.Proofs.Denote.findIndex?_eq_none_mem_iff,
         VerexIR.Proofs.Denote.findIndex?_isSome_mem_iff, VerexIR.Proofs.Denote.exists_mem_val_eq_iff, VerexIR.Proofs.Denote.forall_mem_val_ne_iff,
         VerexIR.Proofs.Denote.exists_position_some_iff, VerexIR.Proofs.Denote.forall_position_some_ne_iff, VerexIR.Proofs.Denote.exists_position_eq_iff,
@@ -2209,6 +2277,15 @@ private def keepsDefinition (name : String) : CoreM Bool := do
   | some reads => return reads.contains name
   | none => return true
 
+/-- Scalar names in a scoped value, including the fields of a native row. -/
+private partial def scopedComponents (value : Lean.Expr) : Array FVarId :=
+  match localName? value with
+  | some x => #[x]
+  | none =>
+    if value.isAppOfArity ``Prod.mk 4 then
+      scopedComponents (value.getArg! 2) ++ scopedComponents (value.getArg! 3)
+    else #[]
+
 /-- The leaf's definitions of named values in normal form with each other:
 each one's term with the others folded to their names. -/
 private def reduceDefinitions (goal : MVarId) (changed : Option (Array Name) := none) :
@@ -2245,9 +2322,10 @@ private def reduceDefinitions (goal : MVarId) (changed : Option (Array Name) := 
     (← getLCtx).foldlM (init := #[]) fun found decl => do
       let some (name, _, value) := scopeEntry? (← instantiateMVars decl.type) | return found
       unless ← keepsDefinition name do return found
-      return match localName? value with
-        | some x => found.push x
-        | none => found
+      -- A structure's scope entry is a row of field values. Preserve their
+      -- definitions too, rather than folding two equal field values into
+      -- each other and losing their common defining expression.
+      return found ++ scopedComponents value
   let definesScoped (definition : FVarId) : MetaM Bool := goal.withContext do
     let some (_, lhs, rhs) := (← instantiateMVars (← definition.getType)).eq? | return false
     return [lhs, rhs].any fun side => (localName? side).any scopedNames.contains
@@ -2758,10 +2836,9 @@ private partial def determinedInstance (goal : MVarId) (candidate : Lean.Expr) :
   if arguments.isEmpty then return false
   let attempts ← IO.mkRef (32 : Nat)
   let skippedReads ← IO.mkRef (#[] : Array Lean.Expr)
-  let rec finish : TacticM Bool := do
+  let finishDetermined : TacticM Bool := do
     let conclusion ← instantiateMVars conclusion
-    if conclusion.hasExprMVar then
-      unless ← goal.withContext (withReducible (isDefEq conclusion target)) do return false
+    if conclusion.hasExprMVar then return false
     let cancelled ← goal.withContext do offsetsCancelled (← instantiateMVars conclusion)
     let (normal, equality?) ← normalForm goal cancelled.expr rules
     let (wanted, wantedEquality?) ← normalForm goal target rules
@@ -2794,6 +2871,25 @@ private partial def determinedInstance (goal : MVarId) (candidate : Lean.Expr) :
         | some equality => mkEqMPR equality read
         | none => pure read)
       return true
+  let finish : TacticM Bool := do
+    let conclusion ← instantiateMVars conclusion
+    unless conclusion.hasExprMVar do return ← finishDetermined
+    -- One side of an equation can determine its binders even when a frame
+    -- equation must rewrite the other side. Each match is only a candidate:
+    -- finishDetermined checks the entire normalized conclusion and premises.
+    let mut matchings := #[withEquationHeads target (isDefEq conclusion target)]
+    if let some (_, lhs, rhs) := conclusion.eq? then
+      if let some (_, wantedLhs, wantedRhs) := target.eq? then
+        matchings := matchings.push (withEquationHeads target (isDefEq lhs wantedLhs))
+        matchings := matchings.push (withEquationHeads target (isDefEq rhs wantedRhs))
+    for matching in matchings do
+      let saved ← saveState
+      if ← goal.withContext matching then
+        if ← finishDetermined then return true
+      let names ← getNGen
+      saved.restore
+      setNGen names
+    return false
   let rec search : TacticM Bool := do
     let left ← attempts.get
     if left == 0 then return false
@@ -2915,7 +3011,7 @@ where
       let saved ← saveState
       try
         let premises ← if literal then goal.apply candidate
-          else withReducible (goal.apply candidate)
+          else withEquationHeads target (goal.apply candidate)
         let mut closed := true
         for premise in premises do
           if ← premise.isAssigned then continue
@@ -3088,14 +3184,17 @@ private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MV
     evalTactic (← `(tactic| first
       | verex_negation_conflict | verex_block_omega | verex_bool_conflict | verex_instance
       | verex_instance_refutation))
-  else if readsMap then
-    evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_instance |
-      verex_block_omega))
   else
     try
-      evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_block_omega |
-        verex_instance))
+      if readsMap then
+        evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_instance |
+          verex_block_omega))
+      else
+        evalTactic (← `(tactic| first | verex_negation_conflict | verex_bool_conflict | verex_block_omega |
+          verex_instance))
     catch failure =>
+      -- Instantiate against the normalized goal, including map reads whose
+      -- source statement still contains typed-map or integer bridges.
       unless ← blockInstance goal do throw failure
       setGoals []
 
@@ -3168,6 +3267,9 @@ run_meta do
             `{parameter.binder}`"
       for binder in binders, name in names do
         if parameters.any (·.binder == name) then continue
+        -- The slice is inferred from the validity obligation, independently
+        -- of the parent map's value type.
+        if theorem_ == ``VerexIR.SpecMap.valid_slice && name == `slice then continue
         unless ← lemmaBinderFilled name (← inferType binder) do
           throwError "built-in lemma {theorem_}: binder `{name}` is filled by nothing"
 
@@ -3268,7 +3370,9 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
       | _, none => throwErrorAt reference "a map lemma is applied at no map"
     values := values.push (parameter.binder, value)
   let theorem_ ← mkConstWithFreshMVarLevels lemmaTheorem
-  let (holes, _, statement) ← forallMetaTelescopeReducing (← inferType theorem_)
+  -- Only the declared binders are inputs. Reducing the conclusion would
+  -- turn a negation into an additional premise and a conclusion of False.
+  let (holes, _, statement) ← forallMetaTelescope (← inferType theorem_)
   -- The binders' names, read from the theorem's statement.
   let rec binderNames : Lean.Expr → List Name
     | .forallE name _ body _ => name :: binderNames body
@@ -3279,6 +3383,12 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
       unless ← isDefEq hole value do
         throwErrorAt reference m!"the lemma's `{name}` does not fit its theorem: {← inferType value} \
           against {← inferType hole}"
+  if lemmaTheorem == ``VerexIR.SpecMap.valid_slice then
+    let mut target ← instantiateMVars (← goal.getType)
+    while target.isAppOf ``VerexIR.Proofs.Obligation do
+      target := target.appArg!
+    unless ← isDefEq statement target do
+      throwErrorAt reference "the slice lemma requires an ordered-map validity obligation"
   for hole in holes, name in names do
     if name == `fallback || name == `read || name == `injective || name == `eq ||
         name == `sound then
@@ -3394,6 +3504,9 @@ private def proveReadingWhy (reference : Syntax) (goal : MVarId) (prove : Tactic
   let goal ← readBounds goal
   setGoals [goal]
   readUnmarked
+  -- Step expressions can introduce fresh native reads after the path was
+  -- prepared. Compare them at the same family spelling as its hypotheses.
+  evalTactic (← `(tactic| all_goals verex_canonical_families))
   if (← getUnsolvedGoals).isEmpty then return none
   try
     withRef reference prove
@@ -3418,7 +3531,12 @@ private def statedInstance (goal : MVarId) (fact : Lean.Expr) (equality? : Optio
     match equality? with
     | some equality => mkEqMP equality (← instantiateMVars stated)
     | none => instantiateMVars stated
-  unless ← goal.withContext (isDefEq owed proof) do saved.restore; return false
+  -- Comparing proof terms can succeed by proof irrelevance without assigning
+  -- the opaque metavariable. Check the statement, then install the proof.
+  unless ← goal.withContext (isDefEq (← inferType owed) (← inferType proof)) do
+    saved.restore
+    return false
+  owed.mvarId!.assign proof
   return true
 
 /-- `fact` normalized as the leaf is, proved by `prove` from the goal's
@@ -3578,7 +3696,7 @@ private def lemmaConclusion (application : Syntax) (closer : TSyntax `tactic) (g
       let (proof, statement, premises) ← lemmaInstance goal lowered application mapLemma
       for premise in premises do
         let some premise ← normalizeFact premise none rules | continue
-        unless ← proveReading application premise (evalTactic closer) do
+        unless ← proveReading application premise (evalTactic (← `(tactic| (repeat intro); $closer:tactic))) do
           withSpecForm <| throwErrorAt application m!"the lemma's premise is not proved:\
             {indentD (MessageData.ofGoal premise)}"
       return (proof, statement)
@@ -4109,14 +4227,54 @@ def normalizeTarget (goal : MVarId) : TacticM (Option MVarId) := do
   let some next ← simpCached goal .rules forward reversed #[] true | return none
   normalizeFact next none
 
+/-- Compose the context's equalities through applications without unfolding
+specification functions. Only local equations are rewrite rules; a bounded
+attempt that leaves a goal restores its state for the other closers. -/
+private def closeByEqualityChain (goal : MVarId) : TacticM Bool := do
+  let saved ← saveState
+  try
+    let closed ← goal.withContext do
+      let mut equations : SimpTheorems := {}
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let statement := (← instantiateMVars decl.type).consumeMData
+        unless statement.isAppOfArity ``Eq 3 do continue
+        let direction ← factRule statement
+        if direction == .none then continue
+        for theorem_ in ← mkSimpTheoremFromExpr (.fvar decl.fvarId) #[] decl.toExpr
+            (inv := direction == .reversed) do
+          equations := equations.addSimpTheorem theorem_
+      let { ctx, simprocs, .. } ← mkSimpContext
+        (← `(tactic| simp (config := { maxSteps := 512 }) only)) (eraseLocal := false)
+      let ctx ← Simp.mkContext ctx.config (ctx.simpTheorems.push equations) ctx.congrTheorems
+      let (remaining, _) ← withReducible <| simpGoal goal ctx simprocs
+        (fvarIdsToSimp := #[])
+      return remaining.isNone
+    if closed then return true
+  catch _ => pure ()
+  let names ← getNGen
+  saved.restore
+  setNGen names
+  return false
+
 @[tactic blockCongrTactic] def evalBlockCongr : Tactic := fun _ => do
   let (_, goal) ← (← getMainGoal).intros
+  if ← closeByEqualityChain goal then
+    replaceMainGoal []
+    return
   let some goal ← normalizeTarget goal | replaceMainGoal []
   let mut open_ := #[]
   for part in ← conjunctionParts goal do
     let (_, part) ← part.intros
     setGoals [part]
-    evalTactic (← `(tactic| lia (splits := 0)))
+    if ← closeByEqualityChain part then
+      setGoals []
+      continue
+    -- Preserve opaque observations when a single congruence step and stated
+    -- equalities suffice; the arithmetic engine may unfold their definitions.
+    evalTactic (← `(tactic| first
+      | (congr 1 <;> assumption)
+      | lia (splits := 0)))
     open_ := open_ ++ (← getUnsolvedGoals).toArray
   setGoals open_.toList
 
@@ -4228,9 +4386,18 @@ def closeByDecide : TacticM (Array MVarId) := do
   let mut open_ := #[]
   for goal in ← getGoals do
     let started ← IO.getNumHeartbeats
-    let (_, normal) ← goal.intros
+    let (introduced, normal) ← goal.intros
     setGoals [normal]
-    try evalTactic (← blockDecide)
+    if !introduced.isEmpty then
+      -- Grouped clauses keep their premises inside their own conjunct.
+      -- Propagate these new facts before deciding that conjunct.
+      evalTactic (← `(tactic| all_goals verex_canonical_families))
+      evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+      evalTactic (← `(tactic| all_goals verex_subst_vars))
+      evalTactic (← `(tactic| all_goals verex_reduce_projections))
+      evalTactic (← `(tactic| all_goals verex_type_bounds))
+    let decide ← blockDecide
+    try evalTactic (← `(tactic| all_goals ($decide:tactic)))
     catch _ => pure ()
     stageLog s!"decide goal: {((← IO.getNumHeartbeats) - started) / 1000}k"
     open_ := open_ ++ (← getUnsolvedGoals).toArray
@@ -4606,6 +4773,29 @@ partial def runSteps (block : Syntax) (path : String := "") : TacticM Unit := do
     else if step.isOfKind ``stepSplit then splitStep step index
     else if step.isOfKind ``stepApply then
       applyStep step[1].getSepArgs (← blockDecide) index
+    else if step.isOfKind ``stepCompute then
+      evalTactic (← `(tactic| all_goals verex_lookups_after_writes))
+    else if step.isOfKind ``stepFinish then
+      if ← atPoint then
+        throwErrorAt step "`finish` closes an obligation; use `assert` for facts at a program point"
+      let closer := step[2]
+      unless [``closerDecide, ``closerArith, ``closerEval, ``closerSolve,
+          ``closerCongr, ``closerRing].contains closer.getKind do
+        throwErrorAt closer "`finish by` accepts decide, arith, eval, solve, congr or ring"
+      let tactic ← closerTactic closer
+      for goal in ← getGoals do
+        -- Unlike an assertion, finish introduces no new source expression or
+        -- native reads. Its obligation already has the block's prepared bounds.
+        setGoals [goal]
+        let why ← try
+          withRef step (evalTactic tactic)
+          pure (if (← getUnsolvedGoals).isEmpty then none else some none)
+        catch failure => pure (some (some failure.toMessageData))
+        if let some why := why then
+          withSpecForm <| throwErrorAt step m!"`finish` did not close the obligation:\
+            {indentD (MessageData.ofGoal ((← getUnsolvedGoals).head?.getD goal))}\
+            {why.map (fun reason => m!"\n{reason}") |>.getD m!""}"
+      setGoals []
     else if step.isOfKind ``stepCalc then calcStep step index
     else if step.isOfKind ``stepForall || step.isOfKind ``stepIf then
       guardedStep step index fun block path => runSteps block path
@@ -4670,12 +4860,7 @@ elab "verex_unmark" : tactic => focusGoal do
   let unmark (e : Lean.Expr) : MetaM Lean.Expr :=
     Core.transform e (post := fun e =>
       return if e.isAppOfArity ``VerexIR.Proofs.Obligation 4 then .done e.appArg! else .continue)
-  let mut goal ← getMainGoal
-  for decl in ← goal.withContext getLCtx do
-    if decl.isImplementationDetail || decl.isLet then continue
-    let type ← goal.withContext (instantiateMVars decl.type)
-    unless (type.find? (·.isAppOfArity ``VerexIR.Proofs.Obligation 4)).isSome do continue
-    goal ← goal.replaceLocalDeclDefEq decl.fvarId (← goal.withContext (unmark type))
+  let mut goal ← unmarkPathHypotheses (← getMainGoal)
   let target ← goal.withContext (instantiateMVars (← goal.getType))
   if (target.find? (·.isAppOfArity ``VerexIR.Proofs.Obligation 4)).isSome then
     goal ← goal.replaceTargetDefEq (← goal.withContext (unmark target))
@@ -4702,31 +4887,136 @@ elab "verex_premise_conditionals" : tactic => focusGoal do
     let (result, _) ← simpGoal goal ctx #[simprocs] (simplifyTarget := false) (fvarIdsToSimp := decided)
     replaceMainGoal (result.map (·.2) |>.toList)
 
-@[tactic verexStepObligation] def evalStepObligation : Tactic := fun stx => do
-  let step := stx[1]
+/-- A clause's identity survives shared case splits and normalization. Its
+statement remains definitionally the original obligation. -/
+def SharedClause (_label : String) (statement : Prop) : Prop := statement
+
+private def wrapSharedClause (goal : MVarId) : TacticM MVarId := do
+  let (key, tag) ← leafKeyOf goal
+  let label := tag.toString
+  (← targetState).leafKeys.modify (·.insert (Name.mkSimple label) key)
+  goal.withContext do
+    goal.replaceTargetDefEq (mkApp2 (mkConst ``SharedClause) (mkStrLit label) (← goal.getType))
+
+/-- Split only the shared conjunction. A clause's own conjunctions and
+quantifiers stay inside its marker until its nested block is entered. -/
+private partial def sharedClauseParts (goal : MVarId) : TacticM (Array (MVarId × ObligationKey)) := do
+  let target ← goal.withContext do pure (← instantiateMVars (← goal.getType)).consumeMData
+  if target.isAppOfArity ``SharedClause 2 then
+    let .lit (.strVal label) := target.getArg! 0 | throwError "a shared clause lost its label"
+    let tag := Name.mkSimple label
+    let some key := (← (← targetState).leafKeys.get)[tag]?
+      | throwError "a shared clause lost its source key"
+    let next ← goal.replaceTargetDefEq target.appArg!.consumeMData
+    next.setTag tag
+    return #[(next, key)]
+  if let some (left, right) := target.and? then
+    -- Preserve wrappers syntactically; `apply And.intro` can reduce the
+    -- child types while unifying its implicit proposition arguments.
+    let (lhs, rhs) ← goal.withContext do
+      let lhs ← mkFreshExprSyntheticOpaqueMVar left (← goal.getTag)
+      let rhs ← mkFreshExprSyntheticOpaqueMVar right (← goal.getTag)
+      goal.assign (mkApp4 (mkConst ``And.intro) left right lhs rhs)
+      return (lhs.mvarId!, rhs.mvarId!)
+    return (← sharedClauseParts lhs) ++ (← sharedClauseParts rhs)
+  throwError "a nested `on` block lost its clause boundary"
+
+mutual
+
+private partial def runOnBlock (step : Syntax) (finish : Bool) (path : String) (continuing : Bool := false) : TacticM Unit := do
   let block := if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then step[3] else step[2]
   let started ← IO.getNumHeartbeats
   -- The values prepared, the maps named (their size bounds and typed reads)
   -- where the block or the obligation reads a map: on a path prepared once
   -- for all its obligations (`verex_step_prepare`), only what the clause adds,
   -- its binders and premises.
+  -- A clause can package several paths under binders. Expose their saved
+  -- contexts before testing the path marker; otherwise an already prepared
+  -- path would run the full authored preparation again.
+  evalTactic (← `(tactic| all_goals verex_paths))
   let prepared ← (← getGoals).allM fun goal => pathPrepared goal
+  if finish && prepared && step.isOfKind ``stepOnDefault && (blockSteps block).isEmpty then
+    -- An empty fallback contributes no steps or source-local bindings. The
+    -- bounded leaf deciders can consume the path's prepared facts directly.
+    let mut open_ := []
+    for goal in ← getGoals do
+      let restoreCaches ← saveWalkCaches
+      -- The path is canonical, but a clause can still introduce premises
+      -- (including a final tuple equality). Expose these before the bounded
+      -- deciders; no map naming or authored fact normalization is needed.
+      -- A map's length is a count independently of naming its carrier.
+      unless ← closesBy goal (← `(tactic| (
+          verex_unmark
+          verex_intro_any
+          all_goals verex_split_hypotheses
+          all_goals verex_subst_vars
+          all_goals verex_reduce_projections
+          all_goals verex_unmark
+          all_goals first
+            | exact VerexIR.SpecMap.size_nonneg _
+            | verex_decide))) do
+        restoreCaches
+        open_ := open_ ++ [goal]
+    stageLog s!"step block at line {(← getFileMap).toPosition (step.getPos?.getD 0) |>.line}: \
+      preparation 0k, steps 0k, decide {((← IO.getNumHeartbeats) - started) / 1000}k"
+    setGoals open_
+    if open_.isEmpty then return
+    -- Some leaves still need the block's normal form (for example, a
+    -- contract's conditional map reads). Only those continue below.
+  let mut clausePremises := #[]
+  let mut reuse := continuing
   if prepared then
-    evalTactic (← `(tactic| verex_paths))
-    evalTactic (← `(tactic| all_goals verex_intro_any))
-    -- The path was prepared with its markers, which name the leaves; the
-    -- leaf reads its clauses unmarked, as a leaf prepared alone does, and a
-    -- substitution into them leaves projections of pairs to reduce.
-    evalTactic (← `(tactic| all_goals verex_unmark))
-    -- The clause's premises read at the caller's family, as the path's.
-    evalTactic (← `(tactic| all_goals verex_canonical_families))
-    evalTactic (← `(tactic| all_goals (try simp only [VerexIR.Proofs.Denote.whichProjectFamily] at *)))
-    evalTactic (← `(tactic| all_goals verex_split_hypotheses))
-    evalTactic (← `(tactic| all_goals verex_subst_vars))
-    evalTactic (← `(tactic| all_goals verex_reduce_projections))
-    evalTactic (← `(tactic| all_goals verex_type_bounds))
-    evalTactic (← `(tactic| all_goals verex_finish_prepare))
+    let mut introducedGoals := []
+    for goal in ← getGoals do
+      let before ← goal.withContext do
+        (← getLCtx).foldlM (init := ({} : Std.HashSet FVarId)) fun found decl =>
+          pure (found.insert decl.fvarId)
+      if reuse then
+        let conditional ← goal.withContext do
+          (← getLCtx).anyM fun decl => do
+            if decl.isImplementationDetail then return false
+            return ((← instantiateMVars decl.type).find? (·.isAppOf ``ite)).isSome
+        if conditional then reuse := false
+      setGoals [goal]
+      evalTactic (← `(tactic| verex_intro_any))
+      for next in ← getGoals do
+        let names ← next.withContext do
+          (← getLCtx).foldlM (init := #[]) fun found decl => do
+            if before.contains decl.fvarId || decl.isImplementationDetail then return found
+            return if ← isProp decl.type then found.push decl.userName else found
+        if reuse then
+          let scalarDelta ← next.withContext do
+            (← getLCtx).allM fun decl => do
+              if before.contains decl.fvarId || decl.isImplementationDetail then return true
+              let type ← instantiateMVars decl.type
+              if ← isProp type then
+                -- Equalities can substitute an older path value; leave that
+                -- dependency to ordinary context preparation.
+                return (type.find? fun e => e.isAppOf ``Eq || e.isAppOf ``Iff).isNone
+              return type.isConstOf ``Int || type.isConstOf ``Nat || type.isConstOf ``Bool
+          unless scalarDelta do reuse := false
+        clausePremises := clausePremises ++ names
+        introducedGoals := introducedGoals ++ [next]
+    setGoals introducedGoals
+    let mut preparedGoals := []
+    for goal in ← getGoals do
+      let delta ← pathHasDelta goal
+      setGoals [goal]
+      evalTactic (← `(tactic| verex_unmark))
+      if delta && !reuse then
+        -- A new premise can rewrite a path fact; retain context-wide work
+        -- for that dependency rather than assuming the old normal form.
+        evalTactic (← `(tactic| all_goals verex_canonical_families))
+        evalTactic (← `(tactic| all_goals (try simp only [VerexIR.Proofs.Denote.whichProjectFamily] at *)))
+        evalTactic (← `(tactic| all_goals verex_split_hypotheses))
+        evalTactic (← `(tactic| all_goals verex_subst_vars))
+        evalTactic (← `(tactic| all_goals verex_reduce_projections))
+        evalTactic (← `(tactic| all_goals verex_type_bounds))
+      evalTactic (← `(tactic| all_goals verex_finish_prepare))
+      preparedGoals := preparedGoals ++ (← getGoals)
+    setGoals preparedGoals
   else
+    reuse := false
     evalTactic (← `(tactic| verex_prepare values))
     evalTactic (← `(tactic| all_goals (try simp only [VerexIR.Proofs.Denote.whichProjectFamily] at *)))
   let names ← blockScope (← getFileName) block
@@ -4761,40 +5051,83 @@ elab "verex_premise_conditionals" : tactic => focusGoal do
           | none => pure goal
         else pure goal
       let needs ← leafNeeds goal
+      -- Read new premises using the shared facts before refreshing those
+      -- facts: a fact can become tautological in the new normal form while
+      -- still being needed to put a fresh premise into that form.
+      let mut live := some goal
+      for name in clausePremises.reverse do
+        if let some current := live then live ← normalizeFact current (some name)
+      let some goal := live | continue
       -- The obligation reads a map where its clause does; a key naming no
       -- clause by its statement.
       let reads ← match needs.bind (·.reads) with
         | some reads => pure reads
         | none => readsMap goal
       let mut goals := [goal]
-      if blockReadsMaps || reads then
+      if !reuse && (blockReadsMaps || reads) then
         setGoals [goal]
         evalTactic (← `(tactic| verex_name_maps))
         goals := ← getGoals
       for goal in goals do
         let goal ← nameBinders goal ((needs.map (·.binders)).getD #[])
-        let some goal ← normalizeBridges goal | continue
+        let some goal ← if reuse then pure (some goal) else normalizeBridges goal | continue
         -- The facts placed at points before the obligation in the normal form
         -- of its leaf, whose names the walk bound after them.
-        let some goal ← renormalizeFacts goal | continue
+        let some goal ← if reuse then pure (some goal) else renormalizeFacts goal | continue
         prepared := prepared.push (← hideEntries goal)
     setGoals prepared.toList
-    setGoals (← (← getGoals).mapM reduceDefinitions)
-    evalTactic (← `(tactic| all_goals verex_premise_conditionals))
+    unless reuse do
+      setGoals (← (← getGoals).mapM reduceDefinitions)
+      evalTactic (← `(tactic| all_goals verex_premise_conditionals))
     let preparedAt ← IO.getNumHeartbeats
-    runSteps block
+    runOnSteps block path
     let stepsAt ← IO.getNumHeartbeats
     -- Its premises introduced, `decide` reads it in the block's normal form,
     -- the conjunction of a group normalized once.
-    let open_ ← closeByDecide
+    let open_ ← if finish then closeByDecide else pure (← getGoals).toArray
     return (preparedAt, stepsAt, open_)
   stageLog s!"step block at line {(← getFileMap).toPosition (step.getPos?.getD 0) |>.line}: \
     preparation {(preparedAt - started) / 1000}k, steps {(stepsAt - preparedAt) / 1000}k, \
     decide {((← IO.getNumHeartbeats) - stepsAt) / 1000}k"
-  for goal in open_ do
+  for goal in (if finish then open_ else #[]) do
     withSpecForm <| logErrorAt step m!"`decide` does not close the obligation from the block's facts:\
       {indentD (MessageData.ofGoal goal)}"
   setGoals open_.toList
+
+private partial def runOnSteps (block : Syntax) (path : String) : TacticM Unit := do
+  let steps := blockSteps block
+  -- Structured steps maintain their facts' normal form. An unrestricted
+  -- Lean escape or primitive computation can expose new expressions, so
+  -- their children prepare normally.
+  let reusable := (block.find? fun step =>
+    step.isOfKind ``verexLeanStep || step.isOfKind ``stepCompute).isNone
+  let firstChild := steps.findIdx? fun step => step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault
+  let some start := firstChild | runSteps block path
+  let prefixBlock := block.setArg 1 (mkNullNode (steps.extract 0 start))
+  runSteps prefixBlock path
+  let mut completed := #[]
+  for goal in ← getGoals do
+    for (part, key) in ← sharedClauseParts goal do
+      setGoals [part]
+      let mut matched := false
+      for child in steps.extract start steps.size, index in [0:steps.size - start] do
+        let takes ← if child.isOfKind ``stepOnDefault then pure (!matched)
+          else do
+            let patterns ← child[1].getSepArgs.mapM keyPattern
+            pure (patterns.any (·.selects key))
+        unless takes do continue
+        matched := true
+        if (← getGoals).isEmpty then break
+        if hasNestedOn child[3] then
+          setGoals (← (← getGoals).mapM wrapSharedClause)
+        runOnBlock child false s!"{path}on{index}_" reusable
+      completed := completed ++ (← getGoals).toArray
+  setGoals completed.toList
+
+end
+
+@[tactic verexStepObligation] def evalStepObligation : Tactic := fun stx =>
+  runOnBlock stx[1] true ""
 
 /-- The values of a frame's slots, by declaration index: the components of an
 environment literal, `none` for a slot not written. -/
@@ -4927,56 +5260,118 @@ def pointAssertNumbers {m : Type → Type} [Monad m] [MonadError m] (steps : Arr
 `verify f by block`), as `verex_on` routes them to its alternatives. -/
 syntax (name := verexStepRoute) "verex_step_route" verexProofBlock : tactic
 
-/-- The leaves an `on` of several keys takes, those of one path joined in one
-goal (as `verex_group` joins them): prepared once, their steps run once, and
-each leaf its part of the conjunction. -/
+/-- Contexts compared modulo local identities, preserving the source names
+and declaration kinds that proof steps observe. -/
+private def stepContextKey (goal : MVarId) :
+    MetaM (Array (Lean.Expr × Option Lean.Expr × BinderInfo × Name × Bool)) := goal.withContext do
+  let mut vars := #[]
+  let mut key := #[]
+  for decl in ← getLCtx do
+    key := key.push ((← instantiateMVars decl.type).abstract vars,
+      ← decl.value?.mapM fun value => return (← instantiateMVars value).abstract vars,
+      decl.binderInfo, decl.userName.eraseMacroScopes, decl.isImplementationDetail)
+    vars := vars.push decl.toExpr
+  return key
+
+/-- The path prefix ends at its preparation marker. With no shared path,
+only identical complete contexts can share steps. -/
+private def preparedPrefixSize (goal : MVarId) : MetaM Nat := goal.withContext do
+  let mut size := 0
+  let mut prepared := none
+  for decl in ← getLCtx do
+    size := size + 1
+    if decl.type.isConstOf ``PathPrepared then prepared := some size
+  return prepared.getD size
+
+/-- Keep the common context and put only the clause-specific suffix back
+under that clause's binders. Shared late facts remain available to preparation. -/
+private def restorePreparedPath (goal : MVarId) (keep : Nat) : MetaM MVarId := do
+  let locals ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => pure (found.push decl.fvarId)
+  let suffix := locals.extract keep locals.size
+  if suffix.isEmpty then return goal
+  let (_, next) ← goal.revert suffix (preserveOrder := true)
+  let state ← targetState
+  if let some decisions := (← state.leafDecisions.get)[goal]? then
+    state.leafDecisions.modify (·.insert next decisions)
+  if let some origin := (← state.leafOrigins.get)[goal]? then
+    state.leafOrigins.modify (·.insert next origin)
+  return next
+
+/-- Join an on-block's clauses by their prepared path. Retain the longest
+common context, including common late premises; abstract only the differing
+suffixes. Every original goal receives its own projection at its own locals. -/
 private def groupLeaves (alternatives : Array RouteAlternative) : TacticM Unit := do
-  unless alternatives.any (fun alternative => alternative.items.any (·.size ≥ 2)) do return
-  -- Only the goals an `on` of several keys names are taken into paths.
+  let nested (alternative : RouteAlternative) := hasNestedOn alternative.reference[3]
+  unless alternatives.any (fun alternative => alternative.items.any (·.size ≥ 2) || nested alternative) do return
   let grouped (goal : MVarId) : TacticM Bool := do
     let some index ← chosenAlternative alternatives goal | return false
-    return alternatives[index]!.items.any (·.size ≥ 2)
+    return alternatives[index]!.items.any (·.size ≥ 2) || nested alternatives[index]!
   let mut split := #[]
   for goal in ← getGoals do
     if ← grouped goal then split := split ++ (← splitPaths goal) else split := split.push goal
-  setGoals split.toList
-  let chosen (goal : MVarId) : TacticM (Option Nat) := chosenAlternative alternatives goal
-  let keyOf (goal : MVarId) : TacticM (ObligationKey × Name) := leafKeyOf goal
   let decisionsOf ← (← targetState).leafDecisions.get
   let mut remaining := #[]
-  let mut classes : Array (Nat × Array (FVarId × Lean.Expr × Option Lean.Expr) × Array MVarId) := #[]
-  for goal in ← getGoals do
-    let some index ← chosen goal | remaining := remaining.push goal; continue
-    unless alternatives[index]!.items.any (·.size ≥ 2) do
+  let mut classes : Array (Nat × Array (Lean.Expr × Option Lean.Expr × BinderInfo × Name × Bool) ×
+      Array MVarId) := #[]
+  for goal in split do
+    let some index ← chosenAlternative alternatives goal | remaining := remaining.push goal; continue
+    unless alternatives[index]!.items.any (·.size ≥ 2) || nested alternatives[index]! do
       remaining := remaining.push goal
       continue
-    let context ← goalContextKey goal
-    match classes.findIdx? fun (other, otherContext, _) => other == index && otherContext == context with
+    let context ← stepContextKey goal
+    let pathContext := context.extract 0 (← preparedPrefixSize goal)
+    match classes.findIdx? fun (other, otherContext, _) => other == index && otherContext == pathContext with
     | some position => classes := classes.modify position fun (i, c, members) => (i, c, members.push goal)
-    | none => classes := classes.push (index, context, #[goal])
-  for (_, _, members) in classes do
+    | none => classes := classes.push (index, pathContext, #[goal])
+  for (index, _, members) in classes do
     if members.size == 1 then
-      remaining := remaining.push members[0]!
+      let goal ← if nested alternatives[index]! then wrapSharedClause members[0]! else pure members[0]!
+      remaining := remaining.push goal
       continue
     let first := members[0]!
-    let statements ← members.mapM fun goal => goal.withContext do instantiateMVars (← goal.getType)
-    let mut statement := statements.back!
-    for part in statements.pop.reverse do statement := mkAnd part statement
-    let decl ← first.getDecl
-    let (key, _) ← keyOf first
+    let contexts ← members.mapM fun goal => stepContextKey goal
+    let mut keep := 0
+    while keep < contexts[0]!.size && contexts.all (fun context =>
+        context[keep]? == contexts[0]![keep]?) do
+      keep := keep + 1
+    let (key, _) ← leafKeyOf first
     let tag := Name.mkSimple s!"group_{(← first.getTag).components.head?.getD .anonymous}"
-    let combined ← mkFreshExprMVarAt decl.lctx decl.localInstances statement .syntheticOpaque tag
-    for goal in members, index in [0:members.size] do
-      let mut part := combined
-      for _ in [0:index] do part := .proj ``And 1 part
-      if index + 1 < members.size then part := .proj ``And 0 part
-      goal.assign part
+    setGoals (← members.toList.mapM fun goal => restorePreparedPath goal keep)
+    if nested alternatives[index]! then
+      setGoals (← (← getGoals).mapM wrapSharedClause)
+    evalTactic (← `(tactic| verex_group_contexts))
+    let [combined] ← getGoals | throwError "the shared path's contexts did not agree"
+    combined.setTag tag
     (← targetState).leafKeys.modify (·.insert tag key)
-    (← targetState).leafDecisions.modify (·.insert combined.mvarId! (decisionsOf[first]?.getD #[]))
-    remaining := remaining.push combined.mvarId!
+    (← targetState).leafDecisions.modify (·.insert combined (decisionsOf[first]?.getD #[]))
+    remaining := remaining.push combined
   setGoals remaining.toList
 
+/-- Nested blocks refine the parent's clause set. Sibling blocks run in
+source order, so overlapping keys accumulate their facts. -/
+private partial def validateNestedOn (block : Syntax)
+    (parents : Option (Array ObligationKey) := none) (inside : Bool := false) : TacticM Unit := do
+  let mut children := false
+  for step in blockSteps block do
+    if step.isOfKind ``stepOn || step.isOfKind ``stepOnDefault then
+      children := true
+      if inside && step[2].getNumArgs != 0 then
+        throwErrorAt step "put a path selector (`when`) on the shared parent block"
+      let keys ← if step.isOfKind ``stepOn then
+          some <$> step[1].getSepArgs.mapM keyPattern
+        else pure parents
+      if inside then
+        if let (some outer, some inner) := (parents, keys) then
+          for key in inner do
+            unless outer.any (·.selects key) do
+              throwErrorAt step "the nested `on` names a clause outside its parent block"
+      validateNestedOn step[3] keys true
+    else if inside && children then
+      throwErrorAt step "shared steps precede nested `on` blocks"
+
 @[tactic verexStepRoute] def evalStepRoute : Tactic := fun stx => do
+  validateNestedOn stx[1]
   -- Point steps are hooks of the obligations' walk (`lowerProofBlock`).
   let routed := (blockSteps stx[1]).filter fun step =>
     !step.isOfKind ``stepAt && !step.isOfKind ``stepAfter

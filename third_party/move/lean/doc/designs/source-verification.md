@@ -259,6 +259,14 @@ A specification is established in one of three ways, tried in this order:
 3. **By raising the budget.** `pragma heartbeats = N` on the spec block,
    for a function the solver proves given more time.
 
+Structured proofs use `verify f by` with `on … { … }` blocks. A block can
+end with nested `on` blocks: its initial steps run over the shared path,
+then the children receive their clauses and clause-local binders. Nested
+children run in source order, including overlapping selections; their keys
+must be within the parent's selection. Unselected clauses use `decide`.
+Path selectors belong on the parent. See the [proof language](../user/proof-language.md)
+for examples and scope rules.
+
 `pragma verify = manual` on the spec block states that the function is
 established by a proof file: it is not attempted automatically, and a
 missing `verify f by …` is an error. The Move Prover reads it as

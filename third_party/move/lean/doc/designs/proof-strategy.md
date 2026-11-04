@@ -89,6 +89,15 @@ more than checking it ([`performance.md`](performance.md)).
   where contexts agree up to local names; `verex_proof preparing` is the
   structured interface, routing source-named alternatives to ordinary Lean
   arguments; `verex_map_simp` evaluates closed map observations directly.
+  The proof language groups an `on` by the prepared path prefix, retaining
+  the longest common context (including shared late premises) and keeping
+  differing binders inside their clauses. Nested `on` blocks run a shared
+  prefix before introducing clause binders; child premises enter the same
+  normal form before shared facts are refreshed. Structured child steps
+  reuse the prepared context when their additions are canonical scalar
+  binders and inequalities; native values, equalities and conditional path
+  facts retain context preparation. Raw Lean steps also retain it. Empty
+  defaults on prepared paths use bounded leaf deciders directly.
   None adds speculative search.
 - **Join scheduler.** `verex.sharedContinuations` (on by default) shares
   kernel-checked continuation summaries at joins, with entry decomposition,

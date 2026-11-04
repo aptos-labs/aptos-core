@@ -127,9 +127,17 @@ rest to the decider. `m'` is the map after the iteration's `pop_front`, `i`
 the invariant's quantified position. An obligation named by no `on` gets the
 cheap deciders alone; `on _ { }` covers the remainder explicitly.
 
-The three blocks repeat the same facts, because each `on` sees one
-obligation. Facts that every invariant of the step needs can be stated once
-at a point after the body's call instead, `after call 1 of pop_front { … }`.
+An `on` naming several obligations shares their path context. Common steps
+can precede nested `on` blocks: the outer steps run once per path, then each
+child introduces the binders of its own clauses. A clause binder such as `i`
+is unavailable in the outer steps. Children run in source order; overlapping
+keys accumulate steps. A nested `on _` takes clauses no earlier child took;
+clauses no child takes finish with `decide`. Child keys must belong to the
+parent, and shared steps must precede all children. Put path selectors
+(`when`) on the parent.
+
+Facts that every invariant of the step needs can also be stated once
+at a point after the body's call, `after call 1 of pop_front { … }`.
 `at loop 1 step` is the start of an iteration, before the body: `m` is the
 map the iteration starts with, and `m'` is not yet bound there.
 
@@ -143,6 +151,8 @@ map the iteration starts with, and `m'` is not yet bound there.
 | `assert e by contradiction { … }` | run the block under `!e`; closes when `decide` finds `false` |
 | `assume e` | use `e` without proof, for this obligation only; enters the assumption ledger, with a warning. Allowed inside an `on` block only |
 | `apply φ, …` | apply lemmas or recursive spec functions at the stated arguments: owe their premises (by `decide`), gain their conclusions; `apply c ==> L(a)` guards both by `c` |
+| `finish by c` | close every remaining obligation with `decide`, `arith`, `eval`, `solve`, `congr` or `ring`; reports an error if any remains open. Not a program-point fact step |
+| `compute` | compute vector lengths and reads after updates, using established index bounds; unresolved reads stay symbolic |
 | `split e` | one case per value of a specification expression: both sides of a Boolean, each variant of an enum or option (payload fields under their Move names), each closure site of a function value plus `foreign` |
 | `split i in a..b` | one case per value of an integer the context bounds by literals |
 | `let V { f, … } := e` | destructure a value known to be of variant `V`; owes `e is V`, creates no cases |
@@ -202,16 +212,21 @@ a map through its iterator:
 
 ```text
 verify test_verify_iter_walk_mut_symbolic by
-  on invariant 6 step {
+  on invariant 1 step, invariant 2 step, invariant 3 step, invariant 4 step,
+    invariant 5 step, invariant 6 step {
     split it
     split iter_next_result
     let k := spec_key_at(m, count)
     apply lemma_contains_key_key_at(m, count)
     apply lemma_len_set(m, k, 7)
-    apply lemma_key_at_set_present(m, k, 7, i)
-    apply lemma_get_set(m, k, 7, spec_key_at(m, i))
-    apply lemma_key_at_eq_iff(m, i, count)
-    split i == count
+    on invariant 3 step, invariant 6 step {
+      apply lemma_key_at_set_present(m, k, 7, i)
+    }
+    on invariant 6 step {
+      apply lemma_get_set(m, k, 7, spec_key_at(m, i))
+      apply lemma_key_at_eq_iff(m, i, count)
+      split i == count
+    }
   }
   on invariant 4 entry, invariant 5 entry {
     split internal_new_begin_iter_result
@@ -341,6 +356,12 @@ lemma is named `lemma_` followed by the bound functions' names without
 `lemma_contains_key_key_at`. The `m`, `k`, `v`, `p`, `i`, `j` below are the
 lemma's parameters, at the map's key and value types; a lemma whose
 statement mentions `spec_rank` reads that role too.
+
+`apply lemma_valid_slice(parent, offset)` proves an ordered integer-keyed
+map's validity obligation. The obligation determines the slice, whose value
+type may differ from the parent's. The premises are the parent's validity,
+a nonnegative offset, a slice ending within the parent, and equality of
+each slice key with the parent's key at `offset + i`.
 
 | Lemma | Conclusion |
 |---|---|

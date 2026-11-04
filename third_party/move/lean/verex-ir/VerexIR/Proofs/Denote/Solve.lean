@@ -2338,13 +2338,17 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
   let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name => do
     let ident := mkIdent (rootNamespace ++ name)
     `(Lean.Parser.Tactic.simpLemma| $ident:ident)
-  let contractNormalization ← simpContextOf (← `(tactic|
-    simp only [$lemmas,*, vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]))
   -- The callee's contract normalized once for its instance, its normal
   -- forms instantiated at the call (`doc/designs/native-verification.md`, "Specialized contracts").
   let contractForms ← if verex.contractLemmas.get (← getOptions) then
       callThroughNormalForms goal proofType proofSyntax lemmas
     else pure false
+  -- The equation rule uses the target's normalization below. Build the
+  -- contract's unfolding context only when a call rule still needs it.
+  let contractNormalization ← if contractForms then pure ctx.normalization else
+    goal.withContext do
+      simpContextOf (← `(tactic|
+        simp only [$lemmas,*, vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]))
   -- A contract whose failure conditions coincide gives its postcondition
   -- outright after a successful run.
   let strict ← if !contractForms then do
