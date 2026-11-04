@@ -10,7 +10,7 @@ module 0x42::m {
 
   friend enum Data2<T1, T2> has drop {
     V1{x: T1},
-    V2{y: u64, x: T2}
+    V2{y: T2, x: T1}
     V3
   }
 

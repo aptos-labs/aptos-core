@@ -1564,7 +1564,7 @@ impl ModuleBuilder<'_, '_> {
         // declaration analysis, before field definitions are known; check for
         // clashes with declared fields here, through the same field lookup
         // used everywhere else.
-        let qid = entry.module_id.qualified_inst(entry.struct_id, vec![]);
+        let qid = entry.module_id.qualified(entry.struct_id);
         let ghost_decls = entry
             .ghost_fields
             .iter()
