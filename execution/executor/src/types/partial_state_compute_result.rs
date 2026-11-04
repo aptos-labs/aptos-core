@@ -10,7 +10,7 @@ use aptos_executor_types::{
 };
 use aptos_storage_interface::{
     state_store::{
-        orders::OrderOverlay, positions::PositionOverlay,
+        collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
         sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
@@ -41,6 +41,7 @@ impl PartialStateComputeResult {
             ledger_summary.state,
             ledger_summary.positions,
             ledger_summary.orders,
+            ledger_summary.collateral,
         );
         let ledger_update_output = OnceCell::new();
         ledger_update_output
@@ -95,6 +96,10 @@ impl PartialStateComputeResult {
 
     pub fn result_orders(&self) -> Option<&OrderOverlay> {
         self.execution_output.orders.as_ref()
+    }
+
+    pub fn result_collateral(&self) -> Option<&CollateralOverlay> {
+        self.execution_output.collateral.as_ref()
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

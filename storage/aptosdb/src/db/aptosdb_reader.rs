@@ -711,6 +711,10 @@ impl DbReader for AptosDB {
                 .order
                 .as_ref()
                 .map(|bundle| bundle.orders.lock().clone());
+            let collateral = self
+                .collateral
+                .as_ref()
+                .map(|bundle| bundle.collateral.lock().clone());
             Ok(LedgerSummary {
                 state,
                 state_summary,
@@ -718,6 +722,7 @@ impl DbReader for AptosDB {
                 position_state_summary,
                 positions,
                 orders,
+                collateral,
             })
         })
     }

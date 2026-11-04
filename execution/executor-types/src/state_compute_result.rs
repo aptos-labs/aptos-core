@@ -170,6 +170,7 @@ impl StateComputeResult {
             position_state_summary: self.state_checkpoint_output.position_state_summary.as_ref(),
             positions: self.execution_output.positions.as_ref(),
             orders: self.execution_output.orders.as_ref(),
+            collateral: self.execution_output.collateral.as_ref(),
             is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
     }

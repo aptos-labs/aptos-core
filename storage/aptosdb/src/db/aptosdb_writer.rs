@@ -14,7 +14,7 @@ use crate::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
     native_state_store::decode_position_writes,
-    native_store::{NativeStoreSpec, OrderStore, PositionStore},
+    native_store::{CollateralStore, NativeStoreSpec, OrderStore, PositionStore},
     pruner::PrunerManager,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -32,6 +32,7 @@ use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit,
     db_ensure as ensure,
     state_store::{
+        collateral::{decode_collateral_writes, CollateralOverlay, ShardedCollateralLayers},
         orders::{decode_order_writes, OrderOverlay, ShardedOrderLayers},
         positions::{PositionOverlay, ShardedPositionLayers},
     },
@@ -124,6 +125,23 @@ impl DbWriter for AptosDB {
                 bundle.order_base.fold(target);
             }
             Ok(Some(bundle.order_base.layers()))
+        })
+    }
+
+    fn advance_collateral_base(
+        &self,
+        target: Option<&CollateralOverlay>,
+    ) -> Result<Option<ShardedCollateralLayers>> {
+        gauged_api("advance_collateral_base", || {
+            let Some(bundle) = self.collateral.as_ref() else {
+                return Ok(None);
+            };
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["advance_collateral_base"]);
+            if let Some(target) = target {
+                // Declined folds are expected, as for positions.
+                bundle.collateral_base.fold(target);
+            }
+            Ok(Some(bundle.collateral_base.layers()))
         })
     }
 
@@ -576,15 +594,41 @@ impl AptosDB {
 
     fn commit_native_collateral(&self, chunk: &ChunkToCommit, sync_commit: bool) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_collateral"]);
-        let Some(collateral) = self.collateral.as_ref() else {
+        let Some(bundle) = self.collateral.as_ref() else {
             return Ok(());
         };
-        if collateral.commit_kv(chunk)?.is_none() {
+        let Some(chunk_last_inclusive) = bundle.store.commit_kv(chunk)? else {
             return Ok(());
+        };
+
+        // Advance the published tip, as `commit_native_position` does.
+        match chunk.collateral {
+            Some(executed) => {
+                assert!(
+                    bundle.collateral_base.is_ancestor_of(executed),
+                    "published collateral overlay does not descend from the base",
+                );
+                *bundle.collateral.lock() = executed.clone();
+            },
+            None => {
+                let writes = decode_collateral_writes(
+                    chunk
+                        .transaction_outputs
+                        .iter()
+                        .flat_map(|output| CollateralStore::write_set_ops(output.write_set()))
+                        .map(|(key, op)| (key, op.as_state_value_opt())),
+                )?;
+                if !writes.is_empty() {
+                    let floor = bundle.collateral_base.layers();
+                    let mut collateral = bundle.collateral.lock();
+                    *collateral = collateral.extend(&floor, chunk_last_inclusive, writes);
+                }
+            },
         }
+
         // The collateral root is not computed yet, so the store always
         // computes its own summary.
-        collateral.advance_pipeline(chunk, None, sync_commit)
+        bundle.store.advance_pipeline(chunk, None, sync_commit)
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
@@ -918,7 +962,7 @@ impl AptosDB {
                 order.store.wake_value_pruner(version);
             }
             if let Some(collateral) = self.collateral.as_ref() {
-                collateral.wake_value_pruner(version);
+                collateral.store.wake_value_pruner(version);
             }
         }
 
