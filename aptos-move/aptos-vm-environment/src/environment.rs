@@ -416,7 +416,7 @@ pub mod tests {
             max_items_per_shard: vec![1; NUM_STATE_SHARDS],
             max_bytes_per_shard: vec![u64::MAX; NUM_STATE_SHARDS],
             refresh_interval_versions: 0,
-            max_promotions_per_block: 0,
+            max_promotion_bytes_per_block: 0,
         })
     }
 
