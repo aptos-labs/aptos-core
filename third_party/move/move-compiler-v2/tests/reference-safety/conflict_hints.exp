@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: cannot freeze local `frozen` which is still mutably borrowed
+   ┌─ tests/reference-safety/conflict_hints.move:12:26
+   │
+11 │         let mutable = &mut s.g;
+   │                       -------- field `g` previously mutably borrowed here
+12 │         let frozen: &S = s;
+   │                          ^ implicitly frozen here
+13 │         *mutable = 1;
+   │         ------------ conflicting reference `mutable` used here
+
+error: cannot write local `s` since it is borrowed
+   ┌─ tests/reference-safety/conflict_hints.move:20:9
+   │
+19 │         let imm = &s.f;
+   │                   ---- field `f` previously borrowed here
+20 │         *s = S { f: 1, g: 2 };
+   │         ^^^^^^^^^^^^^^^^^^^^^ write attempted here
+21 │         *imm
+   │         ---- conflicting reference `imm` used here
+
+error: cannot borrow field `f` of local `read` which is already mutably borrowed
+   ┌─ tests/reference-safety/conflict_hints.move:28:20
+   │
+27 │         let same = &mut s.f;
+   │                    -------- field `f` previously mutably borrowed here
+28 │         let read = &s.f;
+   │                    ^^^^ borrow attempted here
+29 │         *same = 1;
+   │         --------- conflicting reference `same` used here

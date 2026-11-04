@@ -211,22 +211,42 @@ error: cannot transfer mutable value since it is borrowed
     │ ╰─────────' conflicting reference used here
 
 error: cannot transfer mutable value since it is borrowed
-   ┌─ TEMPFILE:67:42
-   │
-67 │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
-   │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │                                          │              │
-   │                                          │              previously mutably borrowed here
-   │                                          transfer attempted here
+    ┌─ TEMPFILE:67:42
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │ ╭──────────────────'
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 67 │ │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
+    │ │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │ │                                          │              │
+    │ │                                          │              previously mutably borrowed here
+    │ │                                          transfer attempted here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────' conflicting reference used here
 
 error: cannot transfer mutable value since it is borrowed
-   ┌─ TEMPFILE:67:42
-   │
-67 │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
-   │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │                                          │                                                                                                     │
-   │                                          │                                                                                                     previously mutably borrowed here
-   │                                          transfer attempted here
+    ┌─ TEMPFILE:67:42
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │ ╭──────────────────'
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 67 │ │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
+    │ │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │ │                                          │                                                                                                     │
+    │ │                                          │                                                                                                     previously mutably borrowed here
+    │ │                                          transfer attempted here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────' conflicting reference used here
 
 warning: This assignment/binding to the left-hand-side variable `var77` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var77`), or renaming to `_`
    ┌─ TEMPFILE:68:45
