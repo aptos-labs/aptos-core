@@ -521,6 +521,8 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
     let action := target.getArg! 3
     if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 then
       return some (action.getArg! 5, action)
+    if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 10 then
+      return some (action.getArg! 6, action)
     let head := action.getAppFn
     if head.isFVar && callees.any (·.1 == head) then return some (head, action)
     return none

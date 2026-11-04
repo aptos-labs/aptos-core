@@ -910,4 +910,10 @@ theorem Resolves.instantiate {ns : Validation.ValidatedNamespace}
               rw [Resolves.node entry]
               simp only [NodeResolves]
 
+/-- A type without its outer shared references: a shared reference is the
+value it observes. -/
+def SemTy.unshared : SemTy → SemTy
+  | .reference .shared referent => referent.unshared
+  | type => type
+
 end VerexIR

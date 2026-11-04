@@ -424,7 +424,7 @@
         ]
       ],
       "profile": "rust",
-      "version": 2
+      "version": 5
     }
   ],
   "tables": {
@@ -696,6 +696,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 7
+    "minor": 9
   }
 }

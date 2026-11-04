@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/library_integers_errors.spec.lean:6:3: error: the specification clause `ensures result == (value * 8589934592) % 4294967296` is not established
+VerexE2ETests/SourceVerify/library_integers_errors.spec.lean:5:6: error: verex verification failed: the automatic verification of `shift_past_width` failed; provide a proof in the module:
+  verify shift_past_width by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integers_errors.spec.lean:9:3: error: the specification clause `ensures result == left + right` is not established
+VerexE2ETests/SourceVerify/library_integers_errors.spec.lean:8:6: error: verex verification failed: the automatic verification of `saturate_up` failed; provide a proof in the module:
+  verify saturate_up by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_integers_errors.spec.lean:12:3: error: the specification clause `ensures result is Some` is not established
+VerexE2ETests/SourceVerify/library_integers_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `subtract` failed; provide a proof in the module:
+  verify subtract by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

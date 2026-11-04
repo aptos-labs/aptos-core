@@ -12,10 +12,10 @@ import VerexIR.TestInfra
 Every `.rs` file in this feature directory is discovered automatically and
 crosses the pinned rustc MIR exporter and validated Rust VIR before its
 canonical VerexSL source, or its current concrete error, is compared with
-the side-by-side `.exp.lean`. The rendering is lowered back and each of its
-functions compiled to its denotation, as verification compiles it; a
-function that has none is recorded after the source with the construct that
-stops it.
+the side-by-side `.exp.lean`: the crate's namespace after the dependency crates
+it reaches. The rendering is lowered back and each of the crate's functions
+compiled to its denotation, as verification compiles it; a function that has
+none is recorded after the source with the construct that stops it.
 -/
 
 namespace VerexE2ETests.RustToVerexSL
@@ -54,12 +54,12 @@ private def denotationGaps (environment : Lean.Environment) (source : System.Fil
 private def render (environment : Lean.Environment) (source : System.FilePath)
     (unit : VerexIR.Validation.ValidatedUnit) : IO String := do
   let printed ← VerexIR.Rust.Benchmark.measureExcept "e2e.verex_print" source.toString fun _ =>
-    VerexSL.Print.render environment unit
+    VerexSL.Print.renderUnit environment unit
   match printed with
   | .ok output =>
       let formatted ← VerexIR.Rust.Benchmark.measureExcept "e2e.verex_reimport"
-          source.toString fun _ =>
-        VerexSL.Print.formatSource environment output 80 "<generated Rust VerexSL>"
+          source.toString fun _ => do
+        VerexSL.Print.renderUnit environment (← VerexSL.Print.reimportUnit environment unit)
       match formatted with
       | .ok reprinted => if reprinted == output then
             pure (output ++ (← denotationGaps environment source unit)) else

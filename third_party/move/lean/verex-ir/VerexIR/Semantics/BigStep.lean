@@ -84,12 +84,13 @@ mutual
       RuntimeState → Control → Prop where
     | node (namespaceId frame state exprId startFrame startState nodeFrame nodeState control
         finalFrame finalState)
-        (before_eq : settleLoans (loanDeathsAt unit namespaceId exprId).before frame state =
-          (startFrame, startState))
+        (before_eq : settleDeaths unit namespaceId (loanDeathsAt unit namespaceId exprId).before
+          (deadPlacesAt unit namespaceId exprId).before frame state = (startFrame, startState))
         (node_step : EvalNodeWith executable callee namespaceId startFrame startState exprId
           nodeFrame nodeState control)
-        (after_eq : settleAfter (loanDeathsAt unit namespaceId exprId).after control
-          nodeFrame nodeState = (finalFrame, finalState)) :
+        (after_eq : settleAfter unit namespaceId (loanDeathsAt unit namespaceId exprId).after
+          (deadPlacesAt unit namespaceId exprId).after control nodeFrame nodeState =
+          (finalFrame, finalState)) :
         EvalExprWith executable callee namespaceId frame state exprId finalFrame finalState control
 
   /-- Big-step evaluation of one node, the loan deaths at it aside. A loop

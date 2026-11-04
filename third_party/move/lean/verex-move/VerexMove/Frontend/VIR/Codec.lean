@@ -164,6 +164,8 @@ def specOperation? : Xast.Operation → Option VerexIR.SpecOperation
 def specXastOperation : VerexIR.SpecOperation → Except String Xast.Operation
   | .functionCall .. => .error "specification function target requires namespace decoding"
   | .lemma .. => .error "a lemma instance has no XAST expression form"
+  | .stringConcat | .stringBytes | .charEncode =>
+    .error "a string operation of the Rust library has no XAST expression form"
   | .behavior kind range => pure (.behavior (xastBehaviorKind kind) (xastMemoryRange range))
   | .result index => pure (.result index)
   | .typeValue => pure .typeValue

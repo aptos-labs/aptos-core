@@ -472,7 +472,10 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
         -- shared as its base: the record must be the reference's kind.
         match type with
         | .reference kind referent =>
-            if (kind == .shared) == sharedDereference context.unit context.ns.unitIdentity id then
+            -- Under a shared view a mutable reference holds what it refers to.
+            let viewed := placeThroughShared context.unit context.ns context.ns.places.size base
+            if (kind == .shared || viewed) ==
+                sharedDereference context.unit context.ns.unitIdentity id then
               some (referent, none)
             else none
         | _ => none
@@ -503,6 +506,10 @@ def placeType (context : Context) : Nat → PlaceId → Option (SemTy × Option 
         let (type, _) ← context.placeType fuel base
         let .vector element length := type | none
         some (.vector element (subsliceLength length start stop fromEnd), none)
+    | some (.unsize base) => do
+        let (type, _) ← context.placeType fuel base
+        let .vector element (some _) := type | none
+        some (.vector element none, none)
     | some (.downcast base variant) => do
         let (type, _) ← context.placeType fuel base
         let .nominal _ _ := type | none
@@ -705,11 +712,11 @@ def checkCall (context : Context) (result : SemTy) : CallKind → Array GenericA
       | [] => false
   | .extension _ _, _, _ => false
 
-/-- A selected value's type: the field's own, or, through a reference, a
-reference of its kind to it (a shared reference is the value it observes). -/
+/-- A selected value's type: the field's own, or, through a shared reference, a
+shared reference to it (a shared reference is the value it observes). -/
 def selected (operand result : SemTy) (field : SemTy → Bool) : Bool :=
   field result || match operand, result with
-    | .reference kind _, .reference resultKind referent => kind == resultKind && field referent
+    | .reference .shared _, .reference .shared referent => field referent
     | _, _ => false
 
 /-- The nominal type a data operation's operand holds, directly or through

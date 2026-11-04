@@ -113,7 +113,7 @@ private partial def placeRoot (ns : ValidatedNamespace) (place : PlaceId) :
   | some (.index base index) =>
       (placeRoot ns base).map fun (root, indexes, through) => (root, indexes.push index, through)
   | some (.field base ..) | some (.ghostField base ..) | some (.subslice base ..) |
-      some (.downcast base _) => placeRoot ns base
+      some (.unsize base) | some (.downcast base _) => placeRoot ns base
   | none => none
 
 private def unknown : Footprint :=
@@ -147,13 +147,22 @@ mutual
       | .localVar localId =>
           #[if target == some localId then .read else .access { reads := #[localId] }]
       | .operation operation _ arguments _ =>
+          -- In Rust, moving or dropping a value that owns its contents ends the
+          -- loans of it, which a read through a reference must not outlive.
+          let endsLoans :=
+            ns.profile == some .rust && match ns.tables.types[expression.typeId.index]? with
+              | some (.vector ..) | some (.nominal ..) | some .string => true
+              | _ => false
           arguments.flatMap (events ns target) ++ match operation with
             | .copy place | .read place => placeEvents ns target place .read
-            | .move place => placeEvents ns target place .move
+            | .move place =>
+                (placeEvents ns target place .move).push (.access { writesMemory := endsLoans })
             | .borrow .mutable place => placeEvents ns target place .borrowMutable
             | .borrow _ place => placeEvents ns target place .read
             | .write place => placeEvents ns target place .write
-            | .drop place => (placeEvents ns target place .move).push (.access { acts := true })
+            | .drop place =>
+                (placeEvents ns target place .move).push
+                  (.access { acts := true, writesMemory := ns.profile == some .rust })
             | .primitive primitive => #[.access { fails := !primitiveTotal primitive }]
             | .reference .dereference => #[.access { readsMemory := true }]
             | .reference (.freeze _) | .reference (.borrow .immutable) => #[]
@@ -234,13 +243,17 @@ def beforeLastRead (trace : Array Event) : Footprint := Id.run do
 def reads (trace : Array Event) : Nat :=
   trace.foldl (init := 0) fun count event => if event matches .read then count + 1 else count
 
-/-- How often each local of a function is read and written, and whether it
-is the base of a projected place. A local projected by an assignment's
-target counts as read. -/
+/-- How often each local of a function is read and written, whether it is the
+base of a projected place, and whether it changes in place: a write or mutable
+borrow of it or of a part of it, not through a reference. A local projected by
+an assignment's target counts as read. -/
 structure Uses where
   reads : Array Nat
   writes : Array Nat
+  /-- The value a local is last assigned. -/
+  values : Array (Option ExprId) := #[]
   bases : Array Bool := #[]
+  changedInPlace : Array Bool := #[]
 
 /-- Count the uses of the locals in the region rooted at `root`. -/
 partial def Uses.of (ns : ValidatedNamespace) (localCount : Nat) (root : ExprId) : Uses :=
@@ -260,6 +273,13 @@ partial def Uses.of (ns : ValidatedNamespace) (localCount : Nat) (root : ExprId)
               bases := if projected && localId.index < uses.bases.size then
                 uses.bases.set! localId.index true else uses.bases }
         | none => uses
+      let changeInPlace (uses : Uses) (place : PlaceId) : Uses :=
+        match placeRoot ns place with
+        | some (localId, _, false) =>
+            if localId.index < uses.changedInPlace.size then
+              { uses with changedInPlace := uses.changedInPlace.set! localId.index true }
+            else uses
+        | _ => uses
       let bind (uses : Uses) (pattern : PatternId) : Uses :=
         { uses with writes := (patternLocals ns pattern).foldl bump uses.writes }
       match expression.kind with
@@ -268,8 +288,9 @@ partial def Uses.of (ns : ValidatedNamespace) (localCount : Nat) (root : ExprId)
       | .operation operation _ arguments _ =>
           let uses := arguments.foldl visit uses
           match operation with
-          | .move place | .copy place | .read place | .borrow _ place | .write place |
-              .drop place => read uses place
+          | .borrow .mutable place | .write place => read (changeInPlace uses place) place
+          | .move place | .copy place | .read place | .borrow _ place | .drop place =>
+              read uses place
           | _ => uses
       | .block statements result => (statements ++ result.toArray).foldl visit uses
       | .letDecl pattern value body =>
@@ -288,8 +309,10 @@ partial def Uses.of (ns : ValidatedNamespace) (localCount : Nat) (root : ExprId)
       | .assign place value =>
           let uses := visit uses value
           match ns.places[place.index]? with
-          | some (.localVar localId) => { uses with writes := bump uses.writes localId }
-          | _ => read uses place
+          | some (.localVar localId) =>
+              { uses with writes := bump uses.writes localId
+                          values := uses.values.setIfInBounds localId.index (some value) }
+          | _ => read (changeInPlace uses place) place
       | .assignPattern pattern value => bind (visit uses value) pattern
       | .quantifier _ binders triggers condition body =>
           (binders.map (·.domain) ++ triggers.flatten ++ condition.toArray.push body).foldl
@@ -301,7 +324,9 @@ partial def Uses.of (ns : ValidatedNamespace) (localCount : Nat) (root : ExprId)
   let empty : Uses := {
     reads := Array.replicate localCount 0
     writes := Array.replicate localCount 0
-    bases := Array.replicate localCount false }
+    values := Array.replicate localCount none
+    bases := Array.replicate localCount false
+    changedInPlace := Array.replicate localCount false }
   visit empty root
 
 /-- Whether a place projects from `target`: substituting its value would turn
@@ -313,14 +338,38 @@ def Uses.projected (uses : Uses) (target : LocalId) : Bool :=
 def Uses.unread (uses : Uses) (target : LocalId) : Bool :=
   uses.reads[target.index]? == some 0
 
+/-- Whether code in the regions `following` writes `target` or changes it in
+place, so that a binding they follow declares it `mut`. -/
+def writtenIn (ns : ValidatedNamespace) (localCount : Nat) (following : Array ExprId)
+    (target : LocalId) : Bool :=
+  following.any fun region =>
+    let uses := Uses.of ns localCount region
+    uses.writes[target.index]?.any (· > 0) || uses.changedInPlace[target.index]?.getD false
+
+/-- What evaluating `value` does once the temporaries it reads are written where they are
+read: its own footprint and those of the single-use `temporary` locals it reads, which move
+along with it. -/
+private def carriedFootprint (ns : ValidatedNamespace) (uses : Uses) (temporary : LocalId → Bool) :
+    Nat → ExprId → Footprint
+  | 0, value => footprint (events ns none value)
+  | fuel + 1, value =>
+      let own := footprint (events ns none value)
+      (own.reads.filter temporary).foldl (init := own) fun found localId =>
+        match uses.values[localId.index]?, uses.reads[localId.index]?,
+            uses.writes[localId.index]? with
+        | some (some assigned), some 1, some 1 =>
+            found.merge (carriedFootprint ns uses temporary fuel assigned)
+        | _, _, _ => found
+
 /-- Whether the assignment of `value` to the temporary `target` at
 `statements[index]` of a region may be left out and `value` written where
 `target` is read; see the module documentation. -/
-def substitutable (ns : ValidatedNamespace) (uses : Uses) (statements : Array ExprId)
-    (result : Option ExprId) (index : Nat) (target : LocalId) (value : ExprId) : Bool :=
+def substitutable (ns : ValidatedNamespace) (uses : Uses) (temporary : LocalId → Bool)
+    (statements : Array ExprId) (result : Option ExprId) (index : Nat) (target : LocalId)
+    (value : ExprId) : Bool :=
   let following := (statements.extract (index + 1) statements.size) ++ result.toArray
   let trace := following.flatMap (events ns (some target))
-  let value := footprint (events ns none value)
+  let value := carriedFootprint ns uses temporary uses.values.size value
   uses.writes[target.index]? == some 1 && uses.reads[target.index]? == some (reads trace) &&
     if value.onlyReads then value.commutes (beforeLastRead trace)
     else reads trace == 1 && match firstRead? trace with

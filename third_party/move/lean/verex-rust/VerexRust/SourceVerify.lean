@@ -18,6 +18,8 @@ A Cargo package's library crate is one namespace whose modules are scopes.
 Each file of the crate's modules has its specification file beside it, whose
 items reopen the module's scope; an inline module's specifications nest in
 those of the file it is declared in.
+
+The standard library's contracts come from `verex-rust/lib` (`VerexRust.Library`).
 -/
 
 namespace VerexIR.Rust.SourceVerify
@@ -26,11 +28,11 @@ open VerexSL.SourceVerify
 
 /-- The specification file of a Rust source: the one named, or
 `<name>.spec.lean` beside `<name>.rs`, read when it exists. Its items are
-spliced into the crate's namespace, the unit's last. -/
+spliced into the crate's namespace, the unit's first. -/
 def specsFor (unit : VerexIR.Validation.ValidatedUnit) (source : System.FilePath)
     (named : Option System.FilePath) : IO (Array Companion) := do
   let path := named.getD (source.withExtension "spec.lean")
-  let some ns := unit.namespaces.back? | return #[]
+  let some ns := unit.namespaces[0]? | return #[]
   let text ← if ← path.pathExists then some <$> IO.FS.readFile path else pure none
   return #[{ path, namespaceId := ns.unitIdentity, text }]
 
@@ -42,10 +44,10 @@ def moduleFiles (unit : VerexIR.Validation.ValidatedUnit)
     (ns : VerexIR.Validation.ValidatedNamespace) :
     Except String (Array (Array String × String)) := do
   let fileOf (loc : VerexIR.LocId) : Option String := do
-    let range ← (← unit.tables.locations[loc.index]?).primary
-    return (← unit.tables.files[range.file.index]?).name
+    let range ← (← ns.location? loc).primary
+    return (← ns.localTables.files[range.file.index]?).name
   let scopeOf (name : VerexIR.NameId) : Array String :=
-    (unit.tables.names[name.index]?.map (·.scope)).getD #[]
+    ((ns.nameOf name).map (·.scope)).getD #[]
   let declarations := ns.functions.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.structs.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.constants.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
@@ -54,7 +56,7 @@ def moduleFiles (unit : VerexIR.Validation.ValidatedUnit)
     else s!"module `{"::".intercalate scope.toList}`"
   -- Every scope's file, each after its parent's.
   let mut scopeFiles : Array (Array String × String) := #[]
-  for scope in #[#[]] ++ ns.scopes.map (·.path) do
+  for scope in #[#[]] ++ (ns.scopes.filter (·.kind == .module)).map (·.path) do
     let found := declarations.foldl (init := #[]) fun found (owner, loc) =>
       match fileOf loc with
       | some file => if owner == scope && !found.contains file then found.push file else found
@@ -70,15 +72,118 @@ def moduleFiles (unit : VerexIR.Validation.ValidatedUnit)
 its modules, read when it exists, its items in the module's scope. -/
 def crateSpecs (unit : VerexIR.Validation.ValidatedUnit) (root : System.FilePath) :
     IO (Array Companion) := do
-  let #[ns] := unit.namespaces
-    | throw <| IO.userError "a Rust crate is exported as exactly one namespace"
+  -- The crate is namespace 0; the namespaces after it are its dependencies'.
+  let some ns := unit.namespaces[0]?
+    | throw <| IO.userError "a Rust crate is exported with no namespace"
   let files ← match moduleFiles unit ns with
     | .ok files => pure files
     | .error message => throw <| IO.userError message
   files.mapM fun (scope, file) => do
     let path := (root / file).withExtension "spec.lean"
     let text ← if ← path.pathExists then some <$> IO.FS.readFile path else pure none
-    return { path, namespaceId := ns.identity, scope, text }
+    return { path, namespaceId := ns.unitIdentity, scope, text }
+
+/-- What a type names: its nominal types, each `crate::scope::name`, and its scalars. -/
+private partial def namedBy (unit : VerexIR.Validation.ValidatedUnit) (type : VerexIR.TypeId)
+    (fuel : Nat := unit.tables.types.size + 1) : Array String :=
+  if fuel == 0 then #[] else
+  let visit := (namedBy unit · (fuel - 1))
+  match unit.tables.types[type.index]? with
+  | some .bool => #["Bool"]
+  | some (.integer .pointer signed) => #[if signed then "isize" else "usize"]
+  | some (.integer (.bits width) signed) => #[s!"{if signed then "i" else "u"}{width}"]
+  | some (.reference reference) => visit reference.referent
+  | some (.tuple elements) => elements.flatMap visit
+  | some (.vector element _) => visit element
+  | some (.nominal name arguments) =>
+      let arguments := arguments.flatMap fun
+        | .typeArg argument => visit argument.typeId
+        | _ => #[]
+      match unit.tables.names[name.index]? with
+      | some qualified =>
+          let crate := (unit.tables.namespaces[qualified.namespaceId.index]?.map (·.segments)).getD #[]
+          arguments.push ("::".intercalate (crate ++ qualified.scope ++ #[qualified.name]).toList)
+      | none => arguments
+  | _ => #[]
+
+/-- The calls of a crate's bodies, each by the scope and name of its callee, in `ns`,
+with what its generic arguments name. -/
+private def callsInto (unit : VerexIR.Validation.ValidatedUnit)
+    (ns : VerexIR.Validation.ValidatedNamespace) : Array (Array String × String × Array String) :=
+  match unit.namespaces[0]? with
+  | none => #[]
+  | some crate => crate.expressions.filterMap fun expression => do
+    let .operation (.call callee) instantiations _ _ := expression.kind | none
+    let reference ← match callee with
+      | .function reference | .closure reference _ => some reference
+      | _ => none
+    guard (crate.namespaceId reference.namespaceId == ns.unitIdentity)
+    let name ← crate.nameOf reference.name
+    let named := (crate.genericArguments instantiations).flatMap fun
+      | .typeArg argument => namedBy unit argument.typeId
+      | _ => #[]
+    return (name.scope, name.name, named)
+
+/-- The library's contracts of the functions a unit declares, each library file
+a companion of its crate's namespace. A contract is a `native_f` hypothesis of
+the theorems whose functions reach it. A contract at a shape comes only for a call
+naming what the shape names, since every type it adds makes a call's frame dearer to
+certify; a function with calls no shape matches keeps its shapes for the message
+listing them. -/
+def libraryCompanions (unit : VerexIR.Validation.ValidatedUnit)
+    (clauses : Array String := #[]) : IO (Array Companion) := do
+  let files ← VerexIR.Rust.Library.readFiles (← Driver.libraryRoot)
+  -- The crate is namespace 0; the library speaks of its dependencies.
+  let dependencies := unit.namespaces.extract 1 unit.namespaces.size
+  let crateNamespace := (unit.namespaces[0]?.map (·.unitIdentity)).getD ⟨0⟩
+  let spliced := files.filterMap fun file => do
+    let ns ← dependencies.find? fun ns =>
+      (unit.tables.namespaces[ns.unitIdentity.index]?.map (·.segments)) == some #[file.crate]
+    let declares (scope : Array String) (target : String) := ns.functions.any fun function =>
+      (ns.nameOf function.name).any fun name =>
+        name.scope == scope && name.name == target
+    let crateOf (other : VerexIR.Validation.ValidatedNamespace) :=
+      unit.tables.namespaces[other.unitIdentity.index]?.map (·.segments)
+    let declaresIn (ns : VerexIR.Validation.ValidatedNamespace) (scope : Array String)
+        (target : String) := ns.structs.any fun declaration =>
+      (ns.nameOf declaration.name).any fun name =>
+        name.scope == scope && name.name == target
+    -- A shape's path resolves in the namespace, or from another crate's name.
+    let crateNamed (scope : Array String) := dependencies.find? fun other =>
+      other.unitIdentity != ns.unitIdentity && crateOf other == some (scope.take 1)
+    let declaresType (scope : Array String) (target : String) :=
+      declaresIn ns scope target ||
+        (crateNamed scope).any (declaresIn · (scope.extract 1 scope.size) target)
+    let calls := callsInto unit ns
+    let typeText (scope : Array String) (name : String) :=
+      let qualified := if (crateNamed scope).isSome then scope else #[file.crate] ++ scope
+      "::".intercalate (qualified.push name).toList
+    let matched (contract : VerexIR.Rust.Library.ContractItem) :=
+      calls.any fun (scope, target, named) =>
+        scope == contract.scope && target == contract.target &&
+          contract.shapeScalars.all named.contains &&
+          contract.shapeTypes.all fun (typeScope, name) => named.contains (typeText typeScope name)
+    let keep (contract : VerexIR.Rust.Library.ContractItem) :=
+      declares contract.scope contract.target &&
+        contract.shapeTypes.all (fun (scope, name) => declaresType scope name) &&
+        (!contract.atShape || matched contract || !file.contracts.any fun other =>
+          other.scope == contract.scope && other.target == contract.target && matched other)
+    let text ← file.reachedItems keep clauses
+    let uses := (file.contracts.filter keep).flatMap fun contract =>
+      contract.shapeTypes.filterMap fun (scope, _) => (crateNamed scope).map (·.unitIdentity)
+    -- A clause writes a function of the library by the path from its scope.
+    let scopes := (file.specFunctions.filter fun item =>
+      clauses.any (item.namedIn false)).foldl (init := #[]) fun scopes item =>
+        if scopes.contains item.scope then scopes else scopes.push item.scope
+    let imports := scopes.map fun scope =>
+      let segments := scope.map (s!"«{·}»")
+      s!"use {file.crate}::{"::".intercalate segments.toList}"
+    let clauseUses : Array Companion := if imports.isEmpty then #[] else #[{
+      path := file.path, namespaceId := crateNamespace
+      text := some ("\n".intercalate imports.toList), uses := #[ns.unitIdentity] }]
+    return #[{ path := file.path, namespaceId := ns.unitIdentity, text := some text, uses }] ++
+      clauseUses
+  return spliced.flatten
 
 /-- Verify a Rust file against its specification file, writing the
 VerexSL rendering to `output`. -/
@@ -89,7 +194,8 @@ def verifyFile (environment : Lean.Environment) (source : System.FilePath)
     let unit ← IO.FS.withTempDir fun directory =>
       return (← Driver.importRustFile {
         source, output := directory / "unit.raw.json", rustcArgs }).unit
-    pure (unit, ← specsFor unit source specFile)
+    let specs ← specsFor unit source specFile
+    pure (unit, specs ++ (← libraryCompanions unit (specs.filterMap (·.text))))
   run environment { unit, companions, output, ignoreProofs }
 
 /-- Verify the library crate of a Cargo package against the specification
@@ -101,7 +207,8 @@ def verifyCrate (environment : Lean.Environment) (request : Driver.CargoImportRe
       Driver.importCargoCrate { request with output := directory / "unit.raw.json" }
     let some root := result.sourceRoot
       | throw <| IO.userError "a Cargo import did not name its workspace root"
-    pure (result.unit, root, ← crateSpecs result.unit root)
+    let specs ← crateSpecs result.unit root
+    pure (result.unit, root, specs ++ (← libraryCompanions result.unit (specs.filterMap (·.text))))
   run environment { unit, companions, output, ignoreProofs, sourceRoot }
 
 end VerexIR.Rust.SourceVerify

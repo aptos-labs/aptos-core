@@ -117,8 +117,9 @@ private abbrev AlignM := StateM (Array (LocId × LocId))
 private def pair (generated original : LocId) : AlignM Unit :=
   modify (·.push (generated, original))
 
-private def nameOf? (ns : ValidatedNamespace) (id : NameId) : Option String :=
-  (ns.nameOf id).map (·.name)
+/-- A declaration's name and the scope it is in. -/
+private def nameOf? (ns : ValidatedNamespace) (id : NameId) : Option (Array String × String) :=
+  (ns.nameOf id).map fun name => (name.scope, name.name)
 
 /-- A block's statements followed by its result, as one sequence: a trailing
 statement may come back as the result. An empty unit result, which a
@@ -221,6 +222,7 @@ private partial def alignPlace (g o : ValidatedNamespace) (generated original : 
   | some (.deref gBase), some (.deref oBase)
   | some (.field gBase _ _), some (.field oBase _ _)
   | some (.subslice gBase ..), some (.subslice oBase ..)
+  | some (.unsize gBase), some (.unsize oBase)
   | some (.downcast gBase _), some (.downcast oBase _) => alignPlace g o gBase oBase
   | some (.index gBase gIndex), some (.index oBase oIndex) =>
       alignPlace g o gBase oBase
@@ -242,6 +244,20 @@ private partial def alignConditions (g o : ValidatedNamespace) (generated origin
         alignExpr g o gAuxiliary oAuxiliary
 
 end
+
+/-- A rendering's temporaries collapse the blocks around its drops and calls,
+where `alignExpr` stops. They run in the same order in both bodies, so they
+align by it, the two bodies' sequences being of the same kinds. Aligned before
+`alignExpr`, as of entries with equal generated ranges the first is taken. -/
+private def alignDropsAndCalls (g o : ValidatedNamespace) (generated original : ExprId) :
+    AlignM Unit := do
+  let isDrop (expression : VerexIR.Expr) := expression.kind matches .operation (.drop _) ..
+  let keep (_ : ExprId) (expression : VerexIR.Expr) :=
+    isDrop expression || expression.kind matches .operation (.call (.function _)) ..
+  let gSites := Verify.expressionsInOrder g keep generated #[]
+  let oSites := Verify.expressionsInOrder o keep original #[]
+  if gSites.map isDrop == oSites.map isDrop then
+    for (gSite, oSite) in gSites.zip oSites do pair gSite.loc oSite.loc
 
 private def alignContract (g o : ValidatedNamespace) (generated original : FunctionContract) :
     AlignM Unit := do
@@ -289,6 +305,7 @@ private def alignNamespace (g o : ValidatedNamespace) : AlignM Unit := do
     pair gDecl.loc oDecl.loc
     alignContract g o gDecl.contract oDecl.contract
     if let (.structured gRoot, .structured oRoot) := (gDecl.body, oDecl.body) then
+      alignDropsAndCalls g o gRoot oRoot
       alignExpr g o gRoot oRoot
 
 /-! ## Source map -/
@@ -646,12 +663,6 @@ def importCompiled (libraries : Array Name) (request : Request) (compiled : Comp
     | .error message => throw <| IO.userError message
   importLibraries (libraries ++ (compiledParts request.unit order compiled).1) #[compiled.root]
 
-/-- The namespace path a validated namespace is declared at, without a
-Move address alias, which a rendering does not spell. -/
-private def pathKey (ns : ValidatedNamespace) : Option (String × String) := do
-  let segments ← ns.tables.namespaces[ns.unitIdentity.index]? |>.map (·.segments)
-  return (← segments[0]?, ← segments.back?)
-
 /-- Render, write, and elaborate a unit, and report every message in the
 coordinates of its source. The environment has imported `VerexSL` and what
 the proof files import, and, with `compiled`, the namespaces before the target
@@ -661,9 +672,11 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
   let root ← match request.sourceRoot with
     | some root => pure root
     | none => IO.currentDir
-  -- A source name as reported: under the source root, when one is named.
+  -- A source name as reported: under the source root, when one is named,
+  -- else relative to the directory the command runs in.
   let display (file : String) : String :=
-    if request.sourceRoot.isSome then (root / file).toString else file
+    if request.sourceRoot.isSome then (root / file).toString
+    else (file.dropPrefix s!"{root}/").toString
   let rendered ← Perf.withPhase .render do
     let order ← match Print.dependencyOrder request.unit (companionUses request.companions) with
       | .ok order => pure order
@@ -700,6 +713,7 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
     companion.role == .proofs && companion.text.isSome
   let environment := VerexSL.Verify.setDeferral environment
     (.proofFiles (proofFiles.map (·.path.toString)))
+  let environment := VerexSL.Verify.setRenderedSource environment { unit := request.unit, display }
   let (headerMessages, commands) ← elaborateRendering environment generated generatedName options
   let mut messages := headerMessages
   let mut deferred : NameSet := {}
@@ -715,11 +729,27 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
   -- Each elaborated namespace aligns with the source namespace at its path.
   let entries := (moduleUnits elaborated).toArray.flatMap fun (_, unit) =>
     unit.namespaces.flatMap fun generatedNs =>
-      match request.unit.namespaces.find? (pathKey · == pathKey generatedNs) with
+      match request.unit.namespaces.find? (Verify.pathKey · == Verify.pathKey generatedNs) with
       | some original => sourceMap generatedNs original
       | none => #[]
   let generatedMap := FileMap.ofString generated
   let mut reports := #[]
+  -- A refused function is an error of the crate at what refused it, however the
+  -- others verify.
+  for ns in request.unit.namespaces do
+    for function in ns.functions do
+      let some refused := function.profileData.find? (·.tag == VerexIR.rustRefusedTag) | continue
+      let some location := ns.location? function.loc | continue
+      let some range := location.related.back? <|> location.primary | continue
+      let some file := ns.localTables.files[range.file.index]? | continue
+      let position := (← fileMap cache (root / file.name).toString).map
+        (·.toPosition ⟨range.startByte⟩)
+      let name := ((ns.nameOf function.name).map (·.name)).getD "?"
+      reports := reports.push {
+        file := display file.name, line := position.map (·.line) |>.getD 1
+        column := position.map (·.column + 1) |>.getD 1, severity := .error
+        text := s!"`{name}` is refused, so it is not verified and a call of it needs a \
+          contract: {refused.payload}" }
   for message in messages do
     if message.isSilent then continue
     let text ← message.data.toString

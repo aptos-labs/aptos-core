@@ -226,10 +226,10 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
           · rename_i evaluation node_eq
             cases h
             exact BigStep.EvalExpr.node
-              (startFrame := (settleLoans (loanDeathsAt unit namespaceId exprId).before
-                frame state).1)
-              (startState := (settleLoans (loanDeathsAt unit namespaceId exprId).before
-                frame state).2)
+              (startFrame := (settleDeaths unit namespaceId (loanDeathsAt unit namespaceId exprId).before
+                (deadPlacesAt unit namespaceId exprId).before frame state).1)
+              (startState := (settleDeaths unit namespaceId (loanDeathsAt unit namespaceId exprId).before
+                (deadPlacesAt unit namespaceId exprId).before frame state).2)
               (before_eq := rfl) (node_step := previous.node _ _ _ _ _ evaluation node_eq)
               (after_eq := rfl)
         node := by
@@ -624,7 +624,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           | borrow _ _ =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
-                                          | loanHole _ =>
+                                          | retired | loanHole _ =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
                                           | ghost _ =>
@@ -1009,7 +1009,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           | borrow _ _ =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
-                                          | loanHole _ =>
+                                          | retired | loanHole _ =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
                                           | ghost _ =>
@@ -1513,7 +1513,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | borrow _ _ =>
                                   simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                     control_eq, failAt] at h
-                              | loanHole _ =>
+                              | retired | loanHole _ =>
                                   simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                     control_eq, failAt] at h
                               | ghost _ =>
@@ -2182,7 +2182,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
                               | borrow _ _ =>
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
-                              | loanHole _ =>
+                              | retired | loanHole _ =>
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
                               | ghost _ =>
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h

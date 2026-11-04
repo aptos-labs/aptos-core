@@ -90,7 +90,7 @@ private def blockText (entries : Array String) : String :=
   | #[entry] =>
       -- The statement terminator belongs to the block, not to the statement:
       -- outside one the entry stands alone as an expression.
-      if entry.startsWith "let " || entry.contains '\n' then wrapped
+      if entry.startsWith "let " then wrapped
       else if entry.endsWith ";" then entry.dropRight 1
       else entry
   | _ => wrapped
@@ -126,6 +126,10 @@ private def nameAt (unit : ValidatedUnit) (id : NameId) : Except String String :
   let some name := unit.tables.names[id.index]?
     | throw s!"VerexSL source references missing name {id.index}"
   pure (sourceIdentifier name.name)
+
+/-- A declaration's name after the scope segments that lead to it. -/
+private def scopedText (scope : Array String) (name : String) : String :=
+  "::".intercalate (scope.toList.map sourceIdentifier ++ [name])
 
 /-- A namespace path as its source spells it: a Move module led by its
 address alias when it has one. -/
@@ -258,12 +262,35 @@ private def referencedNames (unit : ValidatedUnit)
     expressions := enqueueContract expressions declaration.contract
   for declaration in ns.functions do
     names := visitSignature names declaration.signature
-    names := visitLocals names declaration.locals
+    -- A local no code of the body mentions is never spelled, as a collapsed panic
+    -- region's temporaries are not, so its type is no part of the import surface.
+    let mentioned : LocalId → Bool := match declaration.body with
+      | .absent => fun _ => true
+      | .structured root =>
+          let uses := Temporaries.Uses.of ns declaration.locals.size root
+          fun localId => !uses.unread localId || uses.writes[localId.index]? != some 0
+    names := visitLocals names (declaration.locals.filter (mentioned ·.id))
     for type in declaration.contract.reads do names := visitTypeUse names type
     expressions := enqueueContract expressions declaration.contract
+    for shape in declaration.shapes do
+      for argument in shape.arguments do names := visitTypeUse names argument
+      names := visitSignature names shape.signature
+      names := visitLocals names shape.locals
+      for type in shape.contract.reads do names := visitTypeUse names type
+      expressions := enqueueContract expressions shape.contract
     match declaration.body with
     | .absent => pure ()
-    | .structured root => expressions := expressions.push root
+    | .structured root =>
+        let mut body := root
+        repeat
+          let some { kind := .letDecl pattern none next, .. } := ns.expressions[body.index]?
+            | break
+          let some { kind := .variable localId, .. } := ns.patterns[pattern.index]? | break
+          unless mentioned localId do seenPatterns := seenPatterns.push pattern
+          seenExpressions := seenExpressions.push body
+          patterns := patterns.push pattern
+          body := next
+        expressions := expressions.push body
   for declaration in ns.specFunctions do
     -- A derived specification function has no printed text, so a symbol only
     -- its body mentions is not part of this namespace's import surface. The
@@ -375,7 +402,7 @@ private def referencedNames (unit : ValidatedUnit)
         if let some place := ns.places[id.index]? then
           match place with
           | .localVar .. => pure ()
-          | .deref base | .subslice base .. => places := places.push base
+          | .deref base | .subslice base .. | .unsize base => places := places.push base
           | .field base .. | .ghostField base .. | .downcast base _ => places := places.push base
           | .index base index =>
               places := places.push base
@@ -400,9 +427,9 @@ private def importFreeSurfaceName (unit : ValidatedUnit) (ns : ValidatedNamespac
 spells the names of other namespaces, decided once from the names it
 references. -/
 structure PrintNamespace extends ValidatedNamespace where
-  /-- The namespaces the references spell each surface name from, or `none`
-  when a reference names nothing. -/
-  referencedSpellings : Option (Std.HashMap String (Array NamespaceId))
+  /-- The namespaces and scopes the references spell each surface name from, or
+  `none` when a reference names nothing. -/
+  referencedSpellings : Option (Std.HashMap String (Array (NamespaceId × Array String)))
   /-- Surface names of the declarations the namespace owns. Dependency
   declarations may or may not be present in a validated unit, so they must not
   influence canonical source. -/
@@ -413,6 +440,11 @@ structure PrintNamespace extends ValidatedNamespace where
   aliasCounts : Std.HashMap String Nat
   /-- The `use` paths the source imports. -/
   usePaths : Array String := #[]
+  /-- Each declaration the namespace owns, by its scope and surface name: what a
+  path written in the namespace resolves to. -/
+  scopedNames : Std.HashSet (Array String × String) := {}
+  /-- The scope the declaration being printed is in, which paths start from. -/
+  scope : Array String := #[]
 
 instance : Coe PrintNamespace ValidatedNamespace := ⟨(·.toValidatedNamespace)⟩
 
@@ -431,7 +463,7 @@ private def PrintNamespace.importsName (ns : PrintNamespace) (unit : ValidatedUn
       target.namespaceId != ns.identity && !targetName.isEmpty &&
         !targetName.startsWith "$" && !surfaceBuiltin &&
         !ns.ownedNames.contains targetName &&
-        (spellings.getD targetName #[]).all (· == target.namespaceId)
+        (spellings.getD targetName #[]).all (· == (target.namespaceId, target.scope))
   | _, _ => false
 
 /-- A namespace can be imported by its final segment when that segment is
@@ -441,17 +473,20 @@ would shadow a local declaration. -/
 private def PrintNamespace.importsNamespace (ns : PrintNamespace) (unit : ValidatedUnit)
     (target : NamespaceId) : Bool :=
   if target == ns.identity then false else
-  match unit.tables.namespaces[target.index]?.bind (·.segments.back?) with
+  match unit.tables.namespaces[target.index]? with
   | none => false
-  | some alias =>
-      !alias.isEmpty && !ns.currentNames.contains alias && ns.aliasCounts.getD alias 0 == 1
+  | some path =>
+      -- A `use` has two segments at least; a one-segment path needs none.
+      let alias := path.segments.back?.getD ""
+      path.segments.size > 1 && !alias.isEmpty && !ns.currentNames.contains alias &&
+        ns.aliasCounts.getD alias 0 == 1
 
 def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     Except String PrintNamespace := do
   -- Rendering reads the body in the unit's numbering.
   let ns := ns.inUnitIds
   let references := referencedNames unit ns
-  let mut spellings : Std.HashMap String (Array NamespaceId) := {}
+  let mut spellings : Std.HashMap String (Array (NamespaceId × Array String)) := {}
   let mut complete := true
   for id in references do
     unless importFreeSurfaceName unit ns id do
@@ -460,8 +495,8 @@ def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
       | some name =>
           let key := executableReferenceName name.name
           let known := spellings.getD key #[]
-          unless known.contains name.namespaceId do
-            spellings := spellings.insert key (known.push name.namespaceId)
+          unless known.contains (name.namespaceId, name.scope) do
+            spellings := spellings.insert key (known.push (name.namespaceId, name.scope))
   let declared := ns.constants.map (·.name) ++
     ns.structs.flatMap (fun declaration =>
       #[declaration.name] ++ declaration.variants.map (·.name)) ++
@@ -471,10 +506,19 @@ def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     match unit.tables.names[id.index]? with
     | some entry => names.insert (executableReferenceName entry.name)
     | none => names
+  let scopedNames : Std.HashSet (Array String × String) := declared.foldl (init := {})
+    fun names id => match unit.tables.names[id.index]? with
+      | some entry => names.insert (entry.scope, executableReferenceName entry.name)
+      | none => names
+  -- A scope's name leads the paths written in the namespace, so an import of
+  -- that name would capture them.
+  let scopeSegments := ns.scopes.flatMap (·.path)
+  let ownedNames := scopeSegments.foldl (·.insert ·) ownedNames
   let currentNames := unit.tables.names.foldl (init := {}) fun names candidate =>
     if candidate.namespaceId == ns.identity then
       names.insert (executableReferenceName candidate.name)
     else names
+  let currentNames := scopeSegments.foldl (·.insert ·) currentNames
   let aliasCounts := unit.tables.namespaces.foldl (init := {}) fun counts candidate =>
     match candidate.segments.back? with
     | some alias => counts.insert alias (counts.getD alias 0 + 1)
@@ -482,7 +526,7 @@ def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
   let view : PrintNamespace := {
     toValidatedNamespace := ns
     referencedSpellings := if complete then some spellings else none
-    ownedNames, currentNames, aliasCounts }
+    ownedNames, currentNames, aliasCounts, scopedNames }
   let mut paths := #[]
   for id in references do
     let some name := unit.tables.names[id.index]?
@@ -491,30 +535,70 @@ def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
       pure ()
     else if view.importsName unit id then
       let path := s!"{← namespacePath unit name.namespaceId}::{
-        sourceIdentifier (executableReferenceName name.name)}"
+        scopedText name.scope (sourceIdentifier (executableReferenceName name.name))}"
       unless paths.contains path do paths := paths.push path
     else if view.importsNamespace unit name.namespaceId then
       let path ← namespacePath unit name.namespaceId
       unless paths.contains path do paths := paths.push path
   pure { view with usePaths := paths.qsort (· < ·) }
 
+/-- The scope a path resolves in from the scope being printed, as lowering
+resolves it: the innermost enclosing one that declares its target, else the
+namespace root. -/
+private def PrintNamespace.resolvedScope (ns : PrintNamespace) (leading : Array String)
+    (name : String) : Array String :=
+  ((List.range (ns.scope.size + 1)).findSome? fun depth =>
+    let candidate := ns.scope.take (ns.scope.size - depth) ++ leading
+    if ns.scopedNames.contains (candidate, name) then some candidate else none).getD leading
+
+/-- The shortest path from the scope being printed that resolves to the
+declaration `name` of `scope` in this namespace: the ending of `scope` it
+needs, or `none` when an inner scope hides every such path. -/
+private def PrintNamespace.shortestPrefix? (ns : PrintNamespace) (scope : Array String)
+    (name : String) : Option (Array String) :=
+  (List.range (scope.size + 1)).findSome? fun length =>
+    let leading := scope.drop (scope.size - length)
+    if ns.resolvedScope leading name == scope then some leading else none
+
+/-- A name of a namespace as the namespace being printed spells it, given the
+spelling of its final segment. -/
+private def nameTextAt (unit : ValidatedUnit) (ns : PrintNamespace)
+    (name : QualifiedName) (localName : String) (imported : Bool) : Except String String := do
+  let localNameText := sourceIdentifier localName
+  if name.namespaceId == ns.identity then
+    match ns.shortestPrefix? name.scope (executableReferenceName name.name) with
+    | some leading => pure (scopedText leading localNameText)
+    | none => pure s!"{← namespacePath unit name.namespaceId}::{
+        scopedText name.scope localNameText}"
+  else if imported then pure localNameText
+  else if ns.importsNamespace unit name.namespaceId then
+    let some alias := unit.tables.namespaces[name.namespaceId.index]?.bind (·.segments.back?)
+      | throw s!"VerexSL source references an empty namespace {name.namespaceId.index}"
+    pure s!"{sourceIdentifier alias}::{scopedText name.scope localNameText}"
+  else pure s!"{← namespacePath unit name.namespaceId}::{scopedText name.scope localNameText}"
+
 private def qualifiedNameAt (unit : ValidatedUnit) (ns : PrintNamespace)
     (id : NameId) : Except String String := do
   let some name := unit.tables.names[id.index]?
     | throw s!"VerexSL source references missing name {id.index}"
-  let localNameText := sourceIdentifier (surfaceReferenceName name.name)
-  if name.namespaceId == ns.identity then pure localNameText
-  else if ns.importsName unit id then pure localNameText
-  else if ns.importsNamespace unit name.namespaceId then
-    let some alias := unit.tables.namespaces[name.namespaceId.index]?.bind (·.segments.back?)
-      | throw s!"VerexSL source references an empty namespace {name.namespaceId.index}"
-    pure s!"{sourceIdentifier alias}::{localNameText}"
-  else pure s!"{← namespacePath unit name.namespaceId}::{localNameText}"
+  nameTextAt unit ns name (surfaceReferenceName name.name) (ns.importsName unit id)
+
+/-- A binder's source name. An anonymous lifetime binder (Rust's `'_`) has no
+spelling of its own, and is named by its position. -/
+private def binderSpelling (binders : Array VerexIR.GenericBinder) (index : Nat)
+    (name : String) : String :=
+  let spelled := sourceIdentifier name
+  if spelled != "_" then spelled else
+    let taken := binders.map (sourceIdentifier ·.name)
+    let rec fresh (candidate : String) : Nat → String
+      | 0 => candidate
+      | fuel + 1 => if taken.contains candidate then fresh (candidate ++ "_") fuel else candidate
+    fresh s!"l{index}" binders.size
 
 private def binderName (binders : Array VerexIR.GenericBinder) (index : Nat) : Except String String := do
   let some binder := binders[index]?
     | throw s!"VerexSL source references missing generic binder {index}"
-  pure (sourceIdentifier binder.name)
+  pure (binderSpelling binders index binder.name)
 
 private def abilityText : VerexIR.Ability → String
   | .copy => "Copy"
@@ -526,7 +610,8 @@ private def abilitiesText (abilities : Array VerexIR.Ability) : String :=
   if abilities.isEmpty then "" else
     " has " ++ commaSep (abilities.map abilityText)
 
-private def binderText (unit : ValidatedUnit) (binder : VerexIR.GenericBinder) :
+private def binderText (unit : ValidatedUnit) (binders : Array VerexIR.GenericBinder)
+    (index : Nat) (binder : VerexIR.GenericBinder) :
     Except String String := do
   -- A phantom type parameter is a predicate the surface spells in the binder
   -- itself; every other predicate has no VerexSL spelling yet.
@@ -557,7 +642,7 @@ private def binderText (unit : ValidatedUnit) (binder : VerexIR.GenericBinder) :
   | .lifetime, none => pure " : lifetime"
   | .evidence, none => pure " : evidence"
   let annotation := if phantom then " : phantom type" else annotation
-  pure ("{" ++ sourceIdentifier binder.name ++ annotation ++
+  pure ("{" ++ binderSpelling binders index binder.name ++ annotation ++
     abilitiesText binder.abilities ++ "}")
 
 mutual
@@ -612,8 +697,9 @@ mutual
               pure s!"[{sourceIdentifier name}]"
         let mutability := if reference.kind == .mutable then "mut " else ""
         let referent ← typeTextFuel unit ns binders reference.referent (fuel - 1)
-        let separator := if !lifetime.isEmpty then " "
-          else if mutability.isEmpty && referent.startsWith "&" then " " else ""
+        let lifetime := if lifetime.isEmpty then "" else lifetime ++ " "
+        let separator := if lifetime.isEmpty && mutability.isEmpty && referent.startsWith "&" then " "
+          else ""
         pure s!"&{lifetime}{mutability}{separator}{referent}"
     | .typeParameter index => binderName binders index
     | .nominal name arguments =>
@@ -674,7 +760,8 @@ def instantiatedTypeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
 /-- The generic binders of a declaration as its rendering spells them. -/
 def genericBindersText (unit : ValidatedUnit) (binders : Array VerexIR.GenericBinder) :
     Except String String :=
-  return " ".intercalate (← binders.mapM (binderText unit)).toList
+  return " ".intercalate (← binders.zipIdx.mapM fun (binder, index) =>
+    binderText unit binders index binder).toList
 
 private def byteVectorText? (values : Array ConstValue) : Option String := do
   let bytes ← values.mapM fun
@@ -697,7 +784,7 @@ private def constText : ConstValue → Except String String
       | some text => pure text
       | none => do pure s!"#[{commaSep (← values.mapM constText)}]"
   | .character value => pure s!"{repr (Char.ofNat value)}"
-  | .profile _ =>
+  | .profile _ | .opaque _ =>
       throw "constant is outside the current VerexSL literal parser"
 
 /-- Use the source profile's default integer type without a suffix, matching
@@ -841,6 +928,9 @@ private def specificationVectorName? : SpecOperation → Option String
   | .singletonVector => some "singletonVector"
   | .updateVector => some "updateVector"
   | .concatVector => some "concatVector"
+  | .stringConcat => some "stringConcat"
+  | .stringBytes => some "stringBytes"
+  | .charEncode => some "charEncode"
   | .indexOfVector => some "indexOfVector"
   | .containsVector => some "containsVector"
   | .lengthVector => some "lengthVector"
@@ -877,7 +967,8 @@ private partial def placeLocal? (ns : ValidatedNamespace) (id : PlaceId) (fuel :
   match ns.places[id.index]? with
   | some (.localVar localId) => some localId
   | some (.deref base) | some (.field base ..) | some (.ghostField base ..) | some (.index base _) |
-    some (.subslice base ..) | some (.downcast base _) => placeLocal? ns base (fuel - 1)
+    some (.subslice base ..) | some (.unsize base) | some (.downcast base _) =>
+      placeLocal? ns base (fuel - 1)
   | none => none
 
 /-- Names a declaration chain binds for the rest of the block that prints it.
@@ -1101,6 +1192,13 @@ private structure Context where
   /-- Bindings of the declaration being printed whose mutability the pattern
   itself must carry, as in `let (mut head, tail) := ...`. -/
   mutableBindings : Array LocalId := #[]
+  /-- How many components a Rust function's tuple result has, in its contract:
+  `spec.result[i]` reads each of them, and `result` is the tuple. -/
+  tupleResultSize : Option Nat := none
+  /-- The body being printed and the path of its function: its first construction of
+  a closure standing there spells it. -/
+  root : Option ExprId := none
+  function : Array String := #[]
 
 /-- The state labels a two-state operation reads, as the prefix of its
 spelling: `S |~ ` where both are `S`, else `S.. |~ `, `..T |~ `, or
@@ -1231,14 +1329,15 @@ private def specificationCallName (context : Context) (reference : QualifiedRef)
   let localName := surfaceReferenceName localName
   unless !localName.isEmpty do
     throw "a Move specification companion has an empty executable-function name"
-  let localName := sourceIdentifier localName
   let imported ← if reference.namespaceId == context.ns.identity then pure false else do
-    let expected := s!"{← namespacePath context.unit reference.namespaceId}::{localName}"
+    let expected := s!"{← namespacePath context.unit reference.namespaceId}::{
+      scopedText qualified.scope (sourceIdentifier localName)}"
     pure (context.ns.usePaths.contains expected)
-  let name ← if reference.namespaceId == context.ns.identity then pure localName
-    else if imported then pure localName
-    else pure s!"{← namespacePath context.unit reference.namespaceId}::{localName}"
-  pure (name, moveCompanion)
+  if qualified.scope.isEmpty && !imported && reference.namespaceId != context.ns.identity then
+    -- A specification call spells another namespace in full.
+    return (s!"{← namespacePath context.unit reference.namespaceId}::{
+      sourceIdentifier localName}", moveCompanion)
+  pure (← nameTextAt context.unit context.ns qualified localName imported, moveCompanion)
 
 /-- Aborting specification branches have an unspecified value in VIR.  The
 lowerer represents each such site with a private opaque specification
@@ -1435,7 +1534,7 @@ private def placeIndexesElided (context : Context) : Nat → PlaceId → Bool
           checked == index && observesPlace context fuel collection base) &&
           placeIndexesElided context fuel base
     | some (.deref base) | some (.field base ..) | some (.downcast base _) |
-        some (.subslice base ..) => placeIndexesElided context fuel base
+        some (.subslice base ..) | some (.unsize base) => placeIndexesElided context fuel base
     | some (.localVar _) => true
     | _ => false
 
@@ -1472,7 +1571,8 @@ private def placeUnderCheck (context : Context) (collection index : ExprId)
     | fuel + 1, place => match context.ns.places[place.index]? with
       | some (.index base i) =>
           (i == index && observesPlace context fuel collection base) || along fuel base
-      | some (.deref base) | some (.field base ..) | some (.subslice base ..) => along fuel base
+      | some (.deref base) | some (.field base ..) | some (.subslice base ..)
+      | some (.unsize base) => along fuel base
       | _ => false
   along (context.ns.places.size + 1) place
 
@@ -1761,7 +1861,7 @@ private def placeContainsIndex (ns : ValidatedNamespace) : Nat → PlaceId → B
   | fuel + 1, id => match ns.places[id.index]? with
     | some (.index ..) => true
     | some (.deref base) | some (.field base ..) | some (.downcast base _) |
-        some (.subslice base ..) => placeContainsIndex ns fuel base
+        some (.subslice base ..) | some (.unsize base) => placeContainsIndex ns fuel base
     | _ => false
 
 /-- The place a projection's text is spelled on: a downcast has no spelling,
@@ -1771,6 +1871,21 @@ private def spelledPlace? (ns : ValidatedNamespace) (place : PlaceId) : Nat → 
   | fuel + 1 => match ns.places[place.index]? with
     | some (.downcast inner _) => spelledPlace? ns inner fuel
     | other => other
+
+private def nominalAt? (unit : ValidatedUnit) (name : NameId) :
+    Option VerexIR.StructDecl := do
+  let qualified ← unit.tables.names[name.index]?
+  -- Owned namespaces are a list, not an array keyed by namespace identity.
+  let ns ← (unit.namespaces.find? (·.unitIdentity == qualified.namespaceId)).map (·.inUnitIds)
+  ns.structs.find? (·.name == name)
+
+/-- Whether the variants of an enum give a field of this name different types. -/
+private def fieldTypesDiffer (unit : ValidatedUnit) (owner field : NameId) : Bool :=
+  (nominalAt? unit owner).any fun declaration =>
+    let spelling (name : NameId) := unit.tables.names[name.index]?.map (·.name)
+    let types := declaration.variants.flatMap fun variant =>
+      (variant.fields.filter (spelling ·.name == spelling field)).map (·.type.typeId)
+    types.any (· != types[0]!)
 
 private partial def placeText (context : Context)
     (indexText : ExprId → Except String String) (id : PlaceId)
@@ -1797,16 +1912,16 @@ private partial def placeText (context : Context)
         | _ => s!"({baseText})"
       pure s!"*{baseText}"
   | .field base owner field | .ghostField base owner field =>
-      -- Move names the variant a field several variants give different
-      -- types is reached through.
-      if let (some .move, some (.downcast inner variant)) :=
-          (context.ns.profile, context.ns.places[base.index]?) then
-        let innerText ← match context.ns.places[inner.index]? with
-          | some (.deref reference) => placeText context indexText reference (fuel - 1)
-          | _ => placeText context indexText inner (fuel - 1)
-        let enumText ← qualifiedNameAt context.unit context.ns owner.name
-        return s!"(downcast {innerText} as {enumText}::{← nameAt context.unit variant}).\
-          {← nameAt context.unit field}"
+      -- A field several variants give different types is read through the
+      -- variant named, as Move always names it.
+      if let some (.downcast inner variant) := context.ns.places[base.index]? then
+        if context.ns.profile == some .move || fieldTypesDiffer context.unit owner.name field then
+          let innerText ← match context.ns.profile, context.ns.places[inner.index]? with
+            | some .move, some (.deref reference) => placeText context indexText reference (fuel - 1)
+            | _, _ => placeText context indexText inner (fuel - 1)
+          let enumText ← qualifiedNameAt context.unit context.ns owner.name
+          return s!"(downcast {innerText} as {enumText}::{← nameAt context.unit variant}).\
+            {← nameAt context.unit field}"
       -- Move reads a field through a reference implicitly, so the dereference
       -- has no spelling; a borrow underneath it cancels with it, which is what
       -- keeps the result a place rather than a borrow expression.
@@ -1832,7 +1947,17 @@ private partial def placeText (context : Context)
       let baseText := if context.ns.profile == some .move then
           (borrowedReferentText? baseText).getD baseText
         else baseText
-      pure s!"{baseText}[{← indexText index}]"
+      -- A tuple element reads back as `base.N`; a base ending in a digit is
+      -- parenthesized, as `x.0.1` would lex a float literal.
+      let typing : VerexIR.Validation.StaticTyping.Context :=
+        { unit := context.unit, pointerWidth := none, ns := context.ns.toValidatedNamespace,
+          locals := context.locals, env := VerexIR.Validation.StaticTyping.staticEnv context.binders,
+          results := none, loops := [], required := none, table := #[] }
+      match typing.placeTypeOf base, context.ns.expressions[index.index]? with
+      | some (.tuple _), some { kind := .value (.integer position) _, .. } =>
+          let atom := if baseText.back?.any Char.isDigit then s!"({baseText})" else baseText
+          pure s!"{atom}.{position.toNat}"
+      | _, _ => pure s!"{baseText}[{← indexText index}]"
   | .downcast base _ =>
       -- A downcast only refines which enum payload is active. Structured MIR
       -- already guards the corresponding arm by the discriminant, while the
@@ -1853,6 +1978,7 @@ private partial def placeText (context : Context)
           else s!"{receiverText}.length - {stop}usize"
         else s!"{stop}usize"
       pure s!"core.prim.slice({baseText}, {lower}, {upper})"
+  | .unsize base => pure s!"(unsize {← placeText context indexText base (fuel - 1)})"
 
 private def cancelBorrowedPlaceText (value : String) : String :=
   if value.startsWith "*&mut " then value.drop 6 |>.toString
@@ -2211,7 +2337,8 @@ private partial def foldableRegion (context : Context) (node : ExprId)
         | some (localId, value) =>
             if localId == targetLocal then index + 1 == statements.size
             else compilerTemporaryLocal? context localId &&
-              Temporaries.substitutable ns context.uses statements result index localId value
+              Temporaries.substitutable ns context.uses (compilerTemporaryLocal? context) statements result
+                index localId value
         | none => false
       statementsFold && match result with
         | none => lastAssignsTarget
@@ -2332,6 +2459,18 @@ private def typeInstantiationIds? (arguments : Array GenericArgument) : Option (
     | .typeArg value => some value.typeId
     | _ => none
 
+/-- The type arguments a call spells. It spells no lifetime argument, which is
+the elided lifetime lowering supplies; another lifetime, or an argument of
+another kind, has no spelling on a call. -/
+private def callTypeArgumentIds? (unit : ValidatedUnit) (arguments : Array GenericArgument) :
+    Option (Array TypeId) :=
+  arguments.foldlM (init := #[]) fun ids => fun
+    | .typeArg value => some (ids.push value.typeId)
+    | .lifetime lifetime =>
+        if (unit.tables.lifetimes[lifetime.index]?).any (·.kind == .inference) then some ids
+        else none
+    | _ => none
+
 private def inferredDataInstantiations (unit : ValidatedUnit) (operandType : TypeId)
     (ownerArguments instantiations : Array GenericArgument) : Bool :=
   instantiations.isEmpty ||
@@ -2342,13 +2481,6 @@ private def inferredDataInstantiations (unit : ValidatedUnit) (operandType : Typ
         | some (.reference reference) => reference.referent == operandType
         | _ => false
     | _ => false)
-
-private def nominalAt? (unit : ValidatedUnit) (name : NameId) :
-    Option VerexIR.StructDecl := do
-  let qualified ← unit.tables.names[name.index]?
-  -- Owned namespaces are a list, not an array keyed by namespace identity.
-  let ns ← (unit.namespaces.find? (·.unitIdentity == qualified.namespaceId)).map (·.inUnitIds)
-  ns.structs.find? (·.name == name)
 
 /-- The variants of an enum that declare a field of this name. -/
 private def declaringVariants? (unit : ValidatedUnit) (reference : QualifiedRef)
@@ -2380,8 +2512,11 @@ private def standardReceiverFunction? (context : Context)
 private def localReceiverFunction? (context : Context) (reference : QualifiedRef) : Bool :=
   reference.namespaceId == context.ns.identity &&
     (context.unit.tables.names[reference.name.index]?.any fun target =>
-      context.ns.functions.any fun declaration =>
+      -- Receiver notation names a function at the namespace root; a scoped
+      -- function is called by its path.
+      target.scope.isEmpty && context.ns.functions.any fun declaration =>
         (context.unit.tables.names[declaration.name.index]?.any fun candidate =>
+          candidate.scope.isEmpty &&
           executableReferenceName candidate.name == executableReferenceName target.name) &&
           declaration.signature.parameters[0]?.any (·.name == "self"))
 
@@ -2409,12 +2544,12 @@ private partial def typeContainsParameter (unit : ValidatedUnit) (typeId : TypeI
 private def signatureTypeArgumentsInferable (unit : ValidatedUnit)
     (signature : Signature) (instantiations : Array GenericArgument) : Bool :=
   signature.generics.size == instantiations.size &&
-    signature.generics.all (·.kind == BinderKind.typeArg) &&
-    instantiations.all (fun | .typeArg _ => true | _ => false) &&
-    signature.generics.zipIdx.all fun (_, index) =>
-      signature.parameters.any (fun parameter =>
-        typeContainsParameter unit parameter.typeUse.typeId index
-          (unit.tables.types.size + 1))
+    (callTypeArgumentIds? unit instantiations).isSome &&
+    signature.generics.zipIdx.all fun (binder, index) =>
+      binder.kind == VerexIR.BinderKind.lifetime ||
+        (binder.kind == VerexIR.BinderKind.typeArg && signature.parameters.any (fun parameter =>
+          typeContainsParameter unit parameter.typeUse.typeId index
+            (unit.tables.types.size + 1)))
 
 /-- The signature this unit holds for a reference: from an owned namespace, or
 from the dependency interface that declares it. -/
@@ -2764,6 +2899,27 @@ private def printsAsMatch (context : Context) (scrutinee : ExprId) : Bool := Id.
       return (nominalAt? context.unit owner).any (·.abilities.contains .copy)
   | _ => return false
 
+private def stringArrayPayload (payload : String) : Except String (Array String) := do
+  let json ← Lean.Json.parse payload
+  match json with
+  | .arr fields => fields.mapM fun
+      | .str value => pure value
+      | _ => throw "profile payload field is not a string"
+  | _ => throw "profile payload is not an array"
+
+/-- The result a signature declares, as its source spells it. -/
+private def signatureResultText (unit : ValidatedUnit) (ns : PrintNamespace)
+    (signature : VerexIR.Signature) : Except String String := do
+  match signature.results.toList with
+  | [] => pure "Unit"
+  | [result] => typeText unit ns signature.generics result.typeId
+  | results => pure s!"({commaSep (← results.toArray.mapM fun result =>
+      typeText unit ns signature.generics result.typeId)})"
+
+/-- Whether a struct is the struct of a closure's upvars. -/
+private def isClosureStruct (declaration : VerexIR.StructDecl) : Bool :=
+  declaration.properties.any (·.tag == VerexIR.rustClosureTag)
+
 /-- Does this statement's text end inside a block of its own? A separator
 there would attach to that block's last entry rather than to the statement
 around it. It is the last thing printed that decides: a conditional whose
@@ -2781,6 +2937,10 @@ private partial def endsInsideBlock (ns : ValidatedNamespace) (id : ExprId)
           endsInsideBlock ns (elseBranch.getD thenBranch) (fuel - 1)
       | .match_ _ arms => (arms.back?).any fun arm => endsInsideBlock ns arm.body (fuel - 1)
       | .assign _ value | .assignPattern _ value => endsInsideBlock ns value (fuel - 1)
+      -- A closure spelled here ends in its body.
+      | .operation (.call (.constructor reference _)) .. =>
+          ns.structs.any fun declaration =>
+            declaration.name == reference.name && isClosureStruct declaration
       | _ => false
 
 /-- Separator after one statement of a block. -/
@@ -2822,7 +2982,7 @@ private def holderUnused (context : Context) (holder : LocalId) :
           | .localVar localId => localId != holder && next rest
           | .index base index => next (.inr base :: .inl index :: rest)
           | .deref base | .field base .. | .ghostField base .. | .subslice base .. |
-              .downcast base _ =>
+              .unsize base | .downcast base _ =>
               next (.inr base :: rest)
   termination_by pending _ _ fuel => (fuel, pending.length)
   decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
@@ -3021,12 +3181,156 @@ private def referenceMutationText (context : Context) (referenceId : ExprId)
     s!"{reference} := {value}"
   else s!"*({reference}) := {value}"
 
+/-- A block that only forwards a value out of the function, which prints as a
+`return` of that value. -/
+private inductive ForwardedBlock where
+  | value (value : ExprId)
+  | conditional (condition thenValue : ExprId) (thenAssignments : Array (LocalId × ExprId))
+      (elseValue : ExprId) (elseAssignments : Array (LocalId × ExprId))
+  | match_ (scrutinee : ExprId) (arms : Array (MatchArm × ExprId × Array (LocalId × ExprId)))
+
+/-- The fold of a block's statements and result. Folding a conditional absorbs
+the branches' assignments, so only a temporary's may be absorbed: a declared
+local is assigned as itself. -/
+private def forwardedBlock? (context : Context) (statements : Array ExprId)
+    (result : Option ExprId) : Option ForwardedBlock :=
+  match forwardedValue? context.ns statements result,
+      forwardedConditional? context statements result with
+  | some value, _ => some (.value value)
+  | none, some (condition, thenValue, thenAssignments, elseValue, elseAssignments) =>
+      if (thenAssignments ++ elseAssignments).all (compilerTemporaryLocal? context ·.1) then
+        some (.conditional condition thenValue thenAssignments elseValue elseAssignments)
+      else matched
+  | none, none => matched
+where
+  matched : Option ForwardedBlock :=
+    (forwardedMatch? context statements result).map fun (scrutinee, arms) =>
+      .match_ scrutinee arms
+
+/-- A `let` with a value that prints no declaration: the fold that hides it. -/
+private inductive LetFold where
+  /-- A read of a held reference, spelled at its uses. -/
+  | held (holder : LocalId)
+  /-- A value whose binding is discarded: it prints as the value. -/
+  | discarded
+  | indexSlot (slot : LocalId)
+  | checkedIndex (index : ExprId × ExprId)
+  /-- A mutation through a hidden holder: it prints as the mutation. -/
+  | referenceMutation (assigned : ExprId)
+  | placeHolder (holder : LocalId)
+  | constant (substitution : LocalId × String)
+  | storageBorrow (holder : LocalId)
+
+private def letFold? (context : Context) (pattern : PatternId) (value body : ExprId) :
+    Except String (Option LetFold) := do
+  if let some holder := heldReference? context pattern then return some (.held holder)
+  if droppedDiscard? context pattern body then return some .discarded
+  if let some slot := indexTemporary? context pattern body then return some (.indexSlot slot)
+  if let some index := indexCheck? context pattern value body then
+    return some (.checkedIndex index)
+  if let some assigned := hiddenReferenceMutation? context pattern body then
+    return some (.referenceMutation assigned)
+  if let some holder := hiddenPlaceMutation? context pattern body then
+    return some (.placeHolder holder)
+  if let some substitution ← temporaryConstant? context pattern value then
+    return some (.constant substitution)
+  if let some holder := hiddenStorageBorrow? context pattern value then
+    return some (.storageBorrow holder)
+  return none
+
+/-- The temporary a block's statement assigns, with its value. -/
+private def assignedTemporary? (context : Context) (statement : ExprId) :
+    Option (LocalId × ExprId) := do
+  let statementNode ← context.ns.expressions[statement.index]?
+  let .assign place value := statementNode.kind | none
+  let targetLocal ← localPlace? context.ns place
+  if compilerTemporaryLocal? context targetLocal then some (targetLocal, value) else none
+
+/-- Whether a block's statement prints nothing: its temporary's value is written
+where the temporary is read. -/
+private def substitutedTemporary (context : Context) (statements : Array ExprId)
+    (result : Option ExprId) (index : Nat) (targetLocal : LocalId) (value : ExprId) : Bool :=
+  numericTemporaryLocal? context targetLocal && !context.uses.projected targetLocal &&
+    Temporaries.substitutable context.ns context.uses (numericTemporaryLocal? context) statements
+      result index targetLocal value
+
+/-- Whether an expression, outside tail position, prints as a `return` statement:
+a `return`, a block folded into one (`forwardedBlock?`), or a block or `let` that
+prints only what it holds. Such a text leaves the function only with its semicolon;
+without one it reads back as the value of the block around it. -/
+private partial def readsAsReturn (context : Context) (id : ExprId) (fuel : Nat) : Bool :=
+  match context.ns.expressions[id.index]? with
+  | some { kind := .return_ .., .. } => true
+  | some { kind := .block statements result, .. } =>
+      if (forwardedBlock? context statements result).isSome then true else
+      let printed := statements.zipIdx.filter fun (statement, index) =>
+        match assignedTemporary? context statement with
+        | some (targetLocal, value) =>
+            !substitutedTemporary context statements result index targetLocal value
+        | none => true
+      -- A result behind a diverging statement is not printed.
+      match printed.toList, result with
+      | [], some result => readsAsReturn context result fuel
+      | [(statement, _)], none => readsAsReturn context statement fuel
+      | [(statement, _)], some _ =>
+          isDivergingExpression context.ns statement && readsAsReturn context statement fuel
+      | _, _ => false
+  | some { kind := .letDecl pattern none body, .. } =>
+      match uninitializedLocals context pattern body fuel with
+      | .ok (#[], active) => readsAsReturn active body fuel
+      | _ => false
+  | some { kind := .letDecl pattern (some value) body, .. } =>
+      match letFold? context pattern value body with
+      | .ok (some .discarded) => readsAsReturn context value fuel
+      | .ok (some (.held _)) | .ok (some (.indexSlot _)) | .ok (some (.checkedIndex _))
+      | .ok (some (.placeHolder _)) | .ok (some (.constant _))
+      | .ok (some (.storageBorrow _)) => readsAsReturn context body fuel
+      | .ok (some (.referenceMutation _)) | .ok none | .error _ => false
+  | _ => false
+
 /-- The value a folded `return` region gives: bare in tail position, else
 returned, delimited when it spans lines so that a following separator belongs
 to the `return`. -/
 private def returnedText (tailPosition : Bool) (value : String) : String :=
   if tailPosition then value
   else s!"return {if value.contains '\n' then s!"({value})" else value}"
+
+/-- The scope of a closure's body: its struct under the struct's module. -/
+private def closureScope (unit : ValidatedUnit) (declaration : VerexIR.StructDecl) :
+    Option (Array String) := do
+  let name ← unit.tables.names[declaration.name.index]?
+  guard (isClosureStruct declaration)
+  return name.scope.push name.name
+
+/-- A closure's body, where the namespace holds it: an interface holds none. -/
+private def closureBody? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : VerexIR.StructDecl) : Option (VerexIR.FunctionDecl FunctionBody) := do
+  let scope ← closureScope unit declaration
+  ns.functions.find? fun function =>
+    (unit.tables.names[function.name.index]?).any (·.scope == scope) &&
+      (function.body matches .structured _)
+
+/-- The first of a body's expressions, in the order they run, that `select` takes. -/
+private partial def firstExpression? (ns : ValidatedNamespace) (select : ExprId → Bool)
+    (id : ExprId) : Option ExprId := do
+  let expression ← ns.expressions[id.index]?
+  (expressionChildren expression.kind).findSome? (firstExpression? ns select) <|>
+    if select id then some id else none
+
+/-- Whether an expression is the first construction of its closure in the body it
+stands in. -/
+private def spellsClosure (context : Context) (declaration : VerexIR.StructDecl)
+    (reference : QualifiedRef) (id : ExprId) : Bool :=
+  let standsHere := declaration.properties.any fun value =>
+    value.tag == VerexIR.rustClosureTag &&
+      (stringArrayPayload value.payload).toOption == some context.function
+  let constructs (candidate : ExprId) : Bool :=
+    match context.ns.expressions[candidate.index]? with
+    | some { kind := .operation (.call (.constructor other _)) .., .. } =>
+        other == reference
+    | _ => false
+  standsHere && context.root.any fun root =>
+    firstExpression? context.ns constructs root == some id
 
 private partial def expressionText (context : Context) (id : ExprId)
     (fuel : Nat) (tailPosition : Bool := false) (statementPosition : Bool := false) :
@@ -3091,7 +3395,14 @@ private partial def expressionText (context : Context) (id : ExprId)
             some (.integer .pointer _) =>
             pure s!"spec.bitVectorToInt({name})"
         | _, _ => pure name
-  | .operation operation instantiations arguments _surface =>
+  | .operation operation instantiations arguments surface =>
+      if operation matches .primitive .tuple && context.tupleResultSize == some arguments.size &&
+          arguments.zipIdx.all fun (argument, index) =>
+            match context.ns.expressions[argument.index]? with
+            | some { kind := .operation (.specification (.result position)) _ _ _, .. } =>
+                position == index
+            | _ => false then
+        return "result"
       match operation with
       | .move place =>
           unless instantiations.isEmpty do
@@ -3140,6 +3451,11 @@ private partial def expressionText (context : Context) (id : ExprId)
       | .borrow kind place =>
           unless instantiations.isEmpty && arguments.isEmpty do
             throw "a place borrow has unexpected arguments"
+          if surface == some .componentMove then
+            if let some (.deref base) := context.ns.places[place.index]? then
+              let moved ← placeText context
+                (fun index => expressionText context index (fuel - 1)) base
+              return s!"move({cancelBorrowedPlaceText moved})"
           let kind ← match kind with
             | .immutable => pure "immutable"
             | .mutable => pure "mut"
@@ -3149,8 +3465,13 @@ private partial def expressionText (context : Context) (id : ExprId)
               !placeIndexesElided context (context.ns.places.size + 1) place then
             return s!"core.borrowPlace({kind}, {← placeText context
               (fun index => expressionText context index (fuel - 1)) place})"
-          pure s!"({if kind == "mut" then "&mut " else "&"}{
-            ← placeText context (fun index => expressionText context index (fuel - 1)) place})"
+          let borrow := if kind == "mut" then "&mut " else "&"
+          let target ← placeText context (fun index => expressionText context index (fuel - 1)) place
+          -- A reborrow of a borrow of its kind is that borrow: no value is read.
+          if target.startsWith s!"*({borrow}" then
+            if let some referent := borrowedReferentText? (target.drop 1).toString then
+              return s!"({borrow}{referent})"
+          pure s!"({borrow}{target})"
       | .reference (.borrow kind) =>
           unless instantiations.isEmpty && arguments.size == 1 do
             throw "a value borrow must have exactly one operand"
@@ -3389,7 +3710,7 @@ private partial def expressionText (context : Context) (id : ExprId)
               pure typeIds
             else if instantiations.isEmpty || inferableTypeArguments then pure #[]
             else
-              let some typeIds := typeInstantiationIds? instantiations
+              let some typeIds := callTypeArgumentIds? context.unit instantiations
                 | throw "generic function calls contain non-type arguments"
               pure typeIds
           let explicitTypes ← explicitTypeIds.mapM
@@ -3474,6 +3795,40 @@ private partial def expressionText (context : Context) (id : ExprId)
                   pure fields
           unless fields.size == arguments.size do
             throw "a constructor has the wrong number of field operands"
+          -- The first construction of a closure spells the closure.
+          if let some declaration := nominalAt? context.unit reference.name then
+            if let some body := closureBody? context.unit context.ns declaration then
+              if spellsClosure context declaration reference id then
+                let .structured root := body.body
+                  | throw "a closure's body is absent"
+                let inside : PrintNamespace := { context.ns with
+                  scope := (closureScope context.unit declaration).getD #[] }
+                let binders := (← genericBindersText context.unit declaration.generics)
+                let binders := if binders.isEmpty then "" else " " ++ binders
+                let captures ← (fields.zip arguments).mapM fun (field, argument) => do
+                  pure s!"{← nameAt context.unit field.name} : \
+                    {← typeText context.unit context.ns declaration.generics field.type.typeId} := \
+                    {← expressionText context argument (fuel - 1)}"
+                let localNames := declarationLocalNames context.ns body.locals
+                  body.signature.parameters.size (some root)
+                let parameters ← body.signature.parameters.zipIdx.mapM fun (parameter, index) => do
+                  let mutability := if parameter.mutable then "mut " else ""
+                  pure s!"{mutability}{sourceIdentifier (localNames[index]?.getD parameter.name)} : \
+                    {← typeText context.unit inside body.signature.generics parameter.typeUse.typeId}"
+                let result ← signatureResultText context.unit inside body.signature
+                let functionBinders := (← genericBindersText context.unit body.signature.generics)
+                let functionBinders := if functionBinders.isEmpty then "" else " " ++ functionBinders
+                let bodyContext : Context := {
+                  unit := context.unit, ns := inside, locals := body.locals, localNames
+                  binders := body.signature.generics, root := some root
+                  function := (context.unit.tables.names[body.name.index]?).map
+                    (fun name => name.scope.push name.name) |>.getD #[]
+                  uses := Temporaries.Uses.of context.ns body.locals.size root }
+                let bodyText ← expressionText bodyContext root (fuel - 1) true
+                return s!"closure {← nameAt context.unit declaration.name}{binders}\
+                  {abilitiesText declaration.abilities} ({commaSep captures})\n\
+                  {indent s!"fun {← nameAt context.unit body.name}{functionBinders} \
+                    ({commaSep parameters}) -> {result} :=\n{indent bodyText}"}"
           let owner ← typeText context.unit context.ns context.binders expression.typeId
           let constructor := variant.map (s!"{owner}::{·}") |>.getD owner
           let entries ← (fields.zip arguments).mapM fun (field, argument) => do
@@ -3711,7 +4066,8 @@ private partial def expressionText (context : Context) (id : ExprId)
             throw "the specification result operation has unexpected arguments"
           -- A multi-result signature names its later results by index; Move
           -- packs them into one tuple-typed row.
-          pure (if index == 0 then "result" else s!"spec.result[{index}]")
+          pure (if index == 0 && context.tupleResultSize.isNone then "result"
+            else s!"spec.result[{index}]")
       | .specification .final =>
           unless instantiations.isEmpty && arguments.size == 1 do
             throw "`final` must have one operand"
@@ -3901,58 +4257,47 @@ private partial def expressionText (context : Context) (id : ExprId)
           else s!"{head}\n{indent s!"{loopBody}{statementTerminator context.ns loopBodyId loopBody}"}"
         let returned ← expressionText context returned (fuel - 1) true
         return s!"do\n{indent (lines #[whileText, s!"return {returned}"])}"
-      else if let some value := forwardedValue? context.ns statements result then
-        return returnedText tailPosition (← expressionText context value (fuel - 1) true)
-      -- Folding absorbs the branches' assignments, so only a temporary's
-      -- may be absorbed: a declared local is assigned as itself.
-      else if let some (condition, thenValue, thenAssignments,
-          elseValue, elseAssignments) :=
-          (forwardedConditional? context statements result).filter
-            fun (_, _, thenAssignments, _, elseAssignments) =>
-              (thenAssignments ++ elseAssignments).all
-                (compilerTemporaryLocal? context ·.1) then
-        let renderForwarded (value : ExprId) (assignments : Array (LocalId × ExprId)) := do
-          let active ← assignments.foldlM (init := context) fun active (localId, valueId) => do
-            if compilerTemporaryLocal? active localId then
-              let value ← expressionText active valueId (fuel - 1)
-              let value := parenthesizedOperand active.ns valueId value
-              pure { active with
-                constantLocals := active.constantLocals.push (localId, value) }
-            else pure active
-          expressionText active value (fuel - 1) true
-        let condition ← expressionText context condition (fuel - 1)
-        let thenValue ← renderForwarded thenValue thenAssignments
-        let elseValue ← renderForwarded elseValue elseAssignments
-        return returnedText tailPosition s!"if {condition} then {thenValue} else {elseValue}"
-      else if let some (scrutinee, arms) := forwardedMatch? context statements result then
-        let scrutinee ← expressionText context scrutinee (fuel - 1)
-        let arms ← arms.mapM fun (arm, value, assignments) => do
-          let guard ← match arm.guard with
-            | none => pure ""
-            | some guard => pure s!" if {← expressionText context guard (fuel - 1)}"
-          let active ← assignments.foldlM (init := context) fun active (localId, valueId) => do
-            let value ← expressionText active valueId (fuel - 1)
-            let value := parenthesizedOperand active.ns valueId value
-            pure { active with constantLocals := active.constantLocals.push (localId, value) }
-          let value ← expressionText active value (fuel - 1) true
-          pure s!"| {← bindingPatternText context arm.pattern}{guard} => ({value})"
-        return returnedText tailPosition s!"match {scrutinee} with\n{indent (lines arms)}"
+      else if let some forwarded := forwardedBlock? context statements result then
+        match forwarded with
+        | .value value =>
+            return returnedText tailPosition (← expressionText context value (fuel - 1) true)
+        | .conditional condition thenValue thenAssignments elseValue elseAssignments =>
+            let renderForwarded (value : ExprId) (assignments : Array (LocalId × ExprId)) := do
+              let active ← assignments.foldlM (init := context) fun active (localId, valueId) => do
+                if compilerTemporaryLocal? active localId then
+                  let value ← expressionText active valueId (fuel - 1)
+                  let value := parenthesizedOperand active.ns valueId value
+                  pure { active with
+                    constantLocals := active.constantLocals.push (localId, value) }
+                else pure active
+              expressionText active value (fuel - 1) true
+            let condition ← expressionText context condition (fuel - 1)
+            let thenValue ← renderForwarded thenValue thenAssignments
+            let elseValue ← renderForwarded elseValue elseAssignments
+            return returnedText tailPosition s!"if {condition} then {thenValue} else {elseValue}"
+        | .match_ scrutinee arms =>
+            let scrutinee ← expressionText context scrutinee (fuel - 1)
+            let arms ← arms.mapM fun (arm, value, assignments) => do
+              let guard ← match arm.guard with
+                | none => pure ""
+                | some guard => pure s!" if {← expressionText context guard (fuel - 1)}"
+              let active ← assignments.foldlM (init := context) fun active (localId, valueId) => do
+                let value ← expressionText active valueId (fuel - 1)
+                let value := parenthesizedOperand active.ns valueId value
+                pure { active with constantLocals := active.constantLocals.push (localId, value) }
+              let value ← expressionText active value (fuel - 1) true
+              pure s!"| {← bindingPatternText context arm.pattern}{guard} => ({value})"
+            return returnedText tailPosition s!"match {scrutinee} with\n{indent (lines arms)}"
       else
         let originalStatements := statements
         let (active, statements) ← statements.zipIdx.foldlM
           (init := (context, (#[] : Array String)))
           fun (active, rendered) (statement, index) => do
-            let temporary? : Option (LocalId × ExprId) := do
-              let statementNode ← active.ns.expressions[statement.index]?
-              let .assign place value := statementNode.kind | none
-              let targetLocal ← localPlace? active.ns place
-              if compilerTemporaryLocal? active targetLocal then some (targetLocal, value) else none
-            match temporary? with
+            match assignedTemporary? active statement with
             | some (targetLocal, valueId) =>
                 let numeric := numericTemporaryLocal? active targetLocal
-                if numeric && !active.uses.projected targetLocal &&
-                    Temporaries.substitutable active.ns active.uses originalStatements result
-                      index targetLocal valueId then
+                if substitutedTemporary active originalStatements result index targetLocal
+                    valueId then
                   -- The text takes the temporary's place where it is read,
                   -- including under a field selection or an operator, so a
                   -- control-flow value carries the delimiters those need.
@@ -3969,14 +4314,23 @@ private partial def expressionText (context : Context) (id : ExprId)
                   pure (active, rendered.push s!"{value}{
                     statementTerminator active.ns valueId value}")
                 else
-                  let value ← expressionText active valueId (fuel - 1)
+                  let value ← copiedValueText active valueId (fuel - 1)
                   let name ← localName active targetLocal
                   if active.temporaryLocals.contains targetLocal then
+                    let following :=
+                      originalStatements.extract (index + 1) originalStatements.size ++
+                        result.toArray
+                    let mutability :=
+                      if (active.locals[targetLocal.index]?).any (·.mutable) &&
+                          Temporaries.writtenIn active.ns active.locals.size following targetLocal
+                        then "mut " else ""
                     pure ({ active with temporaryLocals :=
                       active.temporaryLocals.filter (· != targetLocal) },
-                      rendered.push s!"let {name} := {value};")
+                      rendered.push s!"let {mutability}{name} := {value}{
+                        statementTerminator active.ns valueId value}")
                   else
-                    pure (active, rendered.push s!"{name} := {value};")
+                    pure (active, rendered.push s!"{name} := {value}{
+                      statementTerminator active.ns valueId value}")
             | none =>
                 let (declarations, active) ←
                   branchDeclarations active (originalStatements.extract 0 index) statement
@@ -4001,37 +4355,34 @@ private partial def expressionText (context : Context) (id : ExprId)
               pure ((statements.push s!"{resultText}{terminator}").push
                 "return ()")
             else if unitResult then
+              -- Returning the unit value from the tail is reaching the tail.
+              let returnsUnit := tailPosition && match resultNode.kind with
+                | .return_ #[value] =>
+                    (active.ns.expressions[value.index]?).any (·.kind matches .value .unit _)
+                | _ => false
               if resultNode.kind matches .value .unit _ ||
                   resultNode.kind matches .operation (.primitive .tuple) _ #[] _ ||
-                  resultNode.kind matches .block #[] none then
+                  resultNode.kind matches .block #[] none || returnsUnit then
                 -- The unit result stays spelled after a statement whose own
                 -- value is not unit: elided, that value would read as the
                 -- block's.
                 let lastIsUnit := originalStatements.back?.all (unitValued active)
                 pure (if lastIsUnit then statements else statements.push "()")
               else
-                let resultText ← expressionText active result (fuel - 1) false statementPosition
+                let resultText ← expressionText active result (fuel - 1)
+                  (tailPosition && resultNode.kind matches .block ..) statementPosition
                 let terminator := statementTerminator active.ns result resultText
                 pure (statements.push s!"{resultText}{terminator}")
             else
               -- A discarded block passes that position on to its own result,
               -- whose `return` then leaves the function rather than supplying
-              -- a value nothing reads.
-              -- Control does not come back from a result that never returns,
-              -- so nothing consumes its value and it is written as it stands.
-              let diverging := isDivergingExpression active.ns result
-              let result ← expressionText active result (fuel - 1) tailPosition statementPosition
-              let terminal := diverging ||
-                resultNode.kind matches .return_ .. ||
-                resultNode.kind matches .break_ .. ||
-                resultNode.kind matches .continue_ .. ||
-                resultNode.kind matches .throw_ ..
+              -- a value nothing reads. A block's value is its final bare
+              -- expression; a `return`, folded or not, is an exit, and its
+              -- semicolon says so.
+              let text ← expressionText active result (fuel - 1) tailPosition statementPosition
               let exitTerminator : String :=
-                if statementPosition && resultNode.kind matches .return_ .. then ";" else ""
-              -- A block's value is its final bare expression; only an exit
-              -- (already spelled `return`) or a diverging result is terminal.
-              pure (statements.push <|
-                if terminal then s!"{result}{exitTerminator}" else result)
+                if statementPosition && readsAsReturn active result fuel then ";" else ""
+              pure (statements.push s!"{text}{exitTerminator}")
           else
             -- A block without a result is unit; after a statement whose own
             -- value is not unit, that is spelled. Control does not come back
@@ -4055,40 +4406,42 @@ private partial def expressionText (context : Context) (id : ExprId)
         return s!"do\n{indent (lines declarations)}\n{(bodyText.drop 3).toString}"
       return blockText (declarations.push bodyText)
   | .letDecl pattern (some value) body =>
-      if let some held := heldReference? context pattern then
-        let valueText := heldText context value (← expressionText context value (fuel - 1))
-        return ← expressionText
-          { context with constantLocals := context.constantLocals.push (held, valueText) }
-          body (fuel - 1) tailPosition statementPosition
-      if droppedDiscard? context pattern body then
-        return ← expressionText context value (fuel - 1) tailPosition statementPosition
-      if let some slot := indexTemporary? context pattern body then
-        let valueText ← expressionText context value (fuel - 1)
-        return ← expressionText
-          { context with constantLocals := context.constantLocals.push (slot, valueText) }
-          body (fuel - 1) tailPosition statementPosition
-      if let some index := indexCheck? context pattern value body then
-        return ← expressionText
-          { context with elidedIndexChecks := context.elidedIndexChecks.push index }
-          body (fuel - 1) tailPosition statementPosition
-      if let some assigned := hiddenReferenceMutation? context pattern body then
-        return referenceMutationText context value
-          (← copiedValueText context value (fuel - 1))
-          (← expressionText context assigned (fuel - 1))
-      if let some holder := hiddenPlaceMutation? context pattern body then
-        let referenceText ← copiedValueText context value (fuel - 1)
-        return ← expressionText
-          { context with constantLocals := context.constantLocals.push (holder, referenceText) }
-          body (fuel - 1) tailPosition statementPosition
-      if let some substitution ← temporaryConstant? context pattern value then
-        return ← expressionText
-          { context with constantLocals := context.constantLocals.push substitution }
-          body (fuel - 1) tailPosition
-      if let some holder := hiddenStorageBorrow? context pattern value then
-        let borrowText ← expressionText context value (fuel - 1)
-        return ← expressionText
-          { context with constantLocals := context.constantLocals.push (holder, borrowText) }
-          body (fuel - 1) tailPosition
+      match ← letFold? context pattern value body with
+      | some (.held held) =>
+          let valueText := heldText context value (← expressionText context value (fuel - 1))
+          return ← expressionText
+            { context with constantLocals := context.constantLocals.push (held, valueText) }
+            body (fuel - 1) tailPosition statementPosition
+      | some .discarded =>
+          return ← expressionText context value (fuel - 1) tailPosition statementPosition
+      | some (.indexSlot slot) =>
+          let valueText ← expressionText context value (fuel - 1)
+          return ← expressionText
+            { context with constantLocals := context.constantLocals.push (slot, valueText) }
+            body (fuel - 1) tailPosition statementPosition
+      | some (.checkedIndex index) =>
+          return ← expressionText
+            { context with elidedIndexChecks := context.elidedIndexChecks.push index }
+            body (fuel - 1) tailPosition statementPosition
+      | some (.referenceMutation assigned) =>
+          return referenceMutationText context value
+            (← copiedValueText context value (fuel - 1))
+            (← expressionText context assigned (fuel - 1))
+      | some (.placeHolder holder) =>
+          let referenceText ← copiedValueText context value (fuel - 1)
+          return ← expressionText
+            { context with constantLocals := context.constantLocals.push (holder, referenceText) }
+            body (fuel - 1) tailPosition statementPosition
+      | some (.constant substitution) =>
+          return ← expressionText
+            { context with constantLocals := context.constantLocals.push substitution }
+            body (fuel - 1) tailPosition
+      | some (.storageBorrow holder) =>
+          let borrowText ← expressionText context value (fuel - 1)
+          return ← expressionText
+            { context with constantLocals := context.constantLocals.push (holder, borrowText) }
+            body (fuel - 1) tailPosition
+      | none => pure ()
       let rec declarationText (pattern : PatternId) (value : ExprId)
           (active : Context) (fuel : Nat) : Except String String := do
         let some patternNode := active.ns.patterns[pattern.index]?
@@ -4262,20 +4615,22 @@ private partial def expressionText (context : Context) (id : ExprId)
         return ← expressionText context thenBranch (fuel - 1) tailPosition
       if condition == "false" then
         return ← expressionText context elseBranch (fuel - 1) tailPosition
-      let thenBranch ← expressionText context thenBranch (fuel - 1) tailPosition statementPosition
-      let elseBranch ← expressionText context elseBranch (fuel - 1) tailPosition statementPosition
+      let thenId := thenBranch
+      let elseId := elseBranch
+      let thenBranch ← expressionText context thenId (fuel - 1) tailPosition statementPosition
+      let elseBranch ← expressionText context elseId (fuel - 1) tailPosition statementPosition
       -- A branch that leaves the function is a statement of its own, not this
       -- `if`'s value. Spelling it as a block keeps the semicolon that tells an
       -- exit from a branch value, which a branch position cannot carry. An
       -- empty counterpart needs none of this: the branch is then the whole
       -- statement, as an `if` without an `else`.
-      let exitBranch (text sibling : String) : String :=
-        if !tailPosition && sibling != "()" && text.startsWith "return " &&
+      let exitBranch (id : ExprId) (text sibling : String) : String :=
+        if !tailPosition && sibling != "()" && readsAsReturn context id fuel &&
             !text.contains '\n' then
           s!"do\n{indent s!"{text};"}"
         else text
-      let thenText := exitBranch thenBranch elseBranch
-      let elseBranch := exitBranch elseBranch thenBranch
+      let thenText := exitBranch thenId thenBranch elseBranch
+      let elseBranch := exitBranch elseId elseBranch thenBranch
       let thenBranch := thenText
       let groupMultiline (value : String) :=
         if value.contains '\n' then s!"({value})" else value
@@ -4363,8 +4718,8 @@ private partial def expressionText (context : Context) (id : ExprId)
               let localId ← localPlace? context.ns place
               guard (numericTemporaryLocal? context localId &&
                 !context.uses.projected localId &&
-                Temporaries.substitutable context.ns context.uses statements (some result)
-                  index localId value)
+                Temporaries.substitutable context.ns context.uses (numericTemporaryLocal? context)
+                  statements (some result) index localId value)
               pure (localId, value)
             pure (computed, condition, thenBranch)
         | _ => none
@@ -4389,7 +4744,7 @@ private partial def expressionText (context : Context) (id : ExprId)
           expressionText context invariant (fuel - 1) false
         let condition ← expressionText loopContext condition (fuel - 1)
         let loopBodyId := loopBody
-        let loopBody ← expressionText loopContext loopBodyId (fuel - 1)
+        let loopBody ← expressionText loopContext loopBodyId (fuel - 1) false true
         let head := s!"while {condition} do"
         let whileText := if loopBody.startsWith "do\n" then
             s!"{head}\n{loopBody.drop 3}"
@@ -4658,6 +5013,10 @@ private def isMoveVariantsProperty : ProfileValue → Bool
   | { profile := .move, tag := "struct.variants", payload := "" } => true
   | _ => false
 
+private def isDestructorProperty : ProfileValue → Bool
+  | { profile := .rust, tag, payload := "" } => tag == VerexIR.Validation.destructorTag
+  | _ => false
+
 private def nominalContractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : VerexIR.StructDecl) (name : String) :
     Except String (Option String) := do
@@ -4721,16 +5080,20 @@ private def isFunctionModifierAttribute : Attribute → Bool
 private def nominalText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : VerexIR.StructDecl) :
     Except String String := do
-  unless declaration.properties.all isMoveVariantsProperty do
+  let isOpaque := declaration.properties.any (·.tag == VerexIR.rustOpaqueTag)
+  unless declaration.properties.all (fun value =>
+      isMoveVariantsProperty value || value.tag == VerexIR.rustOpaqueTag ||
+        value.tag == VerexIR.rustClosureTag || isDestructorProperty value) do
     throw "nominal profile properties are outside the current VerexSL printer"
   let name ← nameAt unit declaration.name
-  let binders := " ".intercalate (← declaration.generics.mapM (binderText unit)).toList
+  let binders := (← genericBindersText unit declaration.generics)
   let binders := if binders.isEmpty then "" else " " ++ binders
   let abilities := abilitiesText declaration.abilities
   let isEnum := !declaration.variants.isEmpty || declaration.properties.any isMoveVariantsProperty
   let declarationText ← if !isEnum then
     let fields ← declaration.fields.mapM (fieldText unit ns declaration.generics)
-    pure s!"struct {name}{binders}{abilities} where\n{indent (lines fields)}"
+    let keyword := if isOpaque then "opaque struct" else "struct"
+    pure s!"{keyword} {name}{binders}{abilities} where\n{indent (lines fields)}"
   else
     unless declaration.fields.isEmpty do
       throw s!"nominal `{name}` has both top-level fields and variants"
@@ -4758,9 +5121,6 @@ private def modifiersText (modifiers : VerexSL.FunctionModifiers) : String :=
   let values := if modifiers.isOpaque then values.push "opaque" else values
   if values.isEmpty then "" else " ".intercalate values.toList ++ " "
 
-private def isFalseExpression (ns : ValidatedNamespace) (id : ExprId) : Bool :=
-  (ns.expressions[id.index]?).any fun expression => expression.kind == .value (.bool false)
-
 private def contractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : VerexIR.FunctionDecl FunctionBody) (name : String) :
     Except String (Option String) := do
@@ -4778,12 +5138,7 @@ private def contractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     throw s!"function pragmas are not the resolved contract and namespace pragmas: \
       the declaration carries {declarationPragmas.toList}, the contract and namespace resolve \
       to {resolvedPragmas.toList}"
-  let mut conditions := contract.conditions
-  if declaration.profile == .rust && conditions.size == 1 then
-    let condition := contract.conditions[0]!
-    if condition.kind == .abortsIf && condition.properties.isEmpty &&
-        condition.auxiliary.isEmpty && isFalseExpression ns condition.expression then
-      conditions := #[]
+  let conditions := contract.conditions.filter (!isImplicitNoPanic ·)
   if conditions.isEmpty && contractPragmas.isEmpty && !hasFrameClauses contract &&
       contract.parameterFrames.isEmpty then return none
   let context : Context := {
@@ -4792,7 +5147,13 @@ private def contractText? (unit : ValidatedUnit) (ns : PrintNamespace)
       declaration.signature.parameters.size (functionBodyRoot? declaration.body)
     binders := declaration.signature.generics
     specification := true
-    logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
+    logicalLocals := declaration.locals.map (fun localDecl => localDecl.id)
+    tupleResultSize := if ns.profile == some .move then none else
+      match declaration.signature.results with
+      | #[result] => match unit.tables.types[result.typeId.index]? with
+          | some (.tuple components) => some components.size
+          | _ => none
+      | _ => none }
   let entries ← conditionTexts context conditions
     ((declaration.locals.extract 0 declaration.signature.parameters.size).map (·.id))
   let entries := entries ++ (← frameTexts context contract)
@@ -4831,14 +5192,6 @@ private def isResolvedMoveEnvironment (unit : ValidatedUnit) (ns : ValidatedName
       | some alias => !alias.isEmpty && payload == alias
       | none => false
   | _ => false
-
-private def stringArrayPayload (payload : String) : Except String (Array String) := do
-  let json ← Lean.Json.parse payload
-  match json with
-  | .arr fields => fields.mapM fun
-      | .str value => pure value
-      | _ => throw "profile payload field is not a string"
-  | _ => throw "profile payload is not an array"
 
 /-- The `friend` module a Move namespace grants privileged access to, spelled
 the way the source declared its address: by alias when one was recorded. -/
@@ -4955,8 +5308,7 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     throw "function predicates are outside the current VerexSL printer"
   let modifiers ← declaredModifiers declaration
   let name ← nameAt unit declaration.name
-  let binders := " ".intercalate
-    (← declaration.signature.generics.mapM (binderText unit)).toList
+  let binders := (← genericBindersText unit declaration.signature.generics)
   let binders := if binders.isEmpty then "" else " " ++ binders
   let localNames := declarationLocalNames ns declaration.locals
     declaration.signature.parameters.size (functionBodyRoot? declaration.body)
@@ -4964,11 +5316,7 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     let mutability := if parameter.mutable then "mut " else ""
     pure s!"{mutability}{sourceIdentifier (localNames[index]?.getD parameter.name)} : \
       {← typeText unit ns declaration.signature.generics parameter.typeUse.typeId}"
-  let result ← match declaration.signature.results.toList with
-    | [] => pure "Unit"
-    | [result] => typeText unit ns declaration.signature.generics result.typeId
-    | results => pure s!"({commaSep (← results.toArray.mapM fun result =>
-        typeText unit ns declaration.signature.generics result.typeId)})"
+  let result ← signatureResultText unit ns declaration.signature
   let declarationPrefix := s!"{modifiersText modifiers}fun {name}{binders}"
   let compactSignature := s!"{declarationPrefix} ({commaSep parameters}) -> {result}"
   let signature :=
@@ -4984,7 +5332,9 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     | .structured root =>
         let context : Context := {
           unit, ns, locals := declaration.locals, localNames
-          binders := declaration.signature.generics
+          binders := declaration.signature.generics, root := some root
+          function := (unit.tables.names[declaration.name.index]?).map
+            (fun name => name.scope.push name.name) |>.getD #[]
           uses := Temporaries.Uses.of ns declaration.locals.size root }
         let body ← expressionText context root (ns.expressions.size + 1) true
         let compact := s!"{signature} := {body}"
@@ -4995,9 +5345,17 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
           pure compact
         else
           pure s!"{signature} :=\n{indent body}"
-  match ← contractText? unit ns declaration name with
-  | none => pure functionText
-  | some contract => pure s!"{functionText}\n\n{contract}"
+  let functionText ← match ← contractText? unit ns declaration name with
+    | none => pure functionText
+    | some contract => pure s!"{functionText}\n\n{contract}"
+  declaration.shapes.foldlM (init := functionText) fun text shape => do
+    let arguments := (declaration.signature.generics.zip shape.arguments).filterMap
+      fun (binder, argument) => if binder.kind == .typeArg then some argument else none
+    let types ← arguments.mapM fun argument => do
+      return s!"\{{← typeText unit ns shape.signature.generics argument.typeId}}"
+    let head := s!"{name} at {" ".intercalate types.toList}"
+    let contract ← contractText? unit ns (declaration.atShape shape) head
+    pure s!"{text}\n\n{contract.getD s!"spec {head} where"}"
 
 private def specFunctionText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : VerexIR.SpecFunctionDecl) : Except String String := do
@@ -5024,8 +5382,7 @@ private def specFunctionText (unit : ValidatedUnit) (ns : PrintNamespace)
       throw s!"an opaque specification function carries profile metadata with no canonical \
         spelling: {(declaration.profileData.map (·.tag)).toList}"
   let name ← nameAt unit declaration.name
-  let binders := " ".intercalate
-    (← declaration.signature.generics.mapM (binderText unit)).toList
+  let binders := (← genericBindersText unit declaration.signature.generics)
   let binders := if binders.isEmpty then "" else " " ++ binders
   let parameters ← declaration.signature.parameters.mapM fun parameter => do
     pure s!"{sourceIdentifier parameter.name} : \
@@ -5071,8 +5428,7 @@ private def lemmaText (unit : ValidatedUnit) (ns : PrintNamespace)
       contract.parameterFrames.isEmpty && contract.pragmas.isEmpty do
     throw "lemma frames and pragmas are outside the current VerexSL printer"
   let name ← nameAt unit declaration.name
-  let binders := " ".intercalate
-    (← declaration.signature.generics.mapM (binderText unit)).toList
+  let binders := (← genericBindersText unit declaration.signature.generics)
   let binders := if binders.isEmpty then "" else " " ++ binders
   let parameters ← declaration.signature.parameters.mapM fun parameter => do
     pure s!"{sourceIdentifier parameter.name} : \
@@ -5115,6 +5471,38 @@ private structure SourceOrderedText where
   priority : Nat
   fallback : Nat
   text : String
+  /-- The scope it is in; a comment takes the scope of what follows it. -/
+  scope : Array String := #[]
+  isComment : Bool := false
+
+/-- The keyword of a scope's item. -/
+def scopeKeywordText : VerexIR.ScopeKind → String
+  | .module => "mod"
+  | .inherent => "impl"
+  | .implementation => "trait impl"
+  | .trait => "trait"
+
+/-- Entries in source order, nested in the blocks of their scopes under
+`parent`: each scope once, at its first entry, with all of its entries. -/
+private partial def nestedEntries (scopes : Array VerexIR.ScopeDecl) (parent : Array String)
+    (entries : Array SourceOrderedText) : Except String (Array String) := do
+  let mut result := #[]
+  let mut seen : Array String := #[]
+  for entry in entries do
+    let some segment := entry.scope[parent.size]?
+      | unless entry.text.isEmpty do result := result.push entry.text
+        continue
+    if seen.contains segment then continue
+    seen := seen.push segment
+    let path := parent.push segment
+    let some declared := scopes.find? (·.path == path)
+      | throw s!"a declaration is in the undeclared scope `{"::".intercalate path.toList}`"
+    let members ← nestedEntries scopes path (entries.filter fun candidate =>
+      candidate.scope.size >= path.size && candidate.scope.take path.size == path)
+    let head := s!"{scopeKeywordText declared.kind} {sourceIdentifier segment} where"
+    result := result.push <| if members.isEmpty then head
+      else s!"{head}\n{indent ("\n\n".intercalate members.toList)}"
+  return result
 
 /-- Recover a semantic VerexSL spelling before canonical document layout.
 This stage is deliberately private: callers must not observe a second,
@@ -5137,8 +5525,6 @@ where
         "profile configuration has no lossless spelling in the current VerexSL header"
     unless ns.imports.isEmpty do
       throw <| errorAt ns.localTables ns.loc "namespace imports are outside the current VerexSL printer"
-    unless ns.scopes.isEmpty do
-      throw <| errorAt ns.localTables ns.loc "scopes are outside the current VerexSL printer"
     let owner := (unit.tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
     let mut skippedComments := #[]
     let mut friends := #[]
@@ -5187,36 +5573,52 @@ where
         else s!"@[{", ".intercalate values.toList}]\n{body}"
     let mut ordered : Array SourceOrderedText := #[]
     let mut fallback := 0
+    -- The scope of a declaration, and the namespace as seen from it.
+    let scopeOf (name : NameId) : Array String :=
+      (unit.tables.names[name.index]?.map (·.scope)).getD #[]
+    let inScope (name : NameId) : PrintNamespace := { ns with scope := scopeOf name }
     for declaration in ns.constants do
       let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       ordered := ordered.push {
-        file, start, priority := 1, fallback
+        file, start, priority := 1, fallback, scope := scopeOf declaration.name
         text := documented declaration.doc
-          (← atLocation ns.localTables declaration.loc (constantText unit ns declaration)) }
+          (← atLocation ns.localTables declaration.loc
+            (constantText unit (inScope declaration.name) declaration)) }
       fallback := fallback + 1
+    -- A closure's struct and body print where it is constructed; a contract of
+    -- the body stands in the struct's scope.
+    let closureScopes := ns.structs.filterMap fun declaration =>
+      if (closureBody? unit ns.toValidatedNamespace declaration).isSome then
+        closureScope unit declaration else none
     for declaration in ns.structs do
+      if (closureBody? unit ns.toValidatedNamespace declaration).isSome then continue
       let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
+      let attributes := if declaration.properties.any isDestructorProperty then
+        #[.call "destructor" #[] none] ++ declaration.attributes else declaration.attributes
       ordered := ordered.push {
-        file, start, priority := 1, fallback
+        file, start, priority := 1, fallback, scope := scopeOf declaration.name
         text := documented (nominalDocumentation declaration)
-          (← withAttributes declaration.name declaration.attributes
-            (← atLocation ns.localTables declaration.loc (nominalText unit ns declaration))) }
+          (← withAttributes declaration.name attributes
+            (← atLocation ns.localTables declaration.loc
+              (nominalText unit (inScope declaration.name) declaration))) }
       fallback := fallback + 1
     for declaration in ns.specFunctions do
       unless isDerivedSpecFunction unit ns declaration do
         let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
         ordered := ordered.push {
-          file, start, priority := 1, fallback
+          file, start, priority := 1, fallback, scope := scopeOf declaration.name
           text := documented declaration.doc
             (← withAttributes declaration.name declaration.contract.pragmas
-              (← atLocation ns.localTables declaration.loc (specFunctionText unit ns declaration))) }
+              (← atLocation ns.localTables declaration.loc
+                (specFunctionText unit (inScope declaration.name) declaration))) }
         fallback := fallback + 1
     for declaration in ns.lemmas do
       let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
       ordered := ordered.push {
-        file, start, priority := 1, fallback
+        file, start, priority := 1, fallback, scope := scopeOf declaration.name
         text := documented declaration.doc
-          (← atLocation ns.localTables declaration.loc (lemmaText unit ns declaration)) }
+          (← atLocation ns.localTables declaration.loc
+            (lemmaText unit (inScope declaration.name) declaration)) }
       fallback := fallback + 1
     for declaration in ns.invariants do
       let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
@@ -5240,13 +5642,33 @@ where
       fallback := fallback + 1
     for declaration in ns.functions do
       let (file, start, _) := sourceOrderKey ns.localTables declaration.loc fallback
+      if closureScopes.contains (scopeOf declaration.name) then
+        let name ← atLocation ns.localTables declaration.loc (nameAt unit declaration.name)
+        if let some contract ← atLocation ns.localTables declaration.loc
+            (contractText? unit (inScope declaration.name) declaration name) then
+          ordered := ordered.push {
+            file, start, priority := 1, fallback, scope := scopeOf declaration.name
+            text := contract }
+          fallback := fallback + 1
+        continue
       ordered := ordered.push {
-        file, start, priority := 1, fallback
+        file, start, priority := 1, fallback, scope := scopeOf declaration.name
         text := documented declaration.doc
           (← withAttributes declaration.name
-            (declaration.attributes.filter (!isFunctionModifierAttribute ·))
-            (← atLocation ns.localTables declaration.loc (functionText unit ns declaration))) }
+            ((declaration.profileData.filter (·.tag == VerexIR.rustRefusedTag)).map (fun value =>
+                Attribute.assign "refused" (.constant (.string value.payload)) none) ++
+              declaration.attributes.filter (!isFunctionModifierAttribute ·))
+            (← atLocation ns.localTables declaration.loc
+              (functionText unit (inScope declaration.name) declaration))) }
       fallback := fallback + 1
+    -- A scope that holds no declaration stands at its own location.
+    for scope in ns.scopes do
+      let holdsDeclaration := ordered.any fun entry =>
+        entry.scope.size >= scope.path.size && entry.scope.take scope.path.size == scope.path
+      unless holdsDeclaration || closureScopes.contains scope.path do
+        let (file, start, _) := sourceOrderKey ns.localTables scope.loc fallback
+        ordered := ordered.push { file, start, priority := 1, fallback, scope := scope.path, text := "" }
+        fallback := fallback + 1
     -- Compiler-v2 can retain comments from dependency files whose inline
     -- functions were expanded into this module. Those declarations do not
     -- survive as Verex items, so their comments have no valid attachment here
@@ -5262,7 +5684,7 @@ where
       if commentFile?.all declarationFiles.contains then
         let (file, start, _) := sourceOrderKey ns.localTables comment.loc fallback
         ordered := ordered.push {
-          file, start, priority := if comment.isDoc then 0 else 1, fallback
+          file, start, priority := if comment.isDoc then 0 else 1, fallback, isComment := true
           text := sourceCommentText comment }
         fallback := fallback + 1
     let sorted := ordered.qsort fun left right =>
@@ -5270,7 +5692,12 @@ where
         (left.start < right.start || (left.start == right.start &&
           (left.priority < right.priority || (left.priority == right.priority &&
             left.fallback < right.fallback)))))
-    let declarations := sorted.map (·.text)
+    -- Each comment stays before what follows it.
+    let (sorted, _) := sorted.foldr (init := ((#[] : Array SourceOrderedText), (#[] : Array String)))
+      fun entry (entries, following) =>
+        let entry := if entry.isComment then { entry with scope := following } else entry
+        (entries.push entry, entry.scope)
+    let declarations ← atLocation ns.localTables ns.loc (nestedEntries ns.scopes #[] sorted.reverse)
     let declarations := if skippedComments.isEmpty then declarations
       else #[lines skippedComments] ++ declarations
     let declarations := if pragmas.isEmpty then declarations
@@ -5370,6 +5797,14 @@ def renderNamespaceParts (environment : Lean.Environment) (unit : ValidatedUnit)
       (undeclaredAliases environment unit) imports |>.mapError fun message =>
     { message := s!"{message}\n--- semantic sources ---\n{"\n".intercalate sources.toList}" }
 
+/-- Render every owned namespace of a unit as one file, each after the
+namespaces it uses. -/
+def renderUnit (environment : Lean.Environment) (unit : ValidatedUnit) (width : Nat := 80) :
+    Except Error String := do
+  let order ← (dependencyOrder unit).mapError fun message => ({ message } : Error)
+  let (prelude, namespaces) ← renderNamespaceParts environment unit order width
+  pure (Layout.joinParts prelude namespaces)
+
 private def compileErrorText : CompileError → String
   | .frontend diagnostics =>
       String.intercalate "\n" (diagnostics.toList.map Diagnostic.render)
@@ -5414,13 +5849,14 @@ private def parseSourceUnit (environment : Lean.Environment) (source sourceName 
 other namespaces in its compilation unit. Bodies and contracts are deliberately
 absent: imported call typing depends on authoritative declarations and
 signatures, not on re-elaborating dependency implementations. -/
-private def dependencyInterfaceItem? : Item → Option Item
+private partial def dependencyInterfaceItem? : Item → Option Item
   | .function declaration => some <| .function {
       declaration with
       modifiers := { declaration.modifiers with isNative := true, isOpaque := false }
       body := none
       contract := #[]
-      pragmas := #[] }
+      pragmas := #[]
+      shapes := #[] }
   -- A specification function whose result is inferred is not callable.
   | .specFunction declaration => declaration.result.map fun _ => .specFunction {
       declaration with isOpaque := true, body := none }
@@ -5435,6 +5871,7 @@ private def dependencyInterfaceItem? : Item → Option Item
       declaration with contract := #[], pragmas := #[] }
   | .constant _ => none
   | .namespaceInvariants _ => none
+  | .scope name kind items span => some <| .scope name kind (items.filterMap dependencyInterfaceItem?) span
 
 private def dependencyInterfaceNamespace (source : Namespace) : Namespace := {
   source with
@@ -5448,7 +5885,7 @@ and comments `dependencyInterfaceItem?` would drop after printing them. -/
 private def interfaceSource (ns : ValidatedNamespace) : ValidatedNamespace :=
   { ns with
     functions := ns.functions.map fun declaration =>
-      { declaration with body := .absent, contract := {}, pragmas := #[] }
+      { declaration with body := .absent, contract := {}, pragmas := #[], shapes? := none }
     specFunctions := ns.specFunctions.map fun declaration => { declaration with body := none }
     structs := ns.structs.map fun declaration => { declaration with
       contract := if declaration.isGhostMemory then
@@ -5478,8 +5915,7 @@ resolve to the logical overload rather than the executable declaration. -/
 private def moveCompanionInterfaceText (unit : ValidatedUnit)
     (ns : PrintNamespace) (declaration : VerexIR.SpecFunctionDecl)
     (name : String) : Except String String := do
-  let binders := " ".intercalate
-    (← declaration.signature.generics.mapM (binderText unit)).toList
+  let binders := (← genericBindersText unit declaration.signature.generics)
   let binders := if binders.isEmpty then "" else " " ++ binders
   let parameters ← declaration.signature.parameters.mapM fun parameter => do
     pure s!"{sourceIdentifier parameter.name} : {
@@ -5526,12 +5962,21 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
     tables := unit.tables
     links := .identity unit.tables
     localTables := unit.tables }
+  let declarations := { declarations with scopes := interface.scopes }
   let ns ← (PrintNamespace.of unit declarations).mapError fun message => { message }
   let path ← (namespacePath unit interface.namespaceId).mapError fun message => { message }
-  let nominals ← interface.structs.mapM fun declaration =>
-    (nominalText unit ns declaration).mapError fun message => { message }
-  let functions ← interface.functions.mapM fun declaration =>
-    (functionText unit ns declaration).mapError fun message => { message }
+  let scopeOf (name : NameId) : Array String :=
+    (unit.tables.names[name.index]?.map (·.scope)).getD #[]
+  let entry (name : NameId) (text : String) : SourceOrderedText :=
+    { file := 0, start := 0, priority := 0, fallback := 0, text, scope := scopeOf name }
+  let nominals ← interface.structs.mapM fun declaration => do
+    let text ← (nominalText unit { ns with scope := scopeOf declaration.name } declaration).mapError
+      fun message => ({ message } : Error)
+    pure (entry declaration.name text)
+  let functions ← interface.functions.mapM fun declaration => do
+    let text ← (functionText unit { ns with scope := scopeOf declaration.name } declaration).mapError
+      fun message => ({ message } : Error)
+    pure (entry declaration.name text)
   let specFunctions ← interface.specFunctions.filterMap
       (fun declaration => if isDerivedSpecFunction unit ns declaration then none
         else some declaration)
@@ -5548,9 +5993,11 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
   -- The interface's own references print with the same aliases as ordinary
   -- source, so it carries the `use` paths that give those aliases a meaning.
   let uses := ns.usePaths
+  let nested ← (nestedEntries interface.scopes #[] (nominals ++ functions)).mapError
+    fun message => ({ message } : Error)
   let declarations := (if uses.isEmpty then #[] else
       #[lines (uses.map fun path => s!"use {path}")]) ++
-    nominals ++ functions ++ specFunctions ++ companions
+    nested ++ specFunctions ++ companions
   pure <| "-- Copyright © Aptos Foundation\n" ++
     "-- SPDX-License-Identifier: Apache-2.0\n\n" ++
     "import VerexSL\n\n" ++

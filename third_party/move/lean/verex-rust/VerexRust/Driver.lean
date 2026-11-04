@@ -3,6 +3,7 @@
 
 import Lean.Data.Json
 import VerexRust.Benchmark
+import VerexRust.Library
 import VerexRust.Profile
 
 /-!
@@ -249,13 +250,44 @@ private def artifactHash (path : System.FilePath) : IO String := do
   let bytes ← IO.FS.readBinFile path
   pure <| toString (appendHash 14695981039346656037 bytes)
 
+/-- The library beside the exporter's crate. -/
+def libraryRoot : IO System.FilePath := do
+  let root ← exporterRoot
+  let some package := root.parent
+    | throw <| IO.userError s!"the exporter crate {root} has no parent directory"
+  return package / "lib"
+
+/-- A validation diagnostic, at the source position of its location where the unit's
+tables and the source file give one. -/
+private def locatedDiagnostic (raw : Import.RawUnit)
+    (diagnostic : VerexIR.Validation.Diagnostic) : IO String := do
+  let text := s!"{diagnostic.code}: {diagnostic.message}"
+  let some range := (diagnostic.primary.bind (raw.tables.locations[·.index]?)).bind (·.primary)
+    | return text
+  let some file := raw.tables.files[range.file.index]? | return text
+  let source ← try IO.FS.readFile file.name catch _ => return s!"{file.name}: {text}"
+  let position := (Lean.FileMap.ofString source).toPosition ⟨range.startByte⟩
+  return s!"{file.name}:{position.line}:{position.column + 1}: {text}"
+
+/-- Validate an exporter artifact, the unit rewritten to the library's models
+first. The artifact itself stays the exporter's. -/
 private def decodeValidated (path : System.FilePath)
     (displayPath : System.FilePath := path) : IO VerexIR.Validation.ValidatedUnit := do
-  let text ← IO.FS.readFile path
-  match decodeAndValidate text with
+  let raw ← match Import.decodeJson (← IO.FS.readFile path) with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust RawUnit for `{displayPath}` does not decode: {message}"
+  let models := (← Library.readFiles (← libraryRoot)).flatMap (·.models)
+  let raw ← match Library.applyModels models raw with
+    | .ok raw => pure raw
+    | .error message => throw <| IO.userError s!"Rust RawUnit for `{displayPath}`: {message}"
+  match validate (Library.pruneOpaqueFunctions
+      (Library.refuseFunctions (Import.PanicRegions.collapseUnit raw))) with
   | .ok unit => pure unit
   | .error diagnostics =>
-      throw <| IO.userError s!"Rust RawUnit for `{displayPath}` did not validate: {repr diagnostics}"
+      let located ← diagnostics.mapM (locatedDiagnostic raw)
+      throw <| IO.userError s!"Rust RawUnit for `{displayPath}` did not validate:\n\
+        {"\n".intercalate located.toList}"
 
 private def cached? (output : System.FilePath) (key : String) :
     IO (Option (VerexIR.Validation.ValidatedUnit × String)) := do

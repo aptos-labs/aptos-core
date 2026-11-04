@@ -5,5 +5,3 @@ import VerexSL
 
 verex namespace slice where
   fun first(values : &Vector<u32>) -> u32 := values[0usize]
-
--- no denotation for `first`: the type of an expression is not carried by the denotation

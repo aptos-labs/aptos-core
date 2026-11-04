@@ -1,0 +1,47 @@
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:11:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:12:96
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:18:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:20:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:26:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:28:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:36:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:38:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:44:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:46:22
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:53:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:58:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:64:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:65:84
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:71:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:77:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:83:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:85:5
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:85:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:91:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:96:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:102:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:103:81
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:109:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:110:94
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:116:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:118:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:124:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:130:5
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:136:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:142:5
+  active loan originates here: VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:141:18
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:150:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:156:5
+  active loan originates here: VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:155:27
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:164:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active shared loan at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:170:5
+  active loan originates here: VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:169:22
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:177:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:187:5
+  active loan originates here: VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:186:20
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:195:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:200:5
+  active loan originates here: VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:199:26
+VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:208:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:213:5
+  active loan originates here: VerexE2ETests/Check/References/DeclaredLifetimeErrors.lean:212:28

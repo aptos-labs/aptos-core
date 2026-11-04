@@ -1,0 +1,43 @@
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:17:5: error: the specification clause `ensures result is Some ==> result.0 == 0` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:16:8: error: verex verification failed: the automatic verification of `SimpleMap::first` failed; provide a proof in the module:
+  verify SimpleMap::first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:21:3: error: `no panic when aborts at abort 1` is not established: the panic `std::process::abort()` at VerexE2ETests/SourceVerify/bench_simple_map_errors.rs:36:13 may panic
+  from: ∀ (i : Int), 0 ≤ i → i < ↑self_data.values.size → ∀ (j : Int), 0 ≤ j → j < ↑self_data.values.size → (self_data.values[i.toNat]?.getD ({ val := 0, fits := ⋯ }, default, ())).fst.val = (self_data.values[j.toNat]?.getD ({ val := 0, fits := ⋯ }, default, ())).fst.val → i = j; (variant✝ find_result = "Some" → ((Option.map VerexIR.Proofs.Denote.Var.here.select (VerexIR.Proofs.Denote.Which.here.there.project? find_result)).getD { val := 0, fits := ⋯ }).val < ↑self_data.values.size) ∧ (variant✝ find_result = "Some" → (self_data.values[((Option.map VerexIR.Proofs.Denote.Var.here.select (VerexIR.Proofs.Denote.Which.here.there.project? find_result)).getD { val := 0, fits := ⋯ }).val.toNat]?.getD ({ val := 0, fits := ⋯ }, default, ())).fst.val = key.val); ∀ (i : Int), 0 ≤ i → i < ↑self_data.values.size → variant✝ find_result = "None" → ¬(self_data.values[i.toNat]?.getD ({ val := 0, fits := ⋯ }, default, ())).fst.val = key.val; is_some_result = true ↔ variant✝ find_result = "Some"; final = final✝; is_some_result = true
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:21:8: error: verex verification failed: the automatic verification of `SimpleMap::add_checked` failed; provide a proof in the module:
+  verify SimpleMap::add_checked by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at abort 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:5:3: error: the specification clause `invariant ∀ (i in 0 .. data.length; j in 0 .. data.length), data[i].key == data[j].key ==> i == j` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:24:8: error: verex verification failed: the automatic verification of `SimpleMap::add_unchecked` failed; provide a proof in the module:
+  verify SimpleMap::add_unchecked by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:5:3: error: the specification clause `invariant ∀ (i in 0 .. data.length; j in 0 .. data.length), data[i].key == data[j].key ==> i == j` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:29:5: error: the specification clause `ensures self.data.length == old(self).data.length` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:27:8: error: verex verification failed: the automatic verification of `SimpleMap::remove` failed; provide a proof in the module:
+  verify SimpleMap::remove by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:33:5: error: the specification clause `ensures result == self.data[0].value` is not established
+VerexE2ETests/SourceVerify/bench_simple_map_errors.spec.lean:31:8: error: verex verification failed: the automatic verification of `SimpleMap::borrow` failed; provide a proof in the module:
+  verify SimpleMap::borrow by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

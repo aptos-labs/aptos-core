@@ -1,4 +1,10 @@
--- error: VerexE2ETests/RustToVerexSL/generic.rs:1:1: Rust exporter failed:
--- verex-rust-export: M0 probe bodies=1 generic_bodies=1 blocks=3 statements=0 generic_parameters=1 traits=1 trait_methods=1 trait_predicates=1 trait_impls=0 direct_calls=1 switches=0 drops=0 cleanup_edges=0 borrows=0 raw_pointer_types=0 raw_pointer_operations=0 inline_asm=0 sources={"generic.rs"} callees={"generic::Step::step"}
--- verex-rust-export: stopping before codegen
--- verex-rust-export: cannot emit RawUnit: callee `generic::Step::step` selects an implementation on a type parameter; implementation-selection evidence is unavailable from the pinned Rustc Public API
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import VerexSL
+
+verex namespace generic where
+  @[refused = "call of `generic::Step::step` in `generic::step_twice` at line 9:5 depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type"]
+  native fun step_twice {T}(value : &mut T) -> Unit
+
+-- no denotation for `step_twice`: a function without a body is not carried by the denotation

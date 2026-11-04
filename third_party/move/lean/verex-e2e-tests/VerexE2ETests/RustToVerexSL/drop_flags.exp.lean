@@ -7,8 +7,8 @@ verex namespace drop_flags where
   -- A value moved on some paths only is dropped under a flag that records
   -- whether it is still owned.
   fun pick {T}(first : Bool, left : T, right : T) -> T := do
-    let _5 := false
-    let _4 := false
+    let mut _5 := false
+    let mut _4 := false
     _5 := true
     _4 := true
     let mut _0 : T
@@ -23,12 +23,12 @@ verex namespace drop_flags where
     _0
 
   fun keep_first {T}(values : (T, T), swap : Bool) -> T := do
-    let _6 := false
-    let _5 := false
+    let mut _6 := false
+    let mut _5 := false
     _6 := true
-    let left := move(values[0u32])
+    let left := move(values.0)
     _5 := true
-    let right := move(values[1u32])
+    let right := move(values.1)
     let mut _0 : T
     if swap then
       _5 := false
@@ -43,10 +43,10 @@ verex namespace drop_flags where
     _0
 
   fun replace_once {T}(count : u32, initial : T, next : T) -> T := do
-    let _12 := false
+    let mut _12 := false
     _12 := true
-    let result := initial
-    let index := 0u32
+    let mut result := initial
+    let mut index := 0u32
     while index < count do
       if index == 1u32 then
         _12 := false
@@ -58,7 +58,3 @@ verex namespace drop_flags where
         continue
     if _12 then drop(next)
     result
-
--- no denotation for `pick`: drop is not carried by the denotation
--- no denotation for `keep_first`: an element place on a non-vector is not carried by the denotation
--- no denotation for `replace_once`: drop is not carried by the denotation

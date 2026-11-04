@@ -1129,9 +1129,9 @@ elab "#guard_verex_frontend" : command => do
   match VerexSL.Print.render env rustImplicitCopy with
   | .error error => throwError "the Rust implicit-copy fixture did not render: {error}"
   | .ok printed =>
-      unless printed.contains "tuple_first(pair : (u32, Bool)) -> u32 := pair[0u32]" &&
+      unless printed.contains "tuple_first(pair : (u32, Bool)) -> u32 := pair.0" &&
           printed.contains "vector_first(values : &Vector<u32>) -> u32 := values[0usize]" &&
-          !printed.contains "core.read(pair[0u32])" &&
+          !printed.contains "core.read(pair.0)" &&
           !printed.contains "*values[0usize]" do
         throwError "Rust scalar reads lost their implicit-copy spelling:\n{printed}"
       match VerexSL.Print.formatSource env printed with

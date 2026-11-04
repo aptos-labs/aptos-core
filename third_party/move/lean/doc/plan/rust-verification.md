@@ -28,13 +28,8 @@ earlier:
 |---|---|---|
 | Export | A call whose dependency signature names an associated type (`v[i]` on `Vec`) is rejected, as is a generic struct deriving `Clone`. | VIR has no projection type; a derived `Clone` of a generic struct calls `Clone::clone` on a type parameter (M2). |
 | Validation | A loop whose exits continue to code they reach only through a cycle, or not at all in common, is rejected (`VIR-CFG-MULTI-EXIT`). | The structurizer needs one block after the loop that every continuing exit reaches without a cycle; early returns, `continue`/`break` of enclosing loops, and valued `break`s meeting after the loop are supported (`RustToVerexSL/loop_exits.rs`). |
-| Denotation | `usize` and `isize` values, `as` casts, and the `overflowing_add` family have no denotation (`not carried by the denotation`). Slice indexing and enum discriminant reads use pointer-width integers and fail with them. | `Denote/Compile.lean` carries Move's checked primitives and integer widths. |
-| Denotation | `char`, arrays, `!`, tuple element places (`values.0` as a place), comparisons of `bool` and `char`, and bitwise operations on `bool` and on signed integers have no denotation. | The same: `Denote/Compile.lean` and `ntyOfFuel` carry what Move has. |
-| Denotation | A function that drops a value (a generic value, or one whose type has drop glue) has no denotation (`drop is not carried`). | What a destructor does is M4; the runtime removes the dropped value without running it. |
-| Denotation | A struct with a lifetime parameter (`Borrowed<'a, T>`) has no denotation, and a `&mut` held in a tuple, struct or enum is rejected (`a loan held inside an aggregate`), as is a reference as a type argument. | `ntyOfFuel` reads only the type arguments of a nominal, and a loan's death resolves only a local that is the reference itself. |
-| Specification | A loop cannot receive an invariant. | Loop invariants are in-body specification blocks; a Rust file has none, and its specification file holds items only. |
-| Messages | A possible panic of a function without `aborts_if` is reported as a residual Lean goal keyed `leaf`. | The panicking path owes the implicit `aborts_if false` lowering appends to every Rust contract ([`verex-sl.md`](../designs/verex-sl.md)). That clause has no location, so `clauseNames` gives it no name. |
-| Rendering | A unit with scopes (modules, methods, dependency crates) stops at the printer (`scopes are outside the current VerexSL printer`). | VerexSL has no `mod` item yet (step 3). |
+| Validation | A mutable borrow of an `unsize` or `subslice` place is rejected (`VIR-SEMANTIC-BORROW-UNSIZED-HOLE`). | The runtime's hole cannot sit in a slice of a vector. |
+| Denotation | A `&mut` held in an enum is rejected (`a loan held inside an aggregate`), as is a reference type argument of a function value or a native, opaque or recursive callee. | A loan's death resolves a local or a tuple's or struct's component at its path. |
 
 The `RustToVerexSL` baselines check that a rendering lowers back to a
 validated unit and prints as a fixed point, and list each function that
@@ -51,19 +46,22 @@ and proof files written in the proof language
 ([`proof-language.md`](proof-language.md)), and every failed obligation
 names its key and its Rust source location.
 
-Not in scope: trait-bounded generics (blocked upstream,
-[rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)),
-destructor effects and unwinding (M4), raw pointers (`unsafe-pointers.md`),
-interior mutability (`interior-mutability.md`), and Rust closures, which
-follow [`native-function-values.md`](native-function-values.md) ("Rust").
+The goal beyond that slice is the semantics of all safe Rust. What verifies must
+be true of real Rust, and what is not modelled yet is rejected, never given another
+meaning. What remains: trait-bounded generics and `dyn` (blocked upstream,
+[rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)), destructor
+effects and unwinding (M4), interior mutability (`interior-mutability.md`, whose cell
+identities keep `&T` a snapshot), `Box` and recursive types (step 3e), floats, and
+concurrency. Closures are step 3d, following
+[`native-function-values.md`](native-function-values.md) ("Rust"). Unsafe code is
+restricted so that verification guarantees what safe Rust assumes: a misuse is a located
+failed obligation, or refused, and the checker may be stricter than Rust
+(`unsafe-pointers.md`, `interior-mutability.md`, §7 of each). So a safe interface over
+unsafe code is not an axiom in principle; the library's contracts are trusted only until
+their bodies verify under that profile.
 
 ## Step 1. Imported bodies verify
 
-In order: the remaining types and primitives, drops, the failing paths' key,
-the normal form. Struct specifications are independent of the rest. Checks are
-folded already, so most divisions, shifts and negations reach the denotation
-as Move's checked operations, and the key's selectors name the sites folding
-produces.
 
 **Printing in the alignment chain.** A theorem is about the rendered unit,
 and the printer writes a compiler temporary as its value only where the
@@ -155,7 +153,11 @@ silently, so two limits hold until M4:
   states `Copy`. A drop at a type with a destructor is rejected at its location.
   `S<T>(T)` with no impl of its own reaches only `T`. Dependency types such as
   `Vec` declare their destruction by a role in step 3 and are rejected until
-  then.
+  then; an opaque dependency type also counts as having one where its fields
+  hold a type argument, which the unit cannot see. A function value's captures
+  are not visible in its type, so a drop of one is rejected. A shared reference
+  denotes its referent, so a field or nested argument of one counts its
+  referent's destructor, which rejects more than rustc would run.
 - A theorem about a body dropping a type parameter assumes that the argument's
   destructor has no observable effect and does not panic, recorded in
   [`assumptions.md`](../status/assumptions.md). A call that instantiates such a
@@ -208,24 +210,25 @@ site (`when aborts at op 3`, `when aborts at abort 2`,
   writes, and `op j` counts operations, including those whose check the
   source shows only as an operator (`a / b`, `v[i]`). A `v[i]` is one `op`, in
   both profiles: today its check and its element read are numbered apart.
-- The message names the operation and its `.rs` position, through the
-  site's origin. Today `reportObligation` names a clause or a callee, never
-  the failing path's site, so this is new: the failing path's decisions are
-  at hand (`leafDecisions`), and the proof request prints the path's selector.
+- The message names the operation and its `.rs` position, and the proof
+  request prints the path's selector. Alignment of a rendering with its source
+  (`alignExpr`) is shallow, because the rendering folds temporaries, so a site
+  takes its position by the order the two bodies run the sites of each shape
+  (`renderedSiteOrigins`), and other messages inside a body still map coarsely.
 
 **Struct specifications.** A struct's data invariants and ghost fields are
 clauses of its `spec S where` item in the specification file
 ([`ghost-fields.md`](../designs/ghost-fields.md)). Stored invariants and
 static memory have no Rust counterpart: a Rust unit has no resources.
 
-Gate: Rust `SourceVerify` fixtures, free functions without dependency types
-since those stop at the printer until step 3, for arithmetic at every integer
+Gate: Rust `SourceVerify` fixtures for arithmetic at every integer
 width including `usize` and `isize`, `overflowing_add`, casts, division, structs and field updates
 through `&mut`, a struct with a shared reference field, enums and `match`, arms computing values, functions
 returning `&mut`, `()` functions with branches, a generic function dropping a
 parameter, and a struct invariant. A drop at a type with a destructor is
-rejected at its location, and an unspecified function on a call cycle is
-reported, as in Move. The `RustToVerexSL` baselines show folded checks,
+rejected at its location (a local `Drop` impl's method has a scope, so these
+Rust fixtures stop at the printer until the `mod` item of step 3), and an
+unspecified function on a call cycle is reported, as in Move. The `RustToVerexSL` baselines show folded checks,
 in loop bodies too, and no `-- no denotation` line for a construct this step
 names. Each has a `_false` counterpart that fails under the key of its clause, or under
 `no panic` with the panic site's decision. A proof file routes one of two
@@ -239,7 +242,7 @@ imported structured-loop identities. This step implements that attachment:
 
 - A loop is addressed as the proof language addresses it
   ([`proof-language.md`](proof-language.md)): `loop k` is the function's
-  `k`-th loop in source order, counted from 1 (`bodySites` in
+  `k`-th loop in the rendered body, counted from 1 (`bodySites` in
   `VerexSL/Verify/Contracts.lean`), and an invariant's obligations are
   `invariant 2 of loop 1 entry` and `invariant 2 of loop 1 step`, so a Rust
   function's specification and proof files name a loop alike. A `loop k` for
@@ -279,18 +282,20 @@ them as `op` sites inside the loop.
 
 ## Step 3. Dependencies and the standard library
 
-**The `mod` item.** Every dependency function and every method lives in a
-scope, and the printer rejects a namespace with scopes, so this comes first:
-the `mod` item of step 4 in VerexSL (syntax, resolution, printing). It is
-independent of steps 1 and 2 and may land before them.
+**Scopes in VerexSL.** Every dependency function and every method lives in a
+scope, and a scope's keyword carries its kind: `mod m where`, `impl Counter
+where`, `trait Step where`, `trait impl «<Token as Drop>» where`. A dependency's
+function renders as `native fun`, its unobserved type as `opaque struct`. Open:
+a trait impl's name is rustc's text, all the exporter states; spelling it `impl
+Drop for Token` needs the exporter to state the trait and the type as data.
 
 **Dependency namespaces.** Each crate the unit reaches (`core`, `alloc`, a
 Cargo dependency) is a namespace of the unit, as a Move package's dependency
 modules are: it holds the declarations the crate reaches, in their modules'
-scopes, and states `verify = false`. A dependency's type whose shape the
-crate observes (constructs, matches, or projects) carries it, as `Option`
-and `Result` do; any other is opaque (the Rust property `struct.opaque`), as
-`Vec` is, and validation rejects constructing or destructuring it. Safe Rust
+scopes, and states `verify = false`. A dependency's enum carries its shape, its variants being public, as `Option`
+and `Result` do, unless a payload's type has no mapping; a struct carries it when
+the crate observes it (constructs or projects). Any other is opaque (the Rust
+property `struct.opaque`), and validation rejects constructing or destructuring it. Safe Rust
 observes only visible fields, so private fields never enter the unit. The
 interfaces of `RawUnit.dependencies` remain the boundary of separate
 compilation ([`relocatable-namespaces.md`](../designs/relocatable-namespaces.md)),
@@ -306,17 +311,40 @@ without its body (the Rust property `function.dependency`); verification
 rejects calling it until a contract or model gives it meaning. A call on a
 type parameter stays rejected until trait evidence (M2).
 
-**A projection type.** A signature that names an associated type (`v[i]` on
-`Vec` returns `<Vec<T, A> as Index<I>>::Output`) is rejected at the call. VIR
-gets a projection type, normalized at concrete instantiations through the
-impls' bindings; its match sites include the VerexSL lowering, printer, and
-denotation.
+**Associated types are type parameters.** Rustc Public has no normalizing
+signature query: the signature of a resolved instance still names the alias, and
+an impl's binding may be another projection (`Vec`'s `Output` is `I::Output`), so
+VIR could normalize a projection type only by reimplementing trait selection.
+The types in MIR are normalized. So each distinct alias in a dependency signature
+becomes a generic parameter after the function's generics (`native fun index {T}
+{I} {A} {Output}(_1 : &Vec<T, A>, _2 : I) -> &Output`, binders in rustc's order), and a call instantiates it
+by unifying the declared signature with the call's operand and destination types,
+wherever the alias is nested (`Option<&Output>` of `get`). This is
+`rust-mir-design.md`'s "explicit type parameters plus equality constraints after
+rustc normalization"; the equality is a fact of the exporter's output, trusted
+until M7.
+
+A trait-method call whose impl selection depends on a type parameter is rejected
+at export until trait evidence (M2): `Instance::resolve` fails on `&v[0]` with
+`v : &Vec<T>`.
+
+**Contracts at a shape.** A contract may name a shape of its function's generics,
+and applies to a call whose instantiation unifies with it: `spec index at {T} {usize}
+{A} {T} where …`. A shape is a generic contract over its own variables: the
+callee's contract is looked up by the callee and the shape unifying with the
+call's type arguments, and specialization (SC1–SC5) goes on unchanged. Two shapes
+matching one call are an error of the library. A call matching none has no contract
+and is rejected at its location.
 
 Open, upstream:
 
 - Trait bounds of functions and impls are not exposed by Rustc Public
   ([rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)),
   so no binder states its predicates, local or dependency.
+- A span's call site (`Span::source_callsite`): what a macro of another crate expands
+  to is located at what it is reached after (step 3c).
+- The value of a promoted constant: no public query evaluates one, so `&5`, `x == None`,
+  `a == Unit::A` and `assert_eq!(a, 1)` are export errors (step 3c).
 - `Copy` of a type parameter: a body copying a `T: Copy` value needs the
   bound, which Rustc Public does not expose; the exporter maps such a copy to
   a move. The binder needs an explicit marker that its bounds are not
@@ -326,16 +354,35 @@ Open, upstream:
   instantiation fails semantic preparation.
 
 **A standard-library specification library.** VerexSL files maintained in
-`verex-rust` give contracts to the `core` and `alloc` functions the
-fixtures and benchmark problems use: integer `checked_*`, `wrapping_*` and
-`saturating_*`, `Vec::new`, `push`, `pop`, `len`, `get` and indexing,
-`Option` and `Result` accessors. They declare model roles for opaque types:
-`Vec<T>` is the VIR vector, as slices already are, its carrier
-`SpecVector`; `String` is the VIR `string`, as `str` already is, its carrier
-Lean's `String`. Roles are declared on the dependency
-declaration in the library, and the verifier dispatches on the role, as for
-Move's intrinsic maps ([`intrinsic-maps.md`](../designs/intrinsic-maps.md));
-generic code never matches a Rust path. The exporter maps `wrapping_shl` and
+`verex-rust/lib/{core,alloc}` give contracts to the `core` and `alloc` functions
+the fixtures and benchmark problems use: integer `checked_*`, `wrapping_*` and
+`saturating_*`, `Vec::new`, `push`, `pop`, `len`, `get` and indexing, `Option` and
+`Result` accessors. A unit declares only the dependency functions it reaches, so
+the driver keeps the library items whose target the unit declares before it
+splices them.
+
+`Vec<T, A>` is the VIR vector type and `String` the VIR string. The library
+declares it (`@[model(vector T)] opaque struct Vec {T} {A} where`), and the Rust
+import rewrites the raw unit before validation: every `Vec<T, A>` is `Vector<T>`,
+the declaration is dropped, its scope keeps its name, and `A` is an unused
+parameter of each native. Runtime typing, `readsUnique`, `typesAgreeCheck` and the
+denotation are unchanged, since the value is a vector; `deref` is the identity; a
+drop of `Vec<T>` is a drop of `Vector<T>`, so `Vec<u32>` passes and `Vec<Guard>` is
+rejected by the existing rule. A nominal carried as a vector would not do: the
+native reading is injective (`readsUnique`), and a type a value reads at must be
+the one the runtime types it at (`typesAgreeCheck`).
+
+The functions are natives with library contracts, at a shape where needed (`spec
+index at {T} {usize} {A} {T} where aborts_if i >= self.length; ensures result ==
+self[i]`; `spec push where ensures self == old(self) ++ [x]`). `push` has no
+failure, capacity and allocation being outside the model (`assumptions.md`). `get`
+returns `Option<&T>`, whose shared reference is its referent. `v[i]` on a `Vec` is a
+call site, `aborts at call j of index`; an import normalization to the `op` site is
+a later step. The Rust backend prints an owned vector as `Vec<T>` and a borrowed one
+as `&[T]`.
+
+The library declares what the import rewrites, so that generic code
+never matches a Rust path. The exporter maps `wrapping_shl` and
 `wrapping_shr` to the bare shifts, which have no outcome where Rust masks the
 distance; this step gives them library contracts (`distance mod width`) and
 removes that mapping, so they stay dependency calls. The other `wrapping_*`
@@ -346,10 +393,180 @@ theorem lists those it uses; verifying them against the generic MIR of their
 bodies needs the unsafe profile for most of `alloc` and comes after its
 library models ([`unsafe-pointers.md`](../designs/unsafe-pointers.md), §6).
 
+**`for` loops.** A `for` loop is the loop rustc writes: `Range` is an observed
+struct, `next` and `into_iter` have contracts at integer shapes, `iter` is the
+name rustc gives the hidden iterator, and the invariant names its fields (`loop 1
+where invariant iter.start <= iter.end && …`); a nested loop's is `iter'`.
+
 Gate: fixtures with methods, with `Option` and `Result` in signatures and
 matches, `checked_add` and `wrapping_add`, `Vec` push, pop, length and indexing under
 loop invariants, and updates through `&mut [T]`; a call to an unmodeled
 standard function is rejected with its location.
+
+## Step 3b. References in aggregates
+
+A measurement of 135 rustc-accepted functions holding references in tuples,
+structs and enums let no false contract through. It stopped 71 at rendering, 26
+at export, 17 at the borrow analysis and 8 at the denotation. The runtime already
+nests borrows: only the denotation is flat.
+
+**Carrier.** A nested `&mut` keeps the carrier `(current, prophecy)` and its path
+is a `Proj`. `refFree` stays required for equality, order and search.
+
+**Death.** The certificate states each loan's holder as a path, and a loan dies at
+its path (`Term.resolveAt`), a no-op on an inactive variant. Two loans of one
+struct are two deaths at one anchor. A death assumes `current = prophecy`, so
+resolving a copy already moved out would assume a false equation and make the path
+vacuous. Hence validation reads a reference moved out of an aggregate as a reborrow
+through it, as `normalizeReferenceCopies` reads a copy of a local, so the component
+stays true on every path, a conditional move included: its other path resolves the
+component at the value it kept. A death states what the place
+holds at that death, not what it held at some other time, and an anchor runs on
+every path reaching it, so a loan dies only once every holder in the merged state
+there is unread from then on, along the continuation including a loop's next
+iteration. `VIR-SEMANTIC-LOAN-DEATH` checks this for each recorded death, from the
+body's structure and on its own enumeration of each path's first access, and refuses
+the unit otherwise. A Move `a;` on a `&mut` moves it into a discarded temporary that
+no place holds, so nothing resolves it: the lender's value is unconstrained, which
+leaves such a function unverified rather than unsound.
+
+**The cursor.** `while let Some(r) = cur { cur = next(r) }` verifies unbounded
+(`SourceVerify/cursor_errors.rs`, `enum_cursor_errors.rs`). A move of a component with an
+overwrite following on every path, before any join, exit or use of an overlapping place,
+prefixes included, is a transfer (`transferredMoves`): the moved reference becomes the
+loan's only holder. Any other such move stays the reborrow it reads as. Four things carry
+it. The runtime clears the component (`clearBorrowValue`), since a `.borrow` is found by
+loan id, and the term's `takeAt` leaves `(π, π)` there, whose value nothing reads and whose
+resolution assumes nothing. A write of a reference is shallow: it does not conflict with a
+reborrow through it, and such a loan no longer goes through the place. A loan going on
+through another holder gets a death for the dead place alone (`LoanDeath.alone`): the term
+resolves the place and the run reconciles the reference it holds with its lender there
+(`settleDeaths`), so a rebound local loses nothing; the loan itself ends at its own death.
+And `final(x)` is usable in a loop invariant of any reference a place holds, so a cursor's
+invariant states what the lender will hold, as `final(h.r) == final(old(h).r)`. A shared
+view holds no prophecy, so `final` through one is rejected by name. A written place is a
+new place, so writing one a live loan moved out of is no conflict:
+`loanDeathLivenessDiagnostics` refuses a death naming a place still read. Linked lists need
+`Box` too.
+
+**Shared views of a holder.** Step 3e, stage 1: `&S` of a struct holding `&mut` is
+what it observes, no loan among it.
+
+**Drop.** A drop denotes nothing, and the analysis anchors the deaths of the loans
+a dropped value holds at the drop.
+`core::mem::drop` is that drop: `@[model(drop)] fun drop {T}` in `lib/core/mem.spec.lean`
+makes the import rewrite a call to `tmp := arg; d := (); drop tmp`, the callee's parameter
+dying at its scope end, so a destructor it reaches is rejected as at any scope end. A generic
+callee dropping its parameter stays rejected at a type holding `&mut`.
+
+**Signatures.** A parameter or result of a type holding `&mut` is lent, and the
+loan list of an enum is consumed by the active variant. No new spelling: the entry
+is `old(x)` and the exit bare `x`, compositionally, so `h.r` is the final referent,
+`old(h).r` the entry, and `Option<&mut T>` presents as `Option<T>`.
+
+**Regions.** Parameter and result types come from the declared signature with its
+lifetimes, because a result must be tied to its source (`get_mut`, `first_mut`); a
+local's stay erased, but a parameter's local takes the signature's type. A bound
+region becomes a lifetime binder after the function's others, which a call states as
+inferred. An elided lifetime that relates nothing stays erased, where the result has
+no region or the signature no other one. The analysis keys incoming loans by declared
+lifetime, and a by-value aggregate's reference component gets an incoming loan, which
+removes the escape rejection of `take(Holder) -> &mut`. `FnDef::fn_sig` keeps a bound
+region and erases an early-bound one, the only kind a `where` clause can mention, so
+`'a: 'b` is not read (rust-lang/rust#161892) and such a lifetime relates to all. A
+relation only an ADT's bound implies is rejected in a body
+(`VIR-SEMANTIC-BORROW-RESULT-REGION`), and a dependency holding an ADT over several
+lifetimes, whose body nothing checks, is exported inferred whole.
+
+Two limits follow. `impl<'a, T> Iterator for Iter<'a, T>` makes `'a` early-bound, so
+`next(&mut self) -> Option<&'a T>` exports erased and each item holds the `&mut iter`
+loan: a `for` loop is unaffected, but two live items from one iterator conflict
+falsely. And `fn ordered_long<'x, 'y>(o: Ordered<'x, 'y>) -> &'x u32` with
+`struct Ordered<'a, 'b: 'a>`, which rustc accepts, is rejected
+(`RustToVerexSL/declared_lifetimes_adt_bound.rs`,
+`SourceVerify/declared_lifetimes_bound_errors.rs`). Both are precision limits, on the
+safe side, until rust-lang/rust#161892 exposes the predicates.
+
+**`Copy` of a type parameter.** Rustc Public hides the bound (rust-lang/rust#161892), and
+optimized MIR spells a final move of a local `copy`, so a `copy` alone shows nothing. The
+exporter states `T has Copy` on a binder where the body shows it: a copy through a reference,
+which rustc refuses as a move (E0507), a copy of a place read again, or an instantiation of
+what a callee needs, to a fixed point over the unit (`copy_parameters`). Any other `copy`
+at a type not `Copy`, or `Copy` only by such a parameter, stays a move. The ability is checked at every
+instantiation, so a wrong inference rejects and proves nothing false. A result of a type
+with no lifetime holds no loan of the frame, since a type parameter outlives the body.
+
+**Generics at references.** A generic theorem does not transfer to `T := &mut U`:
+the generic proof drops `T` as nothing, and dropping a `&mut` resolves its prophecy.
+So an instantiation at a type holding one is verified monomorphically, and
+`InvokeMeaning.Coherent`'s `refFree` stays the transfer's hypothesis.
+
+`compileFunction_agrees` is one family over a substitution:
+`compileFunctionAt unit handle σ = .ok f`, without one exactly `compileFunction`.
+`CompileNamespace` carries the substitution, which `nty` applies; a callee's signature
+is read unsubstituted (`declaredNty`). `Term.callInstance` carries the handle and `θ`
+and means `Meanings.atInstance`, closed `propheticMeaningAt (some θ)`: the run at the
+frame over the substituted rows, so lending follows the `.ref` type, with `Coherent` at
+the family `θ` induces, since at the caller's a type parameter is not its argument. The
+callee is inlined at the rows, with no contract of its generic declaration.
+
+Rejected at the call: a callee dropping the parameter (`dropsDestructor` counts any
+non-`refFree` instantiation, so `mem::drop` at a holder as well; a concrete `drop` of a
+holder is not an instantiation and dies through its paths), and a native, opaque or
+recursive callee, whose generic contract does not transfer. A shared reference over the
+argument erases after the substitution (`ntyAt`), in the fields of an instantiated
+declaration too. A reference
+moved out of an aggregate is a reborrow through it, as validation reads it where the
+type shows it; a holder moved out of one is rejected. A loop in such a callee meets no
+invariant of its generic declaration, so it is not verified automatically.
+
+The check runs substituted instances (`Tests/Differential/generic_references.rs`): the
+interpreter runs the generic body at the concrete instantiation, the term inlines the
+substituted compile, and a perturbed prophecy leaves no execution. It also evaluates
+`coherentCheck` at the frame of each call at type arguments, a false one a disagreement. Closures (step 3d,
+stage 4) also need lending through a function value's captures, since `NTy.lendable`
+treats `.function` as `refFree`.
+
+**`match`.** By value it takes the scrutinee, binds the payload to the arm's local
+and transfers the holder in the certificate. By reference it is a reborrow at the
+path `deref` then `variant`.
+
+**Unsize.** A shared `&[T; N]` as `&[T]` is a borrow of the place `unsize p`. A
+mutable borrow of an `unsize` or `subslice` place is rejected at validation
+(`VIR-SEMANTIC-BORROW-UNSIZED-HOLE`): the runtime's hole cannot sit in a slice of a
+vector, so the run has no derivation and a contract would hold vacuously; the design
+for it is a loan over the whole lender with a length guard at write-back.
+
+**A differential check.** `compileFunction_agrees` is an axiom, so a mistake here
+has no proof to catch it. `verex-rust/VerexRust/Tests/DifferentialCheck.lean`, run
+natively by `lake test` (the smoke suite thins its inputs with
+`VEREX_DIFFERENTIAL=smoke`), exports `Tests/Differential/*.rs` and the exporter's
+fixtures, runs the interpreter on the exported unit, and compares its outcome with
+the term compiled from the rendering lowered back: boundary values per integer
+type, every row of 8-bit integers for the operations and casts. A `&mut`
+parameter's prophecy is its written-back value, and any other leaves no execution
+unless the reference is returned. The term runs as a tree of its outcomes
+(`Term.tree`, `VerexRust/Tests/DenoteEval.lean`), proved to mean the denotation
+(`checked_tree_means`), with choices of prophecies and calls inlined, so a closure
+is covered through its direct call, and a generic callee at a reference type through
+its substituted compile. Function values, other generic calls, globals and
+functions over strings are not covered: their trees are `unknown`, or they have no
+inputs. Rust's `as` wraps and rustc spells no checked
+cast, so `Term.cast` is reached by an authored unit
+(`VerexRust/Tests/Programs/DifferentialCasts.lean`). `run_sound` and `run_complete` relate the
+interpreter to `BigStep`.
+
+**Stages,** each gated on its own:
+
+| Stage | Gate |
+|---|---|
+| Export: reference ADT arguments, `PtrMetadata` without a borrow, declared signature types | `RustToVerexSL` baselines |
+| Tuples returned from a call | `Check/References/NestedHolders` |
+| A struct holding one `&mut` by value | constructed, written through, read after it dies, returned |
+| `Option<&mut T>` and user enums | `match` by value and by reference |
+| Generics at references | `id::<&mut u32>` verifies with the lender seeing the write, a wrapper and `Option<&mut u32>` through generics, a dropping, native, opaque or recursive callee rejected (`generic_references_errors`) |
+| Declared lifetimes in the analysis | `sel<'a, 'b>` writes the unrelated lender |
+| `first_mut`, `get_mut`, a user iterator | a loop over a slice through them |
 
 ## Step 4. Crates
 
@@ -385,14 +602,393 @@ A workspace dependency is a dependency namespace (step 3) whose functions
 are verified with their own specification files or trusted with library
 contracts.
 
-Names carry their scopes, the exporter writes a crate's modules, and
-`verex-rust verify <Cargo.toml>` finds each module file's specifications. Open:
-proof files per module; the `mod` item is step 3's first part. Until it lands
-a unit with scopes (modules, methods, dependency crates) stops at the printer,
-as `RustToVerexSL/method.rs` and `drop.rs` show.
+Names carry their scopes, the exporter writes a crate's modules, VerexSL spells
+scopes, and `verex-rust verify <Cargo.toml>` finds each module file's
+specifications. Open: proof files per module.
 
 Gate: the Cargo fixture verifies with specifications in two modules that
 use each other and a call into its dependency crate.
+
+## Step 3c. What real code needs first
+
+Writing the benchmark's problems as a Rust programmer would (step 5) found these
+ahead of everything else.
+
+**Panics.** The exporter exports an unmappable constant or a callee with an
+unsupported signature as an opaque node rather than failing. An import pass before
+check folding collapses every diverging region, the blocks from which all paths
+reach a diverging call or `unreachable`, into `abort`, which is `throw_ panic` and
+an `abort j` site. That needs no list of panic functions and no purity condition: a
+region's contents are unobservable under `panic=abort`, and a stateless failure
+carries no message. A diverging callee that doesn't panic (`exit`, a loop) only adds
+a spurious panic path, which is sound and incomplete, recorded in `assumptions.md`.
+The import prunes an opaque declaration nothing then calls, as it drops unreferenced
+opaque types, and validation rejects an opaque node or declaration that survives.
+
+Rustc Public gives a span no call site, so a panic a macro of another crate raises
+has only spans in that crate. Its location names what it is reached after, the nearest
+dominator of the region with a terminator in the crate, else the function, in the
+location's `expansion` with no `primary`, and the message says so. A location keys no
+selector. `Span::source_callsite` goes upstream beside rust-lang/rust#161892; with it,
+`primary` holds the macro's call.
+
+**Constants.** Export evaluates a constant (`try_const_eval`): integers, `bool` and
+`char` to literals, structs and arrays through their bytes and layout; a constant at
+`&T` exports as a shared borrow of the referent's value, since a struct referent has
+no `ConstValue`, which covers `&str` and `&STATIC`. A constant states the shape only
+of an ADT whose variants and fields are all visible.
+A constant generic over a parameter (`T::MAX`) and a promoted constant are precise
+export errors: Rustc Public cannot evaluate a promoted, which goes upstream beside
+rust-lang/rust#161892, so `assert_eq!(a, 1)` waits while `assert_eq!(a, b)` works.
+`static mut` stays rejected.
+
+**`?`.** A zero-sized constant of an ADT type is the constructor of its single layout
+variant (`Option::<Infallible>::None`), and `Try::branch` and
+`FromResidual::from_residual` are library contracts at `Option` and `Result` shapes.
+
+**`cmp`.** A variant's discriminant may be negative in VerexSL, and `Ord::cmp` is a
+library contract per integer type.
+
+**Iterators.** A library declares the fields of an opaque iterator (`@[model] struct
+Iter {a : lifetime} {T} where`, its fields deeper than it: `slice : &[a] Vector<T>`, `pos
+: usize`, `end : usize`), which the import puts in place of the opaque declaration,
+dropping the opaque and destructor properties, so `next` has a contract and an
+invariant names progress: `loop 1 where invariant iter.pos <= iter.end && iter.end ==
+iter.slice.length`. `RangeInclusive`, `Rev`, `Enumerate` and `StepBy` hold `core`'s own
+fields, `slice::Iter` two positions in place of its pointers: the elements left are
+`slice[pos .. end]` and `slice` never changes, as a `Range` keeps both its bounds. So
+`iter_mut`'s shape can hold the whole lender and indices, where a shrinking subslice
+would be the mutable borrow `VIR-SEMANTIC-BORROW-UNSIZED-HOLE` rejects. `Enumerate::next_back`
+reads `len` as `end - pos`.
+
+A generic instantiation is built over all binder positions, with a placeholder at a
+lifetime's or constant's: `θ` holds `Unit` there, since no carrier reads it. A shape's
+`arguments` hold it at a lifetime's, which the surface does not spell (`at {T} {A}
+{Iter<lifetime _, T>}` of `{a : lifetime} {T} {A} {IntoIter}`). A call's frame reads its
+real generic arguments, lifetimes included, as the runtime does, so `Term.callGeneric`
+and `FrameOf` hold those, `FrameOf` stating the callee's binder kinds. A call passing
+its caller's own parameters runs in the caller's frame only when all of them are
+types. A function with a constant binder stops at export, as the pinned Rustc Public
+does not expose its type.
+
+Without trait evidence an adapter's `next` has a contract per inner iterator, a shape
+each: `Rev` and `Enumerate` over `Range` and `RangeInclusive` per integer type and
+over `slice::Iter`, with `Rev<Enumerate<Iter>>`, `Enumerate<Rev<Iter>>`, and `StepBy` over
+an unsigned `Range` no wider than `usize`. A chain the library does not list has no
+contract and is rejected at its call. A contract at a shape comes into a rendering
+only for a call naming what the shape names, since each type it adds to a namespace's
+table makes a frame certificate dearer; a function with calls no shape matches keeps
+its shapes for the message listing them. `iter_mut` waits for step 3b.
+
+`.iter()` in a generic body waits upstream, beside
+[rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892):
+`Instance::resolve` uses an empty parameter environment, so `Iter<'_, K>` fails on the
+implicit `K: Sized`, while `Range<usize>` in a generic body exports. Resolution has to
+run in the caller's typing environment. Until then a generic body loops over a range.
+
+A rule for reading a subvector (`(v[a .. b]).length == b - a`, `(v[a .. b])[k] == v[a +
+k]` for `k < b - a`) belongs to the normal form, added when a fixture first reaches it.
+
+## Step 3d. Closures
+
+A closure type is a struct of its upvars with a `self`-taking body, and a call
+through a known closure type is a direct call. Everything needed is public:
+`RigidTy::Closure`, `ClosureDef::body`, `AggregateKind::Closure`, and upvar types in
+the closure's generic arguments. MIR inlining is not a route: at `-O` it also inlines
+`sort_by`'s `RawVec` transmutes.
+
+**Identity.** Rustc's positional name, its path below the module: `struct
+«f::{closure#0}»` in the enclosing module scope, parent generics first, then one
+lifetime binder per region of the upvar types (a reference upvar has one); the
+body is `call`, `call_mut` or `call_once` by the closure's kind, in
+`impl «f::{closure#0}»`. A field is named by the body's debug info. A specification
+file addresses it as any scope: `impl «f::{closure#0}» where spec call where`.
+The backend prints the construction as the closure expression and neither the struct
+nor the impl as items, so the rendering stays a fixed point:
+
+```lean
+let g :=
+  closure «f::{closure#0}» {u0 : lifetime} has Copy (c : &[u0] u32 := &c)
+    fun call(self : &«f::{closure#0}»<lifetime _>, a : u32) -> u32 := …
+```
+
+Lowering makes the struct (the property `struct.closure`) and the body items of the
+module and leaves the construction, joining a contract authored in the scope to the
+body. An interface, which holds no bodies, prints both as items.
+
+**Construction.** The first construction in the body rustc nests the closure in (its
+parent, `f` for `f::{closure#0}`, stated in the struct's property) spells the closure,
+and a further one is `new`. A sized closure is constructed by an aggregate in its
+parent, and one held but constructed by no reached body is rejected at export. A
+zero-sized closure, one without upvars or over such closures only, has no construction
+in MIR, since rustc removes the assignments of zero-sized values: it is the constant
+`new «…» {}` at every use, wherever that is (`let c = make(); let d = c; d(1)` reads an
+unassigned `d`), and its parent spells it at its first use there, or at its entry if it
+has none. A closure no reached body names is dead code and is not exported.
+
+**Calls.** Untupled at import: `Fn*::call*(s, t)` on a concrete closure type is the
+direct call `call(s, t.0, …, t.n)` of the body's spread signature. The tuple is built
+in the call's block and used only by the call, so the call reads its elements. At a
+concrete type a call is always the closure's own kind, so no shim occurs there.
+
+**Contracts.** The body is a function: inlined at a direct call without a
+specification, a target of its own with one. Its `no panic` key and its `loop k` are
+its own, and the enclosing function's loop numbers exclude it.
+
+**Captures.** Upvars are fields, so `FnMut` is `&mut C` with `C { n : &mut u32 }`,
+step 3b's holder. An `Fn` closure with a `&mut` in an upvar's type is a shared view
+of a holder (step 3e). `copy` iff every upvar type is `Copy`, wherever its type arguments are;
+`drop` always; a destructor iff an upvar's type has one, which the drop reads from the
+struct's field types as for any struct with visible fields. A by-value call spells its
+closure `copy g` where it is the last use, so a copy the unit cannot state to be one, of
+a closure that is not `Copy` or that mentions a type parameter, is a move.
+
+**A closure passed to a generic.** Proposed, for decision: `Fn*` evidence as function
+values, Move Prover style (`ensures result == result_of<f>(…)`), with the user
+spelling `ensures_of<F>(f, x, result)`. `apply<F>` exports with an evidence binder
+derived from the body's `<F as Fn<(u32,)>>::call`, since rustc type-checked the
+obligation and #161892 blocks only declaring bounds; a call site instantiates it with
+the closure body as a nullary function value. Open: a generic that only passes `F` on
+to another generic needs its callee's evidence, so derivation is a fixed point over
+the crate. Library combinators get contracts with the bound declared as data; `Map<I, F>`
+is a modeled struct like step 3c's `Iter`.
+
+| Stage | Gate |
+|---|---|
+| 1 Closure items, untupled direct calls, printed closure expressions | fixed point and `verify` of a direct call, a once-called closure, a loop in a closure; the differential check covers them |
+| 2 `&mut` and move upvars | `FnMut` over a counter verifies; an `Fn` closure over a `&mut` upvar is rejected |
+| 3 Specifications on closures | `spec call` with a `loop 1` invariant verifies; `no panic` reported on the closure |
+| 4 `Fn*` evidence for own generics | `apply`, `apply_mut`, `apply_once` verify generically; a caller proves the result of a known closure |
+| 5 Library combinators | `Option::map` verifies; a `for` over `iter().map(..)` with an invariant verifies |
+| 6 Function pointers as evidence, then `dyn Fn` | a function pointer verifies; `dyn Fn` rejected at its location until then |
+
+## Step 3e. What ordinary Rust needs next
+
+**Two-phase borrows.** `v.push(v.len())`. The exporter maps
+`MutBorrowKind::TwoPhaseBorrow` mechanically to the profile borrow kind `rustTwoPhase`, and
+a copy of a `&mut` into a temporary to `rustReferenceCopy`, since optimized MIR spells
+`add(h.r, *h.r)` as `_7 = copy h.r` used once at the call. The runtime gives neither any
+meaning, so a survivor is rejected. Before structurization (`Import/TwoPhase.lean`) each is
+minted at its temporary's one use, when that is an operand and nothing between changes what
+its place names or lends it: a written, moved or mutably borrowed place overlapping it (a
+prefix of it or an extension, distinct fields being disjoint), or an index local of it.
+Otherwise it is rejected at its location, `VIR-RUST-TWO-PHASE`, since a write of a deref's
+base local between would change which place the borrow names. A reference copy that is not
+an operand's one use is the plain reborrow it reads as, at the copy. Reads between see the
+lender's old value, because the prophecy enters the slot only at activation, and the folded
+unit is re-checked by the borrow analysis. It renders as `let _5 := len(&c); add(&mut c, _5)`.
+
+**Mutable unsize of a whole array.** Deferred; `VIR-SEMANTIC-BORROW-UNSIZED-HOLE` stays,
+which is sound. A hole at the array place is no obstacle, since `unsize` is the projection
+`subslice 0 0 true` a borrow can strip. What blocks it is the length guard, "the write-back
+has no derivation when the length differs", which the current runtime cannot state:
+
+- Settling is total. `settleLoans`, `applyWriteBack` and `applyPendingWriteBack` always
+  produce a state; a fill that fails falls through to `pending`, and
+  `resolveReturnedBorrows` uses `.getD`.
+- `fillHole?` cannot check a length: `.loanHole loan` holds only the loan, and a hole may
+  be filled from another frame through `pending`. `HasType.hole` needs the referent's type
+  and `HasType.vector` has `length_matches`, so a fill at an array slot needs the size.
+- `&mut [T]` and `&mut Vec<T>` share the VIR type `&mut Vector<T>`, so a length change
+  through the slice cannot be ruled out statically. Rustc rules it out, but authored VIR
+  can write `push(&mut unsize a, 1)` or call a callee that assigns `*v`.
+
+The options, each changing the semantics and its proofs (`Semantics` holds 65 `fillHole?`
+and 191 `loanHole` mentions); the estimate for A is a few hundred lines of proof:
+
+- A, the likely choice: `RuntimeState` gets `sizedLoans` and a `refused` flag. The loan's type
+  is the array, so `HasType.hole` stays; a new rule types the borrow's current at the slice.
+  Every fill site checks the size, and a mismatch leaves the hole and sets the flag. The
+  final `run` rule and the interpreter require `refused = false`, beside `hole_free`, so a
+  mismatched run has no complete derivation. It touches `Operations` (5 fill sites),
+  `LoanTyping`, `LoanRenaming*`, `Preservation`, `BigStep` and `Interpreter`.
+- B: `.loanHole` carries an optional length, or a new array-hole constructor. The fill
+  checks locally, but every `loanHole` match changes and a failed fill still needs the flag.
+- C: settling becomes partial (`settleLoans?`, with `BigStep` premises): no derivation at
+  the step itself, the most faithful and the most expensive.
+- D, rejected: dropping `length_matches` with no runtime guard. With the prophecy at the
+  array type (`current = arrayVector π`) a length-changing path is vacuous while the run
+  returns, so `compileFunction_agrees` would be false for authored VIR.
+
+The denotation is the same under A, B and C. A mutable `subslice` stays rejected in all of
+them, as does the `t @ ..` of `mutable_subslice_errors`. A loan of `&mut v[a..b]` is a later stage: the whole vector with the subrange as
+current, spliced back at death under the same guard.
+
+**Shared views of a holder.** A shared observation erases loans: `&T` denotes
+`erase T`, with `erase (ref σ) = erase σ` and structural elsewhere, replacing the
+`refFree` test in `ntyOfFuel`. The runtime's shared borrow yields `value.observe`, so a
+callee holds no `borrow` and its frame exports nothing, and `HasType.shared` types the
+observation at the erased referent; `erase` is the identity on reference-free types, so
+Move is untouched. Every dereference under a shared dereference is shared. The
+certificate does not change: a shared borrow mints no loan, and an observation is not a
+holder. In a clause `it.s` is the current value; `final` of a nested reference through
+a shared view is rejected by name.
+
+The typing rule `HasType.observed` admits such a value at `&mut σ` when it is neither a
+live borrow nor a hole. A retired borrow leaves `RuntimeValue.retired`, typed only at
+`&mut σ` by `HasType.dead`, so a unit under a view is a real `()`, for `&mut ()` as for a
+generic `T` at `()`. A shared dereference is stuck on a live value, which `retired` counts
+as; a shared borrow is stuck on a value holding a hole. Validation excludes each: a view
+of a holder is a use of it, so the analysis keeps the holder's loan live until then and a
+write of the lender before it conflicts; a move out of the holder is a reborrow through
+it, which a view conflicts with while the moved reference lives; and a mutable borrow or a
+write under a view targets an immutable place. `retired` never leaves a function: a
+result holding a loan keeps it live, so a write of the lender before the return conflicts.
+A nominal holding a view at its own type arguments (`struct S<'a, T> { v: &'a T }` at
+`T := &mut u8`) reads its fields at them, since `.subst` of a declared row cannot erase below
+`.param`: `ntyOfFuel` carries the type arguments of its scope, a nominal's fields are read at
+its own, and its native type is `S [&mut u8] [u8]` (`SourceVerify/generic_views.rs`). The
+arguments are not what its values hold, so such a type is `refFree`, and a frame's reading of a
+required type is at its parameters' types (`frameNty` in `Coherent`), not a substitution. A generic
+contract transfers to `θ` exactly when `θ` is `refFree` and reading at `θ` agrees with substituting
+it (`CompileNamespace.transfers`), over the callee's signature, locals, contract and body and,
+transitively, what it calls; such a call is `callGeneric`, any other `callInstance`.
+A shared reference holds no loan, so validation lets it move out of an aggregate. A clause
+reads a view a field or a local holds whole, what it holds as current (`NTy.unerase`), as a
+parameter's, and `*copy(p)` lowers to the place `*p`, which the erased deref reads.
+Import folds a reference copy through a shared view, only dereferenced, into the place it
+reads (`Import/TwoPhase.lean`), since a view holds nothing a reborrow could lend. A write
+through the copy is not folded: the copy stays a reborrow, and validation rejects it.
+
+| Stage | Gate |
+|---|---|
+| 1 Erased observations | `idx_len_field`; `fn len(&self)` on a `&mut Vec` holder; a `&mut self` method calling it; `let v = &r` with `r : &mut`; the differential check covers them |
+| 2 Observations in aggregates and closures | `Option<&S>`, a struct holding `&S`, an `Fn` closure over a `&mut` upvar, `iter()` on a `&mut`-holding wrapper driving a loop |
+
+**`Box` and recursive types.** Box is its content, as in Aeneas and Creusot:
+`@[model(T)] opaque struct Box {T} {A}`, a model case aliasing the table entry to the
+argument's type. A `Place::Deref` whose base is an identity-modeled nominal is its base,
+at import, read from the place's type (`Library.applyModels`). `Box::new`, `as_ref` and
+`as_mut` are library natives.
+
+Optimized MIR has no such deref, since `ElaborateBoxDerefs` has run: `*b` reads
+`p = copy (b.0.0) as *const T (Transmute)`, one pointer per use, behind a reference first
+`t = copy *r`, and a box whose content moved out is freed by `f = &mut b; <Box<T> as
+Drop>::drop(move f)`. The exporter undoes exactly that shape (`BoxFolds`), by the box's
+language item: a single-assignment pointer used only by derefs, with the box's local
+unchanged from its assignment to each use. Anything else stays an unsupported raw
+pointer. It erases the free, which only releases the allocation, only for a box whose
+content a folded pointer reads; a drop of the content stays a drop, so a destructor it
+reaches is rejected whole or behind the flag of a move out (`box_destructor_errors`). The
+pointer checks of a dereference are pinned off (`doc/status/assumptions.md`).
+
+The exporter states a destructor where a `Drop` impl is direct and where an opaque ADT's
+hidden fields reach one or hold a parameter, which import cannot see. What a visible
+field reaches is read from its type after models apply, so `Box<Guard>` reaches `Guard`
+and `Box<u32>` nothing. An opaque type hiding a box counts as having a destructor,
+which is conservative.
+
+A recursive nominal is carried by the family, since `NTy` has no binder and no recursive
+type has a carrier in its universe: `NTy.nominal source arguments productive` for a declaration
+whose rows reach itself, carried by `Carriers.nominals`, with a codec to
+`RuntimeValue.nominal`, `fold`/`unfold` with their inverses, and `size` decreasing to
+children. A runtime instance needs no generation; a generated inductive per recursive
+group is the cost step, Aeneas's translation. `Proj` gets a step `unfold`, then today's
+`variant`/`field`, and the normal form adds `unfold (fold v) = v` and injectivity. A
+recursive spec function defaults to the family's `size` as its measure. A recursive type
+holding `&mut` is rejected, since `referencePaths` would be infinite; `&mut` to a
+recursive value is fine. Polymorphic recursion is a precise export error, by memoizing
+`intern_instantiated_fields` on `(adt, arguments)`, which today hangs.
+
+| Stage | Gate |
+|---|---|
+| 1 Box as its content | `Box::new`, `*b` read and move, write through `&mut *b`, drop; fixed point; the differential check covers them |
+| 2 Recursive declarations | `List` constructed and matched by value and by reference; `len` verifies against a recursive `seq`; `destructors::list` and `::plain` leave the known list |
+| 3 `&mut` into recursive values, cursors over `Option<Box<Node>>` | `push_back` with `ensures seq(l) == seq(old(l)) ++ [x]`; a tree insert |
+| 4 Generated carriers per recursive group | same fixtures; heartbeats below the runtime instance |
+
+Stages 2 and up are open. Until then a function whose local or result has a recursive
+type has no denotation, and other functions of the unit are unaffected. Stage 2 is estimated, from counts of the
+`.param` and `.function` arms and `Proj` sites and not from a build, at about 3000 new lines,
+mostly proofs in the lowest modules: 45 arms over `NTy` in `Denote/Types.lean` plus about 15
+new declarations; about 70 mentions across `NativeMaps`, `GlobalTyping`, `FunctionValues`,
+`Resources`, `Invocation`, `Closures`, `Behavior`; new cases in `Compile`, `Term` and
+`Solve/Normal`; 18 `Proj` sites and agreement; the clause translator and a default measure.
+Each edit of `Types.lean` rebuilds nearly all of `verex-ir`.
+
+`Proj.unfold` needs no unit: `Proj.unfold (body : NTy) (rest : Proj body σ)` reads and
+writes through the codecs, `body.codec.decode? (nominal.encode v)` and back, both `Option`
+already, so agreement follows from tightness, the compiler checks that `body` is the
+declaration's rows at the arguments, and the family's `fold`/`unfold` laws serve only the
+normal form.
+
+Inhabitants. `productive : Bool` is computed by `ntyOf` from the unit, as a least fixpoint
+over the recursive group with parameters assumed inhabited, and
+`NTy.inhabitable (.nominal _ args p) := p && args.inhabitable`. `inhabitable` stays
+family-free, so `TypeArgs`, `Carriers.instantiate` and their theorems stay as they are. The
+runtime carrier is `{ v // NTy.admits unit τ v = true }`: `struct Inf(Box<Inf>)` has an empty
+carrier, as in Rust, and `Option<Inf>` carries only `None`. `.enum` inhabitability reads only
+the first variant (`NRows.firstInhabitable`), so `Option<List>` is inhabitable at any `List`,
+and the same rule wrongly refuses `Result<Void, E>`.
+
+`admits` is exact on every typed type, not on all types. Since `inhabitable` reads neither
+family nor unit, `.nominal s a true` must have a value even where the flag is not the unit's
+productivity, and `admits_encode` is universal. So a flag of `true` adds one point,
+`witnessOrUnit unit s a`, beside the values of the rows: the witness when the rows have one,
+else `.unit`. The invariant `productiveWitness? unit source args = some v → NTy.admits unit
+(.nominal source args true) v = true` makes that point redundant where the flag is right, and
+the `.nominal` constructor of `TypedAs` has the rule "flag = the unit's productivity at the
+type's arguments" as its own premise, not only `ntyOf`. A substitution keeps the flag, and
+keeps the rule because `TypeArgs` are inhabitable, which `struct W<T>(T)` at an empty `T` is not. This keeps a wrong-flag point away from every hypothesis over
+typed types, `OwnersRepresentable` above all, which is assumed over every admitted value, so
+that a point it could not represent would make every theorem of the unit vacuous.
+
+| Step of stage 2 | Content |
+|---|---|
+| 1 | `NTy.nominal`, every exhaustive `NTy` arm and its proof; `nominalBody?`, `productiveWitness?` and `admits` in `Types.lean`; nominal fields of `Carriers` bundled as `TypedNominals`; the runtime instance `RuntimeNominal`. `ntyOf` produces no `.nominal`, so no baseline moves |
+| 2 | `Denote/Nominal.lean`: the witness invariant; the rule above as a premise of `TypedAs`'s `.nominal` constructor |
+| 3 | `ntyOf` produces `.nominal` with its flag; `Proj.unfold`, `Compile`, `Term`, `Solve.Normal`, `List` fixtures; `.nominal` stops being `notCarried`; `admits` exact on every type `ntyOf` gives, by that premise |
+| 4 | Clause translator, `size` measure, `len` and `seq` |
+
+A family's nominal fields are bundled in `Carriers`; a per-unit class waits for stage 4's
+generated carriers.
+
+Step 1 leaves these for step 2 or 3 to make sound before `ntyOf` produces `.nominal`. Step 2:
+that `TypeArgs` being inhabitable keeps the rule under substitution, which needs inhabitable
+to imply a witness; that `typeFuel` suffices for the witness search, or the flag is tied to the
+same search, since a productive type whose search runs out gets the `.unit` point. Step 3:
+`carriesInvariant` and `owns` read only the source and arguments, so they can miss an invariant
+or a destructor in the rows; `heldFunctionTypes` returns nothing for a nominal; `refFree` reads
+only the arguments, relying on rejecting a recursive type holding `&mut`; `NTy.equal` with
+handles compares by `eraseGhosts`, so a map in the rows compares by entries; a closure capturing
+a nominal is rejected (`capturedUnsupported?`). `fold`, `unfold` and `size` are still to add to
+`TypedNominals`.
+
+Not yet: `Box<dyn Trait>`; termination of recursive functions; `Rc` and `RefCell`
+(`interior-mutability.md`). `HashMap` and `BTreeMap` as models over the intrinsic map
+value are not designed.
+
+**Library specification functions.** A `spec fun` is a fourth item kind of a library
+file, kept when a kept contract or a user clause names it, spliced in its scope like a
+contract, so a clause writes it by path (`u32::pow(x, n)`). It is a definition, so nothing
+trusts it; only contracts stating with it are trusted.
+
+**Strings.** `String` stays `@[model(string)]`: a `vector u8` model would make every
+clause a byte computation. Stage 1 adds `stringConcat`, `stringBytes` and `charEncode`,
+with `push_str`, `push` and `as_bytes` contracts in those terms. `from_utf8` and `chars`
+as a step 3c iterator model are stage 2.
+
+**Which MIR is verified.** The exporter pins `-Copt-level=0` and `-Zub-checks=no`, so a
+source has one MIR whatever the user's profile. A function holding a promoted is refused, as any body-level
+export failure, since Rustc Public cannot read `promoted_mir`.
+`-Zmir-enable-passes=-PromoteTemps` removes promoteds but rustc then rejects 28 of 180
+crates measured, and a fallback would verify different programs depending on an unrelated
+line, so it is not the default.
+
+**What stops real crates after per-function refusal.** First stop over 180
+dependency-free registry crates: a local of `dyn` type 49, raw pointer 22, `impl Trait`
+parameter 19, associated type alias 12, float 9, const parameter in a signature 8; 27
+export, with 104 of their 383 functions refused. A local's type is read by no other
+function, so a body stating a type the unit cannot is refused. A signature the unit cannot
+state, by a type, a struct field it reaches, an associated type of a parameter or a const
+parameter, makes the function opaque: it is reported, and every caller is refused whatever
+its contract. An `impl Trait` parameter is a generic parameter.
+
+The limit: such a function has no contract, not even an authored one, so a generic iterator
+adapter and everything calling it stay unverified. Per-function binders for associated types,
+as a dependency's signature has them, would not help yet, since these bodies are mostly
+refused for lack of trait evidence. Revisit both when trait evidence is available
+(rust-lang/rust#161892).
 
 ## Step 5. A Rust benchmark
 
@@ -401,11 +997,28 @@ Rust counterparts of Move benchmark problems (`math64`, `bit_vector`,
 `rust` problems in `bench/problems.toml`, so coverage and cost are tracked
 on the same algorithms in both languages.
 
+`rust_math64`, `rust_bit_vector`, `rust_simple_map` and `rust_lower_bound` are in
+`bench/problems.toml`. Writing them as a Rust programmer would found what stops
+real code, by how much it blocks:
+
+| Stops | Construct | Where |
+|---|---|---|
+| Most functions | `assert!`, `panic!`, `expect`, `debug_assert!`, `assert_eq!`, `static` | export: constant types |
+| Most crates | `const` items, `u64::MAX` | export: `Unevaluated` |
+| Most loops | `iter_mut`; `.iter()` in a generic body | step 3b; upstream, see "Iterators" |
+| Comparators | `a.cmp(&b)`, negative discriminants | rendering does not re-import |
+| Iterator chains | closures | export |
+| Error handling | `?` | export: `Option<Infallible>` |
+| Generic containers | `K: PartialEq` | trait evidence, upstream |
+
+`add`, `remove` and `borrow_mut` of `simple_map` need proof steps: a vector update
+under a uniqueness invariant is not automatic.
+
+
 ## Order
 
 Steps 1 and 2 complete M2's contracts-and-verify item for the slice without
-traits, on free functions. Step 3 opens with the `mod` item, which methods and
-dependencies need, and moves M6's library models before M3–M5, because safe Rust
+traits. Step 3 moves M6's library models before M3–M5, because safe Rust
 code needs `Option`, `Result` and `Vec` before it needs references inside
 ADTs or drop effects. Step 4 completes M1.5 for verification. M3 (regions
 over the prophetic model), M4 (drops and panics), trait evidence (M2, after
@@ -448,13 +1061,10 @@ identities and the crate driver do not depend on that work.
    `aborts_if` restricted to the failure kind `panic`, as a code restricts
    it to an abort code. Whichever is chosen, the two designs and this plan
    say it alike.
-3. Mutable references in aggregates. `rust-mir-design.md` says reference-bearing values need
-   nothing special, because borrows nest as values nest, and schedules them in
-   M6. That holds of the runtime; the
-   denotation rejects them, and `Option<&mut T>`, `get_mut` and `iter_mut` need
-   them. The borrow analysis is the other half: Move structs have no reference
-   fields, so only Rust fixtures exercise its nominal paths, it does not model
-   nominal variance, and rustc's check is admission evidence only, so the
-   analysis can reject what rustc accepts. Proposed: a step after step 3, opening
-   with a measurement of which fixtures rustc accepts and the analysis rejects;
-   the denotation of a loan held in an aggregate follows from what that shows.
+
+## Decided
+
+- Mutable references in aggregates are step 3b.
+- A cast in a Rust clause stays rejected. Specification arithmetic never wraps
+  (`verex-sl.md`), and a Move cast to `num` prints as the operand, so a wrapping
+  cast in a clause would be the one exception; a clause writes `x % 256`.

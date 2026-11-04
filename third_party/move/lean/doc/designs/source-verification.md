@@ -174,6 +174,29 @@ spec max where
 The items are spliced into the rendered namespace, indented one level, so
 they may name every declaration of the crate.
 
+The standard library's contracts are VerexSL items too, in
+`verex-rust/lib/<crate>/*.spec.lean`: scopes, contracts and models, one to a
+line, nested by indentation. Those of the functions a unit declares are spliced
+into the namespace of their crate, each file with its lines kept, and each is a
+`native_f` hypothesis of the theorems reaching it; a contract at a shape comes only
+for a call naming what the shape names. A namespace follows those its spliced
+items name. A model (`@[model(vector T)] opaque struct Vec {T} {A} where`) is read by
+the import, which rewrites the raw unit before validation: every use of the type is
+the VIR type, the declaration is dropped, its scope stays a name, and what only the
+type reached goes with it. A model with fields (`@[model] struct Iter {a : lifetime}
+{T} where`, its fields deeper than it) instead puts them in the opaque declaration,
+which then states no destructor.
+
+A Rust file has no in-body specifications, so a `spec` block states a loop's
+invariants as a `loop k where` member ([`verex-sl.md`](verex-sl.md), "Function
+contracts"). The rendering keeps the imported body, lowering places the
+conditions in the loop, and a failed invariant is reported at its clause in
+the specification file. A number counts the rendering's loops, which are the
+ones with a back edge in rustc's MIR, in the rendering's order: rustc removes
+`loop { …; break; }` and `while false`, and `if !c { A } else { B }` renders
+as `if c then B else A`. The invariants name the loop's source locals; a local
+rustc removed or renamed is an error at the clause.
+
 `verex-rust verify <Cargo.toml> --package <name>`, with the other arguments
 of `import-crate`, verifies a package's library crate. The crate is one
 namespace and its modules are scopes of it ([`vir-design.md`](vir-design.md)).
@@ -505,6 +528,12 @@ natively, and a message is mapped by the first rule that applies:
    `spec` item, so a failed function's summary lands on the source's `spec`
    block.
 3. A position outside every aligned node stays in the generated file.
+
+A failed `no panic` or `no abort` names its failing site's source position in
+its text, so the verifier reads it while it elaborates: the driver hands it the
+source's unit, whose body runs the sites of each shape in the same order as the
+rendering's, whatever temporaries the rendering folds, where rule 2 stops at
+the first temporary. A body where they differ keeps the rendering's position.
 
 ## Budgets
 

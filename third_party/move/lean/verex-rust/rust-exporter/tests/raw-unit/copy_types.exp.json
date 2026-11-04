@@ -976,14 +976,47 @@
           "name": {
             "index": 6
           },
-          "properties": [
+          "properties": [],
+          "variants": [
             {
-              "payload": "",
-              "profile": "rust",
-              "tag": "struct.opaque"
+              "discriminant": 0,
+              "fields": [],
+              "loc": {
+                "index": 16
+              },
+              "name": {
+                "index": 7
+              }
+            },
+            {
+              "discriminant": 1,
+              "fields": [
+                {
+                  "doc": "",
+                  "loc": {
+                    "index": 16
+                  },
+                  "name": {
+                    "index": 9
+                  },
+                  "type": {
+                    "loc": {
+                      "index": 16
+                    },
+                    "typeId": {
+                      "index": 2
+                    }
+                  }
+                }
+              ],
+              "loc": {
+                "index": 16
+              },
+              "name": {
+                "index": 8
+              }
             }
-          ],
-          "variants": []
+          ]
         }
       ],
       "traits": []
@@ -1007,7 +1040,7 @@
         ]
       ],
       "profile": "rust",
-      "version": 2
+      "version": 5
     }
   ],
   "tables": {
@@ -1328,6 +1361,33 @@
         "scope": [
           "option"
         ]
+      },
+      {
+        "name": "None",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "Some",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "0",
+        "namespaceId": {
+          "index": 1
+        },
+        "scope": [
+          "option"
+        ]
       }
     ],
     "namespaces": [
@@ -1456,6 +1516,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 7
+    "minor": 9
   }
 }

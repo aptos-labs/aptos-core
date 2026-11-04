@@ -42,6 +42,11 @@ structure ProfileSchema where
 
 abbrev ProfileRegistry := Array ProfileSchema
 
+/-- The Rust profile's property of a nominal whose drop runs a destructor
+whatever its type arguments are: it or a nominal its fields reach has a `Drop`
+impl. -/
+def destructorTag : String := "struct.destructor"
+
 /-- Resolve a profile configuration by semantic identity. Extension IDs are
 positional; the two known profiles are named directly and may occur anywhere
 in the configuration table. -/

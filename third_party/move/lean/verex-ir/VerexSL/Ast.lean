@@ -173,6 +173,9 @@ inductive SpecificationOperation where
   | lengthVector
   | indexVector
   | sliceVector
+  | stringConcat
+  | stringBytes
+  | charEncode
   | bitVectorToInt
   | intToBitVector
   | inRange
@@ -318,6 +321,13 @@ def BindingPattern.span : BindingPattern → Span
   | .wildcard span | .variable _ span _ | .literal _ span | .tuple _ span |
       .constructor _ _ _ span => span
 
+structure Parameter where
+  name : String
+  type : Located Ty
+  mutable : Bool := false
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
 mutual
 inductive Expr where
   | unit (span : Span := {})
@@ -337,6 +347,13 @@ inductive Expr where
   last captured one, `none` for one supplied at invocation. -/
   | closure (name : Array String) (types : Array (Located Ty)) (result : Located Ty)
       (captures : Array (Option Expr)) (span : Span := {})
+  /-- A Rust closure expression: the struct `name` of its captures and the body
+  `function` in the struct's scope. `lower` makes them items of the enclosing
+  module and leaves the construction here. -/
+  | closureItem (name : String) (generics : Array GenericBinder) (abilities : Array Ability)
+      (captures : Array (String × Located Ty × Expr)) (function : String)
+      (functionGenerics : Array GenericBinder) (parameters : Array Parameter)
+      (result : Located Ty) (body : Expr) (span : Span := {})
   | invoke (callable : Expr) (arguments : Array Expr) (span : Span := {})
   | genericCall (name : Array String) (types : Array (Located Ty))
       (arguments : Array Expr) (span : Span := {})
@@ -374,6 +391,11 @@ inductive Expr where
   | updateField (value : Expr) (field : String) (replacement : Expr) (span : Span := {})
   | discriminant (owner result : Located Ty) (value : Expr) (span : Span := {})
   | placeOperation (operation : PlaceOperation) (place : Expr) (span : Span := {})
+  /-- A place as the variant it names, which a field selection reads. -/
+  | downcast (place : Place) (span : Span := {})
+  /-- The whole of a fixed vector place as a dynamic one, which only a borrow
+  reads. -/
+  | unsize (place : Expr) (span : Span := {})
   | borrowPlace (mutable : Bool) (place : Place) (span : Span := {})
   | dropPlace (place : Place) (span : Span := {})
   | borrowValue (mutable : Bool) (value : Expr) (span : Span := {})
@@ -445,7 +467,7 @@ def Expr.span : Expr → Span
       .index _ _ span |
       .membership _ _ span | .variantTest _ _ span | .selectVariants _ _ _ span |
       .testVariants _ _ _ span | .discriminant _ _ _ span | .updateField _ _ _ span |
-      .placeOperation _ _ span | .block _ _ span |
+      .placeOperation _ _ span | .downcast _ span | .unsize _ span | .block _ _ span |
       .borrowPlace _ _ span | .dropPlace _ span | .borrowValue _ _ span |
       .rawBorrowValue _ _ span |
       .freezeReference _ _ span |
@@ -457,16 +479,10 @@ def Expr.span : Expr → Span
       .ifElse _ _ _ span | .match_ _ _ span |
       .forRange _ _ _ _ span |
       .loop _ span _ | .break_ _ span _ | .continue_ span _ |
+      .closureItem _ _ _ _ _ _ _ _ _ span |
       .assign _ _ span | .assignExpression _ _ span | .rawAssignExpression _ _ span |
       .assignPattern _ _ _ span |
       .return_ _ span | .throw_ _ _ span => span
-
-structure Parameter where
-  name : String
-  type : Located Ty
-  mutable : Bool := false
-  span : Span := {}
-  deriving Repr, BEq, Inhabited
 
 inductive Visibility where
   | private_
@@ -549,6 +565,23 @@ def SourceAttribute.name : SourceAttribute → String
 def SourceAttribute.span : SourceAttribute → Span
   | .call _ _ span | .assign _ _ span => span
 
+/-- The conditions a `spec` item states of one of its function's loops. -/
+structure LoopSpecification where
+  /-- The loop's number among the function's loops in source order, from 1. -/
+  number : Nat
+  conditions : Array (SpecificationConditionKind × Expr)
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
+/-- A contract at a shape of a function's generics: its types mention the
+shape's variables, which its clauses read at the function's signature there. -/
+structure ShapeContractDecl where
+  arguments : Array (Located Ty)
+  contract : Array ContractClause := #[]
+  pragmas : Array Pragma := #[]
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
 structure FunctionDecl where
   name : String
   modifiers : FunctionModifiers := {}
@@ -559,8 +592,16 @@ structure FunctionDecl where
   contract : Array ContractClause := #[]
   /-- The `spec` item the contract was declared in. -/
   contractSpan : Option Span := none
+  /-- The conditions the `spec` item states of the body's loops, which
+  lowering places in them. -/
+  loopSpecifications : Array LoopSpecification := #[]
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
+  /-- Its contracts at shapes of its generics, in source order. -/
+  shapes : Array ShapeContractDecl := #[]
+  /-- Only the contract of a closure's body, which a closure expression
+  declares; `lower` joins the two. -/
+  contractOnly : Bool := false
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -609,6 +650,12 @@ structure FieldDecl where
 
 structure StructDecl where
   name : String
+  /-- A dependency's type whose shape the crate does not see (`opaque struct`):
+  it is named, and neither constructed nor destructured. -/
+  isOpaque : Bool := false
+  /-- The struct of a closure expression's captures, with the path of the function
+  the expression stands in. -/
+  closureParent : Option (Array String) := none
   generics : Array GenericBinder := #[]
   fields : Array FieldDecl := #[]
   abilities : Array Ability := #[]
@@ -651,6 +698,15 @@ structure NamespaceInvariantDecl where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
+/-- What a naming scope names: `mod`, a module; `impl`, the type of an inherent
+impl; `trait`, a trait; `trait impl`, a trait impl. -/
+inductive ScopeKind where
+  | module
+  | inherent
+  | implementation
+  | trait
+  deriving Repr, BEq, Inhabited
+
 inductive Item where
   | constant (declaration : ConstantDecl)
   | struct (declaration : StructDecl)
@@ -659,7 +715,26 @@ inductive Item where
   | specFunction (declaration : SpecFunctionDecl)
   | lemma (declaration : LemmaDecl)
   | namespaceInvariants (declarations : Array NamespaceInvariantDecl)
+  /-- One block of a naming scope; further blocks reopen it. -/
+  | scope (name : String) (kind : ScopeKind) (items : Array Item) (span : Span)
   deriving Repr, BEq, Inhabited
+
+/-- The first result of `find` on an item directly in `scope`, a path relative
+to `items`, across every block that opens it. -/
+partial def findInScope (items : Array Item) (scope : List String)
+    (find : Item → Option α) : Option α :=
+  items.findSome? fun
+    | .scope name _ nested _ => match scope with
+        | head :: rest => if name == head then findInScope nested rest find else none
+        | [] => none
+    | item => if scope.isEmpty then find item else none
+
+/-- Every declaration of `items` with the scope it is in, in source order. -/
+partial def scopedItems (items : Array Item) (scope : Array String := #[]) :
+    Array (Array String × Item) :=
+  items.flatMap fun
+    | .scope name _ nested _ => scopedItems nested (scope.push name)
+    | item => #[(scope, item)]
 
 /-- Another namespace granted privileged (`friend`) access to this one. Move
 spells this as a module-level `friend` declaration; other profiles map it onto

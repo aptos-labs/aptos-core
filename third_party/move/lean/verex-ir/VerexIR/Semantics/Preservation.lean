@@ -267,12 +267,40 @@ theorem settleLoans_instantiation (ended : Array LoanId) (frame : RuntimeFrame)
       exact same
     · exact same
 
-theorem settleAfter_instantiation (ended : Array LoanId) (control : Control)
+theorem retirePlace_instantiation (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (frame : RuntimeFrame) (state : RuntimeState) (place : LocalId × List LoanProjection) :
+    (retirePlace unit ns frame state place).1.typeInstantiation = frame.typeInstantiation := by
+  unfold retirePlace
+  split
+  · split
+    · rw [applyWriteBack_instantiation, clearBorrowValue_instantiation]
+    · rfl
+  · rfl
+
+theorem settleDeaths_instantiation (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ended : Array LoanId) (places : Array (LocalId × List LoanProjection))
     (frame : RuntimeFrame) (state : RuntimeState) :
-    (settleAfter ended control frame state).1.typeInstantiation = frame.typeInstantiation := by
+    (settleDeaths unit namespaceId ended places frame state).1.typeInstantiation =
+      frame.typeInstantiation := by
+  have settled := settleLoans_instantiation ended frame state
+  unfold settleDeaths
+  dsimp only
+  split
+  · refine Array.foldl_preserves
+      (fun (pair : RuntimeFrame × RuntimeState) =>
+        pair.1.typeInstantiation = frame.typeInstantiation) _ _ _ settled fun _ _ _ same => ?_
+    rw [retirePlace_instantiation]
+    exact same
+  · exact settled
+
+theorem settleAfter_instantiation (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ended : Array LoanId) (places : Array (LocalId × List LoanProjection)) (control : Control)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    (settleAfter unit namespaceId ended places control frame state).1.typeInstantiation =
+      frame.typeInstantiation := by
   unfold settleAfter
   split
-  · exact settleLoans_instantiation ended frame state
+  · exact settleDeaths_instantiation unit namespaceId ended places frame state
   · rfl
 
 theorem writeRuntimePlace?_instantiation {frame frame' : RuntimeFrame}
@@ -1251,8 +1279,8 @@ theorem borrowRuntimePlace?_instantiation {unit : ValidatedUnit} {ns : Validated
     split at borrow
     · cases borrow
     obtain ⟨read, -, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-    simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-    rw [← borrow.1]
+    obtain ⟨rfl, -, -, -⟩ := RuntimeValue.view?_map_some borrow
+    rfl
   | mutable =>
     simp only [borrowRuntimePlace?, Option.bind_eq_bind, Option.bind_some] at borrow
     split at borrow
@@ -1452,6 +1480,7 @@ theorem HasType.mutable_current {unit : ValidatedUnit} {loans : LoanTypes} {loan
     HasType unit loans current referent := by
   cases typed with
   | borrow _ _ _ _ current_typed => exact current_typed
+  | observed _ _ settled _ => simp [RuntimeValue.live] at settled
 
 theorem updateBorrowValue?_instantiation {frame frame' : RuntimeFrame}
     {state state' : RuntimeState} {loan : Nat} {replacement : RuntimeValue}
@@ -1591,9 +1620,19 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
           obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
           exact ⟨loans, .refl _, running.of_typed (running.typed.clear _) rfl, stateTyped,
             value_typed⟩
-        · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
-          obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
-          exact ⟨loans, .refl _, running, stateTyped, value_typed⟩
+        · cases read with
+          | borrow loan held =>
+              simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
+              obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+              obtain ⟨cleared, clearedState⟩ :=
+                clearBorrowValue_typed (loan := loan) running.typed stateTyped
+              exact ⟨loans, .refl _,
+                running.of_typed cleared (clearBorrowValue_instantiation _ _ _), clearedState,
+                value_typed⟩
+          | _ =>
+              simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
+              obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+              exact ⟨loans, .refl _, running, stateTyped, value_typed⟩
       · cases evaluate_eq
   | borrow kind place =>
       simp only [Context.checkOperation, Bool.and_eq_true] at checked
@@ -1748,10 +1787,9 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                         simp only at evaluate_eq
                         split at evaluate_eq
                         · cases evaluate_eq
-                        · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
-                          obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
+                        · obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate_eq
                           exact ⟨loans, .refl _, running, stateTyped,
-                            .shared _ _ typed.mutable_current⟩
+                            .shared _ _ (typed.mutable_current.observe holeless)⟩
                       all_goals simp at evaluate_eq
                     · cases evaluate_eq
               all_goals simp at checked
@@ -1813,9 +1851,8 @@ theorem Running.placeOperation {unit : ValidatedUnit} {executable : ExecutableUn
                 simp only [beq_iff_eq] at checked
                 subst checked
                 rw [evaluatePlaceOperation?_sharedBorrow] at evaluate_eq
-                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate_eq
-                obtain ⟨rfl, rfl, rfl⟩ := evaluate_eq
-                exact ⟨loans, .refl _, running, stateTyped, .shared _ _ typed⟩
+                obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate_eq
+                exact ⟨loans, .refl _, running, stateTyped, .shared _ _ (typed.observe holeless)⟩
           case mutable =>
             rw [show evaluatePlaceOperation? unit context.ns (context.ns.typeId expression.typeId) exprId
               (.reference (.borrow .mutable)) values.toArray frame state = none from rfl]
@@ -1958,17 +1995,21 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     intro namespaceId frame state exprId startFrame startState nodeFrame nodeState control
       finalFrame finalState before_eq node_step after_eq ih
     intro loans inert context fuel placed checked running stateTyped
-    have settled := settleLoans_typed
-      (ended := (loanDeathsAt unit namespaceId exprId).before) running.typed stateTyped
-    have kept := settleLoans_instantiation (loanDeathsAt unit namespaceId exprId).before
+    have settled := settleDeaths_typed (namespaceId := namespaceId)
+      (ended := (loanDeathsAt unit namespaceId exprId).before)
+      (places := (deadPlacesAt unit namespaceId exprId).before) running.typed stateTyped
+    have kept := settleDeaths_instantiation unit namespaceId
+      (loanDeathsAt unit namespaceId exprId).before (deadPlacesAt unit namespaceId exprId).before
       frame state
     rw [before_eq] at settled kept
     obtain ⟨loans', extends', nodeRunning, nodeState', typed⟩ :=
       ih loans inert context fuel placed checked (running.of_typed settled.1 kept) settled.2
-    have after := settleAfter_typed
-      (ended := (loanDeathsAt unit namespaceId exprId).after) (control := control)
+    have after := settleAfter_typed (namespaceId := namespaceId)
+      (ended := (loanDeathsAt unit namespaceId exprId).after)
+      (places := (deadPlacesAt unit namespaceId exprId).after) (control := control)
       nodeRunning.typed nodeState'
-    have kept' := settleAfter_instantiation (loanDeathsAt unit namespaceId exprId).after
+    have kept' := settleAfter_instantiation unit namespaceId
+      (loanDeathsAt unit namespaceId exprId).after (deadPlacesAt unit namespaceId exprId).after
       control nodeFrame nodeState
     rw [after_eq] at after kept'
     exact ⟨loans', extends', nodeRunning.of_typed after.1 kept', after.2, typed⟩

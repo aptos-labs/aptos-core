@@ -188,7 +188,7 @@ private partial def placeRoot? (ns : ValidatedNamespace) (placeId : PlaceId)
       some (localId, true)
   | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _) |
       fuel + 1, some (.index base _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) => do
+      fuel + 1, some (.unsize base) | fuel + 1, some (.downcast base _) => do
       let (localId, _) ← placeRoot? ns base fuel
       some (localId, true)
 
@@ -209,7 +209,7 @@ private partial def localStaticPath? (ns : ValidatedNamespace) (placeId : PlaceI
   | fuel + 1, some (.downcast base variant) => do
       let (localId, path) ← localStaticPath? ns base fuel
       some (localId, path.push (.downcast variant))
-  | _, some (.deref _) | _, some (.subslice ..) => none
+  | _, some (.deref _) | _, some (.subslice ..) | _, some (.unsize _) => none
 
 private partial def ownedLocalRoot? (ns : ValidatedNamespace) (placeId : PlaceId)
     (fuel : Nat) : Option LocalId :=
@@ -218,7 +218,7 @@ private partial def ownedLocalRoot? (ns : ValidatedNamespace) (placeId : PlaceId
   | _ + 1, some (.localVar localId) => some localId
   | fuel + 1, some (.field base _ _) | fuel + 1, some (.ghostField base _ _) |
       fuel + 1, some (.index base _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) =>
+      fuel + 1, some (.unsize base) | fuel + 1, some (.downcast base _) =>
       ownedLocalRoot? ns base fuel
   | _, some (.deref _) => none
 
@@ -244,7 +244,7 @@ private partial def placeIndexDiagnostics (ns : ValidatedNamespace) (state : Ini
   | 0, _ | _, none | _, some (.localVar _) => #[]
   | fuel + 1, some (.deref base) | fuel + 1, some (.field base _ _) |
       fuel + 1, some (.ghostField base _ _) | fuel + 1, some (.subslice base ..) |
-      fuel + 1, some (.downcast base _) =>
+      fuel + 1, some (.unsize base) | fuel + 1, some (.downcast base _) =>
       placeIndexDiagnostics ns state loc base fuel
   | fuel + 1, some (.index base index) =>
       let baseErrors := placeIndexDiagnostics ns state loc base fuel

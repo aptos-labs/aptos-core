@@ -13,7 +13,7 @@ use serde_json::Number;
 
 macro_rules! id_type {
     ($($name:ident),+ $(,)?) => {$ (
-        #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+        #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
         #[serde(deny_unknown_fields)]
         pub(super) struct $name {
             pub index: usize,
@@ -61,7 +61,7 @@ pub(super) struct ImportEvidence {
     pub trusted: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum Profile {
     Rust,
@@ -170,7 +170,7 @@ pub(super) enum ScopeKind {
     Trait,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum Ty {
     Unit,
@@ -206,7 +206,7 @@ pub(super) enum Ty {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum Ability {
     Copy,
@@ -215,7 +215,7 @@ pub(super) enum Ability {
     Key,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(
     deny_unknown_fields,
     rename_all = "camelCase",
@@ -240,7 +240,7 @@ pub(super) enum BinderKind {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct GenericBinder {
-    pub abilities: Vec<UnsupportedNode>,
+    pub abilities: Vec<Ability>,
     pub kind: BinderKind,
     pub loc: LocId,
     pub name: String,
@@ -249,7 +249,7 @@ pub(super) struct GenericBinder {
     pub type_: Option<TypeUse>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct ReferenceType {
     pub kind: ReferenceKind,
@@ -258,7 +258,7 @@ pub(super) struct ReferenceType {
     pub referent: TypeId,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) enum ReferenceKind {
     Shared,
@@ -286,7 +286,7 @@ pub(super) enum LifetimeKind {
     Local,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(
     deny_unknown_fields,
     rename_all = "camelCase",
@@ -319,14 +319,14 @@ pub(super) struct ProfileConfig {
     pub version: usize,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct TypeUse {
     pub loc: LocId,
     pub type_id: TypeId,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(
     deny_unknown_fields,
     rename_all = "camelCase",
@@ -334,9 +334,24 @@ pub(super) struct TypeUse {
 )]
 pub(super) enum ConstValue {
     Unit,
-    Bool { value: bool },
-    Character { value: usize },
-    Integer { value: Number },
+    Bool {
+        value: bool,
+    },
+    Character {
+        value: usize,
+    },
+    Integer {
+        value: Number,
+    },
+    String {
+        value: String,
+    },
+    /// A constant the exporter cannot state, described by its type. An import
+    /// pass collapses the diverging regions holding these, and validation rejects
+    /// a survivor.
+    Opaque {
+        description: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -383,8 +398,16 @@ pub(super) enum Operation {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(super) enum ReferenceOperation {
+    /// A shared borrow of a computed value, which is that value.
+    Borrow {
+        kind: BorrowKind,
+    },
     Dereference,
 }
 
@@ -402,10 +425,15 @@ pub(super) enum DataOperation {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(super) enum BorrowKind {
     Immutable,
     Mutable,
+    Profile { value: ProfileValue },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -497,6 +525,9 @@ pub(super) enum Place {
         from_end: bool,
         start: usize,
         stop: usize,
+    },
+    Unsize {
+        base: PlaceId,
     },
     Downcast {
         base: PlaceId,
@@ -692,7 +723,7 @@ pub(super) struct FunctionDecl {
     pub locals: Vec<LocalDecl>,
     pub name: NameId,
     pub origin: OriginId,
-    pub pragmas: Vec<UnsupportedNode>,
+    pub pragmas: Vec<Attribute>,
     pub profile: Profile,
     pub profile_data: Vec<ProfileValue>,
     pub signature: Signature,
@@ -734,7 +765,8 @@ pub(super) struct StructDecl {
     pub variants: Vec<VariantDecl>,
 }
 
-/// A profile-owned value: here the Rust profile's `struct.opaque` property.
+/// A profile-owned value: here the Rust profile's `struct.opaque`,
+/// `struct.destructor`, `function.dependency`, and `function.opaque` properties.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct ProfileValue {

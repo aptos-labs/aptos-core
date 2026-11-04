@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/loop_item_errors.spec.lean:6:3: error: VEREX-SPEC-LOOP: `two_loops` has no loop 3: its body has 2 loops

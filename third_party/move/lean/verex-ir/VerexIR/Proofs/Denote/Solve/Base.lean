@@ -261,6 +261,11 @@ def ObligationKey.selects (pattern key : ObligationKey) : Bool :=
       | some point, some other => point.selects other
       | _, _ => false)
 
+/-- Whether a key is that of a function's failing paths no clause permits,
+which a path's abort site tells apart. -/
+def ObligationKey.isNoFailure (key : ObligationKey) : Bool :=
+  key.kind == "no panic" || key.kind == "no abort"
+
 /-- A source decision on a leaf's path (`doc/plan/proof-language.md`,
 "Obligation addressing"): the `number`-th `if` taken, `match` taking a
 variant, loop exiting or continuing, or where the path aborts. -/
@@ -288,6 +293,12 @@ def Decision.text : Decision → String
   | .aborts (.invoke number) => s!"aborts at invoke {number}"
   | .invoke number target => s!"invoke {number} {target}"
   | .returns => "returns"
+
+/-- Where a path aborts, of its decisions. -/
+def abortSiteOf? (decisions : Array Decision) : Option AbortSite :=
+  decisions.findSome? fun
+    | .aborts site => some site
+    | .branch .. | .variant .. | .loop .. | .invoke .. | .returns => none
 
 /-- Whether a path's decision is one a selector states: the same, a call
 without its callee counted among all calls. -/
@@ -385,6 +396,9 @@ structure TargetState where
   /-- The key of each invariant clause, by its source range: `data
   invariant` for a struct's, `module invariant` for a global one. -/
   invariantKeys : IO.Ref (Array (ObligationRange × String))
+  /-- The source range of each site a failing path names, by the selector's
+  words (`aborts at op 1`). -/
+  failureSites : IO.Ref (Array (String × ObligationRange × Bool))
   /-- The last target's undecided leaves with their actual diagnostic
   locations, including foreign files and fallback locations. -/
   failedLeaves : IO.Ref (Array (Message × String))
@@ -424,6 +438,9 @@ structure TargetState where
   /-- The statements of bounds with their literals reduced, in this target:
   the same certificates are asserted at every leaf. Emptied for every target. -/
   reducedBounds : IO.Ref (Std.HashMap Lean.Expr Lean.Expr)
+  /-- The elements a context's hypotheses read, by the types of those hypotheses. A
+  witness search asks once per premise of the same context. -/
+  statedReads : IO.Ref (Std.HashMap (Array Lean.Expr) (Array (Lean.Expr × Lean.Expr)))
   /-- The hypothesis types in which no projection of a constructor
   application remained to reduce, in this target: the leaves restate the
   same context, and traversing a large contract fact for nothing is what the
@@ -633,6 +650,7 @@ def TargetState.new : IO TargetState := do
     clauseRanges := ← IO.mkRef #[]
     preconditionNumbers := ← IO.mkRef #[]
     invariantKeys := ← IO.mkRef #[]
+    failureSites := ← IO.mkRef #[]
     failedLeaves := ← IO.mkRef #[]
     exhaustedLeaves := ← IO.mkRef 0
     undecidedLeaves := ← IO.mkRef 0
@@ -645,6 +663,7 @@ def TargetState.new : IO TargetState := do
     familyProofs := ← IO.mkRef {}
     preparationOwners := ← IO.mkRef #[]
     reducedBounds := ← IO.mkRef {}
+    statedReads := ← IO.mkRef {}
     projectionFreeTypes := ← IO.mkRef {}
     undecidedPremises := ← IO.mkRef {}
     groundFailures := ← IO.mkRef {}
@@ -1985,8 +2004,10 @@ def boundType (type : Lean.Expr) : MetaM Lean.Expr := do
   if type.isAppOf ``VerexIR.Proofs.Denote.ResultShape.carrier then whnfD type else whnfR type
 
 /-- The bound a value carries by its type `type` (in weak head normal form):
-a fixed-width integer's range, a vector's length bound. -/
+a fixed-width integer's range, a character's, a vector's length bound. -/
 def typedBound? (value type : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  if type.isConstOf ``VerexIR.SpecChar then
+    return some (← mkAppM ``VerexIR.SpecChar.bounds #[value])
   if type.isAppOfArity ``VerexIR.SpecVector 1 then
     return some (← mkAppM ``VerexIR.SpecVector.bounded #[value])
   -- A map's entries are as many as a Move vector holds.

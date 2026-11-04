@@ -376,6 +376,15 @@ In the order of expected gain:
   avoid the smart unfolding of `NTy.carrier`; a deeper change to
   `Types.lean`.
 
+An existential witness tries a position a hypothesis states the element of
+(`statedReads`, read by `verex_lookup_read`) after every other candidate, since a
+failed attempt spends the leaf's budget on what those decide. Against trying it
+right after the positions the context's lookup facts read, the order saves 0.03% of
+heartbeats on the four Rust benchmark problems, 1.3509G against 1.3512G, nearly all
+in `rust_bit_vector`, with the same verdicts; failing leaves and Move problems are
+not measured. The reads are computed once per context: a search asks for them per
+premise, and the scan walks every hypothesis.
+
 ### Fixed costs
 
 - **`compiled_eq`**, up to 1 s per function: 80k unfolds dominated by

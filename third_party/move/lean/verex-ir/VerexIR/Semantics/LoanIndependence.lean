@@ -194,19 +194,23 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     intro namespaceId frame state exprId startFrame startState nodeFrame nodeState control
       finalFrame finalState before_eq node_step after_eq ih
     intro ρ offset frontier inside inert inert' state₂ shifted frame_within
-    have settled := settleLoans_rename (loans := (loanDeathsAt unit namespaceId exprId).before)
-      shifted frame_within
+    have settled := settleDeaths_rename (unit := unit) (namespaceId := namespaceId)
+      (loans := (loanDeathsAt unit namespaceId exprId).before)
+      (places := (deadPlacesAt unit namespaceId exprId).before) shifted frame_within
     rw [before_eq] at settled
-    generalize start_eq : settleLoans (loanDeathsAt unit namespaceId exprId).before
-      (frame.rename ρ) state₂ = start₂ at settled
+    generalize start_eq : settleDeaths unit namespaceId (loanDeathsAt unit namespaceId exprId).before
+      (deadPlacesAt unit namespaceId exprId).before (frame.rename ρ) state₂ = start₂ at settled
     obtain ⟨startFrame₂, startState₂⟩ := start₂
     obtain ⟨rfl, startShifted, start_within⟩ := settled
     obtain ⟨nodeState₂, nodeShifted, node_within, control_within, node_step₂⟩ :=
       ih ρ offset frontier inside inert inert' startState₂ startShifted start_within
-    have after := settleAfter_rename (loans := (loanDeathsAt unit namespaceId exprId).after)
+    have after := settleAfter_rename (unit := unit) (namespaceId := namespaceId)
+      (loans := (loanDeathsAt unit namespaceId exprId).after)
+      (places := (deadPlacesAt unit namespaceId exprId).after)
       (control := control) nodeShifted node_within
     rw [after_eq] at after
-    generalize final_eq : settleAfter (loanDeathsAt unit namespaceId exprId).after
+    generalize final_eq : settleAfter unit namespaceId (loanDeathsAt unit namespaceId exprId).after
+      (deadPlacesAt unit namespaceId exprId).after
       (control.rename ρ) (nodeFrame.rename ρ) nodeState₂ = final₂ at after
     obtain ⟨finalFrame₂, finalState₂⟩ := final₂
     obtain ⟨rfl, finalShifted, final_within⟩ := after

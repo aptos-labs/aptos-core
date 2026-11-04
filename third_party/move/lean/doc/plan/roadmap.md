@@ -80,7 +80,7 @@ Designs: [`denotation.md`](../designs/denotation.md),
   units whose owners are all tables.
 - **Denotation coverage not carried.** Signed bitwise operations, `bytes`
   and fixed-length vectors, unspecified pure callees used as summaries,
-  references inside an aggregate, range patterns over characters; generics:
+  references inside an enum, range patterns over characters; generics:
   the storage-aliasing instances, a generic caller of a callee whose storage
   depends on a type parameter, generic storage instantiated at a struct, the
   Rust profile denotations. Unmeasured: kernel `rfl` against `simp only
@@ -281,7 +281,7 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
 - Unsupported, diagnosed: explicit enum-field write frames; write frames at
   dependency-interface boundaries. Not scheduled: closures whose targets
   return references; function types as type arguments
-  (`Option<|u64|u64>`); Rust capturing closures and `Fn*` traits.
+  (`Option<|u64|u64>`); Rust `Fn*` traits ([`rust-verification.md`](rust-verification.md), step 3d).
 - **State labels.** Reads of a removed resource's contents under a label
   (`unmodified_memory_at_label::swap`); a free label with no defining
   operation (`nonlinear_cfg_error`); a witness for a target without a

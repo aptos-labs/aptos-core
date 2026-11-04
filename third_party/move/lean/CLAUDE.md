@@ -61,13 +61,14 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`verex-ir/`](verex-ir/) | Shared typed VIR, versioned RawUnit JSON import, validation, structured semantics, interpreter, proofs, and unit tests. It owns the neutral IR boundary. |
 | [`verex-move/`](verex-move/) | Move semantic profile and intrinsic registry over `verex-ir`, the Move exchange frontend (`VerexMove/Frontend`): CLI invocation, XAST decoding, and VIR encoding, and the XIR backend (`VerexMove/Xir`) compiler-v2 compiles `.lean` sources through. |
 | [`verex-rust/`](verex-rust/) | Rust semantic profile, source backend, registry, Lean-owned import CLI, and Lean integration tests. |
+| [`verex-rust/lib/`](verex-rust/lib/) | The standard-library specification library: VerexSL contracts and type models of `core` and `alloc`, read by the import and the Rust verification (`VerexRust/Library.lean`). |
 | [`verex-rust/rust-exporter/`](verex-rust/rust-exporter/) | Standalone Rust crate using the pinned Rustc Public API to export borrow-checked optimized MIR as RawUnit JSON. Fixtures and JSON baselines live under `tests/`. |
 | [`v0/move-model/`](v0/move-model/) | **Deprecated, reference only.** Logical model of Move stackless bytecode: IR, execution semantics, checking, interpreter, reference elimination, prover stages, XIR, and source/masm frontends. |
 | [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Verex Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified VIR. |
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Verex printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and VIR adapter were ported to `verex-move`. |
 | [`verex-e2e-tests/`](verex-e2e-tests/) | Discoverable Move-to-VerexSL and Rust-to-VerexSL source/result baselines. Assertion-style legacy tests remain with their owning packages. |
 | [`scripts/`](scripts/) | The core smoke suite (`smoke.sh`, see "Between turns"), package verification with one process per module (`verify-modules.py`), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `doc/designs/performance.md`. The verification benchmark driver (`verex-bench.py`); see `doc/status/verification-benchmarks.md`. |
-| [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit, and a Move package of problems written for it (`package/`). |
+| [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit, a Move package of problems written for it (`package/`), and Rust counterparts of Move problems (`rust/`). |
 | [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
 
 Within each package, the root `Foo.lean` is the public import, source modules
@@ -221,7 +222,7 @@ suite described in [`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skil
 stack's regressions, read-only against their `.exp`, with one pass/fail line
 each; it refuses `UB=1`. Green smoke is not a commit gate. For a change on the
 Rust path, `scripts/smoke.sh --rust` runs the Rust renderings and verified
-fixtures, the `verex-rust` suite and a small Move canary, in about 15 s warm.
+fixtures, the `verex-rust` suite and a small Move canary, in under a minute warm.
 
 While iterating, build libraries, not executables: `lake build` in
 `verex-ir`, `lake build VerexMove` in `verex-move`, and `lake build
@@ -309,7 +310,8 @@ not maintained.
 
 Positive Rust exporter inputs and their side-by-side `.exp.json` baselines are
 in `verex-rust/rust-exporter/tests/raw-unit/`; rejection and API-probe inputs
-remain under `tests/fixtures/`. The baseline driver discovers every `.rs` in
+remain under `tests/fixtures/`, and artifacts holding opaque nodes, which validation
+rejects, are in `tests/opaque-unit/`. The baseline driver discovers every `.rs` in
 `raw-unit` automatically. Use `UB=1 cargo test --features rustc-public` to
 update expectations, inspect the semantic diff, and commit an update only when
 the format or mapped MIR is intentionally changing. The Rust and Lean suites

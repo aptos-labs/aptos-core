@@ -1,6 +1,6 @@
 name = "verex-rust"
 defaultTargets = ["VerexRust", "verex-rust"]
-testDriver = "VerexRustTests"
+testDriver = "differentialCheck"
 
 [[require]]
 name = "verex-ir"
@@ -16,6 +16,13 @@ root = "Main"
 # interpreter.
 supportInterpreter = true
 
+[[lean_exe]]
+name = "differentialCheck"
+root = "VerexRust.Tests.DifferentialMain"
+# Imports VerexSL to compile the rendering; the test library builds first.
+supportInterpreter = true
+needs = ["VerexRustTests"]
+
 [[lean_lib]]
 name = "VerexRustTests"
-roots = ["VerexRust.Tests.Profile", "VerexRust.Tests.Driver", "VerexRust.Tests.VerexSL", "VerexRust.Tests.RegistryConsumer", "VerexRust.Tests.Source", "VerexRust.Tests.SourcePredicates"]
+roots = ["VerexRust.Tests.Profile", "VerexRust.Tests.Driver", "VerexRust.Tests.NativeCases", "VerexRust.Tests.VerexSL", "VerexRust.Tests.RegistryConsumer", "VerexRust.Tests.Source", "VerexRust.Tests.SourcePredicates"]

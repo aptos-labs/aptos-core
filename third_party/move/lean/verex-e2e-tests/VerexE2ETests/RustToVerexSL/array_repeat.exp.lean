@@ -5,5 +5,3 @@ import VerexSL
 
 verex namespace array_repeat where
   fun repeat(value : u32) -> Vector<u32, const 4> := #[value; 4]
-
--- no denotation for `repeat`: the type of the result is not carried by the denotation

@@ -388,7 +388,8 @@ private partial def storesInto (target : LocalId) (id : PlaceId) : BodyM Bool :=
   match ← place id with
   | .localVar localId => pure (localId == target)
   | .deref _ => pure false
-  | .field base .. | .ghostField base .. | .index base _ | .subslice base .. | .downcast base _ =>
+  | .field base .. | .ghostField base .. | .index base _ | .subslice base .. | .unsize base
+  | .downcast base _ =>
       storesInto target base
 
 private partial def patternBinds (target : LocalId) (id : PatternId) : BodyM Bool := do
@@ -612,6 +613,7 @@ mutual
         | _ => failHere "an indexed place is not a vector"
     | .downcast base _ => placeType base
     | .subslice .. => failHere "a subslice has no Move bytecode form"
+    | .unsize _ => failHere "an unsize place has no Move bytecode form"
 
   /-- Borrow a place, returning the reference slot. -/
   partial def borrowPlace (id : PlaceId) (mutable : Bool) : BodyM Nat := do
@@ -656,6 +658,7 @@ mutual
         pure reference
     | .downcast .. => failHere "a whole variant cannot be borrowed in Move bytecode"
     | .subslice .. => failHere "a subslice has no Move bytecode form"
+    | .unsize _ => failHere "an unsize place has no Move bytecode form"
 
   /-- The value of a place: the slot itself, or a read through a borrow. -/
   partial def readPlace (id : PlaceId) : BodyM Nat := do

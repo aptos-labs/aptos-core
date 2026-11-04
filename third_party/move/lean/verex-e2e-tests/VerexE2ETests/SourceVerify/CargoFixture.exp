@@ -1,0 +1,1 @@
+src/lib.rs:16:5: error: `through_dependency` calls the native `verex_rust_cargo_fixture_dependency::dependency_value`, which has neither a specification nor a prelude model; specify it

@@ -177,7 +177,6 @@ private partial def typeIsCopy (unit : ValidatedUnit) (typeId : TypeId) (fuel : 
 
 private structure LocalProjectionState where
   mappings : Array (LocalId × Nat) := #[]
-  shiftCastSubstitutions : Array (LocalId × ExprId) := #[]
   valueSubstitutions : Array (LocalId × ExprId) := #[]
   localTypes : Array TypeId := #[]
   normalizePureAdministration : Bool := false
@@ -382,34 +381,6 @@ private def trailingPanicGuardSplit? (unit : ValidatedUnit) (ns : ValidatedNames
   some (statements.extract 0 (statements.size - count), suffix, condition,
     panicBranch, continuation, resultExpression.typeId)
 
-/-- rustc makes the `as u32` required by `wrapping_shl`/`wrapping_shr`
-explicit in MIR. The VIR shift primitive accepts an integer distance directly,
-so source rendering introduces this one administrative widening cast. -/
-private def forwardedShiftCast? (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (statements : Array ExprId) (result : Option ExprId) : Option (LocalId × ExprId × ExprId) := do
-  let [statementId] := statements.toList | none
-  let statement ← ns.expressions[statementId.index]?
-  let .assign temporaryPlace castId := statement.kind | none
-  let temporary ← directLocalPlace? ns temporaryPlace
-  let cast ← ns.expressions[castId.index]?
-  let .operation (.primitive .cast) _ castArguments _ := cast.kind | none
-  let [source] := castArguments.toList | none
-  let some (.integer (.bits 32) false) := unit.tables.types[cast.typeId.index]? | none
-  let sourceExpression ← ns.expressions[source.index]?
-  let some (.integer _ false) := unit.tables.types[sourceExpression.typeId.index]? | none
-  let resultId ← result
-  let resultExpression ← ns.expressions[resultId.index]?
-  let .block shiftStatements _ := resultExpression.kind | none
-  let shiftStatementId ← shiftStatements[0]?
-  let shiftStatement ← ns.expressions[shiftStatementId.index]?
-  let .assign _ shiftId := shiftStatement.kind | none
-  let shift ← ns.expressions[shiftId.index]?
-  let .operation (.primitive operation) _ shiftArguments _ := shift.kind | none
-  if operation != .shiftLeft && operation != .shiftRight then none else
-  let [_, distance] := shiftArguments.toList | none
-  let distanceLocal ← loadedLocal? ns distance
-  if distanceLocal == temporary then some (temporary, source, resultId) else none
-
 private partial def pureInlineableExpression? (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (expressionId : ExprId) (fuel : Nat) : Bool :=
   match fuel, ns.expressions[expressionId.index]? with
@@ -419,8 +390,6 @@ private partial def pureInlineableExpression? (unit : ValidatedUnit)
       (operation matches .move _ || operation matches .copy _ || operation matches .read _ ||
         operation matches .primitive _) &&
         arguments.all (pureInlineableExpression? unit ns · fuel)
-  | _, some { kind := .block statements result, .. } =>
-      (forwardedShiftCast? unit ns statements result).isSome
   | _, _ => false
 
 /-- Recognize rustc's pure temporary chain ending in a result or returned
@@ -810,7 +779,7 @@ private partial def enumAdminPlace? (ns : ValidatedNamespace) (environment : Enu
       some (.field (← enumAdminPlace? ns environment base (fuel - 1)) field)
   | .downcast base variant =>
       some (.downcast (← enumAdminPlace? ns environment base (fuel - 1)) variant)
-  | .index .. | .subslice .. | .ghostField .. => none
+  | .index .. | .subslice .. | .unsize _ | .ghostField .. => none
 
 private partial def enumAdminValue? (ns : ValidatedNamespace) (environment : EnumAdminEnv)
     (expressionId : ExprId) (fuel : Nat) : Option EnumAdminValue := do
@@ -1088,6 +1057,7 @@ mutual
         pure s!"index:{← placeProjection unit ns base (fuel - 1)}:{← expressionProjection unit ns index (fuel - 1)}"
     | .subslice base start stop fromEnd =>
         pure s!"subslice:{← placeProjection unit ns base (fuel - 1)}:{start}:{stop}:{fromEnd}"
+    | .unsize base => pure s!"unsize:{← placeProjection unit ns base (fuel - 1)}"
     | .downcast base variant =>
         pure s!"downcast:{← placeProjection unit ns base (fuel - 1)}:{← liftProjection <| nameProjection unit variant}"
     | .ghostField base _ field =>
@@ -1280,33 +1250,11 @@ mutual
             | _, _ => pure ()
           let instantiations ← liftProjection <| instantiations.mapM
             (genericArgumentProjection unit · unit.tables.types.size.succ)
-          let shiftArguments (value distance : ExprId) : ProjectionM (Array String) := do
-            let value ← expressionProjection unit ns value (fuel - 1)
-            let state ← get
-            let distance ← match loadedLocal? ns distance with
-              | some localId => match state.shiftCastSubstitutions.find? (·.1 == localId) with
-                  | some substitution =>
-                      expressionProjection unit ns substitution.2 (fuel - 1)
-                  | none => expressionProjection unit ns distance (fuel - 1)
-              | none => expressionProjection unit ns distance (fuel - 1)
-            pure #[value, distance]
-          let arguments ← match operation, arguments.toList with
-            | .primitive .shiftLeft, [value, distance] => shiftArguments value distance
-            | .primitive .shiftRight, [value, distance] => shiftArguments value distance
-            | _, _ => children arguments
+          let arguments ← children arguments
           let operation ← operationProjection unit ns expression.typeId operation fuel
           pure s!"operation:{operation}:{repr instantiations}:{repr arguments}"
       | .block statements result =>
-          match forwardedShiftCast? unit ns statements result with
-          | some (temporary, source, forwardedResult) =>
-              let previous ← get
-              set { previous with
-                shiftCastSubstitutions := #[(temporary, source)] ++ previous.shiftCastSubstitutions }
-              let projected ← expressionProjection unit ns forwardedResult (fuel - 1)
-              let current ← get
-              set { previous with mappings := current.mappings, next := current.next }
-              pure projected
-          | none => match forwardedReturnValue? ns statements result with
+          match forwardedReturnValue? ns statements result with
           | some value =>
               let value ← expressionProjection unit ns value (fuel - 1)
               pure s!"return:{repr #[value]}"
@@ -1402,10 +1350,7 @@ mutual
           pure s!"assignPattern:{← patternProjection unit ns pattern (fuel - 1)}:{← expressionProjection unit ns value (fuel - 1)}"
       | .quantifier .. | .spec _ =>
           liftProjection <| fail "specification expressions are outside Rust source alpha-equivalence"
-    let erasesWrapper := expression.kind matches .letDecl _ none _ ||
-      match expression.kind with
-      | .block statements result => (forwardedShiftCast? unit ns statements result).isSome
-      | _ => false
+    let erasesWrapper := expression.kind matches .letDecl _ none _
     if erasesWrapper then pure kind
     else
       let type := if (← get).normalizePureAdministration && expression.kind matches .throw_ ..

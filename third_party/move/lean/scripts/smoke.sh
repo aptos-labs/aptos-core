@@ -32,6 +32,7 @@ COMPILED_NAMESPACES="$LEAN_ROOT/verex-e2e-tests/VerexE2ETests/CompiledNamespaces
 # Check fixtures of verex-e2e-tests (VerexE2ETests/Check/<name>.lean), each
 # elaborated as the Check driver elaborates it.
 CHECKS=(
+  Specifications/ImpureCalls
   Storage/TableReads
   Storage/TableAllocation
   Storage/TableGlobalWrites
@@ -106,9 +107,22 @@ MVP_TESTS=(
 # `--rust`: the Rust renderings and verified fixtures, the verex-rust suite, and
 # the Move fixtures that catch what a Rust change breaks in the code the two
 # profiles share: printing and lowering, site numbering, contracts, the solver.
-RUST_VERIFY=bounds,bounds_errors,references,references_errors
+# One inexpensive fixture per feature; the `verify` suite runs them all.
+RUST_VERIFY=references_errors,shared_views_errors,cursor_errors,nested_holders_errors,holder_structs_errors,holder_repoint_errors,no_panic,no_panic_cycle,loop_item_errors,loop_sites,arithmetic_errors,casts,drops,destructor_errors,methods,struct_specs_errors,library_vec,library_vec_errors,library_option_errors,library_integers_errors,library_index_errors,library_drops_errors,library_index_mut_false,library_for_errors,library_slice_write_false,library_for_wide_errors,diverging_regions_errors,ordering_errors,return_in_nested_branch_errors,declared_lifetimes_errors,declared_lifetimes_bound_errors,library_iter_errors,lifetime_generic_calls_errors,impure_spec_call_errors,closure_specs_errors,closure_loop_numbers_errors,panic_macros_errors,question_mark_errors,constants_errors,cond_moves_errors,death_points_errors
+RUST_VERIFY_GROUP=3
 RUST_MOVE_RENDERINGS=vectors,move2_index,loops
 RUST_CHECKS=(
+  Specifications/ImpureCalls
+  References/NestedHolders
+  References/NestedHolderErrors
+  References/DeclaredLifetimes
+  References/DeclaredLifetimeErrors
+  Control/Destructors
+  Control/NeverCalls
+  Generics/ArrayArguments
+  Generics/ShapeContracts
+  Generics/ShapeContractCallErrors
+  Generics/ShapeContractsRendered
   Specifications/Addressing
   Specifications/AbstractOwners
   Specifications/InsertionMap
@@ -116,6 +130,9 @@ RUST_CHECKS=(
   Closures/InvariantBehavior
 )
 RUST_IR_TESTS=(
+  VerexSL/Tests/Scopes.lean
+  VerexSL/Tests/ClosureItems.lean
+  VerexSL/Tests/LoopSpecifications.lean
   VerexSL/Tests/Points.lean
   VerexSL/Tests/TypedMaps.lean
 )
@@ -314,7 +331,12 @@ done
 if [ $run_rust = 1 ]; then
   # Each reports by its status: its output is shown only when it fails.
   fixture "rust renderings" driver "rust|" /dev/null
-  fixture "rust verify" driver "verify|$RUST_VERIFY" /dev/null
+  # One process elaborates its sources in turn, so they are verified in groups.
+  IFS=, read -r -a verified <<<"$RUST_VERIFY"
+  for (( start = 0; start < ${#verified[@]}; start += RUST_VERIFY_GROUP )); do
+    group=$(IFS=,; echo "${verified[*]:start:RUST_VERIFY_GROUP}")
+    fixture "rust verify ${verified[start]}…" driver "verify|$group" /dev/null
+  done
   fixture "move renderings (canary)" driver "move|$RUST_MOVE_RENDERINGS" /dev/null
   fixture "verex-rust suite" rust-suite "" /dev/null
 fi
@@ -334,7 +356,7 @@ run_fixture() { # index
       cd "$LEAN_ROOT/verex-e2e-tests" &&
       env VEREX_E2E_SUITE="$suite" VEREX_E2E_MANAGED=1 ${filter:+VEREX_E2E_FILTER="$filter"} \
         lake env .lake/build/bin/VerexE2ETestDriver ;;
-    rust-suite) cd "$LEAN_ROOT/verex-rust" && lake test ;;
+    rust-suite) cd "$LEAN_ROOT/verex-rust" && VEREX_DIFFERENTIAL=smoke lake test ;;
   esac >"$TMP/$index.out" 2>&1
   local status=$?
   case ${KINDS[$index]} in

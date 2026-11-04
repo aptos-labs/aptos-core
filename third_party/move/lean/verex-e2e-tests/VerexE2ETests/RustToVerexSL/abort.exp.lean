@@ -5,5 +5,3 @@ import VerexSL
 
 verex namespace «abort» where
   fun abort_now() -> Never := panic()
-
--- no denotation for `abort_now`: the type of the result is not carried by the denotation

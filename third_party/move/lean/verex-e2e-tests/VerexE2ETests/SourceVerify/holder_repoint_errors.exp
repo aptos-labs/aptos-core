@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/holder_repoint_errors.rs:14:1: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-OVERWRITE: a mutable reference the function's caller lends cannot be overwritten at holder_repoint_errors.rs.lean:14:5

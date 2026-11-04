@@ -127,6 +127,7 @@ partial def quoteNTy : VerexIR.Proofs.Denote.NTy → MetaM Lean.Expr
   | .signer => return mkConst ``VerexIR.Proofs.Denote.NTy.signer
   | .string => return mkConst ``VerexIR.Proofs.Denote.NTy.string
   | .bytes => return mkConst ``VerexIR.Proofs.Denote.NTy.bytes
+  | .char => return mkConst ``VerexIR.Proofs.Denote.NTy.char
   | .tuple elements => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.tuple) (← quoteRow elements)
   | .table key value =>
       return mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.table) (← quoteNTy key) (← quoteNTy value)
@@ -138,6 +139,8 @@ partial def quoteNTy : VerexIR.Proofs.Denote.NTy → MetaM Lean.Expr
       let distinct ← mkDecideProof (← mkAppM ``List.Nodup #[namesExpr])
       return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.enum)
         #[toExpr source, ← quoteRow arguments, namesExpr, ← quoteRows rows, distinct]
+  | .array element length =>
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.array) (← quoteNTy element) (toExpr length)
   | .vector element => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) (← quoteNTy element)
   | .ref referent => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.ref) (← quoteNTy referent)
   | .ghost slot => return mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.ghost) (← quoteNTy slot)
@@ -145,6 +148,9 @@ partial def quoteNTy : VerexIR.Proofs.Denote.NTy → MetaM Lean.Expr
   | .function parameters shared results =>
       return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.function)
         #[← quoteRow parameters, toExpr shared, ← quoteRow results]
+  | .nominal source arguments productive =>
+      return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.nominal)
+        #[toExpr source, ← quoteRow arguments, toExpr productive]
 
 partial def quoteRow : VerexIR.Proofs.Denote.NRow → MetaM Lean.Expr
   | .nil => return mkConst ``VerexIR.Proofs.Denote.NRow.nil
@@ -353,6 +359,11 @@ structure Context where
   /-- Lean binder each local denotes under `spec.old`: the entry value of a
   mutable reference, and the ordinary binder for everything else. -/
   oldLocals : Array (Option Lean.Expr) := #[]
+  /-- What each local holds as its references' prophecies, where a clause reads the
+  final value of a place: a loop invariant. -/
+  finalLocals : Array (Option Lean.Expr) := #[]
+  /-- The same under `spec.old`. -/
+  oldFinalLocals : Array (Option Lean.Expr) := #[]
   /-- Lean binder for each function result. -/
   results : Array Lean.Expr
   /-- The final value (prophecy) of each returned mutable reference, where
@@ -944,6 +955,15 @@ def typedVariantField? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (Stri
   let carrier := carrierType carriers fieldType
   return some (fieldType,
     mkAppN (mkConst ``Option.getD [Level.zero]) #[carrier, selected, inhabitant])
+
+/-- The native type of a variant field, where the selection resolves. -/
+def selectedFieldType? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (String × Nat)) :
+    Option VerexIR.Proofs.Denote.NTy := do
+  let .enum _ _ names rows _ := enum | none
+  let (variant, index) ← choices[0]?
+  let ⟨σs, _⟩ ← VerexIR.Proofs.Denote.Which.ofName names rows variant
+  let ⟨field, _⟩ ← VerexIR.Proofs.Denote.Var.ofIndex σs index
+  return field
 
 /-- A variant field of a native enum value as the selection reads it: some
 value under its variant, none under another (`Choices.select?`). The field's
@@ -1636,14 +1656,14 @@ hold ghost slots, and in a unit declaring ghosts (`ghosts`) so may a type
 parameter's instance. An owner without a handle compares by its contents,
 so its entries are read as values are. -/
 def holdsContents (ghosts : Bool) : VerexIR.Proofs.Denote.NTy → Bool
-  | .ghost _ | .function _ _ _ => true
+  | .ghost _ | .function _ _ _ | .nominal _ _ _ => true
   | .param _ => ghosts
   | .table key value => holdsContents ghosts key || holdsContents ghosts value
   | .tuple elements => rowHoldsContents ghosts elements
   | .struct _ _ elements => elements.ownsHandle || rowHoldsContents ghosts elements
   | .enum _ _ _ rows _ => rowsHoldContents ghosts rows
-  | .vector element | .ref element => holdsContents ghosts element
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => false
+  | .vector element | .array element _ | .ref element => holdsContents ghosts element
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => false
 
 private def rowHoldsContents (ghosts : Bool) : VerexIR.Proofs.Denote.NRow → Bool
   | .nil => false
@@ -1654,6 +1674,14 @@ private def rowsHoldContents (ghosts : Bool) : VerexIR.Proofs.Denote.NRows → B
   | .cons fields rest => rowHoldsContents ghosts fields || rowsHoldContents ghosts rest
 end
 
+/-- The element type and the vector of a native vector or array. -/
+def nativeVector? (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) :
+    MetaM (Option (VerexIR.Proofs.Denote.NTy × Lean.Expr)) := do
+  match τ with
+  | .vector element => return some (element, value)
+  | .array element _ => return some (element, ← mkAppM ``VerexIR.SpecArray.vector #[value])
+  | _ => return none
+
 /-- What a quantifier over the elements of a native vector binds: an element
 at its native type, its membership in the vector's values, and the
 pattern's local of the domain. -/
@@ -1661,7 +1689,7 @@ def nativeVectorBinder (carriers : Lean.Expr) (domain : Domain) (vectorType : Ve
     (vector : Lean.Expr) (binderName : Name) :
     MetaM (Name × Lean.Expr × Option (Lean.Expr → MetaM Lean.Expr) ×
       (Lean.Expr → MetaM Lean.Expr)) := do
-  let .vector element := vectorType
+  let some (element, vector) ← nativeVector? vectorType vector
     | throwError "internal: a quantifier over the elements of a value that is not a vector"
   let values ← mkAppM ``VerexIR.SpecVector.values #[vector]
   return (binderName, carrierType carriers (← quoteNTy element),
@@ -1684,6 +1712,23 @@ def locRange (ns : ValidatedNamespace) (loc : VerexIR.LocId) : ObligationRange :
       file := (ns.localTables.files[range.file.index]?.map (·.name)).getD ""
       startByte := range.startByte, endByte := range.endByte }
   | none => {}
+
+/-- The source range of a failing node, and whether a macro of another crate
+raised it, the range then being what it is reached after. -/
+def siteRange (ns : ValidatedNamespace) (loc : VerexIR.LocId) : ObligationRange × Bool :=
+  let fileName (file : VerexIR.FileId) :=
+    (ns.localTables.files[file.index]?.map (·.name)).getD ""
+  match ns.location? loc with
+  | some { primary := none, expansion, .. } =>
+      match expansion[0]? with
+      | some range =>
+          ({ file := fileName range.file, startByte := range.startByte, endByte := range.endByte },
+            true)
+      | none => ({}, false)
+  | some { primary := some range, .. } =>
+      ({ file := fileName range.file, startByte := range.startByte, endByte := range.endByte },
+        false)
+  | none => ({}, false)
 
 /-- The authored byte range of a condition of a namespace. -/
 def conditionRange (ns : ValidatedNamespace) (condition : VerexIR.Condition) :
@@ -1747,7 +1792,7 @@ def lemmaNames (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) : MetaM
   let some (_, declaration) := lemmaOf? unit reference
     | throwError m!"lemma `{qualified.name}` does not resolve"
   let base := Name.str (path.segments.foldl (fun name segment => Name.str name segment) .anonymous)
-    qualified.name
+    (SpecTypes.scopedSpelling qualified)
   let measures := (declaration.contract.conditions.filter (·.kind == .decreases)).size
   return {
     requires := Name.str base "lemmaRequires"
@@ -1902,9 +1947,10 @@ def specRecursive (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) : Bo
   specReaches unit reference reference
 
 /-- The spelling of a specification function, for a diagnostic. -/
-def specFunctionSpelling (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
+def specFunctionSpelling (ns : ValidatedNamespace) (reference : VerexIR.QualifiedRef) :
     String :=
-  ((unit.tables.names[reference.name.index]?).map (·.name)).getD (toString (repr reference))
+  ((ns.nameOf reference.name).map SpecTypes.scopedSpelling).getD
+    (toString (repr reference))
 
 /-- The Lean name of a recursive specification function's definition. -/
 def specDefinitionName (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
@@ -1914,7 +1960,7 @@ def specDefinitionName (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef)
   let some qualified := unit.tables.names[reference.name.index]?
     | throwError "a specification function has no name"
   let base := path.segments.foldl (fun name segment => Name.str name segment) .anonymous
-  return Name.str (Name.str base qualified.name) "spec"
+  return Name.str (Name.str base (SpecTypes.scopedSpelling qualified)) "spec"
 
 /-- The recursive specification functions defined together with one: those
 it reaches that reach it back, itself among them, in declaration order. -/
@@ -2068,5 +2114,24 @@ def Context.bindComponent (context : Context) (element : VerexIR.PatternId)
       context.bindLocal localId elementType (← valueOf elementType)
   | _ => throwError "generated contracts require a variable or wildcard component \
       in a {pattern} binding pattern"
+
+
+/-- The local a specification's place expression reads from. -/
+partial def specRootLocal? (ns : ValidatedNamespace) (id : VerexIR.ExprId) : Option Nat :=
+  let rec placeRoot (place : VerexIR.PlaceId) : Option Nat :=
+    match ns.places[place.index]? with
+    | some (.localVar localId) => some localId.index
+    | some (.deref base) | some (.field base _ _) | some (.ghostField base _ _)
+    | some (.index base _) | some (.subslice base ..) | some (.unsize base)
+    | some (.downcast base _) => placeRoot base
+    | none => none
+  let kind : Option VerexIR.ExprKind := ns.expressions[id.index]?.map (·.kind)
+  match kind with
+  | some (.localVar localId) => some localId.index
+  | some (.operation (.read place) _ _ _) | some (.operation (.copy place) _ _ _) =>
+      placeRoot place
+  | some (.operation _ _ arguments _) =>
+      arguments[0]?.bind (specRootLocal? ns)
+  | _ => none
 
 end VerexSL.Contract

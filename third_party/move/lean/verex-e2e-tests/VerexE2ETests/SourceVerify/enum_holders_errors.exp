@@ -1,0 +1,113 @@
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:11:3: error: the specification clause `ensures o is None` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:10:6: error: verex verification failed: the automatic verification of `opt_by_value_false` failed; provide a proof in the module:
+  verify opt_by_value_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:14:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:14:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `opt_by_value_vacuous` failed; provide a proof in the module:
+  verify opt_by_value_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:21:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:20:6: error: verex verification failed: the automatic verification of `opt_by_value_caller_false` failed; provide a proof in the module:
+  verify opt_by_value_caller_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:24:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `opt_by_value_caller_vacuous` failed; provide a proof in the module:
+  verify opt_by_value_caller_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:31:3: error: the specification clause `ensures a == v` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `opt_returned_false` failed; provide a proof in the module:
+  verify opt_returned_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:34:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `opt_returned_vacuous` failed; provide a proof in the module:
+  verify opt_returned_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:41:3: error: the specification clause `ensures o is Some` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:40:6: error: verex verification failed: the automatic verification of `opt_by_ref_false` failed; provide a proof in the module:
+  verify opt_by_ref_false by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:44:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:44:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:43:6: error: verex verification failed: the automatic verification of `opt_by_ref_vacuous` failed; provide a proof in the module:
+  verify opt_by_ref_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:51:3: error: the specification clause `ensures o is Some` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:50:6: error: verex verification failed: the automatic verification of `opt_ref_of_ref_false` failed; provide a proof in the module:
+  verify opt_ref_of_ref_false by lean =>
+    verex_obligations
+    verex_on
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:54:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:54:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:53:6: error: verex verification failed: the automatic verification of `opt_ref_of_ref_vacuous` failed; provide a proof in the module:
+  verify opt_ref_of_ref_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:61:3: error: the specification clause `ensures result == v` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:60:6: error: verex verification failed: the automatic verification of `opt_none_on_one_path_false` failed; provide a proof in the module:
+  verify opt_none_on_one_path_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:64:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:63:6: error: verex verification failed: the automatic verification of `opt_none_on_one_path_vacuous` failed; provide a proof in the module:
+  verify opt_none_on_one_path_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:71:3: error: the specification clause `ensures spec.result[0] == v` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:70:6: error: verex verification failed: the automatic verification of `slot_repointed_false` failed; provide a proof in the module:
+  verify slot_repointed_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:74:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_errors.spec.lean:73:6: error: verex verification failed: the automatic verification of `slot_repointed_vacuous` failed; provide a proof in the module:
+  verify slot_repointed_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

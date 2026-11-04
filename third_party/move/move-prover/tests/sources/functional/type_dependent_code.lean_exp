@@ -7,8 +7,8 @@ prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok e
 Θ✝ : VerexIR.Proofs.Denote.Skolems unit
 typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
-  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } } 1
-    typeInstantiation✝
+  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } }
+    [VerexIR.BinderKind.typeArg] typeInstantiation✝
 account : VerexIR.Proofs.Denote.NTy.signer.carrier
 x : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
@@ -308,8 +308,8 @@ prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok e
 Θ✝ : VerexIR.Proofs.Denote.Skolems unit
 typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
-  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 1 } } 2
-    typeInstantiation✝
+  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 1 } }
+    [VerexIR.BinderKind.typeArg, VerexIR.BinderKind.typeArg] typeInstantiation✝
 account : VerexIR.Proofs.Denote.NTy.signer.carrier
 t1 : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 t2 : (VerexIR.Proofs.Denote.NTy.param 1).carrier
@@ -388,7 +388,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                   (VerexIR.StorageKey.address account)).isSome =
               true))
       state
-verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 495 (some account, some t1, some t2, ()) initialState✝
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 209 (some account, some t1, some t2, ()) initialState✝
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
@@ -402,11 +402,11 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-              (VerexIR.Proofs.Denote.Term.memoryWritten 495) env)
+              (VerexIR.Proofs.Denote.Term.memoryWritten 209) env)
             fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
           VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-            (((VerexIR.Proofs.Denote.Term.globalPublish 629
+            (((VerexIR.Proofs.Denote.Term.globalPublish 299
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
                         VerexIR.Proofs.Denote.NRow.nil)
                       (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
@@ -416,7 +416,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                         (VerexIR.Proofs.Denote.Args.cons
                           (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there)
                           VerexIR.Proofs.Denote.Args.nil))).seqAfter
-                  (VerexIR.Proofs.Denote.Term.memoryWritten 629)).drop
+                  (VerexIR.Proofs.Denote.Term.memoryWritten 299)).drop
               (VerexIR.Proofs.Denote.Term.lit ()))
             env)
         verexContinuation✝¹
@@ -475,7 +475,7 @@ heq✝ :
     none
 invariantHolds✝¹ : True
 verexAnchor :
-  VerexIR.Proofs.Denote.AnchorSaved 629 (some account, some t1, some t2, ())
+  VerexIR.Proofs.Denote.AnchorSaved 299 (some account, some t1, some t2, ())
     (initialState✝.set
       {
         type :=
@@ -506,7 +506,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-              (VerexIR.Proofs.Denote.Term.memoryWritten 629) env)
+              (VerexIR.Proofs.Denote.Term.memoryWritten 299) env)
             fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
           VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)

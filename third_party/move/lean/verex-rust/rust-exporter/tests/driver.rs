@@ -127,14 +127,14 @@ fn check_baseline(expectation: &PathBuf, actual: &str) {
     );
 }
 
-fn assert_deterministic_baseline(fixture: &str) {
+fn assert_deterministic_baseline(directory: &str, fixture: &str) {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output_path = env::temp_dir().join(format!(
         "verex-rust-{}-{}.raw.json",
         fixture.trim_end_matches(".rs"),
         std::process::id()
     ));
-    let fixture_path = format!("tests/raw-unit/{fixture}");
+    let fixture_path = format!("{directory}/{fixture}");
     let invoke = || {
         Command::new(env!("CARGO_BIN_EXE_verex-rust-export"))
             .current_dir(&manifest)
@@ -163,15 +163,12 @@ fn assert_deterministic_baseline(fixture: &str) {
         "RawUnit output changed between identical runs"
     );
     let stem = fixture.strip_suffix(".rs").expect("a Rust fixture name");
-    let expectation = manifest
-        .join("tests/raw-unit")
-        .join(format!("{stem}.exp.json"));
+    let expectation = manifest.join(directory).join(format!("{stem}.exp.json"));
     check_baseline(&expectation, &first);
 }
 
-#[test]
-fn raw_unit_baselines() {
-    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/raw-unit");
+fn check_directory_baselines(relative: &str) {
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative);
     let mut fixtures: Vec<_> = fs::read_dir(&directory)
         .expect("read the RawUnit baseline directory")
         .map(|entry| {
@@ -188,8 +185,19 @@ fn raw_unit_baselines() {
             .file_name()
             .and_then(|name| name.to_str())
             .expect("a UTF-8 Rust baseline filename");
-        assert_deterministic_baseline(file_name);
+        assert_deterministic_baseline(relative, file_name);
     }
+}
+
+#[test]
+fn raw_unit_baselines() {
+    check_directory_baselines("tests/raw-unit");
+}
+
+/// Artifacts holding opaque nodes, which validation rejects where they survive.
+#[test]
+fn opaque_unit_baselines() {
+    check_directory_baselines("tests/opaque-unit");
 }
 
 #[test]
@@ -222,8 +230,104 @@ fn observes_unsupported_inline_assembly() {
 }
 
 #[test]
-fn rejects_a_dependency_signature_naming_an_associated_type() {
-    let output = export_failure("dependency_projection.rs");
-    assert!(output.contains("names the associated type"), "{output}");
-    assert!(output.contains("Index"), "{output}");
+fn rejects_a_closure_no_reached_body_constructs() {
+    let output = export_failure("closure_unconstructed.rs");
+    assert!(
+        output.contains(
+            "closure `closure_unconstructed::make::{closure#0}` is held but no reached body constructs it"
+        ),
+        "{output}"
+    );
+}
+
+/// The description of the opaque node a function refused for holds this.
+fn assert_refusal(baseline: &str, reason: &str) {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/opaque-unit")
+        .join(baseline);
+    let text = fs::read_to_string(&path).expect("read the opaque-unit baseline");
+    assert!(
+        text.contains(r#""opaque": {"#) && text.contains(reason),
+        "{baseline} does not refuse for: {reason}"
+    );
+}
+
+#[test]
+fn refuses_a_trait_call_that_depends_on_a_type_parameter() {
+    assert_refusal(
+        "generic_trait_call.exp.json",
+        "call of `std::ops::Index::index` in `generic_trait_call::first` at line 7:12 depends on a type parameter and needs trait evidence",
+    );
+}
+
+#[test]
+fn refuses_a_closure_called_through_a_type_parameter() {
+    assert_refusal(
+        "closure_generic_call.exp.json",
+        "call of `std::ops::Fn::call` in `closure_generic_call::apply`",
+    );
+}
+
+#[test]
+fn refuses_a_promoted_constant() {
+    assert_refusal(
+        "const_promoted.exp.json",
+        "the constant of type `&u64` is promoted from `const_promoted::promoted`, and Rustc Public cannot evaluate a promoted constant",
+    );
+}
+
+#[test]
+fn refuses_a_constant_generic_over_a_parameter() {
+    assert_refusal(
+        "const_generic.exp.json",
+        "is the generic definition `const_generic::Limit::MAX`",
+    );
+    assert_refusal(
+        "const_generic_definition.exp.json",
+        "is the generic definition",
+    );
+}
+
+#[test]
+fn refuses_a_static_with_interior_mutability() {
+    assert_refusal(
+        "static_interior_mutable.exp.json",
+        "reads the mutable static `static_interior_mutable::COUNTER`",
+    );
+}
+
+#[test]
+fn refuses_a_static_mut_at_its_local_type() {
+    assert_refusal(
+        "static_mutable.exp.json",
+        "a local of type `*mut u64` is not modelled",
+    );
+}
+
+#[test]
+fn makes_a_function_opaque_for_a_signature_the_unit_cannot_state() {
+    for reason in [
+        "its signature states `<T as Tr>::Out`",
+        "its signature states `&Field<A>`",
+        "its signature states `f32`",
+        "has const parameter `N`",
+    ] {
+        assert_refusal("signature_types.exp.json", reason);
+    }
+    assert_refusal(
+        "signature_types.exp.json",
+        "it holds a closure that takes or returns `f32`",
+    );
+}
+
+#[test]
+fn refuses_a_body_for_a_type_only_it_states() {
+    for reason in [
+        "a local of type `&dyn Shape` is not modelled",
+        "a local of type `*const u64` is not modelled",
+        "a local of type `f32` is not modelled",
+        "a call instantiates a generic parameter with `f64`, which is not modelled",
+    ] {
+        assert_refusal("local_types.exp.json", reason);
+    }
 }

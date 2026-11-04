@@ -493,8 +493,8 @@ proof carries. No theorem shape changes, and no call owes coherence.
 `Coherent` speaks of the types the frame reads, as the runtime reads them:
 the types it requires (`requiredAt`, the resource types of its storage
 operations and the type arguments of its calls and closures, closed under
-its calls) and its type parameters, each read at its node through the
-instantiation. The runtime instantiation maps only the types static typing
+its calls), read at the frame's types for its parameters (`frameNty`), and its
+type parameters, each read at its node through the instantiation. The runtime instantiation maps only the types static typing
 interns, exactly the required ones, so a clause over every type of the
 namespace would fail at real frames. Over the required types and the
 parameters, coherence holds at the runtime frame, and a coherent caller's

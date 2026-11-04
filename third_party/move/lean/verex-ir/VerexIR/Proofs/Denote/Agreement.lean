@@ -34,14 +34,18 @@ export, is an outcome of the denotation, at every frame and type
 instantiation.  Where the frame and the instantiation disagree on a type
 the callee reads the prophetic meaning has no outcome; at a coherent frame
 the compiler's types agree with the runtime's, so a coherent caller's calls
-and closures have coherent frames.  To be proved by induction on the fuel of
-`compileExpr`, one case per term constructor. -/
+and closures have coherent frames.  A function compiled at a substitution
+agrees at the same frames, over its substituted rows (`propheticMeaningAt`);
+without one the statement is `compileFunction`'s and `propheticMeaning`'s.
+To be proved by induction on the fuel of `compileExpr`, one case per term
+constructor. -/
 axiom compileFunction_agrees {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
-    [Skolems unit] (handle : FunctionHandle)
-    (f : Function unit) (compiled : compileFunction unit handle = .ok f)
+    [Skolems unit] (handle : FunctionHandle) (substitution : Option TypeArgs)
+    (f : Function unit) (compiled : compileFunctionAt unit handle substitution = .ok f)
     (typeInstantiation : Array (TypeId × TypeId)) (args : HList f.params) :
-    Spec.Refines (propheticMeaning executable typeInstantiation handle f.params f.result args)
+    Spec.Refines
+      (propheticMeaningAt executable substitution typeInstantiation handle f.params f.result args)
       (f.denote executable typeInstantiation args)
 
 /-- The prophetic meanings of the compiled members of a cycle of calls, at
@@ -93,7 +97,25 @@ theorem wp_propheticMeaning_of_compiled {unit : ValidatedUnit} [FunctionCarriers
     (established : wp (f.denote executable typeInstantiation values) ensures aborts initial) :
     wp (propheticMeaning executable typeInstantiation handle f.params f.result values) ensures aborts
       initial :=
-  wp_of_refines (compileFunction_agrees executable handle f compiled typeInstantiation values) established
+  wp_of_refines (compileFunction_agrees executable handle none f compiled typeInstantiation values)
+    established
+
+/-- A call at type arguments holding a mutable reference: inlined, the callee's body at
+them replacing the call by the agreement theorem. -/
+theorem wp_propheticMeaningAt_of_compiled {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit)
+    [Skolems unit]
+    (substitution : Option TypeArgs) (typeInstantiation : Array (TypeId × TypeId))
+    (handle : FunctionHandle)
+    (f : Function unit) (compiled : compileFunctionAt unit handle substitution = .ok f)
+    (values : HList f.params)
+    (ensures : f.result.carrier → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit)
+    (established : wp (f.denote executable typeInstantiation values) ensures aborts initial) :
+    wp (propheticMeaningAt executable substitution typeInstantiation handle f.params f.result values)
+      ensures aborts initial :=
+  wp_of_refines (compileFunction_agrees executable handle substitution f compiled typeInstantiation
+    values) established
 
 /-- A contract established over the denotation holds of the prophetic
 meaning, which is what a caller's call denotes. -/
@@ -105,7 +127,8 @@ theorem satisfies_propheticMeaning {unit : ValidatedUnit} [FunctionCarriers unit
     (contract : Contract (Memory unit) Failure (HList f.params) f.result.carrier)
     (verified : Satisfies (f.denote executable typeInstantiation) contract) :
     Satisfies (propheticMeaning executable typeInstantiation handle f.params f.result) contract :=
-  satisfies_of_refines (compileFunction_agrees executable handle f compiled typeInstantiation) verified
+  satisfies_of_refines (compileFunction_agrees executable handle none f compiled typeInstantiation)
+    verified
 
 /-- Contracts established over the bodies of a cycle's members at every
 slot, each assuming every slot's contract of the calls to the members, hold

@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL.Contract.Values
+import VerexSL.SpecEffects
 
 /-!
 # Generated contracts: the clause translator
@@ -32,11 +33,13 @@ partial def ntySpelling : VerexIR.Proofs.Denote.NTy → String
   | .signer => "signer"
   | .string => "string"
   | .bytes => "bytes"
+  | .char => "char"
   | .tuple elements => "(" ++ rowSpelling elements ++ ")"
-  | .struct source arguments _ | .enum source arguments _ _ _ =>
+  | .struct source arguments _ | .enum source arguments _ _ _ | .nominal source arguments _ =>
       s!"s{source.namespaceId.index}_{source.structId}" ++
         (if arguments matches .nil then "" else "<" ++ rowSpelling arguments ++ ">")
   | .vector element => "vector<" ++ ntySpelling element ++ ">"
+  | .array element length => s!"array<{ntySpelling element}, {length}>"
   | .table key value => "table<" ++ ntySpelling key ++ "," ++ ntySpelling value ++ ">"
   | .ghost slot => "ghost<" ++ ntySpelling slot ++ ">"
   | .ref referent => "&" ++ ntySpelling referent
@@ -285,6 +288,24 @@ def bundleComponent (domain : Domain) (clause : Lean.Expr) : MetaM Lean.Expr :=
   match domain with
   | .boolean => decideProposition clause
   | _ => pure clause
+
+/-- A component holding a shared view of a value with references, as a clause reads it:
+whole, what the view holds as current. -/
+private def viewedComponent? (context : Context) (held : Option VerexIR.Proofs.Denote.NTy)
+    (resultTypeId : TypeId) (value : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let some held := held | return none
+  let read ← context.nativeType resultTypeId
+  unless read != held && read.erase == held do return none
+  return some <| mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
+    (← context.carriers) (← quoteNTy read) value
+
+/-- A tuple a field holds at the type a specification reads it, whose integers are
+unbounded where the field holds them at their widths. -/
+private def readingTuple (context : Context) (held : VerexIR.Proofs.Denote.NTy)
+    (resultTypeId : TypeId) (value : Lean.Expr) : MetaM Lean.Expr := do
+  let read ← context.nativeType resultTypeId
+  if held == read then return value
+  coerceNative (← context.carriers) held read value
 
 mutual
 /-- A let binding a variable to a variant field whose type has no value to
@@ -599,7 +620,8 @@ private partial def directTarget? (context : Context) (executable frame : Lean.E
   let handleExpr := toExpr handle
   -- Its reading does not depend on where its type arguments are written
   -- (`frameInstantiation_congr`).
-  let located := typeArgs.map fun value => { value with loc := ⟨0⟩ }
+  let located : Array VerexIR.GenericArgument :=
+    typeArgs.map fun value => .typeArg { value with loc := ⟨0⟩ }
   let instantiation := mkApp4 (mkConst ``VerexIR.Proofs.Denote.frameInstantiation) leading[0]!
     handleExpr outer (toExpr located)
   let induced := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) (leading ++ #[θ, frame])
@@ -719,6 +741,12 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
       let some (some binder) := context.locals[localId.index]?
         | throwError "specification local {localId.index} has no binder"
       let logicalType := context.localTypes[localId.index]?.getD ty
+      -- A specification reads a tuple's integers unbounded, where its binder
+      -- holds them at their widths.
+      if logicalType matches .tuple _ then
+        let held ← tupleLocalType logicalType
+        let read ← context.nativeType expression.typeId
+        if held != read then return ← coerceNative (← context.carriers) held read binder
       (domainOf logicalType).ofBinder binder
   -- A specification function read at state labels: its arguments read the
   -- labels' states as the old and current ones.
@@ -1038,38 +1066,48 @@ partial def translateExpression (context : Context) (id : ExprId) : MetaM Lean.E
             active := { active with
               locals := active.locals.set! localId.index (some translated)
               oldLocals := active.oldLocals.setIfInBounds localId.index (some translated) }
-        | kind =>
-            unless withoutLogicalEffect statement do
-              throwError "specification statement {repr kind} is not supported in \
-                generated contracts"
+        | _ =>
+            if let some effect := VerexSL.droppedEffect? active.ns.expressions statement then
+              throwError "a specification statement has an effect it would lose: {effect}"
       translate active result
   | kind =>
       throwError "specification node {repr kind} is not supported in generated contracts"
 where
-  /-- A statement a specification reading may drop: its value is discarded,
-  so only a local mutation or a control transfer could reach the rest of the
-  block. A failure imposes no condition. -/
-  withoutLogicalEffect (id : ExprId) : Bool :=
-    match context.ns.expressions[id.index]? with
-    | none => false
-    | some expression =>
-        match expression.kind with
-        | .value .. | .constant _ | .localVar _ | .quantifier .. | .spec _ => true
-        | .operation (.write _) _ _ _ => false
-        | .operation _ _ arguments _ => arguments.all withoutLogicalEffect
-        | .throw_ _ arguments => arguments.all withoutLogicalEffect
-        | .block statements result =>
-            statements.all withoutLogicalEffect && result.all withoutLogicalEffect
-        | .letDecl _ initializer body =>
-            initializer.all withoutLogicalEffect && withoutLogicalEffect body
-        | .ifElse condition thenBranch elseBranch =>
-            withoutLogicalEffect condition && withoutLogicalEffect thenBranch &&
-              elseBranch.all withoutLogicalEffect
-        | .match_ scrutinee arms =>
-            withoutLogicalEffect scrutinee && arms.all fun arm =>
-              arm.guard.all withoutLogicalEffect && withoutLogicalEffect arm.body
-        | .loop .. | .break_ .. | .continue_ _ | .return_ _ | .assign .. | .assignPattern .. =>
-            false
+  /-- The native type of a tuple a local holds. -/
+  tupleLocalType (logicalType : IrTy) : MetaM VerexIR.Proofs.Denote.NTy := do
+    let .tuple elements := logicalType
+      | throwError "internal: a tuple local is not of a tuple type"
+    let some row := elements.toList.mapM (context.ntyOf? ·)
+      | throwError "a specification reads a tuple with a component that has no native type"
+    return .tuple (VerexIR.Proofs.Denote.NRow.ofList row)
+  /-- A component a specification reads of a tuple a local holds, as its
+  native type and value, at a chain of literal indexes through references. -/
+  tupleComponent (place : VerexIR.PlaceId) :
+      MetaM (VerexIR.Proofs.Denote.NTy × Lean.Expr) := do
+    match context.ns.places[place.index]? with
+    | some (.localVar localId) =>
+        let some (some binder) := context.locals[localId.index]?
+          | throwError "specification local {localId.index} has no binder"
+        let some logicalType := context.localTypes[localId.index]?
+          | throwError "specification local {localId.index} has no type"
+        return (← tupleLocalType logicalType, binder)
+    | some (.deref base) => tupleComponent base
+    | some (.index base index) =>
+        let (σ, value) ← tupleComponent base
+        let .tuple row := σ
+          | throwError "a specification indexes a place that holds no tuple"
+        let some { kind := .value (.integer position) _, .. } :=
+            context.ns.expressions[index.index]?
+          | throwError "a specification indexes a tuple by other than a literal"
+        let components ← nativeComponents (← context.carriers) (← quoteNTy σ) value
+        let (some component, some (_, part)) :=
+            (row.toList[position.toNat]?, components[position.toNat]?)
+          | throwError "a specification reads a tuple component that is out of range"
+        if component matches .ref _ then
+          throwError "a specification reads a reference held in a tuple, which generated \
+            contracts do not carry"
+        return (component, part)
+    | _ => throwError "a specification reads a place that generated contracts do not carry"
   /-- A literal at its type: an integer, a proposition, a string, or a
   native value. -/
   translateLiteral (literal : ConstValue) (ty : IrTy) (typeId : TypeId) : MetaM Lean.Expr := do
@@ -1090,6 +1128,8 @@ where
     | .address value, .address | .address value, .signer | .string value, .string =>
         return toExpr value
     | .bytes value, .bytes => return toExpr value
+    | .character value, .char =>
+        return mkApp2 (mkConst ``VerexIR.SpecChar.mk) (toExpr value) (← mkEqRefl (mkConst ``Bool.true))
     | .vector elements, .vector element =>
         let carrier := carrierType carriers (← quoteNTy element)
         let values ← elements.mapM (nativeLiteral · element)
@@ -1249,6 +1289,8 @@ where
       MetaM (Array (Option VerexIR.Proofs.Denote.NTy)) :=
     instantiations.mapM fun
       | .typeArg argument => pure (context.ntyOf? (context.ns.typeId argument.typeId))
+      -- A binder's position is its index, and no carrier reads a lifetime's.
+      | .lifetime _ => pure (some .unit)
       | _ => throwError "a specification function call takes only type arguments in \
           generated contracts"
   /-- The shape of a definition at resolved type arguments: a native
@@ -1272,13 +1314,13 @@ where
       unless domain == .native do return none
       let some nty := probe.ntyOf? (specTypeId context.unit typeId)
         | throwError m!"a native position of the specification function \
-            `{specFunctionSpelling context.unit reference}` has no native type"
+            `{specFunctionSpelling context.ns reference}` has no native type"
       if inhabited then
         let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable)
           (← quoteNTy nty)
         unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do
           throwError m!"the result type of the recursive specification function \
-            `{specFunctionSpelling context.unit reference}` has no value it can stand for"
+            `{specFunctionSpelling context.ns reference}` has no value it can stand for"
       return some nty
     let mut domains := #[]
     let mut natives := #[]
@@ -1305,7 +1347,7 @@ where
       let spelled ← typeArgumentTypes.mapM fun
         | some nty => pure (ntySpelling nty)
         | none => throwError m!"a type argument of the recursive specification function \
-            `{specFunctionSpelling context.unit reference}` has no native type"
+            `{specFunctionSpelling context.ns reference}` has no native type"
       let .str base "spec" := name
         | throwError "internal: a definition's name does not end in `spec`"
       name := Name.str (Name.str base ("at_" ++ ",".intercalate spelled.toList)) "spec"
@@ -1380,7 +1422,7 @@ where
     let typeArguments ← typeArgumentTypes.mapM fun nty? => do
       let some nty := nty?
         | throwError m!"a type argument of the specification function \
-            `{specFunctionSpelling context.unit member.reference}` has no native type"
+            `{specFunctionSpelling context.ns member.reference}` has no native type"
       let quoted ← quoteNTy nty
       let resolved ← match frame?, types? with
         | some frame, _ =>
@@ -1398,10 +1440,12 @@ where
   call: the call's type arguments, under the caller's family. -/
   definitionTypes (instantiations : Array VerexIR.GenericArgument) : MetaM Lean.Expr := do
     let arguments ← instantiations.mapM fun instantiation => do
-      let .typeArg argument := instantiation
-        | throwError "a specification function call takes only type arguments in \
+      let nty? ← match instantiation with
+        | .typeArg argument => pure (context.ntyOf? argument.typeId)
+        | .lifetime _ => pure (some .unit)
+        | _ => throwError "a specification function call takes only type arguments in \
             generated contracts"
-      let some nty := context.ntyOf? (context.ns.typeId argument.typeId)
+      let some nty := nty?
         | throwError m!"a type argument of a recursive specification function has no \
             native type ({repr instantiation})"
       let quoted ← quoteNTy nty
@@ -1646,8 +1690,8 @@ where
           | throwError "specification function `{repr member}` does not resolve"
         unless declaration.signature.generics.size == entry.signature.generics.size do
           throwError m!"the mutually recursive specification functions \
-            `{specFunctionSpelling context.unit reference}` and \
-            `{specFunctionSpelling context.unit member}` differ in their type parameters, \
+            `{specFunctionSpelling context.ns reference}` and \
+            `{specFunctionSpelling context.ns member}` differ in their type parameters, \
             which generated contracts do not carry"
         definitionShapeAt member shape.typeArgumentTypes
       memberOfShape memberShape member carriers?
@@ -1687,7 +1731,7 @@ where
             else none
       if candidates.isEmpty then
         throwError m!"the recursive specification function \
-          `{specFunctionSpelling context.unit member.reference}` needs a `decreases` measure"
+          `{specFunctionSpelling context.ns member.reference}` needs a `decreases` measure"
       candidates.mapM fun candidate =>
         withLocalDeclD `bundle member.bundleType fun bundle => do
           mkLambdaFVars #[bundle] (← mkAppM ``Int.toNat #[← candidate bundle])
@@ -1779,7 +1823,7 @@ where
     if let some failure := untranslatable then throw failure
     let some (measures, steps) := found
       | let spelled := ", ".intercalate (members.map fun member =>
-            s!"`{specFunctionSpelling context.unit member.reference}`").toList
+            s!"`{specFunctionSpelling context.ns member.reference}`").toList
         throwError m!"{if members.size == 1 then
             s!"no measure of the recursive specification function {spelled} decreases"
           else s!"no measures of the mutually recursive specification functions {spelled} \
@@ -2057,6 +2101,12 @@ where
       (instantiations : Array VerexIR.GenericArgument) (arguments : Array ExprId)
       (ty : IrTy) (resultTypeId : TypeId) : MetaM Lean.Expr := do
     match operation with
+    | .read place =>
+        let (σ, value) ← tupleComponent place
+        let domain := domainOf ty
+        if domain matches .native then
+          return ← coerceNative (← context.carriers) σ (← context.nativeType resultTypeId) value
+        domain.ofNative value
     | .specification (.lemma reference _) =>
         let reference := context.ns.qualifiedRef reference
         let names ← ensureLemmaDefinitions reference
@@ -2093,10 +2143,14 @@ where
             -- reads the arithmetic, not the pairing.
             let (goal, _) ← dsimp goal (← Simp.mkContext)
             let proof ← mkFreshExprMVar goal
+            -- A subvector's length, which a measure over `v[a .. b]` reads.
+            let lengths ← (← ({} : SimpTheorems).addConst ``VerexIR.SpecVector.values_extract).addConst
+              ``Array.size_extract
+            let (target, _) ← simpTarget proof.mvarId! (← Simp.mkContext (simpTheorems := #[lengths]))
             let decreases ← try
                 -- As the tactic does: refute the negated goal from the local
                 -- hypotheses, which include the path conditions.
-                if let some refutation ← proof.mvarId!.falseOrByContra then
+                if let some refutation ← target.bindM (·.falseOrByContra) then
                   let hypotheses ← refutation.withContext getLocalHyps
                   Lean.Elab.Tactic.Omega.omega hypotheses.toList refutation
                 pure true
@@ -2104,7 +2158,7 @@ where
                 if definition.guarded then pure false else
                   let facts ← context.facts.mapM fun fact => do pure m!"{← inferType fact}"
                   throwError (MessageData.tagged `verex.measure m!"the recursive call of \
-                    `{specFunctionSpelling context.unit reference}` does not decrease its \
+                    `{specFunctionSpelling context.ns reference}` does not decrease its \
                     measure under the conditions on its path: \
                     {failure.toMessageData}\ngoal: {goal}\nconditions: {facts.toList}")
             if decreases then
@@ -2152,7 +2206,7 @@ where
           | none => return mkApp applied bundle
         if context.specCallStack.contains reference then
           throwError m!"the recursive specification function \
-            `{specFunctionSpelling context.unit reference}` needs a `decreases` measure"
+            `{specFunctionSpelling context.ns reference}` needs a `decreases` measure"
         -- A generic function is expanded at its arguments' native types.
         let typeArgumentTypes ← instantiations.mapM fun
           | .typeArg argument => pure (context.ntyOf? (context.ns.typeId argument.typeId))
@@ -2417,17 +2471,17 @@ where
           else outsideValue (← memberOfShape shape reference none) #[] none none #[] bundle
         atCall (← mkAppM ``ite #[bounds, expanded, outside])
     | .specification (.result index) =>
-        match context.ns.profile, context.resultTypes[0]?, context.results[0]? with
-        | some .move, some (.tuple _), some _ =>
-            -- Move presents multiple returns as one tuple-typed physical
-            -- result. `spec.result[i]` nevertheless denotes component `i`
-            -- of the native tuple, without inventing extra result slots.
+        match context.resultTypes[0]?, context.results[0]? with
+        | some (.tuple _), some _ =>
+            -- A tuple result is one physical result, Move's several returns
+            -- included. `spec.result[i]` denotes component `i` of the native
+            -- tuple, without inventing extra result slots.
             let some component := context.resultComponents[index]?
               | throwError "specification result {index} is out of range"
             let some logicalType := typeOfResultComponent? context index
               | throwError "specification result {index} has no logical domain"
             (domainOf logicalType).ofBinder component
-        | _, _, _ =>
+        | _, _ =>
             let some binder := context.results[index]?
               | throwError "specification result {index} has no binder"
             let some logicalType := context.resultTypes[index]?
@@ -2436,13 +2490,20 @@ where
     | .specification .final =>
         let some argument := arguments[0]?
           | throwError "`final` expects one argument"
-        let index ← match context.ns.expressions[argument.index]?.map (·.kind) with
-          | some (VerexIR.ExprKind.operation (.specification (.result index)) _ _ _) =>
-              pure index
-          | _ => throwError "`final` reads a returned mutable reference (`result`)"
-        let some (some final) := context.resultFinals[index]?
-          | throwError "`final` has no final value for result {index} in this clause"
-        (domainOf ty).ofBinder final
+        match context.ns.expressions[argument.index]?.map (·.kind) with
+        | some (VerexIR.ExprKind.operation (.specification (.result index)) _ _ _) =>
+            let some (some final) := context.resultFinals[index]?
+              | throwError "`final` has no final value for result {index} in this clause"
+            (domainOf ty).ofBinder final
+        | _ =>
+            if context.finalLocals.isEmpty then
+              throwError "`final` reads a place only in a loop invariant"
+            if let some root := specRootLocal? context.ns argument then
+              if context.finalLocals[root]? matches some none then
+                throwError "a shared view holds no prophecy: `final` reads what a mutable \
+                  reference will hold"
+            translate { context with
+              locals := context.finalLocals, oldLocals := context.oldFinalLocals } argument
     | .specification (.behavior kind range) => translateBehavior kind range arguments ty
     | .specification .old =>
         let some argument := arguments[0]?
@@ -2473,19 +2534,21 @@ where
         let some index := arguments[1]?
           | throwError "spec.indexVector expects an index operand"
         let carriers ← context.carriers
-        let .vector element ← context.exprType vector
+        let some (element, vector) ← nativeVector? (← context.exprType vector) (← translate context vector)
           | throwError "spec.indexVector reads a value that is not a vector"
         let position ← mkAppM ``Int.toNat #[← translate context index]
         -- An element is its value at the position, the element type's
         -- inhabitant outside the vector.
         let inhabitant ← typedInhabitant carriers (← quoteNTy element)
-        let values ← mkAppM ``VerexIR.SpecVector.values #[← translate context vector]
+        let values ← mkAppM ``VerexIR.SpecVector.values #[vector]
         let read ← mkAppM ``GetElem?.getElem? #[values, position]
         (domainOf ty).ofNative (← mkAppM ``Option.getD #[read, inhabitant])
     | .specification .lengthVector =>
         let some vector := arguments[0]?
           | throwError "spec.lengthVector expects a vector operand"
-        let values ← mkAppM ``VerexIR.SpecVector.values #[← translate context vector]
+        let some (_, vector) ← nativeVector? (← context.exprType vector) (← translate context vector)
+          | throwError "spec.lengthVector reads a value that is not a vector"
+        let values ← mkAppM ``VerexIR.SpecVector.values #[vector]
         mkAppOptM ``Nat.cast #[mkConst ``Int, none, ← mkAppM ``Array.size #[values]]
     | .specification .containsVector =>
         let some vector := arguments[0]?
@@ -2496,6 +2559,18 @@ where
         containment (← context.exprType vector) (← translate context vector) ε elementValue
     | .specification .emptyVector =>
         nativeVectorLiteral (← context.carriers) (← context.nativeType resultTypeId) #[]
+    | .specification .stringConcat =>
+        let (some left, some right) := (arguments[0]?, arguments[1]?)
+          | throwError "spec.stringConcat expects two strings"
+        mkAppM ``String.append #[← translate context left, ← translate context right]
+    | .specification .stringBytes =>
+        let some text := arguments[0]?
+          | throwError "spec.stringBytes expects a string"
+        mkAppM ``VerexIR.stringBytes #[← translate context text]
+    | .specification .charEncode =>
+        let some value := arguments[0]?
+          | throwError "spec.charEncode expects a character"
+        mkAppM ``VerexIR.charEncode #[← translate context value]
     | .specification .concatVector =>
         let (some left, some right) := (arguments[0]?, arguments[1]?)
           | throwError "spec.concatVector expects two vector operands"
@@ -2562,10 +2637,22 @@ where
               generated contracts"
         -- A field of a native struct is its component of the struct's row.
         let τ ← context.exprType base
-        let some (_, component) := (← nativeComponents (← context.carriers) (← quoteNTy τ)
-            (← translate context base))[index]?
+        let some (componentType, component) := (← nativeComponents (← context.carriers)
+            (← quoteNTy τ) (← translate context base))[index]?
           | throwError "specification field `{field}` is out of the value's row"
-        (domainOf ty).ofNative component
+        let held := match τ with
+          | .struct _ _ fields => fields.toList[index]?
+          | _ => none
+        if let some viewed ← viewedComponent? context held resultTypeId component then
+          return ← (domainOf ty).ofNative viewed
+        -- A clause sees a reference a field holds as its current value.
+        if componentType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 then
+          (domainOf ty).ofNative (← mkAppM ``Prod.fst #[component])
+        else
+          if let (.tuple _, .struct _ _ fields) := (ty, τ) then
+            if let some held := fields.toList[index]? then
+              return ← readingTuple context held resultTypeId component
+          (domainOf ty).ofNative component
     -- A ghost field's slot follows the declared fields; it reads as its
     -- contents (`doc/designs/ghost-fields.md`).
     | .data (.selectGhost reference field) =>
@@ -2607,9 +2694,17 @@ where
             context.unit handle fields
           | throwError "a variant field selection has no choices"
         let τ ← context.exprType base
-        let (_, read) ← nativeVariantField τ choices (← context.carriers) (← quoteNTy τ)
+        let (fieldType, read) ← nativeVariantField τ choices (← context.carriers) (← quoteNTy τ)
           (← translate context base)
-        (domainOf ty).ofNative read
+        if let some viewed ← viewedComponent? context (selectedFieldType? τ choices)
+            resultTypeId read then
+          return ← (domainOf ty).ofNative viewed
+        if let (.tuple _, some held) := (ty, selectedFieldType? τ choices) then
+          return ← readingTuple context held resultTypeId read
+        -- A clause sees a reference a field holds as its current value.
+        if fieldType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 then
+          (domainOf ty).ofNative (← mkAppM ``Prod.fst #[read])
+        else (domainOf ty).ofNative read
     | .data (.updateField reference field) =>
         let #[base, replacement] := arguments
           | throwError "a field update expects two operands"
@@ -2660,7 +2755,7 @@ where
     | _ =>
         throwError "specification operation {repr operation} is not supported \
           in generated contracts"
-  /-- The logical type of a component of a Move tuple result. -/
+  /-- The logical type of a component of a tuple result. -/
   typeOfResultComponent? (context : Context) (index : Nat) : Option IrTy := do
     let .tuple elements ← context.resultTypes[0]? | none
     let element ← elements[index]?
@@ -2792,7 +2887,9 @@ where
   both widened where they differ in the widths of their integers. -/
   containment (vectorType : VerexIR.Proofs.Denote.NTy) (vector : Lean.Expr)
       (elementType : VerexIR.Proofs.Denote.NTy) (element : Lean.Expr) : MetaM Lean.Expr := do
-    let .vector held := vectorType | throwError "internal: membership in a value that is no vector"
+    let some (held, vector) ← nativeVector? vectorType vector
+      | throwError "internal: membership in a value that is no vector"
+    let vectorType : VerexIR.Proofs.Denote.NTy := .vector held
     if held == elementType then
       return ← mkAppM ``Membership.mem #[← mkAppM ``VerexIR.SpecVector.values #[vector], element]
     let ω := widenedNTy held
@@ -2897,6 +2994,13 @@ where
         shortCircuit arguments false (fun l r => mkArrow l r) fun l right =>
           propDite l right (.lam `fact (mkNot l) (mkConst ``True) .default)
     | .equivalent => let (l, r) ← binary arguments; mkAppM ``Iff #[l, r]
+    -- A string's length is its UTF-8 bytes, as `Term.stringLength` reads them; a
+    -- vector's is `lengthVector`.
+    | .length =>
+        let value ← unary arguments
+        let bytes ← mkAppOptM ``Nat.cast #[mkConst ``Int, none,
+          ← mkAppM ``String.utf8ByteSize #[value]]
+        mkAppM ``VerexIR.Proofs.Denote.wrapInt #[mkNatLit 64, toExpr false, bytes]
     | _ =>
         throwError "specification primitive {repr primitive} at type \
           {describeType ty} is not supported in generated contracts"

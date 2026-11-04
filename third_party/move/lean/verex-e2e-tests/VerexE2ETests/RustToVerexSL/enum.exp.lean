@@ -14,5 +14,3 @@ verex namespace «enum» where
     match discriminant[Choice, isize](value) with
       | 4 => value.0
       | 9 => value.0
-
--- no denotation for `select`: the type of an expression is not carried by the denotation

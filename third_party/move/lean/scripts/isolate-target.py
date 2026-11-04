@@ -61,7 +61,7 @@ def isolate(lines, module, target, options, proofs=()):
     end = None
     identifier = r"(?:«[^»]+»|\w+)"
     for line in lines:
-        if line.startswith("verex module "):
+        if line.startswith(("verex module ", "verex namespace ")):
             if seen_module:
                 break
             in_module = line.split()[2].split("::")[-1] == module

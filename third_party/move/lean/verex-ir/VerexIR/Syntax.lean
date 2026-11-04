@@ -214,6 +214,10 @@ inductive ConstValue where
   | vector (elements : Array ConstValue)
   | tuple (elements : Array ConstValue)
   | profile (value : ProfileValue)
+  /-- A constant its frontend cannot state, described as the source has it. An
+  import pass collapses the diverging regions holding these, and validation
+  rejects a survivor. -/
+  | opaque (description : String)
   deriving Repr, Inhabited
 
 /-! Equality of constants is decided structurally through the nesting in
@@ -232,6 +236,7 @@ def ConstValue.beq : ConstValue → ConstValue → Bool
   | .vector xs, .vector ys => ConstValue.beqList xs.toList ys.toList
   | .tuple xs, .tuple ys => ConstValue.beqList xs.toList ys.toList
   | .profile x, .profile y => decide (x = y)
+  | .opaque x, .opaque y => x == y
   | _, _ => false
 def ConstValue.beqList : List ConstValue → List ConstValue → Bool
   | [], [] => true
@@ -255,6 +260,7 @@ theorem ConstValue.beq_iff : ∀ a b : ConstValue, ConstValue.beq a b = true ↔
       cases b <;> simp only [ConstValue.beq, Bool.false_eq_true, reduceCtorEq]
       rw [ConstValue.beqList_iff, Array.toList_inj]; simp
   | .profile x, b => by cases b <;> simp [ConstValue.beq]
+  | .opaque x, b => by cases b <;> simp [ConstValue.beq]
 theorem ConstValue.beqList_iff : ∀ xs ys : List ConstValue, ConstValue.beqList xs ys = true ↔ xs = ys
   | [], ys => by cases ys <;> simp [ConstValue.beqList]
   | x :: xs, ys => by
@@ -495,6 +501,17 @@ inductive BorrowKind where
   | profile (value : ProfileValue)
   deriving Repr, BEq, Inhabited
 
+/-- A Rust two-phase borrow, reserved here and activated at its use. The runtime gives
+a profile kind no meaning: the structurizer mints it at its use or rejects it. -/
+@[match_pattern] def rustTwoPhase : BorrowKind :=
+  .profile { profile := .rust, tag := "borrow.two_phase" }
+
+/-- A reference copy in a temporary, which optimized MIR spells where the source reborrows.
+The structurizer mints it at its use where that is an operand; elsewhere it is a plain
+mutable borrow. -/
+@[match_pattern] def rustReferenceCopy : BorrowKind :=
+  .profile { profile := .rust, tag := "borrow.reference_copy" }
+
 /-- Classification of a thrown, non-returning outcome. The active semantic
 profile defines state behavior such as Move rollback or Rust panic cleanup. -/
 inductive ThrowKind where
@@ -515,6 +532,30 @@ abort as well. -/
 
 /-- The tags of Move's runtime traps, which carry no payload. -/
 def moveTrapTags : Array String := #["runtime.vector_error", "runtime.arithmetic_error"]
+
+/-- The Rust property of a dependency's type the crate names without seeing
+its shape: it neither constructs, matches, nor projects it. -/
+def rustOpaqueTag : String := "struct.opaque"
+
+/-- The Rust property of the struct of a closure's upvars: its first construction in
+the body it stands in, whose path in the namespace the payload lists as a JSON array of
+strings, spells the struct and the body in its scope, neither of which is an item of the
+source. -/
+def rustClosureTag : String := "struct.closure"
+
+/-- The Rust property of a dependency's function the crate calls, declared by
+its signature: its body is not exported. -/
+def rustDependencyTag : String := "function.dependency"
+
+/-- The Rust property of a dependency's function whose unsafety or signature the
+crate cannot state: it declares no generics or parameters. The import prunes one
+no call is left of, and validation rejects a survivor. -/
+def rustOpaqueFunctionTag : String := "function.opaque"
+
+/-- The Rust property of a crate's function whose body the unit cannot state, the
+payload saying why: declared by its signature as a dependency's function is, and an
+error of its crate's verification. -/
+def rustRefusedTag : String := "function.refused"
 
 /-- Whether a throw is a Move runtime trap. -/
 def ThrowKind.isMoveTrap (kind : ThrowKind) : Bool :=
@@ -614,6 +655,9 @@ are explicit; future source families use a checked extension value. -/
 inductive SurfaceSyntax where
   | receiverCall
   | indexNotation
+  /-- A reborrow through an aggregate that the source spells as moving the
+  mutable reference out of it. -/
+  | componentMove
   | extension (value : ProfileValue)
   deriving Repr, BEq, Inhabited
 
@@ -627,6 +671,12 @@ inductive GlobalKind where
   | take
   | publish
   deriving Repr, BEq, Inhabited
+
+/-- Whether the action changes global memory, or may through the reference it
+returns: what a frame states and a specification cannot read. -/
+def GlobalKind.writesMemory : GlobalKind → Bool
+  | .borrow .mutable | .borrow (.profile _) | .take | .publish => true
+  | .borrow .immutable | .contains => false
 
 /-- Pure primitives shared by the known Move/Rust semantic union. These are
 typed constructors rather than profile tags so every frontend and backend can
@@ -813,6 +863,11 @@ inductive SpecOperation where
   | lengthVector
   | indexVector
   | sliceVector
+  | stringConcat
+  /-- A string's UTF-8 bytes, as a vector of `u8`. -/
+  | stringBytes
+  /-- A character's UTF-8 encoding, as a vector of `u8`. -/
+  | charEncode
   | inRange
   | inVectorRange
   | vectorRange
@@ -868,6 +923,9 @@ inductive Place where
   /-- Select `from..to` when `fromEnd` is false, or
   `from..length-to` when it is true. -/
   | subslice (base : PlaceId) (start stop : Nat) (fromEnd : Bool)
+  /-- The whole of a fixed vector as a dynamic one: `&[T; N]` to `&[T]` is a
+  borrow of this place. A write of another length has no outcome. -/
+  | unsize (base : PlaceId)
   | downcast (base : PlaceId) (variant : NameId)
   deriving Repr, BEq, Inhabited
 
@@ -1191,6 +1249,22 @@ def StructDecl.isGhostMemory (declaration : StructDecl) : Bool :=
     | .assign "ghost_memory" (.constant (.bool true)) _ => true
     | _ => false
 
+/-- A contract of a bodiless function at a shape of its generics: a generic
+contract over the shape's own variables. `arguments` has one type per binder of
+the function, over `signature.generics`, `Unit` as a placeholder at a lifetime's,
+which no value reads; `signature` is the function's at those
+arguments, which `locals` and `contract` read. Absent from
+a declaration without shapes in the JSON form, so a unit that has none keeps
+its encoding. -/
+structure ShapeContract where
+  loc : LocId
+  arguments : Array TypeUse
+  signature : Signature
+  locals : Array LocalDecl := #[]
+  contract : FunctionContract := {}
+  pragmas : Array Attribute := #[]
+  deriving Repr, BEq, Inhabited
+
 /-- Executable function declaration parameterized by its construction-stage
 body representation: `RawBody` at the frontend boundary and `FunctionBody`
 after validation. Origin and alignment are provenance, while `profile`
@@ -1209,7 +1283,25 @@ structure FunctionDecl (Body : Type) where
   pragmas : Array Attribute := #[]
   profileData : Array ProfileValue := #[]
   attributes : Array Attribute := #[]
+  /-- The contracts at shapes of the generics; the function has no other. -/
+  shapes? : Option (Array ShapeContract) := none
   deriving Repr, BEq, Inhabited
+
+/-- The contracts of a function at shapes of its generics, in source order. -/
+def FunctionDecl.shapes {Body : Type} (function : FunctionDecl Body) : Array ShapeContract :=
+  function.shapes?.getD #[]
+
+/-- The function read at a shape: a declaration over the shape's variables,
+which the checks and the translation of a function's contract apply to. -/
+def FunctionDecl.atShape {Body : Type} (function : FunctionDecl Body) (shape : ShapeContract) :
+    FunctionDecl Body :=
+  { function with
+    loc := shape.loc
+    signature := shape.signature
+    locals := shape.locals
+    contract := shape.contract
+    pragmas := shape.pragmas
+    shapes? := none }
 
 /-- Kind and declaration data of one trait-associated item. Method bodies are
 ordinary functions referenced by name so raw and validated namespaces do not
@@ -1415,6 +1507,7 @@ def FunctionDecl.withBody {α β : Type} (declaration : FunctionDecl α)
   pragmas := declaration.pragmas
   profileData := declaration.profileData
   attributes := declaration.attributes
+  shapes? := declaration.shapes?
 
 /-- Rebuild a namespace at a different body stage from replacement arenas and
 converted function declarations, preserving every other field. -/

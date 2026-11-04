@@ -82,7 +82,7 @@
                     "function": {
                       "callee": {
                         "name": {
-                          "index": 9
+                          "index": 12
                         },
                         "namespaceId": {
                           "index": 2
@@ -174,7 +174,7 @@
                     "function": {
                       "callee": {
                         "name": {
-                          "index": 8
+                          "index": 11
                         },
                         "namespaceId": {
                           "index": 2
@@ -278,7 +278,7 @@
                     "function": {
                       "callee": {
                         "name": {
-                          "index": 11
+                          "index": 14
                         },
                         "namespaceId": {
                           "index": 1
@@ -391,7 +391,7 @@
                     "function": {
                       "callee": {
                         "name": {
-                          "index": 10
+                          "index": 13
                         },
                         "namespaceId": {
                           "index": 2
@@ -517,7 +517,7 @@
                     "function": {
                       "callee": {
                         "name": {
-                          "index": 12
+                          "index": 15
                         },
                         "namespaceId": {
                           "index": 1
@@ -1489,12 +1489,28 @@
             }
           ],
           "name": {
-            "index": 11
+            "index": 14
           },
           "origin": {
             "index": 8
           },
-          "pragmas": [],
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "profile": "rust",
           "profileData": [
             {
@@ -1613,12 +1629,28 @@
             }
           ],
           "name": {
-            "index": 12
+            "index": 15
           },
           "origin": {
             "index": 9
           },
-          "pragmas": [],
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "profile": "rust",
           "profileData": [
             {
@@ -1835,9 +1867,14 @@
           },
           "locals": [],
           "name": {
-            "index": 7
+            "index": 10
           },
           "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.destructor"
+            },
             {
               "payload": "",
               "profile": "rust",
@@ -1899,12 +1936,28 @@
             }
           ],
           "name": {
-            "index": 8
+            "index": 11
           },
           "origin": {
             "index": 5
           },
-          "pragmas": [],
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "profile": "rust",
           "profileData": [
             {
@@ -2013,12 +2066,28 @@
             }
           ],
           "name": {
-            "index": 9
+            "index": 12
           },
           "origin": {
             "index": 6
           },
-          "pragmas": [],
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "profile": "rust",
           "profileData": [
             {
@@ -2128,12 +2197,28 @@
             }
           ],
           "name": {
-            "index": 10
+            "index": 13
           },
           "origin": {
             "index": 7
           },
-          "pragmas": [],
+          "pragmas": [
+            {
+              "assign": {
+                "loc": null,
+                "name": "verify",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "bool": {
+                        "value": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "profile": "rust",
           "profileData": [
             {
@@ -2318,14 +2403,47 @@
           "name": {
             "index": 6
           },
-          "properties": [
+          "properties": [],
+          "variants": [
             {
-              "payload": "",
-              "profile": "rust",
-              "tag": "struct.opaque"
+              "discriminant": 0,
+              "fields": [],
+              "loc": {
+                "index": 29
+              },
+              "name": {
+                "index": 7
+              }
+            },
+            {
+              "discriminant": 1,
+              "fields": [
+                {
+                  "doc": "",
+                  "loc": {
+                    "index": 29
+                  },
+                  "name": {
+                    "index": 9
+                  },
+                  "type": {
+                    "loc": {
+                      "index": 29
+                    },
+                    "typeId": {
+                      "index": 3
+                    }
+                  }
+                }
+              ],
+              "loc": {
+                "index": 29
+              },
+              "name": {
+                "index": 8
+              }
             }
-          ],
-          "variants": []
+          ]
         }
       ],
       "traits": []
@@ -2349,7 +2467,7 @@
         ]
       ],
       "profile": "rust",
-      "version": 2
+      "version": 5
     }
   ],
   "tables": {
@@ -2956,6 +3074,33 @@
         ]
       },
       {
+        "name": "None",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "Some",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
+        "name": "0",
+        "namespaceId": {
+          "index": 2
+        },
+        "scope": [
+          "option"
+        ]
+      },
+      {
         "name": "Vec",
         "namespaceId": {
           "index": 1
@@ -3200,7 +3345,7 @@
             }
           ],
           "name": {
-            "index": 7
+            "index": 10
           }
         }
       },
@@ -3254,7 +3399,7 @@
             }
           ],
           "name": {
-            "index": 7
+            "index": 10
           }
         }
       },
@@ -3346,6 +3491,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 7
+    "minor": 9
   }
 }

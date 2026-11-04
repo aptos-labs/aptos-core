@@ -64,8 +64,61 @@ naming their definitions, since the unit does not record the toolchain's
 sources. `tests/raw-unit/dependency_calls.rs` calls dependency functions:
 each call is resolved as codegen resolves it (a trait method on a concrete
 type reaches its impl's method), and each called dependency function is
-declared by its generic signature without its body. A signature naming an
-associated type is rejected (`tests/fixtures/dependency_projection.rs`).
+declared by its generic signature without its body.
+`tests/raw-unit/dependency_projection.rs` calls a function whose signature names
+an associated type. Rustc Public has no normalizing signature query, but the
+types in MIR are normalized, so each distinct associated type is a generic
+parameter after the function's generics, named after the associated item, and a
+call instantiates it by unifying the declared signature with the call's operand
+and destination types. A call this does not bind is an export error at the call.
+A trait-method call whose impl selection depends on a type parameter is rejected
+(`tests/fixtures/generic_trait_call.rs`): it needs trait evidence.
+
+Export evaluates each constant a body uses and reads the result through the
+type's layout, so no constant is matched by name. Integers, `bool`, `char` and
+`&str` are literals (`tests/raw-unit/const_scalar.rs`); tuples, arrays, structs and
+enum variants are constructions of their parts (`const_aggregate.rs`, padding is
+never read); a constant at `&T` is a shared borrow of its referent's value, the
+core operation of a computed value, since a shared reference is the value it
+observes (`const_reference.rs`). An immutable `static` reads the same way, through
+its initializer (`const_static.rs`). A zero-sized constant of an ADT is the
+constructor of its layout's single variant, recursively, and optimized MIR assigns
+no zero-sized place, so a body returning a zero-sized type returns that value
+(`const_zero_sized.rs`). A promoted constant has no public evaluation, and a
+definition with generic parameters none before monomorphization, so both are export
+errors at their location, as is a `static` with interior mutability; `static mut`
+stays rejected.
+
+Rustc Public gives a span no call site, so what a macro of another crate expands to
+has no span in the crate, and no file outside the crate's items enters the unit. Such a
+node is located, with no primary range, at what it is reached after: the nearest
+dominator with a terminator in the crate, past the blocks of a panic region only such
+macros raise, and else the function (`tests/opaque-unit/opaque_panic.rs`).
+
+A failure in a body is not an export error: an rvalue, place, call or constant the
+unit cannot state (a promoted constant, a generic one, a trait call that needs
+evidence) is an opaque node where it stands, stating why, and the rest of the body
+maps. A diverging region holding one collapses; any other survivor refuses its
+function at import. A type only a body states, of a local or of a call's instantiation,
+refuses the function the same way, before anything reads the body
+(`tests/opaque-unit/local_types.rs`). A function whose signature cannot be mapped, by a
+type, a struct field it reaches, or a binder, is declared `function.opaque` with no
+generics or parameters: import reports it as refused and refuses every caller, whatever
+its contract (`tests/opaque-unit/signature_types.rs`). What the whole unit depends on
+stays an export error: names and scopes, `Copy` and destructor properties. The exporter pins `-Copt-level=0` beside
+`-Cpanic=abort`, so a source has one MIR whatever Cargo's profile says.
+
+`tests/opaque-unit` holds artifacts that validation rejects. A constant with no
+statement in the unit (a function pointer, a float) is `ConstValue.opaque` with its
+type's text, and a callee that is unsafe or whose signature has no mapping is
+declared with the Rust property `function.opaque`, with no generics or parameters
+and a `!` result. An import pass collapses the diverging regions that hold them,
+and the import prunes an opaque declaration nothing then calls. Validation rejects a
+node a function reaches and any opaque declaration left (`VIR-OPAQUE-SURVIVOR`).
+A constant states the shape only of an ADT whose variants and fields are all
+visible. Rustc Public exposes no field's visibility, so that is a local ADT, an enum,
+a struct without fields, or a struct a body observes, whose fields rustc admitted;
+a constant of any other dependency struct is opaque.
 
 `tests/fixtures/generic.rs` exercises the same callback with one generic trait
 body. The probe checks that it remains one unspecialized body and observes the
@@ -130,6 +183,10 @@ non-ASCII text, and canonical Rust re-import reconstructs the same call.
 rest pattern as a first-class core place. Shared place semantics read and write
 the selected range, and the baseline reaches structured validated VIR without
 inventing pointer arithmetic.
+`tests/raw-unit/unsize.rs` folds the coercion of `&[T; N]` to `&[T]` into a borrow
+of the core place `unsize p`, so no loan is held at the array's type;
+`tests/raw-unit/unsize_mutable.rs` exports the mutable form, which preparation
+rejects.
 `tests/raw-unit/slice_from_end.rs` lowers a from-end constant slice index to the
 existing core expression `length(slice) - offset` and index place. The baseline
 therefore preserves the runtime-dependent projection without adding a
@@ -200,7 +257,11 @@ unwind action. Under the fixed `panic=abort` profile, Lean structurizes the
 exact unreachable-unwind form to an explicit core drop followed by the normal
 continuation; validation, preparation, and the VerexSL `drop(place)` baseline
 all check that destruction is not silently erased. Cleanup edges and effectful
-drop glue remain explicit M4 boundaries.
+drop glue remain explicit M4 boundaries. The Rust property `struct.destructor`
+states of an ADT that it or an ADT its fields reach has a `Drop` impl, read from
+the trait impls of each crate the unit reaches; a field's type parameter counts
+for an ADT with visible fields only where it is instantiated, and for an opaque
+one always (`tests/raw-unit/destructors.rs`).
 `tests/raw-unit/assert.rs` detaches an `expected=false` division-by-zero MIR
 assertion, its normal target, and unwind action. The Rust mirror also has typed
 forms for storage-live/dead, place-mention, and user-type-ascription statements.

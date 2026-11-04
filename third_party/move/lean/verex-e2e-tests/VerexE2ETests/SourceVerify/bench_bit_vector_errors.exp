@@ -1,0 +1,50 @@
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:6:5: error: the specification clause `aborts_if length == 0` is not established
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:5:8: error: verex verification failed: the automatic verification of `BitVector::new_unbounded` failed; provide a proof in the module:
+  verify BitVector::new_unbounded by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:12:5: error: the specification clause `ensures result.bits.length == length + 1` is not established
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:9:8: error: verex verification failed: the automatic verification of `BitVector::new_longer` failed; provide a proof in the module:
+  verify BitVector::new_longer by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:14:3: error: `no panic when aborts at call 1 of index_mut` is not established: the call `[index]` at VerexE2ETests/SourceVerify/bench_bit_vector_errors.rs:26:18 may panic
+  from: ↑self_bits.values.size ≤ index.val
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:14:8: error: verex verification failed: the automatic verification of `BitVector::set` failed; provide a proof in the module:
+  verify BitVector::set by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of index_mut => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:19:5: error: the specification clause `ensures ∀ (k in 0 .. self.bits.length), !self.bits[k]` is not established
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:17:8: error: verex verification failed: the automatic verification of `BitVector::unset_other` failed; provide a proof in the module:
+  verify BitVector::unset_other by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:23:5: error: the specification clause `ensures amount < self.bits.length ==>
+        ∀ (k in 0 .. self.bits.length - amount), self.bits[k] == old(self).bits[k]` is not established
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:21:8: error: verex verification failed: the automatic verification of `BitVector::shift_left` failed; provide a proof in the module:
+  verify BitVector::shift_left by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:40:5: error: the specification clause `ensures ∀ (k in start .. start + result + 1), self.bits[k]` is not established
+VerexE2ETests/SourceVerify/bench_bit_vector_errors.spec.lean:38:8: error: verex verification failed: the automatic verification of `BitVector::longest_set_sequence_starting_at` failed; provide a proof in the module:
+  verify BitVector::longest_set_sequence_starting_at by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

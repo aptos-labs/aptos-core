@@ -91,7 +91,7 @@ deriving instance FromJson for Expr
 deriving instance ToJson, FromJson for
   PatternKind, Pattern, BinderKind, GenericBinder,
   Parameter, LocalDecl, Signature, ParameterFrame, FunctionContract, ConstantDecl, FieldDecl,
-  VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
+  VariantDecl, GhostFieldDecl, StructDecl, ShapeContract, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
   TraitDecl, AssociatedItemValue, AssociatedItemBinding, ImplDecl,
   SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant, IntrinsicBinding,
   IntrinsicDecl, ScopeKind, ScopeDecl, Namespace

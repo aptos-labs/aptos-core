@@ -14,7 +14,7 @@ private def emptyUnit : RawUnit where
   namespaces := #[]
 
 private def emptyUnitJson : String :=
-  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":7}}"
+  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":9}}"
 
 #guard encodeJson emptyUnit == emptyUnitJson
 
@@ -31,8 +31,8 @@ private def jsonWithUnknownTopLevelField : String :=
 
 private def jsonWithUnknownNestedField : String :=
   (encodeJson emptyUnit).replace
-    "\"version\":{\"major\":1,\"minor\":7}"
-    "\"version\":{\"major\":1,\"minor\":7,\"patch\":0}"
+    "\"version\":{\"major\":1,\"minor\":9}"
+    "\"version\":{\"major\":1,\"minor\":9,\"patch\":0}"
 
 #guard match decodeJson jsonWithUnknownNestedField with
   | .error message => message == "unknown raw VIR JSON field `$.version.patch`"
@@ -40,13 +40,13 @@ private def jsonWithUnknownNestedField : String :=
 
 #guard match decodeJson
     ((encodeJson emptyUnit).replace
-      "\"version\":{\"major\":1,\"minor\":7}"
-      "\"version\":{\"major\":1,\"major\":1,\"minor\":7}") with
+      "\"version\":{\"major\":1,\"minor\":9}"
+      "\"version\":{\"major\":1,\"major\":1,\"minor\":9}") with
   | .error message => message.contains "duplicate JSON object field `major`"
   | .ok _ => false
 
 #guard match decodeJson
-    ("{\"version\":{\"major\":1,\"minor\":7}," ++ (encodeJson emptyUnit).drop 1) with
+    ("{\"version\":{\"major\":1,\"minor\":9}," ++ (encodeJson emptyUnit).drop 1) with
   | .error message => message.contains "duplicate JSON object field `version`"
   | .ok _ => false
 
@@ -80,8 +80,8 @@ private def malformedDocuments : Array String := #[
   (encodeJson emptyUnit).replace "\"tables\":{" "\"tables\":[",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":-1",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":1.5",
-  (encodeJson emptyUnit).replace "\"minor\":7" "\"minor\":\"0\"",
-  (encodeJson emptyUnit).replace "\"minor\":7" "\"patch\":0",
+  (encodeJson emptyUnit).replace "\"minor\":9" "\"minor\":\"0\"",
+  (encodeJson emptyUnit).replace "\"minor\":9" "\"patch\":0",
   (encodeJson profiledUnit).replace "\"profile\":\"rust\"" "\"profile\":\"unknown\""
 ]
 
@@ -96,6 +96,14 @@ private def bytes : ConstValue := .bytes #[0, 255]
 
 #guard match Lean.fromJson? (α := ConstValue) (Lean.toJson bytes) with
   | .ok decoded => decoded == bytes
+  | .error _ => false
+
+private def opaqueConstant : ConstValue := .opaque "&[u8; 7]"
+
+#guard (Lean.toJson opaqueConstant).compress == "{\"opaque\":{\"description\":\"&[u8; 7]\"}}"
+
+#guard match Lean.fromJson? (α := ConstValue) (Lean.toJson opaqueConstant) with
+  | .ok decoded => decoded == opaqueConstant
   | .error _ => false
 
 /-- A name keeps its scope; a name at its namespace's root is encoded without
@@ -324,6 +332,7 @@ private def classifyConstValue : ConstValue → Nat
   | .vector _ => 7
   | .tuple _ => 8
   | .profile _ => 9
+  | .opaque _ => 10
 
 private def classifyGenericArgument : GenericArgument → Nat
   | .typeArg _ => 0
@@ -386,6 +395,7 @@ private def classifyPlace : Place → Nat
   | .subslice _ _ _ _ => 4
   | .downcast _ _ => 5
   | .ghostField _ _ _ => 6
+  | .unsize _ => 7
 
 private def classifyPatternKind : PatternKind → Nat
   | .wildcard => 0
@@ -414,7 +424,8 @@ private def allConstValues : Array ConstValue := #[
   .bytes #[0, 255],
   .vector #[.integer 1],
   .tuple #[.bool false],
-  .profile extensionValue]
+  .profile extensionValue,
+  .opaque "&[u8; 7]"]
 
 private def allGenericArguments : Array GenericArgument := #[
   .typeArg { typeId := ⟨0⟩, loc := ⟨0⟩ },
@@ -465,7 +476,8 @@ private def allPlaces : Array Place := #[
   .index ⟨0⟩ ⟨0⟩,
   .subslice ⟨0⟩ 1 2 false,
   .downcast ⟨0⟩ ⟨0⟩,
-  .ghostField ⟨0⟩ { namespaceId := ⟨0⟩, name := ⟨0⟩ } ⟨0⟩]
+  .ghostField ⟨0⟩ { namespaceId := ⟨0⟩, name := ⟨0⟩ } ⟨0⟩,
+  .unsize ⟨0⟩]
 
 private def allPatterns : Array Pattern := #[
   { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .wildcard },
@@ -549,7 +561,7 @@ private def coreConstructorUnit : RawUnit := {
 #guard #[ReferenceKind.shared, .mutable].map classifyReferenceKind == Array.range 2
 #guard #[LifetimeKind.static, .parameter 0, .inference, .local].map
   classifyLifetimeKind == Array.range 4
-#guard allConstValues.map classifyConstValue == Array.range 10
+#guard allConstValues.map classifyConstValue == Array.range 11
 #guard allGenericArguments.map classifyGenericArgument == Array.range 4
 #guard #[Ability.copy, .drop, .store, .key].map classifyAbility == Array.range 4
 #guard allGenericPredicates.map classifyGenericPredicate == Array.range 7
@@ -557,7 +569,7 @@ private def coreConstructorUnit : RawUnit := {
 #guard #[AttributeValue.constant .unit, .name none "item", .qualifiedName "wire::item"].map
   classifyAttributeValue == Array.range 3
 #guard allAttributes.map classifyAttribute == Array.range 2
-#guard allPlaces.map classifyPlace == Array.range 7
+#guard allPlaces.map classifyPlace == Array.range 8
 #guard allPatterns.map (classifyPatternKind ·.kind) == Array.range 6
 #guard allBinderKinds.map (classifyBinderKind ·.kind) == Array.range 4
 
@@ -590,6 +602,7 @@ private def classifySurfaceSyntax : SurfaceSyntax → Nat
   | .receiverCall => 0
   | .indexNotation => 1
   | .extension _ => 2
+  | .componentMove => 3
 
 private def classifyGlobalKind : GlobalKind → Nat
   | .contains => 0
@@ -732,6 +745,9 @@ private def classifySpecOperation : SpecOperation → Nat
   | .noOp => 42
   | .final => 43
   | .lemma _ _ => 44
+  | .stringConcat => 46
+  | .stringBytes => 47
+  | .charEncode => 48
 
 private def classifyOperation : Operation → Nat
   | .move _ => 0
@@ -854,7 +870,8 @@ private def allSpecOperations : Array SpecOperation := #[
   .inVectorRange, .vectorRange, .maxValue 128, .bitVectorToInt,
   .intToBitVector, .abortFlag, .abortCode, .wellFormed, .boxValue,
   .unboxValue, .emptyEventStore, .extendEventStore, .eventStoreIncludes,
-  .eventStoreIncludedIn, .noOp, .final, .lemma qref { pre := some ⟨0⟩ }, .exists (some ⟨0⟩)]
+  .eventStoreIncludedIn, .noOp, .final, .lemma qref { pre := some ⟨0⟩ }, .exists (some ⟨0⟩),
+  .stringConcat, .stringBytes, .charEncode]
 
 private def operationRepresentatives : Array Operation := #[
   .move ⟨0⟩,
@@ -951,7 +968,7 @@ private def operationConstructorUnit : RawUnit :=
 #guard #[TraceKind.user, .automatic, .subAutomatic].map classifyTraceKind == Array.range 3
 #guard #[BehaviorKind.requiresOf, .abortsOf, .ensuresOf, .resultOf,
     .unchangedOf, .foldsOf, .writeOf 1].map classifyBehaviorKind == Array.range 7
-#guard allSpecOperations.map classifySpecOperation == Array.range 46
+#guard allSpecOperations.map classifySpecOperation == Array.range 49
 #guard operationRepresentatives.map classifyOperation == Array.range 14
 #guard allQuantifierKinds.map classifyQuantifierKind == Array.range 5
 #guard allConditionKinds.map classifyConditionKind == Array.range 21

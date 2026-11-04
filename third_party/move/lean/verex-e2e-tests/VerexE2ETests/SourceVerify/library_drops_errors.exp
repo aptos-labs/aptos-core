@@ -1,0 +1,7 @@
+VerexE2ETests/SourceVerify/library_drops_errors.rs:35:1: error: no denotation for `guards`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/library_drops_errors.rs:39:1: error: no denotation for `mixed`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/library_drops_errors.rs:43:1: error: no denotation for `generic`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/library_drops_errors.rs:47:1: error: no denotation for `own`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/library_drops_errors.rs:51:1: error: no denotation for `nested`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/library_drops_errors.rs:55:1: error: no denotation for `of_mixed`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/library_drops_errors.rs:59:1: error: no denotation for `optional`: a drop at a type with a destructor is not carried by the denotation

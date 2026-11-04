@@ -5,27 +5,31 @@
 
 use super::exchange::*;
 use rustc_public::{
+    abi::{FieldsShape, LayoutShape, Scalar, TagEncoding, VariantsShape},
     crate_def::{CrateDef, CrateDefType, DefId},
     mir::{
+        alloc::GlobalAlloc,
         mono::{Instance, InstanceKind},
-        visit::{Location as MirLocation, PlaceContext},
-        AggregateKind, AssertMessage, BinOp, Body, BorrowKind as MirBorrowKind, CastKind,
-        ConstOperand, Local, LocalDecl as MirLocalDecl, MirVisitor, Mutability, Operand,
-        Place as MirPlace, PointerCoercion, ProjectionElem, RawPtrKind, Rvalue, Safety,
-        StatementKind, TerminatorKind, UnOp, UnwindAction, WithRetag,
+        visit::{statement_location, terminator_location, Location as MirLocation, PlaceContext},
+        AggregateKind, AssertMessage, BasicBlock, BinOp, Body, BorrowKind as MirBorrowKind,
+        CastKind, ConstOperand, Local, LocalDecl as MirLocalDecl, MirVisitor, MutBorrowKind,
+        Mutability, Operand, Place as MirPlace, PointerCoercion, ProjectionElem, RawPtrKind,
+        Rvalue, Safety, SourceInfo, StatementKind, Terminator, TerminatorKind, UnOp, UnwindAction,
+        VarDebugInfo, VarDebugInfoContents, WithRetag,
     },
     target::MachineInfo,
     ty::{
-        Abi, AdtDef, AdtKind, AssocContainer, ConstantKind, FnDef, FnSig, GenericArgKind,
-        GenericArgs, GenericParamDef, GenericParamDefKind, ImplDef, IntTy, PolyFnSig, Region,
+        Abi, AdtDef, AdtKind, AliasKind, Allocation, AssocContainer, BoundRegionKind, ClosureDef,
+        ConstantKind, EarlyParamRegion, FnDef, FnSig, GenericArgKind, GenericArgs, GenericParamDef,
+        GenericParamDefKind, ImplDef, IntTy, MirConst, PolyFnSig, ProvenanceMap, Region,
         RegionKind, RigidTy, Span, TraitDef, Ty as RustTy, TyConst, TyConstKind, TyKind, UintTy,
-        VariantIdx,
+        UnevaluatedConst, VariantIdx,
     },
     Crate, CrateItem, CrateNum, ItemKind,
 };
 use serde_json::Number;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
 };
 
@@ -43,14 +47,29 @@ pub(super) fn raw_unit_json() -> Result<String, String> {
 
 struct UnitMapper {
     items: Vec<CrateItem>,
+    bodies: Vec<Body>,
+    /// Why an item's body is not mapped, by item.
+    refusals: Vec<Option<Refusal>>,
+    /// The local functions whose signatures the unit cannot state.
+    opaque_functions: BTreeSet<String>,
     identities: Vec<String>,
     /// Each callable function by its definition path: the local functions and
     /// the dependency functions the bodies call.
     name_ids: BTreeMap<String, QualifiedRef>,
     dependency_functions: Vec<DependencyFunction>,
+    constants: EvaluatedConstants,
+    /// The type parameters each local function's body shows to be `Copy`.
+    copy_parameters: Vec<BTreeSet<u32>>,
+    impls: AdtImpls,
+    /// The declared signature of each local function.
+    signatures: Vec<DeclaredSignature>,
+    /// How many bound regions' binders each callable function has, by its
+    /// definition path.
+    bound_lifetimes: BTreeMap<String, usize>,
     resolves_trait_calls: bool,
     names: Vec<QualifiedName>,
     adts: Vec<AdtNames>,
+    closures: Vec<ClosureNames>,
     types: TypeLayout,
     scopes: Scopes,
     namespaces: CrateNamespaces,
@@ -179,6 +198,34 @@ impl Scopes {
         Ok(path)
     }
 
+    /// A closure's name and the scope of its body: the name is rustc's path below
+    /// the enclosing module, the scope that name under the module.
+    fn closure_scope(&mut self, closure: ClosureDef) -> (String, Vec<String>, Vec<String>) {
+        let krate = closure.krate().name;
+        let definition = closure.def_id();
+        let module = self.module_scope(&krate, definition);
+        let mut current = definition.parent();
+        while let Some(ancestor) = current {
+            if !self.enclosing.contains(&ancestor) {
+                break;
+            }
+            current = ancestor.parent();
+        }
+        let path = definition.name();
+        let name = current
+            .and_then(|enclosing| {
+                path.strip_prefix(&format!("{}::", enclosing.name()))
+                    .map(str::to_owned)
+            })
+            .unwrap_or(path);
+        let mut scope = module.clone();
+        scope.push(name.clone());
+        self.declarations
+            .entry((krate, scope.clone()))
+            .or_insert_with(|| (ScopeKind::Inherent, closure.span()));
+        (name, module, scope)
+    }
+
     /// The module path of a definition relative to the crate root, each
     /// module on it recorded.
     fn module_scope(&mut self, krate: &str, definition: DefId) -> Vec<String> {
@@ -236,7 +283,94 @@ fn flattened_generics(function: FnDef) -> Result<Vec<GenericParamDef>, String> {
         ));
     }
     parameters.extend(own.params);
+    // An impl header's elided lifetimes all have the name `'_`, and an `impl Trait`
+    // parameter's name is its source text: binders are named apart, by position as a
+    // signature's elided lifetime is.
+    let taken = parameters
+        .iter()
+        .map(|parameter| parameter.name.clone())
+        .collect::<Vec<_>>();
+    for (position, parameter) in parameters.iter_mut().enumerate() {
+        if parameter.name == ANONYMOUS_LIFETIME {
+            let mut name = format!("'l{position}");
+            while taken.contains(&name) {
+                name.push('_');
+            }
+            parameter.name = name;
+        } else if matches!(parameter.kind, GenericParamDefKind::Type {
+            synthetic: true,
+            ..
+        }) {
+            let mut name = format!("Impl{position}");
+            while taken.contains(&name) {
+                name.push('_');
+            }
+            parameter.name = name;
+        }
+    }
     Ok(parameters)
+}
+
+/// The closure a local item is the body of.
+fn closure_of(item: CrateItem) -> Option<(ClosureDef, GenericArgs)> {
+    match item.ty().kind() {
+        TyKind::RigidTy(RigidTy::Closure(definition, arguments)) => Some((definition, arguments)),
+        _ => None,
+    }
+}
+
+/// The generic parameters of a local item: a closure's are those of the
+/// function it stands in, without the kind, signature and upvars rustc adds.
+fn item_generics(item: CrateItem) -> Result<Vec<GenericParamDef>, String> {
+    if closure_of(item).is_none() {
+        return flattened_generics(function_def(item)?);
+    }
+    match FnDef(item.0).generics_of().parent {
+        Some(parent) => flattened_generics(FnDef(parent.0)),
+        None => Err(format!("closure `{}` has no enclosing item", item.name())),
+    }
+}
+
+/// A closure's arguments are its parent's, then its kind, signature and the
+/// tuple of its upvars.
+fn closure_arguments(
+    arguments: &GenericArgs,
+) -> Result<(Vec<GenericArgKind>, Vec<RustTy>), String> {
+    let [parents @ .., _kind, _signature, GenericArgKind::Type(upvars)] = arguments.0.as_slice()
+    else {
+        return Err(format!("closure arguments {arguments:?} have no upvars"));
+    };
+    let TyKind::RigidTy(RigidTy::Tuple(upvars)) = upvars.kind() else {
+        return Err(format!("closure upvars {upvars:?} are no tuple"));
+    };
+    Ok((parents.to_vec(), upvars))
+}
+
+/// The types of a closure's upvars and those of its parent's arguments.
+fn closure_parts(arguments: &GenericArgs) -> Vec<RustTy> {
+    let Ok((parents, upvars)) = closure_arguments(arguments) else {
+        return vec![];
+    };
+    type_arguments(&GenericArgs(parents))
+        .into_iter()
+        .chain(upvars)
+        .collect()
+}
+
+/// Whether a closure's value is zero-sized: its upvars, if any, are such closures.
+/// rustc removes the assignments of such values.
+fn is_zero_sized_closure(arguments: &GenericArgs) -> bool {
+    closure_arguments(arguments).is_ok_and(|(_, upvars)| {
+        upvars.into_iter().all(|upvar| match upvar.kind() {
+            TyKind::RigidTy(RigidTy::Closure(_, nested)) => is_zero_sized_closure(&nested),
+            _ => false,
+        })
+    })
+}
+
+fn is_zero_sized_closure_type(ty: RustTy) -> bool {
+    matches!(ty.kind(), TyKind::RigidTy(RigidTy::Closure(_, arguments))
+        if is_zero_sized_closure(&arguments))
 }
 
 /// The binder kind of a function's generic parameter. A synthetic
@@ -245,15 +379,7 @@ fn flattened_generics(function: FnDef) -> Result<Vec<GenericParamDef>, String> {
 fn binder_kind(function: &str, parameter: &GenericParamDef) -> Result<BinderKind, String> {
     match parameter.kind {
         GenericParamDefKind::Lifetime => Ok(BinderKind::Lifetime),
-        GenericParamDefKind::Type {
-            synthetic: false, ..
-        } => Ok(BinderKind::TypeArg),
-        GenericParamDefKind::Type {
-            synthetic: true, ..
-        } => Err(format!(
-            "function `{function}` has synthetic type parameter `{}`; `impl Trait` generic binders are not yet supported",
-            parameter.name
-        )),
+        GenericParamDefKind::Type { .. } => Ok(BinderKind::TypeArg),
         GenericParamDefKind::Const { .. } => Err(format!(
             "function `{function}` has const parameter `{}` whose declared type is not exposed by the pinned Rustc Public API",
             parameter.name
@@ -264,13 +390,20 @@ fn binder_kind(function: &str, parameter: &GenericParamDef) -> Result<BinderKind
 fn generic_binder(
     function: &str,
     parameter: GenericParamDef,
+    copy_parameters: &BTreeSet<u32>,
     loc: LocId,
 ) -> Result<GenericBinder, String> {
     let kind = binder_kind(function, &parameter)?;
     // Trait bounds are not exposed for functions by the pinned Rustc Public
-    // API (rust-lang/rust#161892), so no binder states its predicates.
+    // API (rust-lang/rust#161892), so no binder states its predicates; `Copy`
+    // is what the body shows (`copy_parameters`).
+    let abilities = if copy_parameters.contains(&parameter.index) {
+        vec![Ability::Copy]
+    } else {
+        vec![]
+    };
     Ok(GenericBinder {
-        abilities: vec![],
+        abilities,
         kind,
         loc,
         name: parameter.name,
@@ -279,126 +412,688 @@ fn generic_binder(
     })
 }
 
+/// The binders of a function's bound regions.
+fn bound_lifetime_binders(
+    signature: &DeclaredSignature,
+    loc: LocId,
+) -> impl Iterator<Item = GenericBinder> + '_ {
+    signature
+        .bound_lifetimes
+        .iter()
+        .map(move |(_, name)| GenericBinder {
+            abilities: vec![],
+            kind: BinderKind::Lifetime,
+            loc,
+            name: name.clone(),
+            predicates: vec![],
+            type_: None,
+        })
+}
+
 fn erased() -> Region {
     Region {
         kind: RegionKind::ReErased,
     }
 }
 
-/// A type with its regions erased, as the types of MIR locals are.
-fn erase_regions(ty: RustTy) -> Result<RustTy, String> {
-    Ok(match ty.kind() {
+/// A type with its regions erased, as the types of MIR locals are. Rustc Public
+/// builds every type with its regions erased, whichever it is given.
+fn erase_regions(ty: RustTy) -> RustTy {
+    match ty.kind() {
         TyKind::RigidTy(RigidTy::Ref(_, referent, mutability)) => {
-            RustTy::new_ref(erased(), erase_regions(referent)?, mutability)
+            RustTy::new_ref(erased(), erase_regions(referent), mutability)
+        },
+        TyKind::RigidTy(RigidTy::RawPtr(pointee, mutability)) => {
+            RustTy::new_ptr(erase_regions(pointee), mutability)
         },
         TyKind::RigidTy(RigidTy::Adt(definition, arguments)) => {
             let arguments = arguments
                 .0
                 .into_iter()
-                .map(|argument| {
-                    Ok(match argument {
-                        GenericArgKind::Lifetime(_) => GenericArgKind::Lifetime(erased()),
-                        GenericArgKind::Type(argument) => {
-                            GenericArgKind::Type(erase_regions(argument)?)
-                        },
-                        argument => argument,
-                    })
+                .map(|argument| match argument {
+                    GenericArgKind::Lifetime(_) => GenericArgKind::Lifetime(erased()),
+                    GenericArgKind::Type(argument) => GenericArgKind::Type(erase_regions(argument)),
+                    argument => argument,
                 })
-                .collect::<Result<Vec<_>, String>>()?;
+                .collect();
             RustTy::from_rigid_kind(RigidTy::Adt(definition, GenericArgs(arguments)))
         },
-        TyKind::RigidTy(RigidTy::Tuple(elements)) => RustTy::new_tuple(
-            &elements
-                .into_iter()
-                .map(erase_regions)
-                .collect::<Result<Vec<_>, String>>()?,
-        ),
+        TyKind::RigidTy(RigidTy::Tuple(elements)) => {
+            RustTy::new_tuple(&elements.into_iter().map(erase_regions).collect::<Vec<_>>())
+        },
         TyKind::RigidTy(RigidTy::Slice(element)) => {
-            RustTy::from_rigid_kind(RigidTy::Slice(erase_regions(element)?))
+            RustTy::from_rigid_kind(RigidTy::Slice(erase_regions(element)))
         },
         TyKind::RigidTy(RigidTy::Array(element, length)) => {
-            RustTy::from_rigid_kind(RigidTy::Array(erase_regions(element)?, length))
+            RustTy::from_rigid_kind(RigidTy::Array(erase_regions(element), length))
         },
         _ => ty,
-    })
+    }
 }
 
-/// The associated type a type names, which VIR does not express.
+/// The regions a type mentions, not those of a function pointer or an alias.
+fn collect_regions(ty: RustTy, regions: &mut Vec<Region>) {
+    let mut add = |region: Region| {
+        if !regions.contains(&region) {
+            regions.push(region);
+        }
+    };
+    match ty.kind() {
+        TyKind::RigidTy(RigidTy::FnPtr(_)) => return,
+        TyKind::RigidTy(RigidTy::Ref(region, ..)) => add(region),
+        TyKind::RigidTy(RigidTy::Adt(_, arguments)) => {
+            for argument in arguments.0 {
+                if let GenericArgKind::Lifetime(region) = argument {
+                    add(region);
+                }
+            }
+        },
+        _ => {},
+    }
+    for child in type_children(ty) {
+        collect_regions(child, regions);
+    }
+}
+
+/// Whether a dependency's signature holds an ADT over several lifetimes, which it
+/// may bound against each other, and Rustc Public exposes no bound
+/// (rust-lang/rust#161892). A local body is checked against its signature; a
+/// dependency has none to check.
+fn hides_lifetime_relations(ty: RustTy) -> bool {
+    let mut regions = Vec::new();
+    collect_regions(ty, &mut regions);
+    let related = matches!(ty.kind(), TyKind::RigidTy(RigidTy::Adt(..)))
+        && regions
+            .iter()
+            .filter(|region| declares_relation(region))
+            .count()
+            > 1;
+    related || type_children(ty).into_iter().any(hides_lifetime_relations)
+}
+
+/// Whether a signature's region says what it relates to: `FnDef::fn_sig` erases an
+/// early-bound one, the only kind a `where` clause can mention, so an erased region
+/// relates to all and a bound one to what the types imply.
+fn declares_relation(region: &Region) -> bool {
+    match region.kind {
+        RegionKind::ReBound(..) | RegionKind::ReEarlyParam(_) => true,
+        RegionKind::ReStatic | RegionKind::RePlaceholder(_) | RegionKind::ReErased => false,
+    }
+}
+
+/// A function's signature as declared: its types with the regions
+/// `FnDef::fn_sig` gives them, each bound region a lifetime binder of its own after
+/// the function's other binders.
+struct DeclaredSignature {
+    /// Its parameter types, then its result type.
+    types: Vec<RustTy>,
+    /// The bound regions it keeps, in the order of their binders, with their names.
+    bound_lifetimes: Vec<(Region, String)>,
+    /// Its first bound region's binder.
+    first_binder: usize,
+}
+
+impl DeclaredSignature {
+    /// A closure's body, which no item declares: its parameters and result are its
+    /// locals, with their regions inferred, and it has no binder of its own after its
+    /// parent's. Its struct's binders hold the regions of its upvars.
+    fn of_closure(body: &Body, first_binder: usize) -> Self {
+        let locals = mapped_locals(body);
+        let arguments = body.arg_locals().len();
+        Self {
+            types: locals[1..=arguments]
+                .iter()
+                .chain(std::iter::once(&locals[0]))
+                .map(|local| local.ty)
+                .collect(),
+            bound_lifetimes: vec![],
+            first_binder,
+        }
+    }
+
+    /// An elided lifetime that relates nothing stays inferred: where the result has
+    /// no region, or the signature no other one. A dependency whose lifetimes may be
+    /// related by what is not exposed is inferred whole.
+    fn new(function: FnDef, first_binder: usize, dependency: bool) -> Self {
+        let types = function.fn_sig().value.inputs_and_output;
+        if dependency && types.iter().any(|ty| hides_lifetime_relations(*ty)) {
+            return Self {
+                types: types.into_iter().map(erase_regions).collect(),
+                bound_lifetimes: vec![],
+                first_binder,
+            };
+        }
+        let mut regions = Vec::new();
+        for ty in &types {
+            collect_regions(*ty, &mut regions);
+        }
+        let mut output_regions = Vec::new();
+        if let Some(output) = types.last() {
+            collect_regions(*output, &mut output_regions);
+        }
+        let named = |region: &Region| !matches!(region.kind, RegionKind::ReErased);
+        let informative =
+            output_regions.iter().any(named) && regions.iter().filter(|r| named(r)).count() > 1;
+        let kept = regions
+            .into_iter()
+            .filter_map(|region| {
+                let RegionKind::ReBound(_, bound) = &region.kind else {
+                    return None;
+                };
+                // An unnamed bound region identifies no definition, so it could
+                // not be told from another function's.
+                let name = match &bound.kind {
+                    BoundRegionKind::BrNamed(_, name) => name.clone(),
+                    BoundRegionKind::BrAnon | BoundRegionKind::BrEnv => return None,
+                };
+                (informative || name != ANONYMOUS_LIFETIME).then_some((region, name))
+            })
+            .collect::<Vec<_>>();
+        // Binders are named apart: an elided lifetime by its position.
+        let mut taken = kept
+            .iter()
+            .map(|(_, name)| name.clone())
+            .collect::<Vec<_>>();
+        if let Ok(generics) = flattened_generics(function) {
+            taken.extend(generics.into_iter().map(|parameter| parameter.name));
+        }
+        let bound_lifetimes = kept
+            .into_iter()
+            .enumerate()
+            .map(|(position, (region, name))| {
+                if name != ANONYMOUS_LIFETIME {
+                    return (region, name);
+                }
+                let mut name = format!("'l{}", first_binder + position);
+                while taken.contains(&name) {
+                    name.push('_');
+                }
+                (region, name)
+            })
+            .collect::<Vec<_>>();
+        let types = if bound_lifetimes.is_empty() {
+            types.into_iter().map(erase_regions).collect()
+        } else {
+            types
+        };
+        Self {
+            types,
+            bound_lifetimes,
+            first_binder,
+        }
+    }
+
+    /// The declared types of a body, each where rustc normalized it to no other
+    /// type than the local's. Where it did, the local's erased type stands.
+    fn at_locals(mut self, body: &Body) -> Self {
+        let argument_count = body.arg_locals().len();
+        let locals = mapped_locals(body);
+        for (index, ty) in self.types.iter_mut().enumerate() {
+            let local = if index == argument_count {
+                &locals[0]
+            } else {
+                &locals[index + 1]
+            };
+            if erase_regions(*ty) != local.ty {
+                *ty = local.ty;
+            }
+        }
+        self
+    }
+
+    /// Each bound region with what the lifetime table says of it.
+    fn region_specs(&self) -> impl Iterator<Item = LifetimeSpec> + '_ {
+        self.bound_lifetimes
+            .iter()
+            .enumerate()
+            .map(|(position, (region, name))| LifetimeSpec {
+                region: region.clone(),
+                kind: LifetimeKind::Parameter {
+                    index: self.first_binder + position,
+                },
+                name: Some(name.clone()),
+            })
+    }
+}
+
+/// The binder name of a lifetime its source does not name.
+const ANONYMOUS_LIFETIME: &str = "'_";
+
+/// How many regions a type states: of its references and its ADTs' arguments, a
+/// closure's being its own.
+fn regions_in(ty: RustTy) -> usize {
+    match ty.kind() {
+        TyKind::RigidTy(RigidTy::Ref(_, referent, _)) => 1 + regions_in(referent),
+        TyKind::RigidTy(RigidTy::Adt(_, arguments)) => arguments
+            .0
+            .into_iter()
+            .map(|argument| match argument {
+                GenericArgKind::Lifetime(_) => 1,
+                GenericArgKind::Type(argument) => regions_in(argument),
+                GenericArgKind::Const(_) => 0,
+            })
+            .sum(),
+        TyKind::RigidTy(RigidTy::Tuple(elements)) => elements.into_iter().map(regions_in).sum(),
+        TyKind::RigidTy(RigidTy::Slice(element) | RigidTy::Array(element, _)) => {
+            regions_in(element)
+        },
+        _ => 0,
+    }
+}
+
+/// The types a type is built of. An alias is a leaf.
+fn type_children(ty: RustTy) -> Vec<RustTy> {
+    let TyKind::RigidTy(rigid) = ty.kind() else {
+        return vec![];
+    };
+    match rigid {
+        RigidTy::Ref(_, inner, _)
+        | RigidTy::RawPtr(inner, _)
+        | RigidTy::Slice(inner)
+        | RigidTy::Array(inner, _)
+        | RigidTy::Pat(inner, _) => vec![inner],
+        RigidTy::Tuple(elements) => elements,
+        RigidTy::FnPtr(signature) => signature.value.inputs_and_output,
+        RigidTy::Closure(_, arguments) => closure_parts(&arguments),
+        RigidTy::Adt(_, arguments)
+        | RigidTy::FnDef(_, arguments)
+        | RigidTy::Coroutine(_, arguments)
+        | RigidTy::CoroutineClosure(_, arguments)
+        | RigidTy::CoroutineWitness(_, arguments) => type_arguments(&arguments),
+        RigidTy::Bool
+        | RigidTy::Char
+        | RigidTy::Int(_)
+        | RigidTy::Uint(_)
+        | RigidTy::Float(_)
+        | RigidTy::Foreign(_)
+        | RigidTy::Str
+        | RigidTy::Never
+        | RigidTy::Dynamic(..) => vec![],
+    }
+}
+
+fn type_arguments(arguments: &GenericArgs) -> Vec<RustTy> {
+    arguments
+        .0
+        .iter()
+        .filter_map(|argument| match argument {
+            GenericArgKind::Type(argument) => Some(*argument),
+            GenericArgKind::Lifetime(_) | GenericArgKind::Const(_) => None,
+        })
+        .collect()
+}
+
+/// The first alias a type names, which only a dependency's signature may.
 fn projection(ty: RustTy) -> Option<RustTy> {
     match ty.kind() {
         TyKind::Alias(..) => Some(ty),
-        TyKind::RigidTy(RigidTy::Ref(_, referent, _)) => projection(referent),
-        TyKind::RigidTy(RigidTy::Slice(element) | RigidTy::Array(element, _)) => {
-            projection(element)
-        },
-        TyKind::RigidTy(RigidTy::Tuple(elements)) => elements.into_iter().find_map(projection),
-        TyKind::RigidTy(RigidTy::Adt(_, arguments)) => {
-            arguments.0.into_iter().find_map(|argument| match argument {
-                GenericArgKind::Type(argument) => projection(argument),
-                _ => None,
-            })
-        },
-        _ => None,
+        _ => type_children(ty).into_iter().find_map(projection),
+    }
+}
+
+const PARAMETER_DEPENDENT_CALL: &str = "depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type";
+
+/// The variant a MIR node is, without its contents, whose spans name absolute paths.
+fn variant_name(node: &impl std::fmt::Debug) -> String {
+    let text = format!("{node:?}");
+    text.split([' ', '(']).next().unwrap_or_default().to_owned()
+}
+
+/// Whether a type names an associated type of a type parameter.
+fn names_parameter_projection(ty: RustTy) -> bool {
+    match ty.kind() {
+        TyKind::Alias(..) => mentions_parameter(ty),
+        _ => type_children(ty)
+            .into_iter()
+            .any(names_parameter_projection),
+    }
+}
+
+/// Whether a type names a type parameter, also inside an alias.
+fn mentions_parameter(ty: RustTy) -> bool {
+    match ty.kind() {
+        TyKind::Param(_) => true,
+        TyKind::Alias(_, alias) => type_arguments(&alias.args)
+            .into_iter()
+            .any(mentions_parameter),
+        _ => type_children(ty).into_iter().any(mentions_parameter),
     }
 }
 
 /// The function a call reaches, as codegen resolves it: a trait method called
-/// on a concrete type resolves to its impl's method.
+/// on a concrete type resolves to its impl's method. rustc selects an impl only
+/// for concrete types, so a call that fails here on a type parameter is one a
+/// bound of the caller would have to justify.
 fn resolve_callee(callee: FnDef, arguments: &GenericArgs) -> Result<(FnDef, GenericArgs), String> {
-    let instance = Instance::resolve(callee, arguments).map_err(|_| {
-        format!(
-            "callee `{}` selects an implementation on a type parameter; implementation-selection evidence is unavailable from the pinned Rustc Public API",
-            callee.name()
-        )
+    // rustc does not answer for an associated type of a parameter: it cannot normalize it.
+    if type_arguments(arguments)
+        .into_iter()
+        .any(names_parameter_projection)
+    {
+        return Err(PARAMETER_DEPENDENT_CALL.to_owned());
+    }
+    let instance = Instance::resolve(callee, arguments).map_err(|error| {
+        if type_arguments(arguments)
+            .into_iter()
+            .any(mentions_parameter)
+        {
+            PARAMETER_DEPENDENT_CALL.to_owned()
+        } else {
+            format!("has no implementation: {error}")
+        }
     })?;
     match instance.kind {
         // An item instance is a function definition with its arguments.
         InstanceKind::Item => Ok((FnDef(instance.def.def_id()), instance.args())),
-        InstanceKind::Intrinsic | InstanceKind::LlvmIntrinsic => Err(format!(
-            "callee `{}` is a compiler intrinsic",
-            callee.name()
-        )),
-        InstanceKind::Virtual { .. } => Err(format!(
-            "callee `{}` is dispatched dynamically",
-            callee.name()
-        )),
-        InstanceKind::Shim => Err(format!(
-            "callee `{}` is compiler-generated glue",
-            callee.name()
-        )),
+        InstanceKind::Intrinsic | InstanceKind::LlvmIntrinsic => {
+            Err("is a compiler intrinsic".to_owned())
+        },
+        InstanceKind::Virtual { .. } => Err("is dispatched dynamically".to_owned()),
+        InstanceKind::Shim => Err("reaches compiler-generated glue".to_owned()),
     }
 }
 
-/// A dependency function's parameter and result types, regions erased, or
-/// why its signature is outside the supported slice.
-fn dependency_signature(function: FnDef) -> Result<Vec<RustTy>, String> {
-    let signature = function.fn_sig().value;
-    if signature.c_variadic || signature.safety != Safety::Safe || signature.abi != Abi::Rust {
-        return Err(format!(
-            "dependency function `{}` is not a safe Rust-ABI function",
-            function.name()
-        ));
+/// The closure a call of an `Fn*` method on a closure type reaches: its body, of
+/// the closure's own kind. Any other kind goes through a shim `resolve_callee`
+/// rejects.
+fn closure_callee(definition: FnDef, arguments: &GenericArgs) -> Option<(ClosureDef, GenericArgs)> {
+    let GenericArgKind::Type(receiver) = arguments.0.first()? else {
+        return None;
+    };
+    let TyKind::RigidTy(RigidTy::Closure(closure, closure_arguments)) = receiver.kind() else {
+        return None;
+    };
+    let (resolved, _) = resolve_callee(definition, arguments).ok()?;
+    (resolved.def_id() == closure.def_id()).then_some((closure, closure_arguments))
+}
+
+/// An associated type a dependency's signature names: a type parameter of the
+/// declaration, after the function's generics. A call's instantiation states
+/// what rustc normalized it to.
+struct AssociatedType {
+    alias: RustTy,
+    /// Its index among the function's generic arguments.
+    index: u32,
+    name: String,
+}
+
+/// A dependency crate's function the bodies call, declared without its body.
+struct DependencyFunction {
+    definition: FnDef,
+    /// Its parameter and result types.
+    signature: Vec<RustTy>,
+    associated_types: Vec<AssociatedType>,
+    /// Whether the unit cannot state its signature or admit its unsafety. It is
+    /// then declared with no generics or parameters, diverging: nothing reads
+    /// the declaration, because validation rejects a call that survives import.
+    opaque: bool,
+    /// Its declared signature, whose binders follow its associated types'.
+    declared: DeclaredSignature,
+}
+
+impl DependencyFunction {
+    /// The function's declaration, opaque if its signature or its unsafety is
+    /// outside the supported slice.
+    fn new(function: FnDef) -> Self {
+        Self::declared(function).unwrap_or_else(|_| Self {
+            definition: function,
+            signature: vec![RustTy::from_rigid_kind(RigidTy::Never)],
+            associated_types: vec![],
+            opaque: true,
+            declared: DeclaredSignature {
+                types: vec![],
+                bound_lifetimes: vec![],
+                first_binder: 0,
+            },
+        })
     }
-    let types = signature
-        .inputs_and_output
-        .into_iter()
-        .map(erase_regions)
-        .collect::<Result<Vec<_>, String>>()?;
-    for ty in &types {
-        if let Some(alias) = projection(*ty) {
+
+    fn declared(function: FnDef) -> Result<Self, String> {
+        let signature = function.fn_sig().value;
+        if signature.c_variadic || signature.safety != Safety::Safe || signature.abi != Abi::Rust {
             return Err(format!(
-                "dependency function `{}` names the associated type `{alias:?}`, which VIR does not yet express",
+                "dependency function `{}` is not a safe Rust-ABI function",
                 function.name()
             ));
         }
-        collect_type_adts(*ty, &[], &mut Vec::new()).map_err(|error| {
-            format!(
-                "dependency function `{}` has a signature outside the supported slice: {error}",
-                function.name()
-            )
-        })?;
+        let types = signature.inputs_and_output;
+        let generics = flattened_generics(function)?;
+        for parameter in &generics {
+            binder_kind(&function.name(), parameter)?;
+        }
+        let mut declared = Self {
+            definition: function,
+            signature: vec![],
+            associated_types: vec![],
+            opaque: false,
+            declared: DeclaredSignature {
+                types: vec![],
+                bound_lifetimes: vec![],
+                first_binder: 0,
+            },
+        };
+        for ty in &types {
+            declared
+                .collect_associated_types(*ty, &generics)
+                .and_then(|()| collect_signature_adts(*ty, &[], &mut Vec::new()))
+                .map_err(|error| {
+                    format!(
+                        "dependency function `{}` has a signature outside the supported slice: {error}",
+                        function.name()
+                    )
+                })?;
+        }
+        let signature = DeclaredSignature::new(
+            function,
+            generics.len() + declared.associated_types.len(),
+            true,
+        );
+        declared.signature = signature.types.clone();
+        declared.declared = signature;
+        Ok(declared)
     }
-    Ok(types)
+
+    fn collect_associated_types(
+        &mut self,
+        ty: RustTy,
+        generics: &[GenericParamDef],
+    ) -> Result<(), String> {
+        let TyKind::Alias(kind, alias) = ty.kind() else {
+            for child in type_children(ty) {
+                self.collect_associated_types(child, generics)?;
+            }
+            return Ok(());
+        };
+        if kind != AliasKind::Projection {
+            return Err(format!("the type alias `{ty}` is not an associated type"));
+        }
+        if self.associated_types.iter().any(|known| known.alias == ty) {
+            return Ok(());
+        }
+        // Two crates' associated types, or a parameter, may share the item's name.
+        let segment = last_segment(&alias.def_id.name());
+        let taken = |name: &str| {
+            generics.iter().any(|parameter| parameter.name == name)
+                || self.associated_types.iter().any(|known| known.name == name)
+        };
+        let name = std::iter::once(segment.clone())
+            .chain((2..).map(|suffix| format!("{segment}{suffix}")))
+            .find(|name| !taken(name))
+            .expect("the suffixes are unbounded");
+        let index = generics.len() + self.associated_types.len();
+        self.associated_types.push(AssociatedType {
+            alias: ty,
+            index: index as u32,
+            name,
+        });
+        Ok(())
+    }
+
+    /// What a call instantiates the associated types with, in their order:
+    /// the declared signature unified with the types at the call, which MIR
+    /// has normalized. `arguments` are the function's generic arguments.
+    fn bind_associated_types(
+        &self,
+        arguments: &GenericArgs,
+        actual: &[RustTy],
+    ) -> Result<Vec<RustTy>, String> {
+        if self.signature.len() != actual.len() {
+            return Err(format!(
+                "the signature of `{}` has {} types, the call {}",
+                self.definition.name(),
+                self.signature.len(),
+                actual.len()
+            ));
+        }
+        let mut bindings = vec![None; self.associated_types.len()];
+        for (declared, actual) in self.signature.iter().zip(actual) {
+            self.unify(*declared, *actual, arguments, &mut bindings)?;
+        }
+        bindings
+            .into_iter()
+            .zip(&self.associated_types)
+            .map(|(binding, associated)| {
+                binding.ok_or_else(|| {
+                    format!(
+                        "no type at the call binds the associated type `{}`",
+                        associated.alias
+                    )
+                })
+            })
+            .collect()
+    }
+
+    fn unify(
+        &self,
+        declared: RustTy,
+        actual: RustTy,
+        arguments: &GenericArgs,
+        bindings: &mut [Option<RustTy>],
+    ) -> Result<(), String> {
+        let mismatch = || format!("the declared type `{declared}` does not unify with `{actual}`");
+        let same = |left: RustTy, right: RustTy| -> Result<bool, String> {
+            Ok(erase_regions(left) == erase_regions(right))
+        };
+        match declared.kind() {
+            TyKind::Alias(..) => {
+                let position = self
+                    .associated_types
+                    .iter()
+                    .position(|associated| associated.alias == declared)
+                    .ok_or_else(|| format!("the type `{declared}` is not declared"))?;
+                match bindings[position] {
+                    Some(bound) if !same(bound, actual)? => Err(format!(
+                        "the associated type `{declared}` is both `{bound}` and `{actual}`"
+                    )),
+                    Some(_) => Ok(()),
+                    None => {
+                        bindings[position] = Some(actual);
+                        Ok(())
+                    },
+                }
+            },
+            TyKind::Param(parameter) => match arguments.0.get(parameter.index as usize) {
+                Some(GenericArgKind::Type(argument)) if same(*argument, actual)? => Ok(()),
+                _ => Err(mismatch()),
+            },
+            TyKind::RigidTy(rigid) => {
+                let TyKind::RigidTy(other) = actual.kind() else {
+                    return Err(mismatch());
+                };
+                let children = type_children(declared);
+                let others = type_children(actual);
+                if !same_constructor(&rigid, &other) || children.len() != others.len() {
+                    return Err(mismatch());
+                }
+                for (child, other) in children.into_iter().zip(others) {
+                    self.unify(child, other, arguments, bindings)?;
+                }
+                Ok(())
+            },
+            TyKind::Bound(..) => Err(mismatch()),
+        }
+    }
+}
+
+/// Whether two rigid types agree on all but the types they are built of.
+fn same_constructor(left: &RigidTy, right: &RigidTy) -> bool {
+    let constants = |arguments: &GenericArgs| {
+        arguments
+            .0
+            .iter()
+            .filter(|argument| matches!(argument, GenericArgKind::Const(_)))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    match (left, right) {
+        (RigidTy::Ref(_, _, left), RigidTy::Ref(_, _, right)) => left == right,
+        (RigidTy::Adt(left, left_arguments), RigidTy::Adt(right, right_arguments)) => {
+            left == right && constants(left_arguments) == constants(right_arguments)
+        },
+        (RigidTy::Array(_, left), RigidTy::Array(_, right)) => {
+            left.eval_target_usize().ok() == right.eval_target_usize().ok()
+        },
+        (RigidTy::Slice(_), RigidTy::Slice(_))
+        | (RigidTy::Tuple(_), RigidTy::Tuple(_))
+        | (RigidTy::FnPtr(_), RigidTy::FnPtr(_)) => true,
+        _ => left == right,
+    }
+}
+
+/// The ADTs a dependency's signature reaches. An associated type reaches none.
+fn collect_signature_adts(
+    ty: RustTy,
+    observed: &[AdtDef],
+    adts: &mut Vec<ReachedAdt>,
+) -> Result<(), String> {
+    if projection(ty).is_none() {
+        return collect_type_adts(ty, observed, adts);
+    }
+    match ty.kind() {
+        TyKind::Alias(..) => Ok(()),
+        TyKind::RigidTy(
+            RigidTy::Ref(..)
+            | RigidTy::Slice(_)
+            | RigidTy::Array(..)
+            | RigidTy::Tuple(_)
+            | RigidTy::FnPtr(_),
+        ) => {
+            for child in type_children(ty) {
+                collect_signature_adts(child, observed, adts)?;
+            }
+            Ok(())
+        },
+        TyKind::RigidTy(RigidTy::Adt(definition, _)) => {
+            for child in type_children(ty) {
+                collect_signature_adts(child, observed, adts)?;
+            }
+            collect_adt(definition, observed, adts)
+        },
+        kind => Err(format!("unsupported Rust local type: {kind:?}")),
+    }
+}
+
+/// The largest parts of a signature's type that name no associated type.
+fn parts_without_associated_types(ty: RustTy) -> Vec<RustTy> {
+    match (projection(ty), ty.kind()) {
+        (None, _) => vec![ty],
+        (Some(_), TyKind::Alias(..)) => vec![],
+        (Some(_), _) => type_children(ty)
+            .into_iter()
+            .flat_map(parts_without_associated_types)
+            .collect(),
+    }
+}
+
+/// The pragma of a namespace that is not a verification target.
+fn verify_false() -> Attribute {
+    Attribute::Assign {
+        loc: None,
+        name: "verify".to_owned(),
+        value: AttributeValue::Constant {
+            value: ConstValue::Bool { value: false },
+        },
+    }
 }
 
 /// The Rust documentation's name of a primitive type that has inherent
@@ -413,6 +1108,8 @@ fn primitive_name(ty: &RigidTy) -> Option<String> {
         RigidTy::Str => "str".to_owned(),
         RigidTy::Slice(_) => "slice".to_owned(),
         RigidTy::Array(..) => "array".to_owned(),
+        RigidTy::RawPtr(_, Mutability::Not) => "const_ptr".to_owned(),
+        RigidTy::RawPtr(_, Mutability::Mut) => "mut_ptr".to_owned(),
         _ => return None,
     })
 }
@@ -424,40 +1121,255 @@ fn is_copy_trait(name: &str) -> bool {
     matches!(name, "core::marker::Copy" | "std::marker::Copy")
 }
 
-/// The ADTs of a crate with a `Copy` impl applying the ADT to the impl's own
-/// parameters in order: those every instantiation of which with `Copy`
-/// arguments is `Copy`, as `#[derive(Copy)]` states it. An impl for one
-/// instantiation (`impl Copy for S<u32>`) has no such statement.
-fn copy_adts(krate: &Crate) -> Vec<AdtDef> {
-    krate
-        .trait_impls()
-        .into_iter()
-        .filter_map(|implementation| {
-            let header = implementation.trait_impl().value;
-            if !is_copy_trait(&header.def_id.name()) {
-                return None;
+/// Whether a path names the `Drop` trait, as `is_copy_trait` names `Copy`.
+fn is_drop_trait(name: &str) -> bool {
+    matches!(name, "core::ops::Drop" | "std::ops::Drop")
+}
+
+/// What the impls of a crate state of its ADTs.
+struct CrateImpls {
+    /// The ADTs with a `Copy` impl applying the ADT to the impl's own
+    /// parameters in order: those every instantiation of which with `Copy`
+    /// arguments is `Copy`, as `#[derive(Copy)]` states it. An impl for one
+    /// instantiation (`impl Copy for S<u32>`) has no such statement.
+    copy: Vec<AdtDef>,
+    /// The ADTs with a `Drop` impl. rustc admits one only in the ADT's own
+    /// crate (E0120) and only for all its instantiations (E0366).
+    drop: Vec<AdtDef>,
+}
+
+fn crate_impls(krate: &Crate) -> CrateImpls {
+    let mut impls = CrateImpls {
+        copy: vec![],
+        drop: vec![],
+    };
+    for implementation in krate.trait_impls() {
+        let header = implementation.trait_impl().value;
+        let trait_name = header.def_id.name();
+        let (copy, drop) = (is_copy_trait(&trait_name), is_drop_trait(&trait_name));
+        if !copy && !drop {
+            continue;
+        }
+        let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = header.self_ty().kind() else {
+            continue;
+        };
+        if drop {
+            impls.drop.push(definition);
+        }
+        let general = arguments
+            .0
+            .iter()
+            .enumerate()
+            .all(|(index, argument)| match argument {
+                GenericArgKind::Type(ty) => {
+                    matches!(ty.kind(), TyKind::Param(parameter) if parameter.index as usize == index)
+                },
+                GenericArgKind::Lifetime(region) => matches!(
+                    &region.kind,
+                    RegionKind::ReEarlyParam(parameter) if parameter.index as usize == index
+                ),
+                GenericArgKind::Const(_) => false,
+            });
+        if copy && general {
+            impls.copy.push(definition);
+        }
+    }
+    impls
+}
+
+/// What dropping a value of an ADT reaches through its fields.
+#[derive(Clone, Default, PartialEq)]
+struct DropReach {
+    /// A `Drop` impl of the ADT, or a field whose destruction the unit cannot
+    /// see (`dyn`, a projection).
+    own: bool,
+    /// That, or the same of an ADT its fields reach.
+    destructor: bool,
+    /// The positions of the type parameters its fields hold: `S<T>(T)` reaches
+    /// `T`, `S<T>(PhantomData<T>)` and `S<T>(&T)` do not.
+    parameters: BTreeSet<usize>,
+}
+
+/// The crates' impls, read once per crate, and the reach of the ADTs seen.
+#[derive(Default)]
+struct AdtImpls {
+    crates: BTreeMap<String, CrateImpls>,
+    reach: HashMap<AdtDef, DropReach>,
+}
+
+impl AdtImpls {
+    fn of_crate(&mut self, krate: Crate) -> &CrateImpls {
+        self.crates
+            .entry(krate.name.clone())
+            .or_insert_with(|| crate_impls(&krate))
+    }
+
+    /// Grows the reach of `adts` and of what their fields name to a fixed
+    /// point. Field types stay generic, so the ADTs are finitely many even for
+    /// a type recursive at growing instantiations, and a reach only grows.
+    fn settle_drop_reach(&mut self, adts: &[ReachedAdt]) {
+        loop {
+            let mut changed = false;
+            let mut pending = adts.iter().map(|adt| adt.definition).collect::<Vec<_>>();
+            let mut visited = HashSet::new();
+            while let Some(definition) = pending.pop() {
+                if !visited.insert(definition) {
+                    continue;
+                }
+                let reach = self.fields_reach(definition, &mut pending);
+                if self.reach.get(&definition) != Some(&reach) {
+                    self.reach.insert(definition, reach);
+                    changed = true;
+                }
             }
-            let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = header.self_ty().kind()
-            else {
-                return None;
-            };
-            let general = arguments
-                .0
-                .iter()
-                .enumerate()
-                .all(|(index, argument)| match argument {
-                    GenericArgKind::Type(ty) => {
-                        matches!(ty.kind(), TyKind::Param(parameter) if parameter.index as usize == index)
-                    },
-                    GenericArgKind::Lifetime(region) => matches!(
-                        &region.kind,
-                        RegionKind::ReEarlyParam(parameter) if parameter.index as usize == index
-                    ),
-                    GenericArgKind::Const(_) => false,
-                });
-            general.then_some(definition)
+            if !changed {
+                return;
+            }
+        }
+    }
+
+    fn fields_reach(&mut self, definition: AdtDef, named: &mut Vec<AdtDef>) -> DropReach {
+        let mut reach = DropReach::default();
+        if self.of_crate(definition.krate()).drop.contains(&definition) {
+            reach.own = true;
+            reach.destructor = true;
+            return reach;
+        }
+        for variant in definition.variants() {
+            for field in variant.fields() {
+                self.type_reach(field.ty(), &mut reach, named);
+            }
+        }
+        reach
+    }
+
+    fn type_reach(&self, ty: RustTy, reach: &mut DropReach, named: &mut Vec<AdtDef>) {
+        match ty.kind() {
+            TyKind::Param(parameter) => {
+                reach.parameters.insert(parameter.index as usize);
+            },
+            TyKind::Alias(..) | TyKind::Bound(..) => {
+                reach.own = true;
+                reach.destructor = true;
+            },
+            TyKind::RigidTy(rigid) => match rigid {
+                RigidTy::Adt(definition, arguments) => {
+                    named.push(definition);
+                    let Some(inner) = self.reach.get(&definition) else {
+                        return;
+                    };
+                    reach.destructor |= inner.destructor;
+                    for parameter in &inner.parameters {
+                        if let Some(GenericArgKind::Type(argument)) = arguments.0.get(*parameter) {
+                            self.type_reach(*argument, reach, named);
+                        }
+                    }
+                },
+                RigidTy::Tuple(elements) => {
+                    for element in elements {
+                        self.type_reach(element, reach, named);
+                    }
+                },
+                RigidTy::Array(element, _) | RigidTy::Slice(element) | RigidTy::Pat(element, _) => {
+                    self.type_reach(element, reach, named)
+                },
+                RigidTy::Bool
+                | RigidTy::Char
+                | RigidTy::Int(_)
+                | RigidTy::Uint(_)
+                | RigidTy::Float(_)
+                | RigidTy::Str
+                | RigidTy::Never
+                | RigidTy::Foreign(_)
+                | RigidTy::RawPtr(..)
+                | RigidTy::Ref(..)
+                | RigidTy::FnDef(..)
+                | RigidTy::FnPtr(_) => {},
+                // A closure holds its upvars.
+                RigidTy::Closure(_, arguments) => {
+                    if let Ok((_, upvars)) = closure_arguments(&arguments) {
+                        for upvar in upvars {
+                            self.type_reach(upvar, reach, named);
+                        }
+                    }
+                },
+                RigidTy::Coroutine(..)
+                | RigidTy::CoroutineClosure(..)
+                | RigidTy::CoroutineWitness(..)
+                | RigidTy::Dynamic(..) => {
+                    reach.own = true;
+                    reach.destructor = true;
+                },
+            },
+        }
+    }
+
+    /// Whether the unit states a destructor of an ADT. A nominal with visible
+    /// fields states its own: what its fields reach, whoever drops it reads from
+    /// their types, a model of the library among them. An opaque one shows
+    /// neither its fields nor its type parameters, so what it reaches and what
+    /// it holds of its arguments count as a destructor.
+    fn has_destructor(&self, adt: &ReachedAdt) -> bool {
+        self.reach.get(&adt.definition).is_some_and(|reach| {
+            reach.own || (adt.opaque && (reach.destructor || !reach.parameters.is_empty()))
         })
-        .collect()
+    }
+
+    /// Whether a type is `Copy` wherever its type arguments are, as a closure
+    /// over it is.
+    fn is_copy(&mut self, ty: RustTy) -> bool {
+        self.copy_requirement(ty).is_some()
+    }
+
+    /// The type parameters a type is `Copy` given, none where it never is.
+    fn copy_requirement(&mut self, ty: RustTy) -> Option<BTreeSet<u32>> {
+        let all = |impls: &mut Self, types: Vec<RustTy>| {
+            types
+                .into_iter()
+                .try_fold(BTreeSet::new(), |mut parameters, ty| {
+                    parameters.extend(impls.copy_requirement(ty)?);
+                    Some(parameters)
+                })
+        };
+        match ty.kind() {
+            TyKind::Param(parameter) => Some(BTreeSet::from([parameter.index])),
+            TyKind::RigidTy(rigid) => match rigid {
+                RigidTy::Bool
+                | RigidTy::Char
+                | RigidTy::Int(_)
+                | RigidTy::Uint(_)
+                | RigidTy::Float(_)
+                | RigidTy::Never
+                | RigidTy::RawPtr(..)
+                | RigidTy::FnDef(..)
+                | RigidTy::FnPtr(_) => Some(BTreeSet::new()),
+                RigidTy::Ref(_, _, Mutability::Not) => Some(BTreeSet::new()),
+                RigidTy::Ref(_, _, Mutability::Mut) => None,
+                RigidTy::Tuple(elements) => all(self, elements),
+                RigidTy::Array(element, _) => all(self, vec![element]),
+                RigidTy::Adt(definition, arguments) => {
+                    if self.of_crate(definition.krate()).copy.contains(&definition) {
+                        all(self, type_arguments(&arguments))
+                    } else {
+                        None
+                    }
+                },
+                RigidTy::Closure(_, arguments) => {
+                    let (_, upvars) = closure_arguments(&arguments).ok()?;
+                    all(self, upvars)
+                },
+                RigidTy::Str
+                | RigidTy::Slice(_)
+                | RigidTy::Pat(..)
+                | RigidTy::Foreign(_)
+                | RigidTy::Dynamic(..)
+                | RigidTy::Coroutine(..)
+                | RigidTy::CoroutineClosure(..)
+                | RigidTy::CoroutineWitness(..) => None,
+            },
+            TyKind::Alias(..) | TyKind::Bound(..) => None,
+        }
+    }
 }
 
 fn is_abort(name: &str) -> bool {
@@ -474,22 +1386,64 @@ fn lowered_callee(name: &str, arguments: &GenericArgs) -> bool {
         && (is_abort(name) || is_string_length(name) || integer_method_primitive(name).is_some())
 }
 
-/// A dependency crate's function the bodies call, declared without its body.
-struct DependencyFunction {
-    definition: FnDef,
-    /// Its parameter and result types, regions erased.
-    signature: Vec<RustTy>,
+/// What the bodies' calls reach.
+struct ReachedCalls {
+    /// The dependency functions, each once, ordered by name.
+    functions: Vec<DependencyFunction>,
+    /// Whether a call of a trait method resolves to an impl's.
+    resolves_trait_calls: bool,
+    /// The types the calls instantiate generic parameters with.
+    instantiations: Vec<RustTy>,
 }
 
-/// The dependency functions the bodies call, each once, ordered by name, and
-/// whether a call of a trait method resolves to an impl's. A call whose
-/// callee cannot be declared is reported where it is mapped.
-fn collect_dependency_functions(bodies: &[Body]) -> (Vec<DependencyFunction>, bool) {
-    let mut functions: Vec<DependencyFunction> = Vec::new();
-    let mut resolves_trait_calls = false;
+/// The files of the crate's own items. A span outside them is in the expansion of
+/// a macro of another crate: Rustc Public exposes no span's call site.
+fn crate_files() -> HashSet<String> {
+    let local = rustc_public::local_crate();
+    let (items, adts, traits, impls) = (
+        rustc_public::all_local_items(),
+        local.adts(),
+        local.trait_decls(),
+        local.trait_impls(),
+    );
+    items
+        .iter()
+        .map(CrateDef::span)
+        .chain(adts.iter().map(CrateDef::span))
+        .chain(traits.iter().map(CrateDef::span))
+        .chain(impls.iter().map(CrateDef::span))
+        .map(|span| span.get_filename())
+        .collect()
+}
+
+/// `call of f in g at line L` of a call whose callee is `definition`.
+fn call_site(definition: FnDef, caller: &str, span: Span, crate_files: &HashSet<String>) -> String {
+    let name = definition.name();
+    if !crate_files.contains(&span.get_filename()) {
+        return format!("call of `{name}` in `{caller}` in a macro expansion");
+    }
+    let line = span.get_lines();
+    format!(
+        "call of `{name}` in `{caller}` at line {}:{}",
+        line.start_line, line.start_col
+    )
+}
+
+/// The dependency functions the bodies call and what else their calls reach. A
+/// call whose callee cannot be declared is reported here, at the call.
+fn collect_calls(bodies: &[Body]) -> Result<ReachedCalls, String> {
+    let mut reached = ReachedCalls {
+        functions: vec![],
+        resolves_trait_calls: false,
+        instantiations: vec![],
+    };
     for body in bodies {
         let locals = mapped_locals(body);
-        for block in &body.blocks {
+        let folds = box_folds(body);
+        for (index, block) in body.blocks.iter().enumerate() {
+            if folds.frees.contains(&index) {
+                continue;
+            }
             let TerminatorKind::Call { func, .. } = &block.terminator.kind else {
                 continue;
             };
@@ -502,27 +1456,609 @@ fn collect_dependency_functions(bodies: &[Body]) -> (Vec<DependencyFunction>, bo
             if lowered_callee(&definition.name(), &arguments) {
                 continue;
             }
-            let Ok((resolved, _)) = resolve_callee(definition, &arguments) else {
+            // A call that resolves to nothing the unit states refuses its function.
+            let Ok((resolved, resolved_arguments)) = resolve_callee(definition, &arguments) else {
                 continue;
             };
-            resolves_trait_calls |= resolved != definition;
-            if resolved.krate().is_local
-                || functions
+            reached.resolves_trait_calls |= resolved != definition;
+            if let Some((_, closure_args)) = closure_callee(definition, &arguments) {
+                let (parents, _) = closure_arguments(&closure_args)?;
+                reached
+                    .instantiations
+                    .extend(type_arguments(&GenericArgs(parents)));
+                continue;
+            }
+            if !resolved.krate().is_local
+                && !reached
+                    .functions
                     .iter()
                     .any(|function| function.definition == resolved)
             {
-                continue;
+                reached.functions.push(DependencyFunction::new(resolved));
             }
-            if let Ok(signature) = dependency_signature(resolved) {
-                functions.push(DependencyFunction {
-                    definition: resolved,
-                    signature,
-                });
+            let opaque = reached
+                .functions
+                .iter()
+                .any(|function| function.definition == resolved && function.opaque);
+            if !opaque {
+                reached
+                    .instantiations
+                    .extend(type_arguments(&resolved_arguments));
             }
         }
     }
-    functions.sort_by_key(|function| function.definition.name());
-    (functions, resolves_trait_calls)
+    reached
+        .functions
+        .sort_by_key(|function| function.definition.name());
+    Ok(reached)
+}
+
+/// A MIR constant, evaluated at export.
+#[derive(Clone)]
+enum EvaluatedConstant {
+    /// A scalar, a string, or unit.
+    Literal { ty: RustTy, value: ConstValue },
+    Tuple {
+        ty: RustTy,
+        elements: Vec<EvaluatedConstant>,
+    },
+    /// A fixed array, or a slice behind a reference.
+    Array {
+        ty: RustTy,
+        elements: Vec<EvaluatedConstant>,
+    },
+    Adt {
+        ty: RustTy,
+        definition: AdtDef,
+        variant: VariantIdx,
+        arguments: GenericArgs,
+        fields: Vec<EvaluatedConstant>,
+    },
+    /// A shared reference, which is the value it observes.
+    Shared {
+        ty: RustTy,
+        referent: Box<EvaluatedConstant>,
+    },
+    /// A zero-sized closure: its upvars, if any, are such closures.
+    Closure {
+        ty: RustTy,
+        definition: ClosureDef,
+        arguments: GenericArgs,
+        upvars: Vec<EvaluatedConstant>,
+    },
+    /// A constant the unit cannot state, at its type if the unit can state that.
+    Opaque {
+        ty: Option<RustTy>,
+        description: String,
+    },
+}
+
+impl EvaluatedConstant {
+    /// The types it is built of, and the ADTs it states the shape of.
+    fn collect(&self, types: &mut Vec<RustTy>, adts: &mut Vec<AdtDef>) {
+        let parts = match self {
+            Self::Literal { ty, .. } => {
+                types.push(*ty);
+                return;
+            },
+            Self::Opaque { ty, .. } => {
+                types.extend(ty);
+                return;
+            },
+            Self::Tuple { ty, elements } | Self::Array { ty, elements } => {
+                types.push(*ty);
+                elements.as_slice()
+            },
+            Self::Adt {
+                ty,
+                definition,
+                fields,
+                ..
+            } => {
+                types.push(*ty);
+                if !adts.contains(definition) {
+                    adts.push(*definition);
+                }
+                fields.as_slice()
+            },
+            Self::Shared { ty, referent } => {
+                types.push(*ty);
+                std::slice::from_ref(referent.as_ref())
+            },
+            Self::Closure { ty, upvars, .. } => {
+                types.push(*ty);
+                upvars.as_slice()
+            },
+        };
+        for part in parts {
+            part.collect(types, adts);
+        }
+    }
+
+    /// The constant, or, if a type it needs has no mapping or a shape it states is
+    /// not visible, the opaque constant at its type. `observed` holds the ADTs the
+    /// bodies observe.
+    fn or_opaque(self, ty: RustTy, observed: &[AdtDef]) -> Self {
+        let (mut types, mut adts) = (vec![], vec![]);
+        self.collect(&mut types, &mut adts);
+        let mappable = adts
+            .iter()
+            .all(|definition| has_visible_shape(*definition, observed))
+            && types
+                .iter()
+                .all(|ty| collect_type_adts(*ty, &adts, &mut Vec::new()).is_ok());
+        if mappable {
+            self
+        } else {
+            Self::opaque(ty)
+        }
+    }
+
+    fn opaque(ty: RustTy) -> Self {
+        let mappable = collect_type_adts(ty, &[], &mut Vec::new()).is_ok();
+        Self::Opaque {
+            ty: mappable.then_some(ty),
+            description: format!("the constant of type `{ty}` has no mapping in the unit"),
+        }
+    }
+}
+
+/// Whether all of an ADT's variants and fields are visible to the crate, so that a
+/// constant may state its shape. Rustc Public exposes no field's visibility, so a
+/// dependency's struct is known to be visible only without fields, or where rustc
+/// admitted a body observing it.
+fn has_visible_shape(definition: AdtDef, observed: &[AdtDef]) -> bool {
+    definition.krate().is_local
+        || definition.kind() == AdtKind::Enum
+        || observed.contains(&definition)
+        || definition
+            .variants()
+            .iter()
+            .all(|variant| variant.fields().is_empty())
+}
+
+enum ConstantFailure {
+    /// The constant has no statement in the unit, so it is opaque.
+    Unmappable,
+    /// The constant refuses its function, for this reason.
+    Rejected(String),
+}
+
+/// The deepest chain of references a constant is followed through; a static
+/// may refer to itself.
+const MAX_CONSTANT_DEPTH: usize = 64;
+
+fn empty_allocation() -> Allocation {
+    Allocation {
+        bytes: vec![],
+        provenance: ProvenanceMap { ptrs: vec![] },
+        align: 1,
+        mutability: Mutability::Not,
+    }
+}
+
+fn read_bytes(memory: &Allocation, offset: usize, size: usize) -> Result<u128, ConstantFailure> {
+    memory
+        .read_partial_uint(offset..offset + size)
+        .map_err(|_| ConstantFailure::Unmappable)
+}
+
+fn layout_shape(ty: RustTy) -> Result<LayoutShape, ConstantFailure> {
+    ty.layout()
+        .map(|layout| layout.shape())
+        .map_err(|_| ConstantFailure::Unmappable)
+}
+
+/// The size of an enum's tag.
+fn scalar_size(scalar: &Scalar) -> usize {
+    let (Scalar::Initialized { value, .. } | Scalar::Union { value }) = scalar;
+    value.size(&MachineInfo::target()).bytes()
+}
+
+/// Whether a pointer is stored at an offset of memory, whose bytes are then its
+/// offset into its allocation rather than its address.
+fn pointer_at(memory: &Allocation, offset: usize) -> Option<GlobalAlloc> {
+    memory
+        .provenance
+        .ptrs
+        .iter()
+        .find(|(at, _)| *at == offset)
+        .map(|(_, provenance)| GlobalAlloc::from(provenance.0))
+}
+
+/// The variant a value holds and the offsets of its fields, from its layout.
+fn read_variant(
+    definition: AdtDef,
+    shape: &LayoutShape,
+    memory: &Allocation,
+    offset: usize,
+) -> Result<(VariantIdx, Vec<usize>), ConstantFailure> {
+    let offsets = match &shape.fields {
+        FieldsShape::Primitive => vec![],
+        FieldsShape::Arbitrary { offsets } => offsets.iter().map(|offset| offset.bytes()).collect(),
+        FieldsShape::Union(_) | FieldsShape::Array { .. } => {
+            return Err(ConstantFailure::Unmappable);
+        },
+    };
+    let (tag, tag_encoding, tag_field, variants) = match &shape.variants {
+        VariantsShape::Single { index } => return Ok((*index, offsets)),
+        VariantsShape::Empty => return Err(ConstantFailure::Unmappable),
+        VariantsShape::Multiple {
+            tag,
+            tag_encoding,
+            tag_field,
+            variants,
+        } => (tag, tag_encoding, *tag_field, variants),
+    };
+    let tag_offset = offset + offsets.get(tag_field).ok_or(ConstantFailure::Unmappable)?;
+    let size = scalar_size(tag);
+    let mask = if size >= 16 {
+        u128::MAX
+    } else {
+        (1_u128 << (size * 8)) - 1
+    };
+    let declared = definition.variants();
+    let position = |index: VariantIdx| declared.iter().position(|variant| variant.idx() == index);
+    let selected = match tag_encoding {
+        TagEncoding::Direct => {
+            let value = read_bytes(memory, tag_offset, size)?;
+            declared
+                .iter()
+                .find(|variant| {
+                    definition.discriminant_for_variant(variant.idx()).val & mask == value
+                })
+                .map(|variant| variant.idx())
+                .ok_or(ConstantFailure::Unmappable)?
+        },
+        TagEncoding::Niche {
+            untagged_variant,
+            niche_variants,
+            niche_start,
+        } => {
+            // A pointer in the niche is not null, so the niche holds no variant.
+            if pointer_at(memory, tag_offset).is_some() {
+                *untagged_variant
+            } else {
+                let value = read_bytes(memory, tag_offset, size)?;
+                let relative = value.wrapping_sub(*niche_start) & mask;
+                let start = position(*niche_variants.start()).ok_or(ConstantFailure::Unmappable)?;
+                let end = position(*niche_variants.end()).ok_or(ConstantFailure::Unmappable)?;
+                if relative <= (end - start) as u128 {
+                    declared[start + relative as usize].idx()
+                } else {
+                    *untagged_variant
+                }
+            }
+        },
+    };
+    let fields = position(selected)
+        .and_then(|index| variants.get(index))
+        .ok_or(ConstantFailure::Unmappable)?;
+    Ok((
+        selected,
+        fields.offsets.iter().map(|offset| offset.bytes()).collect(),
+    ))
+}
+
+/// The value of a type stored at an offset of evaluated memory, driven by the
+/// type's layout.
+fn read_value(
+    ty: RustTy,
+    memory: &Allocation,
+    offset: usize,
+    depth: usize,
+) -> Result<EvaluatedConstant, ConstantFailure> {
+    let literal = |value| Ok(EvaluatedConstant::Literal { ty, value });
+    let TyKind::RigidTy(rigid) = ty.kind() else {
+        return Err(ConstantFailure::Unmappable);
+    };
+    match rigid {
+        RigidTy::Bool => match read_bytes(memory, offset, 1)? {
+            0 => literal(ConstValue::Bool { value: false }),
+            1 => literal(ConstValue::Bool { value: true }),
+            _ => Err(ConstantFailure::Unmappable),
+        },
+        RigidTy::Char => literal(ConstValue::Character {
+            value: character_value(read_bytes(memory, offset, 4)?)
+                .map_err(|_| ConstantFailure::Unmappable)?,
+        }),
+        RigidTy::Uint(_) | RigidTy::Int(_) => {
+            let size = layout_shape(ty)?.size.bytes();
+            literal(ConstValue::Integer {
+                value: integer_value(read_bytes(memory, offset, size)?, ty)
+                    .map_err(|_| ConstantFailure::Unmappable)?,
+            })
+        },
+        RigidTy::Tuple(elements) if elements.is_empty() => literal(ConstValue::Unit),
+        RigidTy::Tuple(elements) => {
+            let FieldsShape::Arbitrary { offsets } = layout_shape(ty)?.fields else {
+                return Err(ConstantFailure::Unmappable);
+            };
+            let elements = elements
+                .into_iter()
+                .zip(offsets)
+                .map(|(element, at)| read_value(element, memory, offset + at.bytes(), depth))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(EvaluatedConstant::Tuple { ty, elements })
+        },
+        RigidTy::Array(element, _) => {
+            let FieldsShape::Array { stride, count } = layout_shape(ty)?.fields else {
+                return Err(ConstantFailure::Unmappable);
+            };
+            let elements = read_elements(
+                element,
+                stride.bytes(),
+                count as usize,
+                memory,
+                offset,
+                depth,
+            )?;
+            Ok(EvaluatedConstant::Array { ty, elements })
+        },
+        RigidTy::Adt(definition, arguments) => {
+            if definition.kind() == AdtKind::Union {
+                return Err(ConstantFailure::Unmappable);
+            }
+            let shape = layout_shape(ty)?;
+            let (variant, offsets) = read_variant(definition, &shape, memory, offset)?;
+            let declared = definition
+                .variants()
+                .into_iter()
+                .find(|declared| declared.idx() == variant)
+                .ok_or(ConstantFailure::Unmappable)?
+                .fields();
+            if declared.len() != offsets.len() {
+                return Err(ConstantFailure::Unmappable);
+            }
+            let fields = declared
+                .iter()
+                .zip(offsets)
+                .map(|(field, at)| {
+                    read_value(field.ty_with_args(&arguments), memory, offset + at, depth)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(EvaluatedConstant::Adt {
+                ty,
+                definition,
+                variant,
+                arguments,
+                fields,
+            })
+        },
+        RigidTy::Closure(definition, arguments) if is_zero_sized_closure(&arguments) => {
+            let (_, upvars) =
+                closure_arguments(&arguments).map_err(|_| ConstantFailure::Unmappable)?;
+            let upvars = upvars
+                .into_iter()
+                .map(|upvar| read_value(upvar, memory, offset, depth))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(EvaluatedConstant::Closure {
+                ty,
+                definition,
+                arguments,
+                upvars,
+            })
+        },
+        RigidTy::Ref(_, referent, Mutability::Not) => {
+            let referent = read_referent(referent, memory, offset, depth)?;
+            Ok(EvaluatedConstant::Shared {
+                ty,
+                referent: Box::new(referent),
+            })
+        },
+        _ => Err(ConstantFailure::Unmappable),
+    }
+}
+
+fn read_elements(
+    element: RustTy,
+    stride: usize,
+    count: usize,
+    memory: &Allocation,
+    offset: usize,
+    depth: usize,
+) -> Result<Vec<EvaluatedConstant>, ConstantFailure> {
+    (0..count)
+        .map(|index| read_value(element, memory, offset + index * stride, depth))
+        .collect()
+}
+
+/// The value a reference stored at an offset of memory refers to.
+fn read_referent(
+    referent: RustTy,
+    memory: &Allocation,
+    offset: usize,
+    depth: usize,
+) -> Result<EvaluatedConstant, ConstantFailure> {
+    if depth >= MAX_CONSTANT_DEPTH {
+        return Err(ConstantFailure::Unmappable);
+    }
+    let pointer_size = MachineInfo::target_pointer_width().bytes();
+    let address = read_bytes(memory, offset, pointer_size)? as usize;
+    let (target, start) = match pointer_at(memory, offset) {
+        // A pointer without provenance refers to zero-sized memory.
+        None => (empty_allocation(), 0),
+        Some(GlobalAlloc::Memory(target)) => (target, address),
+        Some(GlobalAlloc::Static(definition)) => {
+            let target = definition
+                .eval_initializer()
+                .map_err(|_| ConstantFailure::Unmappable)?;
+            if target.mutability == Mutability::Mut {
+                return Err(ConstantFailure::Rejected(format!(
+                    "reads the mutable static `{}`, which has no value at export",
+                    definition.name()
+                )));
+            }
+            (target, address)
+        },
+        Some(_) => return Err(ConstantFailure::Unmappable),
+    };
+    let length = || read_bytes(memory, offset + pointer_size, pointer_size).map(|len| len as usize);
+    match referent.kind() {
+        TyKind::RigidTy(RigidTy::Str) => {
+            let bytes = target
+                .bytes
+                .get(start..start + length()?)
+                .ok_or(ConstantFailure::Unmappable)?
+                .iter()
+                .copied()
+                .collect::<Option<Vec<_>>>()
+                .ok_or(ConstantFailure::Unmappable)?;
+            let value = String::from_utf8(bytes).map_err(|_| ConstantFailure::Unmappable)?;
+            Ok(EvaluatedConstant::Literal {
+                ty: referent,
+                value: ConstValue::String { value },
+            })
+        },
+        TyKind::RigidTy(RigidTy::Slice(element)) => {
+            let stride = layout_shape(element)?.size.bytes();
+            let elements = read_elements(element, stride, length()?, &target, start, depth + 1)?;
+            Ok(EvaluatedConstant::Array {
+                ty: referent,
+                elements,
+            })
+        },
+        _ => read_value(referent, &target, start, depth + 1),
+    }
+}
+
+/// What a constant evaluates to, read through Rustc Public: a promoted constant
+/// and one generic over a parameter have no evaluation there.
+fn evaluate_constant(constant: &ConstOperand) -> Result<EvaluatedConstant, ConstantFailure> {
+    let ty = constant.ty();
+    let generic = |what: String| {
+        ConstantFailure::Rejected(format!(
+            "{what}, which has no value before monomorphization"
+        ))
+    };
+    // A zero-sized closure of a generic function has its one value at any arguments.
+    if mentions_parameter(ty) && !is_zero_sized_closure_type(ty) {
+        return Err(generic(format!("has the generic type `{ty}`")));
+    }
+    match constant.const_.kind() {
+        ConstantKind::Allocated(allocation) => read_value(ty, allocation, 0, 0),
+        ConstantKind::ZeroSized => read_value(ty, &empty_allocation(), 0, 0),
+        ConstantKind::Param(parameter) => Err(generic(format!(
+            "is the const parameter `{}`",
+            parameter.name
+        ))),
+        ConstantKind::Unevaluated(UnevaluatedConst {
+            def,
+            promoted: Some(_),
+            ..
+        }) => Err(ConstantFailure::Rejected(format!(
+            "is promoted from `{}`, and Rustc Public cannot evaluate a promoted constant",
+            def.name()
+        ))),
+        ConstantKind::Unevaluated(UnevaluatedConst { def, .. }) => {
+            let instance = Instance::try_from(CrateItem(def.0))
+                .map_err(|_| generic(format!("is the generic definition `{}`", def.name())))?;
+            let allocation = instance
+                .try_const_eval(ty)
+                .map_err(|_| ConstantFailure::Unmappable)?;
+            read_value(ty, &allocation, 0, 0)
+        },
+        ConstantKind::Ty(value) => match value.kind() {
+            TyConstKind::Value(_, allocation) => read_value(ty, allocation, 0, 0),
+            TyConstKind::ZSTValue(_) => read_value(ty, &empty_allocation(), 0, 0),
+            kind => Err(generic(format!("is the generic constant {kind:?}"))),
+        },
+    }
+}
+
+/// The constants the bodies use, each evaluated, and what they reach: the types
+/// a type of a local need not name (`v.get(0)` with no other `usize` in the
+/// body) and the ADTs whose shape they state.
+struct EvaluatedConstants {
+    values: HashMap<MirConst, EvaluatedConstant>,
+    /// The one value of each zero-sized type a body reads unassigned. Optimized MIR
+    /// assigns no zero-sized place, so a body returns without assigning its return
+    /// place and borrows a closure or a unit struct in a local nothing assigned.
+    zero_sized_values: HashMap<RustTy, EvaluatedConstant>,
+    types: Vec<RustTy>,
+    adts: Vec<AdtDef>,
+}
+
+/// Evaluates the constants of a body. A constant of a function-item type is the
+/// callee of a call or the source of a reification, which map it themselves.
+struct ConstantEvaluator<'a> {
+    observed: &'a [AdtDef],
+    constants: &'a mut EvaluatedConstants,
+}
+
+impl MirVisitor for ConstantEvaluator<'_> {
+    fn visit_const_operand(&mut self, constant: &ConstOperand, _location: MirLocation) {
+        let ty = constant.ty();
+        if matches!(ty.kind(), TyKind::RigidTy(RigidTy::FnDef(..)))
+            || self.constants.values.contains_key(&constant.const_)
+        {
+            return;
+        }
+        let evaluated = match evaluate_constant(constant) {
+            Ok(evaluated) => evaluated.or_opaque(ty, self.observed),
+            Err(ConstantFailure::Unmappable) => EvaluatedConstant::opaque(ty),
+            Err(ConstantFailure::Rejected(reason)) => {
+                let EvaluatedConstant::Opaque { ty: mapped, .. } = EvaluatedConstant::opaque(ty)
+                else {
+                    unreachable!("`opaque` builds an opaque constant");
+                };
+                EvaluatedConstant::Opaque {
+                    ty: mapped,
+                    description: format!("the constant of type `{ty}` {reason}"),
+                }
+            },
+        };
+        evaluated.collect(&mut self.constants.types, &mut self.constants.adts);
+        self.constants
+            .values
+            .insert(constant.const_.clone(), evaluated);
+    }
+
+    // Debug info names constants the code does not use.
+    fn visit_var_debug_info(&mut self, _var_debug_info: &rustc_public::mir::VarDebugInfo) {}
+}
+
+impl EvaluatedConstants {
+    fn new(bodies: &[Body], observed: &[AdtDef]) -> Self {
+        let mut constants = Self {
+            values: HashMap::new(),
+            zero_sized_values: HashMap::new(),
+            types: vec![],
+            adts: vec![],
+        };
+        for body in bodies {
+            let mut evaluator = ConstantEvaluator {
+                observed,
+                constants: &mut constants,
+            };
+            evaluator.visit_body(body);
+            constants.add_zero_sized_value(body.ret_local().ty, observed);
+            for local in unassigned_locals(body) {
+                constants.add_zero_sized_value(body.locals()[local].ty, observed);
+            }
+        }
+        constants
+    }
+
+    fn add_zero_sized_value(&mut self, result: RustTy, observed: &[AdtDef]) {
+        // A type naming a parameter has no layout: rustc does not answer.
+        if self.zero_sized_values.contains_key(&result) || mentions_parameter(result) {
+            return;
+        }
+        let zero_sized = is_zero_sized_closure_type(result)
+            || layout_shape(result).is_ok_and(|shape| shape.is_sized() && shape.size.bytes() == 0);
+        if !zero_sized {
+            return;
+        }
+        let Ok(value) = read_value(result, &empty_allocation(), 0, 0) else {
+            return;
+        };
+        let value = value.or_opaque(result, observed);
+        if !matches!(value, EvaluatedConstant::Opaque { .. }) {
+            value.collect(&mut self.types, &mut self.adts);
+            self.zero_sized_values.insert(result, value);
+        }
+    }
 }
 
 fn function_def(item: CrateItem) -> Result<FnDef, String> {
@@ -540,17 +2076,30 @@ fn function_def(item: CrateItem) -> Result<FnDef, String> {
 
 impl UnitMapper {
     fn new() -> Result<Self, String> {
-        let mut items = rustc_public::all_local_items()
-            .into_iter()
-            .filter(|item| item.kind() == ItemKind::Fn)
-            .collect::<Vec<_>>();
-        items.sort_by_key(CrateDef::name);
+        let MappedBodies {
+            items,
+            bodies,
+            refusals,
+        } = mapped_bodies(
+            rustc_public::all_local_items()
+                .into_iter()
+                .filter(|item| item.kind() == ItemKind::Fn)
+                .collect(),
+        )?;
         if items.is_empty() {
             return Err("the Rust mapper requires at least one local function".to_owned());
         }
-        for item in &items {
-            let generics = flattened_generics(function_def(*item)?)?;
-            if item.requires_monomorphization() && generics.is_empty() {
+        for (item, refusal) in items.iter().zip(&refusals) {
+            if refusal.as_ref().is_some_and(Refusal::is_signature) {
+                continue;
+            }
+            let generics = item_generics(*item)?;
+            // A closure's own parameters are its kind, signature and upvars,
+            // which its arguments state.
+            if closure_of(*item).is_none()
+                && item.requires_monomorphization()
+                && generics.is_empty()
+            {
                 return Err(format!(
                     "function `{}` requires monomorphization without public generic binders",
                     item.name()
@@ -559,21 +2108,35 @@ impl UnitMapper {
             for parameter in &generics {
                 binder_kind(&item.name(), parameter)?;
             }
-            if item.body().is_none() {
-                return Err(format!("function `{}` has no public MIR body", item.name()));
-            }
         }
         let identities = items.iter().map(CrateDef::name).collect::<Vec<_>>();
-        let bodies = items
+        let opaque_functions = identities
             .iter()
-            .map(|item| item.body().expect("checked above"))
-            .collect::<Vec<_>>();
-        let (dependency_functions, resolves_trait_calls) = collect_dependency_functions(&bodies);
+            .zip(&refusals)
+            .filter(|(_, refusal)| refusal.as_ref().is_some_and(Refusal::is_signature))
+            .map(|(identity, _)| identity.clone())
+            .collect::<BTreeSet<_>>();
+        let crate_files = crate_files();
+        let ReachedCalls {
+            functions: dependency_functions,
+            resolves_trait_calls,
+            instantiations,
+        } = collect_calls(&bodies)?;
+        let mut impls = AdtImpls::default();
+        let copy_parameters = copy_parameters(&items, &bodies, &mut impls);
+        let observed = observed_adts(&bodies);
+        let constants = EvaluatedConstants::new(&bodies, &observed);
         let signature_types = dependency_functions
             .iter()
             .flat_map(|function| function.signature.iter().copied())
             .collect::<Vec<_>>();
-        let reached = collect_adts(&bodies, &signature_types)?;
+        let reached = collect_adts(
+            &bodies,
+            observed,
+            &signature_types,
+            &instantiations,
+            &constants,
+        )?;
         let namespaces = CrateNamespaces::new(
             reached.iter().map(|adt| adt.definition.krate()).chain(
                 dependency_functions
@@ -584,14 +2147,33 @@ impl UnitMapper {
         let mut scopes = Scopes::new();
         let item_scopes = items
             .iter()
-            .map(|item| scopes.function_scope(function_def(*item)?))
+            .map(|item| match closure_of(*item) {
+                Some((closure, _)) => Ok(scopes.closure_scope(closure).2),
+                None => scopes.function_scope(function_def(*item)?),
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let item_names = items
+            .iter()
+            .zip(&bodies)
+            .map(|(item, body)| match closure_of(*item) {
+                Some(_) => closure_body_name(item, body),
+                None => Ok(last_segment(&item.name())),
+            })
             .collect::<Result<Vec<_>, String>>()?;
         let (mut names, adts) = build_names(
-            &identities,
+            &item_names,
             &item_scopes,
             &reached,
             &mut scopes,
             &namespaces,
+        )?;
+        let closures = build_closures(
+            &items,
+            &bodies,
+            &item_names,
+            &item_scopes,
+            &mut names,
+            &mut scopes,
         )?;
         let mut name_ids = identities
             .iter()
@@ -616,19 +2198,74 @@ impl UnitMapper {
                 namespace_id,
             });
         }
-        let types = TypeLayout::from_bodies(&items, &bodies, &adts, &dependency_functions)?;
+        let signatures = items
+            .iter()
+            .zip(&bodies)
+            .zip(&refusals)
+            .map(|((item, body), refusal)| {
+                if refusal.as_ref().is_some_and(Refusal::is_signature) {
+                    return Ok(DeclaredSignature {
+                        types: vec![RustTy::from_rigid_kind(RigidTy::Never)],
+                        bound_lifetimes: vec![],
+                        first_binder: 0,
+                    });
+                }
+                if closure_of(*item).is_some() {
+                    return Ok(DeclaredSignature::of_closure(
+                        body,
+                        item_generics(*item)?.len(),
+                    ));
+                }
+                let function = function_def(*item)?;
+                let binders = flattened_generics(function)?.len();
+                Ok(DeclaredSignature::new(function, binders, false).at_locals(body))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let bound_lifetimes = identities
+            .iter()
+            .zip(&signatures)
+            .map(|(identity, signature)| (identity.clone(), signature.bound_lifetimes.len()))
+            .chain(dependency_functions.iter().map(|function| {
+                (
+                    function.definition.name(),
+                    function.declared.bound_lifetimes.len(),
+                )
+            }))
+            .collect();
+        let types = TypeLayout::from_bodies(
+            &items,
+            &bodies,
+            &adts,
+            &closures,
+            &dependency_functions,
+            &signatures,
+            &instantiations,
+            &constants.types,
+        )?;
         Ok(Self {
             items,
+            bodies,
+            refusals,
+            opaque_functions,
             identities,
             name_ids,
             dependency_functions,
+            constants,
+            copy_parameters,
+            impls,
+            signatures,
+            bound_lifetimes,
             resolves_trait_calls,
             names,
             adts,
+            closures,
             types,
             scopes,
             namespaces,
-            sources: SourceTables::default(),
+            sources: SourceTables {
+                crate_files,
+                ..SourceTables::default()
+            },
             arenas: NamespaceArenas::default(),
         })
     }
@@ -640,21 +2277,52 @@ impl UnitMapper {
         for index in 0..self.items.len() {
             let item = self.items[index];
             let identity = self.identities[index].clone();
-            let body = item.body().expect("checked in UnitMapper::new");
+            let body = self.bodies[index].clone();
             let function_loc = self.sources.intern(item.span())?;
-            let generics = flattened_generics(function_def(item)?)?
+            let refusal = self.refusals[index].clone();
+            let opaque = refusal.as_ref().is_some_and(Refusal::is_signature);
+            let parameters = if opaque { vec![] } else { item_generics(item)? };
+            let mut generics = parameters
                 .into_iter()
-                .map(|parameter| generic_binder(&identity, parameter, function_loc))
+                .map(|parameter| {
+                    generic_binder(
+                        &identity,
+                        parameter,
+                        &self.copy_parameters[index],
+                        function_loc,
+                    )
+                })
                 .collect::<Result<Vec<_>, String>>()?;
-            let mapped = FunctionMapper::new(
+            generics.extend(bound_lifetime_binders(
+                &self.signatures[index],
+                function_loc,
+            ));
+            let mut mapper = FunctionMapper::new(
+                &identity,
+                item,
                 &body,
+                &self.signatures[index],
                 &self.types,
                 &self.name_ids,
+                &self.bound_lifetimes,
+                Callees {
+                    dependencies: &self.dependency_functions,
+                    opaque: &self.opaque_functions,
+                },
+                &self.constants,
                 &self.adts,
+                &self.closures,
+                CopyFacts {
+                    parameters: &self.copy_parameters[index],
+                    impls: &mut self.impls,
+                },
                 &mut self.sources,
                 &mut self.arenas,
-            )?
-            .map()?;
+            )?;
+            if let Some(refusal) = &refusal {
+                mapper.body_failure = Some(refusal.reason().to_owned());
+            }
+            let mapped = mapper.map()?;
             functions.push(FunctionDecl {
                 alignment: AlignmentId::new(index),
                 attributes: vec![],
@@ -667,7 +2335,14 @@ impl UnitMapper {
                 origin: OriginId::new(index),
                 pragmas: vec![],
                 profile: Profile::Rust,
-                profile_data: vec![],
+                profile_data: opaque
+                    .then(|| ProfileValue {
+                        payload: String::new(),
+                        profile: Profile::Rust,
+                        tag: "function.opaque".to_owned(),
+                    })
+                    .into_iter()
+                    .collect(),
                 signature: Signature {
                     generics,
                     parameters: mapped.parameters,
@@ -714,13 +2389,7 @@ impl UnitMapper {
                 loc: self.sources.dependency(name),
                 patterns: vec![],
                 places: vec![],
-                pragmas: vec![Attribute::Assign {
-                    loc: None,
-                    name: "verify".to_owned(),
-                    value: AttributeValue::Constant {
-                        value: ConstValue::Bool { value: false },
-                    },
-                }],
+                pragmas: vec![verify_false()],
                 profile: Some(Profile::Rust),
                 profile_metadata: vec![],
                 scopes: vec![],
@@ -739,6 +2408,12 @@ impl UnitMapper {
                 index => dependencies[index - 1].structs.push(declaration),
             }
         }
+        structs.extend(map_closures(
+            &self.closures,
+            &self.adts,
+            &mut self.types,
+            &mut self.sources,
+        )?);
         // A called dependency function is declared by its generic signature;
         // its body is not exported.
         for function in &self.dependency_functions {
@@ -754,14 +2429,37 @@ impl UnitMapper {
             });
             let alignment = AlignmentId::new(alignments.len());
             alignments.push(Alignment {
-                description: "Rustc Public generic signature without its body".to_owned(),
+                description: if function.opaque {
+                    "Rustc Public callee the unit cannot state".to_owned()
+                } else {
+                    "Rustc Public generic signature without its body".to_owned()
+                },
                 source: origin,
                 trust: Trust::Checked,
             });
-            let generics = flattened_generics(function.definition)?
+            let parameters = if function.opaque {
+                vec![]
+            } else {
+                flattened_generics(function.definition)?
+            };
+            let mut generics = parameters
                 .into_iter()
-                .map(|parameter| generic_binder(&identity, parameter, loc))
+                .map(|parameter| generic_binder(&identity, parameter, &BTreeSet::new(), loc))
                 .collect::<Result<Vec<_>, String>>()?;
+            generics.extend(
+                function
+                    .associated_types
+                    .iter()
+                    .map(|associated| GenericBinder {
+                        abilities: vec![],
+                        kind: BinderKind::TypeArg,
+                        loc,
+                        name: associated.name.clone(),
+                        predicates: vec![],
+                        type_: None,
+                    }),
+            );
+            generics.extend(bound_lifetime_binders(&function.declared, loc));
             let (output, inputs) = function
                 .signature
                 .split_last()
@@ -775,7 +2473,11 @@ impl UnitMapper {
                         name: format!("_{}", index + 1),
                         type_use: TypeUse {
                             loc,
-                            type_id: self.types.id(*ty)?,
+                            type_id: self.types.signature_type_id(
+                                *ty,
+                                &function.associated_types,
+                                &self.adts,
+                            )?,
                         },
                     })
                 })
@@ -803,20 +2505,28 @@ impl UnitMapper {
                     locals,
                     name: callee.name,
                     origin,
-                    pragmas: vec![],
+                    // A function's pragmas merge its namespace's.
+                    pragmas: vec![verify_false()],
                     profile: Profile::Rust,
-                    profile_data: vec![ProfileValue {
-                        payload: String::new(),
-                        profile: Profile::Rust,
-                        tag: "function.dependency".to_owned(),
-                    }],
+                    profile_data: std::iter::once("function.dependency")
+                        .chain(function.opaque.then_some("function.opaque"))
+                        .map(|tag| ProfileValue {
+                            payload: String::new(),
+                            profile: Profile::Rust,
+                            tag: tag.to_owned(),
+                        })
+                        .collect(),
                     signature: Signature {
                         generics,
                         parameters,
                         predicates: vec![],
                         results: vec![TypeUse {
                             loc,
-                            type_id: self.types.id(*output)?,
+                            type_id: self.types.signature_type_id(
+                                *output,
+                                &function.associated_types,
+                                &self.adts,
+                            )?,
                         }],
                     },
                 });
@@ -918,7 +2628,7 @@ impl UnitMapper {
                     ),
                 ],
                 profile: Profile::Rust,
-                version: 2,
+                version: 5,
             }],
             tables: Tables {
                 alignments,
@@ -930,7 +2640,7 @@ impl UnitMapper {
                 origins,
                 types: self.types.types,
             },
-            version: Version { major: 1, minor: 7 },
+            version: Version { major: 1, minor: 9 },
         })
     }
 }
@@ -941,10 +2651,459 @@ struct AdtNames {
     namespace_id: NamespaceId,
     /// Whether it is `Copy` wherever its type arguments are.
     copy: bool,
+    /// Whether dropping it runs a destructor whatever its type arguments are.
+    destructor: bool,
     /// A dependency's ADT the unit names without its shape; it has no
     /// variants here.
     opaque: bool,
     variants: Vec<VariantNames>,
+}
+
+/// A closure of the crate: a struct of its upvars, whose fields are named by the
+/// body's debug info, and the body in the struct's scope.
+struct ClosureNames {
+    definition: ClosureDef,
+    item: CrateItem,
+    name: NameId,
+    /// Each upvar's field name and its type, regions erased.
+    fields: Vec<(NameId, RustTy)>,
+    /// One binder per region of the upvar types, after the parent's generics.
+    lifetimes: Vec<String>,
+    copy: bool,
+    /// The definition of the body rustc nests it in, and that body's path in the
+    /// namespace: the rendering spells the closure there.
+    parent: DefId,
+    parent_path: Vec<String>,
+    zero_sized: bool,
+    /// Its generic arguments in its parent's body.
+    arguments: GenericArgs,
+}
+
+/// An access of a place, in the order of a block.
+enum PlaceAccess {
+    Read(MirPlace),
+    Copy(MirPlace),
+    Write(MirPlace),
+}
+
+/// The accesses of a statement or terminator, and the types of its constants.
+#[derive(Default)]
+struct PlaceAccesses {
+    accesses: Vec<PlaceAccess>,
+    constants: Vec<RustTy>,
+}
+
+impl MirVisitor for PlaceAccesses {
+    fn visit_operand(&mut self, operand: &Operand, _location: MirLocation) {
+        match operand {
+            Operand::Copy(place) => self.accesses.push(PlaceAccess::Copy(place.clone())),
+            Operand::Move(place) => self.accesses.push(PlaceAccess::Read(place.clone())),
+            Operand::Constant(constant) => self.constants.push(constant.ty()),
+            Operand::RuntimeChecks(_) => {},
+        }
+    }
+
+    fn visit_place(&mut self, place: &MirPlace, _context: PlaceContext, _location: MirLocation) {
+        self.accesses.push(PlaceAccess::Read(place.clone()));
+    }
+}
+
+impl PlaceAccesses {
+    /// Per block, what its statements and terminator access, in order.
+    fn of_body(body: &Body) -> (Vec<Vec<PlaceAccess>>, Vec<RustTy>) {
+        let mut constants = vec![];
+        let blocks = (0..body.blocks.len())
+            .map(|block| {
+                let mut accesses = Self::default();
+                for (index, statement) in body.blocks[block].statements.iter().enumerate() {
+                    let location = statement_location(body, &block, index);
+                    match &statement.kind {
+                        StatementKind::Assign(destination, rvalue) => {
+                            accesses.visit_rvalue(rvalue, location);
+                            accesses
+                                .accesses
+                                .push(PlaceAccess::Write(destination.clone()));
+                        },
+                        StatementKind::StorageDead(local) => {
+                            accesses.accesses.push(PlaceAccess::Write(MirPlace {
+                                local: *local,
+                                projection: vec![],
+                            }));
+                        },
+                        _ => {},
+                    }
+                }
+                let location = terminator_location(body, &block);
+                match &body.blocks[block].terminator.kind {
+                    TerminatorKind::Call {
+                        func,
+                        args,
+                        destination,
+                        ..
+                    } => {
+                        accesses.visit_operand(func, location);
+                        for argument in args {
+                            accesses.visit_operand(argument, location);
+                        }
+                        accesses
+                            .accesses
+                            .push(PlaceAccess::Write(destination.clone()));
+                    },
+                    TerminatorKind::SwitchInt { discr: operand, .. }
+                    | TerminatorKind::Assert { cond: operand, .. } => {
+                        accesses.visit_operand(operand, location);
+                    },
+                    _ => {},
+                }
+                constants.append(&mut accesses.constants);
+                accesses.accesses
+            })
+            .collect();
+        (blocks, constants)
+    }
+}
+
+/// Whether accessing one place may access the other.
+fn places_overlap(left: &MirPlace, right: &MirPlace) -> bool {
+    left.local == right.local
+        && left
+            .projection
+            .iter()
+            .zip(&right.projection)
+            .all(|(left, right)| left == right)
+}
+
+/// Whether a place is read after an access of it, before being written whole.
+fn read_again(
+    body: &Body,
+    accesses: &[Vec<PlaceAccess>],
+    block: usize,
+    after: usize,
+    place: &MirPlace,
+) -> bool {
+    let mut visited = HashSet::new();
+    let mut pending = vec![(block, after + 1)];
+    while let Some((block, start)) = pending.pop() {
+        let mut ended = false;
+        for access in &accesses[block][start..] {
+            match access {
+                PlaceAccess::Read(other) | PlaceAccess::Copy(other)
+                    if places_overlap(place, other) =>
+                {
+                    return true;
+                },
+                PlaceAccess::Write(other)
+                    if other.local == place.local
+                        && other.projection.len() <= place.projection.len()
+                        && places_overlap(place, other) =>
+                {
+                    ended = true;
+                    break;
+                },
+                PlaceAccess::Read(_) | PlaceAccess::Copy(_) | PlaceAccess::Write(_) => {},
+            }
+        }
+        if !ended {
+            for successor in body.blocks[block].terminator.successors() {
+                if visited.insert(successor) {
+                    pending.push((successor, 0));
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Whether a place goes through a dereference of a reference: rustc refuses a
+/// move out of it (E0507).
+fn through_reference(body: &Body, place: &MirPlace) -> bool {
+    place.projection.iter().enumerate().any(|(index, element)| {
+        matches!(element, ProjectionElem::Deref)
+            && MirPlace {
+                local: place.local,
+                projection: place.projection[..index].to_vec(),
+            }
+            .ty(body.locals())
+            .is_ok_and(|ty| matches!(ty.kind(), TyKind::RigidTy(RigidTy::Ref(..))))
+    })
+}
+
+/// The type parameters each item's body shows to be `Copy`, its binders' ability
+/// (rust-lang/rust#161892 hides the bound). Optimized MIR spells a final move of a
+/// local `copy`, so a `copy` alone shows nothing. What does is a copy rustc would
+/// refuse as a move: through a reference, or of a place read again; and an
+/// instantiation of what a callee needs. Validation checks the ability at each
+/// instantiation, so an over-approximation here rejects and proves nothing false.
+fn copy_parameters(
+    items: &[CrateItem],
+    bodies: &[Body],
+    impls: &mut AdtImpls,
+) -> Vec<BTreeSet<u32>> {
+    let positions = items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (item.0, index))
+        .collect::<HashMap<_, _>>();
+    let mut needed = Vec::with_capacity(bodies.len());
+    let mut mentioned = Vec::with_capacity(bodies.len());
+    for body in bodies {
+        let (accesses, constants) = PlaceAccesses::of_body(body);
+        let mut parameters = BTreeSet::new();
+        for (block, block_accesses) in accesses.iter().enumerate() {
+            for (index, access) in block_accesses.iter().enumerate() {
+                let PlaceAccess::Copy(place) = access else {
+                    continue;
+                };
+                let Some(requirement) = place
+                    .ty(body.locals())
+                    .ok()
+                    .and_then(|ty| impls.copy_requirement(ty))
+                else {
+                    continue;
+                };
+                if !requirement.is_empty()
+                    && (through_reference(body, place)
+                        || read_again(body, &accesses, block, index, place))
+                {
+                    parameters.extend(requirement);
+                }
+            }
+        }
+        needed.push(parameters);
+        let mut instances = vec![];
+        let mut pending = constants;
+        pending.extend(body.locals().iter().map(|local| local.ty));
+        while let Some(ty) = pending.pop() {
+            pending.extend(type_children(ty));
+            if let TyKind::RigidTy(RigidTy::FnDef(FnDef(callee), arguments)) = ty.kind() {
+                instances.extend(positions.get(&callee).map(|index| (*index, arguments)));
+            } else if let TyKind::RigidTy(RigidTy::Closure(callee, arguments)) = ty.kind() {
+                instances.extend(
+                    positions
+                        .get(&callee.def_id())
+                        .map(|index| (*index, arguments)),
+                );
+            }
+        }
+        mentioned.push(instances);
+    }
+    loop {
+        let mut changed = false;
+        for (index, instances) in mentioned.iter().enumerate() {
+            for (callee, arguments) in instances {
+                let required = needed[*callee].iter().copied().collect::<Vec<_>>();
+                for parameter in required {
+                    if let Some(GenericArgKind::Type(argument)) =
+                        arguments.0.get(parameter as usize)
+                    {
+                        for parameter in impls.copy_requirement(*argument).unwrap_or_default() {
+                            changed |= needed[index].insert(parameter);
+                        }
+                    }
+                }
+            }
+        }
+        if !changed {
+            return needed;
+        }
+    }
+}
+
+/// The closures among the items.
+fn build_closures(
+    items: &[CrateItem],
+    bodies: &[Body],
+    item_names: &[String],
+    item_scopes: &[Vec<String>],
+    names: &mut Vec<QualifiedName>,
+    scopes: &mut Scopes,
+) -> Result<Vec<ClosureNames>, String> {
+    let mut closures = Vec::new();
+    let mut impls = AdtImpls::default();
+    for (item, body) in items.iter().zip(bodies) {
+        let Some((definition, arguments)) = closure_of(*item) else {
+            continue;
+        };
+        let (closure_name, module, _) = scopes.closure_scope(definition);
+        let name = NameId::new(names.len());
+        names.push(QualifiedName {
+            name: closure_name,
+            namespace_id: NamespaceId::new(0),
+            scope: module.clone(),
+        });
+        let (_, upvars) = closure_arguments(&arguments)?;
+        let copy = upvars.iter().all(|ty| impls.is_copy(*ty));
+        let generics = item_generics(*item)?;
+        let region_count = upvars.iter().map(|upvar| regions_in(*upvar)).sum::<usize>();
+        let lifetimes = (0..)
+            .map(|suffix| format!("'u{suffix}"))
+            .filter(|candidate| {
+                !generics
+                    .iter()
+                    .any(|parameter| parameter.name == *candidate)
+            })
+            .take(region_count)
+            .collect();
+        let mut fields = Vec::with_capacity(upvars.len());
+        for (index, upvar) in upvars.into_iter().enumerate() {
+            let field = NameId::new(names.len());
+            names.push(QualifiedName {
+                name: upvar_name(body, index),
+                namespace_id: NamespaceId::new(0),
+                scope: module.clone(),
+            });
+            fields.push((field, upvar));
+        }
+        let parent = definition
+            .def_id()
+            .parent()
+            .ok_or_else(|| format!("closure `{}` has no parent", item.name()))?;
+        let parent_index = items
+            .iter()
+            .position(|candidate| candidate.0 == parent)
+            .ok_or_else(|| {
+                format!(
+                    "closure `{}` stands in `{}`, which is no function of the unit",
+                    item.name(),
+                    parent.name()
+                )
+            })?;
+        let mut parent_path = item_scopes[parent_index].clone();
+        parent_path.push(item_names[parent_index].clone());
+        closures.push(ClosureNames {
+            definition,
+            item: *item,
+            name,
+            fields,
+            lifetimes,
+            copy,
+            parent,
+            parent_path,
+            zero_sized: is_zero_sized_closure(&arguments),
+            arguments,
+        });
+    }
+    Ok(closures)
+}
+
+/// An upvar's source name: the debug info of the closure's body names each by a
+/// place through its first parameter, `(*_1).i` or `_1.i`.
+fn upvar_name(body: &Body, index: usize) -> String {
+    body.var_debug_info
+        .iter()
+        .find_map(|info| {
+            let VarDebugInfoContents::Place(place) = &info.value else {
+                return None;
+            };
+            let selected = place
+                .projection
+                .iter()
+                .find_map(|projection| match projection {
+                    ProjectionElem::Field(field, _) => Some(*field),
+                    _ => None,
+                })?;
+            (place.local == 1 && selected == index).then(|| info.name.clone())
+        })
+        .unwrap_or_else(|| index.to_string())
+}
+
+/// The name of a closure's body, by how it takes the closure: `call` by shared
+/// reference, `call_mut` by mutable one, `call_once` by value.
+fn closure_body_name(item: &CrateItem, body: &Body) -> Result<String, String> {
+    let receiver = body
+        .arg_locals()
+        .first()
+        .ok_or_else(|| format!("closure `{}` takes no receiver", item.name()))?
+        .ty;
+    Ok(match receiver.kind() {
+        TyKind::RigidTy(RigidTy::Ref(_, _, Mutability::Not)) => "call",
+        TyKind::RigidTy(RigidTy::Ref(_, _, Mutability::Mut)) => "call_mut",
+        _ => "call_once",
+    }
+    .to_owned())
+}
+
+fn map_closures(
+    closures: &[ClosureNames],
+    adts: &[AdtNames],
+    types: &mut TypeLayout,
+    sources: &mut SourceTables,
+) -> Result<Vec<StructDecl>, String> {
+    closures
+        .iter()
+        .map(|closure| {
+            let loc = sources.intern(closure.definition.span())?;
+            let mut generics = item_generics(closure.item)?
+                .into_iter()
+                .map(|parameter| {
+                    generic_binder(&closure.item.name(), parameter, &BTreeSet::new(), loc)
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            let parents = generics.len();
+            let mut binders = closure.lifetimes.iter().enumerate();
+            let mut next_region = || {
+                let (index, name) = binders.next().expect("one binder per region");
+                Region {
+                    kind: RegionKind::ReEarlyParam(EarlyParamRegion {
+                        index: (parents + index) as u32,
+                        name: name.clone(),
+                    }),
+                }
+            };
+            generics.extend(closure.lifetimes.iter().map(|name| GenericBinder {
+                abilities: vec![],
+                kind: BinderKind::Lifetime,
+                loc,
+                name: name.clone(),
+                predicates: vec![],
+                type_: None,
+            }));
+            let fields = closure
+                .fields
+                .iter()
+                .map(|(name, ty)| {
+                    Ok(FieldDecl {
+                        doc: String::new(),
+                        loc,
+                        name: *name,
+                        type_use: TypeUse {
+                            loc,
+                            type_id: types.rebuilt_type_id(
+                                *ty,
+                                &[],
+                                adts,
+                                &mut |_| next_region(),
+                                &|ty| regions_in(ty) == 0,
+                            )?,
+                        },
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            Ok(StructDecl {
+                abilities: if closure.copy {
+                    vec![Ability::Copy]
+                } else {
+                    vec![]
+                },
+                attributes: vec![],
+                contract: empty_contract(),
+                doc: String::new(),
+                fields,
+                generics,
+                ghosts: vec![],
+                loc,
+                locals: vec![],
+                name: closure.name,
+                properties: vec![ProfileValue {
+                    payload: serde_json::to_string(&closure.parent_path)
+                        .map_err(|error| format!("encode a closure's parent: {error}"))?,
+                    profile: Profile::Rust,
+                    tag: "struct.closure".to_owned(),
+                }],
+                variants: vec![],
+            })
+        })
+        .collect()
 }
 
 struct VariantNames {
@@ -953,6 +3112,459 @@ struct VariantNames {
     name: Option<NameId>,
     source_name: Option<String>,
     fields: Vec<NameId>,
+}
+
+/// The closures a body names by type, and the closures it constructs.
+#[derive(Default)]
+struct ClosureUses {
+    mentioned: Vec<ClosureDef>,
+    constructed: Vec<ClosureDef>,
+}
+
+impl ClosureUses {
+    /// A zero-sized closure's value holds the zero-sized closures it captures.
+    fn construct_zero_sized(&mut self, closure: ClosureDef, arguments: &GenericArgs) {
+        self.constructed.push(closure);
+        if let Ok((_, upvars)) = closure_arguments(arguments) {
+            for upvar in upvars {
+                if let TyKind::RigidTy(RigidTy::Closure(nested, nested_args)) = upvar.kind() {
+                    self.construct_zero_sized(nested, &nested_args);
+                }
+            }
+        }
+    }
+
+    fn observe(&mut self, ty: RustTy) {
+        if let TyKind::RigidTy(RigidTy::Closure(closure, _)) = ty.kind() {
+            self.mentioned.push(closure);
+        }
+        for child in type_children(ty) {
+            self.observe(child);
+        }
+    }
+}
+
+impl MirVisitor for ClosureUses {
+    fn visit_ty(&mut self, ty: &RustTy, _location: MirLocation) {
+        self.observe(*ty);
+    }
+
+    fn visit_const_operand(&mut self, constant: &ConstOperand, _location: MirLocation) {
+        self.observe(constant.ty());
+        // A zero-sized closure is a constant of its type.
+        if let TyKind::RigidTy(RigidTy::Closure(closure, arguments)) = constant.ty().kind() {
+            self.construct_zero_sized(closure, &arguments);
+        }
+    }
+
+    fn visit_rvalue(&mut self, rvalue: &Rvalue, location: MirLocation) {
+        if let Rvalue::Aggregate(AggregateKind::Closure(closure, _), _) = rvalue {
+            self.mentioned.push(*closure);
+            self.constructed.push(*closure);
+        }
+        self.super_rvalue(rvalue, location);
+    }
+
+    fn visit_var_debug_info(&mut self, _var_debug_info: &rustc_public::mir::VarDebugInfo) {}
+}
+
+/// The locals a body reads without assigning: rustc removes the assignments of
+/// zero-sized values.
+fn unassigned_locals(body: &Body) -> Vec<usize> {
+    let assigned = |index: usize| {
+        body.blocks.iter().any(|block| {
+            block.statements.iter().any(|statement| {
+                matches!(&statement.kind, StatementKind::Assign(place, _) if place.local == index)
+            }) || matches!(&block.terminator.kind,
+                TerminatorKind::Call { destination, .. } if destination.local == index)
+        })
+    };
+    let arguments = body.arg_locals().len();
+    (0..body.locals().len())
+        .filter(|index| *index == 0 || *index > arguments)
+        .filter(|index| {
+            let read = if *index == 0 {
+                body.blocks
+                    .iter()
+                    .any(|block| matches!(block.terminator.kind, TerminatorKind::Return))
+            } else {
+                let mut mentions = LocalMentions {
+                    local: *index,
+                    mentions: 0,
+                };
+                mentions.visit_body(body);
+                mentions.mentions > storage_mentions(body, *index)
+            };
+            read && !assigned(*index)
+        })
+        .collect()
+}
+
+/// The functions and the closures they reach, with the closures those stand in: a
+/// closure no body names is dead code. A sized closure is constructed in its parent, so
+/// one no reached body constructs has no expression; a zero-sized one is a value of its
+/// type wherever it is used, and its parent spells it. A refused item's body reaches
+/// nothing, and a body holding a dependency's closure is refused.
+fn reached_items(
+    items: &[CrateItem],
+    refusals: &mut HashMap<DefId, Refusal>,
+) -> Result<Vec<CrateItem>, String> {
+    let (closures, mut reached): (Vec<_>, Vec<_>) = items
+        .iter()
+        .copied()
+        .partition(|item| closure_of(*item).is_some());
+    let mut constructed: HashSet<DefId> = HashSet::new();
+    let mut scanned = 0;
+    while let Some(item) = reached.get(scanned).copied() {
+        scanned += 1;
+        if refusals.contains_key(&item.0) {
+            continue;
+        }
+        let Some(body) = item.body() else { continue };
+        let mut uses = ClosureUses::default();
+        uses.visit_body(&body);
+        constructed.extend(uses.constructed.iter().map(CrateDef::def_id));
+        for closure in uses.mentioned {
+            if !closure.krate().is_local {
+                refusals.insert(
+                    item.0,
+                    Refusal::Body(format!(
+                        "it holds closure `{}` of the dependency crate `{}`, whose body the unit does not export",
+                        closure.name(),
+                        closure.krate().name
+                    )),
+                );
+                break;
+            }
+            let mut ancestor = Some(closure.def_id());
+            while let Some(found) =
+                ancestor.and_then(|def| closures.iter().find(|candidate| candidate.0 == def))
+            {
+                if !reached.contains(found) {
+                    reached.push(*found);
+                }
+                ancestor = found.0.parent();
+            }
+        }
+    }
+    for item in &reached {
+        if let Some((_, arguments)) = closure_of(*item)
+            && !is_zero_sized_closure(&arguments)
+            && !constructed.contains(&item.0)
+        {
+            return Err(format!(
+                "closure `{}` is held but no reached body constructs it",
+                item.name()
+            ));
+        }
+    }
+    Ok(reached)
+}
+
+/// The items the unit maps, by name, with the bodies mapped for them.
+struct MappedBodies {
+    items: Vec<CrateItem>,
+    bodies: Vec<Body>,
+    refusals: Vec<Option<Refusal>>,
+}
+
+/// Why an item is not mapped as it stands.
+#[derive(Clone)]
+enum Refusal {
+    /// Its body states what the unit cannot: its signature stands, for a contract.
+    Body(String),
+    /// Its signature does: the function is opaque, and a call of it refuses the caller.
+    Signature(String),
+}
+
+impl Refusal {
+    fn reason(&self) -> &str {
+        match self {
+            Self::Body(reason) | Self::Signature(reason) => reason,
+        }
+    }
+
+    fn is_signature(&self) -> bool {
+        matches!(self, Self::Signature(_))
+    }
+}
+
+/// The reached items and their bodies, each refusal made before anything reads a body.
+/// Nothing else reads what is inside a body. A signature that cannot be mapped leaves
+/// nothing a caller can read, so the function is opaque and the rest of the crate stands.
+/// Refusing can only unreach items.
+fn mapped_bodies(candidates: Vec<CrateItem>) -> Result<MappedBodies, String> {
+    let mut refusals = HashMap::new();
+    loop {
+        let known = refusals.len();
+        let mut changed = false;
+        let mut items = reached_items(&candidates, &mut refusals)?;
+        items.sort_by_key(CrateDef::name);
+        let bodies = items
+            .iter()
+            .map(|item| {
+                let body = item
+                    .body()
+                    .ok_or_else(|| format!("function `{}` has no public MIR body", item.name()))?;
+                Ok(match refusals.get(&item.0) {
+                    Some(Refusal::Signature(_)) => opaque_body(&body),
+                    Some(Refusal::Body(_)) => refused_body(&body),
+                    None => body,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let observed = observed_adts(&bodies);
+        for (item, body) in items.iter().zip(&bodies) {
+            if refusals.get(&item.0).is_some_and(Refusal::is_signature) {
+                continue;
+            }
+            let refusal = unmodelled_signature(*item, body, &observed)
+                .map(Refusal::Signature)
+                .or_else(|| {
+                    (!refusals.contains_key(&item.0))
+                        .then(|| unmodelled_body_type(body, &observed).map(Refusal::Body))
+                        .flatten()
+                });
+            if let Some(refusal) = refusal {
+                refusals.insert(item.0, refusal);
+                changed = true;
+            }
+        }
+        changed |= refusals.len() != known;
+        if !changed {
+            let refusals = items
+                .iter()
+                .map(|item| refusals.get(&item.0).cloned())
+                .collect();
+            return Ok(MappedBodies {
+                items,
+                bodies,
+                refusals,
+            });
+        }
+    }
+}
+
+/// What a function's signature states and the unit cannot: a binder or a type. Rustc has
+/// normalized a type where it can; an associated type of a parameter it cannot.
+fn unmodelled_signature(item: CrateItem, body: &Body, observed: &[AdtDef]) -> Option<String> {
+    if closure_of(item).is_some() {
+        return None;
+    }
+    let function = function_def(item).ok()?;
+    let generics = flattened_generics(function).ok()?;
+    if let Some(reason) = generics
+        .iter()
+        .find_map(|parameter| binder_kind(&item.name(), parameter).err())
+    {
+        return Some(format!("{reason}, so a call of it refuses its caller"));
+    }
+    DeclaredSignature::new(function, generics.len(), false)
+        .at_locals(body)
+        .types
+        .into_iter()
+        .find(|ty| collect_type_adts(*ty, observed, &mut Vec::new()).is_err())
+        .map(|ty| {
+            format!("its signature states `{ty}`, which is not modelled, so a call of it refuses its caller")
+        })
+}
+
+/// A type a body states and the unit cannot: of a local that is no parameter or result,
+/// of a call's instantiation, or of what a closure it holds takes or returns.
+fn unmodelled_body_type(body: &Body, observed: &[AdtDef]) -> Option<String> {
+    let mappable = |ty: RustTy| collect_type_adts(ty, observed, &mut Vec::new()).is_ok();
+    let locals = mapped_locals(body);
+    if let Some(local) = locals
+        .iter()
+        .skip(body.arg_locals().len() + 1)
+        .find(|local| !mappable(local.ty))
+    {
+        return Some(format!("a local of type `{}` is not modelled", local.ty));
+    }
+    let mut uses = ClosureUses::default();
+    uses.visit_body(body);
+    let closure_type = uses
+        .mentioned
+        .iter()
+        .filter_map(|closure| CrateItem(closure.def_id()).body())
+        .find_map(|held| {
+            let arguments = held.arg_locals().len();
+            mapped_locals(&held)
+                .iter()
+                .take(arguments + 1)
+                .map(|local| local.ty)
+                .find(|ty| !mappable(*ty))
+        });
+    if let Some(ty) = closure_type {
+        return Some(format!(
+            "it holds a closure that takes or returns `{ty}`, which is not modelled"
+        ));
+    }
+    let calls = collect_calls(std::slice::from_ref(body)).ok()?;
+    calls
+        .instantiations
+        .into_iter()
+        .find(|ty| !mappable(*ty))
+        .map(|ty| {
+            format!("a call instantiates a generic parameter with `{ty}`, which is not modelled")
+        })
+}
+
+/// A body with the parameters and result of `body` and nothing else, so that nothing
+/// inside `body` reaches the unit.
+fn refused_body(body: &Body) -> Body {
+    let arguments = body.arg_locals().len();
+    let kept = |info: &&VarDebugInfo| matches!(&info.value, VarDebugInfoContents::Place(place) if place.local <= arguments);
+    Body::new(
+        vec![BasicBlock {
+            statements: vec![],
+            terminator: Terminator {
+                kind: TerminatorKind::Unreachable,
+                source_info: SourceInfo {
+                    span: body.span,
+                    scope: 0,
+                },
+            },
+        }],
+        body.locals()[..=arguments].to_vec(),
+        arguments,
+        body.var_debug_info.iter().filter(kept).cloned().collect(),
+        body.spread_arg(),
+        body.span,
+    )
+}
+
+/// The body of an opaque function: no parameters, and the result nothing can read.
+fn opaque_body(body: &Body) -> Body {
+    let never = MirLocalDecl {
+        ty: RustTy::from_rigid_kind(RigidTy::Never),
+        span: body.span,
+        mutability: Mutability::Not,
+    };
+    Body::new(
+        refused_body(body).blocks,
+        vec![never],
+        0,
+        vec![],
+        None,
+        body.span,
+    )
+}
+
+/// The argument tuples closure calls untuple, by local: `t = (a, b)` before
+/// `Fn*::call*(s, move t)` in its block with nothing but drop flags between, `t`
+/// having no other use. Each argument is then read at the call.
+fn closure_call_tuples(
+    caller: &str,
+    body: &Body,
+    locals: &[MirLocalDecl],
+    crate_files: &HashSet<String>,
+) -> Result<HashMap<usize, Vec<Operand>>, String> {
+    let mut folds = HashMap::new();
+    for block in &body.blocks {
+        let TerminatorKind::Call { func, args, .. } = &block.terminator.kind else {
+            continue;
+        };
+        let Ok(callee_type) = func.ty(locals) else {
+            continue;
+        };
+        let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee_type.kind() else {
+            continue;
+        };
+        if closure_callee(definition, &arguments).is_none() {
+            continue;
+        }
+        let at_call = |reason: &str| {
+            format!(
+                "{} {reason}",
+                call_site(
+                    definition,
+                    caller,
+                    block.terminator.source_info.span,
+                    crate_files,
+                )
+            )
+        };
+        let [_, tuple] = args.as_slice() else {
+            return Err(at_call("does not take a receiver and an argument tuple"));
+        };
+        let tuple = match tuple {
+            Operand::Move(place) | Operand::Copy(place) if place.projection.is_empty() => {
+                place.local
+            },
+            Operand::Constant(constant)
+                if matches!(
+                    constant.ty().kind(),
+                    TyKind::RigidTy(RigidTy::Tuple(elements)) if elements.is_empty()
+                ) =>
+            {
+                continue;
+            },
+            _ => return Err(at_call("takes an argument tuple it does not build")),
+        };
+        let mut built = None;
+        for statement in block.statements.iter().rev() {
+            match &statement.kind {
+                StatementKind::Assign(place, Rvalue::Aggregate(AggregateKind::Tuple, operands))
+                    if place.local == tuple && place.projection.is_empty() =>
+                {
+                    built = Some(operands.clone());
+                    break;
+                },
+                StatementKind::Assign(_, Rvalue::Use(Operand::Constant(_), _))
+                | StatementKind::StorageLive(_)
+                | StatementKind::StorageDead(_)
+                | StatementKind::Nop => {},
+                _ => break,
+            }
+        }
+        let mut mentions = LocalMentions {
+            local: tuple,
+            mentions: 0,
+        };
+        mentions.visit_body(body);
+        let Some(operands) = built else {
+            return Err(at_call("takes an argument tuple it does not build"));
+        };
+        if mentions.mentions != storage_mentions(body, tuple) + 2 {
+            return Err(at_call("uses its argument tuple elsewhere"));
+        }
+        folds.insert(tuple, operands);
+    }
+    Ok(folds)
+}
+
+/// Whether a body writes or mutably borrows a place of a local, other than through a
+/// reference. A drop only ends it.
+struct LocalWrites {
+    local: Local,
+    written: bool,
+}
+
+impl MirVisitor for LocalWrites {
+    fn visit_terminator(&mut self, terminator: &Terminator, location: MirLocation) {
+        if !matches!(terminator.kind, TerminatorKind::Drop { .. }) {
+            self.super_terminator(terminator, location);
+        }
+    }
+
+    fn visit_place(&mut self, place: &MirPlace, context: PlaceContext, _location: MirLocation) {
+        self.written |= place.local == self.local
+            && context.is_mutating()
+            && !place
+                .projection
+                .iter()
+                .any(|projection| matches!(projection, ProjectionElem::Deref));
+    }
+}
+
+fn local_written(body: &Body, local: Local) -> bool {
+    let mut writes = LocalWrites {
+        local,
+        written: false,
+    };
+    writes.visit_body(body);
+    writes.written
 }
 
 /// Counts the mentions of one local.
@@ -969,7 +3581,321 @@ impl MirVisitor for LocalMentions {
     }
 }
 
-/// The locals of a body as they are mapped. rustc reads a slice's length for
+/// What undoes rustc's elaboration of `Box`. Optimized MIR has no deref of a box:
+/// `*b` reads `p = copy (b.0.0) as *const T (Transmute)`, one pointer per use, behind
+/// a reference first `t = copy *r`, and a box whose content moved out is freed by
+/// `f = &mut b; <Box<T> as Drop>::drop(move f)`. Only this exact shape folds, by the
+/// box's language item, to a deref of the box; every other raw pointer stays
+/// unsupported. The free only releases the allocation and has no meaning in a value
+/// semantics: rustc rejects it in source (E0040), and it is erased only for a box
+/// whose content a folded pointer reads, the elaborated free after its content's drop.
+#[derive(Default)]
+struct BoxFolds {
+    /// A pointer local and the box it points into.
+    pointers: HashMap<usize, MirPlace>,
+    /// A temporary copy of a box read only for its pointers, and the place it copies.
+    aliases: HashMap<usize, MirPlace>,
+    /// The blocks ending in an elaborated free.
+    frees: HashSet<usize>,
+    /// The borrows of the box those frees take.
+    free_borrows: HashSet<usize>,
+}
+
+impl BoxFolds {
+    /// A place with its pointers and aliases replaced, a deref of a box remaining.
+    fn resolve(&self, place: &MirPlace) -> MirPlace {
+        let mut place = place.clone();
+        loop {
+            let base = match place.projection.first() {
+                Some(ProjectionElem::Deref) => self.pointers.get(&place.local),
+                _ => None,
+            }
+            .or_else(|| self.aliases.get(&place.local));
+            let Some(base) = base else {
+                return place;
+            };
+            let mut projection = base.projection.clone();
+            projection.extend(place.projection.iter().cloned());
+            place = MirPlace {
+                local: base.local,
+                projection,
+            };
+        }
+    }
+
+    /// Whether a statement defines what folds, so that nothing reads it.
+    fn folds_statement(&self, kind: &StatementKind) -> bool {
+        let StatementKind::Assign(destination, _) = kind else {
+            return false;
+        };
+        destination.projection.is_empty()
+            && (self.pointers.contains_key(&destination.local)
+                || self.aliases.contains_key(&destination.local)
+                || self.free_borrows.contains(&destination.local))
+    }
+}
+
+fn is_box_type(ty: RustTy) -> bool {
+    ty.kind().is_box()
+}
+
+/// The box a pointer's assignment reads: `copy (b.0.0) as *const T (Transmute)`.
+fn box_pointer_source(rvalue: &Rvalue, locals: &[MirLocalDecl]) -> Option<MirPlace> {
+    let Rvalue::Cast(CastKind::Transmute, Operand::Copy(source), _) = rvalue else {
+        return None;
+    };
+    let [prefix @ .., ProjectionElem::Field(0, _), ProjectionElem::Field(0, _)] =
+        source.projection.as_slice()
+    else {
+        return None;
+    };
+    let base = MirPlace {
+        local: source.local,
+        projection: prefix.to_vec(),
+    };
+    is_box_type(base.ty(locals).ok()?).then_some(base)
+}
+
+/// Whether a statement changes a local or lends it mutably.
+fn statement_changes(kind: &StatementKind, local: usize) -> bool {
+    match kind {
+        StatementKind::Assign(destination, rvalue) => {
+            destination.local == local
+                || matches!(rvalue,
+                    Rvalue::Ref(_, MirBorrowKind::Mut { .. }, place) if place.local == local)
+                || matches!(rvalue,
+                    Rvalue::AddressOf(RawPtrKind::Mut, place) if place.local == local)
+        },
+        StatementKind::SetDiscriminant { place, .. } => place.local == local,
+        StatementKind::StorageDead(dead) => *dead == local,
+        _ => false,
+    }
+}
+
+fn terminator_changes(kind: &TerminatorKind, local: usize) -> bool {
+    match kind {
+        TerminatorKind::Drop { place, .. } => place.local == local,
+        TerminatorKind::Call { destination, .. } => destination.local == local,
+        _ => false,
+    }
+}
+
+/// Whether no path from a pointer's assignment changes the box's local before a
+/// use of the pointer, so that the fold reads the box the pointer points into.
+fn box_unchanged_until_uses(body: &Body, pointer: usize, root: usize) -> bool {
+    let mentions_in = |visit: &dyn Fn(&mut LocalMentions)| {
+        let mut mentions = LocalMentions {
+            local: pointer,
+            mentions: 0,
+        };
+        visit(&mut mentions);
+        mentions.mentions != 0
+    };
+    let defines = |kind: &StatementKind| {
+        matches!(kind, StatementKind::Assign(destination, _)
+            if destination.local == pointer && destination.projection.is_empty())
+    };
+    let mut pending = vec![];
+    for (block, data) in body.blocks.iter().enumerate() {
+        for (index, statement) in data.statements.iter().enumerate() {
+            if defines(&statement.kind) {
+                pending.push((block, index + 1, false));
+            }
+        }
+    }
+    let mut visited = HashSet::new();
+    while let Some((block, start, mut changed)) = pending.pop() {
+        if start == 0 && !visited.insert((block, changed)) {
+            continue;
+        }
+        let data = &body.blocks[block];
+        let mut ended = false;
+        for (index, statement) in data.statements.iter().enumerate().skip(start) {
+            if defines(&statement.kind) {
+                ended = true;
+                break;
+            }
+            let location = statement_location(body, &block, index);
+            let used = mentions_in(&|mentions| mentions.visit_statement(statement, location));
+            if used && !matches!(statement.kind, StatementKind::StorageDead(_)) && changed {
+                return false;
+            }
+            changed |= statement_changes(&statement.kind, root);
+        }
+        if ended {
+            continue;
+        }
+        let location = terminator_location(body, &block);
+        let used = mentions_in(&|mentions| mentions.visit_terminator(&data.terminator, location));
+        if used && changed {
+            return false;
+        }
+        changed |= terminator_changes(&data.terminator.kind, root);
+        for successor in data.terminator.successors() {
+            pending.push((successor, 0, changed));
+        }
+    }
+    true
+}
+
+/// Whether a callee is `Drop::drop` at a box.
+fn is_box_drop_call(func: &Operand, locals: &[MirLocalDecl]) -> bool {
+    let Ok(callee) = func.ty(locals) else {
+        return false;
+    };
+    let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee.kind() else {
+        return false;
+    };
+    let name = definition.name();
+    let Some(path) = name.strip_suffix("::drop") else {
+        return false;
+    };
+    is_drop_trait(path)
+        && matches!(arguments.0.first(),
+            Some(GenericArgKind::Type(self_type)) if is_box_type(*self_type))
+}
+
+fn box_folds(body: &Body) -> BoxFolds {
+    let locals = body.locals();
+    let mut folds = BoxFolds::default();
+    let count_mentions = |local: usize| {
+        let mut mentions = LocalMentions { local, mentions: 0 };
+        mentions.visit_body(body);
+        mentions.mentions - storage_mentions(body, local)
+    };
+    let mut sources = vec![];
+    for block in &body.blocks {
+        for statement in &block.statements {
+            if let StatementKind::Assign(destination, rvalue) = &statement.kind
+                && destination.projection.is_empty()
+                && matches!(
+                    locals[destination.local].ty.kind(),
+                    TyKind::RigidTy(RigidTy::RawPtr(_, Mutability::Not))
+                )
+                && let Some(source) = box_pointer_source(rvalue, locals)
+            {
+                sources.push((destination.local, source));
+            }
+        }
+    }
+    if sources.is_empty() {
+        return folds;
+    }
+    // Each pointer: its one assignment, and otherwise only derefs.
+    for (pointer, source) in &sources {
+        let mut derefs = LocalDerefs {
+            local: *pointer,
+            derefs: 0,
+        };
+        derefs.visit_body(body);
+        if count_mentions(*pointer) == derefs.derefs + 1 {
+            folds.pointers.insert(*pointer, source.clone());
+        }
+    }
+    // A temporary box: one bitwise copy, otherwise read only by the pointers.
+    for block in &body.blocks {
+        for statement in &block.statements {
+            let StatementKind::Assign(destination, rvalue) = &statement.kind else {
+                continue;
+            };
+            let (Rvalue::Use(Operand::Copy(copied), WithRetag::No) | Rvalue::CopyForDeref(copied)) =
+                rvalue
+            else {
+                continue;
+            };
+            let readers = folds
+                .pointers
+                .values()
+                .filter(|source| source.local == destination.local)
+                .count();
+            if destination.projection.is_empty()
+                && is_box_type(locals[destination.local].ty)
+                && copied
+                    .projection
+                    .iter()
+                    .any(|projection| matches!(projection, ProjectionElem::Deref))
+                && readers > 0
+                && count_mentions(destination.local) == readers + 1
+            {
+                folds.aliases.insert(destination.local, copied.clone());
+            }
+        }
+    }
+    let checked = folds.pointers.keys().all(|pointer| {
+        let root = folds
+            .resolve(&MirPlace {
+                local: *pointer,
+                projection: vec![ProjectionElem::Deref],
+            })
+            .local;
+        box_unchanged_until_uses(body, *pointer, root)
+    });
+    if !checked
+        || sources
+            .iter()
+            .any(|(pointer, _)| !folds.pointers.contains_key(pointer))
+    {
+        return BoxFolds::default();
+    }
+    // An elaborated free: its borrow and call in one block, of a box a pointer reads.
+    for (index, block) in body.blocks.iter().enumerate() {
+        let TerminatorKind::Call { func, args, .. } = &block.terminator.kind else {
+            continue;
+        };
+        if !is_box_drop_call(func, locals) {
+            continue;
+        }
+        let [Operand::Move(borrow)] = args.as_slice() else {
+            continue;
+        };
+        if !borrow.projection.is_empty() || count_mentions(borrow.local) != 2 {
+            continue;
+        }
+        let borrowed = block
+            .statements
+            .iter()
+            .find_map(|statement| match &statement.kind {
+                StatementKind::Assign(
+                    destination,
+                    Rvalue::Ref(_, MirBorrowKind::Mut { .. }, place),
+                ) if destination.local == borrow.local && destination.projection.is_empty() => {
+                    Some(place)
+                },
+                _ => None,
+            });
+        let Some(borrowed) = borrowed else {
+            continue;
+        };
+        let content_read = folds
+            .pointers
+            .values()
+            .any(|source| folds.resolve(source) == folds.resolve(borrowed));
+        if content_read {
+            folds.frees.insert(index);
+            folds.free_borrows.insert(borrow.local);
+        }
+    }
+    folds
+}
+
+/// Counts the places derefing one local at their first step.
+struct LocalDerefs {
+    local: Local,
+    derefs: usize,
+}
+
+impl MirVisitor for LocalDerefs {
+    fn visit_place(&mut self, place: &MirPlace, _context: PlaceContext, _location: MirLocation) {
+        if place.local == self.local
+            && matches!(place.projection.first(), Some(ProjectionElem::Deref))
+        {
+            self.derefs += 1;
+        }
+    }
+}
+
+/// The locals of a body as they are mapped. A pointer of a folded box dereference
+/// reads as the reference it stands for (`BoxFolds`). rustc reads a slice's length for
 /// a bounds check through a pointer it creates for that read alone,
 /// `p = &raw const (fake) *r` followed by `PtrMetadata(p)`. A pointer local
 /// assigned only such borrows and used only by `PtrMetadata` is mapped as a
@@ -978,11 +3904,22 @@ impl MirVisitor for LocalMentions {
 /// other raw pointer remains unsupported.
 fn mapped_locals(body: &Body) -> Vec<MirLocalDecl> {
     let mut locals = body.locals().to_vec();
+    let folds = box_folds(body);
     for (index, declaration) in locals.iter_mut().enumerate() {
         let TyKind::RigidTy(RigidTy::RawPtr(pointee, Mutability::Not)) = declaration.ty.kind()
         else {
             continue;
         };
+        if folds.pointers.contains_key(&index) {
+            declaration.ty = RustTy::new_ref(
+                Region {
+                    kind: RegionKind::ReErased,
+                },
+                pointee,
+                Mutability::Not,
+            );
+            continue;
+        }
         let mut permitted = 0;
         let mut assigned = false;
         for block in &body.blocks {
@@ -1030,10 +3967,109 @@ fn mapped_locals(body: &Body) -> Vec<MirLocalDecl> {
     locals
 }
 
+/// A profile borrow kind the structurizer settles.
+fn structurized_borrow_kind(tag: &str) -> BorrowKind {
+    BorrowKind::Profile {
+        value: ProfileValue {
+            payload: String::new(),
+            profile: Profile::Rust,
+            tag: tag.to_owned(),
+        },
+    }
+}
+
+/// A mutable borrow's kind: rustc's two-phase borrows activate at their use.
+fn mutable_borrow_kind(kind: &MutBorrowKind) -> BorrowKind {
+    match kind {
+        MutBorrowKind::TwoPhaseBorrow => structurized_borrow_kind("borrow.two_phase"),
+        MutBorrowKind::Default | MutBorrowKind::ClosureCapture => BorrowKind::Mutable,
+    }
+}
+
+/// The borrow temporaries an unsizing coercion folds into its borrow, by
+/// local: `_t = &P` directly followed by `_c = _t as &[T]`, `_t` having no other
+/// use. The coercion then borrows the unsized place itself, so no loan is ever
+/// held at the array's type and retyped.
+fn unsize_folds(body: &Body, locals: &[MirLocalDecl]) -> HashMap<usize, (BorrowKind, MirPlace)> {
+    let mut folds = HashMap::new();
+    for block in &body.blocks {
+        let mut borrow: Option<(usize, BorrowKind, &MirPlace)> = None;
+        for statement in &block.statements {
+            match &statement.kind {
+                StatementKind::Assign(destination, Rvalue::Ref(_, kind, place))
+                    if destination.projection.is_empty() =>
+                {
+                    let kind = match kind {
+                        MirBorrowKind::Shared => Some(BorrowKind::Immutable),
+                        MirBorrowKind::Mut { kind } => Some(mutable_borrow_kind(kind)),
+                        MirBorrowKind::Fake(_) => None,
+                    };
+                    borrow = kind.map(|kind| (destination.local, kind, place));
+                },
+                StatementKind::Assign(
+                    _,
+                    Rvalue::Cast(
+                        CastKind::PointerCoercion(PointerCoercion::Unsize),
+                        Operand::Copy(operand) | Operand::Move(operand),
+                        target,
+                    ),
+                ) => {
+                    if let Some((local, kind, place)) = borrow.take()
+                        && operand.local == local
+                        && operand.projection.is_empty()
+                        && is_array_to_slice(locals[local].ty, *target)
+                    {
+                        let mut mentions = LocalMentions { local, mentions: 0 };
+                        mentions.visit_body(body);
+                        // The storage markers, the borrow's destination and
+                        // the coercion's operand.
+                        let storage = storage_mentions(body, local);
+                        if mentions.mentions == storage + 2 {
+                            folds.insert(local, (kind, place.clone()));
+                        }
+                    }
+                },
+                StatementKind::StorageLive(_)
+                | StatementKind::StorageDead(_)
+                | StatementKind::Nop => {},
+                _ => borrow = None,
+            }
+        }
+    }
+    folds
+}
+
+/// The storage markers of a local in a body.
+fn storage_mentions(body: &Body, local: usize) -> usize {
+    body.blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .filter(|statement| {
+            matches!(
+                statement.kind,
+                StatementKind::StorageLive(marked) | StatementKind::StorageDead(marked)
+                    if marked == local
+            )
+        })
+        .count()
+}
+
+/// Whether a coercion's source and target are `&[T; N]` and `&[T]`.
+fn is_array_to_slice(source: RustTy, target: RustTy) -> bool {
+    let (TyKind::RigidTy(RigidTy::Ref(_, source, _)), TyKind::RigidTy(RigidTy::Ref(_, target, _))) =
+        (source.kind(), target.kind())
+    else {
+        return false;
+    };
+    matches!(source.kind(), TyKind::RigidTy(RigidTy::Array(..)))
+        && matches!(target.kind(), TyKind::RigidTy(RigidTy::Slice(_)))
+}
+
 /// The ADTs a body observes the shape of: those it constructs, reads the
 /// discriminant of, downcasts, or projects a field of.
 struct ObservedAdts<'a> {
     locals: &'a [MirLocalDecl],
+    folds: &'a BoxFolds,
     adts: Vec<AdtDef>,
 }
 
@@ -1048,6 +4084,12 @@ impl ObservedAdts<'_> {
 }
 
 impl MirVisitor for ObservedAdts<'_> {
+    fn visit_statement(&mut self, statement: &rustc_public::mir::Statement, location: MirLocation) {
+        if !self.folds.folds_statement(&statement.kind) {
+            self.super_statement(statement, location);
+        }
+    }
+
     fn visit_place(&mut self, place: &MirPlace, _context: PlaceContext, _location: MirLocation) {
         for (index, projection) in place.projection.iter().enumerate() {
             if matches!(
@@ -1083,27 +4125,43 @@ impl MirVisitor for ObservedAdts<'_> {
     }
 }
 
-/// An ADT the unit reaches. A dependency's ADT whose shape no body observes is
-/// opaque: the unit names it without its fields or variants.
+/// An ADT the unit reaches. A dependency's struct whose shape no body observes
+/// is opaque: the unit names it without its fields. An enum's variants are
+/// public, so its shape is carried unless a payload's type has no mapping.
 #[derive(Clone, Copy)]
 struct ReachedAdt {
     definition: AdtDef,
     opaque: bool,
 }
 
-/// The ADTs the bodies' locals and the called dependency functions'
-/// signatures reach.
-fn collect_adts(bodies: &[Body], signatures: &[RustTy]) -> Result<Vec<ReachedAdt>, String> {
+/// The ADTs the bodies observe the shape of.
+fn observed_adts(bodies: &[Body]) -> Vec<AdtDef> {
     let mut observed = Vec::new();
     for body in bodies {
         let locals = mapped_locals(body);
+        let folds = box_folds(body);
         let mut visitor = ObservedAdts {
             locals: &locals,
+            folds: &folds,
             adts: observed,
         };
         visitor.visit_body(body);
         observed = visitor.adts;
     }
+    observed
+}
+
+/// The ADTs the bodies' locals, the called dependency functions' signatures,
+/// the types calls instantiate with, and the evaluated constants reach. `observed`
+/// holds those the bodies observe; a constant also states the shape of those it holds.
+fn collect_adts(
+    bodies: &[Body],
+    mut observed: Vec<AdtDef>,
+    signatures: &[RustTy],
+    instantiations: &[RustTy],
+    constants: &EvaluatedConstants,
+) -> Result<Vec<ReachedAdt>, String> {
+    observed.extend(constants.adts.iter().copied());
     let mut adts = Vec::new();
     for body in bodies {
         for local in &mapped_locals(body) {
@@ -1111,6 +4169,9 @@ fn collect_adts(bodies: &[Body], signatures: &[RustTy]) -> Result<Vec<ReachedAdt
         }
     }
     for ty in signatures {
+        collect_signature_adts(*ty, &observed, &mut adts)?;
+    }
+    for ty in instantiations.iter().chain(&constants.types) {
         collect_type_adts(*ty, &observed, &mut adts)?;
     }
     adts.sort_by_key(|adt| adt.definition.name());
@@ -1139,6 +4200,12 @@ fn collect_type_adts(
             }
             Ok(())
         },
+        TyKind::RigidTy(RigidTy::Closure(_, arguments)) => {
+            for part in closure_parts(&arguments) {
+                collect_type_adts(part, observed, adts)?;
+            }
+            Ok(())
+        },
         TyKind::RigidTy(RigidTy::Bool)
         | TyKind::RigidTy(RigidTy::Char)
         | TyKind::RigidTy(RigidTy::Never)
@@ -1155,30 +4222,56 @@ fn collect_type_adts(
                     collect_type_adts(*argument, observed, adts)?;
                 }
             }
-            if definition.kind() == AdtKind::Union {
-                return Err(format!(
-                    "unsupported Rust ADT kind for `{}`: {}",
-                    definition.name(),
-                    definition.kind()
-                ));
-            }
-            if adts.iter().any(|adt| adt.definition == definition) {
-                return Ok(());
-            }
-            let opaque = definition.krate() != rustc_public::local_crate()
-                && !observed.contains(&definition);
-            adts.push(ReachedAdt { definition, opaque });
-            if !opaque {
-                for variant in definition.variants() {
-                    for field in variant.fields() {
-                        collect_type_adts(field.ty(), observed, adts)?;
-                    }
-                }
-            }
-            Ok(())
+            collect_adt(definition, observed, adts)
         },
         kind => Err(format!("unsupported Rust local type: {kind:?}")),
     }
+}
+
+/// An ADT, and what its fields reach if the unit carries its shape.
+fn collect_adt(
+    definition: AdtDef,
+    observed: &[AdtDef],
+    adts: &mut Vec<ReachedAdt>,
+) -> Result<(), String> {
+    if definition.kind() == AdtKind::Union {
+        return Err(format!(
+            "unsupported Rust ADT kind for `{}`: {}",
+            definition.name(),
+            definition.kind()
+        ));
+    }
+    if adts.iter().any(|adt| adt.definition == definition) {
+        return Ok(());
+    }
+    let required =
+        definition.krate() == rustc_public::local_crate() || observed.contains(&definition);
+    if required || definition.kind() == AdtKind::Enum {
+        let mut shaped = adts.clone();
+        shaped.push(ReachedAdt {
+            definition,
+            opaque: false,
+        });
+        let carried = definition.variants().into_iter().try_for_each(|variant| {
+            variant
+                .fields()
+                .into_iter()
+                .try_for_each(|field| collect_type_adts(field.ty(), observed, &mut shaped))
+        });
+        match carried {
+            Ok(()) => {
+                *adts = shaped;
+                return Ok(());
+            },
+            Err(message) if required => return Err(message),
+            Err(_) => {},
+        }
+    }
+    adts.push(ReachedAdt {
+        definition,
+        opaque: true,
+    });
+    Ok(())
 }
 
 fn supported_function_pointer_signature(signature: &PolyFnSig) -> Result<&FnSig, String> {
@@ -1199,30 +4292,31 @@ fn supported_function_pointer_signature(signature: &PolyFnSig) -> Result<&FnSig,
 }
 
 fn build_names(
-    identities: &[String],
+    item_names: &[String],
     item_scopes: &[Vec<String>],
     reached: &[ReachedAdt],
     scopes: &mut Scopes,
     namespaces: &CrateNamespaces,
 ) -> Result<(Vec<QualifiedName>, Vec<AdtNames>), String> {
-    let mut names = identities
+    let mut names = item_names
         .iter()
         .zip(item_scopes)
-        .map(|(identity, scope)| QualifiedName {
-            name: last_segment(identity),
+        .map(|(name, scope)| QualifiedName {
+            name: name.clone(),
             namespace_id: NamespaceId::new(0),
             scope: scope.clone(),
         })
         .collect::<Vec<_>>();
     let mut adts = Vec::with_capacity(reached.len());
-    let mut copy_by_crate = BTreeMap::<String, Vec<AdtDef>>::new();
+    let mut impls = AdtImpls::default();
+    impls.settle_drop_reach(reached);
     for adt in reached {
         let definition = adt.definition;
-        let krate = definition.krate();
-        let copy = copy_by_crate
-            .entry(krate.name.clone())
-            .or_insert_with(|| copy_adts(&krate))
+        let copy = impls
+            .of_crate(definition.krate())
+            .copy
             .contains(&definition);
+        let destructor = impls.has_destructor(adt);
         let name = NameId::new(names.len());
         let krate = definition.krate().name;
         let namespace_id = namespaces.id(&krate)?;
@@ -1276,6 +4370,7 @@ fn build_names(
             name,
             namespace_id,
             copy,
+            destructor,
             opaque: adt.opaque,
             variants,
         });
@@ -1417,15 +4512,18 @@ fn map_structs(
                 loc,
                 locals: vec![],
                 name: adt.name,
-                properties: if adt.opaque {
-                    vec![ProfileValue {
-                        payload: String::new(),
-                        profile: Profile::Rust,
-                        tag: "struct.opaque".to_owned(),
-                    }]
-                } else {
-                    vec![]
-                },
+                properties: [
+                    (adt.destructor, "struct.destructor"),
+                    (adt.opaque, "struct.opaque"),
+                ]
+                .into_iter()
+                .filter(|(stated, _)| *stated)
+                .map(|(_, tag)| ProfileValue {
+                    payload: String::new(),
+                    profile: Profile::Rust,
+                    tag: tag.to_owned(),
+                })
+                .collect(),
                 variants,
             })
         })
@@ -1477,6 +4575,8 @@ struct TypeLayout {
     composites: Vec<CompositeEntry>,
     references: Vec<ReferenceEntry>,
     lifetimes: Vec<LifetimeSpec>,
+    /// Each function's bound regions, as binders of that function.
+    bound_regions: Vec<LifetimeSpec>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1508,6 +4608,7 @@ struct ReferenceEntry {
     id: TypeId,
 }
 
+#[derive(Clone)]
 struct LifetimeSpec {
     region: Region,
     kind: LifetimeKind,
@@ -1519,7 +4620,11 @@ impl TypeLayout {
         items: &[CrateItem],
         bodies: &[Body],
         adts: &[AdtNames],
+        closures: &[ClosureNames],
         dependency_functions: &[DependencyFunction],
+        declared: &[DeclaredSignature],
+        instantiations: &[RustTy],
+        constants: &[RustTy],
     ) -> Result<Self, String> {
         let mut needs_never = false;
         let mut needs_bool = false;
@@ -1536,8 +4641,18 @@ impl TypeLayout {
         });
         let signatures = dependency_functions
             .iter()
-            .flat_map(|function| function.signature.iter().copied());
-        for ty in locals.chain(signatures) {
+            .flat_map(|function| function.signature.iter().copied())
+            .flat_map(parts_without_associated_types);
+        let reached = locals
+            .chain(signatures)
+            .chain(
+                declared
+                    .iter()
+                    .flat_map(|signature| signature.types.iter().copied()),
+            )
+            .chain(instantiations.iter().copied())
+            .chain(constants.iter().copied());
+        for ty in reached {
             {
                 observe_type(
                     ty,
@@ -1551,6 +4666,19 @@ impl TypeLayout {
                     &mut pending_references,
                 )?;
             }
+        }
+        for (_, ty) in closures.iter().flat_map(|closure| &closure.fields) {
+            observe_type(
+                *ty,
+                &mut needs_never,
+                &mut needs_bool,
+                &mut needs_character,
+                &mut needed_integers,
+                &mut needed_nominals,
+                &mut needed_composites,
+                adts,
+                &mut pending_references,
+            )?;
         }
         for adt in adts.iter().filter(|adt| !adt.opaque) {
             for variant in adt.definition.variants() {
@@ -1616,10 +4744,21 @@ impl TypeLayout {
                 }
             }
         }
-        let mut lifetimes = lifetime_regions
-            .into_iter()
-            .map(lifetime_spec)
+        let bound_regions = declared
+            .iter()
+            .chain(
+                dependency_functions
+                    .iter()
+                    .map(|function| &function.declared),
+            )
+            .flat_map(DeclaredSignature::region_specs)
             .collect::<Vec<_>>();
+        let spec = |region: Region| match bound_regions.iter().find(|bound| bound.region == region)
+        {
+            Some(bound) => bound.clone(),
+            None => lifetime_spec(region),
+        };
+        let mut lifetimes = lifetime_regions.into_iter().map(spec).collect::<Vec<_>>();
         let mut types = vec![Ty::Unit];
         let never = needs_never.then(|| {
             let id = TypeId::new(types.len());
@@ -1648,13 +4787,14 @@ impl TypeLayout {
             })
             .collect::<Vec<_>>();
         let mut parameter_indices = Vec::new();
-        let functions = items.iter().map(|item| function_def(*item)).chain(
+        let functions = items.iter().map(|item| item_generics(*item)).chain(
             dependency_functions
                 .iter()
-                .map(|function| Ok(function.definition)),
+                .filter(|function| !function.opaque)
+                .map(|function| flattened_generics(function.definition)),
         );
-        for function in functions {
-            for parameter in flattened_generics(function?)? {
+        for generics in functions {
+            for parameter in generics? {
                 if matches!(parameter.kind, GenericParamDefKind::Type { .. }) {
                     parameter_indices.push(parameter.index);
                 }
@@ -1667,6 +4807,12 @@ impl TypeLayout {
                 }
             }
         }
+        parameter_indices.extend(
+            dependency_functions
+                .iter()
+                .flat_map(|function| function.associated_types.iter())
+                .map(|associated| associated.index),
+        );
         parameter_indices.sort_unstable();
         parameter_indices.dedup();
         let type_parameters = parameter_indices
@@ -1680,65 +4826,75 @@ impl TypeLayout {
             })
             .collect::<Vec<_>>();
         let mut nominals = Vec::new();
-        for ty in needed_nominals {
-            let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = ty.kind() else {
-                return Err(format!("nominal Rust type is not an ADT: {:?}", ty.kind()));
-            };
-            let adt = adts
-                .iter()
-                .find(|adt| adt.definition == definition)
-                .ok_or_else(|| format!("ADT `{}` was not interned", definition.name()))?;
-            let arguments = arguments
-                .0
-                .into_iter()
-                .map(|argument| match argument {
-                    GenericArgKind::Type(argument) => interned_type_id(
-                        TypeId::new(0),
-                        never,
-                        bool_,
-                        character,
-                        &type_parameters,
-                        &integers,
-                        &nominals,
-                        &[],
-                        &[],
-                        argument,
-                    )
-                    .map(|type_id| GenericArgument::TypeArg {
-                        value: TypeUse {
-                            loc: LocId::new(0),
-                            type_id,
-                        },
-                    })
-                    .ok_or_else(|| {
-                        format!(
-                            "generic ADT type argument is not yet interned: {:?}",
-                            argument.kind()
-                        )
-                    }),
-                    GenericArgKind::Lifetime(region) => lifetimes
-                        .iter()
-                        .position(|entry| entry.region == region)
-                        .map(|index| GenericArgument::Lifetime {
-                            value: LifetimeId::new(index),
-                        })
-                        .ok_or_else(|| "generic ADT lifetime was not interned".to_owned()),
-                    GenericArgKind::Const(value) => {
-                        const_generic_value(&value).map(|value| GenericArgument::Const { value })
-                    },
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let id = TypeId::new(types.len());
-            types.push(Ty::Nominal {
-                arguments,
-                name: adt.name,
-            });
-            nominals.push(NominalEntry { definition, ty, id });
-        }
         let mut composites = Vec::new();
         let mut references = Vec::new();
+        // A nominal's arguments, a composite's elements and a referent depend on
+        // each other in any nesting (`Option<&u32>`, `&Option<u32>`).
         loop {
-            let before = composites.len() + references.len();
+            let before = nominals.len() + composites.len() + references.len();
+            // A nominal's type arguments may be composites and references,
+            // which may in turn hold nominals, so each kind waits for what it
+            // names.
+            for ty in &needed_nominals {
+                if nominals.iter().any(|entry: &NominalEntry| entry.ty == *ty) {
+                    continue;
+                }
+                let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = ty.kind() else {
+                    return Err(format!("nominal Rust type is not an ADT: {:?}", ty.kind()));
+                };
+                let adt = adts
+                    .iter()
+                    .find(|adt| adt.definition == definition)
+                    .ok_or_else(|| format!("ADT `{}` was not interned", definition.name()))?;
+                let arguments = arguments
+                    .0
+                    .into_iter()
+                    .map(|argument| match argument {
+                        GenericArgKind::Type(argument) => Ok(interned_type_id(
+                            TypeId::new(0),
+                            never,
+                            bool_,
+                            character,
+                            &type_parameters,
+                            &integers,
+                            &nominals,
+                            &composites,
+                            &references,
+                            argument,
+                        )
+                        .map(|type_id| GenericArgument::TypeArg {
+                            value: TypeUse {
+                                loc: LocId::new(0),
+                                type_id,
+                            },
+                        })),
+                        GenericArgKind::Lifetime(region) => lifetimes
+                            .iter()
+                            .position(|entry| entry.region == region)
+                            .map(|index| {
+                                Some(GenericArgument::Lifetime {
+                                    value: LifetimeId::new(index),
+                                })
+                            })
+                            .ok_or_else(|| "generic ADT lifetime was not interned".to_owned()),
+                        GenericArgKind::Const(value) => const_generic_value(&value)
+                            .map(|value| Some(GenericArgument::Const { value })),
+                    })
+                    .collect::<Result<Option<Vec<_>>, String>>()?;
+                let Some(arguments) = arguments else {
+                    continue;
+                };
+                let id = TypeId::new(types.len());
+                types.push(Ty::Nominal {
+                    arguments,
+                    name: adt.name,
+                });
+                nominals.push(NominalEntry {
+                    definition,
+                    ty: *ty,
+                    id,
+                });
+            }
             for ty in &needed_composites {
                 if composites
                     .iter()
@@ -1807,6 +4963,62 @@ impl TypeLayout {
                         length: None,
                     }),
                     TyKind::RigidTy(RigidTy::Str) => Some(Ty::String),
+                    // A closure is the struct of its upvars at its parent's
+                    // arguments, its own binders inferred.
+                    TyKind::RigidTy(RigidTy::Closure(definition, arguments)) => {
+                        let closure = closures
+                            .iter()
+                            .find(|closure| closure.definition == definition)
+                            .ok_or_else(|| {
+                                format!("closure `{}` was not interned", definition.name())
+                            })?;
+                        let mut mapped = Some(Vec::new());
+                        for argument in closure_arguments(&arguments)?.0 {
+                            let argument = match argument {
+                                GenericArgKind::Type(argument) => interned_type_id(
+                                    TypeId::new(0),
+                                    never,
+                                    bool_,
+                                    character,
+                                    &type_parameters,
+                                    &integers,
+                                    &nominals,
+                                    &composites,
+                                    &references,
+                                    argument,
+                                )
+                                .map(|type_id| GenericArgument::TypeArg {
+                                    value: TypeUse {
+                                        loc: LocId::new(0),
+                                        type_id,
+                                    },
+                                }),
+                                GenericArgKind::Lifetime(region) => {
+                                    Some(GenericArgument::Lifetime {
+                                        value: interned_lifetime(&mut lifetimes, region),
+                                    })
+                                },
+                                GenericArgKind::Const(value) => Some(GenericArgument::Const {
+                                    value: const_generic_value(&value)?,
+                                }),
+                            };
+                            match (argument, &mut mapped) {
+                                (Some(argument), Some(mapped)) => mapped.push(argument),
+                                _ => mapped = None,
+                            }
+                        }
+                        mapped.map(|mut arguments| {
+                            for _ in &closure.lifetimes {
+                                arguments.push(GenericArgument::Lifetime {
+                                    value: interned_lifetime(&mut lifetimes, erased()),
+                                });
+                            }
+                            Ty::Nominal {
+                                arguments,
+                                name: closure.name,
+                            }
+                        })
+                    },
                     TyKind::RigidTy(RigidTy::FnPtr(signature)) => {
                         let signature = supported_function_pointer_signature(&signature)?;
                         let mut mapped = signature
@@ -1870,7 +5082,7 @@ impl TypeLayout {
                     Some(index) => LifetimeId::new(index),
                     None => {
                         let id = LifetimeId::new(lifetimes.len());
-                        lifetimes.push(lifetime_spec(region.clone()));
+                        lifetimes.push(spec(region.clone()));
                         id
                     },
                 };
@@ -1894,6 +5106,9 @@ impl TypeLayout {
                     id,
                 });
             }
+            let unresolved_nominal = needed_nominals
+                .iter()
+                .find(|ty| !nominals.iter().any(|entry| entry.ty == **ty));
             let unresolved_composite = needed_composites
                 .iter()
                 .find(|ty| !composites.iter().any(|entry| entry.ty == **ty));
@@ -1904,18 +5119,22 @@ impl TypeLayout {
                         && entry.mutability == candidate.2
                 })
             });
-            if unresolved_composite.is_none() && unresolved_reference.is_none() {
+            if unresolved_nominal.is_none()
+                && unresolved_composite.is_none()
+                && unresolved_reference.is_none()
+            {
                 break;
             }
-            if composites.len() + references.len() == before {
+            if nominals.len() + composites.len() + references.len() == before {
                 return Err(format!(
-                    "could not intern composite/reference type dependencies: composite={:?}, reference={:?}",
+                    "could not intern nominal/composite/reference type dependencies: nominal={:?}, composite={:?}, reference={:?}",
+                    unresolved_nominal.map(|ty| ty.kind()),
                     unresolved_composite.map(|ty| ty.kind()),
                     unresolved_reference.map(|(_, referent, _)| referent.kind())
                 ));
             }
         }
-        Ok(Self {
+        let mut layout = Self {
             types,
             unit: TypeId::new(0),
             never,
@@ -1927,7 +5146,160 @@ impl TypeLayout {
             composites,
             references,
             lifetimes,
-        })
+            bound_regions,
+        };
+        layout.intern_instantiated_fields(adts)?;
+        Ok(layout)
+    }
+
+    /// Interns the fields of each nominal whose arguments hold a lifetime of a
+    /// signature, which a place through it reads. Rustc Public erases the regions of
+    /// a type it builds, so `FieldDef::ty_with_args` cannot state them.
+    fn intern_instantiated_fields(&mut self, adts: &[AdtNames]) -> Result<(), String> {
+        let mut index = 0;
+        while index < self.types.len() {
+            let current = self.types[index].clone();
+            index += 1;
+            let Ty::Nominal { arguments, name } = current else {
+                continue;
+            };
+            if !arguments
+                .iter()
+                .any(|argument| self.holds_declared_lifetime(argument))
+            {
+                continue;
+            }
+            let Some(adt) = adts.iter().find(|adt| adt.name == name && !adt.opaque) else {
+                continue;
+            };
+            for variant in adt.definition.variants() {
+                for field in variant.fields() {
+                    let declared = self.id(field.ty())?;
+                    self.instantiate_field(declared, &arguments);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn holds_declared_lifetime(&self, argument: &GenericArgument) -> bool {
+        let erased = self.interned_lifetime(&erased());
+        let mut pending = vec![];
+        match argument {
+            GenericArgument::Lifetime { value } => return Some(*value) != erased,
+            GenericArgument::TypeArg { value } => pending.push(value.type_id),
+            GenericArgument::Const { .. } | GenericArgument::Evidence { .. } => {},
+        }
+        while let Some(id) = pending.pop() {
+            match &self.types[id.index] {
+                Ty::Reference { value } => {
+                    if Some(value.lifetime) != erased {
+                        return true;
+                    }
+                    pending.push(value.referent);
+                },
+                Ty::Tuple { elements } => pending.extend(elements),
+                Ty::Vector { element, .. } => pending.push(*element),
+                Ty::Nominal { arguments, .. } => {
+                    if arguments
+                        .iter()
+                        .any(|argument| self.holds_declared_lifetime(argument))
+                    {
+                        return true;
+                    }
+                },
+                Ty::Unit
+                | Ty::Never
+                | Ty::Bool
+                | Ty::Character
+                | Ty::String
+                | Ty::Integer { .. }
+                | Ty::TypeParameter { .. }
+                | Ty::Function { .. } => {},
+            }
+        }
+        false
+    }
+
+    /// A declared field type at a nominal's arguments, interned as validation reads it.
+    fn instantiate_field(&mut self, declared: TypeId, arguments: &[GenericArgument]) -> TypeId {
+        let instantiated = match self.types[declared.index].clone() {
+            Ty::TypeParameter { index } => {
+                return match arguments.get(index) {
+                    Some(GenericArgument::TypeArg { value }) => value.type_id,
+                    _ => declared,
+                };
+            },
+            Ty::Reference { value } => Ty::Reference {
+                value: ReferenceType {
+                    lifetime: match self.lifetimes[value.lifetime.index].kind {
+                        LifetimeKind::Parameter { index } => match arguments.get(index) {
+                            Some(GenericArgument::Lifetime { value }) => *value,
+                            _ => value.lifetime,
+                        },
+                        LifetimeKind::Static | LifetimeKind::Inference | LifetimeKind::Local => {
+                            value.lifetime
+                        },
+                    },
+                    referent: self.instantiate_field(value.referent, arguments),
+                    ..value
+                },
+            },
+            Ty::Tuple { elements } => Ty::Tuple {
+                elements: elements
+                    .into_iter()
+                    .map(|element| self.instantiate_field(element, arguments))
+                    .collect(),
+            },
+            Ty::Vector { element, length } => Ty::Vector {
+                element: self.instantiate_field(element, arguments),
+                length,
+            },
+            Ty::Nominal {
+                arguments: nominal,
+                name,
+            } => Ty::Nominal {
+                arguments: nominal
+                    .into_iter()
+                    .map(|argument| match argument {
+                        GenericArgument::TypeArg { value } => GenericArgument::TypeArg {
+                            value: TypeUse {
+                                loc: value.loc,
+                                type_id: self.instantiate_field(value.type_id, arguments),
+                            },
+                        },
+                        GenericArgument::Lifetime { value } => GenericArgument::Lifetime {
+                            value: match self.lifetimes[value.index].kind {
+                                LifetimeKind::Parameter { index } => match arguments.get(index) {
+                                    Some(GenericArgument::Lifetime { value }) => *value,
+                                    _ => value,
+                                },
+                                LifetimeKind::Static
+                                | LifetimeKind::Inference
+                                | LifetimeKind::Local => value,
+                            },
+                        },
+                        argument @ (GenericArgument::Const { .. }
+                        | GenericArgument::Evidence { .. }) => argument,
+                    })
+                    .collect(),
+                name,
+            },
+            Ty::Unit
+            | Ty::Never
+            | Ty::Bool
+            | Ty::Character
+            | Ty::String
+            | Ty::Integer { .. }
+            | Ty::Function { .. } => return declared,
+        };
+        match self.types.iter().position(|ty| *ty == instantiated) {
+            Some(index) => TypeId::new(index),
+            None => {
+                self.types.push(instantiated);
+                TypeId::new(self.types.len() - 1)
+            },
+        }
     }
 
     fn id(&self, ty: rustc_public::ty::Ty) -> Result<TypeId, String> {
@@ -1967,7 +5339,11 @@ impl TypeLayout {
                 .map(|entry| entry.id)
                 .ok_or_else(|| "tuple type was not interned".to_owned()),
             TyKind::RigidTy(
-                RigidTy::Array(_, _) | RigidTy::Slice(_) | RigidTy::Str | RigidTy::FnPtr(_),
+                RigidTy::Array(_, _)
+                | RigidTy::Slice(_)
+                | RigidTy::Str
+                | RigidTy::FnPtr(_)
+                | RigidTy::Closure(..),
             ) => self
                 .composites
                 .iter()
@@ -1991,6 +5367,176 @@ impl TypeLayout {
                 .map(|entry| entry.id)
                 .ok_or_else(|| "reference type was not interned".to_owned()),
             kind => Err(format!("unsupported Rust scalar type: {kind:?}")),
+        }
+    }
+
+    /// The type of a dependency's signature, in which an associated type is the
+    /// type parameter of its binder. Such a type depends on the binder's index,
+    /// so it has no identity as a Rust type.
+    fn signature_type_id(
+        &mut self,
+        ty: RustTy,
+        associated_types: &[AssociatedType],
+        adts: &[AdtNames],
+    ) -> Result<TypeId, String> {
+        self.rebuilt_type_id(ty, associated_types, adts, &mut |region| region, &|ty| {
+            projection(ty).is_none()
+        })
+    }
+
+    /// A type built here rather than looked up, with its regions as `region` maps
+    /// them, since a Rust type cannot carry a region it was not given by rustc: a part
+    /// `settled` takes has its identity as a Rust type.
+    fn rebuilt_type_id(
+        &mut self,
+        ty: RustTy,
+        associated_types: &[AssociatedType],
+        adts: &[AdtNames],
+        region: &mut dyn FnMut(Region) -> Region,
+        settled: &dyn Fn(RustTy) -> bool,
+    ) -> Result<TypeId, String> {
+        if settled(ty) {
+            return self.id(ty);
+        }
+        let mapped = match ty.kind() {
+            TyKind::Alias(..) => {
+                let associated = associated_types
+                    .iter()
+                    .find(|associated| associated.alias == ty)
+                    .ok_or_else(|| format!("the type `{ty}` is not declared"))?;
+                return self
+                    .type_parameters
+                    .iter()
+                    .find(|(index, _)| *index == associated.index)
+                    .map(|(_, id)| *id)
+                    .ok_or_else(|| format!("associated type `{ty}` was not interned"));
+            },
+            TyKind::RigidTy(RigidTy::Ref(own, referent, mutability)) => {
+                let lifetime = self.lifetime_id(region(own));
+                let referent =
+                    self.rebuilt_type_id(referent, associated_types, adts, region, settled)?;
+                Ty::Reference {
+                    value: ReferenceType {
+                        kind: if mutability == Mutability::Mut {
+                            ReferenceKind::Mutable
+                        } else {
+                            ReferenceKind::Shared
+                        },
+                        lifetime,
+                        profile: Profile::Rust,
+                        referent,
+                    },
+                }
+            },
+            TyKind::RigidTy(RigidTy::Tuple(elements)) => Ty::Tuple {
+                elements: elements
+                    .into_iter()
+                    .map(|element| {
+                        self.rebuilt_type_id(element, associated_types, adts, region, settled)
+                    })
+                    .collect::<Result<_, _>>()?,
+            },
+            TyKind::RigidTy(RigidTy::Slice(element)) => Ty::Vector {
+                element: self.rebuilt_type_id(element, associated_types, adts, region, settled)?,
+                length: None,
+            },
+            TyKind::RigidTy(RigidTy::Array(element, length)) => Ty::Vector {
+                element: self.rebuilt_type_id(element, associated_types, adts, region, settled)?,
+                length: Some(ConstValue::Integer {
+                    value: Number::from(
+                        length
+                            .eval_target_usize()
+                            .map_err(|error| format!("evaluate fixed array length: {error:?}"))?,
+                    ),
+                }),
+            },
+            TyKind::RigidTy(RigidTy::FnPtr(signature)) => {
+                let signature = supported_function_pointer_signature(&signature)?;
+                let mut types = signature
+                    .inputs_and_output
+                    .iter()
+                    .map(|type_| {
+                        self.rebuilt_type_id(*type_, associated_types, adts, region, settled)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let result = types
+                    .pop()
+                    .ok_or_else(|| "function pointer has no result type".to_owned())?;
+                Ty::Function {
+                    abilities: vec![Ability::Copy, Ability::Drop],
+                    arguments: types,
+                    result,
+                }
+            },
+            TyKind::RigidTy(RigidTy::Adt(definition, arguments)) => {
+                let name = adts
+                    .iter()
+                    .find(|adt| adt.definition == definition)
+                    .ok_or_else(|| format!("ADT `{}` was not interned", definition.name()))?
+                    .name;
+                let arguments = arguments
+                    .0
+                    .into_iter()
+                    .map(|argument| {
+                        Ok(match argument {
+                            GenericArgKind::Type(argument) => GenericArgument::TypeArg {
+                                value: TypeUse {
+                                    loc: LocId::new(0),
+                                    type_id: self.rebuilt_type_id(
+                                        argument,
+                                        associated_types,
+                                        adts,
+                                        region,
+                                        settled,
+                                    )?,
+                                },
+                            },
+                            GenericArgKind::Lifetime(own) => GenericArgument::Lifetime {
+                                value: self.lifetime_id(region(own)),
+                            },
+                            GenericArgKind::Const(value) => GenericArgument::Const {
+                                value: const_generic_value(&value)?,
+                            },
+                        })
+                    })
+                    .collect::<Result<_, String>>()?;
+                Ty::Nominal { arguments, name }
+            },
+            kind => return Err(format!("unsupported Rust signature type: {kind:?}")),
+        };
+        Ok(match self.types.iter().position(|known| *known == mapped) {
+            Some(index) => TypeId::new(index),
+            None => {
+                self.types.push(mapped);
+                TypeId::new(self.types.len() - 1)
+            },
+        })
+    }
+
+    fn interned_lifetime(&self, region: &Region) -> Option<LifetimeId> {
+        self.lifetimes
+            .iter()
+            .position(|entry| entry.region == *region)
+            .map(LifetimeId::new)
+    }
+
+    fn lifetime_id(&mut self, region: Region) -> LifetimeId {
+        match self
+            .lifetimes
+            .iter()
+            .position(|entry| entry.region == region)
+        {
+            Some(index) => LifetimeId::new(index),
+            None => {
+                let spec = self
+                    .bound_regions
+                    .iter()
+                    .find(|bound| bound.region == region)
+                    .cloned()
+                    .unwrap_or_else(|| lifetime_spec(region));
+                self.lifetimes.push(spec);
+                LifetimeId::new(self.lifetimes.len() - 1)
+            },
         }
     }
 
@@ -2110,6 +5656,16 @@ fn integer_width(kind: IntegerType) -> IntWidth {
     }
 }
 
+fn interned_lifetime(lifetimes: &mut Vec<LifetimeSpec>, region: Region) -> LifetimeId {
+    match lifetimes.iter().position(|entry| entry.region == region) {
+        Some(index) => LifetimeId::new(index),
+        None => {
+            lifetimes.push(lifetime_spec(region));
+            LifetimeId::new(lifetimes.len() - 1)
+        },
+    }
+}
+
 fn interned_type_id(
     unit: TypeId,
     never: Option<TypeId>,
@@ -2148,7 +5704,8 @@ fn interned_type_id(
             | RigidTy::Array(_, _)
             | RigidTy::Slice(_)
             | RigidTy::Str
-            | RigidTy::FnPtr(_),
+            | RigidTy::FnPtr(_)
+            | RigidTy::Closure(..),
         ) => composites
             .iter()
             .find(|entry| entry.ty == ty)
@@ -2237,6 +5794,25 @@ fn observe_type(
             Ok(())
         },
         TyKind::RigidTy(RigidTy::Str) => {
+            if !needed_composites.contains(&ty) {
+                needed_composites.push(ty);
+            }
+            Ok(())
+        },
+        TyKind::RigidTy(RigidTy::Closure(_, arguments)) => {
+            for part in closure_parts(&arguments) {
+                observe_type(
+                    part,
+                    needs_never,
+                    needs_bool,
+                    needs_character,
+                    needed_integers,
+                    needed_nominals,
+                    needed_composites,
+                    adts,
+                    references,
+                )?;
+            }
             if !needed_composites.contains(&ty) {
                 needed_composites.push(ty);
             }
@@ -2337,13 +5913,11 @@ fn lifetime_spec(region: Region) -> LifetimeSpec {
             },
             Some(parameter.name.clone()),
         ),
-        RegionKind::ReBound(_, bound) => (
-            LifetimeKind::Parameter {
-                index: bound.var as usize,
-            },
-            None,
-        ),
-        RegionKind::RePlaceholder(_) | RegionKind::ReErased => (LifetimeKind::Inference, None),
+        // A bound region without a binder relates nothing, or is a function
+        // pointer's.
+        RegionKind::ReBound(..) | RegionKind::RePlaceholder(_) | RegionKind::ReErased => {
+            (LifetimeKind::Inference, None)
+        },
     };
     LifetimeSpec { region, kind, name }
 }
@@ -2385,12 +5959,14 @@ fn const_generic_type(value: &TyConst) -> Option<RustTy> {
 
 #[derive(Default)]
 struct SourceTables {
+    crate_files: HashSet<String>,
     files: Vec<SourceFile>,
     file_contents: Vec<String>,
     locations: Vec<Location>,
     file_ids: BTreeMap<String, FileId>,
     location_ids: BTreeMap<(usize, usize, usize), LocId>,
     generated_location_ids: BTreeMap<usize, LocId>,
+    expansion_location_ids: BTreeMap<(usize, usize, usize), LocId>,
     dependency_location_ids: BTreeMap<String, LocId>,
 }
 
@@ -2429,23 +6005,57 @@ impl SourceTables {
         id
     }
 
+    fn file_id(&mut self, filename: String) -> Result<FileId, String> {
+        if let Some(id) = self.file_ids.get(&filename) {
+            return Ok(*id);
+        }
+        let source = fs::read_to_string(&filename)
+            .map_err(|error| format!("read Rust source `{filename}`: {error}"))?;
+        let id = FileId::new(self.files.len());
+        self.files.push(SourceFile {
+            content_hash: String::new(),
+            name: filename.clone(),
+        });
+        self.file_contents.push(source);
+        self.file_ids.insert(filename, id);
+        Ok(id)
+    }
+
+    fn in_crate(&self, span: Span) -> bool {
+        self.crate_files.contains(&span.get_filename())
+    }
+
+    /// The location of what a macro of another crate expanded to, whose own span
+    /// is not stated: the crate's source it is reached after. It has no primary
+    /// range, since it is not where the node was written.
+    fn expansion(&mut self, reached_after: Span) -> Result<LocId, String> {
+        let file = self.file_id(reached_after.get_filename())?;
+        let source = &self.file_contents[file.index];
+        let lines = reached_after.get_lines();
+        let start_byte = byte_offset(source, lines.start_line, lines.start_col)?;
+        let end_byte = byte_offset(source, lines.end_line, lines.end_col)?;
+        let key = (file.index, start_byte, end_byte);
+        if let Some(id) = self.expansion_location_ids.get(&key) {
+            return Ok(*id);
+        }
+        let id = LocId::new(self.locations.len());
+        self.locations.push(Location {
+            expansion: vec![SourceRange {
+                end_byte,
+                file,
+                start_byte,
+            }],
+            generated_by: Some("macro expansion".to_owned()),
+            parent: None,
+            primary: None,
+            related: vec![],
+        });
+        self.expansion_location_ids.insert(key, id);
+        Ok(id)
+    }
+
     fn intern(&mut self, span: Span) -> Result<LocId, String> {
-        let filename = span.get_filename();
-        let file_id = match self.file_ids.get(&filename).copied() {
-            Some(id) => id,
-            None => {
-                let source = fs::read_to_string(&filename)
-                    .map_err(|error| format!("read Rust source `{filename}`: {error}"))?;
-                let id = FileId::new(self.files.len());
-                self.files.push(SourceFile {
-                    content_hash: String::new(),
-                    name: filename.clone(),
-                });
-                self.file_contents.push(source);
-                self.file_ids.insert(filename.clone(), id);
-                id
-            },
-        };
+        let file_id = self.file_id(span.get_filename())?;
         let source = &self.file_contents[file_id.index];
         let lines = span.get_lines();
         if lines.start_line == 0
@@ -2737,10 +6347,6 @@ fn integer_method_primitive(name: &str) -> Option<PrimitiveOperation> {
         Some(PrimitiveOperation::Multiply)
     } else if name.ends_with(">::overflowing_mul") {
         Some(PrimitiveOperation::OverflowingMultiply)
-    } else if name.ends_with(">::wrapping_shl") {
-        Some(PrimitiveOperation::ShiftLeft)
-    } else if name.ends_with(">::wrapping_shr") {
-        Some(PrimitiveOperation::ShiftRight)
     } else {
         None
     }
@@ -2748,6 +6354,146 @@ fn integer_method_primitive(name: &str) -> Option<PrimitiveOperation> {
 
 fn is_string_length(name: &str) -> bool {
     name == "core::str::<impl str>::len"
+}
+
+/// The immediate dominator of each block of a body; none for its entry and a block
+/// it does not reach. Cooper, Harvey and Kennedy's iteration over reverse postorder.
+fn immediate_dominators(body: &Body) -> Vec<Option<usize>> {
+    let count = body.blocks.len();
+    let successors = |block: usize| body.blocks[block].terminator.successors();
+    let mut postorder = Vec::with_capacity(count);
+    let mut visited = vec![false; count];
+    let mut stack = vec![(0, successors(0).into_iter())];
+    visited[0] = true;
+    while let Some((block, pending)) = stack.last_mut() {
+        match pending.next() {
+            Some(next) if !visited[next] => {
+                visited[next] = true;
+                stack.push((next, successors(next).into_iter()));
+            },
+            Some(_) => {},
+            None => {
+                postorder.push(*block);
+                stack.pop();
+            },
+        }
+    }
+    let mut position = vec![0; count];
+    for (index, block) in postorder.iter().enumerate() {
+        position[*block] = index;
+    }
+    let mut predecessors = vec![Vec::new(); count];
+    for block in &postorder {
+        for next in successors(*block) {
+            predecessors[next].push(*block);
+        }
+    }
+    let mut dominators: Vec<Option<usize>> = vec![None; count];
+    dominators[0] = Some(0);
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for block in postorder.iter().rev().filter(|block| **block != 0) {
+            let mut new = None;
+            for predecessor in &predecessors[*block] {
+                if dominators[*predecessor].is_none() {
+                    continue;
+                }
+                let Some(mut left) = new else {
+                    new = Some(*predecessor);
+                    continue;
+                };
+                let mut right = *predecessor;
+                while left != right {
+                    while position[left] < position[right] {
+                        left = dominators[left].expect("processed in reverse postorder");
+                    }
+                    while position[right] < position[left] {
+                        right = dominators[right].expect("processed in reverse postorder");
+                    }
+                }
+                new = Some(left);
+            }
+            if dominators[*block] != new {
+                dominators[*block] = new;
+                changed = true;
+            }
+        }
+    }
+    dominators[0] = None;
+    dominators
+}
+
+/// How the paths from a block end, as the import's collapse reads them.
+#[derive(Clone, Copy, PartialEq)]
+enum RegionEnding {
+    Unknown,
+    /// Every path fails or cannot happen, and none holds a call.
+    NoCall,
+    /// The calls that do not return are all in macros of other crates.
+    MacroCalls,
+    /// A call that does not return is in the crate.
+    CrateCall,
+}
+
+/// The blocks of the regions the import collapses to a panic and only a macro of
+/// another crate raises. The collapse keeps the location of a region's entry, which
+/// may be a format argument's, so a region's blocks are located here.
+fn macro_panic_blocks(body: &Body, crate_files: &HashSet<String>) -> Vec<bool> {
+    let own = |block: &rustc_public::mir::BasicBlock| match &block.terminator.kind {
+        TerminatorKind::Call { target: None, .. } => {
+            if crate_files.contains(&block.terminator.source_info.span.get_filename()) {
+                RegionEnding::CrateCall
+            } else {
+                RegionEnding::MacroCalls
+            }
+        },
+        TerminatorKind::Abort | TerminatorKind::Unreachable => RegionEnding::NoCall,
+        _ => RegionEnding::Unknown,
+    };
+    let mut endings = body.blocks.iter().map(own).collect::<Vec<_>>();
+    for _ in 0..=body.blocks.len() {
+        let next = body
+            .blocks
+            .iter()
+            .zip(&endings)
+            .map(|(block, current)| {
+                let flows = matches!(
+                    block.terminator.kind,
+                    TerminatorKind::Goto { .. }
+                        | TerminatorKind::SwitchInt { .. }
+                        | TerminatorKind::Call {
+                            target: Some(_),
+                            ..
+                        }
+                        | TerminatorKind::Drop { .. }
+                        | TerminatorKind::Assert { .. }
+                );
+                let targets = block.terminator.successors();
+                if !flows || targets.is_empty() {
+                    return *current;
+                }
+                let of = |ending| targets.iter().any(|target| endings[*target] == ending);
+                if of(RegionEnding::Unknown) {
+                    *current
+                } else if of(RegionEnding::CrateCall) {
+                    RegionEnding::CrateCall
+                } else if of(RegionEnding::MacroCalls) {
+                    RegionEnding::MacroCalls
+                } else {
+                    RegionEnding::NoCall
+                }
+            })
+            .collect::<Vec<_>>();
+        if next == endings {
+            break;
+        }
+        endings = next;
+    }
+    endings
+        .into_iter()
+        .map(|ending| ending == RegionEnding::MacroCalls)
+        .collect()
 }
 
 struct MappedFunction {
@@ -2758,23 +6504,65 @@ struct MappedFunction {
     body: RawBody,
 }
 
+/// What a function's mapper reads of `Copy`.
+struct CopyFacts<'a> {
+    /// The type parameters its body shows to be `Copy`.
+    parameters: &'a BTreeSet<u32>,
+    impls: &'a mut AdtImpls,
+}
+
 struct FunctionMapper<'a> {
+    identity: &'a str,
+    item: CrateItem,
+    /// A closure's body has `self` as its first parameter.
+    is_closure: bool,
+    /// The locals holding a zero-sized value no statement assigned.
+    zero_sized_locals: Vec<usize>,
     body: &'a Body,
+    signature: &'a DeclaredSignature,
     locals: Vec<MirLocalDecl>,
     types: &'a TypeLayout,
     name_ids: &'a BTreeMap<String, QualifiedRef>,
+    bound_lifetimes: &'a BTreeMap<String, usize>,
+    dependency_functions: &'a [DependencyFunction],
+    opaque_functions: &'a BTreeSet<String>,
+    constants: &'a EvaluatedConstants,
     adts: &'a [AdtNames],
+    closures: &'a [ClosureNames],
+    copies: CopyFacts<'a>,
     sources: &'a mut SourceTables,
     arenas: &'a mut NamespaceArenas,
     rust_to_vir: Vec<LocalId>,
+    unsize_folds: HashMap<usize, (BorrowKind, MirPlace)>,
+    call_tuples: HashMap<usize, Vec<Operand>>,
+    box_folds: BoxFolds,
+    dominators: Vec<Option<usize>>,
+    macro_panics: Vec<bool>,
+    /// Why the body cannot be mapped at all, which refuses the function.
+    body_failure: Option<String>,
+}
+
+/// What a body can call beside its own crate's mapped functions.
+struct Callees<'a> {
+    dependencies: &'a [DependencyFunction],
+    /// The crate's functions whose signatures the unit cannot state.
+    opaque: &'a BTreeSet<String>,
 }
 
 impl<'a> FunctionMapper<'a> {
     fn new(
+        identity: &'a str,
+        item: CrateItem,
         body: &'a Body,
+        signature: &'a DeclaredSignature,
         types: &'a TypeLayout,
         name_ids: &'a BTreeMap<String, QualifiedRef>,
+        bound_lifetimes: &'a BTreeMap<String, usize>,
+        callees: Callees<'a>,
+        constants: &'a EvaluatedConstants,
         adts: &'a [AdtNames],
+        closures: &'a [ClosureNames],
+        copies: CopyFacts<'a>,
         sources: &'a mut SourceTables,
         arenas: &'a mut NamespaceArenas,
     ) -> Result<Self, String> {
@@ -2792,12 +6580,42 @@ impl<'a> FunctionMapper<'a> {
         for (rust_local, vir_local) in rust_to_vir.iter_mut().enumerate().skip(argument_count + 1) {
             *vir_local = LocalId::new(rust_local);
         }
+        let locals = mapped_locals(body);
+        let (call_tuples, body_failure) =
+            match closure_call_tuples(identity, body, &locals, &sources.crate_files) {
+                Ok(call_tuples) => (call_tuples, None),
+                Err(reason) => (HashMap::new(), Some(reason)),
+            };
         Ok(Self {
+            identity,
+            item,
+            is_closure: closure_of(item).is_some(),
+            zero_sized_locals: unassigned_locals(body)
+                .into_iter()
+                .filter(|local| {
+                    constants
+                        .zero_sized_values
+                        .contains_key(&body.locals()[*local].ty)
+                })
+                .collect(),
             body,
-            locals: mapped_locals(body),
+            signature,
+            unsize_folds: unsize_folds(body, &locals),
+            call_tuples,
+            box_folds: box_folds(body),
+            body_failure,
+            dominators: immediate_dominators(body),
+            macro_panics: macro_panic_blocks(body, &sources.crate_files),
+            locals,
             types,
             name_ids,
+            bound_lifetimes,
+            dependency_functions: callees.dependencies,
+            opaque_functions: callees.opaque,
+            constants,
             adts,
+            closures,
+            copies,
             sources,
             arenas,
             rust_to_vir,
@@ -2806,106 +6624,79 @@ impl<'a> FunctionMapper<'a> {
 
     fn map(mut self) -> Result<MappedFunction, String> {
         let (locals, parameters) = self.map_locals()?;
+        let blocks = match self.body_failure.take() {
+            Some(reason) => Err(reason),
+            None => self.map_blocks(),
+        };
+        let blocks = match blocks {
+            Ok(blocks) => blocks,
+            Err(reason) => {
+                let loc = self.local_location(self.body.span)?;
+                let expression = self.opaque_value(reason, loc);
+                vec![RawBasicBlock {
+                    loc,
+                    statements: vec![RawStatement::Execute { expression }],
+                    terminator: RawTerminator::Unreachable,
+                }]
+            },
+        };
+        self.map_function_result(locals, parameters, blocks)
+    }
+
+    fn map_blocks(&mut self) -> Result<Vec<RawBasicBlock>, String> {
         let mut blocks = Vec::with_capacity(self.body.blocks.len());
-        for block in &self.body.blocks {
-            let block_loc = self.sources.intern(block.terminator.source_info.span)?;
-            let mut statements = Vec::new();
+        let mut entry_statements = self.unused_closure_statements()?;
+        let body = self.body;
+        for (index, block) in body.blocks.iter().enumerate() {
+            let block_loc = self.block_location(index, block.terminator.source_info.span)?;
+            let mut statements = std::mem::take(&mut entry_statements);
             for statement in &block.statements {
-                let loc = self.sources.intern(statement.source_info.span)?;
-                match &statement.kind {
-                    StatementKind::Assign(destination, rvalue) => {
-                        let value = self.map_rvalue(rvalue, loc)?;
-                        let place = self.map_place(destination)?;
-                        let expression =
-                            self.arenas
-                                .expression(loc, self.types.unit, ExprKind::Assign {
-                                    place,
-                                    value,
-                                });
-                        statements.push(RawStatement::Execute { expression });
-                    },
-                    StatementKind::StorageLive(local) => {
-                        statements.push(RawStatement::StorageLive {
-                            local_id: self.local_id(*local)?,
-                        });
-                    },
-                    StatementKind::StorageDead(local) => {
-                        statements.push(RawStatement::StorageDead {
-                            local_id: self.local_id(*local)?,
-                        });
-                    },
-                    StatementKind::SetDiscriminant {
-                        place,
-                        variant_index,
-                    } => {
-                        let place_type = place.ty(&self.locals).map_err(|error| {
-                            format!("query set-discriminant place type: {error:?}")
-                        })?;
-                        let TyKind::RigidTy(RigidTy::Adt(definition, _)) = place_type.kind() else {
-                            return Err(format!(
-                                "cannot set the discriminant of MIR place type {place_type:?}"
-                            ));
-                        };
-                        let adt = self
-                            .adts
-                            .iter()
-                            .find(|entry| entry.definition == definition)
-                            .ok_or_else(|| {
-                                format!("enum `{}` was not interned", definition.name())
-                            })?;
-                        let variant = adt
-                            .variants
-                            .iter()
-                            .find(|variant| variant.index == *variant_index)
-                            .and_then(|variant| variant.name)
-                            .ok_or_else(|| {
-                                format!(
-                                    "enum `{}` has no named variant {:?}",
-                                    definition.name(),
-                                    variant_index
-                                )
-                            })?;
-                        statements.push(RawStatement::SetDiscriminant {
-                            place: self.map_place(place)?,
-                            variant,
-                        });
-                    },
-                    StatementKind::PlaceMention(place) => {
-                        statements.push(RawStatement::PlaceMention {
-                            place: self.map_place(place)?,
-                        });
-                    },
-                    StatementKind::FakeRead(_, place) => {
-                        statements.push(RawStatement::PlaceMention {
-                            place: self.map_place(place)?,
-                        });
-                    },
-                    StatementKind::AscribeUserType { place, .. } => {
-                        let type_id = self.types.id(place
-                            .ty(&self.locals)
-                            .map_err(|error| format!("query ascribed place type: {error:?}"))?)?;
-                        statements.push(RawStatement::AscribeUserType {
-                            place: self.map_place(place)?,
-                            r#type: TypeUse { loc, type_id },
-                        });
-                    },
-                    StatementKind::Nop
-                    | StatementKind::Coverage(_)
-                    | StatementKind::ConstEvalCounter => {},
-                    kind => return Err(format!("unsupported MIR statement: {kind:?}")),
+                let loc = self.block_location(index, statement.source_info.span)?;
+                if let Err(reason) = self.map_statement(statement, loc, &mut statements) {
+                    let expression = self.opaque_value(reason, loc);
+                    statements.push(RawStatement::Execute { expression });
                 }
             }
-            let terminator = self.map_terminator(&block.terminator.kind, block_loc)?;
+            let mapped = match &block.terminator.kind {
+                TerminatorKind::Call {
+                    target: Some(target),
+                    ..
+                } if self.box_folds.frees.contains(&index) => Ok(RawTerminator::Goto {
+                    target: BlockId::new(*target),
+                }),
+                _ => self.map_terminator(&block.terminator, block_loc),
+            };
+            let terminator = match mapped {
+                Ok(terminator) => terminator,
+                Err(reason) => {
+                    self.refused_terminator(&block.terminator, block_loc, reason, &mut statements)
+                },
+            };
             blocks.push(RawBasicBlock {
                 loc: block_loc,
                 statements,
                 terminator,
             });
         }
+        Ok(blocks)
+    }
+
+    fn map_function_result(
+        mut self,
+        locals: Vec<LocalDecl>,
+        parameters: Vec<Parameter>,
+        blocks: Vec<RawBasicBlock>,
+    ) -> Result<MappedFunction, String> {
         let result = &self.body.ret_local();
+        let declared_result = self
+            .signature
+            .types
+            .last()
+            .copied()
+            .ok_or_else(|| format!("`{}` has no result type", self.identity))?;
         Ok(MappedFunction {
-            result_type: self.types.id(result.ty)?,
-            result_loc: self.sources.intern(result.span)?,
+            result_type: self.types.id(declared_result)?,
+            result_loc: self.local_location(result.span)?,
             locals,
             parameters,
             body: RawBody::Cfg {
@@ -2917,6 +6708,197 @@ impl<'a> FunctionMapper<'a> {
         })
     }
 
+    /// A node the unit cannot state, which refuses the function if it survives the
+    /// collapse of diverging regions.
+    fn opaque_value(&mut self, description: String, loc: LocId) -> ExprId {
+        self.arenas
+            .expression(loc, self.types.unit, ExprKind::Value {
+                source_constant: None,
+                value: ConstValue::Opaque { description },
+            })
+    }
+
+    /// A terminator the unit cannot state, with its successors: the collapse reads a
+    /// region's paths through them.
+    fn refused_terminator(
+        &mut self,
+        terminator: &Terminator,
+        loc: LocId,
+        reason: String,
+        statements: &mut Vec<RawStatement>,
+    ) -> RawTerminator {
+        let opaque = self.opaque_value(reason, loc);
+        if let TerminatorKind::Call {
+            destination,
+            target,
+            unwind,
+            ..
+        } = &terminator.kind
+        {
+            let destination = match target {
+                None => Some(None),
+                Some(target) => self.map_place(destination).ok().map(|place| {
+                    Some(RawCallDestination {
+                        place,
+                        target: BlockId::new(*target),
+                    })
+                }),
+            };
+            if let Some(destination) = destination {
+                return RawTerminator::Call {
+                    call: opaque,
+                    destination,
+                    unwind: map_unwind(unwind),
+                };
+            }
+        }
+        statements.push(RawStatement::Execute { expression: opaque });
+        match terminator.successors().as_slice() {
+            [] => RawTerminator::Unreachable,
+            [target] => RawTerminator::Goto {
+                target: BlockId::new(*target),
+            },
+            [first, rest @ ..] => RawTerminator::Switch {
+                cases: rest
+                    .iter()
+                    .enumerate()
+                    .map(|(index, target)| {
+                        (
+                            ConstValue::Integer {
+                                value: Number::from(index),
+                            },
+                            BlockId::new(*target),
+                        )
+                    })
+                    .collect(),
+                default_target: BlockId::new(*first),
+                scrutinee: opaque,
+            },
+        }
+    }
+
+    fn map_statement(
+        &mut self,
+        statement: &rustc_public::mir::Statement,
+        loc: LocId,
+        statements: &mut Vec<RawStatement>,
+    ) -> Result<(), String> {
+        match &statement.kind {
+            kind if self.box_folds.folds_statement(kind) => {},
+            // The coercion it folds into is the borrow.
+            StatementKind::Assign(destination, Rvalue::Ref(..))
+                if destination.projection.is_empty()
+                    && self.unsize_folds.contains_key(&destination.local) => {},
+            // The closure call reads the elements.
+            StatementKind::Assign(destination, Rvalue::Aggregate(AggregateKind::Tuple, _))
+                if destination.projection.is_empty()
+                    && self.call_tuples.contains_key(&destination.local) => {},
+            StatementKind::Assign(destination, rvalue) => {
+                let value = self.map_rvalue(rvalue, loc)?;
+                self.mark_reference_copy(destination, rvalue, value);
+                let place = self.map_place(destination)?;
+                let expression = self
+                    .arenas
+                    .expression(loc, self.types.unit, ExprKind::Assign { place, value });
+                statements.push(RawStatement::Execute { expression });
+            },
+            StatementKind::StorageLive(local) => {
+                statements.push(RawStatement::StorageLive {
+                    local_id: self.local_id(*local)?,
+                });
+            },
+            StatementKind::StorageDead(local) => {
+                statements.push(RawStatement::StorageDead {
+                    local_id: self.local_id(*local)?,
+                });
+            },
+            StatementKind::SetDiscriminant {
+                place,
+                variant_index,
+            } => {
+                let place_type = place
+                    .ty(&self.locals)
+                    .map_err(|error| format!("query set-discriminant place type: {error:?}"))?;
+                let TyKind::RigidTy(RigidTy::Adt(definition, _)) = place_type.kind() else {
+                    return Err(format!(
+                        "cannot set the discriminant of MIR place type {place_type:?}"
+                    ));
+                };
+                let adt = self
+                    .adts
+                    .iter()
+                    .find(|entry| entry.definition == definition)
+                    .ok_or_else(|| format!("enum `{}` was not interned", definition.name()))?;
+                let variant = adt
+                    .variants
+                    .iter()
+                    .find(|variant| variant.index == *variant_index)
+                    .and_then(|variant| variant.name)
+                    .ok_or_else(|| {
+                        format!(
+                            "enum `{}` has no named variant {:?}",
+                            definition.name(),
+                            variant_index
+                        )
+                    })?;
+                statements.push(RawStatement::SetDiscriminant {
+                    place: self.map_place(place)?,
+                    variant,
+                });
+            },
+            StatementKind::PlaceMention(place) => {
+                statements.push(RawStatement::PlaceMention {
+                    place: self.map_place(place)?,
+                });
+            },
+            StatementKind::FakeRead(_, place) => {
+                statements.push(RawStatement::PlaceMention {
+                    place: self.map_place(place)?,
+                });
+            },
+            StatementKind::AscribeUserType { place, .. } => {
+                let type_id = self.types.id(place
+                    .ty(&self.locals)
+                    .map_err(|error| format!("query ascribed place type: {error:?}"))?)?;
+                statements.push(RawStatement::AscribeUserType {
+                    place: self.map_place(place)?,
+                    r#type: TypeUse { loc, type_id },
+                });
+            },
+            StatementKind::Nop | StatementKind::Coverage(_) | StatementKind::ConstEvalCounter => {},
+            kind => return Err(format!("unsupported MIR statement: {}", variant_name(kind))),
+        }
+        Ok(())
+    }
+
+    /// The location of a node of a block: its span in the crate, or, in a macro of
+    /// another crate or a panic region only such a macro raises, what it is reached
+    /// after: the nearest dominator outside the region with a terminator in the
+    /// crate, else the body.
+    fn block_location(&mut self, block: usize, span: Span) -> Result<LocId, String> {
+        if !self.macro_panics[block] && self.sources.in_crate(span) {
+            return self.sources.intern(span);
+        }
+        let mut current = self.dominators[block];
+        while let Some(dominator) = current {
+            let terminator = self.body.blocks[dominator].terminator.source_info.span;
+            if !self.macro_panics[dominator] && self.sources.in_crate(terminator) {
+                return self.sources.expansion(terminator);
+            }
+            current = self.dominators[dominator];
+        }
+        self.sources.expansion(self.body.span)
+    }
+
+    /// The location of a local, which a macro of another crate may have introduced.
+    fn local_location(&mut self, span: Span) -> Result<LocId, String> {
+        if self.sources.in_crate(span) {
+            self.sources.intern(span)
+        } else {
+            self.sources.expansion(self.body.span)
+        }
+    }
+
     fn map_locals(&mut self) -> Result<(Vec<LocalDecl>, Vec<Parameter>), String> {
         let argument_count = self.body.arg_locals().len();
         let rust_order = (1..=argument_count)
@@ -2924,10 +6906,15 @@ impl<'a> FunctionMapper<'a> {
             .chain(argument_count + 1..self.locals.len());
         let mut locals = Vec::with_capacity(self.locals.len());
         for rust_local in rust_order {
-            let declaration = &self.locals[rust_local];
             let id = self.rust_to_vir[rust_local];
-            let loc = self.sources.intern(declaration.span)?;
-            let type_id = self.types.id(declaration.ty)?;
+            let loc = self.local_location(self.locals[rust_local].span)?;
+            let declaration = &self.locals[rust_local];
+            // A parameter's local has the signature's type, the others stay erased.
+            let declared_type = match rust_local {
+                1.. if rust_local <= argument_count => self.signature.types[rust_local - 1],
+                _ => declaration.ty,
+            };
+            let type_id = self.types.id(declared_type)?;
             locals.push(LocalDecl {
                 id,
                 loc,
@@ -2935,7 +6922,11 @@ impl<'a> FunctionMapper<'a> {
                 // the body even when their source binding was not `mut`.
                 mutable: rust_local == 0
                     || rust_local > argument_count
-                    || declaration.mutability == Mutability::Mut,
+                    || if self.is_closure && rust_local == 1 {
+                        local_written(self.body, rust_local)
+                    } else {
+                        declaration.mutability == Mutability::Mut
+                    },
                 name: self.local_name(rust_local),
                 type_use: TypeUse { loc, type_id },
             });
@@ -2951,7 +6942,23 @@ impl<'a> FunctionMapper<'a> {
         Ok((locals, parameters))
     }
 
+    /// What a use of a function states for its bound regions, which MIR's
+    /// generic arguments do not name: a lifetime the borrow analysis infers.
+    fn bound_lifetime_arguments(&self, function: &str) -> Result<Vec<GenericArgument>, String> {
+        let count = self.bound_lifetimes.get(function).copied().unwrap_or(0);
+        if count == 0 {
+            return Ok(vec![]);
+        }
+        let value = self.types.interned_lifetime(&erased()).ok_or_else(|| {
+            format!("`{function}` has lifetime binders, but no erased lifetime was interned")
+        })?;
+        Ok(vec![GenericArgument::Lifetime { value }; count])
+    }
+
     fn local_name(&self, rust_local: usize) -> String {
+        if self.is_closure && rust_local == 1 {
+            return "self".to_owned();
+        }
         self.body
             .var_debug_info
             .iter()
@@ -3117,15 +7124,57 @@ impl<'a> FunctionMapper<'a> {
                     )
                 })?;
                 let result_type = self.types.id(*target)?;
+                let instantiations = self.bound_lifetime_arguments(&callee_name)?;
+                Ok(self
+                    .arenas
+                    .expression(loc, result_type, ExprKind::Operation {
+                        arguments: vec![],
+                        instantiations,
+                        operation: Operation::Call {
+                            // A function pointer captures nothing.
+                            kind: CallKind::Closure { function, mask: 0 },
+                        },
+                        surface: None,
+                    }))
+            },
+            Rvalue::Cast(
+                CastKind::PointerCoercion(PointerCoercion::Unsize),
+                Operand::Copy(operand) | Operand::Move(operand),
+                target,
+            ) if is_array_to_slice(
+                operand
+                    .ty(&self.locals)
+                    .map_err(|error| format!("query unsizing source type: {error:?}"))?,
+                *target,
+            ) =>
+            {
+                let (kind, base) = match self.unsize_folds.get(&operand.local).cloned() {
+                    Some((kind, place)) if operand.projection.is_empty() => {
+                        (kind, self.map_place(&place)?)
+                    },
+                    _ => {
+                        let TyKind::RigidTy(RigidTy::Ref(_, _, mutability)) = target.kind() else {
+                            return Err(format!("unsizing to a non-reference {target:?}"));
+                        };
+                        let kind = match mutability {
+                            Mutability::Not => BorrowKind::Immutable,
+                            Mutability::Mut => BorrowKind::Mutable,
+                        };
+                        let reference = self.map_place(operand)?;
+                        let base = PlaceId::new(self.arenas.places.len());
+                        self.arenas.places.push(Place::Deref { base: reference });
+                        (kind, base)
+                    },
+                };
+                let place = PlaceId::new(self.arenas.places.len());
+                self.arenas.places.push(Place::Unsize { base });
+                let result_type = self.types.id(*target)?;
                 Ok(self
                     .arenas
                     .expression(loc, result_type, ExprKind::Operation {
                         arguments: vec![],
                         instantiations: vec![],
-                        operation: Operation::Call {
-                            // A function pointer captures nothing.
-                            kind: CallKind::Closure { function, mask: 0 },
-                        },
+                        operation: Operation::Borrow { kind, place },
                         surface: None,
                     }))
             },
@@ -3180,10 +7229,34 @@ impl<'a> FunctionMapper<'a> {
                         surface: None,
                     }))
             },
-            Rvalue::Ref(_, borrow_kind, place) => {
+            Rvalue::Ref(_, borrow_kind, place) if self.zero_sized_local(place).is_some() => {
                 let kind = match borrow_kind {
                     MirBorrowKind::Shared => BorrowKind::Immutable,
                     MirBorrowKind::Mut { .. } => BorrowKind::Mutable,
+                    MirBorrowKind::Fake(kind) => {
+                        return Err(format!("unsupported fake MIR borrow: {kind:?}"))
+                    },
+                };
+                let constant = self.zero_sized_local(place).expect("checked");
+                let value = self.constant_expression(&constant, loc)?;
+                let result_type = self.types.id(rvalue
+                    .ty(&self.locals)
+                    .map_err(|error| format!("query borrow result type: {error:?}"))?)?;
+                Ok(self
+                    .arenas
+                    .expression(loc, result_type, ExprKind::Operation {
+                        arguments: vec![value],
+                        instantiations: vec![],
+                        operation: Operation::Reference {
+                            kind: ReferenceOperation::Borrow { kind },
+                        },
+                        surface: None,
+                    }))
+            },
+            Rvalue::Ref(_, borrow_kind, place) => {
+                let kind = match borrow_kind {
+                    MirBorrowKind::Shared => BorrowKind::Immutable,
+                    MirBorrowKind::Mut { kind } => mutable_borrow_kind(kind),
                     MirBorrowKind::Fake(kind) => {
                         return Err(format!("unsupported fake MIR borrow: {kind:?}"))
                     },
@@ -3343,6 +7416,13 @@ impl<'a> FunctionMapper<'a> {
                         surface: None,
                     }))
             },
+            Rvalue::Aggregate(AggregateKind::Closure(definition, arguments), operands) => {
+                let arguments_of = operands
+                    .iter()
+                    .map(|operand| self.map_operand(operand, loc))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.closure_value(*definition, arguments, arguments_of, loc)
+            },
             Rvalue::Aggregate(kind, operands) => {
                 let AggregateKind::Adt(definition, variant_index, arguments, _, active_field) =
                     kind
@@ -3355,69 +7435,227 @@ impl<'a> FunctionMapper<'a> {
                         definition.name()
                     ));
                 }
-                let adt = self
-                    .adts
-                    .iter()
-                    .find(|entry| entry.definition == *definition)
-                    .ok_or_else(|| format!("ADT `{}` was not interned", definition.name()))?;
-                let variant = adt
-                    .variants
-                    .iter()
-                    .find(|variant| variant.index == *variant_index)
-                    .ok_or_else(|| {
-                        format!(
-                            "ADT `{}` has no variant {:?}",
-                            definition.name(),
-                            variant_index
-                        )
-                    })?;
-                let instantiations = self.types.generic_arguments(arguments, loc)?;
-                let arguments = operands
+                let fields = operands
                     .iter()
                     .map(|operand| self.map_operand(operand, loc))
                     .collect::<Result<Vec<_>, _>>()?;
                 let result_type = self.types.id(rvalue
                     .ty(&self.locals)
                     .map_err(|error| format!("query aggregate result type: {error:?}"))?)?;
-                Ok(self
-                    .arenas
-                    .expression(loc, result_type, ExprKind::Operation {
-                        arguments,
-                        instantiations,
-                        operation: Operation::Call {
-                            kind: CallKind::Constructor {
-                                constructor: QualifiedRef {
-                                    name: adt.name,
-                                    namespace_id: adt.namespace_id,
-                                },
-                                variant: variant.source_name.clone(),
-                            },
-                        },
-                        surface: None,
-                    }))
+                self.constructor(
+                    *definition,
+                    *variant_index,
+                    arguments,
+                    fields,
+                    result_type,
+                    loc,
+                )
             },
-            kind => Err(format!("unsupported MIR rvalue: {kind:?}")),
+            kind => Err(format!("unsupported MIR rvalue: {}", variant_name(kind))),
         }
+    }
+
+    /// The construction of a variant of an ADT from its fields.
+    fn constructor(
+        &mut self,
+        definition: AdtDef,
+        variant_index: VariantIdx,
+        arguments: &GenericArgs,
+        fields: Vec<ExprId>,
+        result_type: TypeId,
+        loc: LocId,
+    ) -> Result<ExprId, String> {
+        let adt = self
+            .adts
+            .iter()
+            .find(|entry| entry.definition == definition)
+            .ok_or_else(|| format!("ADT `{}` was not interned", definition.name()))?;
+        let variant = adt
+            .variants
+            .iter()
+            .find(|variant| variant.index == variant_index)
+            .ok_or_else(|| {
+                format!(
+                    "ADT `{}` has no variant {:?}",
+                    definition.name(),
+                    variant_index
+                )
+            })?;
+        let instantiations = self.types.generic_arguments(arguments, loc)?;
+        Ok(self
+            .arenas
+            .expression(loc, result_type, ExprKind::Operation {
+                arguments: fields,
+                instantiations,
+                operation: Operation::Call {
+                    kind: CallKind::Constructor {
+                        constructor: QualifiedRef {
+                            name: adt.name,
+                            namespace_id: adt.namespace_id,
+                        },
+                        variant: variant.source_name.clone(),
+                    },
+                },
+                surface: None,
+            }))
+    }
+
+    /// Whether a type is not `Copy`, or only by a parameter the body does not show to be.
+    fn copy_is_move(&mut self, ty: RustTy) -> bool {
+        self.copies
+            .impls
+            .copy_requirement(ty)
+            .is_none_or(|requirement| !requirement.is_subset(self.copies.parameters))
+    }
+
+    /// Whether a type is a closure's that the unit does not state to be `Copy`.
+    fn closure_consumed_by_copy(&self, ty: RustTy) -> bool {
+        let TyKind::RigidTy(RigidTy::Closure(definition, arguments)) = ty.kind() else {
+            return false;
+        };
+        let known = self
+            .closures
+            .iter()
+            .any(|closure| closure.definition == definition && closure.copy);
+        !known
+            || closure_parts(&arguments)
+                .into_iter()
+                .any(mentions_parameter)
+    }
+
+    /// Marks the reborrow a copy of a `&mut` reads as, where a temporary holds it.
+    fn mark_reference_copy(&mut self, destination: &MirPlace, rvalue: &Rvalue, value: ExprId) {
+        let Rvalue::Use(Operand::Copy(_), _) = rvalue else {
+            return;
+        };
+        let local = destination.local;
+        let temporary = destination.projection.is_empty()
+            && local > self.body.arg_locals().len()
+            && !self
+                .body
+                .var_debug_info
+                .iter()
+                .any(|info| info.local() == Some(local));
+        if !temporary {
+            return;
+        }
+        if let ExprKind::Operation {
+            operation: Operation::Borrow { kind, .. },
+            ..
+        } = &mut self.arenas.expressions[value.index].kind
+            && matches!(kind, BorrowKind::Mutable)
+        {
+            *kind = structurized_borrow_kind("borrow.reference_copy");
+        }
+    }
+
+    /// The value a place holds, where it is a local holding a zero-sized value or a field
+    /// of one: reading it is that value.
+    fn zero_sized_local(&self, place: &MirPlace) -> Option<EvaluatedConstant> {
+        if !self.zero_sized_locals.contains(&place.local)
+            || !place
+                .projection
+                .iter()
+                .all(|projection| matches!(projection, ProjectionElem::Field(..)))
+        {
+            return None;
+        }
+        read_value(place.ty(&self.locals).ok()?, &empty_allocation(), 0, 0).ok()
+    }
+
+    /// The closures standing in this body whose value it never uses, which still
+    /// stand here: their values, as statements at its entry.
+    fn unused_closure_statements(&mut self) -> Result<Vec<RawStatement>, String> {
+        let mut uses = ClosureUses::default();
+        uses.visit_body(self.body);
+        for local in &self.zero_sized_locals {
+            if let TyKind::RigidTy(RigidTy::Closure(closure, arguments)) =
+                self.locals[*local].ty.kind()
+            {
+                uses.construct_zero_sized(closure, &arguments);
+            }
+        }
+        let closures = self.closures;
+        let mut statements = Vec::new();
+        for closure in closures {
+            if closure.parent == self.item.0
+                && closure.zero_sized
+                && !uses.constructed.contains(&closure.definition)
+            {
+                let loc = self.sources.intern(closure.definition.span())?;
+                let ty = RustTy::from_rigid_kind(RigidTy::Closure(
+                    closure.definition,
+                    closure.arguments.clone(),
+                ));
+                let value = read_value(ty, &empty_allocation(), 0, 0)
+                    .map_err(|_| format!("closure `{}` has no value", closure.item.name()))?;
+                let expression = self.constant_expression(&value, loc)?;
+                statements.push(RawStatement::Execute { expression });
+            }
+        }
+        Ok(statements)
+    }
+
+    /// The construction of a closure's struct.
+    fn closure_value(
+        &mut self,
+        definition: ClosureDef,
+        arguments: &GenericArgs,
+        values: Vec<ExprId>,
+        loc: LocId,
+    ) -> Result<ExprId, String> {
+        let closure = self
+            .closures
+            .iter()
+            .find(|closure| closure.definition == definition)
+            .ok_or_else(|| format!("closure `{}` was not interned", definition.name()))?;
+        let (parents, _) = closure_arguments(arguments)?;
+        let mut instantiations = self.types.generic_arguments(&GenericArgs(parents), loc)?;
+        let inferred = self.types.generic_arguments(
+            &GenericArgs(vec![
+                GenericArgKind::Lifetime(erased());
+                closure.lifetimes.len()
+            ]),
+            loc,
+        )?;
+        instantiations.extend(inferred);
+        let result_type = self.types.id(RustTy::from_rigid_kind(RigidTy::Closure(
+            definition,
+            arguments.clone(),
+        )))?;
+        Ok(self
+            .arenas
+            .expression(loc, result_type, ExprKind::Operation {
+                arguments: values,
+                instantiations,
+                operation: Operation::Call {
+                    kind: CallKind::Constructor {
+                        constructor: QualifiedRef {
+                            name: closure.name,
+                            namespace_id: NamespaceId::new(0),
+                        },
+                        variant: None,
+                    },
+                },
+                surface: None,
+            }))
     }
 
     fn map_operand(&mut self, operand: &Operand, loc: LocId) -> Result<ExprId, String> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
+                if let Some(constant) = self.zero_sized_local(place) {
+                    return self.constant_expression(&constant, loc);
+                }
                 let rust_type = place
                     .ty(&self.locals)
                     .map_err(|error| format!("query operand place type: {error:?}"))?;
                 let type_id = self.types.id(rust_type)?;
                 let place_id = self.map_place(place)?;
                 let operation = match operand {
-                    // Optimized generic MIR may spell a final, consuming use
-                    // of an unconstrained type parameter as `Copy` after the
-                    // source move and return-place forwarding have been
-                    // contracted. The shared VIR requires actual Copy
-                    // evidence, so retain the source-valid consuming meaning.
-                    // A body that uses the same parameter again still fails
-                    // definite-initialization checking until rustc Public can
-                    // expose its declared Copy predicate.
-                    Operand::Copy(_) if matches!(rust_type.kind(), TyKind::Param(_)) => {
+                    // Likewise of a closure, which a by-value call takes: a copy
+                    // only where it is `Copy` whatever the parameters are.
+                    Operand::Copy(_) if self.closure_consumed_by_copy(rust_type) => {
                         Operation::Move { place: place_id }
                     },
                     // `&mut T` is never Copy in Rust. Optimized MIR spells a
@@ -3436,6 +7674,12 @@ impl<'a> FunctionMapper<'a> {
                             kind: BorrowKind::Mutable,
                             place: referent,
                         }
+                    },
+                    // Optimized MIR spells a final move of a local `copy`. At a
+                    // type not `Copy`, or only by parameters the body does not
+                    // show to be, a copy keeps the source's consuming meaning.
+                    Operand::Copy(_) if self.copy_is_move(rust_type) => {
+                        Operation::Move { place: place_id }
                     },
                     Operand::Copy(_) => Operation::Copy { place: place_id },
                     Operand::Move(_) => Operation::Move { place: place_id },
@@ -3456,29 +7700,103 @@ impl<'a> FunctionMapper<'a> {
     }
 
     fn map_constant(&mut self, constant: &ConstOperand, loc: LocId) -> Result<ExprId, String> {
-        let type_id = self.types.id(constant.ty())?;
-        let value = match constant.ty().kind() {
-            TyKind::RigidTy(RigidTy::Bool) => ConstValue::Bool {
-                value: read_bool_constant(constant)?,
+        let constants = self.constants;
+        let evaluated = constants
+            .values
+            .get(&constant.const_)
+            .ok_or_else(|| format!("unsupported MIR constant type: {:?}", constant.ty().kind()))?;
+        self.constant_expression(evaluated, loc)
+    }
+
+    /// The expression of an evaluated constant: a literal, or the construction
+    /// of its parts.
+    fn constant_expression(
+        &mut self,
+        constant: &EvaluatedConstant,
+        loc: LocId,
+    ) -> Result<ExprId, String> {
+        let primitive = |kind| Operation::Primitive { kind };
+        let (ty, arguments, operation) = match constant {
+            EvaluatedConstant::Literal { ty, value } => {
+                let type_id = self.types.id(*ty)?;
+                return Ok(self.arenas.expression(loc, type_id, ExprKind::Value {
+                    source_constant: None,
+                    value: value.clone(),
+                }));
             },
-            TyKind::RigidTy(RigidTy::Char) => ConstValue::Character {
-                value: read_character_constant(constant)?,
+            EvaluatedConstant::Opaque { ty, description } => {
+                let type_id = match ty {
+                    Some(ty) => self.types.id(*ty)?,
+                    None => self.types.unit,
+                };
+                return Ok(self.arenas.expression(loc, type_id, ExprKind::Value {
+                    source_constant: None,
+                    value: ConstValue::Opaque {
+                        description: description.clone(),
+                    },
+                }));
             },
-            TyKind::RigidTy(RigidTy::Uint(_)) | TyKind::RigidTy(RigidTy::Int(_)) => {
-                ConstValue::Integer {
-                    value: read_integer_constant(constant)?,
-                }
+            EvaluatedConstant::Adt {
+                ty,
+                definition,
+                variant,
+                arguments,
+                fields,
+            } => {
+                let type_id = self.types.id(*ty)?;
+                let fields = fields
+                    .iter()
+                    .map(|field| self.constant_expression(field, loc))
+                    .collect::<Result<Vec<_>, _>>()?;
+                return self.constructor(*definition, *variant, arguments, fields, type_id, loc);
             },
-            TyKind::RigidTy(RigidTy::Tuple(elements)) if elements.is_empty() => ConstValue::Unit,
-            kind => return Err(format!("unsupported MIR constant type: {kind:?}")),
+            EvaluatedConstant::Tuple { ty, elements } => (
+                *ty,
+                elements.as_slice(),
+                primitive(PrimitiveOperation::Tuple),
+            ),
+            EvaluatedConstant::Array { ty, elements } => (
+                *ty,
+                elements.as_slice(),
+                primitive(PrimitiveOperation::Vector),
+            ),
+            EvaluatedConstant::Shared { ty, referent } => (
+                *ty,
+                std::slice::from_ref(referent.as_ref()),
+                Operation::Reference {
+                    kind: ReferenceOperation::Borrow {
+                        kind: BorrowKind::Immutable,
+                    },
+                },
+            ),
+            EvaluatedConstant::Closure {
+                definition,
+                arguments,
+                upvars,
+                ..
+            } => {
+                let values = upvars
+                    .iter()
+                    .map(|upvar| self.constant_expression(upvar, loc))
+                    .collect::<Result<Vec<_>, _>>()?;
+                return self.closure_value(*definition, arguments, values, loc);
+            },
         };
-        Ok(self.arenas.expression(loc, type_id, ExprKind::Value {
-            source_constant: None,
-            value,
+        let type_id = self.types.id(ty)?;
+        let arguments = arguments
+            .iter()
+            .map(|argument| self.constant_expression(argument, loc))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(self.arenas.expression(loc, type_id, ExprKind::Operation {
+            arguments,
+            instantiations: vec![],
+            operation,
+            surface: None,
         }))
     }
 
     fn map_place(&mut self, place: &rustc_public::mir::Place) -> Result<PlaceId, String> {
+        let place = &self.box_folds.resolve(place);
         let local_id = self
             .rust_to_vir
             .get(place.local)
@@ -3492,12 +7810,25 @@ impl<'a> FunctionMapper<'a> {
                 ProjectionElem::Deref => {
                     let id = PlaceId::new(self.arenas.places.len());
                     self.arenas.places.push(Place::Deref { base: current });
-                    let TyKind::RigidTy(RigidTy::Ref(_, referent, _)) = current_type.kind() else {
-                        return Err(format!(
-                            "cannot dereference MIR place type {current_type:?}"
-                        ));
+                    current_type = match current_type.kind() {
+                        TyKind::RigidTy(RigidTy::Ref(_, referent, _)) => referent,
+                        // Import reads it as the box's content (`Library.applyModels`).
+                        TyKind::RigidTy(RigidTy::Adt(definition, arguments))
+                            if definition.is_box() =>
+                        {
+                            let Some(GenericArgKind::Type(content)) = arguments.0.first() else {
+                                return Err(format!(
+                                    "cannot dereference MIR place type {current_type:?}"
+                                ));
+                            };
+                            *content
+                        },
+                        _ => {
+                            return Err(format!(
+                                "cannot dereference MIR place type {current_type:?}"
+                            ));
+                        },
                     };
-                    current_type = referent;
                     selected_variant = None;
                     id
                 },
@@ -3537,7 +7868,7 @@ impl<'a> FunctionMapper<'a> {
                                 "tuple field {index} has MIR type {field_type:?}, expected {expected:?}"
                             ));
                         }
-                        let loc = self.sources.intern(self.locals[place.local].span)?;
+                        let loc = self.local_location(self.locals[place.local].span)?;
                         let index_type =
                             self.types.integer_id(IntegerType::Unsigned(UintTy::U32))?;
                         let index_expression =
@@ -3553,6 +7884,31 @@ impl<'a> FunctionMapper<'a> {
                         self.arenas.places.push(Place::Index {
                             base: current,
                             index: index_expression,
+                        });
+                        current = id;
+                        current_type = *field_type;
+                        selected_variant = None;
+                        continue;
+                    }
+                    if let TyKind::RigidTy(RigidTy::Closure(definition, _)) = current_type.kind() {
+                        let closure = self
+                            .closures
+                            .iter()
+                            .find(|closure| closure.definition == definition)
+                            .ok_or_else(|| {
+                                format!("closure `{}` was not interned", definition.name())
+                            })?;
+                        let (field, _) = closure.fields.get(*index).ok_or_else(|| {
+                            format!("closure `{}` has no upvar {index}", definition.name())
+                        })?;
+                        let id = PlaceId::new(self.arenas.places.len());
+                        self.arenas.places.push(Place::Field {
+                            base: current,
+                            owner: QualifiedRef {
+                                name: closure.name,
+                                namespace_id: NamespaceId::new(0),
+                            },
+                            field: *field,
                         });
                         current = id;
                         current_type = *field_type;
@@ -3616,7 +7972,7 @@ impl<'a> FunctionMapper<'a> {
                     };
                     let index_local_id = self.local_id(*index_local)?;
                     let index_place = self.arenas.place(index_local_id);
-                    let index_loc = self.sources.intern(self.locals[*index_local].span)?;
+                    let index_loc = self.local_location(self.locals[*index_local].span)?;
                     let index_type = self.types.id(self.locals[*index_local].ty)?;
                     let index_expression =
                         self.arenas
@@ -3640,7 +7996,7 @@ impl<'a> FunctionMapper<'a> {
                     min_length,
                     from_end,
                 } => {
-                    let loc = self.sources.intern(self.locals[place.local].span)?;
+                    let loc = self.local_location(self.locals[place.local].span)?;
                     let index_type = self
                         .types
                         .integer_id(IntegerType::Unsigned(UintTy::Usize))?;
@@ -3775,12 +8131,28 @@ impl<'a> FunctionMapper<'a> {
         Ok(current)
     }
 
+    /// The types of a call's operands, then its destination's, as MIR states
+    /// them: normalized.
+    fn call_types(&self, args: &[Operand], destination: &MirPlace) -> Result<Vec<RustTy>, String> {
+        let mut types = args
+            .iter()
+            .map(|argument| argument.ty(&self.locals))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| format!("query call operand type: {error:?}"))?;
+        types.push(
+            destination
+                .ty(&self.locals)
+                .map_err(|error| format!("query call destination type: {error:?}"))?,
+        );
+        Ok(types)
+    }
+
     fn map_terminator(
         &mut self,
-        terminator: &TerminatorKind,
+        terminator: &Terminator,
         loc: LocId,
     ) -> Result<RawTerminator, String> {
-        match terminator {
+        match &terminator.kind {
             TerminatorKind::Goto { target } => Ok(RawTerminator::Goto {
                 target: BlockId::new(*target),
             }),
@@ -3854,7 +8226,29 @@ impl<'a> FunctionMapper<'a> {
                         return Ok(RawTerminator::Abort);
                     }
                 }
-                let mut arguments = args
+                let closure_call = match callee_type.kind() {
+                    TyKind::RigidTy(RigidTy::FnDef(definition, generic_arguments)) => {
+                        closure_callee(definition, &generic_arguments)
+                    },
+                    _ => None,
+                };
+                // A closure's body takes its parameters spread.
+                let operands = match (&closure_call, args.as_slice()) {
+                    (Some(_), [receiver, Operand::Move(tuple) | Operand::Copy(tuple)]) => {
+                        let elements = self.call_tuples.get(&tuple.local).ok_or_else(|| {
+                            format!(
+                                "the argument tuple of a closure call in `{}` was not folded",
+                                self.identity
+                            )
+                        })?;
+                        std::iter::once(receiver.clone())
+                            .chain(elements.iter().cloned())
+                            .collect()
+                    },
+                    (Some(_), [receiver, _]) => vec![receiver.clone()],
+                    _ => args.clone(),
+                };
+                let mut arguments = operands
                     .iter()
                     .map(|argument| self.map_operand(argument, loc))
                     .collect::<Result<Vec<_>, _>>()?;
@@ -3905,21 +8299,69 @@ impl<'a> FunctionMapper<'a> {
                             Operation::Primitive { kind }
                         } else {
                             let (resolved, resolved_arguments) =
-                                resolve_callee(definition, &generic_arguments)?;
+                                resolve_callee(definition, &generic_arguments).map_err(
+                                    |reason| {
+                                        format!(
+                                            "{} {reason}",
+                                            call_site(
+                                                definition,
+                                                self.identity,
+                                                terminator.source_info.span,
+                                                &self.sources.crate_files
+                                            )
+                                        )
+                                    },
+                                )?;
                             let resolved_name = resolved.name();
                             let callee =
                                 self.name_ids.get(&resolved_name).cloned().ok_or_else(|| {
-                                    // A dependency function is declared unless its
-                                    // signature is outside the slice; say why.
-                                    match dependency_signature(resolved) {
-                                        Err(reason) => reason,
-                                        Ok(_) => format!(
-                                            "callee `{resolved_name}` is not a mapped function"
-                                        ),
-                                    }
+                                    format!("callee `{resolved_name}` is not a mapped function")
                                 })?;
-                            instantiations =
-                                self.types.generic_arguments(&resolved_arguments, loc)?;
+                            let dependency = self
+                                .dependency_functions
+                                .iter()
+                                .find(|function| function.definition == resolved);
+                            if let Some((_, closure_args)) = &closure_call {
+                                instantiations = self.types.generic_arguments(
+                                    &GenericArgs(closure_arguments(closure_args)?.0),
+                                    loc,
+                                )?;
+                            } else if !dependency.is_some_and(|dependency| dependency.opaque)
+                                && !self.opaque_functions.contains(&resolved_name)
+                            {
+                                instantiations =
+                                    self.types.generic_arguments(&resolved_arguments, loc)?;
+                            }
+                            if let Some(dependency) = dependency
+                                && !dependency.associated_types.is_empty()
+                            {
+                                let bindings = self
+                                    .call_types(args, destination)
+                                    .and_then(|actual| {
+                                        dependency
+                                            .bind_associated_types(&resolved_arguments, &actual)
+                                    })
+                                    .map_err(|reason| {
+                                        format!(
+                                            "{}: {reason}",
+                                            call_site(
+                                                definition,
+                                                self.identity,
+                                                terminator.source_info.span,
+                                                &self.sources.crate_files
+                                            )
+                                        )
+                                    })?;
+                                for binding in bindings {
+                                    instantiations.push(GenericArgument::TypeArg {
+                                        value: TypeUse {
+                                            loc,
+                                            type_id: self.types.id(binding)?,
+                                        },
+                                    });
+                                }
+                            }
+                            instantiations.extend(self.bound_lifetime_arguments(&resolved_name)?);
                             Operation::Call {
                                 kind: CallKind::Function { callee },
                             }
@@ -3989,18 +8431,14 @@ impl<'a> FunctionMapper<'a> {
                 let return_type = return_place
                     .ty(&self.locals)
                     .map_err(|error| format!("query return place type: {error:?}"))?;
-                // Optimized MIR never assigns the unit return place of a
-                // `()` function. Its value is nevertheless determined, so
-                // export the unit value itself rather than a return-place
-                // move that definite-initialization checking must reject.
-                let result = match return_type.kind() {
-                    TyKind::RigidTy(RigidTy::Tuple(elements)) if elements.is_empty() => self
-                        .arenas
-                        .expression(loc, self.types.unit, ExprKind::Value {
-                            source_constant: None,
-                            value: ConstValue::Unit,
-                        }),
-                    _ => self.map_operand(&Operand::Move(return_place), loc)?,
+                // Optimized MIR never assigns a zero-sized return place. Its
+                // value is nevertheless determined, so export the value itself
+                // rather than a return-place move that definite-initialization
+                // checking must reject.
+                let constants = self.constants;
+                let result = match constants.zero_sized_values.get(&return_type) {
+                    Some(value) => self.constant_expression(value, loc)?,
+                    None => self.map_operand(&Operand::Move(return_place), loc)?,
                 };
                 Ok(RawTerminator::Return {
                     values: vec![result],
@@ -4009,7 +8447,10 @@ impl<'a> FunctionMapper<'a> {
             TerminatorKind::Unreachable => Ok(RawTerminator::Unreachable),
             TerminatorKind::Resume => Ok(RawTerminator::Resume),
             TerminatorKind::Abort => Ok(RawTerminator::Abort),
-            kind => Err(format!("unsupported MIR terminator: {kind:?}")),
+            kind => Err(format!(
+                "unsupported MIR terminator: {}",
+                variant_name(kind)
+            )),
         }
     }
 }
@@ -4120,63 +8561,6 @@ fn character_value(value: u128) -> Result<usize, String> {
     char::from_u32(value)
         .map(|_| value as usize)
         .ok_or_else(|| format!("character value U+{value:04X} is not a Unicode scalar value"))
-}
-
-fn read_bool_constant(constant: &ConstOperand) -> Result<bool, String> {
-    match constant.const_.kind() {
-        ConstantKind::Allocated(allocation) => allocation
-            .read_bool()
-            .map_err(|error| format!("read Bool MIR constant: {error:?}")),
-        kind => Err(format!(
-            "unsupported Bool MIR constant representation: {kind:?}"
-        )),
-    }
-}
-
-fn read_character_constant(constant: &ConstOperand) -> Result<usize, String> {
-    match constant.const_.kind() {
-        ConstantKind::Allocated(allocation) => allocation
-            .read_uint()
-            .map_err(|error| format!("read character MIR constant: {error:?}"))
-            .and_then(character_value),
-        ConstantKind::Ty(value) => match value.kind() {
-            TyConstKind::Value(_, allocation) => allocation
-                .read_uint()
-                .map_err(|error| format!("read typed character MIR constant: {error:?}"))
-                .and_then(character_value),
-            kind => Err(format!(
-                "unsupported typed character MIR constant representation: {kind:?}"
-            )),
-        },
-        kind => Err(format!(
-            "unsupported character MIR constant representation: {kind:?}"
-        )),
-    }
-}
-
-fn read_integer_constant(constant: &ConstOperand) -> Result<Number, String> {
-    match constant.const_.kind() {
-        ConstantKind::Allocated(allocation) => {
-            let value = allocation
-                .read_uint()
-                .map_err(|error| format!("read integer MIR constant: {error:?}"))?;
-            integer_value(value, constant.ty())
-        },
-        ConstantKind::Ty(value) => match value.kind() {
-            TyConstKind::Value(_, allocation) => {
-                let value = allocation
-                    .read_uint()
-                    .map_err(|error| format!("read typed integer MIR constant: {error:?}"))?;
-                integer_value(value, constant.ty())
-            },
-            kind => Err(format!(
-                "unsupported typed integer MIR constant representation: {kind:?}"
-            )),
-        },
-        kind => Err(format!(
-            "unsupported integer MIR constant representation: {kind:?}"
-        )),
-    }
 }
 
 fn empty_contract() -> FunctionContract {

@@ -6,9 +6,6 @@ import VerexSL
 verex namespace aggregate where
   fun array(left : u32, right : u32) -> Vector<u32, const 2> := #[left, right]
 
-  fun first(pair : (u32, Bool)) -> u32 := pair[0u32]
+  fun first(pair : (u32, Bool)) -> u32 := pair.0
 
   fun tuple(value : u32, flag : Bool) -> (u32, Bool) := (value, flag)
-
--- no denotation for `array`: the type of the result is not carried by the denotation
--- no denotation for `first`: an element place on a non-vector is not carried by the denotation

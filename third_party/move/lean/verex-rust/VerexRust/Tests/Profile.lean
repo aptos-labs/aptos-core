@@ -362,6 +362,73 @@ def checkRustDependencyCalls : IO Unit := do
 #guard_msgs in
 #eval checkRustDependencyCalls
 
+/-- An opaque constant and a call of an opaque function, which no diverging region
+holds, are rejected at their nodes. -/
+def checkRustOpaqueNodes : IO Unit := do
+  for file in #["opaque_constant.exp.json", "opaque_callee.exp.json"] do
+    let text ← readBaselineJson ("rust-exporter/tests/opaque-unit" / file)
+    match decodeAndValidate text with
+    | .ok _ => throw <| IO.userError s!"Rust exporter baseline {file} validated"
+    | .error diagnostics =>
+        unless diagnostics.all (·.code == "VIR-OPAQUE-SURVIVOR") do
+          throw <| IO.userError s!"Rust exporter baseline {file} diagnosed {repr diagnostics}"
+
+#guard_msgs in
+#eval checkRustOpaqueNodes
+
+/-- A collapse leaves no call of an opaque function in any body, only its node in
+the arena. The import prunes such a declaration; validation rejects it unpruned. -/
+def checkRustOpaquePruning : IO Unit := do
+  let file := "opaque_callee.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/opaque-unit" / file)
+  let raw ← match VerexIR.Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message => throw <| IO.userError message
+  let some ns := raw.namespaces[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no namespace"
+  let some function := ns.functions[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no function"
+  -- The body's call of the opaque function becomes a recursive call.
+  let recursive : VerexIR.ExprId := ⟨ns.expressions.size⟩
+  let body := match function.body with
+    | .cfg graph => .cfg { graph with blocks := graph.blocks.map fun block =>
+        match block.terminator with
+        | .call _ destination unwind =>
+            { block with terminator := .call recursive destination unwind }
+        | _ => block }
+    | body => body
+  let some original := ns.expressions.findIdx? (· matches
+      { kind := .operation (.call (.function _)) .., .. }) |>.bind (ns.expressions[·]?)
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no call"
+  let .operation _ _ arguments surface := original.kind
+    | throw <| IO.userError s!"Rust exporter baseline {file} has no call"
+  let collapsed := { raw with namespaces := raw.namespaces.set! 0 { ns with
+    expressions := ns.expressions.push { original with
+      kind := .operation (.call (.function { namespaceId := ns.identity, name := function.name }))
+        #[] arguments surface }
+    functions := ns.functions.set! 0 { function with body } } }
+  match validate collapsed with
+  | .ok _ => throw <| IO.userError "an unpruned opaque function validated"
+  | .error diagnostics =>
+      unless diagnostics.all (·.code == "VIR-OPAQUE-SURVIVOR") do
+        throw <| IO.userError s!"an unpruned opaque function diagnosed {repr diagnostics}"
+  let pruned := VerexIR.Rust.Library.pruneOpaqueFunctions collapsed
+  if pruned.namespaces.any (·.functions.any (·.profileData.any
+      (·.tag == rustOpaqueFunctionTag))) then
+    throw <| IO.userError "an uncalled opaque function was not pruned"
+  match validate pruned with
+  | .ok _ => pure ()
+  | .error diagnostics =>
+      throw <| IO.userError s!"a pruned unit diagnosed {repr diagnostics}"
+  -- A unit whose bodies still call it keeps it, for validation to reject.
+  let kept := VerexIR.Rust.Library.pruneOpaqueFunctions raw
+  unless kept.namespaces.any (·.functions.any (·.profileData.any
+      (·.tag == rustOpaqueFunctionTag))) do
+    throw <| IO.userError "a called opaque function was pruned"
+
+#guard_msgs in
+#eval checkRustOpaquePruning
+
 /-- A type with a `Copy` impl applying it to its own parameters carries the
 `copy` ability, conditional on its type arguments: the local `Point`, and
 `Option`, which is copied at `Option<u32>`. -/
@@ -381,6 +448,29 @@ def checkRustCopyTypes : IO Unit := do
 
 #guard_msgs in
 #eval checkRustCopyTypes
+
+/-- An ADT states a destructor where it has a `Drop` impl; an opaque one also
+where its hidden fields reach one or it holds a type argument. What a visible
+field reaches is read from the field's type. A field's type parameter is not
+one, nor is a reference's referent or a phantom. -/
+def checkRustDestructors : IO Unit := do
+  let file := "destructors.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let checked ← match decodeAndValidate text with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let stated := checked.namespaces.flatMap fun ns => ns.structs.filterMap fun declaration =>
+    if declaration.properties.any (·.tag == destructorTag) then
+      (checked.tables.names[declaration.name.index]?).map (·.name)
+    else none
+  unless stated == #["Guard", "Box", "Rc", "String", "Vec", "Cell"] &&
+      (prepareExecution #[semantics] checked).isOk &&
+      (prepareVerification #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its destructors: {repr stated}"
+
+#guard_msgs in
+#eval checkRustDestructors
 
 def checkRustExporterCallBaseline : IO Unit := do
   let file := "call.exp.json"

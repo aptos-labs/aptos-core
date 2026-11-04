@@ -1,0 +1,5 @@
+VerexE2ETests/SourceVerify/box_destructor_errors.rs:17:1: error: no denotation for `whole`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/box_destructor_errors.rs:21:1: error: no denotation for `read_then_drop`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/box_destructor_errors.rs:25:1: error: no denotation for `in_a_field`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/box_destructor_errors.rs:29:1: error: no denotation for `behind_flag`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/box_destructor_errors.rs:40:5: error: no denotation for `part_behind_flag`: a drop at a type with a destructor is not carried by the denotation

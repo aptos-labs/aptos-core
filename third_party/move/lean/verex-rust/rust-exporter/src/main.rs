@@ -88,12 +88,24 @@ mod driver {
             return Ok(Invocation::CargoDependency(exit_code(status)));
         }
         let mut rustc_args = rustc_args;
-        rustc_args.push("-Cpanic=abort".to_owned());
+        rustc_args.extend(pinned_rustc_args());
         rustc_args.insert(0, "rustc".to_owned());
         Ok(Invocation::CargoRoot(Options {
             output: Some(PathBuf::from(output)),
             rustc_args,
         }))
+    }
+
+    /// What an artifact's MIR is fixed by, last so that an earlier setting of the
+    /// user or of Cargo's profile cannot differ from what it declares: the initial
+    /// Rust profile has only terminal panic semantics, and a source has one MIR.
+    fn pinned_rustc_args() -> [String; 3] {
+        [
+            "-Copt-level=0".to_owned(),
+            "-Cpanic=abort".to_owned(),
+            // The pointer checks of a dereference, which safe code cannot fail.
+            "-Zub-checks=no".to_owned(),
+        ]
     }
 
     fn options() -> Result<Invocation, String> {
@@ -127,10 +139,7 @@ mod driver {
             );
         }
         if output.is_some() {
-            // The initial Rust profile has only terminal panic semantics. Put
-            // this last so an emitted artifact cannot claim `panic=abort`
-            // while observing an earlier user-supplied unwind setting.
-            rustc_args.push("-Cpanic=abort".to_owned());
+            rustc_args.extend(pinned_rustc_args());
         }
         rustc_args.insert(0, "rustc".to_owned());
         Ok(Invocation::Direct(Options { output, rustc_args }))

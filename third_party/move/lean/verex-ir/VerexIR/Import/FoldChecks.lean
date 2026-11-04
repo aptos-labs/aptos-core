@@ -35,42 +35,43 @@ private inductive Sym where
   | binary (operation : PrimitiveOperation) (left right : Sym)
   deriving BEq, Inhabited
 
-private inductive Access where
+inductive Access where
   | read
   | write
   deriving BEq
 
-private structure Occurrence where
+structure Occurrence where
   place : PlaceId
   node : ExprId
   access : Access
 
-private structure Context where
+structure Context where
   places : Array Place
   types : Array Ty
   pointerWidth : Option Nat
 
-private structure State where
+structure State where
   expressions : Array Expr
   locals : Array LocalDecl
   blocks : Array RawBasicBlock
 
-private def exprKind? (state : State) (id : ExprId) : Option ExprKind :=
+def exprKind? (state : State) (id : ExprId) : Option ExprKind :=
   (state.expressions[id.index]?).map (·.kind)
 
 private def typeOf? (state : State) (id : ExprId) : Option TypeId :=
   (state.expressions[id.index]?).map (·.typeId)
 
-private def bareLocal? (context : Context) (place : PlaceId) : Option LocalId :=
+def bareLocal? (context : Context) (place : PlaceId) : Option LocalId :=
   match context.places[place.index]? with
   | some (.localVar localId) => some localId
   | _ => none
 
-private partial def rootLocal? (context : Context) (place : PlaceId) : Option LocalId :=
+partial def rootLocal? (context : Context) (place : PlaceId) : Option LocalId :=
   match context.places[place.index]? with
   | some (.localVar localId) => some localId
   | some (.deref base) | some (.field base _ _) | some (.ghostField base _ _)
-  | some (.index base _) | some (.subslice base _ _ _) | some (.downcast base _) =>
+  | some (.index base _) | some (.subslice base _ _ _) | some (.unsize base)
+      | some (.downcast base _) =>
       rootLocal? context base
   | none => none
 
@@ -84,14 +85,15 @@ private def integerInfo? (context : Context) (typeId : TypeId) : Option (Nat × 
 /-! ## What a graph reads and writes -/
 
 mutual
-  private partial def placeOccurrences (context : Context) (state : State) (place : PlaceId)
+  partial def placeOccurrences (context : Context) (state : State) (place : PlaceId)
       (node : ExprId) (access : Access) : Option (Array Occurrence) := do
     let inner ← match context.places[place.index]? with
       | some (.index _ index) => exprOccurrences context state index
       | _ => pure #[]
     let nested ← match context.places[place.index]? with
       | some (.deref base) | some (.field base _ _) | some (.ghostField base _ _)
-      | some (.index base _) | some (.subslice base _ _ _) | some (.downcast base _) =>
+      | some (.index base _) | some (.subslice base _ _ _) | some (.unsize base)
+      | some (.downcast base _) =>
           -- A nested place is only read on the way to the projected slot.
           let parts ← placeOccurrences context state base node .read
           pure (parts.filter (fun occurrence => occurrence.place != base))
@@ -100,7 +102,7 @@ mutual
 
   /-- The places an expression tree of a raw block reaches; none for a form
   no raw block holds that this pass would have to look inside of. -/
-  private partial def exprOccurrences (context : Context) (state : State) (id : ExprId) :
+  partial def exprOccurrences (context : Context) (state : State) (id : ExprId) :
       Option (Array Occurrence) := do
     match ← exprKind? state id with
     | .value .. | .constant _ => pure #[]
@@ -123,7 +125,7 @@ mutual
     | _ => none
 end
 
-private def blockOccurrences (context : Context) (state : State) (block : RawBasicBlock) :
+def blockOccurrences (context : Context) (state : State) (block : RawBasicBlock) :
     Option (Array Occurrence) := do
   let mut result := #[]
   for statement in block.statements do
@@ -144,7 +146,7 @@ private def blockOccurrences (context : Context) (state : State) (block : RawBas
   | .goto _ | .unreachable | .resume | .abort => pure ()
   return result
 
-private def graphOccurrences (context : Context) (state : State) : Option (Array Occurrence) :=
+def graphOccurrences (context : Context) (state : State) : Option (Array Occurrence) :=
   state.blocks.foldlM (init := #[]) fun result block => do
     pure (result ++ (← blockOccurrences context state block))
 
@@ -452,7 +454,8 @@ private partial def indexLevels (context : Context) (place : PlaceId) : Array (P
   match context.places[place.index]? with
   | some (.index base index) => #[(base, index)] ++ indexLevels context base
   | some (.deref base) | some (.field base _ _) | some (.ghostField base _ _)
-  | some (.subslice base _ _ _) | some (.downcast base _) => indexLevels context base
+  | some (.subslice base _ _ _) | some (.unsize base) | some (.downcast base _) =>
+      indexLevels context base
   | _ => #[]
 
 /-- The expression observing a place's vector without copying its elements,
@@ -572,24 +575,26 @@ private partial def removeDeadTemporaries (context : Context) (state : State)
               { block with statements := block.statements.filter (!dead ·) } } candidates
       else state
 
-/-- The locals an assert condition reads, through the assignments of the
-graph: what folding its check may leave unread. -/
-private partial def conditionLocals (context : Context) (state : State) (id : ExprId)
-    (fuel : Nat) : Array LocalId :=
-  match fuel, exprOccurrences context state id with
-  | 0, _ | _, none => #[]
-  | fuel + 1, some occurrences =>
-      let direct := occurrences.filterMap fun occurrence => rootLocal? context occurrence.place
-      direct ++ direct.flatMap fun localId =>
-        (state.blocks.flatMap (·.statements)).flatMap fun statement =>
-          match statement with
-          | .execute expression => match exprKind? state expression with
-              | some (.assign place value) =>
-                  if bareLocal? context place == some localId then
-                    conditionLocals context state value fuel
-                  else #[]
-              | _ => #[]
-          | _ => #[]
+/-- The locals the assert conditions read, through the assignments of the graph: what
+folding their checks may leave unread. -/
+private def conditionLocals (context : Context) (state : State) (conditions : Array ExprId) :
+    Array LocalId := Id.run do
+  let assignments := (state.blocks.flatMap (·.statements)).filterMap fun statement => do
+    let .execute expression := statement | none
+    let .assign place value ← exprKind? state expression | none
+    return (← bareLocal? context place, value)
+  let mut pending := conditions
+  let mut reached : Array LocalId := #[]
+  repeat
+    let some id := pending.back? | break
+    pending := pending.pop
+    for occurrence in (exprOccurrences context state id).getD #[] do
+      let some localId := rootLocal? context occurrence.place | continue
+      unless reached.contains localId do
+        reached := reached.push localId
+        for (assigned, value) in assignments do
+          if assigned == localId then pending := pending.push value
+  return reached
 
 /-- Fold the checks of a raw graph. A graph holding a form this pass does not
 read is left as it is. -/
@@ -601,8 +606,7 @@ def foldChecks (places : Array Place) (types : Array Ty) (pointerWidth : Option 
   let conditions := graph.blocks.filterMap fun block => match block.terminator with
     | .assert condition _ kind _ _ => if panicAssertion kind then some condition else none
     | _ => none
-  let candidates := conditions.flatMap fun condition =>
-    conditionLocals context initial condition (graph.blocks.size + 1)
+  let candidates := conditionLocals context initial conditions
   let indices := Array.range graph.blocks.size
   let overflow := indices.foldl (foldOverflowCheck context) initial
   let operations := indices.foldl (foldOperationCheck context) overflow

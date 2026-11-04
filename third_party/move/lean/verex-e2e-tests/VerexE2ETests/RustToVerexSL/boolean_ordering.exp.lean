@@ -6,5 +6,3 @@ import VerexSL
 verex namespace boolean_ordering where
   fun ordering(left : Bool, right : Bool) -> (Bool, Bool, Bool, Bool) :=
     (left < right, left <= right, left > right, left >= right)
-
--- no denotation for `ordering`: a comparison of non-integers is not carried by the denotation

@@ -10,3 +10,8 @@ pub fn answer() -> bool {
 pub fn limit() -> u32 {
     100
 }
+
+#[cfg(feature = "dependency-call")]
+pub fn through_dependency() -> i32 {
+    verex_rust_cargo_fixture_dependency::dependency_value()
+}

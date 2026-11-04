@@ -49,14 +49,17 @@ def Denote.NTy.settle : (τ : NTy) → τ.carrier → τ.carrier
   | .signer, value => value
   | .string, value => value
   | .bytes, value => value
+  | .char, value => value
   | .tuple _, value => value
   | .struct _ _ _, value => value
   | .enum _ _ _ _ _, value => value
   | .vector _, value => value
+  | .array _ _, value => value
   | .table _ _, value => value
   | .ghost _, value => value
   | .param _, value => value
   | .function _ _ _, value => value
+  | .nominal _ _ _, value => value
 
 /-- A row of arguments, each settled. -/
 def Denote.HList.settle : (row : NRow) → HList row → HList row
@@ -757,8 +760,8 @@ theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs) (free : θ.1.
   | .param index, _ =>
       NTy.settle_self_of_refFree _ (NRow.getD_refFree θ.1 free index _ rfl) _
   | .ref _, _ | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
-  | .string, _ | .bytes, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .vector _, _
-  | .table _ _, _ | .ghost _, _ | .function _ _ _, _ => rfl
+  | .string, _ | .bytes, _ | .char, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .vector _, _ | .array _ _, _
+  | .table _ _, _ | .ghost _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
 
 theorem Denote.HList.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs) (free : θ.1.refFree = true) :
     (row : NRow) → (values : @HList (Carriers.instantiate θ Θ) row) →
@@ -796,9 +799,10 @@ theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
         (NRow.getD_refFree θ.1 free index _ rfl) (ResultShape.ofSkolem θ (.one (.param index)) value)
       exact ⟨fun _ => trivial, fun _ => settled⟩
   | .one .unit, _ | .one .bool, _ | .one (.int _ _), _ | .one .num, _ | .one .address, _
-  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one (.tuple _), _
-  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _
-  | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _ => Iff.rfl
+  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one .char, _ | .one (.tuple _), _
+  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _ | .one (.array _ _), _
+  | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _
+  | .one (.nominal _ _ _), _ => Iff.rfl
 
 /-- A result encodes alike in either view. -/
 theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] (θ : TypeArgs) : (shape : ResultShape) →

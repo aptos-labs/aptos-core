@@ -174,9 +174,12 @@ statements and call/drop/assert/cleanup terminators; the structurizer
 classifies storage lifetime markers, place mentions, and user-type
 ascriptions as inert administration and erases them after validation, and
 under `panic=abort` lowers ordinary bounds, overflow, division, and remainder
-assertions to explicit panic branches. Destructive and provenance-sensitive
-statements, cleanup edges, and exceptional terminators are rejection
-boundaries.
+assertions to explicit panic branches. Before that, a region of blocks all of
+whose paths reach a call that does not return collapses to `abort`
+(`Import/PanicRegions.lean`). `unreachable` is not a panic path: it says a path
+cannot happen, and leaves the graph only together with such a call. Destructive and
+provenance-sensitive statements, cleanup edges, and exceptional terminators outside
+a region are rejection boundaries.
 
 ## Compilation units and dependencies
 
@@ -314,9 +317,11 @@ freeze form a typed reference-operation family. A direct local read is
 non-consuming; validation infers the access of a value type without `Copy`:
 a selection or index of it with `Copy` copies its place, the operand of an
 observer (discriminant, variant test, length, index check) reads it, and
-otherwise the local is moved; a reference local keeps its read. Field and
-variant operations carry strong qualified references; enum variants may
-record an observable integer discriminant distinct from array position.
+otherwise the local is moved. A reference without `Copy` is moved too, except
+as the operand an observer or a reference operation takes at rest; a reference
+with `Copy` keeps its read. Field and variant operations carry strong qualified
+references; enum variants may record an observable integer discriminant
+distinct from array position.
 
 The specification language is core: contract clauses and the
 `forall`/`exists`/choice quantifiers are typed nodes; mathematical integers,
@@ -338,7 +343,7 @@ literals core constants. An elided Move lifetime produces a fresh core
 the same table. Lifetime constraints, inference, and profile-specific borrow
 checking are separate checked passes.
 
-Places are first-class (local, dereference, field, index, subslice,
+Places are first-class (local, dereference, field, index, subslice, unsize,
 downcast) because both lowerings need them and Rust moves and borrows cannot
 be value-only expressions. Operations distinguish move, copy, borrow kinds,
 read, write, assert, and drop. `GlobalKind` makes keyed storage first-class

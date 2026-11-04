@@ -295,7 +295,9 @@ def resolveUseSites {β : Type} (tables : Tables) (index : ResolutionIndex)
           ds ++ operationTargetDiagnostics target expr.loc op
       | _ => ds
     let functionErrors := ns.functions.foldl (init := #[]) fun ds function =>
-      ds ++ signatureDiagnostics target function.loc function.signature
+      function.shapes.foldl (init :=
+          ds ++ signatureDiagnostics target function.loc function.signature)
+        fun ds shape => ds ++ signatureDiagnostics target shape.loc shape.signature
     let specFunctionErrors := ns.specFunctions.foldl (init := #[]) fun ds function =>
       ds ++ signatureDiagnostics target function.loc function.signature
     let specFunctionErrors := ns.lemmas.foldl (init := specFunctionErrors) fun ds lemma =>

@@ -170,7 +170,7 @@ theorem maskReturnedBorrows_rename (injective : Function.Injective ρ) (loans : 
   | .ghost contents =>
       rw [RuntimeValue.rename_ghost, maskReturnedBorrows, maskReturnedBorrows,
         RuntimeValue.rename_ghost, maskReturnedBorrows_rename injective loans contents]
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ | .loanHole _ => simp [maskReturnedBorrows]
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -221,7 +221,7 @@ theorem maskReturnedBorrows_within (loans : Array Nat) (value : RuntimeValue)
       simp only [RuntimeValue.within_closure, List.mem_toArray] at above ⊢
       exact maskReturnedBorrowList_within loans captures.toList (fun value member =>
         above value (Array.mem_toList_iff.mp member))
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ | .loanHole _ => rw [maskReturnedBorrows]; exact above
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -438,7 +438,7 @@ theorem RuntimeValue.holeFree?_rename (value : RuntimeValue) :
         RuntimeValue.holeFree?_rename contents]
   | .borrow loan current => simp [RuntimeValue.holeFree?]
   | .loanHole loan => simp [RuntimeValue.holeFree?]
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => simp [RuntimeValue.holeFree?]
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)

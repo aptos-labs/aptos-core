@@ -447,7 +447,11 @@ example:
 - Move global storage is organized by resource family and address; Rust state
   may include allocations and interior-mutable cells.
 - Move has abilities; Rust has ownership, destruction, traits, and lifetimes.
-  The Rust profile reads `Copy` as the `copy` ability and drops every value.
+  The Rust profile reads `Copy` as the `copy` ability and drops every value;
+  the property `struct.destructor` states which nominals run a destructor of
+  their own, or hide one (an opaque type); what a visible field reaches is read
+  from its type, a type the library models among them, and
+  until M4 a drop or a generic call that could run one has no denotation.
   A struct with a `Copy` impl applying it to its own parameters declares
   `copy`, which an instantiation has where its type arguments are `Copy`, as
   `#[derive(Copy)]` states it; a generic parameter's abilities only constrain

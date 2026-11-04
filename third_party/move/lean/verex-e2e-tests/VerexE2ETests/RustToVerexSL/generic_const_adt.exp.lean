@@ -8,5 +8,3 @@ verex namespace generic_const_adt where
     value : T
 
   fun read_u32(value : Tagged<u32, const 3, const true>) -> u32 := value.value
-
--- no denotation for `read_u32`: the type of a local is not carried by the denotation
