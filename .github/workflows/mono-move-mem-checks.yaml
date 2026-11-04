@@ -1,0 +1,106 @@
+name: "mono-move-mem-checks"
+
+# Runs the MonoMove test suites with runtime memory checks compiled in
+# (`MONO_MOVE_MEM_CHECKS=hardened|exhaustive`, see
+# third_party/move/mono-move/mem/src/checks.rs). A valid program never trips a
+# check, so any failure here is either a wrong check or a VM bug.
+#
+# Mirrors mono-move-miri.yaml: the required check `mono-move-mem-checks-required`
+# always reports; `changes` decides whether the suites run.
+on:
+  # `pull_request`, never `pull_request_target`: this runs untrusted PR code on
+  # a self-hosted runner, and `pull_request_target` would hand that code a
+  # writable token in the base-repo context.
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: mono-move-mem-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  changes:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      mono_move: ${{ steps.filter.outputs.mono_move }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" != pull_request ]; then
+            echo "mono_move=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if grep -qE \
+            -e '^third_party/move/mono-move/' \
+            -e '^aptos-move/block-executor/src/mono_move/' \
+            -e '^Cargo\.(toml|lock)$' \
+            -e '^\.github/workflows/mono-move-mem-checks\.yaml$' \
+            <<< "$changed"; then
+            echo "mono_move=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mono_move=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  checks:
+    needs: changes
+    if: |
+      needs.changes.outputs.mono_move == 'true' &&
+      (
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: [hardened, exhaustive]
+    env:
+      MONO_MOVE_MEM_CHECKS: ${{ matrix.tier }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: "Run the mono-move suites with ${{ matrix.tier }} checks"
+        # The tier is a build property of mono-move-mem; cargo rebuilds its
+        # dependents when it changes. Expect zero faults on every valid
+        # program; the negative tests assert the checks fire.
+        run: |
+          cargo test --locked \
+            -p mono-move-mem -p mono-move-core -p mono-move-runtime \
+            -p mono-move-natives --features mono-move-natives/testing
+          cargo test --locked -p mono-move-testsuite
+
+  mono-move-mem-checks-required:
+    needs: [changes, checks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+        run: |
+          echo "changes: $CHANGES_RESULT, checks: $CHECKS_RESULT"
+          case "$CHANGES_RESULT/$CHECKS_RESULT" in
+            success/success | success/skipped) ;;
+            *) exit 1 ;;
+          esac

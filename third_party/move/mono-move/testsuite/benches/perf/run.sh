@@ -59,6 +59,14 @@ cmd_ab() {
         echo "error: unset RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS; they override the bench build flags" >&2
         exit 2
     fi
+    # The gate measures the production tier. A check tier is a different
+    # program; measure it deliberately with `MONO_MOVE_MEM_CHECKS_BENCH=1`.
+    if [[ -n "${MONO_MOVE_MEM_CHECKS:-}" && "${MONO_MOVE_MEM_CHECKS}" != "none" \
+          && -z "${MONO_MOVE_MEM_CHECKS_BENCH:-}" ]]; then
+        echo "error: MONO_MOVE_MEM_CHECKS=${MONO_MOVE_MEM_CHECKS} would build both sides with memory checks;" >&2
+        echo "       unset it, or set MONO_MOVE_MEM_CHECKS_BENCH=1 to measure a check tier on purpose" >&2
+        exit 2
+    fi
 
     if [[ "$base_ref" == origin/* ]]; then
         git -C "$REPO_ROOT" fetch --quiet origin \
