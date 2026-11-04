@@ -3619,6 +3619,12 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     ) -> Self {
         unimplemented!()
     }
+
+    /// Size of a key promoted by the block epilogue, counted against
+    /// `max_promotion_bytes_per_block`.
+    fn promoted_key_size(_key: &Self::Key) -> usize {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

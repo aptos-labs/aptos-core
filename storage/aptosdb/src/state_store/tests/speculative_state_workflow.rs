@@ -61,8 +61,8 @@ const HOT_STATE_MAX_BYTES_PER_SHARD: usize = HashValue::LENGTH + ARB_STATE_VALUE
 // Small enough that a block leaves many keys read but not written, so they are eligible for
 // promotion.
 const MAX_WRITE_SET_SIZE: usize = NUM_KEYS / 8;
-// Small enough that blocks regularly hit the cap.
-const MAX_PROMOTIONS_PER_BLOCK: usize = 16;
+// Small enough that blocks regularly hit the cap: 16 keys of 5 bytes each.
+const MAX_PROMOTION_BYTES_PER_BLOCK: usize = 80;
 // Short enough that promotions mix refreshes with skips of recently hot keys.
 const REFRESH_INTERVAL_VERSIONS: Version = 20;
 
@@ -844,7 +844,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
     let mut state_by_version = StateByVersion::new_empty();
     for (block_txns, epilogue) in blocks {
         let mut op_accu =
-            BlockHotStateOpAccumulator::<StateKey>::new_with_config(MAX_PROMOTIONS_PER_BLOCK);
+            BlockHotStateOpAccumulator::<StateKey>::new_with_config(MAX_PROMOTION_BYTES_PER_BLOCK);
         let num_txns = block_txns.len();
         for (idx, txn) in block_txns.into_iter().enumerate() {
             // No promotions except for block epilogue. Also note that in case of reconfig, there's
@@ -871,7 +871,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
         }
         if let Some(epi_txn) = epilogue {
             let to_make_hot = op_accu
-                .get_keys_to_make_hot(|k| Ok(k.clone()))
+                .get_keys_to_make_hot(|k| Ok(k.clone()), StateKey::size)
                 .expect("Identity conversion to storage key cannot fail");
 
             state_by_version.append_version(
