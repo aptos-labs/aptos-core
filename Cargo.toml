@@ -547,7 +547,7 @@ assert_approx_eq = "1.1.0"
 async-mutex = "1.4.0"
 async-recursion = "1.2.0"
 async-trait = "0.1.92"
-axum = "0.7.5"
+axum = "0.8.9"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.77"
 base64 = "0.13.0"
@@ -563,7 +563,7 @@ bls12_381 = "0.8.0"
 blst = "0.3.15"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
-bollard = "0.15"
+bollard = "0.21.1"
 bon = "3.10.3"
 boxcar = "0.2.13"
 build_html = "2.5.0"
@@ -612,7 +612,7 @@ derivation-path = "0.2.0"
 derivative = "2.2.0"
 derive_builder = "0.20.0"
 derive_more = { version = "2.1.1", features = ["add", "deref", "deref_mut"] }
-determinator = "0.12.0"
+determinator = "0.13.0"
 diesel = { version = "~2.3", features = ["uuid"] }
 diesel-async = { version = "0.7.4", features = [
     "async-connection-wrapper",
@@ -664,7 +664,7 @@ glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
 group = "0.13"
-guppy = "0.17.5"
+guppy = "0.19.1"
 handlebars = "6.4.4"
 hashbrown = { version = "0.14.3", features = ["equivalent"] }
 heck = "0.5.0"
@@ -746,7 +746,7 @@ paste = "1.0.7"
 pathsearch = "0.2.0"
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
-petgraph = "0.6.5"
+petgraph = "0.8.3"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 poem = { version = "3.1.3", features = ["anyhow", "compression", "rustls"] }
@@ -857,7 +857,7 @@ tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.19", features = ["fs"] }
 tokio-test = "0.4.6"
 tokio-util = { version = "0.7.20", features = ["compat", "codec"] }
-toml = "0.7.4"
+toml = "1.1.8"
 tonic = { version = "0.12.3", features = [
     "tls-roots",
     "transport",

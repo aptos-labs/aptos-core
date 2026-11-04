@@ -141,7 +141,7 @@ impl Server for AssetUploaderApiContext {
         axum::Router::new()
             .route("/upload", post(Self::handle_upload_batch))
             .route(
-                "/status/:application_id/:idempotency_key",
+                "/status/{application_id}/{idempotency_key}",
                 get(Self::handle_get_status),
             )
             .layer(Extension(self_arc.clone()))
