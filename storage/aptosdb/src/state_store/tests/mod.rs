@@ -198,7 +198,7 @@ fn test_load_on_chain_hot_state_config() {
         max_items_per_shard: vec![3; NUM_STATE_SHARDS],
         max_bytes_per_shard: vec![5_000; NUM_STATE_SHARDS],
         refresh_interval_versions: 7,
-        max_promotions_per_block: 0,
+        max_promotion_bytes_per_block: 0,
     });
     let config_value = StateValue::new_legacy(
         bcs::to_bytes(&bcs::to_bytes(&on_chain).unwrap())
