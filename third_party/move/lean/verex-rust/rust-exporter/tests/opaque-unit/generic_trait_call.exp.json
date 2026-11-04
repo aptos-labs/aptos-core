@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -15,18 +15,10 @@
         {
           "isDoc": false,
           "loc": {
-            "index": 10
+            "index": 5
           },
           "ownLine": true,
-          "text": "// The impl of `Index` for `Vec<T>` holds only under `T`'s bounds, so rustc selects"
-        },
-        {
-          "isDoc": false,
-          "loc": {
-            "index": 11
-          },
-          "ownLine": true,
-          "text": "// it only at a concrete `T`."
+          "text": "// Non-unit methods remain outside the first method-evidence slice."
         }
       ],
       "constants": [],
@@ -51,25 +43,7 @@
             "index": 3
           },
           "typeId": {
-            "index": 7
-          }
-        },
-        {
-          "kind": {
-            "value": {
-              "sourceConstant": null,
-              "value": {
-                "integer": {
-                  "value": 0
-                }
-              }
-            }
-          },
-          "loc": {
             "index": 3
-          },
-          "typeId": {
-            "index": 1
           }
         },
         {
@@ -78,7 +52,7 @@
               "sourceConstant": null,
               "value": {
                 "opaque": {
-                  "description": "call of `std::ops::Index::index` in `generic_trait_call::first` at line 7:12 depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type"
+                  "description": "call of `generic_trait_call::Step::step` in `generic_trait_call::step` at line 7:42 depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type"
                 }
               }
             }
@@ -109,7 +83,7 @@
             "index": 4
           },
           "typeId": {
-            "index": 6
+            "index": 1
           }
         }
       ],
@@ -131,7 +105,7 @@
                     "terminator": {
                       "call": {
                         "call": {
-                          "index": 2
+                          "index": 1
                         },
                         "destination": {
                           "place": {
@@ -154,7 +128,7 @@
                       "return_": {
                         "values": [
                           {
-                            "index": 3
+                            "index": 2
                           }
                         ]
                       }
@@ -191,13 +165,13 @@
                 "index": 1
               },
               "mutable": false,
-              "name": "values",
+              "name": "value",
               "type": {
                 "loc": {
                   "index": 1
                 },
                 "typeId": {
-                  "index": 7
+                  "index": 3
                 }
               }
             },
@@ -215,7 +189,7 @@
                   "index": 2
                 },
                 "typeId": {
-                  "index": 6
+                  "index": 1
                 }
               }
             }
@@ -245,13 +219,13 @@
             "parameters": [
               {
                 "mutable": false,
-                "name": "values",
+                "name": "value",
                 "typeUse": {
                   "loc": {
                     "index": 1
                   },
                   "typeId": {
-                    "index": 7
+                    "index": 3
                   }
                 }
               }
@@ -263,7 +237,7 @@
                   "index": 2
                 },
                 "typeId": {
-                  "index": 6
+                  "index": 1
                 }
               }
             ]
@@ -312,168 +286,6 @@
       "specFunctions": [],
       "specVars": [],
       "structs": [],
-      "traits": []
-    },
-    {
-      "associatedItems": [],
-      "attributes": [],
-      "comments": [],
-      "constants": [],
-      "doc": "",
-      "expressions": [],
-      "functions": [],
-      "identity": {
-        "index": 1
-      },
-      "implementations": [],
-      "imports": [],
-      "intrinsics": [],
-      "invariants": [],
-      "lemmas": [],
-      "loc": {
-        "index": 5
-      },
-      "patterns": [],
-      "places": [],
-      "pragmas": [
-        {
-          "assign": {
-            "loc": null,
-            "name": "verify",
-            "value": {
-              "constant": {
-                "value": {
-                  "bool": {
-                    "value": false
-                  }
-                }
-              }
-            }
-          }
-        }
-      ],
-      "profile": "rust",
-      "profileMetadata": [],
-      "scopes": [
-        {
-          "kind": "module",
-          "loc": {
-            "index": 8
-          },
-          "path": [
-            "alloc"
-          ]
-        },
-        {
-          "kind": "module",
-          "loc": {
-            "index": 9
-          },
-          "path": [
-            "vec"
-          ]
-        }
-      ],
-      "specFunctions": [],
-      "specVars": [],
-      "structs": [
-        {
-          "abilities": [
-            "copy"
-          ],
-          "attributes": [],
-          "contract": {
-            "conditions": [],
-            "hasFrame": false,
-            "loc": null,
-            "modifies": [],
-            "modifiesAll": false,
-            "parameterFrames": [],
-            "pragmas": [],
-            "reads": [],
-            "readsAll": false
-          },
-          "doc": "",
-          "fields": [],
-          "generics": [],
-          "ghosts": [],
-          "loc": {
-            "index": 6
-          },
-          "locals": [],
-          "name": {
-            "index": 1
-          },
-          "properties": [
-            {
-              "payload": "",
-              "profile": "rust",
-              "tag": "struct.opaque"
-            }
-          ],
-          "variants": []
-        },
-        {
-          "abilities": [],
-          "attributes": [],
-          "contract": {
-            "conditions": [],
-            "hasFrame": false,
-            "loc": null,
-            "modifies": [],
-            "modifiesAll": false,
-            "parameterFrames": [],
-            "pragmas": [],
-            "reads": [],
-            "readsAll": false
-          },
-          "doc": "",
-          "fields": [],
-          "generics": [
-            {
-              "abilities": [],
-              "kind": "typeArg",
-              "loc": {
-                "index": 7
-              },
-              "name": "T",
-              "predicates": [],
-              "type": null
-            },
-            {
-              "abilities": [],
-              "kind": "typeArg",
-              "loc": {
-                "index": 7
-              },
-              "name": "A",
-              "predicates": [],
-              "type": null
-            }
-          ],
-          "ghosts": [],
-          "loc": {
-            "index": 7
-          },
-          "locals": [],
-          "name": {
-            "index": 2
-          },
-          "properties": [
-            {
-              "payload": "",
-              "profile": "rust",
-              "tag": "struct.destructor"
-            },
-            {
-              "payload": "",
-              "profile": "rust",
-              "tag": "struct.opaque"
-            }
-          ],
-          "variants": []
-        }
-      ],
       "traits": []
     }
   ],
@@ -529,11 +341,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 225,
+          "endByte": 222,
           "file": {
             "index": 0
           },
-          "startByte": 187
+          "startByte": 184
         },
         "related": []
       },
@@ -542,11 +354,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 209,
+          "endByte": 210,
           "file": {
             "index": 0
           },
-          "startByte": 203
+          "startByte": 205
         },
         "related": []
       },
@@ -555,11 +367,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 225,
+          "endByte": 222,
           "file": {
             "index": 0
           },
-          "startByte": 223
+          "startByte": 219
         },
         "related": []
       },
@@ -568,7 +380,20 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 242,
+          "endByte": 237,
+          "file": {
+            "index": 0
+          },
+          "startByte": 225
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 239,
           "file": {
             "index": 0
           },
@@ -581,111 +406,27 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 244,
-          "file": {
-            "index": 0
-          },
-          "startByte": 244
-        },
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": "rustc dependency `alloc`",
-        "parent": null,
-        "primary": null,
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": "rustc dependency `std::alloc::Global`",
-        "parent": null,
-        "primary": null,
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": "rustc dependency `std::vec::Vec`",
-        "parent": null,
-        "primary": null,
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": "rustc dependency `alloc::alloc`",
-        "parent": null,
-        "primary": null,
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": "rustc dependency `alloc::vec`",
-        "parent": null,
-        "primary": null,
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": null,
-        "parent": null,
-        "primary": {
-          "endByte": 156,
+          "endByte": 140,
           "file": {
             "index": 0
           },
           "startByte": 73
         },
         "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": null,
-        "parent": null,
-        "primary": {
-          "endByte": 186,
-          "file": {
-            "index": 0
-          },
-          "startByte": 157
-        },
-        "related": []
       }
     ],
     "names": [
       {
-        "name": "first",
+        "name": "step",
         "namespaceId": {
           "index": 0
         }
-      },
-      {
-        "name": "Global",
-        "namespaceId": {
-          "index": 1
-        },
-        "scope": [
-          "alloc"
-        ]
-      },
-      {
-        "name": "Vec",
-        "namespaceId": {
-          "index": 1
-        },
-        "scope": [
-          "vec"
-        ]
       }
     ],
     "namespaces": [
       {
         "segments": [
           "generic_trait_call"
-        ]
-      },
-      {
-        "segments": [
-          "alloc"
         ]
       }
     ],
@@ -696,7 +437,7 @@
         "location": {
           "index": 0
         },
-        "sourceIdentity": "generic_trait_call::first"
+        "sourceIdentity": "generic_trait_call::step"
       }
     ],
     "types": [
@@ -704,58 +445,16 @@
       {
         "integer": {
           "signed": false,
-          "width": "pointer"
+          "width": {
+            "bits": {
+              "width": 64
+            }
+          }
         }
       },
       {
         "typeParameter": {
           "index": 0
-        }
-      },
-      {
-        "typeParameter": {
-          "index": 1
-        }
-      },
-      {
-        "nominal": {
-          "arguments": [],
-          "name": {
-            "index": 1
-          }
-        }
-      },
-      {
-        "nominal": {
-          "arguments": [
-            {
-              "typeArg": {
-                "value": {
-                  "loc": {
-                    "index": 0
-                  },
-                  "typeId": {
-                    "index": 2
-                  }
-                }
-              }
-            },
-            {
-              "typeArg": {
-                "value": {
-                  "loc": {
-                    "index": 0
-                  },
-                  "typeId": {
-                    "index": 4
-                  }
-                }
-              }
-            }
-          ],
-          "name": {
-            "index": 2
-          }
         }
       },
       {
@@ -768,20 +467,6 @@
             "profile": "rust",
             "referent": {
               "index": 2
-            }
-          }
-        }
-      },
-      {
-        "reference": {
-          "value": {
-            "kind": "shared",
-            "lifetime": {
-              "index": 0
-            },
-            "profile": "rust",
-            "referent": {
-              "index": 5
             }
           }
         }

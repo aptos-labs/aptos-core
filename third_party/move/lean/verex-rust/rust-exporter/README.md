@@ -1,7 +1,7 @@
 # `verex-rust-export`
 
 This is the project-owned Rustc Public driver for Verex. Its M0 spike uses
-Rustc Public's `run!` callback, inventories the public queries needed by the
+Rustc Public's `run_with_tcx!` callback, inventories the public queries needed by the
 mapper, and returns `ControlFlow::Break`, which stops rustc after analysis and
 before code generation/linking. The inventory is a diagnostic, not another
 exchange format; the only detached artifact will be `RawUnit` JSON.
@@ -71,8 +71,9 @@ types in MIR are normalized, so each distinct associated type is a generic
 parameter after the function's generics, named after the associated item, and a
 call instantiates it by unifying the declared signature with the call's operand
 and destination types. A call this does not bind is an export error at the call.
-A trait-method call whose impl selection depends on a type parameter is rejected
-(`tests/fixtures/generic_trait_call.rs`): it needs trait evidence.
+Parameter-dependent dispatch uses explicit dictionaries for local single-method
+`&mut self` traits returning unit and for declared `Fn` and `FnMut` bounds. Other trait
+interfaces still require checked evidence (`tests/fixtures/generic_trait_call.rs`).
 
 Export evaluates each constant a body uses and reads the result through the
 type's layout, so no constant is matched by name. Integers, `bool`, `char` and
@@ -84,19 +85,17 @@ observes (`const_reference.rs`). An immutable `static` reads the same way, throu
 its initializer (`const_static.rs`). A zero-sized constant of an ADT is the
 constructor of its layout's single variant, recursively, and optimized MIR assigns
 no zero-sized place, so a body returning a zero-sized type returns that value
-(`const_zero_sized.rs`). A promoted constant has no public evaluation, and a
-definition with generic parameters none before monomorphization, so both are export
-errors at their location, as is a `static` with interior mutability; `static mut`
-stays rejected.
+(`const_zero_sized.rs`). The confined `driver/polyfill.rs` bridge evaluates
+promoted constants (`const_promoted.rs`, `polyfill.rs`). Constants whose values
+depend on generic parameters and statics with interior mutability remain refused;
+`static mut` stays rejected.
 
-Rustc Public gives a span no call site, so what a macro of another crate expands to
-has no span in the crate, and no file outside the crate's items enters the unit. Such a
-node is located, with no primary range, at what it is reached after: the nearest
-dominator with a terminator in the crate, past the blocks of a panic region only such
-macros raise, and else the function (`tests/opaque-unit/opaque_panic.rs`).
+The bridge maps external macro expansion spans to their outer source call sites,
+so `assert!`, `assert_eq!`, and `panic!` carry primary locations in the user's
+source. The dominator fallback remains for generated spans without a local call site.
 
 A failure in a body is not an export error: an rvalue, place, call or constant the
-unit cannot state (a promoted constant, a generic one, a trait call that needs
+unit cannot state (a generic constant or a trait call that needs
 evidence) is an opaque node where it stands, stating why, and the rest of the body
 maps. A diverging region holding one collapses; any other survivor refuses its
 function at import. A type only a body states, of a local or of a call's instantiation,
@@ -303,9 +302,16 @@ The design now explicitly selects the generic `optimized_mir` returned by the
 pinned Rustc Public API. Plain lifetime/type-generic declarations and local
 direct generic calls retain one parametric body; `generic_identity.rs` checks
 validation, execution, VerexSL, and canonical-Rust re-import. The remaining
-M0 API blockers are that `FnDef` exposes neither its predicates nor a const
-function binder's declared type. The mapper does not work around those gaps
-through `rustc_middle`.
+public API gaps are covered by `driver/polyfill.rs`: item predicates (including
+parent identities and higher-ranked binders), caller-aware instance selection,
+const-parameter types, promoted evaluation, and macro call sites. The bridge also
+preserves early-bound signature lifetimes and queries declared Copy bounds,
+including supertraits. Only this module uses compiler queries and conversion;
+`mapper.rs` and `probe.rs` use public types. Import evidence names the polyfill.
+The mapper exports Copy abilities, region outlives predicates, and the static
+method-evidence slice described below. General trait predicates still need M2's
+checked evidence.
+Retire each wrapper when the pinned public API supplies its replacement.
 
 The M0 probe deliberately does **not** serialize a substitute JSON format. The
 detached writer implements the versioned `RawUnit` JSON spelling owned by
@@ -365,3 +371,50 @@ toolchain, and semantic profile. Each uncached input gets a content-addressed
 Cargo target directory, avoiding both destructive `cargo clean` calls and a
 stale Cargo-fresh root that would skip extraction. `VEREX_RUST_CACHE` may
 override the managed cache root.
+
+## Static method evidence
+
+`tests/evidence-unit/` checks declared method dictionaries with strict
+differential execution. Each dictionary is an ordinary function parameter,
+marked by `method_evidence = <parameter index>`. Its name starts with
+`__trait_<Trait>_<method>`; numeric suffixes disambiguate repeated bounds and
+source locals. Callers select implementations using compiler identities, and
+generic forwarding passes the dictionary without specializing the helper body.
+
+`FnMut` evidence retains a mutable closure receiver and spreads its argument
+tuple. Results may be generic or aggregate types admitted by the Rust profile.
+Closures inside bounded generic functions capture their inherited dictionaries
+as additional arguments. A non-mutating `Fn` closure gets a checked
+`__fnmut_adapter_*` function that reborrows its receiver as shared.
+Declared `Fn` bounds instead supply a dictionary taking `&F` and invoke the
+shared closure body directly. `evidence-unit/static_fn` covers generic forwarding,
+arguments, generic and tuple results, multiple bounds, and repeated unit calls.
+Generic forwarding from `Fn` to `FnMut` uses a checked adapter that captures
+that shared dictionary and reborrows its mutable receiver. The
+`shared_method_adapter` attribute identifies the captured dictionary parameter;
+Rust source verification generates and proves receiver-preservation and
+behavioral specifications for both adapter kinds. `closure_method_adapter`
+identifies the concrete shared closure target. Users specify the source closure's
+`call` method; they do not write specifications naming generated adapters.
+Generated-contract diagnostics point into the rendered verification file. `evidence-unit/fn_forward` exercises this forwarding
+with arguments, multiple bounds, repeated calls, generic/tuple results, and unit
+results. `FnOnce` bounds remain unsupported. The
+`fixtures/evidence_composition` fixture covers these combinations through native
+execution, interpreter expectations, and source round-trip.
+`raw-unit/evidence_arguments` additionally exercises arguments, receiver adapters,
+multiple bounds, and struct results in the differential suite. The evaluator also
+checks generic closure construction and captured dictionary invocations, retaining runtime type frames and mutable arguments' prophecies.
+Unsupported captures or incoherent frames remain inconclusive; the strict
+evidence suite requires every input to be conclusive.
+
+Export, execution, and verification are separate gates. A dictionary's
+`MethodContract` requires a defined, non-panicking, memory-preserving invocation;
+its target's proof must establish that obligation. Opaque generic contract
+transfer still rejects types containing mutable loans. Tuple-returning callbacks
+are covered by `raw-unit/tuple_callbacks`, including
+generic results instantiated by tuples, one-element tuples, and nested tuples.
+Tuples containing borrowed references retain the aggregate-reference restrictions.
+
+`function.shapeOnly` marks dependency declarations whose contracts are supplied
+only at modeled shapes. It does not grant unchecked trait evidence or make an
+unmodeled implementation executable.

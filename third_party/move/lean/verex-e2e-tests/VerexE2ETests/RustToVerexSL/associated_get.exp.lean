@@ -23,6 +23,7 @@ verex namespace core where
 
   mod primitive where
     impl slice where
+      @[shape_only]
       native fun get {T} {I} {Output}(
         _1 : &Vector<T>, _2 : I
       ) -> option::Option<&Output>

@@ -151,11 +151,9 @@ def ntyFuel : NRow → Nat → NamespaceId → TypeId → Option NTy
           let parameters ← arguments.toList.mapM (ntyFuel env fuel namespaceId)
           let results ← match ← view.lookup namespaceId result with
             | .unit => some []
-            | .tuple elements => elements.toList.mapM (ntyFuel env fuel namespaceId)
             | _ => (fun τ => [τ]) <$> ntyFuel env fuel namespaceId result
           let resultIds ← match ← view.lookup namespaceId result with
             | .unit => some []
-            | .tuple elements => some elements.toList
             | _ => some [result]
           some (.function (NRow.ofList parameters)
             { parameters := arguments.toList.map (sharedReference view.lookup namespaceId)

@@ -312,7 +312,8 @@ Positive Rust exporter inputs and their side-by-side `.exp.json` baselines are
 in `verex-rust/rust-exporter/tests/raw-unit/`; rejection and API-probe inputs
 remain under `tests/fixtures/`, and artifacts holding opaque nodes, which validation
 rejects, are in `tests/opaque-unit/`. The baseline driver discovers every `.rs` in
-`raw-unit` automatically. Use `UB=1 cargo test --features rustc-public` to
+`raw-unit` automatically. Static dictionary cases live in `tests/evidence-unit/`,
+which additionally requires conclusive differential execution. Use `UB=1 cargo test --features rustc-public` to
 update expectations, inspect the semantic diff, and commit an update only when
 the format or mapped MIR is intentionally changing. The Rust and Lean suites
 both validate these artifacts.

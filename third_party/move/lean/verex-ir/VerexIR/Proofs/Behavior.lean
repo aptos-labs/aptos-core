@@ -995,4 +995,44 @@ end Induced
 attribute [vir_denote_norm] Denote.NTy.refFree Denote.NRow.refFree Denote.NRows.refFree
 attribute [vir_denote_norm] Denote.ResultShape.Settled Denote.NTy.settle Denote.HList.settle
 
+/-- A generic closure's verified target applies at the induced frame, with
+captured dictionaries woven into its ordinary arguments. -/
+theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
+    (shape : ResultShape) (handle : FunctionHandle) (outer : Array (TypeId × TypeId))
+    (typeArgs : Array GenericArgument)
+    (coherent : @Coherent unit _ (Skolems.instantiate θ Θ) handle
+      (frameInstantiation unit handle outer typeArgs))
+    (captures : HList (NRow.subst θ.1 captured)) (shared : Sharing)
+    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs) (NRow.subst θ.1 captured))
+    (args : HList (NRow.subst θ.1 supplied))
+    {result : (shape.subst θ.1).carrier} {pre post : Memory unit}
+    {contract : Contract (Memory unit) Failure
+      (@HList (Skolems.instantiate θ Θ).toCarriers full)
+      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    (verified : Satisfies
+      (@propheticMeaning unit _ executable (Skolems.instantiate θ Θ)
+        (frameInstantiation unit handle outer typeArgs) handle full shape) contract)
+    (ensures : EnsuresOf (closureMeaning executable) (NRow.subst θ.1 supplied) shared
+      (shape.subst θ.1) (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed)
+      args result pre post)
+    (assumed : contract.assumes (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
+    (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre) :
+    (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
+      contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+        (ResultShape.toSkolem θ shape result) post) ∧
+    contract.frame (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+      (ResultShape.toSkolem θ shape result) post ∧
+    ¬contract.mustAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre := by
+  unfold EnsuresOf at ensures
+  rw [closureMeaning_closureOfGeneric executable θ free weave capturedFree shape handle outer typeArgs coherent] at ensures
+  rcases ensures with ⟨value, middle, run, same, state⟩
+  subst post
+  subst result
+  rw [NTy.toSkolem_ofSkolem_shape]
+  exact (verified _ pre assumed permitted).1 value middle run
+
 end VerexIR.Proofs

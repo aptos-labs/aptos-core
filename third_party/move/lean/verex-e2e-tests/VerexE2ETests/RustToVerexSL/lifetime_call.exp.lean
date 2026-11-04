@@ -11,18 +11,20 @@ verex namespace lifetime_call where
     r : &[a] T
 
   impl Shared where
-    fun get {a : lifetime}(self : &Shared<lifetime _>) -> u32 := do
+    fun get {a : lifetime}(self : &[a] Shared<lifetime a>) -> u32 := do
       let _2 := copy((*self).r)
       *_2
 
-    fun inner {a : lifetime}(self : &Shared<lifetime _>) -> &u32 :=
-      copy((*self).r)
+    fun inner {a : lifetime} {l1 : lifetime}(
+      self : &[l1] Shared<lifetime a>
+    ) -> &[a] u32 := copy((*self).r)
 
   impl Generic where
-    fun inner {a : lifetime} {T}(self : &Generic<lifetime _, T>) -> &T :=
-      copy((*self).r)
+    fun inner {a : lifetime} {T} {l2 : lifetime}(
+      self : &[l2] Generic<lifetime a, T>
+    ) -> &[a] T := copy((*self).r)
 
-  fun shrink {s : lifetime} {l : lifetime}(
+  fun shrink {s : lifetime} {l : lifetime outlives s}(
     h : Shared<lifetime _>
   ) -> Shared<lifetime _> := h
 

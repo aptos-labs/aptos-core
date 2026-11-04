@@ -239,12 +239,21 @@ pub(super) enum BinderKind {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) enum GenericPredicate {
+    LifetimeOutlives {
+        longer: LifetimeId,
+        shorter: LifetimeId,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct GenericBinder {
     pub abilities: Vec<Ability>,
     pub kind: BinderKind,
     pub loc: LocId,
     pub name: String,
-    pub predicates: Vec<UnsupportedNode>,
+    pub predicates: Vec<GenericPredicate>,
     #[serde(rename = "type")]
     pub type_: Option<TypeUse>,
 }
@@ -682,7 +691,7 @@ pub(super) struct Parameter {
 pub(super) struct Signature {
     pub generics: Vec<GenericBinder>,
     pub parameters: Vec<Parameter>,
-    pub predicates: Vec<UnsupportedNode>,
+    pub predicates: Vec<GenericPredicate>,
     pub results: Vec<TypeUse>,
 }
 
@@ -715,7 +724,7 @@ pub(super) struct FunctionContract {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct FunctionDecl {
     pub alignment: AlignmentId,
-    pub attributes: Vec<UnsupportedNode>,
+    pub attributes: Vec<Attribute>,
     pub body: RawBody,
     pub contract: FunctionContract,
     pub doc: String,

@@ -1115,7 +1115,7 @@ until it lands, is rejected, or is superseded by a recorded decision.
 | Deferred item | Reactivate by |
 |---|---|
 | Approval and publication of RawUnit JSON v1 as an external compatibility contract | M0, before fixtures beyond the supported mirror become compatibility artifacts |
-| Public function predicate query (function `where` clauses and const-function binder types are not exposed by Rustc Public) | M0; filed upstream as [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892); public queries are requested rather than reading `rustc_middle` |
+| Retire the confined Rustc Public polyfill | Replace `driver/polyfill.rs` wrappers with public queries when the pinned toolchain incorporates [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892); the mapper continues to use only public types |
 | Remaining MIR-to-RawUnit mapper forms: symbolic const-dependent types, destructive/provenance administration exposed by Rustc Public, constrained and const generic functions | M1 once their metadata is public; M4 adds cleanup and effectful drop glue |
 | Checked implementation-selection evidence and dictionary interpretation (`EvidenceId` is opaque) | M2, before trait method calls execute or transfer contracts and proofs |
 | Destructive/provenance nodes, cleanup edges, pointer-alignment assertions, and reachable `unreachable` blocks, rejected by structurization | M4 for destruction, cleanup, and richer panic behavior; M5 for retag/provenance and alignment assertions |
@@ -1140,8 +1140,8 @@ until it lands, is rejected, or is superseded by a recorded decision.
 - Implement the `verex-rust-export` driver against the pinned Rustc Public
   toolchain.  It must serialize a detached Rust-profile `RawUnit` in its
   post-analysis callback and return `Compilation::Stop`.  The mapper makes no
-  direct `rustc_middle` queries; startup-only bridge dependencies stay confined
-  to the driver crate.
+  direct `rustc_middle` queries; temporary compiler queries stay confined to
+  the driver's `polyfill.rs` module.
 - Demonstrate the selected post-analysis optimized generic body shape, source
   origins, generic predicates, direct callee identity, drop/cleanup data, and
   raw-pointer tags on that corpus.  Any absent query is a documented blocker

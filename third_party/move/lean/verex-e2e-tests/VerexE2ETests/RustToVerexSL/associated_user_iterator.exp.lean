@@ -19,6 +19,7 @@ verex namespace core where
 
       mod iterator where
         trait Iterator where
+          @[shape_only]
           native fun last {Self} {Item}(_1 : Self) -> option::Option<Item>
 
 verex namespace associated_user_iterator where

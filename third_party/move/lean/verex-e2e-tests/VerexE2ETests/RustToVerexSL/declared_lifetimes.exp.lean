@@ -11,6 +11,7 @@ verex namespace alloc where
 
   mod vec where
     trait impl «<std::vec::Vec<T, A> as std::ops::IndexMut<I>>» where
+      @[shape_only]
       native fun index_mut {T} {I} {A} {Output}(
         _1 : &mut Vector<T>, _2 : I
       ) -> &mut Output
@@ -38,11 +39,14 @@ verex namespace declared_lifetimes where
     x : &[a] mut u32, _y : &[l1] mut u32
   ) -> &[a] mut u32 := &mut *x
 
-  -- An outlives bound makes its lifetimes early-bound, which `fn_sig` erases.
-  fun outlives {s : lifetime} {l : lifetime}(x : &mut u32) -> &mut u32 :=
-    &mut *x
+  -- The bridge keeps early-bound lifetimes and their explicit outlives bound.
+  fun outlives {s : lifetime} {l : lifetime outlives s}(
+    x : &[l] mut u32
+  ) -> &[s] mut u32 := &mut *x
 
-  fun outlives_static {a : lifetime}(x : &u32) -> &u32 := x
+  fun outlives_static {a : lifetime outlives static}(
+    x : &[a] u32
+  ) -> &[static] u32 := x
 
   fun generic {T} {a : lifetime} {l2 : lifetime}(
     x : &[a] mut T, _y : &[l2] u32
@@ -59,10 +63,10 @@ verex namespace declared_lifetimes where
     h : &[s] mut Holder<lifetime a>
   ) -> &[s] mut u32 := &mut *((*h).r)
 
-  -- Early-bound lifetimes are erased: a clause may relate them.
-  fun bounded {a : lifetime} {b : lifetime} {T}(
-    _value : &T, _x : &mut u32, y : &mut u32
-  ) -> &mut u32 := &mut *y
+  -- Trait-bound early lifetimes remain distinct in the declared signature.
+  fun bounded {a : lifetime} {b : lifetime} {T} {l3 : lifetime}(
+    _value : &[l3] T, _x : &[a] mut u32, y : &[b] mut u32
+  ) -> &[b] mut u32 := &mut *y
 
   struct S where
     v : u32
@@ -73,10 +77,11 @@ verex namespace declared_lifetimes where
     ) -> &[l0] mut u32 := &mut (*self).v
 
   impl Holder where
-    fun get {a : lifetime}(self : &mut Holder<lifetime _>) -> &mut u32 :=
-      &mut *((*self).r)
+    fun get {a : lifetime} {l1 : lifetime}(
+      self : &[l1] mut Holder<lifetime a>
+    ) -> &[l1] mut u32 := &mut *((*self).r)
 
-    fun take {a : lifetime}(self : Holder<lifetime _>) -> &mut u32 :=
+    fun take {a : lifetime}(self : Holder<lifetime a>) -> &[a] mut u32 :=
       &mut *(self.r)
 
   fun caller(mut a : u32, mut b : u32) -> u32 := do

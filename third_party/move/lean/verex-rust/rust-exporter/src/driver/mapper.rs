@@ -3,27 +3,28 @@
 
 //! Mechanical Rustc Public to RawUnit mapping for the supported scalar CFG.
 
-use super::exchange::*;
+use super::{exchange::*, polyfill};
 use rustc_public::{
     abi::{FieldsShape, LayoutShape, Scalar, TagEncoding, VariantsShape},
     crate_def::{CrateDef, CrateDefType, DefId},
     mir::{
         alloc::GlobalAlloc,
-        mono::{Instance, InstanceKind},
+        mono::Instance,
         visit::{statement_location, terminator_location, Location as MirLocation, PlaceContext},
         AggregateKind, AssertMessage, BasicBlock, BinOp, Body, BorrowKind as MirBorrowKind,
         CastKind, ConstOperand, Local, LocalDecl as MirLocalDecl, MirVisitor, MutBorrowKind,
         Mutability, Operand, Place as MirPlace, PointerCoercion, ProjectionElem, RawPtrKind,
-        Rvalue, Safety, SourceInfo, StatementKind, Terminator, TerminatorKind, UnOp, UnwindAction,
-        VarDebugInfo, VarDebugInfoContents, WithRetag,
+        Rvalue, Safety, SourceInfo, Statement, StatementKind, Terminator, TerminatorKind, UnOp,
+        UnwindAction, VarDebugInfo, VarDebugInfoContents, WithRetag,
     },
     target::MachineInfo,
     ty::{
-        Abi, AdtDef, AdtKind, AliasKind, Allocation, AssocContainer, BoundRegionKind, ClosureDef,
-        ConstantKind, EarlyParamRegion, FnDef, FnSig, GenericArgKind, GenericArgs, GenericParamDef,
-        GenericParamDefKind, ImplDef, IntTy, MirConst, PolyFnSig, ProvenanceMap, Region,
-        RegionKind, RigidTy, Span, TraitDef, Ty as RustTy, TyConst, TyConstKind, TyKind, UintTy,
-        UnevaluatedConst, VariantIdx,
+        Abi, AdtDef, AdtKind, AliasKind, Allocation, AssocContainer, AssocKind, BoundRegionKind,
+        ClauseKind, ClosureDef, ConstantKind, EarlyParamRegion, FnDef, FnSig, GenericArgKind,
+        GenericArgs, GenericParamDef, GenericParamDefKind, ImplDef, IntTy, MirConst,
+        OutlivesPredicate, PolyFnSig, PredicateKind, PredicatePolarity, ProvenanceMap, Region,
+        RegionKind, RigidTy, Span, TermKind, TraitDef, Ty as RustTy, TyConst, TyConstKind, TyKind,
+        UintTy, UnevaluatedConst, VariantIdx,
     },
     Crate, CrateItem, CrateNum, ItemKind,
 };
@@ -47,7 +48,7 @@ pub(super) fn raw_unit_json() -> Result<String, String> {
 
 struct UnitMapper {
     items: Vec<CrateItem>,
-    bodies: Vec<Body>,
+    bodies: Vec<PreparedBody>,
     /// Why an item's body is not mapped, by item.
     refusals: Vec<Option<Refusal>>,
     /// The local functions whose signatures the unit cannot state.
@@ -58,11 +59,12 @@ struct UnitMapper {
     name_ids: BTreeMap<String, QualifiedRef>,
     dependency_functions: Vec<DependencyFunction>,
     constants: EvaluatedConstants,
-    /// The type parameters each local function's body shows to be `Copy`.
+    /// The type parameters declared Copy in each local function's environment.
     copy_parameters: Vec<BTreeSet<u32>>,
     impls: AdtImpls,
     /// The declared signature of each local function.
     signatures: Vec<DeclaredSignature>,
+    method_evidence: BTreeMap<String, Vec<MethodEvidence>>,
     /// How many bound regions' binders each callable function has, by its
     /// definition path.
     bound_lifetimes: BTreeMap<String, usize>,
@@ -70,6 +72,8 @@ struct UnitMapper {
     names: Vec<QualifiedName>,
     adts: Vec<AdtNames>,
     closures: Vec<ClosureNames>,
+    fnmut_adapters: Vec<(usize, QualifiedRef)>,
+    shared_evidence_adapters: Vec<(usize, usize, QualifiedRef)>,
     types: TypeLayout,
     scopes: Scopes,
     namespaces: CrateNamespaces,
@@ -373,30 +377,24 @@ fn is_zero_sized_closure_type(ty: RustTy) -> bool {
         if is_zero_sized_closure(&arguments))
 }
 
-/// The binder kind of a function's generic parameter. A synthetic
-/// (`impl Trait`) parameter has no binder of its own, and the pinned API does
-/// not expose a const parameter's type.
-fn binder_kind(function: &str, parameter: &GenericParamDef) -> Result<BinderKind, String> {
+/// The binder kind of a source generic parameter.
+fn binder_kind(parameter: &GenericParamDef) -> BinderKind {
     match parameter.kind {
-        GenericParamDefKind::Lifetime => Ok(BinderKind::Lifetime),
-        GenericParamDefKind::Type { .. } => Ok(BinderKind::TypeArg),
-        GenericParamDefKind::Const { .. } => Err(format!(
-            "function `{function}` has const parameter `{}` whose declared type is not exposed by the pinned Rustc Public API",
-            parameter.name
-        )),
+        GenericParamDefKind::Lifetime => BinderKind::Lifetime,
+        GenericParamDefKind::Type { .. } => BinderKind::TypeArg,
+        GenericParamDefKind::Const { .. } => BinderKind::Const,
     }
 }
 
 fn generic_binder(
-    function: &str,
     parameter: GenericParamDef,
     copy_parameters: &BTreeSet<u32>,
     loc: LocId,
+    types: &mut TypeLayout,
 ) -> Result<GenericBinder, String> {
-    let kind = binder_kind(function, &parameter)?;
-    // Trait bounds are not exposed for functions by the pinned Rustc Public
-    // API (rust-lang/rust#161892), so no binder states its predicates; `Copy`
-    // is what the body shows (`copy_parameters`).
+    let kind = binder_kind(&parameter);
+    // rustc selects Copy in the item's environment, including inherited and
+    // supertrait bounds; no inference from MIR operand spellings is needed.
     let abilities = if copy_parameters.contains(&parameter.index) {
         vec![Ability::Copy]
     } else {
@@ -408,7 +406,14 @@ fn generic_binder(
         loc,
         name: parameter.name,
         predicates: vec![],
-        type_: None,
+        type_: if matches!(parameter.kind, GenericParamDefKind::Const { .. }) {
+            Some(TypeUse {
+                loc,
+                type_id: types.id(polyfill::const_param_ty(parameter.def_id))?,
+            })
+        } else {
+            None
+        },
     })
 }
 
@@ -495,30 +500,339 @@ fn collect_regions(ty: RustTy, regions: &mut Vec<Region>) {
     }
 }
 
-/// Whether a dependency's signature holds an ADT over several lifetimes, which it
-/// may bound against each other, and Rustc Public exposes no bound
-/// (rust-lang/rust#161892). A local body is checked against its signature; a
-/// dependency has none to check.
-fn hides_lifetime_relations(ty: RustTy) -> bool {
-    let mut regions = Vec::new();
-    collect_regions(ty, &mut regions);
-    let related = matches!(ty.kind(), TyKind::RigidTy(RigidTy::Adt(..)))
-        && regions
-            .iter()
-            .filter(|region| declares_relation(region))
-            .count()
-            > 1;
-    related || type_children(ty).into_iter().any(hides_lifetime_relations)
+/// Clauses of an item and its enclosing impl/trait, preserving their binders.
+fn item_predicates(definition: DefId) -> Vec<rustc_public::ty::Binder<PredicateKind>> {
+    let declared = polyfill::explicit_predicates_of(definition);
+    let mut predicates = declared.parent.map(item_predicates).unwrap_or_default();
+    predicates.extend(
+        declared
+            .predicates
+            .into_iter()
+            .map(|(predicate, _)| predicate),
+    );
+    predicates
 }
 
-/// Whether a signature's region says what it relates to: `FnDef::fn_sig` erases an
-/// early-bound one, the only kind a `where` clause can mention, so an erased region
-/// relates to all and a bound one to what the types imply.
-fn declares_relation(region: &Region) -> bool {
-    match region.kind {
-        RegionKind::ReBound(..) | RegionKind::ReEarlyParam(_) => true,
-        RegionKind::ReStatic | RegionKind::RePlaceholder(_) | RegionKind::ReErased => false,
+/// A method dictionary retains its receiver as an ordinary argument. In
+/// particular, a mutable receiver is never encoded as a captured, stateless
+/// function. Local single-method traits and declared Fn/FnMut bounds use this interface.
+#[derive(Clone)]
+struct MethodEvidence {
+    method: FnDef,
+    arguments: GenericArgs,
+    receiver: RustTy,
+    name: String,
+    tupled: bool,
+    mutable_receiver: bool,
+    result: RustTy,
+    parameters: Vec<RustTy>,
+}
+
+impl MethodEvidence {
+    /// Whether this shared dictionary supplies the requested mutable call.
+    fn forwards_to(&self, required: &Self) -> bool {
+        required.tupled
+            && required.mutable_receiver
+            && self.tupled
+            && !self.mutable_receiver
+            && self.arguments == required.arguments
+            && self.result == required.result
     }
+
+    fn instantiate(&self, arguments: &GenericArgs) -> Self {
+        let receiver = polyfill::instantiate_type(self.receiver, arguments);
+        let parameters = self
+            .parameters
+            .iter()
+            .map(|ty| polyfill::instantiate_type(*ty, arguments))
+            .collect::<Vec<_>>();
+        let mut trait_arguments = GenericArgs(vec![GenericArgKind::Type(receiver)]);
+        if self.tupled {
+            trait_arguments
+                .0
+                .push(GenericArgKind::Type(RustTy::from_rigid_kind(
+                    RigidTy::Tuple(parameters.clone()),
+                )));
+        }
+        Self {
+            receiver,
+            parameters,
+            result: polyfill::instantiate_type(self.result, arguments),
+            arguments: trait_arguments,
+            ..self.clone()
+        }
+    }
+
+    fn receiver_type(&self) -> RustTy {
+        RustTy::from_rigid_kind(RigidTy::Ref(
+            erased(),
+            self.receiver,
+            if self.mutable_receiver {
+                Mutability::Mut
+            } else {
+                Mutability::Not
+            },
+        ))
+    }
+}
+
+fn declared_method_evidence(definition: DefId) -> Vec<MethodEvidence> {
+    let mut evidence = Vec::new();
+    let predicates = item_predicates(definition);
+    for predicate in &predicates {
+        if !predicate.bound_vars.is_empty() {
+            continue;
+        }
+        let PredicateKind::Clause(ClauseKind::Trait(predicate)) = &predicate.value else {
+            continue;
+        };
+        if predicate.polarity != PredicatePolarity::Positive {
+            continue;
+        }
+        let trait_ = predicate.trait_ref.def_id;
+        let shared = Some(trait_) == polyfill::fn_trait();
+        if shared || Some(trait_) == polyfill::fn_mut_trait() {
+            let arguments = predicate.trait_ref.args();
+            let [GenericArgKind::Type(receiver), GenericArgKind::Type(tuple)] =
+                arguments.0.as_slice()
+            else {
+                continue;
+            };
+            let TyKind::RigidTy(RigidTy::Tuple(parameters)) = tuple.kind() else {
+                continue;
+            };
+            if !matches!(receiver.kind(), TyKind::Param(_)) {
+                continue;
+            }
+            // Fn and FnMut inherit Output from FnOnce. Require the declared equality;
+            // neither an observed call nor an unconstrained projection suffices.
+            let result = predicates.iter().find_map(|bound| {
+                if !bound.bound_vars.is_empty() {
+                    return None;
+                }
+                let PredicateKind::Clause(ClauseKind::Projection(projection)) = &bound.value else {
+                    return None;
+                };
+                if projection.projection_term.args != *arguments
+                    || Some(projection.projection_term.def_id.0) != polyfill::fn_once_output()
+                {
+                    return None;
+                }
+                let TermKind::Type(result) = projection.term else {
+                    return None;
+                };
+                (collect_signature_adts(result, &[], &mut Vec::new()).is_ok()
+                    && parameters
+                        .iter()
+                        .all(|ty| collect_signature_adts(*ty, &[], &mut Vec::new()).is_ok()))
+                .then_some(result)
+            });
+            let Some(result) = result else { continue };
+            let method = trait_.associated_items().into_iter().find_map(|item| {
+                matches!(&item.kind, AssocKind::Fn { name, has_self: true }
+                    if name == if shared { "call" } else { "call_mut" })
+                .then_some(FnDef(item.def_id.0))
+            });
+            if let Some(method) = method
+                && !evidence.iter().any(|entry: &MethodEvidence| {
+                    entry.method == method && entry.arguments == *arguments
+                })
+            {
+                evidence.push(MethodEvidence {
+                    method,
+                    arguments: arguments.clone(),
+                    receiver: *receiver,
+                    name: if shared {
+                        "__trait_Fn_call"
+                    } else {
+                        "__trait_FnMut_call_mut"
+                    }
+                    .to_owned(),
+                    tupled: true,
+                    mutable_receiver: !shared,
+                    result,
+                    parameters: parameters.clone(),
+                });
+            }
+            continue;
+        }
+        if !trait_.krate().is_local {
+            continue;
+        }
+        let items = trait_.associated_items();
+        let [item] = items.as_slice() else { continue };
+        let AssocKind::Fn {
+            name,
+            has_self: true,
+        } = &item.kind
+        else {
+            continue;
+        };
+        let receiver = predicate.trait_ref.self_ty();
+        if !matches!(receiver.kind(), TyKind::Param(_)) {
+            continue;
+        }
+        let method = FnDef(item.def_id.0);
+        if flattened_generics(method).map_or(true, |parameters| parameters.len() != 1) {
+            continue;
+        }
+        let signature = method.fn_sig().value;
+        let [input, output] = signature.inputs_and_output.as_slice() else {
+            continue;
+        };
+        let TyKind::RigidTy(RigidTy::Ref(_, referent, Mutability::Mut)) = input.kind() else {
+            continue;
+        };
+        if !matches!(referent.kind(), TyKind::Param(p) if p.index == 0)
+            || !matches!(output.kind(), TyKind::RigidTy(RigidTy::Tuple(ts)) if ts.is_empty())
+            || signature.safety != Safety::Safe
+            || signature.c_variadic
+            || predicate.trait_ref.args().0.len() != 1
+        {
+            continue;
+        }
+        let entry = MethodEvidence {
+            method,
+            arguments: predicate.trait_ref.args().clone(),
+            receiver,
+            name: format!("__trait_{}_{}", last_segment(&trait_.name()), name),
+            tupled: false,
+            mutable_receiver: true,
+            result: *output,
+            parameters: vec![],
+        };
+        if !evidence
+            .iter()
+            .any(|e: &MethodEvidence| e.method == method && e.receiver == receiver)
+        {
+            evidence.push(entry);
+        }
+    }
+    evidence
+}
+
+/// Explicit region bounds only. A higher-ranked clause is not an edge between
+/// this item's generic regions, so it must not lose its quantifier here.
+fn lifetime_predicates(definition: DefId, types: &mut TypeLayout) -> Vec<GenericPredicate> {
+    item_predicates(definition)
+        .into_iter()
+        .filter_map(|predicate| {
+            if !predicate.bound_vars.is_empty() {
+                return None;
+            }
+            match predicate.value {
+                PredicateKind::Clause(ClauseKind::RegionOutlives(OutlivesPredicate(
+                    longer,
+                    shorter,
+                ))) => Some(GenericPredicate::LifetimeOutlives {
+                    longer: types.lifetime_id(longer),
+                    shorter: types.lifetime_id(shorter),
+                }),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+/// Well-formed input ADTs imply their declared region bounds, instantiated
+/// with the signature's regions (including late-bound lifetime parameters).
+fn implied_adt_relations(ty: RustTy, found: &mut Vec<(Region, Region)>) {
+    // A function pointer's signature is not a well-formed value held by this
+    // function. Its binders and implied bounds belong to the pointed-to call.
+    if matches!(ty.kind(), TyKind::RigidTy(RigidTy::FnPtr(_))) {
+        return;
+    }
+    if let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = ty.kind() {
+        let substitute = |region: Region| match &region.kind {
+            RegionKind::ReEarlyParam(parameter) => {
+                match arguments.0.get(parameter.index as usize) {
+                    Some(GenericArgKind::Lifetime(argument)) => argument.clone(),
+                    _ => region,
+                }
+            },
+            _ => region,
+        };
+        for predicate in item_predicates(definition.0) {
+            if predicate.bound_vars.is_empty()
+                && let PredicateKind::Clause(ClauseKind::RegionOutlives(OutlivesPredicate(
+                    longer,
+                    shorter,
+                ))) = predicate.value
+            {
+                let relation = (substitute(longer), substitute(shorter));
+                if !found.contains(&relation) {
+                    found.push(relation);
+                }
+            }
+        }
+    }
+    for child in type_children(ty) {
+        implied_adt_relations(child, found);
+    }
+}
+
+fn signature_lifetime_predicates(
+    definition: DefId,
+    signature: &DeclaredSignature,
+    types: &mut TypeLayout,
+) -> Vec<GenericPredicate> {
+    let mut predicates = lifetime_predicates(definition, types);
+    let mut implied = Vec::new();
+    for ty in signature
+        .types
+        .iter()
+        .take(signature.types.len().saturating_sub(1))
+    {
+        implied_adt_relations(*ty, &mut implied);
+    }
+    predicates.extend(implied.into_iter().map(|(longer, shorter)| {
+        GenericPredicate::LifetimeOutlives {
+            longer: types.lifetime_id(longer),
+            shorter: types.lifetime_id(shorter),
+        }
+    }));
+    predicates
+}
+
+fn regions_have_early_parameters(types: &[RustTy]) -> bool {
+    let mut regions = Vec::new();
+    for ty in types {
+        collect_regions(*ty, &mut regions);
+    }
+    regions
+        .iter()
+        .any(|region| matches!(region.kind, RegionKind::ReEarlyParam(_)))
+}
+
+/// The neutral IR does not yet carry nominal variance. Preserve the previous
+/// inferred-region boundary for signatures that coerce the same nominal across
+/// different lifetimes, rather than teaching the core an unchecked variance rule.
+fn needs_nominal_variance(types: &[RustTy]) -> bool {
+    fn nominals(ty: RustTy, found: &mut Vec<RustTy>) {
+        if matches!(ty.kind(), TyKind::RigidTy(RigidTy::FnPtr(_))) {
+            return;
+        }
+        if matches!(ty.kind(), TyKind::RigidTy(RigidTy::Adt(..))) {
+            found.push(ty);
+        }
+        for child in type_children(ty) {
+            nominals(child, found);
+        }
+    }
+    let Some((result, inputs)) = types.split_last() else {
+        return false;
+    };
+    let mut results = Vec::new();
+    nominals(*result, &mut results);
+    let mut arguments = Vec::new();
+    for input in inputs {
+        nominals(*input, &mut arguments);
+    }
+    results.iter().any(|result| {
+        arguments.iter().any(|argument| {
+            result != argument && erase_regions(*result) == erase_regions(*argument)
+        })
+    })
 }
 
 /// A function's signature as declared: its types with the regions
@@ -537,8 +851,8 @@ impl DeclaredSignature {
     /// A closure's body, which no item declares: its parameters and result are its
     /// locals, with their regions inferred, and it has no binder of its own after its
     /// parent's. Its struct's binders hold the regions of its upvars.
-    fn of_closure(body: &Body, first_binder: usize) -> Self {
-        let locals = mapped_locals(body);
+    fn of_closure(body: &PreparedBody, first_binder: usize) -> Self {
+        let locals = &body.mapped_locals;
         let arguments = body.arg_locals().len();
         Self {
             types: locals[1..=arguments]
@@ -551,18 +865,12 @@ impl DeclaredSignature {
         }
     }
 
-    /// An elided lifetime that relates nothing stays inferred: where the result has
-    /// no region, or the signature no other one. A dependency whose lifetimes may be
-    /// related by what is not exposed is inferred whole.
-    fn new(function: FnDef, first_binder: usize, dependency: bool) -> Self {
-        let types = function.fn_sig().value.inputs_and_output;
-        if dependency && types.iter().any(|ty| hides_lifetime_relations(*ty)) {
-            return Self {
-                types: types.into_iter().map(erase_regions).collect(),
-                bound_lifetimes: vec![],
-                first_binder,
-            };
-        }
+    /// Keep declared early-bound regions and informative late-bound regions.
+    /// An elided lifetime relating no result to a parameter stays inferred.
+    fn new(function: FnDef, first_binder: usize) -> Self {
+        let types = polyfill::declared_signature(function)
+            .value
+            .inputs_and_output;
         let mut regions = Vec::new();
         for ty in &types {
             collect_regions(*ty, &mut regions);
@@ -611,7 +919,9 @@ impl DeclaredSignature {
                 (region, name)
             })
             .collect::<Vec<_>>();
-        let types = if bound_lifetimes.is_empty() {
+        let types = if needs_nominal_variance(&types)
+            || (bound_lifetimes.is_empty() && !regions_have_early_parameters(&types))
+        {
             types.into_iter().map(erase_regions).collect()
         } else {
             types
@@ -625,9 +935,9 @@ impl DeclaredSignature {
 
     /// The declared types of a body, each where rustc normalized it to no other
     /// type than the local's. Where it did, the local's erased type stands.
-    fn at_locals(mut self, body: &Body) -> Self {
+    fn at_locals(mut self, body: &PreparedBody) -> Self {
         let argument_count = body.arg_locals().len();
-        let locals = mapped_locals(body);
+        let locals = &body.mapped_locals;
         for (index, ty) in self.types.iter_mut().enumerate() {
             let local = if index == argument_count {
                 &locals[0]
@@ -764,7 +1074,11 @@ fn mentions_parameter(ty: RustTy) -> bool {
 /// on a concrete type resolves to its impl's method. rustc selects an impl only
 /// for concrete types, so a call that fails here on a type parameter is one a
 /// bound of the caller would have to justify.
-fn resolve_callee(callee: FnDef, arguments: &GenericArgs) -> Result<(FnDef, GenericArgs), String> {
+fn resolve_callee(
+    caller: DefId,
+    callee: FnDef,
+    arguments: &GenericArgs,
+) -> Result<(FnDef, GenericArgs), String> {
     // rustc does not answer for an associated type of a parameter: it cannot normalize it.
     if type_arguments(arguments)
         .into_iter()
@@ -772,38 +1086,34 @@ fn resolve_callee(callee: FnDef, arguments: &GenericArgs) -> Result<(FnDef, Gene
     {
         return Err(PARAMETER_DEPENDENT_CALL.to_owned());
     }
-    let instance = Instance::resolve(callee, arguments).map_err(|error| {
-        if type_arguments(arguments)
-            .into_iter()
-            .any(mentions_parameter)
-        {
-            PARAMETER_DEPENDENT_CALL.to_owned()
-        } else {
-            format!("has no implementation: {error}")
-        }
-    })?;
-    match instance.kind {
-        // An item instance is a function definition with its arguments.
-        InstanceKind::Item => Ok((FnDef(instance.def.def_id()), instance.args())),
-        InstanceKind::Intrinsic | InstanceKind::LlvmIntrinsic => {
-            Err("is a compiler intrinsic".to_owned())
+    match polyfill::resolve_in_caller(caller, callee, arguments)? {
+        polyfill::ResolvedCallee::Item(function, arguments) => Ok((function, arguments)),
+        polyfill::ResolvedCallee::Closure(closure, arguments) => Ok((FnDef(closure.0), arguments)),
+        polyfill::ResolvedCallee::TraitParam { trait_method, args } => {
+            debug_assert_eq!(trait_method, callee);
+            // M2 consumes these normalized arguments with the selected evidence.
+            drop(args);
+            Err(PARAMETER_DEPENDENT_CALL.to_owned())
         },
-        InstanceKind::Virtual { .. } => Err("is dispatched dynamically".to_owned()),
-        InstanceKind::Shim => Err("reaches compiler-generated glue".to_owned()),
+        polyfill::ResolvedCallee::Unsupported(reason) => Err(reason.to_owned()),
     }
 }
 
 /// The closure a call of an `Fn*` method on a closure type reaches: its body, of
 /// the closure's own kind. Any other kind goes through a shim `resolve_callee`
 /// rejects.
-fn closure_callee(definition: FnDef, arguments: &GenericArgs) -> Option<(ClosureDef, GenericArgs)> {
+fn closure_callee(
+    caller: DefId,
+    definition: FnDef,
+    arguments: &GenericArgs,
+) -> Option<(ClosureDef, GenericArgs)> {
     let GenericArgKind::Type(receiver) = arguments.0.first()? else {
         return None;
     };
     let TyKind::RigidTy(RigidTy::Closure(closure, closure_arguments)) = receiver.kind() else {
         return None;
     };
-    let (resolved, _) = resolve_callee(definition, arguments).ok()?;
+    let (resolved, _) = resolve_callee(caller, definition, arguments).ok()?;
     (resolved.def_id() == closure.def_id()).then_some((closure, closure_arguments))
 }
 
@@ -849,7 +1159,7 @@ impl DependencyFunction {
     }
 
     fn declared(function: FnDef) -> Result<Self, String> {
-        let signature = function.fn_sig().value;
+        let signature = polyfill::declared_signature(function).value;
         if signature.c_variadic || signature.safety != Safety::Safe || signature.abi != Abi::Rust {
             return Err(format!(
                 "dependency function `{}` is not a safe Rust-ABI function",
@@ -858,9 +1168,6 @@ impl DependencyFunction {
         }
         let types = signature.inputs_and_output;
         let generics = flattened_generics(function)?;
-        for parameter in &generics {
-            binder_kind(&function.name(), parameter)?;
-        }
         let mut declared = Self {
             definition: function,
             signature: vec![],
@@ -883,11 +1190,8 @@ impl DependencyFunction {
                     )
                 })?;
         }
-        let signature = DeclaredSignature::new(
-            function,
-            generics.len() + declared.associated_types.len(),
-            true,
-        );
+        let signature =
+            DeclaredSignature::new(function, generics.len() + declared.associated_types.len());
         declared.signature = signature.types.clone();
         declared.declared = signature;
         Ok(declared)
@@ -1114,18 +1418,6 @@ fn primitive_name(ty: &RigidTy) -> Option<String> {
     })
 }
 
-/// Whether a path names the `Copy` trait. The pinned Rustc Public API has no
-/// lang-item query, so the exporter names the language items it maps by their
-/// defining path, as rustc prints it through `core` or its `std` re-export.
-fn is_copy_trait(name: &str) -> bool {
-    matches!(name, "core::marker::Copy" | "std::marker::Copy")
-}
-
-/// Whether a path names the `Drop` trait, as `is_copy_trait` names `Copy`.
-fn is_drop_trait(name: &str) -> bool {
-    matches!(name, "core::ops::Drop" | "std::ops::Drop")
-}
-
 /// What the impls of a crate state of its ADTs.
 struct CrateImpls {
     /// The ADTs with a `Copy` impl applying the ADT to the impl's own
@@ -1145,8 +1437,8 @@ fn crate_impls(krate: &Crate) -> CrateImpls {
     };
     for implementation in krate.trait_impls() {
         let header = implementation.trait_impl().value;
-        let trait_name = header.def_id.name();
-        let (copy, drop) = (is_copy_trait(&trait_name), is_drop_trait(&trait_name));
+        let copy = Some(header.def_id.0) == polyfill::copy_trait();
+        let drop = Some(header.def_id.0) == polyfill::drop_trait();
         if !copy && !drop {
             continue;
         }
@@ -1372,18 +1664,21 @@ impl AdtImpls {
     }
 }
 
-fn is_abort(name: &str) -> bool {
-    matches!(
-        name,
-        "core::intrinsics::abort" | "std::intrinsics::abort" | "std::process::abort"
-    )
+fn is_abort(definition: FnDef) -> bool {
+    definition
+        .as_intrinsic()
+        .is_some_and(|intrinsic| intrinsic.fn_name() == "abort")
+        || polyfill::is_process_abort(definition)
 }
 
 /// Whether the mapper lowers a call to a VIR operation (an abort or a
 /// primitive) rather than mapping it as a call.
-fn lowered_callee(name: &str, arguments: &GenericArgs) -> bool {
+fn lowered_callee(definition: FnDef, arguments: &GenericArgs) -> bool {
+    let name = definition.name();
     arguments.0.is_empty()
-        && (is_abort(name) || is_string_length(name) || integer_method_primitive(name).is_some())
+        && (is_abort(definition)
+            || is_string_length(&name)
+            || integer_method_primitive(&name).is_some())
 }
 
 /// What the bodies' calls reach.
@@ -1396,8 +1691,7 @@ struct ReachedCalls {
     instantiations: Vec<RustTy>,
 }
 
-/// The files of the crate's own items. A span outside them is in the expansion of
-/// a macro of another crate: Rustc Public exposes no span's call site.
+/// The files of the crate's own items, used to recognize local macro call sites.
 fn crate_files() -> HashSet<String> {
     let local = rustc_public::local_crate();
     let (items, adts, traits, impls) = (
@@ -1412,13 +1706,14 @@ fn crate_files() -> HashSet<String> {
         .chain(adts.iter().map(CrateDef::span))
         .chain(traits.iter().map(CrateDef::span))
         .chain(impls.iter().map(CrateDef::span))
-        .map(|span| span.get_filename())
+        .map(|span| polyfill::source_callsite(span).get_filename())
         .collect()
 }
 
 /// `call of f in g at line L` of a call whose callee is `definition`.
 fn call_site(definition: FnDef, caller: &str, span: Span, crate_files: &HashSet<String>) -> String {
     let name = definition.name();
+    let span = polyfill::source_callsite(span);
     if !crate_files.contains(&span.get_filename()) {
         return format!("call of `{name}` in `{caller}` in a macro expansion");
     }
@@ -1431,15 +1726,15 @@ fn call_site(definition: FnDef, caller: &str, span: Span, crate_files: &HashSet<
 
 /// The dependency functions the bodies call and what else their calls reach. A
 /// call whose callee cannot be declared is reported here, at the call.
-fn collect_calls(bodies: &[Body]) -> Result<ReachedCalls, String> {
+fn collect_calls(items: &[CrateItem], bodies: &[PreparedBody]) -> Result<ReachedCalls, String> {
     let mut reached = ReachedCalls {
         functions: vec![],
         resolves_trait_calls: false,
         instantiations: vec![],
     };
-    for body in bodies {
-        let locals = mapped_locals(body);
-        let folds = box_folds(body);
+    for (item, body) in items.iter().zip(bodies) {
+        let locals = &body.mapped_locals;
+        let folds = &body.box_folds;
         for (index, block) in body.blocks.iter().enumerate() {
             if folds.frees.contains(&index) {
                 continue;
@@ -1447,21 +1742,22 @@ fn collect_calls(bodies: &[Body]) -> Result<ReachedCalls, String> {
             let TerminatorKind::Call { func, .. } = &block.terminator.kind else {
                 continue;
             };
-            let Ok(callee_type) = func.ty(&locals) else {
+            let Ok(callee_type) = func.ty(locals) else {
                 continue;
             };
             let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee_type.kind() else {
                 continue;
             };
-            if lowered_callee(&definition.name(), &arguments) {
+            if lowered_callee(definition, &arguments) {
                 continue;
             }
             // A call that resolves to nothing the unit states refuses its function.
-            let Ok((resolved, resolved_arguments)) = resolve_callee(definition, &arguments) else {
+            let Ok((resolved, resolved_arguments)) = resolve_callee(item.0, definition, &arguments)
+            else {
                 continue;
             };
             reached.resolves_trait_calls |= resolved != definition;
-            if let Some((_, closure_args)) = closure_callee(definition, &arguments) {
+            if let Some((_, closure_args)) = closure_callee(item.0, definition, &arguments) {
                 let (parents, _) = closure_arguments(&closure_args)?;
                 reached
                     .instantiations
@@ -1922,8 +2218,8 @@ fn read_referent(
     }
 }
 
-/// What a constant evaluates to, read through Rustc Public: a promoted constant
-/// and one generic over a parameter have no evaluation there.
+/// Evaluate constants, using the confined bridge for promoted MIR. Constants
+/// depending on type or const parameters remain refused.
 fn evaluate_constant(constant: &ConstOperand) -> Result<EvaluatedConstant, ConstantFailure> {
     let ty = constant.ty();
     let generic = |what: String| {
@@ -1943,13 +2239,16 @@ fn evaluate_constant(constant: &ConstOperand) -> Result<EvaluatedConstant, Const
             parameter.name
         ))),
         ConstantKind::Unevaluated(UnevaluatedConst {
-            def,
-            promoted: Some(_),
-            ..
-        }) => Err(ConstantFailure::Rejected(format!(
-            "is promoted from `{}`, and Rustc Public cannot evaluate a promoted constant",
-            def.name()
-        ))),
+            promoted: Some(_), ..
+        }) => {
+            let evaluated = polyfill::eval_promoted_const(&constant.const_, constant.span)
+                .map_err(ConstantFailure::Rejected)?;
+            match evaluated.kind() {
+                ConstantKind::Allocated(allocation) => read_value(ty, allocation, 0, 0),
+                ConstantKind::ZeroSized => read_value(ty, &empty_allocation(), 0, 0),
+                _ => Err(ConstantFailure::Unmappable),
+            }
+        },
         ConstantKind::Unevaluated(UnevaluatedConst { def, .. }) => {
             let instance = Instance::try_from(CrateItem(def.0))
                 .map_err(|_| generic(format!("is the generic definition `{}`", def.name())))?;
@@ -2015,11 +2314,11 @@ impl MirVisitor for ConstantEvaluator<'_> {
     }
 
     // Debug info names constants the code does not use.
-    fn visit_var_debug_info(&mut self, _var_debug_info: &rustc_public::mir::VarDebugInfo) {}
+    fn visit_var_debug_info(&mut self, _var_debug_info: &VarDebugInfo) {}
 }
 
 impl EvaluatedConstants {
-    fn new(bodies: &[Body], observed: &[AdtDef]) -> Self {
+    fn new(bodies: &[PreparedBody], observed: &[AdtDef]) -> Self {
         let mut constants = Self {
             values: HashMap::new(),
             zero_sized_values: HashMap::new(),
@@ -2105,9 +2404,6 @@ impl UnitMapper {
                     item.name()
                 ));
             }
-            for parameter in &generics {
-                binder_kind(&item.name(), parameter)?;
-            }
         }
         let identities = items.iter().map(CrateDef::name).collect::<Vec<_>>();
         let opaque_functions = identities
@@ -2120,10 +2416,74 @@ impl UnitMapper {
         let ReachedCalls {
             functions: dependency_functions,
             resolves_trait_calls,
-            instantiations,
-        } = collect_calls(&bodies)?;
-        let mut impls = AdtImpls::default();
-        let copy_parameters = copy_parameters(&items, &bodies, &mut impls);
+            mut instantiations,
+        } = collect_calls(&items, &bodies)?;
+        let method_evidence = items
+            .iter()
+            .zip(&bodies)
+            .map(|(item, body)| {
+                let mut evidence = declared_method_evidence(item.0);
+                let mut names = body
+                    .var_debug_info
+                    .iter()
+                    .map(|info| info.name.clone())
+                    .collect::<BTreeSet<_>>();
+                for entry in &mut evidence {
+                    let base = entry.name.clone();
+                    let mut suffix = 0;
+                    while !names.insert(entry.name.clone()) {
+                        suffix += 1;
+                        entry.name = format!("{base}_{suffix}");
+                    }
+                }
+                (item.name(), evidence)
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut dictionary_types = method_evidence
+            .values()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut shared_adapters = BTreeSet::new();
+        for (item_index, (item, body)) in items.iter().zip(&bodies).enumerate() {
+            let locals = &body.mapped_locals;
+            for block in &body.blocks {
+                let TerminatorKind::Call { func, .. } = &block.terminator.kind else {
+                    continue;
+                };
+                let Ok(callee) = func.ty(locals) else {
+                    continue;
+                };
+                let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee.kind() else {
+                    continue;
+                };
+                let Ok((resolved, arguments)) = resolve_callee(item.0, definition, &arguments)
+                else {
+                    continue;
+                };
+                if let Some(evidence) = method_evidence.get(&resolved.name()) {
+                    for required in evidence.iter().map(|e| e.instantiate(&arguments)) {
+                        if required.tupled && required.mutable_receiver {
+                            for (index, available) in
+                                method_evidence[&item.name()].iter().enumerate()
+                            {
+                                if available.forwards_to(&required) {
+                                    shared_adapters.insert((item_index, index));
+                                }
+                            }
+                        }
+                        dictionary_types.push(required);
+                    }
+                }
+            }
+        }
+        for evidence in &dictionary_types {
+            instantiations.push(evidence.receiver_type());
+            instantiations.push(evidence.result);
+            instantiations.extend(&evidence.parameters);
+        }
+        let impls = AdtImpls::default();
+        let copy_parameters = copy_parameters(&items);
         let observed = observed_adts(&bodies);
         let constants = EvaluatedConstants::new(&bodies, &observed);
         let signature_types = dependency_functions
@@ -2185,6 +2545,71 @@ impl UnitMapper {
                 })
             })
             .collect::<BTreeMap<_, _>>();
+        let mut fnmut_adapters = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let Some((closure, _)) = closure_of(*item) else {
+                continue;
+            };
+            if item_names[index] != "call" || !dictionary_types.iter().any(|e| e.tupled && e.mutable_receiver &&
+                matches!(e.receiver.kind(), TyKind::RigidTy(RigidTy::Closure(def, _)) if def == closure)) {
+                continue;
+            }
+            let name = NameId::new(names.len());
+            let mut adapter_name = format!("__fnmut_adapter_{}", item_scopes[index].join("::"));
+            while names
+                .iter()
+                .any(|name| name.scope.is_empty() && name.name == adapter_name)
+            {
+                adapter_name.push('_');
+            }
+            names.push(QualifiedName {
+                name: adapter_name,
+                scope: vec![],
+                namespace_id: NamespaceId::new(0),
+            });
+            let target = QualifiedRef {
+                name,
+                namespace_id: NamespaceId::new(0),
+            };
+            name_ids.insert(format!("{}::__fnmut_adapter", item.name()), target.clone());
+            fnmut_adapters.push((index, target));
+        }
+        let mut shared_evidence_adapters = Vec::new();
+        for (item_index, evidence_index) in shared_adapters {
+            let name = NameId::new(names.len());
+            let mut adapter_name = format!(
+                "__fn_to_fnmut_{}_{evidence_index}",
+                item_scopes[item_index]
+                    .iter()
+                    .chain(std::iter::once(&item_names[item_index]))
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("::")
+            );
+            while names
+                .iter()
+                .any(|name| name.scope.is_empty() && name.name == adapter_name)
+            {
+                adapter_name.push('_');
+            }
+            names.push(QualifiedName {
+                name: adapter_name,
+                scope: vec![],
+                namespace_id: NamespaceId::new(0),
+            });
+            let target = QualifiedRef {
+                name,
+                namespace_id: NamespaceId::new(0),
+            };
+            name_ids.insert(
+                format!(
+                    "{}::__fn_to_fnmut_{evidence_index}",
+                    items[item_index].name()
+                ),
+                target.clone(),
+            );
+            shared_evidence_adapters.push((item_index, evidence_index, target));
+        }
         for function in &dependency_functions {
             let namespace_id = namespaces.id(&function.definition.krate().name)?;
             let name = NameId::new(names.len());
@@ -2218,7 +2643,7 @@ impl UnitMapper {
                 }
                 let function = function_def(*item)?;
                 let binders = flattened_generics(function)?.len();
-                Ok(DeclaredSignature::new(function, binders, false).at_locals(body))
+                Ok(DeclaredSignature::new(function, binders).at_locals(body))
             })
             .collect::<Result<Vec<_>, String>>()?;
         let bound_lifetimes = identities
@@ -2232,7 +2657,7 @@ impl UnitMapper {
                 )
             }))
             .collect();
-        let types = TypeLayout::from_bodies(
+        let mut types = TypeLayout::from_bodies(
             &items,
             &bodies,
             &adts,
@@ -2242,6 +2667,7 @@ impl UnitMapper {
             &instantiations,
             &constants.types,
         )?;
+        types.intern_method_evidence(&dictionary_types)?;
         Ok(Self {
             items,
             bodies,
@@ -2254,11 +2680,14 @@ impl UnitMapper {
             copy_parameters,
             impls,
             signatures,
+            method_evidence,
             bound_lifetimes,
             resolves_trait_calls,
             names,
             adts,
             closures,
+            fnmut_adapters,
+            shared_evidence_adapters,
             types,
             scopes,
             namespaces,
@@ -2274,7 +2703,9 @@ impl UnitMapper {
         let mut functions = Vec::with_capacity(self.items.len());
         let mut origins = Vec::with_capacity(self.items.len());
         let mut alignments = Vec::with_capacity(self.items.len());
+        let mut expression_ranges = Vec::new();
         for index in 0..self.items.len() {
+            let expression_start = self.arenas.expressions.len();
             let item = self.items[index];
             let identity = self.identities[index].clone();
             let body = self.bodies[index].clone();
@@ -2286,10 +2717,10 @@ impl UnitMapper {
                 .into_iter()
                 .map(|parameter| {
                     generic_binder(
-                        &identity,
                         parameter,
                         &self.copy_parameters[index],
                         function_loc,
+                        &mut self.types,
                     )
                 })
                 .collect::<Result<Vec<_>, String>>()?;
@@ -2308,6 +2739,7 @@ impl UnitMapper {
                 Callees {
                     dependencies: &self.dependency_functions,
                     opaque: &self.opaque_functions,
+                    method_evidence: &self.method_evidence,
                 },
                 &self.constants,
                 &self.adts,
@@ -2323,9 +2755,22 @@ impl UnitMapper {
                 mapper.body_failure = Some(refusal.reason().to_owned());
             }
             let mapped = mapper.map()?;
+            expression_ranges.push(expression_start..self.arenas.expressions.len());
+            let evidence_count = self.method_evidence.get(&identity).map_or(0, Vec::len);
+            let evidence_attributes = (0..evidence_count)
+                .map(|index| Attribute::Assign {
+                    loc: Some(function_loc),
+                    name: "method_evidence".to_owned(),
+                    value: AttributeValue::Constant {
+                        value: ConstValue::Integer {
+                            value: Number::from(mapped.parameters.len() - evidence_count + index),
+                        },
+                    },
+                })
+                .collect();
             functions.push(FunctionDecl {
                 alignment: AlignmentId::new(index),
-                attributes: vec![],
+                attributes: evidence_attributes,
                 body: mapped.body,
                 contract: empty_contract(),
                 doc: String::new(),
@@ -2346,7 +2791,15 @@ impl UnitMapper {
                 signature: Signature {
                     generics,
                     parameters: mapped.parameters,
-                    predicates: vec![],
+                    predicates: if opaque {
+                        vec![]
+                    } else {
+                        signature_lifetime_predicates(
+                            item.0,
+                            &self.signatures[index],
+                            &mut self.types,
+                        )
+                    },
                     results: vec![TypeUse {
                         loc: mapped.result_loc,
                         type_id: mapped.result_type,
@@ -2365,6 +2818,270 @@ impl UnitMapper {
                 trust: Trust::Checked,
             });
         }
+
+        // Rust's Fn-to-FnMut adapter reborrows its mutable receiver as shared.
+        // Keep it as a checked body so both invocation and verification see the
+        // same receiver conversion; never relabel the shared closure's type.
+        let adapters = self
+            .fnmut_adapters
+            .iter()
+            .map(|(index, target)| (*index, None, target))
+            .chain(
+                self.shared_evidence_adapters
+                    .iter()
+                    .map(|(index, evidence, target)| (*index, Some(*evidence), target)),
+            );
+        for (index, evidence_index, target) in adapters {
+            let expression_start = self.arenas.expressions.len();
+            let mut original = functions[index].clone();
+            let loc = original.loc;
+            if let Some(evidence_index) = evidence_index {
+                let evidence = &self.method_evidence[&self.identities[index]][evidence_index];
+                let Ty::Function {
+                    arguments, result, ..
+                } = self.types.evidence_function(evidence)?
+                else {
+                    return Err("method evidence is not a function".to_owned());
+                };
+                original.signature.parameters = arguments
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, type_id)| Parameter {
+                        mutable: false,
+                        name: if index == 0 {
+                            "receiver".to_owned()
+                        } else {
+                            format!("arg_{index}")
+                        },
+                        type_use: TypeUse { loc, type_id },
+                    })
+                    .collect();
+                let dictionary_index = original.signature.parameters.len();
+                original.signature.parameters.push(Parameter {
+                    mutable: false,
+                    name: evidence.name.clone(),
+                    type_use: TypeUse {
+                        loc,
+                        type_id: self.types.method_evidence_type(evidence)?,
+                    },
+                });
+                original.signature.results = vec![TypeUse {
+                    loc,
+                    type_id: result,
+                }];
+                original.attributes = vec![Attribute::Assign {
+                    name: "method_evidence".to_owned(),
+                    value: AttributeValue::Constant {
+                        value: ConstValue::Integer {
+                            value: Number::from(dictionary_index),
+                        },
+                    },
+                    loc: None,
+                }];
+                // Source verification synthesizes and proves the forwarding
+                // contract for this checked body; this is not a trusted axiom.
+                original.attributes.push(Attribute::Assign {
+                    loc: None,
+                    name: "shared_method_adapter".to_owned(),
+                    value: AttributeValue::Constant {
+                        value: ConstValue::Integer {
+                            value: Number::from(dictionary_index),
+                        },
+                    },
+                });
+            }
+            if evidence_index.is_none() {
+                let name = &self.names[original.name.index];
+                let target = name
+                    .scope
+                    .iter()
+                    .chain(std::iter::once(&name.name))
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("::");
+                original.attributes.push(Attribute::Assign {
+                    loc: None,
+                    name: "closure_method_adapter".to_owned(),
+                    value: AttributeValue::Constant {
+                        value: ConstValue::String { value: target },
+                    },
+                });
+            }
+            let shared_type = original.signature.parameters[0].type_use.type_id;
+            let Ty::Reference { value: shared } = self.types.types[shared_type.index].clone()
+            else {
+                return Err("Fn closure receiver is not a reference".to_owned());
+            };
+            let mutable = Ty::Reference {
+                value: ReferenceType {
+                    kind: ReferenceKind::Mutable,
+                    ..shared
+                },
+            };
+            let mutable_type =
+                if let Some(index) = self.types.types.iter().position(|ty| *ty == mutable) {
+                    TypeId::new(index)
+                } else {
+                    let id = TypeId::new(self.types.types.len());
+                    self.types.types.push(mutable);
+                    id
+                };
+            let mut signature = original.signature.clone();
+            signature.parameters[0].type_use.type_id = mutable_type;
+            let mut locals = signature
+                .parameters
+                .iter()
+                .enumerate()
+                .map(|(index, p)| LocalDecl {
+                    id: LocalId::new(index),
+                    loc,
+                    mutable: false,
+                    name: p.name.clone(),
+                    type_use: p.type_use.clone(),
+                })
+                .collect::<Vec<_>>();
+            let receiver = self.arenas.place(LocalId::new(0));
+            let deref = PlaceId::new(self.arenas.places.len());
+            self.arenas.places.push(Place::Deref { base: receiver });
+            let receiver = self
+                .arenas
+                .expression(loc, shared_type, ExprKind::Operation {
+                    operation: Operation::Borrow {
+                        kind: BorrowKind::Immutable,
+                        place: deref,
+                    },
+                    arguments: vec![],
+                    instantiations: vec![],
+                    surface: None,
+                });
+            let mut arguments = vec![receiver];
+            let parameter_count =
+                signature.parameters.len() - usize::from(evidence_index.is_some());
+            for (index, parameter) in signature
+                .parameters
+                .iter()
+                .enumerate()
+                .take(parameter_count)
+                .skip(1)
+            {
+                let place = self.arenas.place(LocalId::new(index));
+                arguments.push(self.arenas.expression(
+                    loc,
+                    parameter.type_use.type_id,
+                    ExprKind::Operation {
+                        operation: Operation::Move { place },
+                        arguments: vec![],
+                        instantiations: vec![],
+                        surface: None,
+                    },
+                ));
+            }
+            let (kind, instantiations) = if evidence_index.is_some() {
+                let parameter = &signature.parameters[parameter_count];
+                let place = self.arenas.place(LocalId::new(parameter_count));
+                let dictionary =
+                    self.arenas
+                        .expression(loc, parameter.type_use.type_id, ExprKind::Operation {
+                            operation: Operation::Copy { place },
+                            arguments: vec![],
+                            instantiations: vec![],
+                            surface: None,
+                        });
+                arguments.insert(0, dictionary);
+                (CallKind::Invoke, vec![])
+            } else {
+                let (_, closure_args) =
+                    closure_of(self.items[index]).ok_or("missing Fn closure")?;
+                let mut instantiations = self
+                    .types
+                    .generic_arguments(&GenericArgs(closure_arguments(&closure_args)?.0), loc)?;
+                let bound_count = self.signatures[index].bound_lifetimes.len();
+                if bound_count > 0 {
+                    let value = self
+                        .types
+                        .interned_lifetime(&erased())
+                        .ok_or("missing adapter lifetime")?;
+                    instantiations.extend(vec![GenericArgument::Lifetime { value }; bound_count]);
+                }
+                (
+                    CallKind::Function {
+                        callee: QualifiedRef {
+                            name: original.name,
+                            namespace_id: NamespaceId::new(0),
+                        },
+                    },
+                    instantiations,
+                )
+            };
+            let result_type = signature.results[0].clone();
+            let call = self
+                .arenas
+                .expression(loc, result_type.type_id, ExprKind::Operation {
+                    operation: Operation::Call { kind },
+                    arguments,
+                    instantiations,
+                    surface: None,
+                });
+            let result_id = LocalId::new(locals.len());
+            locals.push(LocalDecl {
+                id: result_id,
+                loc,
+                mutable: true,
+                name: "result".to_owned(),
+                type_use: result_type.clone(),
+            });
+            let result_place = self.arenas.place(result_id);
+            let result = self
+                .arenas
+                .expression(loc, result_type.type_id, ExprKind::Operation {
+                    operation: Operation::Move {
+                        place: result_place,
+                    },
+                    arguments: vec![],
+                    instantiations: vec![],
+                    surface: None,
+                });
+            functions.push(FunctionDecl {
+                name: target.name,
+                signature,
+                locals,
+                contract: empty_contract(),
+                body: RawBody::Cfg {
+                    graph: RawCfg {
+                        entry: BlockId::new(0),
+                        blocks: vec![
+                            RawBasicBlock {
+                                loc,
+                                statements: vec![],
+                                terminator: RawTerminator::Call {
+                                    call,
+                                    destination: Some(RawCallDestination {
+                                        place: result_place,
+                                        target: BlockId::new(1),
+                                    }),
+                                    unwind: RawUnwindAction::Unreachable,
+                                },
+                            },
+                            RawBasicBlock {
+                                loc,
+                                statements: vec![],
+                                terminator: RawTerminator::Return {
+                                    values: vec![result],
+                                },
+                            },
+                        ],
+                    },
+                },
+                ..original
+            });
+            expression_ranges.push(expression_start..self.arenas.expressions.len());
+        }
+
+        self.types.complete_invocation_types(
+            &functions,
+            &self.arenas.expressions,
+            &expression_ranges,
+        )?;
 
         let namespace_loc = functions[0].loc;
         let mut structs = Vec::new();
@@ -2399,7 +3116,7 @@ impl UnitMapper {
                 traits: vec![],
             });
         }
-        for (declaration, adt) in map_structs(&self.adts, &self.types, &mut self.sources)?
+        for (declaration, adt) in map_structs(&self.adts, &mut self.types, &mut self.sources)?
             .into_iter()
             .zip(&self.adts)
         {
@@ -2444,7 +3161,16 @@ impl UnitMapper {
             };
             let mut generics = parameters
                 .into_iter()
-                .map(|parameter| generic_binder(&identity, parameter, &BTreeSet::new(), loc))
+                .map(|parameter| {
+                    generic_binder(
+                        parameter,
+                        &polyfill::copy_parameters(function.definition.0)
+                            .into_iter()
+                            .collect(),
+                        loc,
+                        &mut self.types,
+                    )
+                })
                 .collect::<Result<Vec<_>, String>>()?;
             generics.extend(
                 function
@@ -2510,6 +3236,9 @@ impl UnitMapper {
                     profile: Profile::Rust,
                     profile_data: std::iter::once("function.dependency")
                         .chain(function.opaque.then_some("function.opaque"))
+                        .chain(
+                            (!function.associated_types.is_empty()).then_some("function.shapeOnly"),
+                        )
                         .map(|tag| ProfileValue {
                             payload: String::new(),
                             profile: Profile::Rust,
@@ -2519,7 +3248,15 @@ impl UnitMapper {
                     signature: Signature {
                         generics,
                         parameters,
-                        predicates: vec![],
+                        predicates: if function.opaque {
+                            vec![]
+                        } else {
+                            signature_lifetime_predicates(
+                                function.definition.0,
+                                &function.declared,
+                                &mut self.types,
+                            )
+                        },
                         results: vec![TypeUse {
                             loc,
                             type_id: self.types.signature_type_id(
@@ -2565,7 +3302,7 @@ impl UnitMapper {
             description: format!(
                 "rustc accepted this crate through analysis and exposed optimized generic MIR for a {target_pointer_width}-bit pointer target"
             ),
-            producer: "verex-rust-export via rustc Public".to_owned(),
+            producer: polyfill::PRODUCER.to_owned(),
             trusted: true,
         }];
         if self.resolves_trait_calls {
@@ -2679,240 +3416,18 @@ struct ClosureNames {
     arguments: GenericArgs,
 }
 
-/// An access of a place, in the order of a block.
-enum PlaceAccess {
-    Read(MirPlace),
-    Copy(MirPlace),
-    Write(MirPlace),
-}
-
-/// The accesses of a statement or terminator, and the types of its constants.
-#[derive(Default)]
-struct PlaceAccesses {
-    accesses: Vec<PlaceAccess>,
-    constants: Vec<RustTy>,
-}
-
-impl MirVisitor for PlaceAccesses {
-    fn visit_operand(&mut self, operand: &Operand, _location: MirLocation) {
-        match operand {
-            Operand::Copy(place) => self.accesses.push(PlaceAccess::Copy(place.clone())),
-            Operand::Move(place) => self.accesses.push(PlaceAccess::Read(place.clone())),
-            Operand::Constant(constant) => self.constants.push(constant.ty()),
-            Operand::RuntimeChecks(_) => {},
-        }
-    }
-
-    fn visit_place(&mut self, place: &MirPlace, _context: PlaceContext, _location: MirLocation) {
-        self.accesses.push(PlaceAccess::Read(place.clone()));
-    }
-}
-
-impl PlaceAccesses {
-    /// Per block, what its statements and terminator access, in order.
-    fn of_body(body: &Body) -> (Vec<Vec<PlaceAccess>>, Vec<RustTy>) {
-        let mut constants = vec![];
-        let blocks = (0..body.blocks.len())
-            .map(|block| {
-                let mut accesses = Self::default();
-                for (index, statement) in body.blocks[block].statements.iter().enumerate() {
-                    let location = statement_location(body, &block, index);
-                    match &statement.kind {
-                        StatementKind::Assign(destination, rvalue) => {
-                            accesses.visit_rvalue(rvalue, location);
-                            accesses
-                                .accesses
-                                .push(PlaceAccess::Write(destination.clone()));
-                        },
-                        StatementKind::StorageDead(local) => {
-                            accesses.accesses.push(PlaceAccess::Write(MirPlace {
-                                local: *local,
-                                projection: vec![],
-                            }));
-                        },
-                        _ => {},
-                    }
-                }
-                let location = terminator_location(body, &block);
-                match &body.blocks[block].terminator.kind {
-                    TerminatorKind::Call {
-                        func,
-                        args,
-                        destination,
-                        ..
-                    } => {
-                        accesses.visit_operand(func, location);
-                        for argument in args {
-                            accesses.visit_operand(argument, location);
-                        }
-                        accesses
-                            .accesses
-                            .push(PlaceAccess::Write(destination.clone()));
-                    },
-                    TerminatorKind::SwitchInt { discr: operand, .. }
-                    | TerminatorKind::Assert { cond: operand, .. } => {
-                        accesses.visit_operand(operand, location);
-                    },
-                    _ => {},
-                }
-                constants.append(&mut accesses.constants);
-                accesses.accesses
-            })
-            .collect();
-        (blocks, constants)
-    }
-}
-
-/// Whether accessing one place may access the other.
-fn places_overlap(left: &MirPlace, right: &MirPlace) -> bool {
-    left.local == right.local
-        && left
-            .projection
-            .iter()
-            .zip(&right.projection)
-            .all(|(left, right)| left == right)
-}
-
-/// Whether a place is read after an access of it, before being written whole.
-fn read_again(
-    body: &Body,
-    accesses: &[Vec<PlaceAccess>],
-    block: usize,
-    after: usize,
-    place: &MirPlace,
-) -> bool {
-    let mut visited = HashSet::new();
-    let mut pending = vec![(block, after + 1)];
-    while let Some((block, start)) = pending.pop() {
-        let mut ended = false;
-        for access in &accesses[block][start..] {
-            match access {
-                PlaceAccess::Read(other) | PlaceAccess::Copy(other)
-                    if places_overlap(place, other) =>
-                {
-                    return true;
-                },
-                PlaceAccess::Write(other)
-                    if other.local == place.local
-                        && other.projection.len() <= place.projection.len()
-                        && places_overlap(place, other) =>
-                {
-                    ended = true;
-                    break;
-                },
-                PlaceAccess::Read(_) | PlaceAccess::Copy(_) | PlaceAccess::Write(_) => {},
-            }
-        }
-        if !ended {
-            for successor in body.blocks[block].terminator.successors() {
-                if visited.insert(successor) {
-                    pending.push((successor, 0));
-                }
-            }
-        }
-    }
-    false
-}
-
-/// Whether a place goes through a dereference of a reference: rustc refuses a
-/// move out of it (E0507).
-fn through_reference(body: &Body, place: &MirPlace) -> bool {
-    place.projection.iter().enumerate().any(|(index, element)| {
-        matches!(element, ProjectionElem::Deref)
-            && MirPlace {
-                local: place.local,
-                projection: place.projection[..index].to_vec(),
-            }
-            .ty(body.locals())
-            .is_ok_and(|ty| matches!(ty.kind(), TyKind::RigidTy(RigidTy::Ref(..))))
-    })
-}
-
-/// The type parameters each item's body shows to be `Copy`, its binders' ability
-/// (rust-lang/rust#161892 hides the bound). Optimized MIR spells a final move of a
-/// local `copy`, so a `copy` alone shows nothing. What does is a copy rustc would
-/// refuse as a move: through a reference, or of a place read again; and an
-/// instantiation of what a callee needs. Validation checks the ability at each
-/// instantiation, so an over-approximation here rejects and proves nothing false.
-fn copy_parameters(
-    items: &[CrateItem],
-    bodies: &[Body],
-    impls: &mut AdtImpls,
-) -> Vec<BTreeSet<u32>> {
-    let positions = items
+/// Declared Copy bounds, including those inherited from an enclosing impl.
+fn copy_parameters(items: &[CrateItem]) -> Vec<BTreeSet<u32>> {
+    items
         .iter()
-        .enumerate()
-        .map(|(index, item)| (item.0, index))
-        .collect::<HashMap<_, _>>();
-    let mut needed = Vec::with_capacity(bodies.len());
-    let mut mentioned = Vec::with_capacity(bodies.len());
-    for body in bodies {
-        let (accesses, constants) = PlaceAccesses::of_body(body);
-        let mut parameters = BTreeSet::new();
-        for (block, block_accesses) in accesses.iter().enumerate() {
-            for (index, access) in block_accesses.iter().enumerate() {
-                let PlaceAccess::Copy(place) = access else {
-                    continue;
-                };
-                let Some(requirement) = place
-                    .ty(body.locals())
-                    .ok()
-                    .and_then(|ty| impls.copy_requirement(ty))
-                else {
-                    continue;
-                };
-                if !requirement.is_empty()
-                    && (through_reference(body, place)
-                        || read_again(body, &accesses, block, index, place))
-                {
-                    parameters.extend(requirement);
-                }
-            }
-        }
-        needed.push(parameters);
-        let mut instances = vec![];
-        let mut pending = constants;
-        pending.extend(body.locals().iter().map(|local| local.ty));
-        while let Some(ty) = pending.pop() {
-            pending.extend(type_children(ty));
-            if let TyKind::RigidTy(RigidTy::FnDef(FnDef(callee), arguments)) = ty.kind() {
-                instances.extend(positions.get(&callee).map(|index| (*index, arguments)));
-            } else if let TyKind::RigidTy(RigidTy::Closure(callee, arguments)) = ty.kind() {
-                instances.extend(
-                    positions
-                        .get(&callee.def_id())
-                        .map(|index| (*index, arguments)),
-                );
-            }
-        }
-        mentioned.push(instances);
-    }
-    loop {
-        let mut changed = false;
-        for (index, instances) in mentioned.iter().enumerate() {
-            for (callee, arguments) in instances {
-                let required = needed[*callee].iter().copied().collect::<Vec<_>>();
-                for parameter in required {
-                    if let Some(GenericArgKind::Type(argument)) =
-                        arguments.0.get(parameter as usize)
-                    {
-                        for parameter in impls.copy_requirement(*argument).unwrap_or_default() {
-                            changed |= needed[index].insert(parameter);
-                        }
-                    }
-                }
-            }
-        }
-        if !changed {
-            return needed;
-        }
-    }
+        .map(|item| polyfill::copy_parameters(item.0).into_iter().collect())
+        .collect()
 }
 
 /// The closures among the items.
 fn build_closures(
     items: &[CrateItem],
-    bodies: &[Body],
+    bodies: &[PreparedBody],
     item_names: &[String],
     item_scopes: &[Vec<String>],
     names: &mut Vec<QualifiedName>,
@@ -3036,7 +3551,14 @@ fn map_closures(
             let mut generics = item_generics(closure.item)?
                 .into_iter()
                 .map(|parameter| {
-                    generic_binder(&closure.item.name(), parameter, &BTreeSet::new(), loc)
+                    generic_binder(
+                        parameter,
+                        &polyfill::copy_parameters(closure.item.0)
+                            .into_iter()
+                            .collect(),
+                        loc,
+                        types,
+                    )
                 })
                 .collect::<Result<Vec<_>, String>>()?;
             let parents = generics.len();
@@ -3165,7 +3687,7 @@ impl MirVisitor for ClosureUses {
         self.super_rvalue(rvalue, location);
     }
 
-    fn visit_var_debug_info(&mut self, _var_debug_info: &rustc_public::mir::VarDebugInfo) {}
+    fn visit_var_debug_info(&mut self, _var_debug_info: &VarDebugInfo) {}
 }
 
 /// The locals a body reads without assigning: rustc removes the assignments of
@@ -3261,10 +3783,39 @@ fn reached_items(
     Ok(reached)
 }
 
+/// Immutable analysis shared by signature discovery, type collection and mapping.
+/// A changed/refused MIR body receives a fresh analysis in `mapped_bodies`.
+#[derive(Clone)]
+struct PreparedBody {
+    body: Body,
+    mapped_locals: Vec<MirLocalDecl>,
+    box_folds: BoxFolds,
+}
+
+impl PreparedBody {
+    fn new(body: Body) -> Self {
+        let box_folds = box_folds(&body);
+        let mapped_locals = mapped_locals(&body, &box_folds);
+        Self {
+            body,
+            mapped_locals,
+            box_folds,
+        }
+    }
+}
+
+impl std::ops::Deref for PreparedBody {
+    type Target = Body;
+
+    fn deref(&self) -> &Body {
+        &self.body
+    }
+}
+
 /// The items the unit maps, by name, with the bodies mapped for them.
 struct MappedBodies {
     items: Vec<CrateItem>,
-    bodies: Vec<Body>,
+    bodies: Vec<PreparedBody>,
     refusals: Vec<Option<Refusal>>,
 }
 
@@ -3306,11 +3857,11 @@ fn mapped_bodies(candidates: Vec<CrateItem>) -> Result<MappedBodies, String> {
                 let body = item
                     .body()
                     .ok_or_else(|| format!("function `{}` has no public MIR body", item.name()))?;
-                Ok(match refusals.get(&item.0) {
+                Ok(PreparedBody::new(match refusals.get(&item.0) {
                     Some(Refusal::Signature(_)) => opaque_body(&body),
                     Some(Refusal::Body(_)) => refused_body(&body),
                     None => body,
-                })
+                }))
             })
             .collect::<Result<Vec<_>, String>>()?;
         let observed = observed_adts(&bodies);
@@ -3322,7 +3873,7 @@ fn mapped_bodies(candidates: Vec<CrateItem>) -> Result<MappedBodies, String> {
                 .map(Refusal::Signature)
                 .or_else(|| {
                     (!refusals.contains_key(&item.0))
-                        .then(|| unmodelled_body_type(body, &observed).map(Refusal::Body))
+                        .then(|| unmodelled_body_type(*item, body, &observed).map(Refusal::Body))
                         .flatten()
                 });
             if let Some(refusal) = refusal {
@@ -3347,19 +3898,17 @@ fn mapped_bodies(candidates: Vec<CrateItem>) -> Result<MappedBodies, String> {
 
 /// What a function's signature states and the unit cannot: a binder or a type. Rustc has
 /// normalized a type where it can; an associated type of a parameter it cannot.
-fn unmodelled_signature(item: CrateItem, body: &Body, observed: &[AdtDef]) -> Option<String> {
+fn unmodelled_signature(
+    item: CrateItem,
+    body: &PreparedBody,
+    observed: &[AdtDef],
+) -> Option<String> {
     if closure_of(item).is_some() {
         return None;
     }
     let function = function_def(item).ok()?;
     let generics = flattened_generics(function).ok()?;
-    if let Some(reason) = generics
-        .iter()
-        .find_map(|parameter| binder_kind(&item.name(), parameter).err())
-    {
-        return Some(format!("{reason}, so a call of it refuses its caller"));
-    }
-    DeclaredSignature::new(function, generics.len(), false)
+    DeclaredSignature::new(function, generics.len())
         .at_locals(body)
         .types
         .into_iter()
@@ -3371,9 +3920,13 @@ fn unmodelled_signature(item: CrateItem, body: &Body, observed: &[AdtDef]) -> Op
 
 /// A type a body states and the unit cannot: of a local that is no parameter or result,
 /// of a call's instantiation, or of what a closure it holds takes or returns.
-fn unmodelled_body_type(body: &Body, observed: &[AdtDef]) -> Option<String> {
+fn unmodelled_body_type(
+    item: CrateItem,
+    body: &PreparedBody,
+    observed: &[AdtDef],
+) -> Option<String> {
     let mappable = |ty: RustTy| collect_type_adts(ty, observed, &mut Vec::new()).is_ok();
-    let locals = mapped_locals(body);
+    let locals = &body.mapped_locals;
     if let Some(local) = locals
         .iter()
         .skip(body.arg_locals().len() + 1)
@@ -3389,7 +3942,8 @@ fn unmodelled_body_type(body: &Body, observed: &[AdtDef]) -> Option<String> {
         .filter_map(|closure| CrateItem(closure.def_id()).body())
         .find_map(|held| {
             let arguments = held.arg_locals().len();
-            mapped_locals(&held)
+            PreparedBody::new(held)
+                .mapped_locals
                 .iter()
                 .take(arguments + 1)
                 .map(|local| local.ty)
@@ -3400,7 +3954,7 @@ fn unmodelled_body_type(body: &Body, observed: &[AdtDef]) -> Option<String> {
             "it holds a closure that takes or returns `{ty}`, which is not modelled"
         ));
     }
-    let calls = collect_calls(std::slice::from_ref(body)).ok()?;
+    let calls = collect_calls(std::slice::from_ref(&item), std::slice::from_ref(body)).ok()?;
     calls
         .instantiations
         .into_iter()
@@ -3456,6 +4010,7 @@ fn opaque_body(body: &Body) -> Body {
 /// having no other use. Each argument is then read at the call.
 fn closure_call_tuples(
     caller: &str,
+    item: CrateItem,
     body: &Body,
     locals: &[MirLocalDecl],
     crate_files: &HashSet<String>,
@@ -3471,7 +4026,11 @@ fn closure_call_tuples(
         let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee_type.kind() else {
             continue;
         };
-        if closure_callee(definition, &arguments).is_none() {
+        if closure_callee(item.0, definition, &arguments).is_none()
+            && !declared_method_evidence(item.0)
+                .iter()
+                .any(|e| e.tupled && e.method == definition && e.arguments == arguments)
+        {
             continue;
         }
         let at_call = |reason: &str| {
@@ -3589,7 +4148,7 @@ impl MirVisitor for LocalMentions {
 /// unsupported. The free only releases the allocation and has no meaning in a value
 /// semantics: rustc rejects it in source (E0040), and it is erased only for a box
 /// whose content a folded pointer reads, the elaborated free after its content's drop.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct BoxFolds {
     /// A pointer local and the box it points into.
     pointers: HashMap<usize, MirPlace>,
@@ -3746,11 +4305,7 @@ fn is_box_drop_call(func: &Operand, locals: &[MirLocalDecl]) -> bool {
     let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee.kind() else {
         return false;
     };
-    let name = definition.name();
-    let Some(path) = name.strip_suffix("::drop") else {
-        return false;
-    };
-    is_drop_trait(path)
+    Some(definition.0) == polyfill::drop_method()
         && matches!(arguments.0.first(),
             Some(GenericArgKind::Type(self_type)) if is_box_type(*self_type))
 }
@@ -3902,9 +4457,8 @@ impl MirVisitor for LocalDerefs {
 /// shared borrow of the same place, whose metadata is the same length. The
 /// MIR validator does not enforce this use, so it is checked here; every
 /// other raw pointer remains unsupported.
-fn mapped_locals(body: &Body) -> Vec<MirLocalDecl> {
+fn mapped_locals(body: &Body, folds: &BoxFolds) -> Vec<MirLocalDecl> {
     let mut locals = body.locals().to_vec();
-    let folds = box_folds(body);
     for (index, declaration) in locals.iter_mut().enumerate() {
         let TyKind::RigidTy(RigidTy::RawPtr(pointee, Mutability::Not)) = declaration.ty.kind()
         else {
@@ -4084,7 +4638,7 @@ impl ObservedAdts<'_> {
 }
 
 impl MirVisitor for ObservedAdts<'_> {
-    fn visit_statement(&mut self, statement: &rustc_public::mir::Statement, location: MirLocation) {
+    fn visit_statement(&mut self, statement: &Statement, location: MirLocation) {
         if !self.folds.folds_statement(&statement.kind) {
             self.super_statement(statement, location);
         }
@@ -4135,14 +4689,14 @@ struct ReachedAdt {
 }
 
 /// The ADTs the bodies observe the shape of.
-fn observed_adts(bodies: &[Body]) -> Vec<AdtDef> {
+fn observed_adts(bodies: &[PreparedBody]) -> Vec<AdtDef> {
     let mut observed = Vec::new();
     for body in bodies {
-        let locals = mapped_locals(body);
-        let folds = box_folds(body);
+        let locals = &body.mapped_locals;
+        let folds = &body.box_folds;
         let mut visitor = ObservedAdts {
-            locals: &locals,
-            folds: &folds,
+            locals,
+            folds,
             adts: observed,
         };
         visitor.visit_body(body);
@@ -4155,7 +4709,7 @@ fn observed_adts(bodies: &[Body]) -> Vec<AdtDef> {
 /// the types calls instantiate with, and the evaluated constants reach. `observed`
 /// holds those the bodies observe; a constant also states the shape of those it holds.
 fn collect_adts(
-    bodies: &[Body],
+    bodies: &[PreparedBody],
     mut observed: Vec<AdtDef>,
     signatures: &[RustTy],
     instantiations: &[RustTy],
@@ -4164,7 +4718,7 @@ fn collect_adts(
     observed.extend(constants.adts.iter().copied());
     let mut adts = Vec::new();
     for body in bodies {
-        for local in &mapped_locals(body) {
+        for local in &body.mapped_locals {
             collect_type_adts(local.ty, &observed, &mut adts)?;
         }
     }
@@ -4190,9 +4744,13 @@ fn collect_type_adts(
             }
             Ok(())
         },
-        TyKind::RigidTy(RigidTy::Array(element, _) | RigidTy::Slice(element)) => {
+        TyKind::RigidTy(RigidTy::Array(element, length)) => {
+            length
+                .eval_target_usize()
+                .map_err(|error| format!("symbolic array length is not modelled: {error:?}"))?;
             collect_type_adts(element, observed, adts)
         },
+        TyKind::RigidTy(RigidTy::Slice(element)) => collect_type_adts(element, observed, adts),
         TyKind::RigidTy(RigidTy::FnPtr(signature)) => {
             let signature = supported_function_pointer_signature(&signature)?;
             for type_ in &signature.inputs_and_output {
@@ -4427,7 +4985,7 @@ impl CrateNamespaces {
 
 fn map_structs(
     adts: &[AdtNames],
-    types: &TypeLayout,
+    types: &mut TypeLayout,
     sources: &mut SourceTables,
 ) -> Result<Vec<StructDecl>, String> {
     adts.iter()
@@ -4437,34 +4995,19 @@ fn map_structs(
                 &adt.definition.name(),
                 adt.definition.span(),
             )?;
-            let generics = adt
+            let copy_parameters = polyfill::copy_parameters(adt.definition.0)
+                .into_iter()
+                .collect();
+            let mut generics = adt
                 .definition
                 .generics_of()
                 .params
                 .into_iter()
-                .map(|parameter| {
-                    let (kind, type_) = match parameter.kind {
-                        GenericParamDefKind::Type { .. } => (BinderKind::TypeArg, None),
-                        GenericParamDefKind::Lifetime => (BinderKind::Lifetime, None),
-                        GenericParamDefKind::Const { .. } => (
-                            BinderKind::Const,
-                            Some(types.const_parameter_type(
-                                adt.definition,
-                                parameter.index,
-                                loc,
-                            )?),
-                        ),
-                    };
-                    Ok(GenericBinder {
-                        abilities: vec![],
-                        kind,
-                        loc,
-                        name: parameter.name,
-                        predicates: vec![],
-                        type_,
-                    })
-                })
+                .map(|parameter| generic_binder(parameter, &copy_parameters, loc, types))
                 .collect::<Result<Vec<_>, String>>()?;
+            if let Some(first) = generics.first_mut() {
+                first.predicates = lifetime_predicates(adt.definition.0, types);
+            }
             let (fields, variants) = if adt.opaque {
                 (vec![], vec![])
             } else if adt.definition.kind() == AdtKind::Struct {
@@ -4616,9 +5159,102 @@ struct LifetimeSpec {
 }
 
 impl TypeLayout {
+    /// Complete only the types consulted along actual generic call edges. A
+    /// nested frame must be able to look up the same instantiated type as its
+    /// caller; interning a receiver/result cross product does not establish this.
+    fn complete_invocation_types(
+        &mut self,
+        functions: &[FunctionDecl],
+        expressions: &[Expr],
+        ranges: &[std::ops::Range<usize>],
+    ) -> Result<(), String> {
+        let mut required = vec![BTreeSet::new(); functions.len()];
+        let mut edges = vec![Vec::new(); functions.len()];
+        for (index, range) in ranges.iter().enumerate() {
+            for expression in &expressions[range.clone()] {
+                let ExprKind::Operation {
+                    operation: Operation::Call { kind },
+                    instantiations,
+                    ..
+                } = &expression.kind
+                else {
+                    continue;
+                };
+                let reference = match kind {
+                    CallKind::Function { callee } => callee,
+                    CallKind::Closure { function, .. } => function,
+                    _ => continue,
+                };
+                for arg in instantiations {
+                    if let GenericArgument::TypeArg { value } = arg {
+                        required[index].insert(value.type_id.index);
+                    }
+                }
+                if reference.namespace_id.index == 0
+                    && let Some(target) = functions.iter().position(|f| f.name == reference.name)
+                {
+                    edges[index].push((target, instantiations.clone()));
+                }
+            }
+        }
+        // As with static validation, growing polymorphic recursion has no finite
+        // frame table. Bound the fixed point rather than hanging on such input.
+        let bound = functions.len() * (self.types.len() + 1) + 1;
+        for _ in 0..bound {
+            let mut changed = false;
+            for (index, calls) in edges.iter().enumerate() {
+                for (target, arguments) in calls {
+                    for ty in required[*target].clone() {
+                        let instance = self.instantiate_field(TypeId::new(ty), arguments);
+                        changed |= required[index].insert(instance.index);
+                    }
+                }
+            }
+            if !changed {
+                return Ok(());
+            }
+        }
+        Err("generic invocation types do not have a finite closure".to_owned())
+    }
+
+    fn evidence_function(&self, evidence: &MethodEvidence) -> Result<Ty, String> {
+        let mut arguments = vec![self.id(evidence.receiver_type())?];
+        arguments.extend(
+            evidence
+                .parameters
+                .iter()
+                .map(|ty| self.id(*ty))
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        Ok(Ty::Function {
+            abilities: vec![Ability::Copy, Ability::Drop],
+            arguments,
+            result: self.id(evidence.result)?,
+        })
+    }
+
+    fn intern_method_evidence(&mut self, evidence: &[MethodEvidence]) -> Result<(), String> {
+        for entry in evidence {
+            let function = self.evidence_function(entry)?;
+            if !self.types.contains(&function) {
+                self.types.push(function);
+            }
+        }
+        Ok(())
+    }
+
+    fn method_evidence_type(&self, evidence: &MethodEvidence) -> Result<TypeId, String> {
+        let function = self.evidence_function(evidence)?;
+        self.types
+            .iter()
+            .position(|ty| *ty == function)
+            .map(TypeId::new)
+            .ok_or_else(|| "method evidence type was not interned".to_owned())
+    }
+
     fn from_bodies(
         items: &[CrateItem],
-        bodies: &[Body],
+        bodies: &[PreparedBody],
         adts: &[AdtNames],
         closures: &[ClosureNames],
         dependency_functions: &[DependencyFunction],
@@ -4634,8 +5270,8 @@ impl TypeLayout {
         let mut needed_composites = Vec::new();
         let mut pending_references = Vec::new();
         let locals = bodies.iter().flat_map(|body| {
-            mapped_locals(body)
-                .into_iter()
+            body.mapped_locals
+                .iter()
                 .map(|local| local.ty)
                 .collect::<Vec<_>>()
         });
@@ -4643,7 +5279,25 @@ impl TypeLayout {
             .iter()
             .flat_map(|function| function.signature.iter().copied())
             .flat_map(parts_without_associated_types);
+        let const_types = items
+            .iter()
+            .flat_map(|item| item_generics(*item).unwrap_or_default())
+            .chain(
+                dependency_functions
+                    .iter()
+                    .filter(|function| !function.opaque)
+                    .flat_map(|function| {
+                        flattened_generics(function.definition).unwrap_or_default()
+                    }),
+            )
+            .chain(
+                adts.iter()
+                    .flat_map(|adt| adt.definition.generics_of().params),
+            )
+            .filter(|parameter| matches!(parameter.kind, GenericParamDefKind::Const { .. }))
+            .map(|parameter| polyfill::const_param_ty(parameter.def_id));
         let reached = locals
+            .chain(const_types)
             .chain(signatures)
             .chain(
                 declared
@@ -5245,6 +5899,18 @@ impl TypeLayout {
                     ..value
                 },
             },
+            Ty::Function {
+                abilities,
+                arguments: parameters,
+                result,
+            } => Ty::Function {
+                abilities,
+                arguments: parameters
+                    .into_iter()
+                    .map(|ty| self.instantiate_field(ty, arguments))
+                    .collect(),
+                result: self.instantiate_field(result, arguments),
+            },
             Ty::Tuple { elements } => Ty::Tuple {
                 elements: elements
                     .into_iter()
@@ -5285,13 +5951,9 @@ impl TypeLayout {
                     .collect(),
                 name,
             },
-            Ty::Unit
-            | Ty::Never
-            | Ty::Bool
-            | Ty::Character
-            | Ty::String
-            | Ty::Integer { .. }
-            | Ty::Function { .. } => return declared,
+            Ty::Unit | Ty::Never | Ty::Bool | Ty::Character | Ty::String | Ty::Integer { .. } => {
+                return declared
+            },
         };
         match self.types.iter().position(|ty| *ty == instantiated) {
             Some(index) => TypeId::new(index),
@@ -5546,52 +6208,6 @@ impl TypeLayout {
             .find(|entry| entry.kind == kind)
             .map(|entry| entry.id)
             .ok_or_else(|| format!("{kind:?} type was not interned"))
-    }
-
-    fn const_parameter_type(
-        &self,
-        definition: AdtDef,
-        parameter_index: u32,
-        loc: LocId,
-    ) -> Result<TypeUse, String> {
-        let mut inferred: Option<TypeId> = None;
-        for nominal in self
-            .nominals
-            .iter()
-            .filter(|entry| entry.definition == definition)
-        {
-            let TyKind::RigidTy(RigidTy::Adt(_, arguments)) = nominal.ty.kind() else {
-                continue;
-            };
-            let Some(GenericArgKind::Const(argument)) = arguments.0.get(parameter_index as usize)
-            else {
-                continue;
-            };
-            let Some(argument_type) = const_generic_type(argument) else {
-                continue;
-            };
-            let type_id = self.id(argument_type)?;
-            match inferred {
-                Some(previous) if previous.index != type_id.index => {
-                    return Err(format!(
-                        "const parameter {} of `{}` has inconsistent observed types",
-                        parameter_index,
-                        definition.name()
-                    ));
-                },
-                Some(_) => {},
-                None => inferred = Some(type_id),
-            }
-        }
-        inferred
-            .map(|type_id| TypeUse { loc, type_id })
-            .ok_or_else(|| {
-                format!(
-                    "const parameter {} of `{}` has no concrete observed type",
-                    parameter_index,
-                    definition.name()
-                )
-            })
     }
 
     fn generic_arguments(
@@ -6022,13 +6638,15 @@ impl SourceTables {
     }
 
     fn in_crate(&self, span: Span) -> bool {
-        self.crate_files.contains(&span.get_filename())
+        self.crate_files
+            .contains(&polyfill::source_callsite(span).get_filename())
     }
 
     /// The location of what a macro of another crate expanded to, whose own span
     /// is not stated: the crate's source it is reached after. It has no primary
     /// range, since it is not where the node was written.
     fn expansion(&mut self, reached_after: Span) -> Result<LocId, String> {
+        let reached_after = polyfill::source_callsite(reached_after);
         let file = self.file_id(reached_after.get_filename())?;
         let source = &self.file_contents[file.index];
         let lines = reached_after.get_lines();
@@ -6055,6 +6673,7 @@ impl SourceTables {
     }
 
     fn intern(&mut self, span: Span) -> Result<LocId, String> {
+        let span = polyfill::source_callsite(span);
         let file_id = self.file_id(span.get_filename())?;
         let source = &self.file_contents[file_id.index];
         let lines = span.get_lines();
@@ -6440,7 +7059,7 @@ enum RegionEnding {
 /// another crate raises. The collapse keeps the location of a region's entry, which
 /// may be a format argument's, so a region's blocks are located here.
 fn macro_panic_blocks(body: &Body, crate_files: &HashSet<String>) -> Vec<bool> {
-    let own = |block: &rustc_public::mir::BasicBlock| match &block.terminator.kind {
+    let own = |block: &BasicBlock| match &block.terminator.kind {
         TerminatorKind::Call { target: None, .. } => {
             if crate_files.contains(&block.terminator.source_info.span.get_filename()) {
                 RegionEnding::CrateCall
@@ -6526,6 +7145,7 @@ struct FunctionMapper<'a> {
     bound_lifetimes: &'a BTreeMap<String, usize>,
     dependency_functions: &'a [DependencyFunction],
     opaque_functions: &'a BTreeSet<String>,
+    method_evidence: &'a BTreeMap<String, Vec<MethodEvidence>>,
     constants: &'a EvaluatedConstants,
     adts: &'a [AdtNames],
     closures: &'a [ClosureNames],
@@ -6547,13 +7167,135 @@ struct Callees<'a> {
     dependencies: &'a [DependencyFunction],
     /// The crate's functions whose signatures the unit cannot state.
     opaque: &'a BTreeSet<String>,
+    method_evidence: &'a BTreeMap<String, Vec<MethodEvidence>>,
 }
 
 impl<'a> FunctionMapper<'a> {
+    fn evidence_operand(&mut self, index: usize, loc: LocId) -> Result<ExprId, String> {
+        let evidence = &self.method_evidence[self.identity][index];
+        let type_id = self.types.method_evidence_type(evidence)?;
+        let place = self
+            .arenas
+            .place(LocalId::new(self.body.arg_locals().len() + index));
+        Ok(self.arenas.expression(loc, type_id, ExprKind::Operation {
+            operation: Operation::Copy { place },
+            arguments: vec![],
+            instantiations: vec![],
+            surface: None,
+        }))
+    }
+
+    fn evidence_for(&mut self, evidence: &MethodEvidence, loc: LocId) -> Result<ExprId, String> {
+        let receiver = evidence.receiver;
+        if let Some(index) = self.method_evidence.get(self.identity).and_then(|methods| {
+            methods.iter().position(|entry| {
+                entry.method == evidence.method && entry.arguments == evidence.arguments
+            })
+        }) {
+            return self.evidence_operand(index, loc);
+        }
+        // Fn entails FnMut. Derive the mutable dictionary with a checked body
+        // that invokes the original Fn dictionary through a shared reborrow.
+        if evidence.tupled
+            && evidence.mutable_receiver
+            && let Some(index) = self
+                .method_evidence
+                .get(self.identity)
+                .and_then(|methods| methods.iter().position(|entry| entry.forwards_to(evidence)))
+        {
+            let key = format!("{}::__fn_to_fnmut_{index}", self.identity);
+            let function = self
+                .name_ids
+                .get(&key)
+                .cloned()
+                .ok_or("missing generic Fn-to-FnMut adapter")?;
+            let dictionary = self.evidence_operand(index, loc)?;
+            let arguments = match self.item.ty().kind() {
+                TyKind::RigidTy(RigidTy::FnDef(_, arguments)) => arguments,
+                TyKind::RigidTy(RigidTy::Closure(_, arguments)) => {
+                    GenericArgs(closure_arguments(&arguments)?.0)
+                },
+                _ => return Err("Fn-to-FnMut adapter has no generic environment".to_owned()),
+            };
+            let mut instantiations = self.types.generic_arguments(&arguments, loc)?;
+            instantiations.extend(self.bound_lifetime_arguments(self.identity)?);
+            let mask = 1u64
+                .checked_shl((1 + evidence.parameters.len()) as u32)
+                .ok_or("too many Fn-to-FnMut adapter parameters")?;
+            return Ok(self.arenas.expression(
+                loc,
+                self.types.method_evidence_type(evidence)?,
+                ExprKind::Operation {
+                    operation: Operation::Call {
+                        kind: CallKind::Closure { function, mask },
+                    },
+                    arguments: vec![dictionary],
+                    instantiations,
+                    surface: None,
+                },
+            ));
+        }
+        let (resolved, arguments) =
+            resolve_callee(self.item.0, evidence.method, &evidence.arguments)?;
+        let arguments = if evidence.tupled {
+            let TyKind::RigidTy(RigidTy::Closure(closure, closure_args)) = receiver.kind() else {
+                return Err("callable evidence requires a concrete closure".to_owned());
+            };
+            if resolved.def_id() != closure.def_id() {
+                return Err("callable evidence did not resolve to the closure body".to_owned());
+            }
+            GenericArgs(closure_arguments(&closure_args)?.0)
+        } else {
+            arguments
+        };
+        let name = resolved.name();
+        let mut captures = Vec::new();
+        let mut mask = 0u64;
+        for (index, nested) in self
+            .method_evidence
+            .get(&name)
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+        {
+            captures.push(self.evidence_for(&nested.instantiate(&arguments), loc)?);
+            mask |= 1u64
+                .checked_shl((1 + evidence.parameters.len() + index) as u32)
+                .ok_or("too many captured method dictionaries")?;
+        }
+        let target_name = if evidence.tupled
+            && evidence.mutable_receiver
+            && self
+                .name_ids
+                .contains_key(&format!("{name}::__fnmut_adapter"))
+        {
+            format!("{name}::__fnmut_adapter")
+        } else {
+            name.clone()
+        };
+        let function = self
+            .name_ids
+            .get(&target_name)
+            .cloned()
+            .ok_or_else(|| format!("method implementation `{target_name}` is not mapped"))?;
+        let mut instantiations = self.types.generic_arguments(&arguments, loc)?;
+        instantiations.extend(self.bound_lifetime_arguments(&name)?);
+        let type_id = self.types.method_evidence_type(evidence)?;
+        Ok(self.arenas.expression(loc, type_id, ExprKind::Operation {
+            operation: Operation::Call {
+                kind: CallKind::Closure { function, mask },
+            },
+            arguments: captures,
+            instantiations,
+            surface: None,
+        }))
+    }
+
     fn new(
         identity: &'a str,
         item: CrateItem,
-        body: &'a Body,
+        body: &'a PreparedBody,
         signature: &'a DeclaredSignature,
         types: &'a TypeLayout,
         name_ids: &'a BTreeMap<String, QualifiedRef>,
@@ -6580,9 +7322,15 @@ impl<'a> FunctionMapper<'a> {
         for (rust_local, vir_local) in rust_to_vir.iter_mut().enumerate().skip(argument_count + 1) {
             *vir_local = LocalId::new(rust_local);
         }
-        let locals = mapped_locals(body);
+        let evidence_count = callees.method_evidence.get(identity).map_or(0, Vec::len);
+        for local in &mut rust_to_vir {
+            if local.index >= argument_count {
+                local.index += evidence_count;
+            }
+        }
+        let locals = &body.mapped_locals;
         let (call_tuples, body_failure) =
-            match closure_call_tuples(identity, body, &locals, &sources.crate_files) {
+            match closure_call_tuples(identity, item, body, locals, &sources.crate_files) {
                 Ok(call_tuples) => (call_tuples, None),
                 Err(reason) => (HashMap::new(), Some(reason)),
             };
@@ -6600,18 +7348,19 @@ impl<'a> FunctionMapper<'a> {
                 .collect(),
             body,
             signature,
-            unsize_folds: unsize_folds(body, &locals),
+            unsize_folds: unsize_folds(body, locals),
             call_tuples,
-            box_folds: box_folds(body),
+            box_folds: body.box_folds.clone(),
             body_failure,
             dominators: immediate_dominators(body),
             macro_panics: macro_panic_blocks(body, &sources.crate_files),
-            locals,
+            locals: locals.clone(),
             types,
             name_ids,
             bound_lifetimes,
             dependency_functions: callees.dependencies,
             opaque_functions: callees.opaque,
+            method_evidence: callees.method_evidence,
             constants,
             adts,
             closures,
@@ -6779,7 +7528,7 @@ impl<'a> FunctionMapper<'a> {
 
     fn map_statement(
         &mut self,
-        statement: &rustc_public::mir::Statement,
+        statement: &Statement,
         loc: LocId,
         statements: &mut Vec<RawStatement>,
     ) -> Result<(), String> {
@@ -6794,6 +7543,21 @@ impl<'a> FunctionMapper<'a> {
                 if destination.projection.is_empty()
                     && self.call_tuples.contains_key(&destination.local) => {},
             StatementKind::Assign(destination, rvalue) => {
+                // Optimized MIR can borrow an unassigned zero-sized closure.
+                // A mutable borrow still needs a place, not a computed value.
+                // Materialize the unique value at that local before borrowing;
+                // keep projected places on the existing conservative path.
+                if let Rvalue::Ref(_, MirBorrowKind::Mut { .. }, borrowed) = rvalue
+                    && borrowed.projection.is_empty()
+                    && let Some(constant) = self.zero_sized_local(borrowed)
+                {
+                    let value = self.constant_expression(&constant, loc)?;
+                    let place = self.map_place(borrowed)?;
+                    let expression =
+                        self.arenas
+                            .expression(loc, self.types.unit, ExprKind::Assign { place, value });
+                    statements.push(RawStatement::Execute { expression });
+                }
                 let value = self.map_rvalue(rvalue, loc)?;
                 self.mark_reference_copy(destination, rvalue, value);
                 let place = self.map_place(destination)?;
@@ -6876,7 +7640,7 @@ impl<'a> FunctionMapper<'a> {
     /// after: the nearest dominator outside the region with a terminator in the
     /// crate, else the body.
     fn block_location(&mut self, block: usize, span: Span) -> Result<LocId, String> {
-        if !self.macro_panics[block] && self.sources.in_crate(span) {
+        if self.sources.in_crate(span) {
             return self.sources.intern(span);
         }
         let mut current = self.dominators[block];
@@ -6931,7 +7695,30 @@ impl<'a> FunctionMapper<'a> {
                 type_use: TypeUse { loc, type_id },
             });
         }
-        let parameters = locals[..argument_count]
+        let evidence = self
+            .method_evidence
+            .get(self.identity)
+            .cloned()
+            .unwrap_or_default();
+        for (index, evidence) in evidence.iter().enumerate() {
+            if locals.iter().any(|local| local.name == evidence.name) {
+                return Err(format!(
+                    "method evidence name `{}` conflicts with a local",
+                    evidence.name
+                ));
+            }
+            locals.insert(argument_count + index, LocalDecl {
+                id: LocalId::new(argument_count + index),
+                mutable: false,
+                loc: self.local_location(self.body.span)?,
+                name: evidence.name.clone(),
+                type_use: TypeUse {
+                    loc: self.local_location(self.body.span)?,
+                    type_id: self.types.method_evidence_type(evidence)?,
+                },
+            });
+        }
+        let parameters = locals[..argument_count + evidence.len()]
             .iter()
             .map(|local| Parameter {
                 mutable: local.mutable,
@@ -7229,7 +8016,11 @@ impl<'a> FunctionMapper<'a> {
                         surface: None,
                     }))
             },
-            Rvalue::Ref(_, borrow_kind, place) if self.zero_sized_local(place).is_some() => {
+            Rvalue::Ref(_, borrow_kind, place)
+                if self.zero_sized_local(place).is_some()
+                    && !(matches!(borrow_kind, MirBorrowKind::Mut { .. })
+                        && place.projection.is_empty()) =>
+            {
                 let kind = match borrow_kind {
                     MirBorrowKind::Shared => BorrowKind::Immutable,
                     MirBorrowKind::Mut { .. } => BorrowKind::Mutable,
@@ -7795,7 +8586,7 @@ impl<'a> FunctionMapper<'a> {
         }))
     }
 
-    fn map_place(&mut self, place: &rustc_public::mir::Place) -> Result<PlaceId, String> {
+    fn map_place(&mut self, place: &MirPlace) -> Result<PlaceId, String> {
         let place = &self.box_folds.resolve(place);
         let local_id = self
             .rust_to_vir
@@ -8217,7 +9008,7 @@ impl<'a> FunctionMapper<'a> {
                     callee_type.kind()
                 {
                     let callee_name = definition.name();
-                    if is_abort(&callee_name) {
+                    if is_abort(definition) {
                         if !generic_arguments.0.is_empty() || !args.is_empty() || target.is_some() {
                             return Err(format!(
                                 "unexpected MIR shape for abort intrinsic `{callee_name}`"
@@ -8228,13 +9019,26 @@ impl<'a> FunctionMapper<'a> {
                 }
                 let closure_call = match callee_type.kind() {
                     TyKind::RigidTy(RigidTy::FnDef(definition, generic_arguments)) => {
-                        closure_callee(definition, &generic_arguments)
+                        closure_callee(self.item.0, definition, &generic_arguments)
                     },
                     _ => None,
                 };
+                let tupled_evidence = match callee_type.kind() {
+                    TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) => self
+                        .method_evidence
+                        .get(self.identity)
+                        .is_some_and(|methods| {
+                            methods.iter().any(|evidence| {
+                                evidence.tupled
+                                    && evidence.method == definition
+                                    && evidence.arguments == arguments
+                            })
+                        }),
+                    _ => false,
+                };
                 // A closure's body takes its parameters spread.
-                let operands = match (&closure_call, args.as_slice()) {
-                    (Some(_), [receiver, Operand::Move(tuple) | Operand::Copy(tuple)]) => {
+                let operands = match (closure_call.is_some() || tupled_evidence, args.as_slice()) {
+                    (true, [receiver, Operand::Move(tuple) | Operand::Copy(tuple)]) => {
                         let elements = self.call_tuples.get(&tuple.local).ok_or_else(|| {
                             format!(
                                 "the argument tuple of a closure call in `{}` was not folded",
@@ -8245,8 +9049,17 @@ impl<'a> FunctionMapper<'a> {
                             .chain(elements.iter().cloned())
                             .collect()
                     },
-                    (Some(_), [receiver, _]) => vec![receiver.clone()],
-                    _ => args.clone(),
+                    (true, [receiver, Operand::Constant(tuple)]) if matches!(tuple.ty().kind(), TyKind::RigidTy(RigidTy::Tuple(ts)) if ts.is_empty()) =>
+                    {
+                        vec![receiver.clone()]
+                    },
+                    (true, _) => {
+                        return Err(
+                            "closure evidence requires a receiver and a built argument tuple"
+                                .to_owned(),
+                        )
+                    },
+                    (false, _) => args.clone(),
                 };
                 let mut arguments = operands
                     .iter()
@@ -8297,10 +9110,23 @@ impl<'a> FunctionMapper<'a> {
                             && generic_arguments.0.is_empty()
                         {
                             Operation::Primitive { kind }
+                        } else if let Some(index) =
+                            self.method_evidence.get(self.identity).and_then(|methods| {
+                                methods.iter().position(|evidence| {
+                                    evidence.method == definition
+                                        && evidence.arguments == generic_arguments
+                                })
+                            })
+                        {
+                            let callable = self.evidence_operand(index, loc)?;
+                            arguments.insert(0, callable);
+                            Operation::Call {
+                                kind: CallKind::Invoke,
+                            }
                         } else {
                             let (resolved, resolved_arguments) =
-                                resolve_callee(definition, &generic_arguments).map_err(
-                                    |reason| {
+                                resolve_callee(self.item.0, definition, &generic_arguments)
+                                    .map_err(|reason| {
                                         format!(
                                             "{} {reason}",
                                             call_site(
@@ -8310,8 +9136,7 @@ impl<'a> FunctionMapper<'a> {
                                                 &self.sources.crate_files
                                             )
                                         )
-                                    },
-                                )?;
+                                    })?;
                             let resolved_name = resolved.name();
                             let callee =
                                 self.name_ids.get(&resolved_name).cloned().ok_or_else(|| {
@@ -8362,6 +9187,17 @@ impl<'a> FunctionMapper<'a> {
                                 }
                             }
                             instantiations.extend(self.bound_lifetime_arguments(&resolved_name)?);
+                            for evidence in self
+                                .method_evidence
+                                .get(&resolved_name)
+                                .cloned()
+                                .unwrap_or_default()
+                            {
+                                arguments.push(self.evidence_for(
+                                    &evidence.instantiate(&resolved_arguments),
+                                    loc,
+                                )?);
+                            }
                             Operation::Call {
                                 kind: CallKind::Function { callee },
                             }
@@ -8424,7 +9260,7 @@ impl<'a> FunctionMapper<'a> {
                 unwind: map_unwind(unwind),
             }),
             TerminatorKind::Return => {
-                let return_place = rustc_public::mir::Place {
+                let return_place = MirPlace {
                     local: 0,
                     projection: vec![],
                 };

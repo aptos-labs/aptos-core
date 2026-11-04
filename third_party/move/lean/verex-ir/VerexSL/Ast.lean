@@ -107,6 +107,8 @@ structure GenericBinder where
   /-- A type parameter no field of the declaration stores. Move spells this
   `phantom`; the marker is recorded as a profile predicate on the binder. -/
   phantom : Bool := false
+  /-- Regions this lifetime parameter is declared to outlive. -/
+  outlives : Array SourceLifetime := #[]
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -328,6 +330,28 @@ structure Parameter where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
+/-- Literal or unresolved name assigned in declaration metadata. -/
+inductive SourceAttributeValue where
+  | number (value : Nat)
+  | string (value : String)
+  | name (value : String)
+  /-- A name in another namespace, as written. -/
+  | qualifiedName (value : String)
+  deriving Repr, BEq, Inhabited
+
+/-- Structured declaration metadata. Intrinsic owner/role annotations use
+the same call syntax, but are consumed into the intrinsic graph by lowering. -/
+inductive SourceAttribute where
+  | call (name : String) (arguments : Array SourceAttribute) (span : Span)
+  | assign (name : String) (value : SourceAttributeValue) (span : Span)
+  deriving Repr, BEq, Inhabited
+
+def SourceAttribute.name : SourceAttribute → String
+  | .call name .. | .assign name .. => name
+
+def SourceAttribute.span : SourceAttribute → Span
+  | .call _ _ span | .assign _ _ span => span
+
 mutual
 inductive Expr where
   | unit (span : Span := {})
@@ -351,7 +375,7 @@ inductive Expr where
   `function` in the struct's scope. `lower` makes them items of the enclosing
   module and leaves the construction here. -/
   | closureItem (name : String) (generics : Array GenericBinder) (abilities : Array Ability)
-      (captures : Array (String × Located Ty × Expr)) (function : String)
+      (captures : Array (String × Located Ty × Expr)) (attributes : Array SourceAttribute) (function : String)
       (functionGenerics : Array GenericBinder) (parameters : Array Parameter)
       (result : Located Ty) (body : Expr) (span : Span := {})
   | invoke (callable : Expr) (arguments : Array Expr) (span : Span := {})
@@ -479,7 +503,7 @@ def Expr.span : Expr → Span
       .ifElse _ _ _ span | .match_ _ _ span |
       .forRange _ _ _ _ span |
       .loop _ span _ | .break_ _ span _ | .continue_ span _ |
-      .closureItem _ _ _ _ _ _ _ _ _ span |
+      .closureItem _ _ _ _ _ _ _ _ _ _ span |
       .assign _ _ span | .assignExpression _ _ span | .rawAssignExpression _ _ span |
       .assignPattern _ _ _ span |
       .return_ _ span | .throw_ _ _ span => span
@@ -542,28 +566,6 @@ def ContractClause.span : ContractClause → Span
       .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
       .reads _ span | .readsAll span | .modifiesOf _ _ _ span | .modifiesOfAll _ span |
       .ghost _ _ _ span => span
-
-/-- Literal or unresolved name assigned in declaration metadata. -/
-inductive SourceAttributeValue where
-  | number (value : Nat)
-  | string (value : String)
-  | name (value : String)
-  /-- A name in another namespace, as written. -/
-  | qualifiedName (value : String)
-  deriving Repr, BEq, Inhabited
-
-/-- Structured declaration metadata. Intrinsic owner/role annotations use
-the same call syntax, but are consumed into the intrinsic graph by lowering. -/
-inductive SourceAttribute where
-  | call (name : String) (arguments : Array SourceAttribute) (span : Span)
-  | assign (name : String) (value : SourceAttributeValue) (span : Span)
-  deriving Repr, BEq, Inhabited
-
-def SourceAttribute.name : SourceAttribute → String
-  | .call name .. | .assign name .. => name
-
-def SourceAttribute.span : SourceAttribute → Span
-  | .call _ _ span | .assign _ _ span => span
 
 /-- The conditions a `spec` item states of one of its function's loops. -/
 structure LoopSpecification where

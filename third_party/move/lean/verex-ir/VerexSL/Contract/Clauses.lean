@@ -649,12 +649,6 @@ private partial def functionLiteral (context : Context) (reference : VerexIR.Qua
   let some handle := VerexIR.SemanticOperations.resolveFunction? context.unit
       context.namespaceId reference
     | throwError "a function value's target does not resolve"
-  let some targetNs := context.unit.namespaces[handle.namespaceId.index]?
-    | throwError "a function value's target does not resolve"
-  let some target := targetNs.functions[handle.functionId.index]?
-    | throwError "a function value's target does not resolve"
-  if let some refusal := VerexIR.Proofs.Denote.closureTargetRefusal targetNs target then
-    throwError refusal
   let some (parameters, _) := VerexIR.Proofs.Denote.closureSignature? context.unit handle
     | throwError "a function value's target has no native signature"
   let captured := VerexIR.Proofs.Denote.NRow.ofList (VerexIR.ClosureMask.extract mask true parameters)
@@ -2472,14 +2466,20 @@ where
         atCall (← mkAppM ``ite #[bounds, expanded, outside])
     | .specification (.result index) =>
         match context.resultTypes[0]?, context.results[0]? with
-        | some (.tuple _), some _ =>
+        | some (VerexIR.Ty.tuple _), some _ => do
             -- A tuple result is one physical result, Move's several returns
             -- included. `spec.result[i]` denotes component `i` of the native
             -- tuple, without inventing extra result slots.
             let some component := context.resultComponents[index]?
               | throwError "specification result {index} is out of range"
-            let some logicalType := typeOfResultComponent? context index
+            let some (logicalType : IrTy) := typeOfResultComponent? context index
               | throwError "specification result {index} has no logical domain"
+            -- A nested tuple's binder still holds fixed-width integers;
+            -- its specification type reads those integers unbounded.
+            if logicalType matches .tuple _ then
+              let held ← tupleLocalType logicalType
+              let read ← context.nativeType resultTypeId
+              if held != read then return ← coerceNative (← context.carriers) held read component
             (domainOf logicalType).ofBinder component
         | _, _ =>
             let some binder := context.results[index]?
@@ -2796,6 +2796,16 @@ where
           finalValues := finalValues.push (← nativeOfClause carriers τ (← translate finalContext final))
         let result ← match invocation.shape, declared.toList with
           | .none, [] => pure (mkConst ``Unit.unit)
+          | .one (.tuple elements), outputs =>
+              -- The source predicate spells a tuple's result elements
+              -- separately; the invocation carries one packed tuple.
+              unless outputs.length == elements.toList.length do
+                throwError "`ensures_of` names each element of the tuple result"
+              let values ← (outputs.zip elements.toList).mapM fun (output, target) => do
+                let source ← context.exprType output
+                let value ← nativeOfClause carriers source (← translate context output)
+                coerceNative carriers source target value
+              nativeValueRow carriers elements values
           | .one (.ref σ), [output] =>
               -- A returned mutable reference at its value at return.
               let value ← nativeOfClause carriers σ (← translate context output)

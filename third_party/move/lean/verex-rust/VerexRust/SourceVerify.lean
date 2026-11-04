@@ -26,6 +26,70 @@ namespace VerexIR.Rust.SourceVerify
 
 open VerexSL.SourceVerify
 
+/-- Checked forwarding contracts for exporter-generated Fn-to-FnMut bodies.
+These are ordinary specifications: verification must prove them from the
+adapter's shared invocation, including preservation of the mutable receiver.
+The marker never grants a theorem or changes the body's semantics. -/
+private def adapterSpecs (unit : VerexIR.Validation.ValidatedUnit)
+    (source : System.FilePath) : Except String (Array Companion) := do
+  let some ns := unit.namespaces[0]? | return #[]
+  let mut specifications : Array String := #[]
+  for function in ns.functions do
+    let marker (key : String) := function.attributes.findSome? (fun
+      | .assign name (.constant (.integer index)) _ => if name == key then some index else none
+      | _ => none)
+    let dictionaryIndex := marker "shared_method_adapter"
+    let closureTarget := function.attributes.findSome? (fun
+      | .assign "closure_method_adapter" (.constant (.string target)) _ => some target
+      | _ => none)
+    if dictionaryIndex.isNone && closureTarget.isNone then continue
+    let parameters := function.signature.parameters
+    let some receiver := parameters[0]? | throw "shared adapter has no receiver"
+    let some name := ns.nameOf function.name | throw "shared adapter has no name"
+    unless name.scope.isEmpty do throw "shared adapter must be at crate scope"
+    let (callable, parameterCount) ← match dictionaryIndex, closureTarget with
+      | some index, none => do
+          unless parameters.size ≥ 2 && index == Int.ofNat (parameters.size - 1) do
+            throw "shared adapter dictionary must be its final parameter"
+          let some dictionary := parameters.back? | throw "shared adapter has no dictionary"
+          pure (s!"«{dictionary.name}»", parameters.size - 1)
+      | none, some qualified => do
+          let some target := ns.functions.find? (fun candidate =>
+              (ns.nameOf candidate.name).any fun name =>
+                "::".intercalate (name.scope.push name.name).toList == qualified)
+            | throw "closure adapter target is missing"
+          pure (← VerexSL.Print.declaredFunctionText unit ns target, parameters.size)
+      | _, _ => throw "shared adapter has conflicting targets"
+    let some result := function.signature.results[0]? | throw "shared adapter has no result"
+    let outputs := match unit.tables.types[result.typeId.index]? with
+      | some .unit => #[]
+      | some (.tuple elements) => elements.mapIdx fun index _ => s!"spec.result[{index}]"
+      | _ => #["result"]
+    let receiver := s!"«{receiver.name}»"
+    let mut inputs := #[s!"old({receiver})"]
+    let mut mutated := #[]
+    for parameter in parameters.extract 1 parameterCount do
+      let name := s!"«{parameter.name}»"
+      match unit.tables.types[parameter.typeUse.typeId.index]? with
+        | some (.reference reference) =>
+            if reference.kind == .mutable then
+              inputs := inputs.push s!"old({name})"
+              mutated := mutated.push name
+            else inputs := inputs.push name
+        | _ => inputs := inputs.push name
+    let arguments := inputs ++ outputs ++ mutated
+    specifications := specifications.push s!"spec «{name.name}» where
+  pragma opaque
+  ensures {receiver} == old({receiver})
+  ensures ensures_of<{callable}>({", ".intercalate arguments.toList})
+"
+  if specifications.isEmpty then return #[]
+  return #[{
+    path := source
+    generated := true
+    namespaceId := ns.unitIdentity
+    text := some ("\n".intercalate specifications.toList) }]
+
 /-- The specification file of a Rust source: the one named, or
 `<name>.spec.lean` beside `<name>.rs`, read when it exists. Its items are
 spliced into the crate's namespace, the unit's first. -/
@@ -34,7 +98,10 @@ def specsFor (unit : VerexIR.Validation.ValidatedUnit) (source : System.FilePath
   let path := named.getD (source.withExtension "spec.lean")
   let some ns := unit.namespaces[0]? | return #[]
   let text ← if ← path.pathExists then some <$> IO.FS.readFile path else pure none
-  return #[{ path, namespaceId := ns.unitIdentity, text }]
+  let adapters ← match adapterSpecs unit source with
+    | .ok adapters => pure adapters
+    | .error error => throw <| IO.userError error
+  return adapters ++ #[{ path, namespaceId := ns.unitIdentity, text }]
 
 /-- The files of a crate's modules: the root's and each module's declared in a
 file of its own, with the module's scope. A scope's file holds its
@@ -48,7 +115,12 @@ def moduleFiles (unit : VerexIR.Validation.ValidatedUnit)
     return (← ns.localTables.files[range.file.index]?).name
   let scopeOf (name : VerexIR.NameId) : Array String :=
     ((ns.nameOf name).map (·.scope)).getD #[]
-  let declarations := ns.functions.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
+  -- Generated adapters have specifications supplied by adapterSpecs. Their
+  -- crate-scoped names must not make a module file appear to declare root items.
+  let sourceFunctions := ns.functions.filter fun function =>
+    !function.attributes.any (fun attr => attr matches
+      .assign "shared_method_adapter" _ _ | .assign "closure_method_adapter" _ _)
+  let declarations := sourceFunctions.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.structs.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.constants.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.scopes.map fun scope => (scope.path.pop, scope.loc)
@@ -78,10 +150,14 @@ def crateSpecs (unit : VerexIR.Validation.ValidatedUnit) (root : System.FilePath
   let files ← match moduleFiles unit ns with
     | .ok files => pure files
     | .error message => throw <| IO.userError message
-  files.mapM fun (scope, file) => do
+  let companions ← files.mapM fun (scope, file) => do
     let path := (root / file).withExtension "spec.lean"
     let text ← if ← path.pathExists then some <$> IO.FS.readFile path else pure none
     return { path, namespaceId := ns.unitIdentity, scope, text }
+  let adapters ← match adapterSpecs unit root with
+    | .ok adapters => pure adapters
+    | .error error => throw <| IO.userError error
+  return adapters ++ companions
 
 /-- What a type names: its nominal types, each `crate::scope::name`, and its scalars. -/
 private partial def namedBy (unit : VerexIR.Validation.ValidatedUnit) (type : VerexIR.TypeId)

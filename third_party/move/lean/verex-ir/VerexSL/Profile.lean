@@ -69,7 +69,7 @@ def rustSchema : ProfileSchema where
   checkSurface := unsupportedExtension "Rust" "surface"
   checkProperty := fun value =>
     if value.tag == rustClosureTag || value.tag == rustRefusedTag ||
-        (value.tag == rustOpaqueTag || value.tag == rustDependencyTag ||
+        (value.tag == rustOpaqueTag || value.tag == rustDependencyTag || value.tag == rustShapeOnlyTag ||
           value.tag == rustOpaqueFunctionTag || value.tag == destructorTag) &&
           value.payload.isEmpty
     then #[]

@@ -11,8 +11,9 @@ verex namespace alloc where
 
   mod vec where
     trait impl «<&'a std::vec::Vec<T, A> as std::iter::IntoIterator>» where
+      @[shape_only]
       native fun into_iter {a : lifetime} {T} {A} {IntoIter}(
-        _1 : &Vector<T>
+        _1 : &[a] Vector<T>
       ) -> IntoIter
 
 verex namespace core where
@@ -26,6 +27,7 @@ verex namespace core where
           count : usize
 
         trait impl «<std::iter::Enumerate<I> as std::iter::Iterator>» where
+          @[shape_only]
           native fun next {I} {Item}(
             _1 : &mut Enumerate<I>
           ) -> option::Option<(usize, Item)>
@@ -35,6 +37,7 @@ verex namespace core where
           iter : T
 
         trait impl «<std::iter::Rev<I> as std::iter::Iterator>» where
+          @[shape_only]
           native fun next {I} {Item}(_1 : &mut Rev<I>) -> option::Option<Item>
 
       mod step_by where
@@ -44,6 +47,7 @@ verex namespace core where
           first_take : Bool
 
         trait impl «<std::iter::StepBy<I> as std::iter::Iterator>» where
+          @[shape_only]
           native fun next {I} {Item}(
             _1 : &mut StepBy<I>
           ) -> option::Option<Item>
@@ -98,9 +102,9 @@ verex namespace core where
         end : usize
 
       trait impl «<std::slice::Iter<'a, T> as std::iter::Iterator>» where
-        native fun next {a : lifetime} {T}(
-          _1 : &mut Iter<lifetime _, T>
-        ) -> option::Option<&T>
+        native fun next {a : lifetime} {T} {l2 : lifetime}(
+          _1 : &[l2] mut Iter<lifetime a, T>
+        ) -> option::Option<&[a] T>
 
   mod primitive where
     impl slice where

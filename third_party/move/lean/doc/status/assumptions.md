@@ -97,13 +97,17 @@ hypotheses the theorems take.
   Every outcome of a run is an outcome of the reading in which the runs
   pass each assumption only where its condition holds. A caller using the
   theorem takes the same hypothesis; one inlining the function takes none.
-- **A dropped type argument's destructor** (no hypothesis states it; Rust
-  functions dropping a type parameter). The argument's destructor has no
+- **`DroppedTypeArgumentsTrivial`** (public generic Rust `verified` theorems,
+  including recursive functions). The argument's destructor has no
   observable effect and does not panic: the runtime and the denotation read the
   drop as removing the value. A call in the unit instantiating such a parameter
   at a type with a destructor has no denotation (`dropsDestructor`,
   `Denote/Compile.lean`), so only a use of the theorem outside the unit relies
-  on this. Discharged by M4 of
+  on this. The public theorem now requires that the instantiated types of
+  potentially dropped parameters have no destructor and hold no mutable loan.
+  Internal `typedVerified` and `typedSemanticsVerified` artifacts remain about
+  VIR's pure-drop semantics; they are not a claim about arbitrary Rust drop glue.
+  The exporter/type alignment remains trusted until M7. Discharged by M4 of
   [`rust-mir-design.md`](../designs/rust-mir-design.md), where a drop runs the
   destructor.
 - **A diverging region is a panic** (no hypothesis states it; Rust functions).

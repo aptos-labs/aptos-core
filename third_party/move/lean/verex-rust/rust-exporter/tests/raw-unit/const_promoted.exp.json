@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -20,10 +20,38 @@
             "value": {
               "sourceConstant": null,
               "value": {
-                "opaque": {
-                  "description": "the constant of type `&u64` is promoted from `const_promoted::promoted`, and Rustc Public cannot evaluate a promoted constant"
+                "integer": {
+                  "value": 5
                 }
               }
+            }
+          },
+          "loc": {
+            "index": 3
+          },
+          "typeId": {
+            "index": 1
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 0
+                }
+              ],
+              "instantiations": [],
+              "operation": {
+                "reference": {
+                  "kind": {
+                    "borrow": {
+                      "kind": "immutable"
+                    }
+                  }
+                }
+              },
+              "surface": null
             }
           },
           "loc": {
@@ -40,7 +68,7 @@
                 "index": 0
               },
               "value": {
-                "index": 0
+                "index": 1
               }
             }
           },
@@ -92,7 +120,7 @@
                       {
                         "execute": {
                           "expression": {
-                            "index": 1
+                            "index": 2
                           }
                         }
                       }
@@ -101,7 +129,7 @@
                       "return_": {
                         "values": [
                           {
-                            "index": 2
+                            "index": 3
                           }
                         ]
                       }
@@ -247,7 +275,7 @@
     "files": [
       {
         "contentHash": "",
-        "name": "tests/opaque-unit/const_promoted.rs"
+        "name": "tests/raw-unit/const_promoted.rs"
       }
     ],
     "lifetimes": [

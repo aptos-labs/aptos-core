@@ -3570,24 +3570,38 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           -- The value is typed by its carrier; an invocation's rows that
           -- mention the frame's type parameters are decided where the frame
           -- resolves them to scalars.
-          for invoked in #[row, type.getArg! 2] do
+          let methodEvidence := declaration.profile == .rust &&
+            declaration.attributes.any (fun
+              | .assign "method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false)
+          for invoked in (if methodEvidence then #[] else #[row, type.getArg! 2]) do
             if mentionsInvocableParameter invoked then
               conjuncts := conjuncts.push
                 (mkAppN (mkConst ``VerexIR.Proofs.ScalarAt)
                   ((← frameLeading signature.skolems) ++ #[signature.skolems, invoked]))
           -- Over a model, the frame is of the model's invocations.
           let invoke? ← modelInvoke? executable signature.skolems
+          -- A compiler-generated static method dictionary carries a checked
+          -- non-panicking, memory-preserving contract. Unlike the ordinary
+          -- function-value frame, this obligation applies to mutable receivers.
+          if methodEvidence then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.MethodContract)
+                ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+              #[row, sharing, shape, value])
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>
-              conjuncts := conjuncts.push (← match invoke? with
-                | some invoke =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
-                      ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
-                      #[row, sharing, shape, value]
-                | none =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
-                      ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
-                      #[row, sharing, shape, value])
+              unless methodEvidence do
+                conjuncts := conjuncts.push (← match invoke? with
+                  | some invoke =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
+                        ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
+                        #[row, sharing, shape, value]
+                  | none =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
+                        ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+                        #[row, sharing, shape, value])
           | some frame =>
               -- The closed frame but for the targets, the formals bound to
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.

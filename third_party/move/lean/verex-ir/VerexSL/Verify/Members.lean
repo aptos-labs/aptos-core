@@ -621,9 +621,14 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
               (mkApp2 (mkConst ``Skolems.runtime) unitExpr functions)
             withLocalDeclD `coherent (mkAppN (mkConst ``Coherent)
                 #[unitExpr, functions, induced, toExpr handle, instantiation]) fun coherent => do
-            mkForallFVars #[θ, free, instantiation, frame, coherent]
+            let conclusion ← mkForallFVars #[instantiation, frame, coherent]
               (← mkAppM ``VerexIR.Proofs.SatisfiesFunctionAt
                 #[executable, toExpr handle, instantiation, contractAt #[θ, instantiation]])
+            let conclusion ← if declaration.profile == .rust then
+                mkArrow (mkApp3 (mkConst ``DroppedTypeArgumentsTrivial) unitExpr (toExpr handle) θ)
+                  conclusion
+              else pure conclusion
+            mkForallFVars #[θ, free] conclusion
           else
             mkAppM ``VerexIR.Proofs.SatisfiesFunction #[executable, toExpr handle, contractAt #[]]
         -- The natives the theorems assume, in their binding order.
@@ -3295,6 +3300,12 @@ private def transportCommands (m : Member) (runtimeFrame instantiation contract 
       let publicContract ← atUnit segments unit (contractName segments function) publicContract
         none #[← `(term| θ), ← `(term| typeInstantiation)]
       let induced ← `(term| (VerexIR.Proofs.Denote.Skolems.instantiate θ $runtimeFrame))
+      let dropBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+        if declaration.profile == .rust then
+          pure #[← `(bracketedBinder|
+            (trivialDrops : VerexIR.Proofs.Denote.DroppedTypeArgumentsTrivial
+              $unitTerm $handleTerm θ))]
+        else pure #[]
       `(command|
         theorem $(mkIdent (verifiedName segments function))
             {registry : VerexIR.Validation.SemanticsRegistry}
@@ -3304,6 +3315,7 @@ private def transportCommands (m : Member) (runtimeFrame instantiation contract 
             (globalsPreserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
             (failuresIntegral : VerexIR.Proofs.Denote.FailuresIntegral executable)
             $nativeBinders* (θ : VerexIR.Proofs.Denote.TypeArgs) (free : θ.1.refFree = true)
+            $dropBinders*
             (typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)) $frameBinders*
             (coherent : @VerexIR.Proofs.Denote.Coherent $unitTerm _ $induced $handleTerm
               typeInstantiation) :
@@ -4047,6 +4059,12 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
               (rootIdent (contractName segments name)) none
               #[← `(term| θ), ← `(term| typeInstantiation)]
             let induced ← `(term| (VerexIR.Proofs.Denote.Skolems.instantiate θ $runtimeFrame))
+            let dropBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+              if (declarationOf? unit member).any (·.profile == .rust) then
+                pure #[← `(bracketedBinder|
+                  (trivialDrops : VerexIR.Proofs.Denote.DroppedTypeArgumentsTrivial
+                    $unitTerm $handleTerm θ))]
+              else pure #[]
             `(command|
               theorem $(mkIdent (verifiedName segments name))
                   {registry : VerexIR.Validation.SemanticsRegistry}
@@ -4056,6 +4074,7 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
                   (globalsPreserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
                   (failuresIntegral : VerexIR.Proofs.Denote.FailuresIntegral executable)
                   $nativeBinders* (θ : VerexIR.Proofs.Denote.TypeArgs) (free : θ.1.refFree = true)
+                  $dropBinders*
                   (typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId))
                   (_frame : VerexIR.Proofs.Denote.FrameOf $unitTerm $handleTerm
                     $(← bindersTerm (memberBinders member)) typeInstantiation)

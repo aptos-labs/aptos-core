@@ -111,6 +111,59 @@ def checkCargoImportDriver : IO Unit := do
       throw <| IO.userError s!"Cargo specification files were not found by module: \
         {specs.map fun companion => (companion.scope, companion.path)}"
 
+/-- Both receiver adapters are covered by synthesized, proved specifications;
+these items do not pretend to come from a companion file on disk. -/
+def checkAdapterSpecs (environment : Lean.Environment) : IO Unit := do
+  IO.FS.withTempDir fun directory => do
+    let source : System.FilePath := "rust-exporter/tests/raw-unit/tuple_callbacks.rs"
+    let imported ← importRustFile { source, output := directory / "adapters.raw.json" }
+    let companions ← VerexIR.Rust.SourceVerify.specsFor imported.unit source none
+    let #[generated] := companions.filter (·.generated)
+      | throw <| IO.userError "expected one generated adapter companion"
+    unless generated.path == source do
+      throw <| IO.userError "adapter contracts must retain generated-file diagnostics"
+    let text := generated.text.getD ""
+    unless (text.splitOn "ensures ensures_of<function[").length == 3 &&
+        (text.splitOn "== old(").length == 3 do
+      throw <| IO.userError "both closure adapters need behavior and receiver-preservation contracts"
+    let reimported ← match VerexSL.Print.reimportUnit environment imported.unit with
+      | .ok unit => pure unit
+      | .error error => throw <| IO.userError s!"adapter round-trip failed: {error}"
+    let roundTrip ← VerexIR.Rust.SourceVerify.specsFor reimported source none
+    let contracts (text : String) :=
+      ((text.splitOn "\n\n").toArray.map (·.trimAscii.toString)).qsort (· < ·)
+    unless (roundTrip.filter (·.generated)).map (fun c => contracts (c.text.getD "")) ==
+        #[contracts text] do
+      throw <| IO.userError "adapter target changed when the rendering was reimported"
+    let some ns := imported.unit.namespaces[0]?
+      | throw <| IO.userError "adapter fixture has no namespace"
+    match VerexIR.Rust.SourceVerify.moduleFiles imported.unit ns with
+    | .ok files => unless files.size == 1 && files[0]!.1.isEmpty do
+        throw <| IO.userError "generated closure adapters changed module discovery"
+    | .error error => throw <| IO.userError error
+
+/-- An error in synthesized text names the persisted rendering, with its real
+line numbers, rather than the nominal companion path. -/
+def checkGeneratedDiagnostics (environment : Lean.Environment) : IO Unit := do
+  IO.FS.withTempDir fun directory => do
+    let imported ← importRustFile {
+      source := "rust-exporter/tests/raw-unit/basic.rs"
+      output := directory / "basic.raw.json" }
+    let some ns := imported.unit.namespaces[0]?
+      | throw <| IO.userError "diagnostic fixture has no namespace"
+    let output := directory / "generated.lean"
+    let reports ← VerexSL.SourceVerify.run environment {
+      unit := imported.unit, output
+      companions := #[{
+        path := directory / "not-a-real-companion.spec.lean"
+        namespaceId := ns.unitIdentity, generated := true
+        text := some "spec answer where\n  ensures false\n" }] }
+    unless reports.any (fun report => report.file == output.toString &&
+        report.text.contains "not established") do
+      throw <| IO.userError s!"a generated specification error did not name its rendering: {reports.map (·.render)}"
+    unless ← output.pathExists do
+      throw <| IO.userError "generated diagnostic target does not exist"
+
 /-- The import rewrites a type the library models to its VIR type, and the
 verification keeps the library's contracts of the functions a unit declares. -/
 def checkLibrary : IO Unit := do
@@ -209,3 +262,9 @@ def checkLibrary : IO Unit := do
 #eval checkImportDriver *> checkCargoImportDriver *> checkLibrary
 
 end VerexIR.Rust.Tests
+
+open Lean Elab Command in
+run_cmd do
+  let environment ← getEnv
+  liftIO <| VerexIR.Rust.Tests.checkAdapterSpecs environment
+  liftIO <| VerexIR.Rust.Tests.checkGeneratedDiagnostics environment

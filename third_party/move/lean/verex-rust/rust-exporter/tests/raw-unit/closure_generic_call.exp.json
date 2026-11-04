@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -62,9 +62,31 @@
               "arguments": [],
               "instantiations": [],
               "operation": {
-                "copy": {
+                "move": {
                   "place": {
                     "index": 2
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 5
+          },
+          "typeId": {
+            "index": 7
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 3
                   }
                 }
               },
@@ -81,52 +103,10 @@
         {
           "kind": {
             "operation": {
-              "arguments": [
-                {
-                  "index": 2
-                }
-              ],
-              "instantiations": [],
-              "operation": {
-                "primitive": {
-                  "kind": "tuple"
-                }
-              },
-              "surface": null
-            }
-          },
-          "loc": {
-            "index": 5
-          },
-          "typeId": {
-            "index": 4
-          }
-        },
-        {
-          "kind": {
-            "assign": {
-              "place": {
-                "index": 3
-              },
-              "value": {
-                "index": 3
-              }
-            }
-          },
-          "loc": {
-            "index": 5
-          },
-          "typeId": {
-            "index": 0
-          }
-        },
-        {
-          "kind": {
-            "operation": {
               "arguments": [],
               "instantiations": [],
               "operation": {
-                "move": {
+                "copy": {
                   "place": {
                     "index": 4
                   }
@@ -139,7 +119,37 @@
             "index": 5
           },
           "typeId": {
-            "index": 7
+            "index": 10
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [
+                {
+                  "index": 4
+                },
+                {
+                  "index": 2
+                },
+                {
+                  "index": 3
+                }
+              ],
+              "instantiations": [],
+              "operation": {
+                "call": {
+                  "kind": "invoke"
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 5
+          },
+          "typeId": {
+            "index": 2
           }
         },
         {
@@ -150,7 +160,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 5
+                    "index": 7
                   }
                 }
               },
@@ -158,47 +168,7 @@
             }
           },
           "loc": {
-            "index": 5
-          },
-          "typeId": {
-            "index": 4
-          }
-        },
-        {
-          "kind": {
-            "value": {
-              "sourceConstant": null,
-              "value": {
-                "opaque": {
-                  "description": "call of `std::ops::Fn::call` in `closure_generic_call::apply` at line 5:5 depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type"
-                }
-              }
-            }
-          },
-          "loc": {
-            "index": 5
-          },
-          "typeId": {
-            "index": 0
-          }
-        },
-        {
-          "kind": {
-            "operation": {
-              "arguments": [],
-              "instantiations": [],
-              "operation": {
-                "move": {
-                  "place": {
-                    "index": 8
-                  }
-                }
-              },
-              "surface": null
-            }
-          },
-          "loc": {
-            "index": 7
+            "index": 8
           },
           "typeId": {
             "index": 2
@@ -213,7 +183,7 @@
                 "borrow": {
                   "kind": "immutable",
                   "place": {
-                    "index": 9
+                    "index": 8
                   }
                 }
               },
@@ -221,7 +191,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 12
           },
           "typeId": {
             "index": 8
@@ -231,15 +201,15 @@
           "kind": {
             "assign": {
               "place": {
-                "index": 10
+                "index": 9
               },
               "value": {
-                "index": 9
+                "index": 7
               }
             }
           },
           "loc": {
-            "index": 11
+            "index": 12
           },
           "typeId": {
             "index": 0
@@ -253,7 +223,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 11
+                    "index": 10
                   }
                 }
               },
@@ -261,7 +231,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 12
           },
           "typeId": {
             "index": 8
@@ -272,7 +242,7 @@
             "operation": {
               "arguments": [
                 {
-                  "index": 11
+                  "index": 9
                 }
               ],
               "instantiations": [
@@ -305,7 +275,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 12
           },
           "typeId": {
             "index": 5
@@ -315,15 +285,15 @@
           "kind": {
             "assign": {
               "place": {
-                "index": 12
+                "index": 11
               },
               "value": {
-                "index": 12
+                "index": 10
               }
             }
           },
           "loc": {
-            "index": 11
+            "index": 12
           },
           "typeId": {
             "index": 0
@@ -337,7 +307,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 13
+                    "index": 12
                   }
                 }
               },
@@ -345,7 +315,7 @@
             }
           },
           "loc": {
-            "index": 12
+            "index": 13
           },
           "typeId": {
             "index": 5
@@ -363,7 +333,7 @@
             }
           },
           "loc": {
-            "index": 12
+            "index": 13
           },
           "typeId": {
             "index": 2
@@ -372,12 +342,47 @@
         {
           "kind": {
             "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "call": {
+                  "kind": {
+                    "closure": {
+                      "function": {
+                        "name": {
+                          "index": 2
+                        },
+                        "namespaceId": {
+                          "index": 0
+                        }
+                      },
+                      "mask": 0
+                    }
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 13
+          },
+          "typeId": {
+            "index": 11
+          }
+        },
+        {
+          "kind": {
+            "operation": {
               "arguments": [
                 {
-                  "index": 14
+                  "index": 12
                 },
                 {
-                  "index": 15
+                  "index": 13
+                },
+                {
+                  "index": 14
                 }
               ],
               "instantiations": [
@@ -385,7 +390,7 @@
                   "typeArg": {
                     "value": {
                       "loc": {
-                        "index": 12
+                        "index": 13
                       },
                       "typeId": {
                         "index": 5
@@ -414,7 +419,7 @@
             }
           },
           "loc": {
-            "index": 12
+            "index": 13
           },
           "typeId": {
             "index": 2
@@ -428,7 +433,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 15
+                    "index": 14
                   }
                 }
               },
@@ -436,7 +441,7 @@
             }
           },
           "loc": {
-            "index": 13
+            "index": 14
           },
           "typeId": {
             "index": 2
@@ -450,7 +455,7 @@
               "operation": {
                 "copy": {
                   "place": {
-                    "index": 18
+                    "index": 17
                   }
                 }
               },
@@ -458,7 +463,7 @@
             }
           },
           "loc": {
-            "index": 17
+            "index": 18
           },
           "typeId": {
             "index": 8
@@ -468,15 +473,15 @@
           "kind": {
             "assign": {
               "place": {
-                "index": 19
+                "index": 18
               },
               "value": {
-                "index": 18
+                "index": 17
               }
             }
           },
           "loc": {
-            "index": 17
+            "index": 18
           },
           "typeId": {
             "index": 0
@@ -490,7 +495,7 @@
               "operation": {
                 "copy": {
                   "place": {
-                    "index": 21
+                    "index": 20
                   }
                 }
               },
@@ -498,7 +503,7 @@
             }
           },
           "loc": {
-            "index": 17
+            "index": 18
           },
           "typeId": {
             "index": 2
@@ -508,18 +513,40 @@
           "kind": {
             "assign": {
               "place": {
-                "index": 22
+                "index": 21
               },
               "value": {
-                "index": 20
+                "index": 19
               }
             }
           },
           "loc": {
-            "index": 17
+            "index": 18
           },
           "typeId": {
             "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "copy": {
+                  "place": {
+                    "index": 22
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 19
+          },
+          "typeId": {
+            "index": 2
           }
         },
         {
@@ -538,29 +565,7 @@
             }
           },
           "loc": {
-            "index": 18
-          },
-          "typeId": {
-            "index": 2
-          }
-        },
-        {
-          "kind": {
-            "operation": {
-              "arguments": [],
-              "instantiations": [],
-              "operation": {
-                "copy": {
-                  "place": {
-                    "index": 24
-                  }
-                }
-              },
-              "surface": null
-            }
-          },
-          "loc": {
-            "index": 18
+            "index": 19
           },
           "typeId": {
             "index": 2
@@ -571,10 +576,10 @@
             "operation": {
               "arguments": [
                 {
-                  "index": 22
+                  "index": 21
                 },
                 {
-                  "index": 23
+                  "index": 22
                 }
               ],
               "instantiations": [],
@@ -587,7 +592,7 @@
             }
           },
           "loc": {
-            "index": 18
+            "index": 19
           },
           "typeId": {
             "index": 6
@@ -597,15 +602,15 @@
           "kind": {
             "assign": {
               "place": {
-                "index": 25
+                "index": 24
               },
               "value": {
-                "index": 24
+                "index": 23
               }
             }
           },
           "loc": {
-            "index": 18
+            "index": 19
           },
           "typeId": {
             "index": 0
@@ -623,7 +628,7 @@
             }
           },
           "loc": {
-            "index": 18
+            "index": 19
           },
           "typeId": {
             "index": 2
@@ -637,7 +642,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 27
+                    "index": 26
                   }
                 }
               },
@@ -645,7 +650,7 @@
             }
           },
           "loc": {
-            "index": 18
+            "index": 19
           },
           "typeId": {
             "index": 1
@@ -663,7 +668,7 @@
             }
           },
           "loc": {
-            "index": 18
+            "index": 19
           },
           "typeId": {
             "index": 2
@@ -677,47 +682,7 @@
               "operation": {
                 "move": {
                   "place": {
-                    "index": 29
-                  }
-                }
-              },
-              "surface": null
-            }
-          },
-          "loc": {
-            "index": 18
-          },
-          "typeId": {
-            "index": 2
-          }
-        },
-        {
-          "kind": {
-            "assign": {
-              "place": {
-                "index": 30
-              },
-              "value": {
-                "index": 29
-              }
-            }
-          },
-          "loc": {
-            "index": 18
-          },
-          "typeId": {
-            "index": 0
-          }
-        },
-        {
-          "kind": {
-            "operation": {
-              "arguments": [],
-              "instantiations": [],
-              "operation": {
-                "move": {
-                  "place": {
-                    "index": 31
+                    "index": 28
                   }
                 }
               },
@@ -730,6 +695,46 @@
           "typeId": {
             "index": 2
           }
+        },
+        {
+          "kind": {
+            "assign": {
+              "place": {
+                "index": 29
+              },
+              "value": {
+                "index": 28
+              }
+            }
+          },
+          "loc": {
+            "index": 19
+          },
+          "typeId": {
+            "index": 0
+          }
+        },
+        {
+          "kind": {
+            "operation": {
+              "arguments": [],
+              "instantiations": [],
+              "operation": {
+                "move": {
+                  "place": {
+                    "index": 30
+                  }
+                }
+              },
+              "surface": null
+            }
+          },
+          "loc": {
+            "index": 20
+          },
+          "typeId": {
+            "index": 2
+          }
         }
       ],
       "functions": [
@@ -737,7 +742,25 @@
           "alignment": {
             "index": 0
           },
-          "attributes": [],
+          "attributes": [
+            {
+              "assign": {
+                "loc": {
+                  "index": 0
+                },
+                "name": "method_evidence",
+                "value": {
+                  "constant": {
+                    "value": {
+                      "integer": {
+                        "value": 2
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "body": {
             "cfg": {
               "graph": {
@@ -753,23 +776,16 @@
                             "index": 1
                           }
                         }
-                      },
-                      {
-                        "execute": {
-                          "expression": {
-                            "index": 4
-                          }
-                        }
                       }
                     ],
                     "terminator": {
                       "call": {
                         "call": {
-                          "index": 7
+                          "index": 5
                         },
                         "destination": {
                           "place": {
-                            "index": 6
+                            "index": 5
                           },
                           "target": {
                             "index": 1
@@ -781,13 +797,13 @@
                   },
                   {
                     "loc": {
-                      "index": 6
+                      "index": 7
                     },
                     "statements": [],
                     "terminator": {
                       "drop": {
                         "place": {
-                          "index": 7
+                          "index": 6
                         },
                         "target": {
                           "index": 2
@@ -798,14 +814,14 @@
                   },
                   {
                     "loc": {
-                      "index": 7
+                      "index": 8
                     },
                     "statements": [],
                     "terminator": {
                       "return_": {
                         "values": [
                           {
-                            "index": 8
+                            "index": 6
                           }
                         ]
                       }
@@ -875,6 +891,24 @@
                 "index": 2
               },
               "loc": {
+                "index": 6
+              },
+              "mutable": false,
+              "name": "__trait_Fn_call",
+              "type": {
+                "loc": {
+                  "index": 6
+                },
+                "typeId": {
+                  "index": 10
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 3
+              },
+              "loc": {
                 "index": 3
               },
               "mutable": true,
@@ -890,7 +924,7 @@
             },
             {
               "id": {
-                "index": 3
+                "index": 4
               },
               "loc": {
                 "index": 4
@@ -908,7 +942,7 @@
             },
             {
               "id": {
-                "index": 4
+                "index": 5
               },
               "loc": {
                 "index": 5
@@ -971,6 +1005,18 @@
                     "index": 2
                   }
                 }
+              },
+              {
+                "mutable": false,
+                "name": "__trait_Fn_call",
+                "typeUse": {
+                  "loc": {
+                    "index": 6
+                  },
+                  "typeId": {
+                    "index": 10
+                  }
+                }
               }
             ],
             "predicates": [],
@@ -997,20 +1043,20 @@
                 "blocks": [
                   {
                     "loc": {
-                      "index": 12
+                      "index": 13
                     },
                     "statements": [
                       {
                         "execute": {
                           "expression": {
-                            "index": 10
+                            "index": 8
                           }
                         }
                       },
                       {
                         "execute": {
                           "expression": {
-                            "index": 13
+                            "index": 11
                           }
                         }
                       }
@@ -1018,11 +1064,11 @@
                     "terminator": {
                       "call": {
                         "call": {
-                          "index": 16
+                          "index": 15
                         },
                         "destination": {
                           "place": {
-                            "index": 14
+                            "index": 13
                           },
                           "target": {
                             "index": 1
@@ -1034,14 +1080,14 @@
                   },
                   {
                     "loc": {
-                      "index": 13
+                      "index": 14
                     },
                     "statements": [],
                     "terminator": {
                       "return_": {
                         "values": [
                           {
-                            "index": 17
+                            "index": 16
                           }
                         ]
                       }
@@ -1067,7 +1113,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 8
+            "index": 9
           },
           "locals": [
             {
@@ -1075,28 +1121,10 @@
                 "index": 0
               },
               "loc": {
-                "index": 9
+                "index": 10
               },
               "mutable": false,
               "name": "c",
-              "type": {
-                "loc": {
-                  "index": 9
-                },
-                "typeId": {
-                  "index": 2
-                }
-              }
-            },
-            {
-              "id": {
-                "index": 1
-              },
-              "loc": {
-                "index": 10
-              },
-              "mutable": true,
-              "name": "_0",
               "type": {
                 "loc": {
                   "index": 10
@@ -1108,16 +1136,34 @@
             },
             {
               "id": {
-                "index": 2
+                "index": 1
               },
               "loc": {
                 "index": 11
               },
               "mutable": true,
-              "name": "_2",
+              "name": "_0",
               "type": {
                 "loc": {
                   "index": 11
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 2
+              },
+              "loc": {
+                "index": 12
+              },
+              "mutable": true,
+              "name": "_2",
+              "type": {
+                "loc": {
+                  "index": 12
                 },
                 "typeId": {
                   "index": 5
@@ -1129,13 +1175,13 @@
                 "index": 3
               },
               "loc": {
-                "index": 11
+                "index": 12
               },
               "mutable": true,
               "name": "_3",
               "type": {
                 "loc": {
-                  "index": 11
+                  "index": 12
                 },
                 "typeId": {
                   "index": 8
@@ -1160,7 +1206,7 @@
                 "name": "c",
                 "typeUse": {
                   "loc": {
-                    "index": 9
+                    "index": 10
                   },
                   "typeId": {
                     "index": 2
@@ -1172,7 +1218,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 10
+                  "index": 11
                 },
                 "typeId": {
                   "index": 2
@@ -1192,27 +1238,27 @@
                 "blocks": [
                   {
                     "loc": {
-                      "index": 18
+                      "index": 19
                     },
                     "statements": [
                       {
                         "execute": {
                           "expression": {
-                            "index": 19
+                            "index": 18
                           }
                         }
                       },
                       {
                         "execute": {
                           "expression": {
-                            "index": 21
+                            "index": 20
                           }
                         }
                       },
                       {
                         "execute": {
                           "expression": {
-                            "index": 25
+                            "index": 24
                           }
                         }
                       }
@@ -1220,7 +1266,7 @@
                     "terminator": {
                       "assert": {
                         "condition": {
-                          "index": 27
+                          "index": 26
                         },
                         "expected": false,
                         "kind": "overflow",
@@ -1233,13 +1279,13 @@
                   },
                   {
                     "loc": {
-                      "index": 19
+                      "index": 20
                     },
                     "statements": [
                       {
                         "execute": {
                           "expression": {
-                            "index": 30
+                            "index": 29
                           }
                         }
                       }
@@ -1248,7 +1294,7 @@
                       "return_": {
                         "values": [
                           {
-                            "index": 31
+                            "index": 30
                           }
                         ]
                       }
@@ -1274,7 +1320,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 14
+            "index": 15
           },
           "locals": [
             {
@@ -1282,13 +1328,13 @@
                 "index": 0
               },
               "loc": {
-                "index": 11
+                "index": 12
               },
               "mutable": false,
               "name": "self",
               "type": {
                 "loc": {
-                  "index": 11
+                  "index": 12
                 },
                 "typeId": {
                   "index": 9
@@ -1300,28 +1346,10 @@
                 "index": 1
               },
               "loc": {
-                "index": 15
+                "index": 16
               },
               "mutable": false,
               "name": "x",
-              "type": {
-                "loc": {
-                  "index": 15
-                },
-                "typeId": {
-                  "index": 2
-                }
-              }
-            },
-            {
-              "id": {
-                "index": 2
-              },
-              "loc": {
-                "index": 16
-              },
-              "mutable": true,
-              "name": "_0",
               "type": {
                 "loc": {
                   "index": 16
@@ -1333,13 +1361,13 @@
             },
             {
               "id": {
-                "index": 3
+                "index": 2
               },
               "loc": {
                 "index": 17
               },
               "mutable": true,
-              "name": "_3",
+              "name": "_0",
               "type": {
                 "loc": {
                   "index": 17
@@ -1351,16 +1379,34 @@
             },
             {
               "id": {
-                "index": 4
+                "index": 3
               },
               "loc": {
                 "index": 18
               },
               "mutable": true,
-              "name": "_4",
+              "name": "_3",
               "type": {
                 "loc": {
                   "index": 18
+                },
+                "typeId": {
+                  "index": 2
+                }
+              }
+            },
+            {
+              "id": {
+                "index": 4
+              },
+              "loc": {
+                "index": 19
+              },
+              "mutable": true,
+              "name": "_4",
+              "type": {
+                "loc": {
+                  "index": 19
                 },
                 "typeId": {
                   "index": 6
@@ -1372,13 +1418,13 @@
                 "index": 5
               },
               "loc": {
-                "index": 11
+                "index": 12
               },
               "mutable": true,
               "name": "_5",
               "type": {
                 "loc": {
-                  "index": 11
+                  "index": 12
                 },
                 "typeId": {
                   "index": 8
@@ -1403,7 +1449,7 @@
                 "name": "self",
                 "typeUse": {
                   "loc": {
-                    "index": 11
+                    "index": 12
                   },
                   "typeId": {
                     "index": 9
@@ -1415,7 +1461,7 @@
                 "name": "x",
                 "typeUse": {
                   "loc": {
-                    "index": 15
+                    "index": 16
                   },
                   "typeId": {
                     "index": 2
@@ -1427,7 +1473,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 16
+                  "index": 17
                 },
                 "typeId": {
                   "index": 2
@@ -1460,7 +1506,14 @@
         {
           "localVar": {
             "localId": {
-              "index": 3
+              "index": 4
+            }
+          }
+        },
+        {
+          "localVar": {
+            "localId": {
+              "index": 4
             }
           }
         },
@@ -1474,7 +1527,7 @@
         {
           "localVar": {
             "localId": {
-              "index": 4
+              "index": 2
             }
           }
         },
@@ -1488,20 +1541,6 @@
         {
           "localVar": {
             "localId": {
-              "index": 4
-            }
-          }
-        },
-        {
-          "localVar": {
-            "localId": {
-              "index": 2
-            }
-          }
-        },
-        {
-          "localVar": {
-            "localId": {
               "index": 0
             }
           }
@@ -1509,7 +1548,7 @@
         {
           "localVar": {
             "localId": {
-              "index": 2
+              "index": 3
             }
           }
         },
@@ -1572,14 +1611,14 @@
         {
           "deref": {
             "base": {
-              "index": 16
+              "index": 15
             }
           }
         },
         {
           "field": {
             "base": {
-              "index": 17
+              "index": 16
             },
             "owner": {
               "name": {
@@ -1611,7 +1650,7 @@
         {
           "deref": {
             "base": {
-              "index": 20
+              "index": 19
             }
           }
         },
@@ -1653,10 +1692,10 @@
         {
           "index": {
             "base": {
-              "index": 26
+              "index": 25
             },
             "index": {
-              "index": 26
+              "index": 25
             }
           }
         },
@@ -1670,10 +1709,10 @@
         {
           "index": {
             "base": {
-              "index": 28
+              "index": 27
             },
             "index": {
-              "index": 28
+              "index": 27
             }
           }
         },
@@ -1699,7 +1738,7 @@
         {
           "kind": "inherent",
           "loc": {
-            "index": 14
+            "index": 15
           },
           "path": [
             "use_apply::{closure#0}"
@@ -1730,17 +1769,17 @@
             {
               "doc": "",
               "loc": {
-                "index": 14
+                "index": 15
               },
               "name": {
                 "index": 4
               },
               "type": {
                 "loc": {
-                  "index": 14
+                  "index": 15
                 },
                 "typeId": {
-                  "index": 10
+                  "index": 12
                 }
               }
             }
@@ -1750,7 +1789,7 @@
               "abilities": [],
               "kind": "lifetime",
               "loc": {
-                "index": 14
+                "index": 15
               },
               "name": "'u0",
               "predicates": [],
@@ -1759,7 +1798,7 @@
           ],
           "ghosts": [],
           "loc": {
-            "index": 14
+            "index": 15
           },
           "locals": [],
           "name": {
@@ -1826,7 +1865,7 @@
     "files": [
       {
         "contentHash": "",
-        "name": "tests/opaque-unit/closure_generic_call.rs"
+        "name": "tests/raw-unit/closure_generic_call.rs"
       }
     ],
     "lifetimes": [
@@ -1925,6 +1964,19 @@
             "index": 0
           },
           "startByte": 132
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 138,
+          "file": {
+            "index": 0
+          },
+          "startByte": 73
         },
         "related": []
       },
@@ -2166,7 +2218,7 @@
         "description": "Rustc Public CrateItem::body",
         "kind": "rustMir",
         "location": {
-          "index": 8
+          "index": 9
         },
         "sourceIdentity": "closure_generic_call::use_apply"
       },
@@ -2174,7 +2226,7 @@
         "description": "Rustc Public CrateItem::body",
         "kind": "rustMir",
         "location": {
-          "index": 14
+          "index": 15
         },
         "sourceIdentity": "closure_generic_call::use_apply::{closure#0}"
       }
@@ -2273,6 +2325,44 @@
             "referent": {
               "index": 5
             }
+          }
+        }
+      },
+      {
+        "function": {
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "arguments": [
+            {
+              "index": 7
+            },
+            {
+              "index": 2
+            }
+          ],
+          "result": {
+            "index": 2
+          }
+        }
+      },
+      {
+        "function": {
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "arguments": [
+            {
+              "index": 9
+            },
+            {
+              "index": 2
+            }
+          ],
+          "result": {
+            "index": 2
           }
         }
       },

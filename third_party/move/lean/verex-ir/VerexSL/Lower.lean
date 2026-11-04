@@ -683,14 +683,22 @@ private def specificationExprContext (context : ExprContext) : LowerM ExprContex
     specification := true
     loopResults := ← context.loopResults.mapM projectSpecTypeId }
 
-private def lowerBinder (binder : GenericBinder) : LowerM VerexIR.GenericBinder := do
+private def lowerBinder (context : TypeContext) (binder : GenericBinder) : LowerM VerexIR.GenericBinder := do
   let loc ← addLoc binder.span
   let type ← if binder.kind == .const then
       some <$> lowerTypeUse {} (binder.type.getD { value := .uptr, span := binder.span })
     else pure none
   -- The phantom marker is a profile predicate: Move's `phantom` parameter.
-  let predicates : Array VerexIR.GenericPredicate := if binder.phantom then
+  let mut predicates : Array VerexIR.GenericPredicate := if binder.phantom then
       #[.profile { profile := .move, tag := "typeParameter.phantom" }] else #[]
+  unless binder.outlives.isEmpty do
+    unless binder.kind == .lifetime do
+      failAt "VEREX-LIFETIME-BOUND" "only a lifetime binder may declare outlives bounds" (some binder.span)
+    let longer ← lowerLifetime context (.parameter binder.name) binder.span
+    for shorter in binder.outlives do
+      if shorter matches .inference then
+        failAt "VEREX-LIFETIME-BOUND" "an outlives bound must name a lifetime" (some binder.span)
+      predicates := predicates.push (.lifetimeOutlives longer (← lowerLifetime context shorter binder.span))
   return {
     name := binder.name
     kind := binder.kind.toVIR
@@ -980,11 +988,11 @@ private partial def mapChildExpressions (f : Expr → Expr) : Expr → Expr
   | .call name arguments span => .call name (arguments.map f) span
   | .closure name types result captures span =>
       .closure name types result (captures.map (·.map f)) span
-  | .closureItem name generics abilities captures function functionGenerics parameters result
+  | .closureItem name generics abilities captures attributes function functionGenerics parameters result
       body span =>
       .closureItem name generics abilities
         (captures.map fun (field, type, value) => (field, type, f value))
-        function functionGenerics parameters result body span
+        attributes function functionGenerics parameters result body span
   | .invoke callable arguments span => .invoke (f callable) (arguments.map f) span
   | .genericCall name types arguments span => .genericCall name types (arguments.map f) span
   | .typedCall name result arguments span => .typedCall name result (arguments.map f) span
@@ -1059,7 +1067,7 @@ private partial def closureExpressions (module parent : Array String) (source : 
     Array (Array String × Expr) :=
   let nested := (childExpressions source).flatMap (closureExpressions module parent)
   match source with
-  | .closureItem name _ _ _ function _ _ _ body _ =>
+  | .closureItem name _ _ _ _ function _ _ _ body _ =>
       nested ++ closureExpressions module ((module.push name).push function) body ++
         #[(parent, source)]
   | _ => nested
@@ -1068,7 +1076,7 @@ private partial def closureExpressions (module parent : Array String) (source : 
 the arguments of the construction are the type parameters of its function. -/
 private partial def constructClosures (source : Expr) : Expr :=
   match mapChildExpressions constructClosures source with
-  | .closureItem name generics _ captures _ _ _ _ _ span =>
+  | .closureItem name generics _ captures _ _ _ _ _ _ span =>
       let arguments := generics.map fun binder =>
         match binder.kind with
         | .lifetime => TypeArgument.lifetime .inference
@@ -1119,7 +1127,7 @@ private partial def closuresToItems (module : Array String) (items : Array Item)
       | item => item
     for (parent, body) in itemBodies module item do
       for (closureParent, closure) in closureExpressions module parent body do
-        let .closureItem name generics abilities captures function functionGenerics parameters
+        let .closureItem name generics abilities captures attributes function functionGenerics parameters
             result_ closureBody span := closure | continue
         result := result.push <| .struct {
           name, closureParent := some closureParent, generics, abilities, span
@@ -1127,7 +1135,7 @@ private partial def closuresToItems (module : Array String) (items : Array Item)
             { name := field, type, span := type.span } }
         let declaration : FunctionDecl := {
           (contractOf name function).getD ({ name := function } : FunctionDecl) with
-          name := function, generics := functionGenerics, parameters, result := result_
+          name := function, attributes, generics := functionGenerics, parameters, result := result_
           body := some (constructClosures closureBody), contractOnly := false, span }
         result := result.push <| .scope name .inherent #[.function declaration] span
   return result
@@ -1139,7 +1147,7 @@ partial def closureFunctions (items : Array Item) (module : Array String := #[])
   items.flatMap fun item =>
     let declared := (itemBodies module item).flatMap fun (parent, body) =>
       (closureExpressions module parent body).filterMap fun
-        | (_, .closureItem name _ _ _ function ..) => some (module.push name, function)
+        | (_, .closureItem name _ _ _ _ function ..) => some (module.push name, function)
         | _ => none
     match item with
     | .scope name .module nested _ => closureFunctions nested (module.push name)
@@ -6972,6 +6980,13 @@ private def bodyWithLoopSpecifications (declaration : FunctionDecl) : LowerM (Op
 
 private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   let declaration := { declaration with body := ← bodyWithLoopSpecifications declaration }
+  let shapeOnly := declaration.attributes.any fun
+    | .call "shape_only" #[] _ => true
+    | _ => false
+  if shapeOnly && !declaration.contract.isEmpty then
+    failAt "VEREX-SHAPE-REQUIRED"
+      "a dependency with promoted associated types requires a contract at a shape"
+      (some (declaration.contractSpan.getD declaration.span))
   if declaration.modifiers.isNative && declaration.modifiers.isOpaque then
     failAt "VEREX-FUNCTION-MODIFIER"
       "a function cannot be both `native` and `opaque`" (some declaration.span)
@@ -6985,7 +7000,7 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-FUNCTION-NAME" s!"function `{declaration.name}` was not interned"
   let typeContext ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder typeContext)
   let mut parameters := #[]
   let mut locals := #[]
   let mut localTypes := #[]
@@ -7251,7 +7266,7 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   let contractPragmaNames := declaration.pragmas.map (·.name)
   let (contract, contractLocals) ← lowerContract specContext declaration.contract
     declaration.contractSpan contractPragmas
-    (if state.sourceNamespace.profile == .rust then
+    (if state.sourceNamespace.profile == .rust && !shapeOnly then
       some (declaration.contractSpan.getD declaration.span) else none)
     executableLocals.size
   let pragmas := contract.pragmas ++
@@ -7274,6 +7289,7 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     -- signature.
     profileData := (if declaration.modifiers.isNative && state.sourceNamespace.profile == .rust then
       #[{ profile := .rust, tag := VerexIR.rustDependencyTag }] else #[]) ++
+      (if shapeOnly then #[{ profile := .rust, tag := VerexIR.rustShapeOnlyTag }] else #[]) ++
       (if state.sourceNamespace.profile == .rust then
         declaration.attributes.filterMap fun attr => match attr with
           | .assign "refused" (.string reason) _ =>
@@ -7287,6 +7303,7 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
       (← sourceAttributes (declaration.attributes.filter fun attr => match attr with
         | .call "move_public" #[] _ => false
         | .assign "refused" _ _ => state.sourceNamespace.profile != .rust
+        | .call "shape_only" #[] _ => false
         | _ => true)) }
   modify fun state => { state with output := { state.output with
     functions := state.output.functions.push function } }
@@ -7415,6 +7432,9 @@ private def lowerShapes (declaration : FunctionDecl) : LowerM Unit := do
       { name, kind := .type, span := shape.span }
     let row := (parameters.map (·.name)).zip (shape.arguments.map (·.value))
     let atShape : FunctionDecl := { declaration with
+      attributes := declaration.attributes.filter fun
+        | .call "shape_only" #[] _ => false
+        | _ => true
       generics := binders
       parameters := declaration.parameters.map fun parameter =>
         { parameter with type :=
@@ -7463,7 +7483,7 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
     | failAt "VEREX-SPEC-FUNCTION-NAME"
         s!"specification function `{declaration.name}` was not interned"
   let typeContext ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder typeContext)
   let mut parameters := #[]
   let mut locals := #[]
   let mut localTypes := #[]
@@ -7609,7 +7629,7 @@ private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
   let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-LEMMA-NAME" s!"lemma `{declaration.name}` was not interned"
   let typeContext ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder typeContext)
   let mut parameters := #[]
   let mut locals := #[]
   let mut localTypes := #[]
@@ -7785,7 +7805,7 @@ private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
   let some name := nameId? state.tables state.namespaceId declaration.name state.scope
     | failAt "VEREX-STRUCT-NAME" s!"struct `{declaration.name}` was not interned"
   let context ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder context)
   let fields ← declaration.fields.mapM (lowerField context)
   let boolType ← internType .bool
   let mut locals := #[]
@@ -7883,7 +7903,7 @@ private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
     failAt "VEREX-ENUM-EMPTY" s!"enum `{declaration.name}` declares no variant"
       (some declaration.span)
   let context ← liftM <| typeContext declaration.generics
-  let generics ← declaration.generics.mapM lowerBinder
+  let generics ← declaration.generics.mapM (lowerBinder context)
   let variants ← declaration.variants.mapM fun variant => do
     let loc ← addLoc variant.span
     let current ← get

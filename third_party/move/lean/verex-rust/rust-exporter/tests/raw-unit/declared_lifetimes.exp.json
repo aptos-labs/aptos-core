@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     },
     {
@@ -39,7 +39,7 @@
             "index": 107
           },
           "ownLine": true,
-          "text": "// An outlives bound makes its lifetimes early-bound, which `fn_sig` erases."
+          "text": "// The bridge keeps early-bound lifetimes and their explicit outlives bound."
         },
         {
           "isDoc": false,
@@ -47,7 +47,7 @@
             "index": 108
           },
           "ownLine": true,
-          "text": "// Early-bound lifetimes are erased: a clause may relate them."
+          "text": "// Trait-bound early lifetimes remain distinct in the declared signature."
         }
       ],
       "constants": [],
@@ -73,7 +73,7 @@
             "index": 4
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -113,7 +113,7 @@
             "index": 3
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -136,7 +136,7 @@
             "index": 10
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -176,7 +176,7 @@
             "index": 9
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -199,7 +199,7 @@
             "index": 17
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -239,7 +239,7 @@
             "index": 16
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -262,7 +262,7 @@
             "index": 23
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -303,7 +303,7 @@
             "index": 24
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -344,7 +344,7 @@
             "index": 28
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -367,7 +367,7 @@
             "index": 28
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -420,7 +420,7 @@
             "index": 28
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -643,7 +643,7 @@
             "index": 27
           },
           "typeId": {
-            "index": 14
+            "index": 15
           }
         },
         {
@@ -804,7 +804,7 @@
             "index": 36
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -844,7 +844,7 @@
             "index": 35
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -961,7 +961,7 @@
             "index": 49
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1001,7 +1001,7 @@
             "index": 48
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1024,7 +1024,7 @@
             "index": 55
           },
           "typeId": {
-            "index": 19
+            "index": 20
           }
         },
         {
@@ -1064,7 +1064,7 @@
             "index": 54
           },
           "typeId": {
-            "index": 19
+            "index": 20
           }
         },
         {
@@ -1087,7 +1087,7 @@
             "index": 60
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1244,7 +1244,7 @@
             "index": 70
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1284,7 +1284,7 @@
             "index": 69
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1306,7 +1306,7 @@
             "index": 75
           },
           "typeId": {
-            "index": 17
+            "index": 18
           }
         },
         {
@@ -1346,7 +1346,7 @@
             "index": 74
           },
           "typeId": {
-            "index": 17
+            "index": 18
           }
         },
         {
@@ -1369,7 +1369,7 @@
             "index": 81
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1409,7 +1409,7 @@
             "index": 80
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1431,7 +1431,7 @@
             "index": 87
           },
           "typeId": {
-            "index": 17
+            "index": 18
           }
         },
         {
@@ -1471,7 +1471,7 @@
             "index": 86
           },
           "typeId": {
-            "index": 17
+            "index": 18
           }
         },
         {
@@ -1494,7 +1494,7 @@
             "index": 92
           },
           "typeId": {
-            "index": 20
+            "index": 21
           }
         },
         {
@@ -1603,7 +1603,7 @@
             "index": 92
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         },
         {
@@ -1625,7 +1625,7 @@
             "index": 93
           },
           "typeId": {
-            "index": 15
+            "index": 16
           }
         }
       ],
@@ -1699,7 +1699,7 @@
                   "index": 1
                 },
                 "typeId": {
-                  "index": 8
+                  "index": 13
                 }
               }
             },
@@ -1717,7 +1717,7 @@
                   "index": 2
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -1753,7 +1753,7 @@
                     "index": 1
                   },
                   "typeId": {
-                    "index": 8
+                    "index": 13
                   }
                 }
               }
@@ -1765,7 +1765,7 @@
                   "index": 2
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 23
                 }
               }
             ]
@@ -1840,7 +1840,7 @@
                   "index": 6
                 },
                 "typeId": {
-                  "index": 22
+                  "index": 24
                 }
               }
             },
@@ -1858,7 +1858,7 @@
                   "index": 7
                 },
                 "typeId": {
-                  "index": 23
+                  "index": 25
                 }
               }
             },
@@ -1876,7 +1876,7 @@
                   "index": 8
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -1922,7 +1922,7 @@
                     "index": 6
                   },
                   "typeId": {
-                    "index": 22
+                    "index": 24
                   }
                 }
               },
@@ -1934,7 +1934,7 @@
                     "index": 7
                   },
                   "typeId": {
-                    "index": 23
+                    "index": 25
                   }
                 }
               }
@@ -1946,7 +1946,7 @@
                   "index": 8
                 },
                 "typeId": {
-                  "index": 24
+                  "index": 26
                 }
               }
             ]
@@ -2021,7 +2021,7 @@
                   "index": 12
                 },
                 "typeId": {
-                  "index": 18
+                  "index": 27
                 }
               }
             },
@@ -2039,7 +2039,7 @@
                   "index": 13
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 23
                 }
               }
             },
@@ -2057,7 +2057,7 @@
                   "index": 14
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 28
                 }
               }
             },
@@ -2075,7 +2075,7 @@
                   "index": 15
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -2120,6 +2120,16 @@
                 "name": "T",
                 "predicates": [],
                 "type": null
+              },
+              {
+                "abilities": [],
+                "kind": "lifetime",
+                "loc": {
+                  "index": 11
+                },
+                "name": "'l3",
+                "predicates": [],
+                "type": null
               }
             ],
             "parameters": [
@@ -2131,7 +2141,7 @@
                     "index": 12
                   },
                   "typeId": {
-                    "index": 18
+                    "index": 27
                   }
                 }
               },
@@ -2143,7 +2153,7 @@
                     "index": 13
                   },
                   "typeId": {
-                    "index": 15
+                    "index": 23
                   }
                 }
               },
@@ -2155,7 +2165,7 @@
                     "index": 14
                   },
                   "typeId": {
-                    "index": 15
+                    "index": 28
                   }
                 }
               }
@@ -2167,7 +2177,7 @@
                   "index": 15
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 28
                 }
               }
             ]
@@ -2388,7 +2398,7 @@
                   "index": 22
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             },
@@ -2406,7 +2416,7 @@
                   "index": 23
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             },
@@ -2424,7 +2434,7 @@
                   "index": 24
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             },
@@ -2478,7 +2488,7 @@
                   "index": 27
                 },
                 "typeId": {
-                  "index": 14
+                  "index": 15
                 }
               }
             }
@@ -2602,7 +2612,7 @@
                   "index": 33
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             },
@@ -2620,7 +2630,7 @@
                   "index": 34
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -2645,7 +2655,7 @@
                     "index": 33
                   },
                   "typeId": {
-                    "index": 15
+                    "index": 16
                   }
                 }
               }
@@ -2657,7 +2667,7 @@
                   "index": 34
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             ]
@@ -2739,7 +2749,7 @@
                   "index": 38
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             },
@@ -2757,7 +2767,7 @@
                   "index": 39
                 },
                 "typeId": {
-                  "index": 17
+                  "index": 18
                 }
               }
             },
@@ -2818,7 +2828,7 @@
                     "index": 38
                   },
                   "typeId": {
-                    "index": 15
+                    "index": 16
                   }
                 }
               },
@@ -2830,7 +2840,7 @@
                     "index": 39
                   },
                   "typeId": {
-                    "index": 17
+                    "index": 18
                   }
                 }
               }
@@ -2917,7 +2927,7 @@
                   "index": 45
                 },
                 "typeId": {
-                  "index": 25
+                  "index": 29
                 }
               }
             },
@@ -2935,7 +2945,7 @@
                   "index": 46
                 },
                 "typeId": {
-                  "index": 26
+                  "index": 30
                 }
               }
             },
@@ -2953,7 +2963,7 @@
                   "index": 47
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -2999,7 +3009,7 @@
                     "index": 45
                   },
                   "typeId": {
-                    "index": 25
+                    "index": 29
                   }
                 }
               },
@@ -3011,7 +3021,7 @@
                     "index": 46
                   },
                   "typeId": {
-                    "index": 26
+                    "index": 30
                   }
                 }
               }
@@ -3023,7 +3033,7 @@
                   "index": 47
                 },
                 "typeId": {
-                  "index": 25
+                  "index": 29
                 }
               }
             ]
@@ -3098,7 +3108,7 @@
                   "index": 51
                 },
                 "typeId": {
-                  "index": 27
+                  "index": 31
                 }
               }
             },
@@ -3116,7 +3126,7 @@
                   "index": 52
                 },
                 "typeId": {
-                  "index": 28
+                  "index": 32
                 }
               }
             },
@@ -3134,7 +3144,7 @@
                   "index": 53
                 },
                 "typeId": {
-                  "index": 19
+                  "index": 20
                 }
               }
             }
@@ -3190,7 +3200,7 @@
                     "index": 51
                   },
                   "typeId": {
-                    "index": 27
+                    "index": 31
                   }
                 }
               },
@@ -3202,7 +3212,7 @@
                     "index": 52
                   },
                   "typeId": {
-                    "index": 28
+                    "index": 32
                   }
                 }
               }
@@ -3214,7 +3224,7 @@
                   "index": 53
                 },
                 "typeId": {
-                  "index": 27
+                  "index": 31
                 }
               }
             ]
@@ -3289,7 +3299,7 @@
                   "index": 57
                 },
                 "typeId": {
-                  "index": 29
+                  "index": 33
                 }
               }
             },
@@ -3343,7 +3353,7 @@
                     "index": 57
                   },
                   "typeId": {
-                    "index": 29
+                    "index": 33
                   }
                 }
               }
@@ -3355,7 +3365,7 @@
                   "index": 58
                 },
                 "typeId": {
-                  "index": 13
+                  "index": 14
                 }
               }
             ]
@@ -3430,7 +3440,7 @@
                   "index": 62
                 },
                 "typeId": {
-                  "index": 30
+                  "index": 34
                 }
               }
             },
@@ -3484,7 +3494,7 @@
                     "index": 62
                   },
                   "typeId": {
-                    "index": 30
+                    "index": 34
                   }
                 }
               }
@@ -3571,7 +3581,7 @@
                   "index": 67
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 35
                 }
               }
             },
@@ -3589,7 +3599,7 @@
                   "index": 68
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -3635,19 +3645,30 @@
                     "index": 67
                   },
                   "typeId": {
-                    "index": 15
+                    "index": 35
                   }
                 }
               }
             ],
-            "predicates": [],
+            "predicates": [
+              {
+                "lifetimeOutlives": {
+                  "longer": {
+                    "index": 12
+                  },
+                  "shorter": {
+                    "index": 13
+                  }
+                }
+              }
+            ],
             "results": [
               {
                 "loc": {
                   "index": 68
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 36
                 }
               }
             ]
@@ -3722,7 +3743,7 @@
                   "index": 72
                 },
                 "typeId": {
-                  "index": 17
+                  "index": 37
                 }
               }
             },
@@ -3740,7 +3761,7 @@
                   "index": 73
                 },
                 "typeId": {
-                  "index": 17
+                  "index": 18
                 }
               }
             }
@@ -3776,19 +3797,30 @@
                     "index": 72
                   },
                   "typeId": {
-                    "index": 17
+                    "index": 37
                   }
                 }
               }
             ],
-            "predicates": [],
+            "predicates": [
+              {
+                "lifetimeOutlives": {
+                  "longer": {
+                    "index": 1
+                  },
+                  "shorter": {
+                    "index": 14
+                  }
+                }
+              }
+            ],
             "results": [
               {
                 "loc": {
                   "index": 73
                 },
                 "typeId": {
-                  "index": 17
+                  "index": 38
                 }
               }
             ]
@@ -3863,7 +3895,7 @@
                   "index": 77
                 },
                 "typeId": {
-                  "index": 31
+                  "index": 39
                 }
               }
             },
@@ -3881,7 +3913,7 @@
                   "index": 78
                 },
                 "typeId": {
-                  "index": 32
+                  "index": 40
                 }
               }
             },
@@ -3899,7 +3931,7 @@
                   "index": 79
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -3945,7 +3977,7 @@
                     "index": 77
                   },
                   "typeId": {
-                    "index": 31
+                    "index": 39
                   }
                 }
               },
@@ -3957,7 +3989,7 @@
                     "index": 78
                   },
                   "typeId": {
-                    "index": 32
+                    "index": 40
                   }
                 }
               }
@@ -3969,7 +4001,7 @@
                   "index": 79
                 },
                 "typeId": {
-                  "index": 31
+                  "index": 39
                 }
               }
             ]
@@ -4044,7 +4076,7 @@
                   "index": 83
                 },
                 "typeId": {
-                  "index": 33
+                  "index": 41
                 }
               }
             },
@@ -4062,7 +4094,7 @@
                   "index": 84
                 },
                 "typeId": {
-                  "index": 34
+                  "index": 38
                 }
               }
             },
@@ -4080,7 +4112,7 @@
                   "index": 85
                 },
                 "typeId": {
-                  "index": 17
+                  "index": 18
                 }
               }
             }
@@ -4116,7 +4148,7 @@
                     "index": 83
                   },
                   "typeId": {
-                    "index": 33
+                    "index": 41
                   }
                 }
               },
@@ -4128,7 +4160,7 @@
                     "index": 84
                   },
                   "typeId": {
-                    "index": 34
+                    "index": 38
                   }
                 }
               }
@@ -4140,7 +4172,7 @@
                   "index": 85
                 },
                 "typeId": {
-                  "index": 34
+                  "index": 38
                 }
               }
             ]
@@ -4229,7 +4261,7 @@
                   "index": 89
                 },
                 "typeId": {
-                  "index": 20
+                  "index": 21
                 }
               }
             },
@@ -4265,7 +4297,7 @@
                   "index": 91
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             }
@@ -4290,7 +4322,7 @@
                     "index": 89
                   },
                   "typeId": {
-                    "index": 20
+                    "index": 21
                   }
                 }
               },
@@ -4314,7 +4346,7 @@
                   "index": 91
                 },
                 "typeId": {
-                  "index": 15
+                  "index": 16
                 }
               }
             ]
@@ -4992,7 +5024,7 @@
                   "index": 96
                 },
                 "typeId": {
-                  "index": 35
+                  "index": 23
                 }
               }
             }
@@ -5113,7 +5145,7 @@
                   "index": 101
                 },
                 "typeId": {
-                  "index": 21
+                  "index": 22
                 }
               }
             },
@@ -5165,6 +5197,11 @@
               "payload": "",
               "profile": "rust",
               "tag": "function.dependency"
+            },
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "function.shapeOnly"
             }
           ],
           "signature": {
@@ -5219,7 +5256,7 @@
                     "index": 101
                   },
                   "typeId": {
-                    "index": 21
+                    "index": 22
                   }
                 }
               },
@@ -5243,7 +5280,7 @@
                   "index": 101
                 },
                 "typeId": {
-                  "index": 36
+                  "index": 42
                 }
               }
             ]
@@ -5574,6 +5611,17 @@
         "loc": {
           "index": 0
         },
+        "name": "'a"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
         "name": "'l0"
       },
       {
@@ -5586,6 +5634,28 @@
           "index": 0
         },
         "name": "'l1"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 3
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l3"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'b"
       },
       {
         "kind": {
@@ -5656,6 +5726,35 @@
       {
         "kind": {
           "parameter": {
+            "index": 1
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'l"
+      },
+      {
+        "kind": {
+          "parameter": {
+            "index": 0
+          }
+        },
+        "loc": {
+          "index": 0
+        },
+        "name": "'s"
+      },
+      {
+        "kind": "static",
+        "loc": {
+          "index": 0
+        },
+        "name": "'static"
+      },
+      {
+        "kind": {
+          "parameter": {
             "index": 0
           }
         },
@@ -5685,24 +5784,6 @@
           "index": 0
         },
         "name": "'a"
-      },
-      {
-        "kind": "static",
-        "loc": {
-          "index": 0
-        },
-        "name": "'static"
-      },
-      {
-        "kind": {
-          "parameter": {
-            "index": 0
-          }
-        },
-        "loc": {
-          "index": 0
-        },
-        "name": "'a"
       }
     ],
     "locations": [
@@ -5711,11 +5792,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1526,
+          "endByte": 1537,
           "file": {
             "index": 0
           },
-          "startByte": 1494
+          "startByte": 1505
         },
         "related": []
       },
@@ -5724,11 +5805,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1510,
+          "endByte": 1521,
           "file": {
             "index": 0
           },
-          "startByte": 1506
+          "startByte": 1517
         },
         "related": []
       },
@@ -5737,11 +5818,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1526,
+          "endByte": 1537,
           "file": {
             "index": 0
           },
-          "startByte": 1515
+          "startByte": 1526
         },
         "related": []
       },
@@ -5750,11 +5831,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1549,
+          "endByte": 1560,
           "file": {
             "index": 0
           },
-          "startByte": 1549
+          "startByte": 1560
         },
         "related": []
       },
@@ -5763,11 +5844,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1543,
+          "endByte": 1554,
           "file": {
             "index": 0
           },
-          "startByte": 1537
+          "startByte": 1548
         },
         "related": []
       },
@@ -5776,11 +5857,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1436,
+          "endByte": 1447,
           "file": {
             "index": 0
           },
-          "startByte": 1387
+          "startByte": 1398
         },
         "related": []
       },
@@ -5789,20 +5870,7 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1409,
-          "file": {
-            "index": 0
-          },
-          "startByte": 1400
-        },
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": null,
-        "parent": null,
-        "primary": {
-          "endByte": 1417,
+          "endByte": 1420,
           "file": {
             "index": 0
           },
@@ -5815,11 +5883,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1436,
+          "endByte": 1428,
           "file": {
             "index": 0
           },
-          "startByte": 1428
+          "startByte": 1422
         },
         "related": []
       },
@@ -5828,11 +5896,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1464,
+          "endByte": 1447,
           "file": {
             "index": 0
           },
-          "startByte": 1464
+          "startByte": 1439
         },
         "related": []
       },
@@ -5841,11 +5909,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1458,
+          "endByte": 1475,
           "file": {
             "index": 0
           },
-          "startByte": 1447
+          "startByte": 1475
         },
         "related": []
       },
@@ -5854,11 +5922,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1328,
+          "endByte": 1469,
           "file": {
             "index": 0
           },
-          "startByte": 1226
+          "startByte": 1458
         },
         "related": []
       },
@@ -5867,11 +5935,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1275,
+          "endByte": 1339,
           "file": {
             "index": 0
           },
-          "startByte": 1269
+          "startByte": 1237
         },
         "related": []
       },
@@ -5880,11 +5948,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1283,
+          "endByte": 1286,
           "file": {
             "index": 0
           },
-          "startByte": 1281
+          "startByte": 1280
         },
         "related": []
       },
@@ -5893,11 +5961,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1299,
+          "endByte": 1294,
           "file": {
             "index": 0
           },
-          "startByte": 1298
+          "startByte": 1292
         },
         "related": []
       },
@@ -5906,11 +5974,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1328,
+          "endByte": 1310,
           "file": {
             "index": 0
           },
-          "startByte": 1317
+          "startByte": 1309
         },
         "related": []
       },
@@ -5919,11 +5987,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1338,
+          "endByte": 1339,
           "file": {
             "index": 0
           },
-          "startByte": 1338
+          "startByte": 1328
         },
         "related": []
       },
@@ -5932,11 +6000,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1336,
+          "endByte": 1349,
           "file": {
             "index": 0
           },
-          "startByte": 1335
+          "startByte": 1349
         },
         "related": []
       },
@@ -5945,11 +6013,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1597,
+          "endByte": 1347,
           "file": {
             "index": 0
           },
-          "startByte": 1553
+          "startByte": 1346
         },
         "related": []
       },
@@ -5958,11 +6026,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1572,
+          "endByte": 1608,
           "file": {
             "index": 0
           },
-          "startByte": 1567
+          "startByte": 1564
         },
         "related": []
       },
@@ -5971,11 +6039,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1584,
+          "endByte": 1583,
           "file": {
             "index": 0
           },
-          "startByte": 1579
+          "startByte": 1578
         },
         "related": []
       },
@@ -5984,11 +6052,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1597,
+          "endByte": 1595,
           "file": {
             "index": 0
           },
-          "startByte": 1594
+          "startByte": 1590
         },
         "related": []
       },
@@ -5997,11 +6065,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1609,
+          "endByte": 1608,
           "file": {
             "index": 0
           },
-          "startByte": 1608
+          "startByte": 1605
         },
         "related": []
       },
@@ -6010,11 +6078,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1622,
+          "endByte": 1620,
           "file": {
             "index": 0
           },
-          "startByte": 1616
+          "startByte": 1619
         },
         "related": []
       },
@@ -6023,11 +6091,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1630,
+          "endByte": 1633,
           "file": {
             "index": 0
           },
-          "startByte": 1624
+          "startByte": 1627
         },
         "related": []
       },
@@ -6036,11 +6104,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1661,
+          "endByte": 1641,
           "file": {
             "index": 0
           },
-          "startByte": 1660
+          "startByte": 1635
         },
         "related": []
       },
@@ -6049,11 +6117,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1665,
+          "endByte": 1672,
           "file": {
             "index": 0
           },
-          "startByte": 1664
+          "startByte": 1671
         },
         "related": []
       },
@@ -6062,11 +6130,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1665,
+          "endByte": 1676,
           "file": {
             "index": 0
           },
-          "startByte": 1660
+          "startByte": 1675
         },
         "related": []
       },
@@ -6075,11 +6143,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1631,
+          "endByte": 1676,
           "file": {
             "index": 0
           },
-          "startByte": 1612
+          "startByte": 1671
         },
         "related": []
       },
@@ -6092,7 +6160,7 @@
           "file": {
             "index": 0
           },
-          "startByte": 1637
+          "startByte": 1623
         },
         "related": []
       },
@@ -6101,7 +6169,7 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1654,
+          "endByte": 1653,
           "file": {
             "index": 0
           },
@@ -6114,11 +6182,24 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1667,
+          "endByte": 1665,
           "file": {
             "index": 0
           },
-          "startByte": 1667
+          "startByte": 1659
+        },
+        "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 1678,
+          "file": {
+            "index": 0
+          },
+          "startByte": 1678
         },
         "related": []
       },
@@ -6855,11 +6936,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1725,
+          "endByte": 1736,
           "file": {
             "index": 0
           },
-          "startByte": 1669
+          "startByte": 1680
         },
         "related": []
       },
@@ -6868,11 +6949,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1687,
+          "endByte": 1698,
           "file": {
             "index": 0
           },
-          "startByte": 1686
+          "startByte": 1697
         },
         "related": []
       },
@@ -6881,11 +6962,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1705,
+          "endByte": 1716,
           "file": {
             "index": 0
           },
-          "startByte": 1704
+          "startByte": 1715
         },
         "related": []
       },
@@ -6894,11 +6975,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1725,
+          "endByte": 1736,
           "file": {
             "index": 0
           },
-          "startByte": 1717
+          "startByte": 1728
         },
         "related": []
       },
@@ -6907,11 +6988,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1741,
+          "endByte": 1752,
           "file": {
             "index": 0
           },
-          "startByte": 1738
+          "startByte": 1749
         },
         "related": []
       },
@@ -6920,11 +7001,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1743,
+          "endByte": 1754,
           "file": {
             "index": 0
           },
-          "startByte": 1743
+          "startByte": 1754
         },
         "related": []
       },
@@ -6966,11 +7047,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1352,
+          "endByte": 1363,
           "file": {
             "index": 0
           },
-          "startByte": 1340
+          "startByte": 1351
         },
         "related": []
       },
@@ -6979,11 +7060,11 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1369,
+          "endByte": 1380,
           "file": {
             "index": 0
           },
-          "startByte": 1359
+          "startByte": 1370
         },
         "related": []
       },
@@ -7073,7 +7154,7 @@
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 1225,
+          "endByte": 1236,
           "file": {
             "index": 0
           },
@@ -7517,7 +7598,23 @@
             {
               "lifetime": {
                 "value": {
-                  "index": 7
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "name": {
+            "index": 15
+          }
+        }
+      },
+      {
+        "nominal": {
+          "arguments": [
+            {
+              "lifetime": {
+                "value": {
+                  "index": 10
                 }
               }
             }
@@ -7646,6 +7743,20 @@
             },
             "profile": "rust",
             "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 2
+            },
+            "profile": "rust",
+            "referent": {
               "index": 9
             }
           }
@@ -7655,34 +7766,6 @@
         "reference": {
           "value": {
             "kind": "shared",
-            "lifetime": {
-              "index": 2
-            },
-            "profile": "rust",
-            "referent": {
-              "index": 2
-            }
-          }
-        }
-      },
-      {
-        "reference": {
-          "value": {
-            "kind": "mutable",
-            "lifetime": {
-              "index": 1
-            },
-            "profile": "rust",
-            "referent": {
-              "index": 2
-            }
-          }
-        }
-      },
-      {
-        "reference": {
-          "value": {
-            "kind": "mutable",
             "lifetime": {
               "index": 3
             },
@@ -7698,11 +7781,25 @@
           "value": {
             "kind": "mutable",
             "lifetime": {
-              "index": 4
+              "index": 2
             },
             "profile": "rust",
             "referent": {
               "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 4
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 6
             }
           }
         }
@@ -7716,7 +7813,7 @@
             },
             "profile": "rust",
             "referent": {
-              "index": 4
+              "index": 2
             }
           }
         }
@@ -7724,7 +7821,7 @@
       {
         "reference": {
           "value": {
-            "kind": "shared",
+            "kind": "mutable",
             "lifetime": {
               "index": 6
             },
@@ -7758,7 +7855,7 @@
             },
             "profile": "rust",
             "referent": {
-              "index": 2
+              "index": 4
             }
           }
         }
@@ -7766,7 +7863,7 @@
       {
         "reference": {
           "value": {
-            "kind": "mutable",
+            "kind": "shared",
             "lifetime": {
               "index": 9
             },
@@ -7794,7 +7891,7 @@
       {
         "reference": {
           "value": {
-            "kind": "shared",
+            "kind": "mutable",
             "lifetime": {
               "index": 11
             },
@@ -7808,7 +7905,7 @@
       {
         "reference": {
           "value": {
-            "kind": "shared",
+            "kind": "mutable",
             "lifetime": {
               "index": 12
             },
@@ -7825,6 +7922,76 @@
             "kind": "mutable",
             "lifetime": {
               "index": 13
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 1
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 14
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 15
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "mutable",
+            "lifetime": {
+              "index": 16
+            },
+            "profile": "rust",
+            "referent": {
+              "index": 2
+            }
+          }
+        }
+      },
+      {
+        "reference": {
+          "value": {
+            "kind": "shared",
+            "lifetime": {
+              "index": 17
             },
             "profile": "rust",
             "referent": {

@@ -1589,6 +1589,51 @@ theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
     FramedAt executable parameters shared shape frame function :=
   fun free => by simp [references] at free
 
+/-- The first static method dictionary's checked contract: every invocation
+is defined, cannot panic, and preserves global memory. Mutable receiver state
+remains in the arguments' prophecies; it is not required to stay unchanged.
+Concrete dictionaries discharge this obligation using their target's theorem. -/
+def MethodContract {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (parameters : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
+  ∀ (args : HList parameters) (initial : Memory unit),
+    wp (closureMeaning executable parameters shared shape function args)
+      (fun _ final => final = initial) (fun _ => False) initial
+
+theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
+    {shared : Sharing} {shape : ResultShape}
+    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (checked : MethodContract executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
+      (shape.functionOfSkolem θ parameters shared function)) :
+    @MethodContract unit _ executable (Skolems.instantiate θ Θ)
+      parameters shared shape function := by
+  intro args initial
+  rw [closureMeaning_instantiate executable θ free parameters shared shape function args]
+  simpa only [wp_bind, wp_pure] using checked (HList.ofSkolem θ parameters args) initial
+
+/-- Use a checked dictionary without assuming reference-free arguments. The
+success hypothesis retains the entire receiver transition in `EnsuresOf`. -/
+theorem MethodContract.invoke {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
+    {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {function : (NTy.function parameters shared shape.row).carrier}
+    (checked : MethodContract executable parameters shared shape function)
+    (args : HList parameters) {initial : Memory unit}
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    (returns : ∀ result,
+      EnsuresOf (closureMeaning executable) parameters shared shape function args result initial initial →
+      ensures result initial) :
+    wp (closureMeaning executable parameters shared shape function args) ensures aborts initial := by
+  have safe := checked args initial
+  refine ⟨fun result final run => ?_, fun error run => False.elim (safe.2.1 error run), safe.2.2⟩
+  have same := safe.1 result final run
+  subst final
+  exact returns result run
+
 /-- A literal closure keeps a frame where every run of its target from
 typed memory, at any arguments, keeps it: the frame its body establishes,
 whatever its precondition. -/

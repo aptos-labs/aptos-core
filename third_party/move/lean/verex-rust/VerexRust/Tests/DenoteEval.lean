@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Proofs.Denote.Compile
+import VerexIR.Proofs.Denote.Closures
 
 /-!
 # A computable reading of the denotation
@@ -354,9 +355,24 @@ variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
 /-- What a call of a monomorphic callee computes, or of a callee at type arguments
 holding a mutable reference, at its generic arguments and them. -/
-abbrev CallTree : Type :=
+abbrev DirectCallTree : Type :=
   FunctionHandle → Option (Array GenericArgument × TypeArgs) → (σs : NRow) →
     (shape : ResultShape) → HList σs → Tree shape.carrier
+
+/-- Trees for direct calls, generic calls under their induced family, and
+invocation of a function value. -/
+structure CallTree [Θ : Skolems unit] where
+  typeInstantiation : Array (TypeId × TypeId) := #[]
+  direct : DirectCallTree (unit := unit)
+  generic : FunctionHandle → Array GenericArgument → (θ : TypeArgs) →
+    (σs : NRow) → (shape : ResultShape) →
+    @HList (Skolems.instantiate θ Θ).toCarriers σs →
+    Tree (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
+  invoke : (σs : NRow) → (shared : Sharing) → (shape : ResultShape) →
+    (NTy.function σs shared shape.row).carrier → HList σs → Tree shape.carrier
+
+instance : CoeFun (CallTree (unit := unit)) (fun _ => DirectCallTree (unit := unit)) :=
+  ⟨CallTree.direct⟩
 
 /-- What a call means, by the same reading. -/
 def Meanings.callAt {executable : ExecutableUnit unit} (meanings : Meanings executable)
@@ -365,6 +381,20 @@ def Meanings.callAt {executable : ExecutableUnit unit} (meanings : Meanings exec
       Comp unit shape.carrier
   | none => meanings.call handle
   | some (typeArgs, θ) => meanings.atInstance handle typeArgs θ
+
+/-- Each callback agrees with the corresponding denotation callback. -/
+structure CallTree.Means {executable : ExecutableUnit unit}
+    (calls : CallTree (unit := unit)) (meanings : Meanings executable) : Prop where
+  frame : calls.typeInstantiation = meanings.typeInstantiation
+  direct : ∀ handle substitution σs shape args,
+    (calls handle substitution σs shape args).Means
+      (meanings.callAt handle substitution σs shape args)
+  generic : ∀ handle typeArgs θ σs shape args,
+    (calls.generic handle typeArgs θ σs shape args).Means
+      (meanings.generic handle typeArgs θ σs shape args)
+  invoke : ∀ σs shared shape function args,
+    (calls.invoke σs shared shape function args).Means
+      (meanings.invoke σs shared shape function args)
 
 def Tree.flowBind {ρ : ResultShape} {Γ : NRow} {α β : Type}
     (action : Tree (Flow ρ Γ α)) (next : α → HEnv Γ → Tree (Flow ρ Γ β)) : Tree (Flow ρ Γ β) :=
@@ -430,6 +460,7 @@ def loopTree {ρ : ResultShape} {Γ : NRow}
         | .break_ (nest + 1) env => .ok (.break_ nest env)
         | .return_ result env => .ok (.return_ result env)
 
+set_option maxHeartbeats 800000 in
 mutual
 /-- `Term.denote` as a tree, read case by case against it. -/
 def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} :
@@ -538,14 +569,39 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
       Tree.flowBind (arguments.tree calls fuel env) fun values env =>
         (calls handle none _ shape values).bind fun result =>
           .ok (.value (shape.toBody result) env)
-  | _, _, .callGeneric .., _ => .unknown "callGeneric"
+  | _, _, .callGeneric _ handle typeArgs θ shape shape' resolved arguments, env =>
+      Tree.flowBind (arguments.tree calls fuel env) fun values env =>
+        (calls.generic handle typeArgs θ _ shape
+          (HList.toSkolem θ _ (cast (congrArg HList (resolvedCall resolved).1.symm) values))).bind
+          fun result => .ok (.value (shape'.toBody
+            (cast (congrArg ResultShape.carrier (resolvedCall resolved).2)
+              (ResultShape.ofSkolem θ shape result))) env)
   | _, _, .callInstance _ handle typeArgs θ shape arguments, env =>
       Tree.flowBind (arguments.tree calls fuel env) fun values env =>
         (calls handle (some (typeArgs, θ)) _ shape values).bind fun result =>
           .ok (.value (shape.toBody result) env)
-  | _, _, .closure .., _ => .unknown "closure"
-  | _, _, .closureGeneric .., _ => .unknown "closureGeneric"
-  | _, _, .invoke .., _ => .unknown "invoke"
+  | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
+      captures, env =>
+      Tree.flowBind (captures.tree calls fuel env) fun values env =>
+        .ok (.value (Skolems.construct supplied shared results handle weave.mask #[] values
+          (SiteTyped.ofClosure rows sharing closed faithful)) env)
+  | _, _, .closureGeneric handle weave typeArgs θ shape _ shared rows sharing below resolved captures, env =>
+      Tree.flowBind (captures.tree calls fuel env) fun values env =>
+        let instantiation := frameInstantiation unit handle calls.typeInstantiation typeArgs
+        if coherent : @coherentCheck unit _ (Skolems.instantiate θ ‹_›) handle instantiation = true then
+          if faithful : closureFaithful unit handle instantiation = true then
+            .ok (.value (cast (congrArg NTy.carrier (resolvedClosure (shared := shared) resolved).2)
+              (functionOfGeneric unit calls.typeInstantiation typeArgs θ weave shape shared handle
+                (cast (congrArg HList (resolvedClosure (shared := shared) resolved).1.symm) values)
+                (closureOfGeneric_typed calls.typeInstantiation typeArgs θ weave shape rows sharing below
+                  ⟨@Coherent.ofCheck unit _ (Skolems.instantiate θ ‹_›) handle _ coherent, faithful⟩))) env)
+          else .unknown "unfaithful generic closure"
+        else .unknown "incoherent generic closure"
+  | _, _, .invoke _ shape function arguments, env =>
+      Tree.flowBind (function.tree calls fuel env) fun closure env =>
+        Tree.flowBind (arguments.tree calls fuel env) fun values env =>
+          (calls.invoke _ _ shape closure values).bind fun result =>
+            .ok (.value (shape.toBody result) env)
   | _, _, .tuple elements, env =>
       Tree.flowBind (elements.tree calls fuel env) fun values env => .ok (.value values env)
   | _, _, .pack _ _ fields, env =>
@@ -735,7 +791,8 @@ def finishTree {Γ : NRow} (mutables : Mutables Γ) (shape : ResultShape) :
 /-- `Function.denoteWith` as a tree. -/
 def Function.tree (calls : CallTree (unit := unit)) (fuel : Nat) (f : Function unit)
     (args : HList f.params) : Tree f.result.carrier :=
-  (f.body.tree calls fuel (initialEnv f.params f.locals args)).bind (finishTree f.mutables f.result)
+  (f.body.tree calls fuel (initialEnv f.params f.locals f.frame_eq args)).bind
+    (finishTree f.mutables f.result)
 
 end Term
 
@@ -924,9 +981,7 @@ theorem loop_means {ρ : ResultShape} {Γ : NRow} {iteration : HEnv Γ → Tree 
 
 variable {executable : ExecutableUnit unit} (meanings : Meanings executable)
   (calls : CallTree (unit := unit)) (fuel : Nat)
-  (callsMean : ∀ handle substitution σs shape args,
-    (calls handle substitution σs shape args).Means
-      (meanings.callAt handle substitution σs shape args))
+  (callsMean : calls.Means meanings)
 
 set_option linter.unusedSectionVars false in
 include callsMean in
@@ -1029,14 +1084,29 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
         (fun env => Term.tree_means body env) fuel env
   | _, _, .call _ handle shape arguments, env =>
       means_flowBind (Args.tree_means arguments env) fun values _ =>
-        Tree.means_bind (callsMean handle none _ shape values) fun _ => rfl
-  | _, _, .callGeneric .., _ => True.intro
+        Tree.means_bind (callsMean.direct handle none _ shape values) fun _ => rfl
+  | _, _, .callGeneric _ handle typeArgs θ shape _ _ arguments, env =>
+      means_flowBind (Args.tree_means arguments env) fun values _ =>
+        Tree.means_bind (callsMean.generic handle typeArgs θ _ shape _) fun _ => rfl
   | _, _, .callInstance _ handle typeArgs θ shape arguments, env =>
       means_flowBind (Args.tree_means arguments env) fun values _ =>
-        Tree.means_bind (callsMean handle (some (typeArgs, θ)) _ shape values) fun _ => rfl
-  | _, _, .closure .., _ => True.intro
-  | _, _, .closureGeneric .., _ => True.intro
-  | _, _, .invoke .., _ => True.intro
+        Tree.means_bind (callsMean.direct handle (some (typeArgs, θ)) _ shape values) fun _ => rfl
+  | _, _, .closure _ _ _ _ _ _ _ _ captures, env =>
+      means_flowBind (Args.tree_means captures env) fun _ _ => rfl
+  | _, _, .closureGeneric handle weave typeArgs θ shape _ shared rows sharing below resolved captures, env =>
+      means_flowBind (Args.tree_means captures env) fun values env => by
+        dsimp only
+        split
+        · split
+          · rename_i coherent faithful
+            rw [Spec.given_of ⟨@Coherent.ofCheck unit _ (Skolems.instantiate θ ‹_›) handle _ (callsMean.frame ▸ coherent), callsMean.frame ▸ faithful⟩]
+            simp only [callsMean.frame, Tree.Means]
+          · exact True.intro
+        · exact True.intro
+  | _, _, .invoke _ shape function arguments, env =>
+      means_flowBind (Term.tree_means function env) fun closure env =>
+        means_flowBind (Args.tree_means arguments env) fun values _ =>
+          Tree.means_bind (callsMean.invoke _ _ shape closure values) fun _ => rfl
   | _, _, .tuple elements, env => means_flowBind (Args.tree_means elements env) fun _ _ => rfl
   | _, _, .pack _ _ fields, env => means_flowBind (Args.tree_means fields env) fun _ _ => rfl
   | _, _, .variant _ _ _ _ fields, env =>
@@ -1323,79 +1393,164 @@ def calleeAt {unit : ValidatedUnit} (compiled : CompiledUnit unit) (handle : Fun
 section Calls
 variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
-/-- The callee a call runs: its compilation, or, at type arguments holding a mutable
-reference, its compilation at them. -/
+/-- The callee a call runs: its compilation, or its compilation specialized at
+the call's type arguments. -/
 def substitutedCallee (compiled : CompiledUnit unit) (handle : FunctionHandle) :
     Option (Array GenericArgument × TypeArgs) → Except String (Function unit)
   | none => calleeAt compiled handle
   | some (_, θ) => compileFunctionAt unit handle (some θ)
 
-/-- Calls as the callee's tree, its denotation inlined. -/
-def callTree (compiled : CompiledUnit unit) (loopFuel : Nat) : Nat → CallTree (unit := unit)
-  | 0, _, _, _, _, _ => .unknown "call depth"
-  | depth + 1, handle, substitution, σs, shape, args =>
-      match substitutedCallee compiled handle substitution with
-      | .ok f =>
-          if same : f.params = σs ∧ f.result = shape then
-            same.2 ▸ Function.tree (callTree compiled loopFuel depth) loopFuel f (same.1.symm ▸ args)
-          else .unknown "a callee at another signature"
-      | .error reason => .unknown reason
+/-- Evaluate a compiled callee at a checked signature. -/
+def bodyTree (compiled : CompiledUnit unit) (calls : CallTree (unit := unit)) (loopFuel : Nat)
+    (handle : FunctionHandle) (substitution : Option (Array GenericArgument × TypeArgs))
+    (σs : NRow) (shape : ResultShape) (args : HList σs) : Tree shape.carrier :=
+  match substitutedCallee compiled handle substitution with
+  | .ok f =>
+      if same : f.params = σs ∧ f.result = shape then
+        same.2 ▸ Function.tree calls loopFuel f (same.1.symm ▸ args)
+      else .unknown "a callee at another signature"
+  | .error reason => .unknown reason
 
-/-- Every call the callee's denotation, inlined to a depth, a call at type arguments
-holding a mutable reference its denotation at them. -/
+/-- The same compiled body read relationally. -/
+def bodyMeaning {executable : ExecutableUnit unit} (compiled : CompiledUnit unit)
+    (meanings : Meanings executable) (handle : FunctionHandle)
+    (substitution : Option (Array GenericArgument × TypeArgs))
+    (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier :=
+  match substitutedCallee compiled handle substitution with
+  | .ok f =>
+      if same : f.params = σs ∧ f.result = shape then
+        same.2 ▸ f.denoteWith meanings (same.1.symm ▸ args)
+      else Spec.bottom
+  | .error _ => Spec.bottom
+
+theorem bodyTree_means {executable : ExecutableUnit unit} (compiled : CompiledUnit unit)
+    (calls : CallTree (unit := unit)) (meanings : Meanings executable) (loopFuel : Nat)
+    (agrees : calls.Means meanings) (handle substitution σs shape args) :
+    (bodyTree compiled calls loopFuel handle substitution σs shape args).Means
+      (bodyMeaning compiled meanings handle substitution σs shape args) := by
+  unfold bodyTree bodyMeaning
+  cases substitutedCallee compiled handle substitution with
+  | error reason => exact True.intro
+  | ok f =>
+      dsimp only
+      by_cases same : f.params = σs ∧ f.result = shape
+      · obtain ⟨rfl, rfl⟩ := same
+        simp only [and_self, ↓reduceDIte]
+        exact Function.tree_means _ _ _ agrees f args
+      · simp only [same, ↓reduceDIte]
+        exact True.intro
+
+private theorem rowOfList : (row : NRow) → NRow.ofList row.toList = row
+  | .nil => rfl
+  | .cons τ rest => congrArg (NRow.cons τ) (rowOfList rest)
+
+/-- Decode captures separately from the supplied arguments: encoding and
+re-decoding the latter would lose a mutable argument's prophecy. -/
+def closureCallee (closure : ClosureValue) (σs : NRow) (shape : ResultShape)
+    (args : HList σs) : Except String (Σ f : Function unit, {_values : HList f.params // f.result = shape}) := do
+  let row := NRow.ofList <| (List.range (typeArity unit closure.function)).map
+    (closureArgument unit closure.function closure.typeInstantiation)
+  if inhabited : row.inhabitable = true then
+    let f ← compileFunctionAt unit closure.function (some ⟨row, inhabited⟩)
+    let ⟨captured, supplied, weave⟩ := Weave.ofMask closure.mask f.params.toList
+    if same : supplied = σs ∧ f.result = shape then
+      let some values := (rowCodec captured).decode? closure.captures.toList
+        | throw "cannot decode closure captures"
+      let full := weave.compose values (same.1.symm ▸ args)
+      return ⟨f, (rowOfList f.params ▸ full), same.2⟩
+    else throw "closure invocation at another signature"
+  else throw "uninhabitable closure type arguments"
+
+/-- Calls as compiled bodies, retaining each generic call's runtime frame so
+closures created in that body capture the same type instantiation as the IR. -/
+def callTree (compiled : CompiledUnit unit) (loopFuel : Nat) :
+    Nat → (outer : Array (TypeId × TypeId) := #[]) → CallTree (unit := unit)
+  | 0, outer => {
+      typeInstantiation := outer
+      direct := fun _ _ _ _ _ => .unknown "call depth"
+      generic := fun _ _ _ _ _ _ => .unknown "call depth"
+      invoke := fun _ _ _ _ _ => .unknown "call depth" }
+  | depth + 1, outer =>
+      let body := fun handle substitution =>
+        let nested := match substitution with
+          | none => #[]
+          | some (typeArgs, _) => frameInstantiation unit handle outer typeArgs
+        bodyTree compiled (callTree compiled loopFuel depth nested) loopFuel handle substitution
+      { typeInstantiation := outer
+        direct := body
+        generic := fun handle typeArgs θ σs shape args =>
+          (body handle (some (typeArgs, θ)) (NRow.subst θ.1 σs) (shape.subst θ.1)
+            (HList.ofSkolem θ σs args)).bind fun result =>
+              .ok (ResultShape.toSkolem θ shape result)
+        invoke := fun σs shared shape function args =>
+          let closure := (Carriers.functions σs shared shape.row).closure function
+          match closureCallee closure σs shape args with
+          | .error reason => .unknown reason
+          | .ok ⟨f, values, same⟩ =>
+              same ▸ Function.tree (callTree compiled loopFuel depth closure.typeInstantiation) loopFuel f values }
+
+/-- The relational counterpart of callTree. Dispatch checks compiled bodies;
+this does not assume compiler correctness or runtime-dispatch agreement. -/
 def inlined (executable : ExecutableUnit unit) (compiled : CompiledUnit unit) :
-    Nat → Meanings executable
-  | 0 => { closedMeanings executable #[] with
+    Nat → (outer : Array (TypeId × TypeId) := #[]) → Meanings executable
+  | 0, outer => { closedMeanings executable outer with
       call := fun _ _ _ _ => Spec.bottom
-      atInstance := fun _ _ _ _ _ _ => Spec.bottom }
-  | depth + 1 =>
-      let body := fun handle substitution σs (shape : ResultShape) (args : HList σs) =>
-        match substitutedCallee compiled handle substitution with
-        | .ok f =>
-            if same : f.params = σs ∧ f.result = shape then
-              same.2 ▸ f.denoteWith (inlined executable compiled depth) (same.1.symm ▸ args)
-            else Spec.bottom
-        | .error _ => Spec.bottom
-      { closedMeanings executable #[] with
+      atInstance := fun _ _ _ _ _ _ => Spec.bottom
+      generic := fun _ _ _ _ _ _ => Spec.bottom
+      invoke := fun _ _ _ _ _ => Spec.bottom }
+  | depth + 1, outer =>
+      let body := fun handle substitution =>
+        let nested := match substitution with
+          | none => #[]
+          | some (typeArgs, _) => frameInstantiation unit handle outer typeArgs
+        bodyMeaning compiled (inlined executable compiled depth nested) handle substitution
+      { closedMeanings executable outer with
         call := fun handle σs shape args => body handle none σs shape args
-        atInstance := fun handle typeArgs θ σs shape args =>
-          body handle (some (typeArgs, θ)) σs shape args }
+        atInstance := fun handle typeArgs θ σs shape args => body handle (some (typeArgs, θ)) σs shape args
+        generic := fun handle typeArgs θ σs shape args =>
+          Spec.bind (body handle (some (typeArgs, θ)) (NRow.subst θ.1 σs) (shape.subst θ.1)
+            (HList.ofSkolem θ σs args)) fun result => Spec.pure (ResultShape.toSkolem θ shape result)
+        invoke := fun σs shared shape function args =>
+          let closure := (Carriers.functions σs shared shape.row).closure function
+          match closureCallee closure σs shape args with
+          | .error _ => Spec.bottom
+          | .ok ⟨f, values, same⟩ =>
+              same ▸ f.denoteWith (inlined executable compiled depth closure.typeInstantiation) values }
 
 theorem callTree_means (executable : ExecutableUnit unit) (compiled : CompiledUnit unit) (loopFuel : Nat) :
-    (depth : Nat) → ∀ handle substitution σs shape args,
-      (callTree compiled loopFuel depth handle substitution σs shape args).Means
-        ((inlined executable compiled depth).callAt handle substitution σs shape args)
-  | 0, _, substitution, _, _, _ => by cases substitution <;> exact True.intro
-  | depth + 1, handle, substitution, σs, shape, args => by
-      have statement : Tree.Means (match substitutedCallee compiled handle substitution with
-          | .ok f =>
-              if same : f.params = σs ∧ f.result = shape then
-                same.2 ▸ Function.tree (callTree compiled loopFuel depth) loopFuel f
-                  (same.1.symm ▸ args)
-              else .unknown "a callee at another signature"
-          | .error reason => .unknown reason)
-        (match substitutedCallee compiled handle substitution with
-          | .ok f =>
-              if same : f.params = σs ∧ f.result = shape then
-                same.2 ▸ f.denoteWith (inlined executable compiled depth) (same.1.symm ▸ args)
-              else Spec.bottom
-          | .error _ => Spec.bottom) := by
-        cases substitutedCallee compiled handle substitution with
-        | error reason => exact True.intro
-        | ok f =>
-            dsimp only
-            by_cases same : f.params = σs ∧ f.result = shape
-            · obtain ⟨rfl, rfl⟩ := same
-              simp only [and_self, ↓reduceDIte]
-              exact Function.tree_means _ _ _ (callTree_means executable compiled loopFuel depth) f args
-            · simp only [same, ↓reduceDIte]
-              exact True.intro
-      cases substitution with
-      | none => exact statement
-      | some entry => exact statement
+    (depth : Nat) → (outer : Array (TypeId × TypeId) := #[]) →
+      (callTree compiled loopFuel depth outer).Means (inlined executable compiled depth outer)
+  | 0, _ => by
+      constructor
+      · rfl
+      · intro _ substitution; cases substitution <;> intros <;> exact True.intro
+      · intros; exact True.intro
+      · intros; exact True.intro
+  | depth + 1, outer => by
+      constructor
+      · rfl
+      · intro handle substitution σs shape args
+        cases substitution with
+        | none =>
+            exact bodyTree_means compiled _ _ loopFuel
+              (callTree_means executable compiled loopFuel depth #[]) handle none σs shape args
+        | some entry =>
+            exact bodyTree_means compiled _ _ loopFuel
+              (callTree_means executable compiled loopFuel depth _) handle (some entry) σs shape args
+      · intro handle typeArgs θ σs shape args
+        exact Tree.means_bind (bodyTree_means compiled _ _ loopFuel
+          (callTree_means executable compiled loopFuel depth _) handle (some (typeArgs, θ)) _ _ _) fun _ => rfl
+      · intro σs shared shape function args
+        dsimp only [callTree, inlined]
+        split
+        · exact True.intro
+        · rename_i f values same found
+          cases same
+          exact Function.tree_means _ _ _
+            (callTree_means executable compiled loopFuel depth _) f values
 
 /-- What the check runs means the denotation of the function, each callee's
-inlined: a walk's outcome is an outcome of it (`Tree.walk_sound`). -/
+compiled body inlined: a walk's outcome is an outcome of it (`Tree.walk_sound`). -/
 theorem checked_tree_means (executable : ExecutableUnit unit) (compiled : CompiledUnit unit)
     (loopFuel depth : Nat) (f : Function unit) (args : HList f.params) :
     (Function.tree (callTree compiled loopFuel depth) loopFuel f args).Means

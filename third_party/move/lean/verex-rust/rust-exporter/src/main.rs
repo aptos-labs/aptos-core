@@ -22,6 +22,7 @@ extern crate rustc_public;
 mod driver {
     mod exchange;
     mod mapper;
+    mod polyfill;
     mod probe;
 
     use rustc_public::CompilerError;
@@ -146,7 +147,7 @@ mod driver {
     }
 
     /// Runs inside Rustc Public's post-analysis callback.  `Break` is
-    /// intentionally translated by `run!` to `Compilation::Stop`, so no LLVM
+    /// intentionally translated by `run_with_tcx!` to `Compilation::Stop`, so no LLVM
     /// code generation, object production, or linking follows this probe.
     fn extract_m0(emit_artifact: bool) -> ControlFlow<Result<Option<String>, String>, ()> {
         let report = probe::collect();
@@ -187,7 +188,7 @@ mod driver {
         };
         let emit_artifact = options.output.is_some();
 
-        match rustc_public::run!(&options.rustc_args, || extract_m0(emit_artifact)) {
+        match rustc_public::run_with_tcx!(&options.rustc_args, |_tcx| extract_m0(emit_artifact)) {
             Err(CompilerError::Interrupted(Ok(Some(artifact)))) => {
                 match write_artifact(
                     options.output.as_ref().expect("artifact output exists"),

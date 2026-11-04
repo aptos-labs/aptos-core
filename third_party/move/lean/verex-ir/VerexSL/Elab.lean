@@ -851,7 +851,9 @@ private def binderOf (stx : Syntax) : Except String GenericBinder := do
   let phantom := containsAtom "phantom" stx
   if phantom && kind != .type then
     throw s!"only type binder `{name}` may be phantom"
-  return { name, kind, type, abilities, phantom, span := spanOf stx }
+  let outlives ← (childrenWhere (fun child => child.isOfKind ``verexNamedLifetime ||
+      child.isOfKind ``verexInferenceLifetime) stx).mapM lifetimeOf
+  return { name, kind, type, abilities, phantom, outlives, span := spanOf stx }
 
 mutual
 private partial def blockExpressionOfEntries (entries : Array Syntax) (span : Span) :
@@ -1536,10 +1538,10 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
     pure (.closureItem stx[1].getId.getString!
       (← (childrenWhere isGenericBinderSyntax stx[2]).mapM binderOf)
       (← (childrenWhere isAbilitySyntax stx[3]).mapM abilityOf)
-      captures stx[8].getId.getString!
-      (← (childrenWhere isGenericBinderSyntax stx[9]).mapM binderOf)
-      (← (childrenOfKind ``verexParameterSyntax stx[11]).mapM parameterOf)
-      (← typeOf stx[14]) (← expressionOf body) span)
+      captures (← (childrenWhere isAttributeSyntax stx[7]).mapM attributeOf) stx[9].getId.getString!
+      (← (childrenWhere isGenericBinderSyntax stx[10]).mapM binderOf)
+      (← (childrenOfKind ``verexParameterSyntax stx[12]).mapM parameterOf)
+      (← typeOf stx[15]) (← expressionOf body) span)
   else if stx.isOfKind ``verexRawPlaceBorrowExpr then
     let some place := (exprChildren stx)[0]?
       | throw "core.borrowPlace must contain a place expression"
@@ -1934,7 +1936,7 @@ private partial def itemOf (stx : Syntax) : Except String ParsedItem := do
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       fields := ← (childrenOfKind ``verexFieldSyntax stx).mapM fieldOf
       abilities := ← (declarationAbilities stx).mapM abilityOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexEnumItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1944,7 +1946,7 @@ private partial def itemOf (stx : Syntax) : Except String ParsedItem := do
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       variants := ← (childrenOfKind ``verexVariantSyntax stx).mapM variantOf
       abilities := ← (declarationAbilities stx).mapM abilityOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1959,7 +1961,7 @@ private partial def itemOf (stx : Syntax) : Except String ParsedItem := do
       parameters := ← (childrenOfKind ``verexParameterSyntax stx).mapM parameterOf
       result := ← typeOf result
       body := ← expressions.back?.mapM expressionOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexSpecFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1981,7 +1983,7 @@ private partial def itemOf (stx : Syntax) : Except String ParsedItem := do
       decreases := ← ((childrenOfKind ``verexSpecDecreasesSyntax stx)[0]?.bind
         (exprChildren · |>.back?)).mapM expressionOf
       body := ← expressions.back?.mapM expressionOf
-      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
+      attributes := ← (childrenWhereOutsideExpressions isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``verexLemmaItem then
     let some name := stx.getArgs.find? (·.isIdent)

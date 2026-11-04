@@ -613,15 +613,30 @@ private def abilitiesText (abilities : Array VerexIR.Ability) : String :=
 private def binderText (unit : ValidatedUnit) (binders : Array VerexIR.GenericBinder)
     (index : Nat) (binder : VerexIR.GenericBinder) :
     Except String String := do
-  -- A phantom type parameter is a predicate the surface spells in the binder
-  -- itself; every other predicate has no VerexSL spelling yet.
+  let predicates := binders.flatMap (·.predicates)
   let phantom := binder.predicates.any fun
-    | .profile { profile := .move, tag := "typeParameter.phantom", payload } =>
-        payload.isEmpty
+    | .profile { profile := .move, tag := "typeParameter.phantom", payload } => payload.isEmpty
     | _ => false
-  let remaining := binder.predicates.size - (if phantom then 1 else 0)
-  unless remaining == 0 do
-    throw s!"generic binder `{binder.name}` has predicates outside the current VerexSL printer"
+  for predicate in binder.predicates do
+    match predicate with
+    | .profile { profile := .move, tag := "typeParameter.phantom", payload := "" } => pure ()
+    | .lifetimeOutlives .. => pure ()
+    | _ => throw s!"generic binder `{binder.name}` has predicates outside the current VerexSL printer"
+  let mut outlives : Array String := #[]
+  for predicate in predicates do
+    if let .lifetimeOutlives longer shorter := predicate then
+      let some longer := unit.tables.lifetimes[longer.index]?
+        | throw "missing outlives bound lifetime"
+      let .parameter owner := longer.kind
+        | throw "outlives bounds require a lifetime parameter on the left"
+      if owner == index then
+        let some shorter := unit.tables.lifetimes[shorter.index]?
+          | throw "missing outlives bound lifetime"
+        let text ← match shorter.kind with
+          | .parameter parameter => binderName binders parameter
+          | .static => pure "static"
+          | _ => throw "outlives bounds require named lifetimes"
+        unless outlives.contains text do outlives := outlives.push text
   if phantom && binder.kind != .typeArg then
     throw s!"non-type binder `{binder.name}` is marked phantom"
   if binder.kind != .typeArg && !binder.abilities.isEmpty then
@@ -639,11 +654,31 @@ private def binderText (unit : ValidatedUnit) (binders : Array VerexIR.GenericBi
   | .const, none => throw s!"const binder `{binder.name}` has no declared type"
   | _, some _ => throw s!"non-const binder `{binder.name}` carries a const type"
   | .typeArg, none => pure ""
-  | .lifetime, none => pure " : lifetime"
+  | .lifetime, none => pure (" : lifetime" ++ if outlives.isEmpty then "" else
+      " outlives " ++ commaSep outlives)
   | .evidence, none => pure " : evidence"
   let annotation := if phantom then " : phantom type" else annotation
   pure ("{" ++ binderSpelling binders index binder.name ++ annotation ++
     abilitiesText binder.abilities ++ "}")
+
+/-- Canonical declaration metadata, separate from contract pragmas. -/
+private partial def sourceAttributeText (unit : ValidatedUnit) : Attribute → Except String String
+  | .call name arguments _ => do
+      let arguments ← arguments.mapM (sourceAttributeText unit)
+      pure <| sourceIdentifier name ++ (if arguments.isEmpty then "" else
+        s!" ({commaSep arguments})")
+  | .assign name (.constant (.integer value)) _ => do
+      unless 0 ≤ value do throw "negative attribute literals have no source spelling"
+      pure s!"{sourceIdentifier name} = {value}"
+  | .assign name (.constant (.string value)) _ =>
+      pure s!"{sourceIdentifier name} = {repr value}"
+  | .assign name (.name none value) _ =>
+      pure s!"{sourceIdentifier name} = {sourceIdentifier value}"
+  | .assign name (.name (some namespaceId) value) _ => do
+      pure s!"{sourceIdentifier name} = {← namespacePath unit namespaceId}::{sourceIdentifier value}"
+  | .assign name (.qualifiedName value) _ =>
+      pure s!"{sourceIdentifier name} = {value}"
+  | attr => throw s!"attribute `{repr attr}` has no canonical source spelling"
 
 mutual
   private partial def typeTextFuel (unit : ValidatedUnit)
@@ -744,6 +779,23 @@ def PrintNamespace.specificationTypeText (ns : PrintNamespace) (unit : Validated
 def specificationTypeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (binders : Array VerexIR.GenericBinder) (id : TypeId) : Except String String := do
   (← PrintNamespace.of unit ns).specificationTypeText unit binders id
+
+/-- An uncaptured function value at its declaration's generic parameters.
+Used by generated forwarding contracts as well as the source renderer. -/
+def declaredFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (function : VerexIR.FunctionDecl FunctionBody) : Except String String := do
+  let printed ← PrintNamespace.of unit ns
+  let binders := function.signature.generics
+  let arguments ← function.signature.parameters.mapM fun p =>
+    typeText unit printed binders (ns.typeId p.typeUse.typeId)
+  let some result := function.signature.results[0]? | throw "function has no result"
+  let result ← typeText unit printed binders (ns.typeId result.typeId)
+  let some qualified := ns.nameOf function.name | throw "function has no name"
+  let name ← nameTextAt unit printed qualified (surfaceReferenceName qualified.name) false
+  let generics ← binders.zipIdx.mapM fun (_, index) => binderName binders index
+  let target := if generics.isEmpty then name
+    else name ++ "::<" ++ commaSep generics ++ ">"
+  return s!"function[Fn({commaSep arguments}) -> {result} has Copy, Drop]({target})"
 
 /-- A specification type's text with the generic binders `binders` read as
 the type texts `arguments`, as a call instantiates its callee's types. -/
@@ -3825,9 +3877,16 @@ private partial def expressionText (context : Context) (id : ExprId)
                     (fun name => name.scope.push name.name) |>.getD #[]
                   uses := Temporaries.Uses.of context.ns body.locals.size root }
                 let bodyText ← expressionText bodyContext root (fuel - 1) true
+                -- Embedded closure bodies are private by construction; lowering
+                -- restores this modifier. Preserve their remaining metadata.
+                let attributes := body.attributes.filter fun
+                  | .assign "visibility" (.qualifiedName "private") _ => false
+                  | _ => true
+                let attributes ← attributes.mapM (sourceAttributeText context.unit)
+                let attributes := if attributes.isEmpty then "" else s!"@[{commaSep attributes}]\n"
                 return s!"closure {← nameAt context.unit declaration.name}{binders}\
                   {abilitiesText declaration.abilities} ({commaSep captures})\n\
-                  {indent s!"fun {← nameAt context.unit body.name}{functionBinders} \
+                  {indent s!"{attributes}fun {← nameAt context.unit body.name}{functionBinders} \
                     ({commaSep parameters}) -> {result} :=\n{indent bodyText}"}"
           let owner ← typeText context.unit context.ns context.binders expression.typeId
           let constructor := variant.map (s!"{owner}::{·}") |>.getD owner
@@ -5052,25 +5111,6 @@ private def fieldText (unit : ValidatedUnit) (ns : PrintNamespace)
     (field : VerexIR.FieldDecl) : Except String String := do
   pure s!"{← nameAt unit field.name} : {← typeText unit ns binders field.type.typeId}"
 
-/-- Canonical declaration metadata, separate from contract pragmas. -/
-private partial def sourceAttributeText (unit : ValidatedUnit) : Attribute → Except String String
-  | .call name arguments _ => do
-      let arguments ← arguments.mapM (sourceAttributeText unit)
-      pure <| sourceIdentifier name ++ (if arguments.isEmpty then "" else
-        s!" ({commaSep arguments})")
-  | .assign name (.constant (.integer value)) _ => do
-      unless 0 ≤ value do throw "negative attribute literals have no source spelling"
-      pure s!"{sourceIdentifier name} = {value}"
-  | .assign name (.constant (.string value)) _ =>
-      pure s!"{sourceIdentifier name} = {repr value}"
-  | .assign name (.name none value) _ =>
-      pure s!"{sourceIdentifier name} = {sourceIdentifier value}"
-  | .assign name (.name (some namespaceId) value) _ => do
-      pure s!"{sourceIdentifier name} = {← namespacePath unit namespaceId}::{sourceIdentifier value}"
-  | .assign name (.qualifiedName value) _ =>
-      pure s!"{sourceIdentifier name} = {value}"
-  | attr => throw s!"attribute `{repr attr}` has no canonical source spelling"
-
 private def isFunctionModifierAttribute : Attribute → Bool
   | .assign "visibility" (.qualifiedName _) _ => true
   | .call name _ _ =>
@@ -5304,11 +5344,16 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : VerexIR.FunctionDecl FunctionBody) : Except String String := do
   unless ns.profile == some declaration.profile do
     throw "function profile differs from its namespace profile"
-  unless declaration.signature.predicates.isEmpty do
+  unless declaration.signature.predicates.all (fun p => p matches .lifetimeOutlives ..) do
     throw "function predicates are outside the current VerexSL printer"
+  unless declaration.signature.predicates.isEmpty || !declaration.signature.generics.isEmpty do
+    throw "function lifetime predicates require declared lifetime binders"
+  let generics := if declaration.signature.predicates.isEmpty then declaration.signature.generics
+    else declaration.signature.generics.modify 0 fun binder =>
+      { binder with predicates := binder.predicates ++ declaration.signature.predicates }
   let modifiers ← declaredModifiers declaration
   let name ← nameAt unit declaration.name
-  let binders := (← genericBindersText unit declaration.signature.generics)
+  let binders := (← genericBindersText unit generics)
   let binders := if binders.isEmpty then "" else " " ++ binders
   let localNames := declarationLocalNames ns declaration.locals
     declaration.signature.parameters.size (functionBodyRoot? declaration.body)
@@ -5657,6 +5702,8 @@ where
           (← withAttributes declaration.name
             ((declaration.profileData.filter (·.tag == VerexIR.rustRefusedTag)).map (fun value =>
                 Attribute.assign "refused" (.constant (.string value.payload)) none) ++
+              (if declaration.profileData.any (·.tag == VerexIR.rustShapeOnlyTag) then
+                #[Attribute.call "shape_only" #[] none] else #[]) ++
               declaration.attributes.filter (!isFunctionModifierAttribute ·))
             (← atLocation ns.localTables declaration.loc
               (functionText unit (inScope declaration.name) declaration))) }

@@ -58,6 +58,9 @@ structure Companion where
   scope : Array String := #[]
   /-- The file's text; `none` when the file does not exist. -/
   text : Option String := none
+  /-- Synthesized items retain coordinates in the generated rendering, which
+  exists on disk, rather than pointing at an imaginary companion file. -/
+  generated : Bool := false
   role : CompanionRole := .spliced
   /-- The other namespaces its items name, which their namespace follows. -/
   uses : Array NamespaceId := #[]
@@ -360,6 +363,7 @@ private structure Splice where
   firstLine : Nat
   lastLine : Nat
   indent : Nat
+  generated : Bool := false
 
 private def spliceIndent : Nat := 2
 
@@ -407,7 +411,8 @@ private def compose (prelude sources : String) (order : Array NamespaceId)
         let firstLine := (generated.splitOn "\n").length
         generated := generated ++ items ++ "\n"
         let lastLine := firstLine + (items.splitOn "\n").length - 1
-        splices := splices.push { path := companion.path, firstLine, lastLine, indent }
+        splices := splices.push {
+          path := companion.path, firstLine, lastLine, indent, generated := companion.generated }
     while !generated.endsWith "\n\n" do generated := generated ++ "\n"
     (generated ++ sources, splices)
 
@@ -764,9 +769,11 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
         splice.firstLine ≤ message.pos.line && message.pos.line ≤ splice.lastLine
     let report ← match spliced with
       | some splice => pure {
-          file := splice.path.toString
-          line := message.pos.line - splice.firstLine + 1
-          column := message.pos.column - splice.indent + 1
+          file := if splice.generated then generatedName else splice.path.toString
+          line := if splice.generated then message.pos.line
+            else message.pos.line - splice.firstLine + 1
+          column := if splice.generated then message.pos.column + 1
+            else message.pos.column - splice.indent + 1
           severity := message.severity, text }
       | none => do
           let fileMapOf ← if message.fileName == generatedName then pure generatedMap else

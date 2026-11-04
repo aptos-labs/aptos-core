@@ -27,6 +27,7 @@ verex namespace core where
       ) -> Option<T>
 
     trait impl «<std::option::Option<T> as std::ops::Try>» where
+      @[shape_only]
       native fun branch {T} {Residual} {Output}(
         _1 : Option<T>
       ) -> ops::control_flow::ControlFlow<Residual, Output>

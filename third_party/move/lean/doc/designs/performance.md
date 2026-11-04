@@ -89,6 +89,17 @@ downstream rebuild from 4m24s to 1m44s (`Solve.lean` 104 s → 28 s,
 `Verify.lean` 72 s → 14 s). Profile the compiler stages before touching
 proofs for build latency.
 
+### Rust differential evaluator
+
+The generic-closure branch of `VerexRust/Tests/DenoteEval.lean` carries dependent
+frame and capture certificates through the mutually recursive evaluator. Its
+scoped elaboration allowance is deliberate; it does not raise source-verification
+budgets or change how many inputs the differential suite executes. The before/after
+module compilation measurements, heartbeat counts, source revisions and command
+are recorded in [the build-cost artifact](../status/rust-denote-eval-build.json).
+The measurement includes Lean's C generation, but excludes C compilation and
+linking; it is not a differential-suite execution timing.
+
 ### Modules split for edits
 
 Lake rebuilds every importer of a changed module and compiles the C of the

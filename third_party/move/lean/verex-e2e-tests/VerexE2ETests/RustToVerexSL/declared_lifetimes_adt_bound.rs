@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// An ADT's bound on its lifetimes is not exposed, so a result that needs it is
-// rejected.
+// An input ADT's declared lifetime bound also holds in this function.
 
 pub struct Ordered<'a, 'b: 'a> {
     pub short: &'a u32,

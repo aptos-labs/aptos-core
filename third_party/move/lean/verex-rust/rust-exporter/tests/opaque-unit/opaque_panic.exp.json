@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -139,7 +139,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 11
@@ -157,7 +157,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 0
@@ -179,7 +179,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 11
@@ -203,7 +203,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 15
@@ -221,7 +221,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 0
@@ -261,7 +261,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 11
@@ -279,7 +279,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 0
@@ -301,7 +301,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 11
@@ -327,7 +327,7 @@
                   "typeArg": {
                     "value": {
                       "loc": {
-                        "index": 7
+                        "index": 4
                       },
                       "typeId": {
                         "index": 5
@@ -356,7 +356,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 8
@@ -378,7 +378,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 8
@@ -402,7 +402,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 9
@@ -420,7 +420,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 0
@@ -438,7 +438,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -456,7 +456,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -474,7 +474,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -492,7 +492,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -510,7 +510,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -528,7 +528,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -546,7 +546,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -564,7 +564,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -582,7 +582,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 3
@@ -630,7 +630,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 10
@@ -658,7 +658,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 12
@@ -676,7 +676,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 0
@@ -699,7 +699,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 13
@@ -717,7 +717,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 0
@@ -739,7 +739,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 12
@@ -761,7 +761,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 13
@@ -799,7 +799,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 7
@@ -821,7 +821,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 7
@@ -856,7 +856,7 @@
             }
           },
           "loc": {
-            "index": 7
+            "index": 4
           },
           "typeId": {
             "index": 1
@@ -878,7 +878,7 @@
             }
           },
           "loc": {
-            "index": 9
+            "index": 6
           },
           "typeId": {
             "index": 5
@@ -896,7 +896,7 @@
             }
           },
           "loc": {
-            "index": 9
+            "index": 6
           },
           "typeId": {
             "index": 0
@@ -918,7 +918,7 @@
             }
           },
           "loc": {
-            "index": 8
+            "index": 5
           },
           "typeId": {
             "index": 5
@@ -964,7 +964,7 @@
                   },
                   {
                     "loc": {
-                      "index": 7
+                      "index": 4
                     },
                     "statements": [
                       {
@@ -1008,7 +1008,7 @@
                   },
                   {
                     "loc": {
-                      "index": 7
+                      "index": 4
                     },
                     "statements": [
                       {
@@ -1052,7 +1052,7 @@
                   },
                   {
                     "loc": {
-                      "index": 7
+                      "index": 4
                     },
                     "statements": [],
                     "terminator": {
@@ -1067,7 +1067,7 @@
                   },
                   {
                     "loc": {
-                      "index": 8
+                      "index": 5
                     },
                     "statements": [
                       {
@@ -1224,13 +1224,13 @@
                 "index": 6
               },
               "loc": {
-                "index": 5
+                "index": 4
               },
               "mutable": true,
               "name": "_6",
               "type": {
                 "loc": {
-                  "index": 5
+                  "index": 4
                 },
                 "typeId": {
                   "index": 11
@@ -1260,13 +1260,13 @@
                 "index": 8
               },
               "loc": {
-                "index": 6
+                "index": 4
               },
               "mutable": true,
               "name": "_8",
               "type": {
                 "loc": {
-                  "index": 6
+                  "index": 4
                 },
                 "typeId": {
                   "index": 8
@@ -1588,7 +1588,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 13
+            "index": 10
           },
           "locals": [
             {
@@ -1596,13 +1596,13 @@
                 "index": 0
               },
               "loc": {
-                "index": 13
+                "index": 10
               },
               "mutable": false,
               "name": "_1",
               "type": {
                 "loc": {
-                  "index": 13
+                  "index": 10
                 },
                 "typeId": {
                   "index": 14
@@ -1647,7 +1647,7 @@
                 "abilities": [],
                 "kind": "lifetime",
                 "loc": {
-                  "index": 13
+                  "index": 10
                 },
                 "name": "'l0",
                 "predicates": [],
@@ -1657,7 +1657,7 @@
                 "abilities": [],
                 "kind": "typeArg",
                 "loc": {
-                  "index": 13
+                  "index": 10
                 },
                 "name": "T",
                 "predicates": [],
@@ -1670,7 +1670,7 @@
                 "name": "_1",
                 "typeUse": {
                   "loc": {
-                    "index": 13
+                    "index": 10
                   },
                   "typeId": {
                     "index": 14
@@ -1682,7 +1682,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 13
+                  "index": 10
                 },
                 "typeId": {
                   "index": 8
@@ -1710,7 +1710,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 14
+            "index": 11
           },
           "locals": [],
           "name": {
@@ -1756,7 +1756,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 14
+                  "index": 11
                 },
                 "typeId": {
                   "index": 1
@@ -1784,7 +1784,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 15
+            "index": 12
           },
           "locals": [
             {
@@ -1792,13 +1792,13 @@
                 "index": 0
               },
               "loc": {
-                "index": 15
+                "index": 12
               },
               "mutable": false,
               "name": "_1",
               "type": {
                 "loc": {
-                  "index": 15
+                  "index": 12
                 },
                 "typeId": {
                   "index": 7
@@ -1845,7 +1845,7 @@
                 "name": "_1",
                 "typeUse": {
                   "loc": {
-                    "index": 15
+                    "index": 12
                   },
                   "typeId": {
                     "index": 7
@@ -1857,7 +1857,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 15
+                  "index": 12
                 },
                 "typeId": {
                   "index": 1
@@ -1876,7 +1876,7 @@
       "invariants": [],
       "lemmas": [],
       "loc": {
-        "index": 10
+        "index": 7
       },
       "patterns": [],
       "places": [],
@@ -1903,7 +1903,7 @@
         {
           "kind": "module",
           "loc": {
-            "index": 16
+            "index": 13
           },
           "path": [
             "fmt"
@@ -1912,7 +1912,7 @@
         {
           "kind": "inherent",
           "loc": {
-            "index": 17
+            "index": 14
           },
           "path": [
             "fmt",
@@ -1922,7 +1922,7 @@
         {
           "kind": "module",
           "loc": {
-            "index": 18
+            "index": 15
           },
           "path": [
             "fmt",
@@ -1932,7 +1932,7 @@
         {
           "kind": "inherent",
           "loc": {
-            "index": 11
+            "index": 8
           },
           "path": [
             "fmt",
@@ -1943,7 +1943,7 @@
         {
           "kind": "module",
           "loc": {
-            "index": 19
+            "index": 16
           },
           "path": [
             "panicking"
@@ -1976,7 +1976,7 @@
               "abilities": [],
               "kind": "lifetime",
               "loc": {
-                "index": 11
+                "index": 8
               },
               "name": "'a",
               "predicates": [],
@@ -1985,7 +1985,7 @@
           ],
           "ghosts": [],
           "loc": {
-            "index": 11
+            "index": 8
           },
           "locals": [],
           "name": {
@@ -2023,7 +2023,7 @@
               "abilities": [],
               "kind": "lifetime",
               "loc": {
-                "index": 12
+                "index": 9
               },
               "name": "'a",
               "predicates": [],
@@ -2032,7 +2032,7 @@
           ],
           "ghosts": [],
           "loc": {
-            "index": 12
+            "index": 9
           },
           "locals": [],
           "name": {
@@ -2172,59 +2172,16 @@
         "related": []
       },
       {
-        "expansion": [
-          {
-            "endByte": 178,
-            "file": {
-              "index": 0
-            },
-            "startByte": 73
-          }
-        ],
-        "generatedBy": "macro expansion",
-        "parent": null,
-        "primary": null,
-        "related": []
-      },
-      {
         "expansion": [],
         "generatedBy": null,
         "parent": null,
         "primary": {
-          "endByte": 158,
+          "endByte": 159,
           "file": {
             "index": 0
           },
-          "startByte": 153
+          "startByte": 134
         },
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": null,
-        "parent": null,
-        "primary": {
-          "endByte": 150,
-          "file": {
-            "index": 0
-          },
-          "startByte": 148
-        },
-        "related": []
-      },
-      {
-        "expansion": [
-          {
-            "endByte": 123,
-            "file": {
-              "index": 0
-            },
-            "startByte": 113
-          }
-        ],
-        "generatedBy": "macro expansion",
-        "parent": null,
-        "primary": null,
         "related": []
       },
       {
@@ -2406,7 +2363,7 @@
         "description": "Rustc Public FnDef::fn_sig",
         "kind": "rustMir",
         "location": {
-          "index": 13
+          "index": 10
         },
         "sourceIdentity": "core::fmt::rt::Argument::<'_>::new_display"
       },
@@ -2414,7 +2371,7 @@
         "description": "Rustc Public FnDef::fn_sig",
         "kind": "rustMir",
         "location": {
-          "index": 14
+          "index": 11
         },
         "sourceIdentity": "std::fmt::Arguments::<'a>::new"
       },
@@ -2422,7 +2379,7 @@
         "description": "Rustc Public FnDef::fn_sig",
         "kind": "rustMir",
         "location": {
-          "index": 15
+          "index": 12
         },
         "sourceIdentity": "std::rt::panic_fmt"
       }

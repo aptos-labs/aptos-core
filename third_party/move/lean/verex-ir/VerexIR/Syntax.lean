@@ -547,6 +547,10 @@ def rustClosureTag : String := "struct.closure"
 its signature: its body is not exported. -/
 def rustDependencyTag : String := "function.dependency"
 
+/-- A dependency signature with promoted associated-type binders. Until their
+equalities are represented, contracts must constrain them at a shape. -/
+def rustShapeOnlyTag : String := "function.shapeOnly"
+
 /-- The Rust property of a dependency's function whose unsafety or signature the
 crate cannot state: it declares no generics or parameters. The import prunes one
 no call is left of, and validation rejects a survivor. -/

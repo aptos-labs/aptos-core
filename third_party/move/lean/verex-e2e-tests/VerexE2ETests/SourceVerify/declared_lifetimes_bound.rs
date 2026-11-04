@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// An ADT's bound on its lifetimes is not exposed, so a result that needs it is
-// rejected.
+// The exporter's predicate queries preserve the ADT's outlives bound,
+// so a reference with the longer lifetime can be returned at the shorter one.
 
 pub struct Ordered<'a, 'b: 'a> {
     pub short: &'a u32,

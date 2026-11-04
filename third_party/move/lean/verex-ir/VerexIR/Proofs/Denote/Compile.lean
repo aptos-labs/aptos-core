@@ -78,23 +78,6 @@ def ghostInitSite (namespaceIndex expressionIndex k : Nat) : Nat :=
 def notCarried (what : String) : Except String α :=
   .error s!"{what} is not carried by the denotation"
 
-/-- Why a function cannot be the target of a function value: its result is
-a tuple, which a function type states as a row of results and a result shape as
-one type (`doc/designs/higher-order-functions.md`, "Function values of
-tuple-returning functions"). -/
-def closureTargetRefusal (targetNs : ValidatedNamespace)
-    (target : FunctionDecl FunctionBody) : Option String :=
-  match target.signature.results.toList with
-  | [result] => match (targetNs.typeOf result.typeId) with
-    | some (.tuple elements) =>
-        let name := ((targetNs.nameOf target.name).map (·.name)).getD "?"
-        let holdsReference := elements.any fun element =>
-          targetNs.tables.types[element.index]? matches some (.reference _)
-        some s!"a function value of `{name}` is not supported: `{name}` returns a tuple\
-          {if holdsReference then " holding a reference" else ""}"
-    | _ => none
-  | _ => none
-
 /-- A namespace as a compilation reads it. The kernel evaluates a
 compilation and reads a plain array in time linear in the index, so the
 arenas and the type table are viewed as balanced trees, built once per
@@ -995,6 +978,19 @@ def CompileNamespace.dropsDestructor (ns : CompileNamespace) (unit : ValidatedUn
             (holdsDestructor unit τ || !τ.refFree) && dropsParameter unit ns.fuel [] [(callee, index)]
       | _ => false
 
+/-- The public Rust theorem's restriction on instantiated parameters that the
+function can drop, directly or through callees. Until effectful drop is modelled,
+such an argument may neither run a destructor nor hold an unresolved mutable loan.
+This is a check on the instantiated types, not a claim that arbitrary Rust drop
+glue is pure. Alignment of those types with Rust remains the frontend obligation. -/
+def DroppedTypeArgumentsTrivial (unit : ValidatedUnit) (handle : FunctionHandle)
+    (θ : TypeArgs) : Prop :=
+  ∀ index, index < θ.1.toList.length →
+    dropsParameter unit (unit.namespaces.foldl (fun n ns => n + ns.expressions.size + 1) 1)
+      [] [(handle, index)] = true →
+    holdsDestructor unit (θ.1.getD index .unit) = false ∧
+      (θ.1.getD index .unit).refFree = true
+
 /-- A generic instantiation in the caller's types over all binder positions: no
 carrier reads a lifetime's or a constant's position, which holds a placeholder. -/
 def CompileNamespace.instantiation? (ns : CompileNamespace) (unit : ValidatedUnit)
@@ -1228,7 +1224,6 @@ mutual
               | .error "a closure target's namespace is out of range"
             let some target := targetNs.functions[handle.functionId.index]?
               | .error "a closure's target is out of range"
-            if let some refusal := closureTargetRefusal targetNs target then throw refusal
             let some targetParameters := target.signature.parameters.toList.mapM fun parameter =>
                 ns.declaredNty unit handle.namespaceId (targetNs.typeId parameter.typeUse.typeId)
               | notCarried "the type of a closure target's parameter"

@@ -1,9 +1,212 @@
 # Closing the Rust verification gaps
 
-Proposed 2026-10-28. Refines section 7 of [`roadmap.md`](roadmap.md) and
+Refines section 7 of [`roadmap.md`](roadmap.md) and
 milestones M2, M1.5 and M6 of
 [`rust-mir-design.md`](../designs/rust-mir-design.md). The unsafe profile
 stays in [`unsafe-pointers.md`](../designs/unsafe-pointers.md).
+
+## Implementation boundary and next gates
+
+The sections below include the rationale for work already implemented; they
+are not a list of outstanding features. The current frontend supports checked
+arithmetic and panic locations, reducible loops and invariants, native library
+contracts at shapes, declared lifetime bounds, const-generic metadata, promoted
+constants, direct closure calls, two-phase borrows, and the supported `Box` slice.
+The exporter, renderer and denotation each have separate rejection boundaries;
+successful export alone is not successful verification.
+
+The confined [`rustc_public` polyfill](rustc-public-polyfill.md) is an accepted
+temporary exception until the upstream Rust bug is fixed in the pinned toolchain.
+Missing upstream queries no longer block the local use of predicates, const
+parameter types, promoted constants, caller-aware resolution or macro locations.
+Compiler-private access stays in the bridge. Replace each helper with its public
+query and retire it when that query becomes available; this exception does not
+authorize moving compiler internals into the mapper.
+
+The first three implementation gates are:
+
+1. Establish the restacked baseline across all four Lake packages, exporter
+   checks, and the full Move Prover Lean suite. Record actual differential
+   outcomes separately from inconclusive cases; an allowlisted generic call is
+   not evidence of interpreter/denotation agreement.
+2. Close the generic interface gaps: require shape contracts where dependency
+   associated types have been promoted to independent binders, expose the
+   trivial-destructor requirement of dropped abstract parameters, and retain
+   closure receivers and their state in higher-order contracts. Include negative
+   tests for each boundary.
+3. Carry static trait evidence through one narrow end-to-end slice:
+   `Step::step(&mut self)` and `step_twice<T: Step>`. Prove the generic body once,
+   check method signatures and implementation contracts, instantiate two
+   implementations, reject malformed evidence and incorrect contracts, and
+   compare interpreter execution. Associated types, supertraits, `dyn`, and
+   effectful destructors follow after this gate; concrete dispatch alone does
+   not satisfy it.
+
+The restack comparison uses parent `059a708b0c2` (`wrwg/verex-fx`). A clean
+parent verifier reproduces the six full Move Prover baseline failures in
+`ghost_field_intrinsic_map_ops`, `loops`, `references`, `math8`,
+`lambda_variant_field_access`, and `closures/inline/folds_of_wrapper_mut`.
+It also reproduces the source-verification failures in
+`behavior_nominal_arguments`. These are inherited failures, not passing gates;
+their expectations must not be updated merely to conceal the failures. The
+parent's stale denotation-performance baseline was regenerated independently
+and used unchanged to check this branch. The final full Move Prover run is
+462 passed / 6 failed, with exactly those same failing fixtures. The IR and Move
+package suites pass. The exporter passes 24 tests, `cargo check`, formatting,
+and Clippy. The new positive/negative source tests and generic-proof reuse audit
+pass; the differential suite checks 3,653,449 inputs with 955 explicitly
+inconclusive cases (not counted as agreement).
+
+The `bench_bit_vector_errors` timeout is also present in clean pre-change
+HEAD `1661d5efd0d`: replaying the same rendering gives identical diagnostics
+and the same 173 decided leaves. Its budget and expected output are unchanged.
+The shape-only guard required migrating the `u128`-to-`u64` conversion contract
+to its concrete `TryFromIntError` shape; positive and negative conversion cases
+are now included in the Rust smoke gate.
+
+The complete E2E driver was replayed in an isolated copy with generated
+expectations compared against the working tree, so a baseline mismatch could
+not stop coverage early. All 124 Move and 181 Rust source fixtures, package
+verification, Check fixtures, VM checks and differential checks completed.
+After reviewing and refreshing diagnostic-only changes, the only remaining
+mismatches are `behavior_nominal_arguments` and `bench_bit_vector_errors` above.
+The expanded Rust smoke run passed 40 of 41 cases; the remaining group passed
+on read-only replay after refreshing its diagnostic-only expectation. No
+verification budget or inherited failure expectation was weakened.
+
+General trait evidence is still unimplemented. The bridge supplies the compiler
+facts needed to implement it; it does not turn them into checked VIR evidence.
+
+### First static dictionary slice
+
+The local single-method `fn step(&mut self)` slice lowers to a typed function
+value parameter, marked by `@[method_evidence = n]`, where `n` is its parameter
+index. The dictionary takes the receiver explicitly and captures nothing. The
+exporter obtains it from a positive declared trait predicate, forwards it through
+generic calls, and resolves a concrete implementation in the caller's typing
+environment. Generic bodies are not cloned.
+
+The shared validator checks the dictionary parameter's signature and rejects
+out-of-range indices; ordinary closure typing checks a concrete implementation's
+receiver and result. Generated contracts require `MethodContract`: the method
+is defined, does not panic, and preserves global memory at every receiver value.
+This is a proof obligation for the concrete dictionary, discharged through the
+implementation's verified contract or body, not a trusted native assumption.
+Receiver changes remain in `EnsuresOf`'s before/after arguments. The generic proof
+can compose those transitions without knowing the implementation.
+
+This deliberately small interface does not yet support conditional method
+preconditions, arbitrary method results, multiple associated items, associated
+equalities, supertrait evidence or `dyn`. The `Fn` and `FnMut` slices below
+uses the same checked dictionary interface. Ordinary Rust methods
+may panic; only implementations establishing this slice's stronger contract can
+be used to verify its generic callers. Rust-to-dictionary alignment, including
+selection of the declared trait's implementation, remains in the exporter's M7
+trust boundary. It is not a general implementation of VIR's trait declarations.
+
+The `static_step` source fixtures cover a counter, a toggle, and generic
+forwarding; negative fixtures reject false implementation/caller contracts and
+a method that can panic. `StaticMethodEvidence.lean` audits reuse of the generic
+theorem. Exporter native execution and Rust profile interpreter tests use the
+same normal and overflow-boundary cases, and the profile tests corrupt a
+dictionary's receiver and parameter index. These evidence fixtures have a
+separate exporter directory, included in the default differential suite with
+zero inconclusive inputs required. The denotation-tree evaluator executes
+`callGeneric` through a specialized compiled body and `invoke` for dictionaries
+including checked captures and runtime type instantiations. The
+`method_evidence` differential fixture also checks a panicking implementation through generic forwarding; this
+is execution coverage, not evidence that it meets `MethodContract`.
+
+### Stateful `FnMut` dictionaries
+
+A declared `F: FnMut(A, ...) -> R` bound supplies a dictionary taking `&mut F`
+and the spread arguments, retaining generic argument and result types. The exporter requires the
+declared `FnOnce::Output` equality and identifies the compiler's trait and
+associated item by identity, not spelling. It forwards the dictionary through
+generic calls without inferring a bound from observed calls or cloning the body.
+Concrete dictionaries target mutable closure bodies or checked adapters that
+reborrow an `Fn` closure's receiver as shared. Multiple bounds get distinct,
+collision-free evidence names. Closures inside bounded generic functions capture
+the inherited dictionaries as partial applications, preserving their contracts.
+
+Move-captured state remains in the closure struct. `ensures_of` relates the old
+receiver, result and new receiver, in that order. `MethodContract` still requires
+an everywhere-defined, non-panicking method preserving global memory; the
+closure's verified contract must discharge it. The `static_fnmut` fixtures prove
+counter and toggle updates through opaque generic helpers and forwarding, and
+`FnMutEvidence.lean` checks reuse of those generic theorems. Native Rust execution
+and the strict evidence differential suite compare the same mutation and
+wrapping-overflow cases. Negative fixtures cover false caller and closure
+contracts, panics, malformed dictionaries, and unsupported bounds.
+`evidence_composition` adds multiple dictionaries, name collisions, inherited
+evidence, receiver adapters, argument tuples, and generic/struct results. The
+exporter completes types along generic call edges, including transitive calls,
+rather than interning an unrelated receiver/result cross product.
+
+Closures capturing mutable references retain the existing refusal when an opaque
+generic contract would have to transfer to a type containing a loan. No loan or
+receiver state is erased to make that call verify. `FnOnce` dictionaries,
+general associated-type equalities and conditional method contracts remain open.
+Tuple-returning callbacks use the target's packed result throughout the native
+function type, invocation, and generic contract transport. The `tuple_callbacks`
+fixtures cover opaque forwarding, generic results instantiated by tuples,
+single-element and nested tuples, and shared-receiver adapters, with positive
+and false contracts and differential execution. Source `ensures_of` keeps its
+separate result-element operands; translation packs them into the result value.
+The representation is described in
+[`higher-order-functions.md`](../designs/higher-order-functions.md#function-values-of-tuple-returning-functions).
+Tuples containing borrowed references still need aggregate sharing and loan
+transfer support. Move regression coverage for this shared change is deferred.
+
+### Shared `Fn` dictionaries
+
+A declared `F: Fn(A, ...) -> R` bound supplies a dictionary taking `&F`, using
+compiler identities and the declared `FnOnce::Output` equality. It calls the
+shared closure body directly and forwards the evidence through generic helpers.
+The existing `MethodContract` proof supports this shared receiver without a new
+axiom or an extra receiver-state output in `ensures_of`.
+
+`static_fn` covers scalar and generic results (including tuples), arguments,
+multiple independent bounds, and repeated unit-returning calls. Native Rust,
+strict differential execution, dictionary validation, source proofs, and false
+contract/panic regressions exercise the implementation. The formerly refused
+`closure_generic_call` fixture is now a positive export regression. `FnOnce`,
+higher-ranked bounds and conditional method contracts remain outside this slice.
+
+### Generic `Fn` to `FnMut` forwarding
+
+An `Fn`-bounded helper can now pass its callback to an `FnMut`-bounded helper.
+The exporter creates an adapter only at a call edge that needs one. The adapter
+captures the declared shared dictionary, takes `&mut F`, and invokes that
+dictionary through a shared reborrow. It neither specializes the generic body
+nor adds an independent `FnMut` assumption to the caller.
+
+Rust source verification synthesizes ordinary specifications for the marked
+adapter bodies: the receiver is unchanged and the result obeys the original
+shared dictionary's `ensures_of`. These specifications are proved, not assumed.
+Concrete closure receiver adapters use the same specification generation,
+referring to the source closure's `call` method. Neither adapter kind requires
+user specifications naming generated functions. The solver follows nested
+concrete callback facts through verified target contracts and avoids expanding
+the same observation twice. Derived callback facts use the existing
+instantiated-frame transport theorem before comparison with the caller's facts. Generated adapters do not participate
+in Cargo module-file discovery; their specifications are supplied separately.
+
+The `fn_forward` fixtures cover generic and tuple results, argument forwarding,
+repeated calls, multiple independent bounds, and nullary unit calls. Source
+proofs are split into `fn_forward`, `_multi`, `_unit`, and `_tuple` to keep each
+unit small. The repeated unit-returning case uses a transparent `FnMut` helper;
+its fully opaque version currently exceeds the automatic solver budget.
+`_errors` rejects false results, a false implementation contract,
+and a potentially panicking callback. The combined evidence fixture remains
+subject to the strict differential-execution gate. The denotation evaluator now
+constructs generic closures only after checking their frames, carries those
+frames through calls, decodes captures separately, and retains the supplied
+arguments' mutable-reference prophecies. Its evaluator-to-denotation theorem
+covers these cases without new axioms. Optimized, unassigned zero-sized locals
+borrowed mutably are materialized before borrowing, so capture-free callbacks
+also execute in the interpreter. Existing loan restrictions
+and the requirement for unconditional non-panicking method contracts remain.
 
 ## Problem
 
@@ -13,11 +216,11 @@ denotation and verified
 ([`source-verification.md`](../designs/source-verification.md)). For Move
 this path verifies the benchmark's standard-library and framework modules up
 to `ordered_map`, runs the Move Prover's test corpus, and verifies the
-`SourceVerify` fixtures. For Rust it verifies two fixtures:
-`SourceVerify/bounds.rs`, also the benchmark's only Rust problem, with
-branches, a modular call and a `&mut` parameter, and
-`SourceVerify/references.rs`, with field updates through `&mut` and calls
-passing a mutable reference on.
+`SourceVerify` fixtures. Rust now has a broad `SourceVerify` corpus covering
+arithmetic, loops, declared regions, library contracts, generics, closures,
+promoted constants and references. Its positive tests are paired with false
+contracts and refusal tests; the original two fixtures no longer describe its
+coverage.
 
 Where a Rust body reaches the verifier, it behaves as for Move: a missing
 precondition on `a + b` fails as a possible panic, and a caller verifies
@@ -26,7 +229,7 @@ earlier:
 
 | Stage | Behavior | Cause |
 |---|---|---|
-| Export | A call whose dependency signature names an associated type (`v[i]` on `Vec`) is rejected, as is a generic struct deriving `Clone`. | VIR has no projection type; a derived `Clone` of a generic struct calls `Clone::clone` on a type parameter (M2). |
+| Export | General parameter-dependent trait calls, including derived generic `Clone`, are rejected. | General checked dictionaries and associated-type equalities remain M2 work. Dependency projections such as indexing use promoted binders and shape contracts. |
 | Validation | A loop whose exits continue to code they reach only through a cycle, or not at all in common, is rejected (`VIR-CFG-MULTI-EXIT`). | The structurizer needs one block after the loop that every continuing exit reaches without a cycle; early returns, `continue`/`break` of enclosing loops, and valued `break`s meeting after the loop are supported (`RustToVerexSL/loop_exits.rs`). |
 | Validation | A mutable borrow of an `unsize` or `subslice` place is rejected (`VIR-SEMANTIC-BORROW-UNSIZED-HOLE`). | The runtime's hole cannot sit in a slice of a vector. |
 | Denotation | A `&mut` held in an enum is rejected (`a loan held inside an aggregate`), as is a reference type argument of a function value or a native, opaque or recursive callee. | A loan's death resolves a local or a tuple's or struct's component at its path. |
@@ -48,8 +251,8 @@ names its key and its Rust source location.
 
 The goal beyond that slice is the semantics of all safe Rust. What verifies must
 be true of real Rust, and what is not modelled yet is rejected, never given another
-meaning. What remains: trait-bounded generics and `dyn` (blocked upstream,
-[rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)), destructor
+meaning. What remains: general trait-bounded generics and `dyn` (the local
+predicate-query prerequisite is supplied by the temporary polyfill), destructor
 effects and unwinding (M4), interior mutability (`interior-mutability.md`, whose cell
 identities keep `&T` a snapshot), `Box` and recursive types (step 3e), floats, and
 concurrency. Closures are step 3d, following
@@ -336,22 +539,10 @@ call's type arguments, and specialization (SC1–SC5) goes on unchanged. Two sha
 matching one call are an error of the library. A call matching none has no contract
 and is rejected at its location.
 
-Open, upstream:
-
-- Trait bounds of functions and impls are not exposed by Rustc Public
-  ([rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)),
-  so no binder states its predicates, local or dependency.
-- A span's call site (`Span::source_callsite`): what a macro of another crate expands
-  to is located at what it is reached after (step 3c).
-- The value of a promoted constant: no public query evaluates one, so `&5`, `x == None`,
-  `a == Unit::A` and `assert_eq!(a, 1)` are export errors (step 3c).
-- `Copy` of a type parameter: a body copying a `T: Copy` value needs the
-  bound, which Rustc Public does not expose; the exporter maps such a copy to
-  a move. The binder needs an explicit marker that its bounds are not
-  exported, which VerexSL must spell. A struct's `Copy` is exported (its
-  `Copy` impl applying it to its own parameters); a `Copy` impl for one
-  instantiation (`impl Copy for S<u32>`) is not stated, and copying that
-  instantiation fails semantic preparation.
+The temporary polyfill supplies declared predicates, macro call sites, promoted
+constant evaluation and declared `Copy` bounds. General trait predicates and
+associated equalities still need checked evidence; availability of the query
+alone does not implement that evidence.
 
 **A standard-library specification library.** VerexSL files maintained in
 `verex-rust/lib/{core,alloc}` give contracts to the `core` and `alloc` functions
@@ -478,23 +669,15 @@ relation only an ADT's bound implies is rejected in a body
 (`VIR-SEMANTIC-BORROW-RESULT-REGION`), and a dependency holding an ADT over several
 lifetimes, whose body nothing checks, is exported inferred whole.
 
-Two limits follow. `impl<'a, T> Iterator for Iter<'a, T>` makes `'a` early-bound, so
-`next(&mut self) -> Option<&'a T>` exports erased and each item holds the `&mut iter`
-loan: a `for` loop is unaffected, but two live items from one iterator conflict
-falsely. And `fn ordered_long<'x, 'y>(o: Ordered<'x, 'y>) -> &'x u32` with
-`struct Ordered<'a, 'b: 'a>`, which rustc accepts, is rejected
-(`RustToVerexSL/declared_lifetimes_adt_bound.rs`,
-`SourceVerify/declared_lifetimes_bound_errors.rs`). Both are precision limits, on the
-safe side, until rust-lang/rust#161892 exposes the predicates.
+Declared outlives predicates now propagate through ADT arguments. In particular,
+`Ordered<'a, 'b: 'a>` is covered by the positive
+`SourceVerify/declared_lifetimes_bound.rs` fixture. Iterator result-region precision
+still needs its own tests; the query gap is no longer the reason to defer it.
 
-**`Copy` of a type parameter.** Rustc Public hides the bound (rust-lang/rust#161892), and
-optimized MIR spells a final move of a local `copy`, so a `copy` alone shows nothing. The
-exporter states `T has Copy` on a binder where the body shows it: a copy through a reference,
-which rustc refuses as a move (E0507), a copy of a place read again, or an instantiation of
-what a callee needs, to a fixed point over the unit (`copy_parameters`). Any other `copy`
-at a type not `Copy`, or `Copy` only by such a parameter, stays a move. The ability is checked at every
-instantiation, so a wrong inference rejects and proves nothing false. A result of a type
-with no lifetime holds no loan of the frame, since a type parameter outlives the body.
+**`Copy` of a type parameter.** The mapper uses the declared bounds through
+`polyfill::copy_parameters`, under the item's typing environment. Optimized MIR's
+use of `copy` alone is not evidence of a `Copy` bound. Instantiations remain
+subject to the shared ability checker.
 
 **Generics at references.** A generic theorem does not transfer to `T := &mut U`:
 the generic proof drops `T` as nothing, and dropping a `&mut` resolves its prophecy.
@@ -547,12 +730,14 @@ type, every row of 8-bit integers for the operations and casts. A `&mut`
 parameter's prophecy is its written-back value, and any other leaves no execution
 unless the reference is returned. The term runs as a tree of its outcomes
 (`Term.tree`, `VerexRust/Tests/DenoteEval.lean`), proved to mean the denotation
-(`checked_tree_means`), with choices of prophecies and calls inlined, so a closure
-is covered through its direct call, and a generic callee at a reference type through
-its substituted compile. Function values, other generic calls, globals and
-functions over strings are not covered: their trees are `unknown`, or they have no
-inputs. Rust's `as` wraps and rustc spells no checked
-cast, so `Term.cast` is reached by an authored unit
+(`checked_tree_means`), with choices of prophecies and compiled calls inlined.
+Generic calls use a specialized compile and transport arguments and results through the skolem
+codecs; invocation reads the target of a function value without captures or
+runtime type instantiations. The theorem relates the tree to this inlined
+compiled-body meaning, not to runtime dispatch or compiler correctness. Closure
+captures, generic closure construction, globals and functions over strings remain
+outside this evaluator's coverage: their trees are `unknown`, or they have no
+inputs. Rust's `as` wraps and rustc spells no checked cast, so `Term.cast` is reached by an authored unit
 (`VerexRust/Tests/Programs/DifferentialCasts.lean`). `run_sound` and `run_complete` relate the
 interpreter to `BigStep`.
 
@@ -625,21 +810,17 @@ a spurious panic path, which is sound and incomplete, recorded in `assumptions.m
 The import prunes an opaque declaration nothing then calls, as it drops unreferenced
 opaque types, and validation rejects an opaque node or declaration that survives.
 
-Rustc Public gives a span no call site, so a panic a macro of another crate raises
-has only spans in that crate. Its location names what it is reached after, the nearest
-dominator of the region with a terminator in the crate, else the function, in the
-location's `expansion` with no `primary`, and the message says so. A location keys no
-selector. `Span::source_callsite` goes upstream beside rust-lang/rust#161892; with it,
-`primary` holds the macro's call.
+Macro diagnostics use the polyfilled source call site, preserving expansion
+information and locating a panic at the macro invocation in the user's crate.
 
 **Constants.** Export evaluates a constant (`try_const_eval`): integers, `bool` and
 `char` to literals, structs and arrays through their bytes and layout; a constant at
 `&T` exports as a shared borrow of the referent's value, since a struct referent has
 no `ConstValue`, which covers `&str` and `&STATIC`. A constant states the shape only
 of an ADT whose variants and fields are all visible.
-A constant generic over a parameter (`T::MAX`) and a promoted constant are precise
-export errors: Rustc Public cannot evaluate a promoted, which goes upstream beside
-rust-lang/rust#161892, so `assert_eq!(a, 1)` waits while `assert_eq!(a, b)` works.
+A constant generic over a parameter (`T::MAX`) remains a precise export error.
+Promoted constants are evaluated through the bridge, including constant references
+and assertions that create promoteds.
 `static mut` stays rejected.
 
 **`?`.** A zero-sized constant of an ADT type is the constructor of its single layout
@@ -680,11 +861,9 @@ only for a call naming what the shape names, since each type it adds to a namesp
 table makes a frame certificate dearer; a function with calls no shape matches keeps
 its shapes for the message listing them. `iter_mut` waits for step 3b.
 
-`.iter()` in a generic body waits upstream, beside
-[rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892):
-`Instance::resolve` uses an empty parameter environment, so `Iter<'_, K>` fails on the
-implicit `K: Sized`, while `Range<usize>` in a generic body exports. Resolution has to
-run in the caller's typing environment. Until then a generic body loops over a range.
+Caller-aware resolution now runs in the caller's typing environment through
+the bridge, so `K: Sized` is available when resolving a generic iterator call.
+Parameter-dependent dispatch still requires a supported method dictionary.
 
 A rule for reading a subvector (`(v[a .. b]).length == b - a`, `(v[a .. b])[k] == v[a +
 k]` for `k < b - a`) belongs to the normal form, added when a fixture first reaches it.
@@ -743,22 +922,24 @@ struct's field types as for any struct with visible fields. A by-value call spel
 closure `copy g` where it is the last use, so a copy the unit cannot state to be one, of
 a closure that is not `Copy` or that mentions a type parameter, is a move.
 
-**A closure passed to a generic.** Proposed, for decision: `Fn*` evidence as function
-values, Move Prover style (`ensures result == result_of<f>(…)`), with the user
-spelling `ensures_of<F>(f, x, result)`. `apply<F>` exports with an evidence binder
-derived from the body's `<F as Fn<(u32,)>>::call`, since rustc type-checked the
-obligation and #161892 blocks only declaring bounds; a call site instantiates it with
-the closure body as a nullary function value. Open: a generic that only passes `F` on
-to another generic needs its callee's evidence, so derivation is a fixed point over
-the crate. Library combinators get contracts with the bound declared as data; `Map<I, F>`
-is a modeled struct like step 3c's `Iter`.
+**A closure passed to a generic.** `Fn*` evidence must come from the declared
+predicates now available through the bridge, including when a function merely
+forwards its closure to another generic. Do not infer bounds from observed calls.
+The evidence's method takes the receiver explicitly: `&F` for `Fn`, `&mut F` for
+`FnMut`, and `F` for `FnOnce`. Its behavioral contract relates the old and new
+receiver as well as arguments and result. A nullary function value would erase
+captured state and is not a valid encoding. A closure carrying mutable references
+must retain the existing substitution and loan checks. Library combinators get
+contracts with the bound declared as data; `Map<I, F>` is a modeled struct like
+step 3c's `Iter`. The `Fn` and `FnMut` evidence slices are implemented as described
+above; consuming `FnOnce` evidence remains open.
 
 | Stage | Gate |
 |---|---|
 | 1 Closure items, untupled direct calls, printed closure expressions | fixed point and `verify` of a direct call, a once-called closure, a loop in a closure; the differential check covers them |
 | 2 `&mut` and move upvars | `FnMut` over a counter verifies; an `Fn` closure over a `&mut` upvar is rejected |
 | 3 Specifications on closures | `spec call` with a `loop 1` invariant verifies; `no panic` reported on the closure |
-| 4 `Fn*` evidence for own generics | `apply`, `apply_mut`, `apply_once` verify generically; a caller proves the result of a known closure |
+| 4 `Fn*` evidence for own generics | `FnMut` arguments, generic/struct/tuple results, forwarding and receiver adapters; declared `Fn` shared receivers; `FnOnce` bounds remain open |
 | 5 Library combinators | `Option::map` verifies; a `for` over `iter().map(..)` with an invariant verifies |
 | 6 Function pointers as evidence, then `dyn Fn` | a function pointer verifies; `dyn Fn` rejected at its location until then |
 
@@ -969,11 +1150,9 @@ with `push_str`, `push` and `as_bytes` contracts in those terms. `from_utf8` and
 as a step 3c iterator model are stage 2.
 
 **Which MIR is verified.** The exporter pins `-Copt-level=0` and `-Zub-checks=no`, so a
-source has one MIR whatever the user's profile. A function holding a promoted is refused, as any body-level
-export failure, since Rustc Public cannot read `promoted_mir`.
-`-Zmir-enable-passes=-PromoteTemps` removes promoteds but rustc then rejects 28 of 180
-crates measured, and a fallback would verify different programs depending on an unrelated
-line, so it is not the default.
+source has one MIR whatever the user's profile. The bridge reads promoted MIR;
+there is no fallback that disables promotion and thereby changes the program
+selected for verification.
 
 **What stops real crates after per-function refusal.** First stop over 180
 dependency-free registry crates: a local of `dyn` type 49, raw pointer 22, `impl Trait`
@@ -1005,11 +1184,11 @@ real code, by how much it blocks:
 |---|---|---|
 | Most functions | `assert!`, `panic!`, `expect`, `debug_assert!`, `assert_eq!`, `static` | export: constant types |
 | Most crates | `const` items, `u64::MAX` | export: `Unevaluated` |
-| Most loops | `iter_mut`; `.iter()` in a generic body | step 3b; upstream, see "Iterators" |
+| Most loops | `iter_mut`; `.iter()` in a generic body | step 3b; see "Iterators" |
 | Comparators | `a.cmp(&b)`, negative discriminants | rendering does not re-import |
 | Iterator chains | closures | export |
 | Error handling | `?` | export: `Option<Infallible>` |
-| Generic containers | `K: PartialEq` | trait evidence, upstream |
+| Generic containers | `K: PartialEq` | general trait evidence |
 
 `add`, `remove` and `borrow_mut` of `simple_map` need proof steps: a vector update
 under a uniqueness invariant is not automatic.
@@ -1021,8 +1200,7 @@ Steps 1 and 2 complete M2's contracts-and-verify item for the slice without
 traits. Step 3 moves M6's library models before M3–M5, because safe Rust
 code needs `Option`, `Result` and `Vec` before it needs references inside
 ADTs or drop effects. Step 4 completes M1.5 for verification. M3 (regions
-over the prophetic model), M4 (drops and panics), trait evidence (M2, after
-the upstream query) and the unsafe profile follow in the order of
+over the prophetic model), M4 (drops and panics), trait evidence (M2, using the temporary query bridge) and the unsafe profile follow in the order of
 `rust-mir-design.md`, each adding fixtures to the same Rust `SourceVerify`
 gate.
 

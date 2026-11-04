@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -15,7 +15,7 @@
         {
           "isDoc": false,
           "loc": {
-            "index": 18
+            "index": 17
           },
           "ownLine": true,
           "text": "// `Option<T>` is `Copy` where `T` is, so `Option<u32>` is copied."
@@ -80,7 +80,7 @@
             }
           },
           "loc": {
-            "index": 1
+            "index": 0
           },
           "typeId": {
             "index": 3
@@ -102,7 +102,7 @@
             }
           },
           "loc": {
-            "index": 6
+            "index": 5
           },
           "typeId": {
             "index": 3
@@ -124,7 +124,7 @@
             }
           },
           "loc": {
-            "index": 6
+            "index": 5
           },
           "typeId": {
             "index": 3
@@ -151,7 +151,7 @@
             }
           },
           "loc": {
-            "index": 6
+            "index": 5
           },
           "typeId": {
             "index": 5
@@ -169,7 +169,7 @@
             }
           },
           "loc": {
-            "index": 6
+            "index": 5
           },
           "typeId": {
             "index": 0
@@ -191,7 +191,7 @@
             }
           },
           "loc": {
-            "index": 5
+            "index": 4
           },
           "typeId": {
             "index": 5
@@ -213,7 +213,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 10
           },
           "typeId": {
             "index": 4
@@ -235,7 +235,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 10
           },
           "typeId": {
             "index": 4
@@ -262,7 +262,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 10
           },
           "typeId": {
             "index": 6
@@ -280,7 +280,7 @@
             }
           },
           "loc": {
-            "index": 11
+            "index": 10
           },
           "typeId": {
             "index": 0
@@ -302,7 +302,7 @@
             }
           },
           "loc": {
-            "index": 10
+            "index": 9
           },
           "typeId": {
             "index": 6
@@ -321,7 +321,7 @@
                 "blocks": [
                   {
                     "loc": {
-                      "index": 1
+                      "index": 0
                     },
                     "statements": [
                       {
@@ -451,7 +451,7 @@
                 "blocks": [
                   {
                     "loc": {
-                      "index": 5
+                      "index": 4
                     },
                     "statements": [
                       {
@@ -492,7 +492,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 2
+            "index": 1
           },
           "locals": [
             {
@@ -500,13 +500,13 @@
                 "index": 0
               },
               "loc": {
-                "index": 3
+                "index": 2
               },
               "mutable": false,
               "name": "point",
               "type": {
                 "loc": {
-                  "index": 3
+                  "index": 2
                 },
                 "typeId": {
                   "index": 3
@@ -518,13 +518,13 @@
                 "index": 1
               },
               "loc": {
-                "index": 4
+                "index": 3
               },
               "mutable": true,
               "name": "_0",
               "type": {
                 "loc": {
-                  "index": 4
+                  "index": 3
                 },
                 "typeId": {
                   "index": 5
@@ -549,7 +549,7 @@
                 "name": "point",
                 "typeUse": {
                   "loc": {
-                    "index": 3
+                    "index": 2
                   },
                   "typeId": {
                     "index": 3
@@ -561,7 +561,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 4
+                  "index": 3
                 },
                 "typeId": {
                   "index": 5
@@ -581,7 +581,7 @@
                 "blocks": [
                   {
                     "loc": {
-                      "index": 10
+                      "index": 9
                     },
                     "statements": [
                       {
@@ -622,7 +622,7 @@
           },
           "doc": "",
           "loc": {
-            "index": 7
+            "index": 6
           },
           "locals": [
             {
@@ -630,13 +630,13 @@
                 "index": 0
               },
               "loc": {
-                "index": 8
+                "index": 7
               },
               "mutable": false,
               "name": "value",
               "type": {
                 "loc": {
-                  "index": 8
+                  "index": 7
                 },
                 "typeId": {
                   "index": 4
@@ -648,13 +648,13 @@
                 "index": 1
               },
               "loc": {
-                "index": 9
+                "index": 8
               },
               "mutable": true,
               "name": "_0",
               "type": {
                 "loc": {
-                  "index": 9
+                  "index": 8
                 },
                 "typeId": {
                   "index": 6
@@ -679,7 +679,7 @@
                 "name": "value",
                 "typeUse": {
                   "loc": {
-                    "index": 8
+                    "index": 7
                   },
                   "typeId": {
                     "index": 4
@@ -691,7 +691,7 @@
             "results": [
               {
                 "loc": {
-                  "index": 9
+                  "index": 8
                 },
                 "typeId": {
                   "index": 6
@@ -837,14 +837,14 @@
             {
               "doc": "",
               "loc": {
-                "index": 14
+                "index": 13
               },
               "name": {
                 "index": 4
               },
               "type": {
                 "loc": {
-                  "index": 14
+                  "index": 13
                 },
                 "typeId": {
                   "index": 1
@@ -854,14 +854,14 @@
             {
               "doc": "",
               "loc": {
-                "index": 15
+                "index": 14
               },
               "name": {
                 "index": 5
               },
               "type": {
                 "loc": {
-                  "index": 15
+                  "index": 14
                 },
                 "typeId": {
                   "index": 1
@@ -872,7 +872,7 @@
           "generics": [],
           "ghosts": [],
           "loc": {
-            "index": 13
+            "index": 12
           },
           "locals": [],
           "name": {
@@ -901,7 +901,7 @@
       "invariants": [],
       "lemmas": [],
       "loc": {
-        "index": 12
+        "index": 11
       },
       "patterns": [],
       "places": [],
@@ -928,7 +928,7 @@
         {
           "kind": "module",
           "loc": {
-            "index": 17
+            "index": 16
           },
           "path": [
             "option"
@@ -961,7 +961,7 @@
               "abilities": [],
               "kind": "typeArg",
               "loc": {
-                "index": 16
+                "index": 15
               },
               "name": "T",
               "predicates": [],
@@ -970,7 +970,7 @@
           ],
           "ghosts": [],
           "loc": {
-            "index": 16
+            "index": 15
           },
           "locals": [],
           "name": {
@@ -982,7 +982,7 @@
               "discriminant": 0,
               "fields": [],
               "loc": {
-                "index": 16
+                "index": 15
               },
               "name": {
                 "index": 7
@@ -994,14 +994,14 @@
                 {
                   "doc": "",
                   "loc": {
-                    "index": 16
+                    "index": 15
                   },
                   "name": {
                     "index": 9
                   },
                   "type": {
                     "loc": {
-                      "index": 16
+                      "index": 15
                     },
                     "typeId": {
                       "index": 2
@@ -1010,7 +1010,7 @@
                 }
               ],
               "loc": {
-                "index": 16
+                "index": 15
               },
               "name": {
                 "index": 8
@@ -1093,19 +1093,6 @@
             "index": 0
           },
           "startByte": 82
-        },
-        "related": []
-      },
-      {
-        "expansion": [],
-        "generatedBy": null,
-        "parent": null,
-        "primary": {
-          "endByte": 87,
-          "file": {
-            "index": 0
-          },
-          "startByte": 87
         },
         "related": []
       },
@@ -1415,7 +1402,7 @@
         "description": "Rustc Public CrateItem::body",
         "kind": "rustMir",
         "location": {
-          "index": 2
+          "index": 1
         },
         "sourceIdentity": "copy_types::duplicate"
       },
@@ -1423,7 +1410,7 @@
         "description": "Rustc Public CrateItem::body",
         "kind": "rustMir",
         "location": {
-          "index": 7
+          "index": 6
         },
         "sourceIdentity": "copy_types::twice"
       }

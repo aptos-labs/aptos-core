@@ -17,10 +17,10 @@ open VerexIR.Rust.Tests.Differential
 /-- The disagreements known, each to be resolved by removing it here. All are
 functions no input runs to a return or an abort. -/
 def knownDisagreements : Array String := #[
-  -- `Term.tree` does not evaluate a generic call or a closure, or the callee has no body.
+  -- The dependency callee has no executable body.
   "dependency_calls::checked", "dependency_calls::copied", "dependency_calls::length",
   "dependency_calls::or_zero", "dependency_calls::push_one", "dependency_projection::element",
-  "function_pointer::apply", "declared_lifetimes::vec_index", "boxes::make",
+  "declared_lifetimes::vec_index", "boxes::make", "polyfill::is_none",
   -- The inputs cover no `String` or `Vec`.
   "destructors::string", "owned_vector::named", "owned_vector::view",
   "string_length::byte_length", "string_slice::identity", "string_slice::identity_mut",
@@ -83,10 +83,13 @@ def main (args : List String) : IO UInt32 := do
   let verbose := args.contains "--verbose"
   let directories := args.filter (!·.startsWith "--")
   let own ← if directories.isEmpty then
-      checkDirectory environment "Tests/Differential" (coverage #["bytes", "casts"])
+      checkDirectory environment "Tests/Differential" (coverage #["bytes", "casts", "method_evidence"])
     else
       pure #[]
-  let mut reports := own
+  let evidence ← if directories.isEmpty then
+      checkDirectory environment "rust-exporter/tests/evidence-unit" (coverage #[])
+    else pure #[]
+  let mut reports := own ++ evidence
   if directories.isEmpty then
     reports := reports ++ (← checkDirectory environment "rust-exporter/tests/raw-unit" (coverage #[]))
     let some casts := VerexSL.registeredUnit? environment `differential_casts
@@ -105,7 +108,11 @@ def main (args : List String) : IO UInt32 := do
     {total (·.inconclusive)} inconclusive, {total (·.interpreterErrors)} interpreter errors, \
     in {(← IO.monoMsNow) - start} ms"
   if directories.isEmpty then
-    let found := failures own reports
+    let mut found := failures (own ++ evidence) reports
+    -- Dictionary fixtures must exercise every input, not just one successful path.
+    for report in evidence ++ own.filter (·.name == "method_evidence") do
+      if report.inputs == 0 || report.inconclusive != 0 || report.interpreterErrors != 0 then
+        found := found.push s!"incomplete method evidence comparison: {report.name}"
     for line in found do
       IO.eprintln line
     return if found.isEmpty then 0 else 1

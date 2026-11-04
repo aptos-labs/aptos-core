@@ -1261,7 +1261,29 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     checkAcyclic "place" ns.places.size fun index =>
       (ns.places[index]?).map (placeChildren · |>.map (·.index)) |>.getD #[]
   let shapeErrors := ns.functions.foldl (fun ds function =>
-    ds ++ checkShapes registry unit function) #[]
+    ds ++ checkShapes registry unit function ++
+      (if function.profileData.any (·.tag == rustShapeOnlyTag) &&
+          (!function.contract.conditions.isEmpty || function.contract.hasFrame ||
+            !function.contract.parameterFrames.isEmpty) then
+        #[.at "VIR-SHAPE-REQUIRED"
+          "a dependency with promoted associated types requires a contract at a shape"
+          function.loc]
+      else #[])) #[]
+  let methodEvidenceErrors := ns.functions.flatMap fun function =>
+    function.attributes.filterMap fun attr => do
+      let .assign "method_evidence" value _ := attr | none
+      let valid := Id.run do
+        unless function.profile == .rust do return false
+        let .constant (.integer index) := value | return false
+        if index < 0 then return false
+        let some parameter := function.signature.parameters[index.toNat]? | return false
+        let some (.function parameters _ _) := unit.tables.types[parameter.typeUse.typeId.index]?
+          | return false
+        let some (receiver : TypeId) := parameters[0]? | return false
+        let some (.reference _) := unit.tables.types[receiver.index]? | return false
+        return true
+      if valid then none else some (.at "VIR-METHOD-EVIDENCE"
+        "method evidence must name a parameter of type Fn(&T, ...) -> R or Fn(&mut T, ...) -> R" function.loc)
   let declErrors := (ns.functions.flatMap fun function =>
       #[function] ++ function.shapes.map function.atShape).foldl (fun ds function =>
     let functionBinders := binderKinds function.signature.generics
@@ -1508,7 +1530,7 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     checkAttributes registry unit unit.tables ns.pragmas ++
     ns.comments.foldl (fun ds comment => ds ++ checkLoc unit.tables comment.loc) #[]
   headerErrors ++ declarationNameErrors ++ scopeErrors ++ exprErrors ++ patternErrors ++ placeErrors ++ arenaErrors ++
-    declErrors ++ shapeErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
+    declErrors ++ shapeErrors ++ methodEvidenceErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
     implementationErrors ++ specFunctionErrors ++ specVarErrors ++ lemmaErrors ++ invariantErrors ++
     intrinsicErrors ++ traitCycleErrors ++ metadataErrors ++ surfaceErrors
 

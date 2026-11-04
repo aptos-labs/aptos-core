@@ -1,0 +1,67 @@
+{
+  "module": "verex-rust/VerexRust/Tests/DenoteEval.lean",
+  "toolchain": "Lean 4.32.2",
+  "architecture": "aarch64",
+  "measurement": "Three alternating warm module compilations, emitting olean and C; no other task builds or tests running. Dependencies fixed at the current restacked branch. Includes elaboration, kernel checking and Lean C generation; excludes C compiler and linking.",
+  "command": "lake env lean -R /tmp -o /tmp/Measure-VARIANT.olean -c /tmp/Measure-VARIANT.c /tmp/Measure-VARIANT.lean",
+  "instrumentation": "IO.getNumHeartbeats immediately before and after the first mutual block, using run_cmd; counts are raw heartbeats (1000 per user-facing heartbeat).",
+  "before": {
+    "commit": "f8b174e2df30614e6ad374eaeeb9f0b2d90066e5",
+    "sha256": "145607b34a1337b0bddd4148bac26cb165bfe7308f19cfa0e94a336f1b68fc77",
+    "cap": 200000
+  },
+  "after": {
+    "commit": "a5dd0e79e5b17df57af6fbebc3a1c3cc56e9783e",
+    "sha256": "df1d00140fa38b6e66e7b9c8e528315c184642bb8042b48efd9e76dc5db5d312",
+    "cap": 800000
+  },
+  "runs": [
+    {
+      "variant": "before",
+      "iteration": 1,
+      "seconds": 6.132,
+      "exit_code": 0,
+      "mutual_heartbeats": 17791232
+    },
+    {
+      "variant": "after",
+      "iteration": 1,
+      "seconds": 14.287,
+      "exit_code": 0,
+      "mutual_heartbeats": 268821215
+    },
+    {
+      "variant": "before",
+      "iteration": 2,
+      "seconds": 6.1,
+      "exit_code": 0,
+      "mutual_heartbeats": 17791232
+    },
+    {
+      "variant": "after",
+      "iteration": 2,
+      "seconds": 14.212,
+      "exit_code": 0,
+      "mutual_heartbeats": 268821215
+    },
+    {
+      "variant": "before",
+      "iteration": 3,
+      "seconds": 6.11,
+      "exit_code": 0,
+      "mutual_heartbeats": 17791232
+    },
+    {
+      "variant": "after",
+      "iteration": 3,
+      "seconds": 14.883,
+      "exit_code": 0,
+      "mutual_heartbeats": 268821215
+    }
+  ],
+  "median_seconds": {
+    "before": 6.11,
+    "after": 14.287
+  },
+  "decision": "Retain the scoped elaboration allowance for the generic-closure branch. The first mutual block consumes about 268821 user-facing heartbeats, above the default 200000; the allowance does not change verification budgets or differential input counts."
+}

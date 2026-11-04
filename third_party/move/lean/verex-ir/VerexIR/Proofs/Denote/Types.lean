@@ -623,11 +623,9 @@ def ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
           let parameters ← arguments.toList.mapM (ntyOfFuel types unit env fuel namespaceId)
           let results ← match ← types namespaceId result with
             | .unit => some []
-            | .tuple elements => elements.toList.mapM (ntyOfFuel types unit env fuel namespaceId)
             | _ => (fun τ => [τ]) <$> ntyOfFuel types unit env fuel namespaceId result
           let resultIds ← match ← types namespaceId result with
             | .unit => some []
-            | .tuple elements => some elements.toList
             | _ => some [result]
           some (.function (NRow.ofList parameters)
             { parameters := arguments.toList.map (sharedReference types namespaceId)
@@ -833,11 +831,11 @@ def closureSignature? (unit : ValidatedUnit) (function : FunctionHandle) :
 
 /-! ### Native and semantic readings -/
 
-/-- A semantic type's results as a function type's result row reads them:
-none for the unit, a tuple's elements, or the one type. -/
+/-- A function value has the same result row as its target: no value for
+unit, otherwise one value, including a tuple. Keeping tuples packed preserves
+single-element tuples and substitution of a generic result by a tuple. -/
 def _root_.VerexIR.SemTy.resultRow : SemTy → List SemTy
   | .unit => []
-  | .tuple elements => elements
   | type => [type]
 
 /-- A function's results packed into one type, as a function type states
@@ -3596,8 +3594,8 @@ def hlistCodec (Γ : NRow) : Codec (HList Γ) (Array RuntimeValue) where
     intro values
     simp [HList.encode, (rowCodec Γ).decode_encode]
 
-/-- The declared results of a function: none, or one native value.  Move
-lowers a multi-result as one tuple; that shape is not carried yet. -/
+/-- The declared results of a function: none, or one native value. A
+tuple result stays one tuple value, including at a function-value call. -/
 inductive ResultShape where
   | none
   | one (τ : NTy)

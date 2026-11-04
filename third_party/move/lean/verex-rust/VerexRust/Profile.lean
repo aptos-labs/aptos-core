@@ -79,6 +79,7 @@ def schema : ProfileSchema where
   checkProperty := fun value =>
     if value.tag == closureTag || value.tag == VerexIR.rustRefusedTag ||
         (value.tag == opaqueTag || value.tag == destructorTag || value.tag == dependencyTag ||
+          value.tag == VerexIR.rustShapeOnlyTag ||
           value.tag == opaqueFunctionTag) && value.payload.isEmpty then #[]
     else unknown "property" value
   opaqueNominal := fun properties => properties.any (·.tag == opaqueTag)
@@ -94,7 +95,7 @@ def semantics : SemanticProfile where
     | .property =>
         if value.tag == opaqueTag || value.tag == destructorTag || value.tag == dependencyTag ||
             value.tag == opaqueFunctionTag || value.tag == closureTag ||
-            value.tag == VerexIR.rustRefusedTag then
+            value.tag == VerexIR.rustRefusedTag || value.tag == VerexIR.rustShapeOnlyTag then
           some .frontendOnly
         else none
     | _ => none

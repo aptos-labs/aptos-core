@@ -51,6 +51,7 @@ def metadataModifiers (profile : VerexIR.Profile) (properties : Array VerexIR.Pr
       | "function.dependency" => result := { result with isNative := true }
       -- A refused function is also a dependency's in form; `@[refused]` spells why.
       | "function.refused" => pure ()
+      | "function.shapeOnly" => pure ()
       -- Move classifies both tags as frontend-only provenance. Canonical
       -- VerexSL retains the ordinary function and prefix-call semantics.
       | "function.inlineRetained" | "function.receiver" => pure ()

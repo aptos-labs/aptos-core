@@ -29,7 +29,7 @@ pub fn elided_with_named<'a>(x: &'a mut u32, _y: &mut u32) -> &'a mut u32 {
     x
 }
 
-// An outlives bound makes its lifetimes early-bound, which `fn_sig` erases.
+// The bridge keeps early-bound lifetimes and their explicit outlives bound.
 pub fn outlives<'s, 'l: 's>(x: &'l mut u32) -> &'s mut u32 {
     x
 }
@@ -54,7 +54,7 @@ pub trait Convert<'a, 'b> {
     fn convert(self, x: &'a mut u32) -> &'b mut u32;
 }
 
-// Early-bound lifetimes are erased: a clause may relate them.
+// Trait-bound early lifetimes remain distinct in the declared signature.
 pub fn bounded<'a, 'b, T: Convert<'a, 'b>>(_value: &T, _x: &'a mut u32, y: &'b mut u32) -> &'b mut u32 {
     y
 }

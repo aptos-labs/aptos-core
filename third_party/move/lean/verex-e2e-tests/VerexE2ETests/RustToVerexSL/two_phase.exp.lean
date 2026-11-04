@@ -11,6 +11,7 @@ verex namespace alloc where
 
   mod vec where
     trait impl «<std::vec::Vec<T, A> as std::ops::Index<I>>» where
+      @[shape_only]
       native fun index {T} {I} {A} {Output}(_1 : &Vector<T>, _2 : I) -> &Output
 
     impl Vec where

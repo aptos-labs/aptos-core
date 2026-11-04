@@ -1909,6 +1909,12 @@ private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   if ← scalarAt? (← contextFacts goal) goal then
     charge "scalar rows" stageStart
     return true
+  if let some remaining ← methodContract? goal then
+    setGoals remaining
+    evalTactic (← `(tactic| all_goals (try verex_normalize)))
+    queue (← getGoals) provenance (← withTargetClause goal clauses)
+    charge "method contract" stageStart
+    return true
   if let some remaining ← routedClosureFrame? goal then
     queue remaining provenance (← withTargetClause goal clauses)
     charge "closure frame" stageStart

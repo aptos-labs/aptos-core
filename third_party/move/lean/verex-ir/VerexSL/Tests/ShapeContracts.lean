@@ -53,4 +53,26 @@ run_cmd do
     | throwError "a function with shapes did not decode"
   unless decoded == shaped do throwError "a function's shapes did not round-trip"
 
+-- Promoted associated types are independent binders until trait equalities are
+-- modelled. A contract cannot silently quantify over arbitrary outputs.
+run_cmd do
+  let env ← getEnv
+  let declaration := "verex namespace promoted_shapes where\n" ++
+    "  @[shape_only]\n" ++
+    "  native fun project {T} {Output}(value : &T) -> &Output\n\n"
+  let unshaped := declaration ++ "  spec project where\n    ensures true\n"
+  match VerexSL.Print.formatSource env unshaped with
+  | .ok _ => throwError "an unshaped contract on promoted associated types was accepted"
+  | .error message => unless (toString message).contains "requires a contract at a shape" do
+      throwError "unexpected rejection: {message}"
+  let shaped := declaration ++ "  spec project at {u64} {u64} where\n    ensures result == value\n"
+  let printed ← match VerexSL.Print.formatSource env shaped with
+    | .ok printed => pure printed
+    | .error error => throwError "a shaped contract on promoted associated types was rejected: {error}"
+  unless printed.contains "shape_only" do
+    throwError "printing lost the shape requirement"
+  let .ok again := VerexSL.Print.formatSource env printed
+    | throwError "the shape-only rendering did not re-import"
+  unless again == printed do throwError "the shape-only rendering was not a fixed point"
+
 end VerexSL.Tests.ShapeContracts

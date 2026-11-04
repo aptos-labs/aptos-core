@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -109,7 +109,7 @@
               "sourceConstant": null,
               "value": {
                 "opaque": {
-                  "description": "function `signature_types::const_parameter` has const parameter `N` whose declared type is not exposed by the pinned Rustc Public API, so a call of it refuses its caller"
+                  "description": "its signature states `[u64; N]`, which is not modelled, so a call of it refuses its caller"
                 }
               }
             }
@@ -1875,6 +1875,12 @@
               "width": 64
             }
           }
+        }
+      },
+      {
+        "integer": {
+          "signed": false,
+          "width": "pointer"
         }
       },
       {

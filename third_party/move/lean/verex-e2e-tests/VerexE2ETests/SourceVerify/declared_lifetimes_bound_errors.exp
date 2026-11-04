@@ -1,2 +1,0 @@
-VerexE2ETests/SourceVerify/declared_lifetimes_bound_errors.rs:12:1: error: the borrow analysis rejects the unit, so preparation refuses it:
-VIR-SEMANTIC-BORROW-RESULT-REGION: a result holds a loan of a parameter whose declared lifetime is not known to outlive the result's: Rustc Public exposes no outlives bound, and this signature implies none at declared_lifetimes_bound_errors.rs.lean:15:20

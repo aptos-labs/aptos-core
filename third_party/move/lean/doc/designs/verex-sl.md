@@ -370,7 +370,10 @@ Verex exposes the four VIR binder sorts: `{T}`, `{N : const}`,
 binders, not implicit Lean arguments. An unannotated binder is a type
 binder; `: type` is written only for a phantom parameter
 (`{T : phantom type}`). Type binders may carry the core abilities
-(`{T has Copy, Drop, Store}`); other constraints use a `where` block:
+(`{T has Copy, Drop, Store}`). A lifetime binder may declare region bounds,
+for example `{a : lifetime outlives b, static}`; these lower to core
+`lifetimeOutlives` predicates and survive canonical printing and reimport.
+The general trait-constraint design uses a `where` block:
 
 ```lean
 where

@@ -202,7 +202,8 @@ private def binderText (binder : GenericBinder) : String :=
     | .const => " : const" ++ match binder.type with
         | some type => " " ++ typeText type.value
         | none => ""
-    | .lifetime => " : lifetime"
+    | .lifetime => " : lifetime" ++ if binder.outlives.isEmpty then "" else
+        " outlives " ++ ", ".intercalate (binder.outlives.map lifetimeText).toList
     | .evidence => " : evidence"
   "{" ++ identifier binder.name ++ annotation ++ abilitiesText binder.abilities ++ "}"
 
@@ -592,6 +593,23 @@ private partial def normalizeUnitTail : Expr → Expr
         (pattern, guard, normalizeUnitTail body)) span
   | body => body
 
+/-- A declaration's source attributes print on their own line above it. -/
+private partial def sourceAttributeText : SourceAttribute → String
+  | .call name arguments _ =>
+      identifier name ++ (if arguments.isEmpty then "" else
+        " (" ++ ", ".intercalate (arguments.map sourceAttributeText).toList ++ ")")
+  | .assign name value _ =>
+      identifier name ++ " = " ++ match value with
+        | .number value => toString value
+        | .string value => toString (repr value)
+        | .name value => identifier value
+        | .qualifiedName value => value
+
+private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
+  if attributes.isEmpty then .nil else
+    let entries := attributes.map sourceAttributeText
+    text ("@[" ++ ", ".intercalate entries.toList ++ "]") ++ hard
+
 mutual
   private partial def expressionDoc : Expr → Except String Doc
     | .unit _ => pure <| text "()"
@@ -698,7 +716,7 @@ mutual
           else text ", " ++ commaSep captures
         pure <| text s!"function[{typeText result.value}]({pathText name}{typeSuffix}" ++
           suffix ++ text ")"
-    | .closureItem name generics abilities captures function functionGenerics parameters result
+    | .closureItem name generics abilities captures attributes function functionGenerics parameters result
         body _ => do
       let captures ← captures.mapM fun (field, type, value) => do
         pure <| text s!"{identifier field} : {typeText type.value} := " ++ (← expressionDoc value)
@@ -708,7 +726,7 @@ mutual
         (text s!"fun {identifier function}{bindersText functionGenerics}") "(" ")"
         (parameters.map parameterDoc) (text s!" -> {typeText result.value}")
       pure <| hangingDelimited head " (" ")" captures ++ Format.nest 2 (hard ++
-        (← functionBodyDoc signature result.value body))
+        (attributesDoc attributes ++ (← functionBodyDoc signature result.value body)))
     | .invoke callable arguments _ =>
         call (text "invoke") <$> (#[callable] ++ arguments).mapM expressionDoc
     | .genericCall name types arguments _ => do
@@ -974,7 +992,13 @@ mutual
         expressionDoc (.primitive .logicalOr #[condition, elseBranch] span)
     | .ifElse condition thenBranch (some (.unit _)) span =>
         expressionDoc (.ifElse condition thenBranch none span)
-    | .ifElse condition thenBranch elseBranch _ => do
+    | .ifElse condition thenBranch elseBranch span => do
+        -- CFG imports can wrap an empty branch in a block. Normalize it before
+        -- choosing the one-sided spelling, so a second print cannot invert it.
+        if emptyUnit thenBranch && !(thenBranch matches .unit _) then
+          return ← expressionDoc (.ifElse condition (.unit span) elseBranch span)
+        if elseBranch.any (fun branch => emptyUnit branch && !(branch matches .unit _)) then
+          return ← expressionDoc (.ifElse condition thenBranch (some (.unit span)) span)
         -- A block-valued condition renders across lines; parentheses are what
         -- keep the following `then` attached to this `if`.
         let conditionDoc ← if rendersAsDo condition then
@@ -1176,6 +1200,13 @@ mutual
         | .update => "update "
       pure <| text memberPrefix ++ (← expressionDoc expression)
 
+  private partial def emptyUnit : Expr → Bool
+    | .unit _ => true
+    | .block #[] none _ => true
+    | .block #[] (some result) _ => emptyUnit result
+    | .block #[.expression value] none _ => emptyUnit value
+    | _ => false
+
   private partial def negate : Expr → Expr
     | .primitive .logicalNot #[argument] _ => argument
     | .typedPrimitive .logicalNot _ #[argument] _ => argument
@@ -1338,23 +1369,6 @@ private def shapeDoc (name : String) (shape : ShapeContractDecl) : Except String
 
 private def fieldDoc (field : FieldDecl) : Doc :=
   text s!"{identifier field.name} : {typeText field.type.value}"
-
-/-- A declaration's source attributes print on their own line above it. -/
-private partial def sourceAttributeText : SourceAttribute → String
-  | .call name arguments _ =>
-      identifier name ++ (if arguments.isEmpty then "" else
-        " (" ++ ", ".intercalate (arguments.map sourceAttributeText).toList ++ ")")
-  | .assign name value _ =>
-      identifier name ++ " = " ++ match value with
-        | .number value => toString value
-        | .string value => toString (repr value)
-        | .name value => identifier value
-        | .qualifiedName value => value
-
-private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
-  if attributes.isEmpty then .nil else
-    let entries := attributes.map sourceAttributeText
-    text ("@[" ++ ", ".intercalate entries.toList ++ "]") ++ hard
 
 private def itemDocs : Item → Except String (Array Doc)
   | .constant declaration => do

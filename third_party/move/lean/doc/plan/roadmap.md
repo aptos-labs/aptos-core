@@ -219,10 +219,11 @@ Design: [`rust-mir-design.md`](../designs/rust-mir-design.md); proposals
 gaps of the safe slice), [`unsafe-pointers.md`](../designs/unsafe-pointers.md),
 and [`interior-mutability.md`](../designs/interior-mutability.md).
 
-- The M0 gate is blocked upstream: `FnDef` exposes no predicates and there
-  is no const-fn binder type query
-  ([rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892));
-  the answer stays an upstream query, not a private `rustc_middle` read.
+- The missing M0 queries are supplied by the confined
+  [`rustc_public` polyfill](rustc-public-polyfill.md), an accepted temporary
+  exception until [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)
+  is fixed in the pinned toolchain. Replace and remove its helpers as the public
+  queries become available. Compiler-private types must not cross the bridge.
 - Then M1 mapper completion and Charon differential tests; M1.5 a prebuilt
   exporter and sysroot distribution (today the managed path builds the
   exporter from the checkout); M2 contracts and `verify` for Rust through
@@ -234,8 +235,8 @@ and [`interior-mutability.md`](../designs/interior-mutability.md).
   nominal variance, the remaining use-site constraints, returned-reference
   region precision (argument-changing recursive and external result-source
   selection stays conservative); M4 drops and panics: cleanup edges,
-  `Resume` and effectful drop glue are rejection boundaries today, and a
-  drop has no denotation; M5 the unsafe profile; M6 library models; M7
+  `Resume` and effectful drop glue are rejection boundaries today; only
+  trivial drops have a denotation. M5 the unsafe profile; M6 library models; M7
   alignment proofs.
 
 ## 8. Surface and backends

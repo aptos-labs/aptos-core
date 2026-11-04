@@ -59,7 +59,6 @@ VerexE2ETests/SourceVerify/diverging_regions_errors.spec.lean:24:6: error: verex
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/diverging_regions_errors.spec.lean:28:1: error: `no panic when aborts at abort 1` is not established: the panic `die()` at VerexE2ETests/SourceVerify/diverging_regions_errors.rs:62:13 may panic
-  from: c = true
 VerexE2ETests/SourceVerify/diverging_regions_errors.spec.lean:28:6: error: verex verification failed: the automatic verification of `only_exit` failed; provide a proof in the module:
   verify only_exit by lean =>
     verex_obligations

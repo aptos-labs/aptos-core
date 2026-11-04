@@ -92,6 +92,7 @@ private def kwMod := Lean.Parser.nonReservedSymbol "mod" true
 private def kwImpl := Lean.Parser.nonReservedSymbol "impl" true
 private def kwTrait := Lean.Parser.nonReservedSymbol "trait" true
 private def kwUsing := Lean.Parser.nonReservedSymbol "using" true
+private def kwOutlives := Lean.Parser.nonReservedSymbol "outlives" true
 private def kwWhere := Lean.Parser.nonReservedSymbol "where" true
 private def kwDecreases := Lean.Parser.nonReservedSymbol "decreases" true
 private def kwUse := Lean.Parser.symbol "use"
@@ -342,7 +343,7 @@ syntax (name := verexConstBinder)
 syntax (name := verexTypedConstBinder)
   "{" verexIdentifier ":" kwConst verexType "}" : verexGenericBinder
 syntax (name := verexLifetimeBinder)
-  "{" verexIdentifier ":" kwLifetime "}" : verexGenericBinder
+  "{" verexIdentifier ":" kwLifetime (kwOutlives verexLifetime,+)? "}" : verexGenericBinder
 syntax (name := verexEvidenceBinder)
   "{" verexIdentifier ":" kwEvidence "}" : verexGenericBinder
 
@@ -822,11 +823,19 @@ declare_syntax_cat verexParameter
 syntax (name := verexParameterSyntax)
   (kwMut)? verexIdentifier ":" verexType : verexParameter
 
+declare_syntax_cat verexAttribute
+declare_syntax_cat verexAttributeListSyntax
+syntax (name := verexAttributeSyntax)
+  verexIdentifier ("(" verexAttribute,+ ")")? : verexAttribute
+syntax (name := verexAttributeAssignmentSyntax)
+  verexIdentifier "=" (verexQualifiedName <|> num <|> str <|> verexIdentifier) : verexAttribute
+syntax (name := verexAttributeList) "@[" verexAttribute,+ "]" : verexAttributeListSyntax
+
 /-- A Rust closure: the struct of its captures with the value of each, and the
 function its call reaches, both named here and items of the enclosing module. -/
 syntax (name := verexClosureItemExpr) (priority := high)
   kwClosureItem verexIdentifier verexGenericBinder* (kwHas verexAbility,+)?
-    "(" verexCapture,* ")" kwFun verexIdentifier verexGenericBinder*
+    "(" verexCapture,* ")" (verexAttributeListSyntax)? kwFun verexIdentifier verexGenericBinder*
     "(" verexParameter,* ")" "->" verexType ":=" verexExpr : verexExpr
 
 declare_syntax_cat verexModifier
@@ -895,14 +904,6 @@ syntax (name := verexNamespacePragmaItem)
   kwPragma (verexIdentifier <|> kwOpaque) ("=" verexExpr)? (";")? : verexItem
 syntax (name := verexConstantItem)
   (docComment)? kwConst verexIdentifier ":" verexType ":=" verexExpr : verexItem
-declare_syntax_cat verexAttribute
-declare_syntax_cat verexAttributeListSyntax
-syntax (name := verexAttributeSyntax)
-  verexIdentifier ("(" verexAttribute,+ ")")? : verexAttribute
-syntax (name := verexAttributeAssignmentSyntax)
-  verexIdentifier "=" (verexQualifiedName <|> num <|> str <|> verexIdentifier) : verexAttribute
-syntax (name := verexAttributeList) "@[" verexAttribute,+ "]" : verexAttributeListSyntax
-
 syntax (name := verexStructItem)
   (docComment)? (verexAttributeListSyntax)? (kwOpaque)? kwStruct verexIdentifier verexGenericBinder* (kwHas verexAbility,+)? kwWhere
     ppLine ppIndent(verexField*) : verexItem

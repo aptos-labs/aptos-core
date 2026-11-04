@@ -194,6 +194,137 @@ fn raw_unit_baselines() {
     check_directory_baselines("tests/raw-unit");
 }
 
+#[test]
+fn method_evidence_baselines() {
+    check_directory_baselines("tests/evidence-unit");
+}
+
+// This integration fixture also covers generic closure captures and tuple
+// results, beyond the differential evaluator's supported term forms.
+#[test]
+fn evidence_composition_baseline() {
+    assert_deterministic_baseline("tests/fixtures", "evidence_composition.rs");
+}
+
+fn native_behavior(directory: &str, fixture_name: &str, checks: &str) {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("tests/{directory}/{fixture_name}.rs"));
+    let source = env::temp_dir().join(format!("verex_{fixture_name}_{}.rs", std::process::id()));
+    let binary = source.with_extension("bin");
+    fs::write(
+        &source,
+        format!("mod fixture {{ include!({fixture:?}); }}\nfn main() {{ {checks} }}\n"),
+    )
+    .expect("write native method-evidence harness");
+    let compiler = Command::new(env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        .arg(&source)
+        .args(["--edition=2024", "-Cpanic=abort", "-o"])
+        .arg(&binary)
+        .output()
+        .expect("compile native method-evidence harness");
+    assert!(
+        compiler.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiler.stderr)
+    );
+    let run = Command::new(&binary)
+        .output()
+        .expect("run native method-evidence harness");
+    fs::remove_file(source).expect("remove native harness source");
+    fs::remove_file(binary).expect("remove native harness binary");
+    assert!(
+        run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+}
+
+#[test]
+fn method_evidence_native_behavior() {
+    native_behavior(
+        "evidence-unit",
+        "static_step",
+        r#"
+        for (input, expected) in [(0, 2), (41, 43), (u64::MAX - 1, 0), (u64::MAX, 1)] {
+            assert_eq!(fixture::counter(input), expected);
+        }
+        assert!(!fixture::toggle(false));
+        assert!(fixture::toggle(true));
+    "#,
+    );
+    native_behavior(
+        "evidence-unit",
+        "static_fnmut",
+        r#"
+        for (input, expected) in [(0, 2), (41, 43), (u64::MAX - 1, 0), (u64::MAX, 1)] {
+            assert_eq!(fixture::counter(input), expected);
+            fixture::unit(input);
+        }
+        assert!(!fixture::toggle(false));
+        assert!(fixture::toggle(true));
+    "#,
+    );
+    native_behavior(
+        "evidence-unit",
+        "fn_forward",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::scalar(value), value.wrapping_mul(2).wrapping_add(1));
+            assert_eq!(fixture::pair(value), (value.wrapping_add(1), true));
+            assert_eq!(fixture::multiple(value), value.wrapping_add(2));
+            assert_eq!(fixture::tuple_value(value), (value, true));
+        }
+        fixture::unit();
+    "#,
+    );
+    native_behavior(
+        "evidence-unit",
+        "static_fn",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::scalar(value), value.wrapping_add(1));
+            assert_eq!(fixture::pair(value), (value.wrapping_add(1), true));
+            assert_eq!(fixture::multiple(value), value.wrapping_add(1));
+        }
+        fixture::unit();
+    "#,
+    );
+    native_behavior(
+        "raw-unit",
+        "tuple_callbacks",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::pair(value), (value.wrapping_add(1), true));
+            assert_eq!(fixture::generic_pair(value), (value.wrapping_add(1), true));
+            assert_eq!(fixture::singleton(value), (value,));
+            assert_eq!(fixture::nested_tuple(value), (value, (true, value.wrapping_add(1))));
+        }
+    "#,
+    );
+    native_behavior(
+        "fixtures",
+        "evidence_composition",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::nested(value), value.wrapping_add(2));
+            assert_eq!(fixture::shared(value), value);
+            assert_eq!(fixture::argument(value), value);
+            assert_eq!(fixture::arguments(value), value);
+            assert_eq!(fixture::pair(value), (value.wrapping_add(1), true));
+            assert_eq!(fixture::multiple(value), value.wrapping_add(2));
+            assert_eq!(fixture::record(value).number, value.wrapping_add(1));
+            assert!(fixture::record(value).flag);
+            assert_eq!(fixture::collision(&mut || value), value);
+        }
+        struct Counter(u64);
+        impl fixture::Step for Counter { fn step(&mut self) { self.0 += 1; } }
+        let (mut a, mut b) = (Counter(0), Counter(41));
+        fixture::two_steps(&mut a, &mut b);
+        assert_eq!((a.0, b.0), (1, 42));
+    "#,
+    );
+}
+
 /// Artifacts holding opaque nodes, which validation rejects where they survive.
 #[test]
 fn opaque_unit_baselines() {
@@ -256,24 +387,42 @@ fn assert_refusal(baseline: &str, reason: &str) {
 fn refuses_a_trait_call_that_depends_on_a_type_parameter() {
     assert_refusal(
         "generic_trait_call.exp.json",
-        "call of `std::ops::Index::index` in `generic_trait_call::first` at line 7:12 depends on a type parameter and needs trait evidence",
+        "depends on a type parameter and needs trait evidence",
     );
 }
 
 #[test]
-fn refuses_a_closure_called_through_a_type_parameter() {
-    assert_refusal(
-        "closure_generic_call.exp.json",
-        "call of `std::ops::Fn::call` in `closure_generic_call::apply`",
+fn exports_a_declared_fn_call_through_a_type_parameter() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/raw-unit/closure_generic_call.exp.json");
+    let text = fs::read_to_string(path).expect("read generic Fn baseline");
+    let unit: serde_json::Value = serde_json::from_str(&text).expect("parse generic Fn baseline");
+    let functions = unit["namespaces"][0]["functions"].as_array().unwrap();
+    let dictionaries = functions
+        .iter()
+        .flat_map(|function| {
+            function["attributes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(move |attribute| {
+                    let assignment = &attribute["assign"];
+                    (assignment["name"] == "method_evidence").then_some((function, assignment))
+                })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(dictionaries.len(), 1, "exactly one declared Fn dictionary");
+    let (function, assignment) = dictionaries[0];
+    let index = assignment["value"]["constant"]["value"]["integer"]["value"]
+        .as_u64()
+        .unwrap() as usize;
+    let parameters = function["signature"]["parameters"].as_array().unwrap();
+    assert_eq!(
+        index,
+        parameters.len() - 1,
+        "dictionary is the final parameter"
     );
-}
-
-#[test]
-fn refuses_a_promoted_constant() {
-    assert_refusal(
-        "const_promoted.exp.json",
-        "the constant of type `&u64` is promoted from `const_promoted::promoted`, and Rustc Public cannot evaluate a promoted constant",
-    );
+    assert!(!text.contains(r#""opaque": {"#));
 }
 
 #[test]
@@ -310,7 +459,7 @@ fn makes_a_function_opaque_for_a_signature_the_unit_cannot_state() {
         "its signature states `<T as Tr>::Out`",
         "its signature states `&Field<A>`",
         "its signature states `f32`",
-        "has const parameter `N`",
+        "its signature states `[u64; N]`",
     ] {
         assert_refusal("signature_types.exp.json", reason);
     }

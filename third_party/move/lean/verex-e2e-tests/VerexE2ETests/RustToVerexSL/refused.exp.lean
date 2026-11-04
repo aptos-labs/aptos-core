@@ -4,8 +4,7 @@
 import VerexSL
 
 verex namespace refused where
-  @[refused = "the constant of type `&u64` is promoted from `refused::promoted`, and Rustc Public cannot evaluate a promoted constant"]
-  native fun promoted() -> &u64
+  fun promoted() -> &u64 := &5u64
 
   @[refused = "the constant of type `u64` is the generic definition `refused::Limit::MAX`, which has no value before monomorphization"]
   native fun generic_limit {T}() -> u64
@@ -22,6 +21,5 @@ verex namespace refused where
   fun plain(a : u64) -> u64 :=
     if 2u64 == 0u64 then panic() else core.prim.checkedDividePanic(a, 2u64)
 
--- no denotation for `promoted`: a function without a body is not carried by the denotation
 -- no denotation for `generic_limit`: a function without a body is not carried by the denotation
 -- no denotation for `generic_clone`: a function without a body is not carried by the denotation

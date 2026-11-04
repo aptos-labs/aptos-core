@@ -1,2 +1,2 @@
-VerexE2ETests/SourceVerify/refused_call_errors.rs:5:5: error: `promoted` is refused, so it is not verified and a call of it needs a contract: the constant of type `&u64` is promoted from `refused_call_errors::promoted`, and Rustc Public cannot evaluate a promoted constant
-VerexE2ETests/SourceVerify/refused_call_errors.rs:9:6: error: `no_contract` calls the native `promoted`, which has neither a specification nor a prelude model; specify it
+VerexE2ETests/SourceVerify/refused_call_errors.rs:6:14: error: `assembly` is refused, so it is not verified and a call of it needs a contract: unsupported MIR terminator: InlineAsm
+VerexE2ETests/SourceVerify/refused_call_errors.rs:11:5: error: `no_contract` calls the native `assembly`, which has neither a specification nor a prelude model; specify it

@@ -1,0 +1,48 @@
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:39:3: error: the specification clause `ensures result == (value + 3) % 18446744073709551616` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:38:6: error: verex verification failed: the automatic verification of `nested` failed; provide a proof in the module:
+  verify nested by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:46:3: error: the specification clause `ensures result != value` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:45:6: error: verex verification failed: the automatic verification of `shared` failed; provide a proof in the module:
+  verify shared by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:55:3: error: the specification clause `ensures result != value` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:54:6: error: verex verification failed: the automatic verification of `argument` failed; provide a proof in the module:
+  verify argument by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:70:3: error: the specification clause `ensures result == (value + 3) % 18446744073709551616` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:69:6: error: verex verification failed: the automatic verification of `multiple` failed; provide a proof in the module:
+  verify multiple by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:81:3: error: the specification clause `ensures !result.flag` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:79:6: error: verex verification failed: the automatic verification of `record` failed; provide a proof in the module:
+  verify record by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:94:3: error: the specification clause `ensures result != value` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:93:6: error: verex verification failed: the automatic verification of `arguments` failed; provide a proof in the module:
+  verify arguments by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

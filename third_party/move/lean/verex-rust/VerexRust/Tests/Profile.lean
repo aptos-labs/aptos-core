@@ -174,7 +174,7 @@ def checkRustExporterBaseline : IO Unit := do
       | .error diagnostics =>
           throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
     unless checked.evidence == #[{
-        producer := "verex-rust-export via rustc Public"
+        producer := "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)"
         description :=
           "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target"
         trusted := true }] do
@@ -1761,5 +1761,189 @@ def checkRustExporterCharacterBaseline : IO Unit := do
 
 #guard_msgs in
 #eval checkRustExporterCharacterBaseline
+
+/-- The temporary compiler bridge exports typed const binders, declared Copy
+bounds, explicit lifetime relations, and promoted values without opaque nodes. -/
+def checkRustPolyfillBaseline : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/raw-unit/polyfill.exp.json"
+  let unit ← match decodeAndValidate text with
+    | .ok unit => pure unit
+    | .error diagnostics => throw <| IO.userError s!"polyfill fixture does not validate: {repr diagnostics}"
+  let functions := unit.namespaces[0]!.functions
+  let find (name : String) := functions.find? fun f => unit.tables.names[f.name.index]!.name == name
+  let some constant := find "constant" | throw <| IO.userError "missing const-generic function"
+  let binder := constant.signature.generics[0]!
+  unless binder.kind == .const && binder.type.any (fun use =>
+      unit.tables.types[use.typeId.index]? == some (.integer .pointer false)) do
+    throw <| IO.userError "const parameter lost its declared usize type"
+  for name in #["twice", "unused_copy", "super_copy"] do
+    let some function := find name | throw <| IO.userError s!"missing {name}"
+    unless function.signature.generics[0]!.abilities.contains .copy do
+      throw <| IO.userError s!"{name} lost its declared Copy bound"
+  for name in #["shorten", "get"] do
+    let some function := find name | throw <| IO.userError s!"missing {name}"
+    unless function.signature.predicates.any (· matches .lifetimeOutlives ..) do
+      throw <| IO.userError s!"{name} lost its outlives predicate"
+  let executable ← match prepareExecution #[semantics] unit with
+    | .ok executable => pure executable
+    | .error diagnostics => throw <| IO.userError s!"polyfill fixture is not executable: {repr diagnostics}"
+  for (name, expected) in #[("promoted", 5), ("promoted_array", 2)] do
+    let some index := functions.findIdx? (fun f => unit.tables.names[f.name.index]!.name == name)
+      | throw <| IO.userError s!"missing {name}"
+    match Interpreter.run executable 48 { namespaceId := ⟨0⟩, functionId := ⟨index⟩ } #[] with
+      | .ok (_, { value := .returned #[.integer value], .. }) =>
+          unless value == expected do throw <| IO.userError s!"{name} returned {value}"
+      | result => throw <| IO.userError s!"{name} did not execute: {repr result}"
+
+#guard_msgs in
+#eval checkRustPolyfillBaseline
+
+/-- Static dictionaries retain one generic body, forward evidence, and update
+the mutable receiver. Corrupting a dictionary's signature or parameter index
+must be rejected before execution. -/
+def checkStaticMethodEvidence (fixture : String) (genericNames : Array String) (expectedDictionaries : Nat) : IO Unit := do
+  let text ← readBaselineJson s!"rust-exporter/tests/evidence-unit/{fixture}.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"static evidence rejected: {repr errors}"
+  let ns := raw.namespaces[0]!
+  for name in genericNames do
+    let functions := ns.functions.filter fun f => raw.tables.names[f.name.index]!.name == name
+    unless functions.size == 1 && functions[0]!.signature.generics.size == 1 &&
+        functions[0]!.signature.parameters.size == 2 do
+      throw <| IO.userError s!"{name} is not a single generic body with its dictionary"
+  let dictionaries := ns.expressions.filterMap fun expression => match expression.kind with
+    | .operation (.call (.closure target _)) _ _ _ => some target
+    | _ => none
+  unless dictionaries.size == expectedDictionaries && dictionaries.toList.eraseDups.length == dictionaries.size do
+    throw <| IO.userError "method implementations did not produce the expected distinct dictionaries"
+  let corrupt := { raw with namespaces := raw.namespaces.modify 0 fun ns =>
+    { ns with expressions := ns.expressions.map fun expression => match expression.kind with
+      | .operation (.call (.closure target mask)) types args surface =>
+          if target == dictionaries[0]! then
+            { expression with kind := .operation (.call (.closure dictionaries[1]! mask)) types args surface }
+          else expression
+      | _ => expression } }
+  if (validate corrupt).isOk then
+    throw <| IO.userError "a method dictionary with the wrong receiver type was accepted"
+  let malformed := { raw with namespaces := raw.namespaces.modify 0 fun ns =>
+    { ns with functions := ns.functions.modify 0 fun function => { function with
+        attributes := function.attributes.push
+          (.assign "method_evidence" (.constant (.integer 999)) none) } } }
+  match validate malformed with
+    | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+        throw <| IO.userError s!"wrong malformed-evidence diagnostic: {repr errors}"
+    | .ok _ => throw <| IO.userError "an out-of-range dictionary parameter was accepted"
+  let some generic := ns.functions.find? fun f =>
+      raw.tables.names[f.name.index]!.name == genericNames[0]!
+    | throw <| IO.userError "missing generic dictionary function"
+  let dictionaryType := generic.signature.parameters[1]!.typeUse.typeId
+  let missingReceiver := { raw with tables := { raw.tables with
+    types := raw.tables.types.modify dictionaryType.index fun type => match type with
+      | .function _ result abilities => .function #[] result abilities
+      | other => other } }
+  match validate missingReceiver with
+    | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+        throw <| IO.userError s!"wrong missing-receiver diagnostic: {repr errors}"
+    | .ok _ => throw <| IO.userError "method evidence without a receiver was accepted"
+  let executable ← match prepareExecution #[semantics] unit with
+    | .ok executable => pure executable
+    | .error errors => throw <| IO.userError s!"static evidence is not executable: {repr errors}"
+  for (name, input, expected) in #[
+      ("counter", RuntimeValue.integer 0, RuntimeValue.integer 2),
+      ("counter", .integer 41, .integer 43),
+      ("counter", .integer 18446744073709551614, .integer 0),
+      ("counter", .integer 18446744073709551615, .integer 1),
+      ("toggle", .bool false, .bool false), ("toggle", .bool true, .bool true)] do
+    let some index := unit.namespaces[0]!.functions.findIdx? fun f =>
+        unit.tables.names[f.name.index]!.name == name
+      | throw <| IO.userError s!"missing {name}"
+    match Interpreter.run executable 128 { namespaceId := ⟨0⟩, functionId := ⟨index⟩ } #[input] with
+      | .ok (_, { value := .returned #[result], .. }) =>
+          unless result == expected do throw <| IO.userError s!"{name}: {repr result} != {repr expected}"
+      | result => throw <| IO.userError s!"{name} did not execute: {repr result}"
+
+#guard_msgs in
+#eval checkStaticMethodEvidence "static_step" #["step_twice", "forward"] 2
+
+#guard_msgs in
+#eval checkStaticMethodEvidence "static_fnmut" #["apply_mut", "forward", "apply_bool", "apply_unit"] 3
+
+/-- Declared Fn dictionaries borrow their receiver immutably, including two
+independent bounds and a generic result. A value receiver is still invalid. -/
+def checkSharedMethodEvidence : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/evidence-unit/static_fn.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"shared evidence rejected: {repr errors}"
+  let mut count := 0
+  for function in raw.namespaces[0]!.functions do
+    for attr in function.attributes do
+      if let .assign "method_evidence" (.constant (.integer index)) _ := attr then
+        count := count + 1
+        let parameter := function.signature.parameters[index.toNat]!
+        let some (.function parameters _ _) := raw.tables.types[parameter.typeUse.typeId.index]?
+          | throw <| IO.userError "missing dictionary type"
+        let receiver := parameters[0]!
+        let some (.reference reference) := raw.tables.types[receiver.index]?
+          | throw <| IO.userError "missing dictionary receiver"
+        unless reference.kind == .shared do
+          throw <| IO.userError "Fn evidence changed the receiver to mutable"
+        let malformed := { raw with tables := { raw.tables with
+          types := raw.tables.types.modify parameter.typeUse.typeId.index fun type => match type with
+            | .function parameters result abilities =>
+                .function (parameters.set! 0 reference.referent) result abilities
+            | other => other } }
+        match validate malformed with
+          | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+              throw <| IO.userError s!"wrong value-receiver diagnostic: {repr errors}"
+          | .ok _ => throw <| IO.userError "method evidence with a value receiver was accepted"
+  unless count == 5 do throw <| IO.userError s!"expected five Fn dictionaries, got {count}"
+  unless (prepareExecution #[semantics] unit).isOk do
+    throw <| IO.userError "shared evidence is not executable"
+
+#guard_msgs in
+#eval checkSharedMethodEvidence
+
+/-- Native expectations also hold through dictionary captures, receiver adapters,
+argument tuples and generic/aggregate results in the interpreter. -/
+def checkEvidenceComposition : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/fixtures/evidence_composition.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"evidence composition rejected: {repr errors}"
+  let executable ← match prepareExecution #[semantics] unit with
+    | .ok executable => pure executable
+    | .error errors => throw <| IO.userError s!"evidence composition not executable: {repr errors}"
+  let some pairIndex := unit.namespaces[0]!.structs.findIdx? fun declaration =>
+      unit.tables.names[declaration.name.index]!.name == "Pair"
+    | throw <| IO.userError "missing Pair"
+  let pairHandle : StructHandle := { namespaceId := ⟨0⟩, structId := pairIndex }
+  for value in #[0, 41, 18446744073709551614, 18446744073709551615] do
+    for (name, expected) in #[
+        ("nested", RuntimeValue.integer ((value + 2) % 18446744073709551616)),
+        ("shared", .integer value), ("argument", .integer value), ("arguments", .integer value),
+        ("pair", .tuple #[.integer ((value + 1) % 18446744073709551616), .bool true]),
+        ("multiple", .integer ((value + 2) % 18446744073709551616)),
+        ("record", .nominal pairHandle none #[.integer ((value + 1) % 18446744073709551616), .bool true])] do
+      let some index := unit.namespaces[0]!.functions.findIdx? fun f =>
+          unit.tables.names[f.name.index]!.name == name
+        | throw <| IO.userError s!"missing {name}"
+      match Interpreter.run executable 256 { namespaceId := ⟨0⟩, functionId := ⟨index⟩ } #[.integer value] with
+        | .ok (_, { value := .returned #[result], .. }) =>
+            unless result == expected do throw <| IO.userError s!"{name}: {repr result} != {repr expected}"
+        | result => throw <| IO.userError s!"{name} did not execute: {repr result}"
+
+#guard_msgs in
+#eval checkEvidenceComposition
 
 end VerexIR.Rust.Tests

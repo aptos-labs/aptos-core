@@ -18,7 +18,9 @@ verex namespace core where
     opaque struct Arguments {a : lifetime} has Copy where
 
     impl Arguments where
-      native fun from_str {a : lifetime}(_1 : &string) -> Arguments<lifetime _>
+      native fun from_str {a : lifetime}(
+        _1 : &[static] string
+      ) -> Arguments<lifetime a>
 
   mod option where
     enum Option {T} has Copy where

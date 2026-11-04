@@ -9,7 +9,9 @@ verex namespace lifetime_drop where
     r : &[a] mut u32
 
   trait impl «<lifetime_drop::Anonymous<'_> as std::ops::Drop>» where
-    fun «drop» {l0 : lifetime}(self : &mut Anonymous<lifetime _>) -> Unit := do
+    fun «drop» {l0 : lifetime}(
+      self : &[l0] mut Anonymous<lifetime l0>
+    ) -> Unit := do
       let _2 := &mut *((*self).r)
       *_2 := 9u32
 
@@ -18,6 +20,6 @@ verex namespace lifetime_drop where
     r : &[a] mut u32
 
   trait impl «<lifetime_drop::Named<'a> as std::ops::Drop>» where
-    fun «drop» {a : lifetime}(self : &mut Named<lifetime _>) -> Unit := do
+    fun «drop» {a : lifetime}(self : &[a] mut Named<lifetime a>) -> Unit := do
       let _2 := &mut *((*self).r)
       *_2 := 9u32

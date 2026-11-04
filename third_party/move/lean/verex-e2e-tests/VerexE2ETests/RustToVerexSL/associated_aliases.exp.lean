@@ -13,6 +13,7 @@ verex namespace core where
         opaque struct Peekable {I} where
 
         impl Peekable where
+          @[shape_only]
           native fun peek {I} {Item}(
             _1 : &mut Peekable<I>
           ) -> option::Option<&Item>
@@ -21,6 +22,7 @@ verex namespace core where
         @[destructor]
         opaque struct Zip {A} {B} where
 
+        @[shape_only]
         native fun zip {A} {B} {IntoIter} {IntoIter2}(
           _1 : A, _2 : B
         ) -> Zip<IntoIter, IntoIter2>
@@ -41,6 +43,7 @@ verex namespace core where
       | Some (0 : T) = 1
 
     impl Option where
+      @[shape_only]
       native fun as_deref {T} {Target}(_1 : &Option<T>) -> Option<&Target>
 
   mod result where
@@ -51,6 +54,7 @@ verex namespace core where
   mod convert where
     mod num where
       trait impl «std::convert::num::<impl std::convert::TryFrom<u32> for u8>» where
+        @[shape_only]
         native fun try_from {Error}(_1 : u32) -> result::Result<u8, Error>
 
 verex namespace associated_aliases where

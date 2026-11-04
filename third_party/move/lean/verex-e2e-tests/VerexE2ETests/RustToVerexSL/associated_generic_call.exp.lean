@@ -3,8 +3,20 @@
 
 import VerexSL
 
-verex namespace associated_generic_call where
-  @[refused = "call of `std::ops::Index::index` in `associated_generic_call::first` at line 5:12 depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type"]
-  native fun first {T}(values : &Vector<T>) -> &T
+verex namespace alloc where
+  pragma verify = false
 
--- no denotation for `first`: a function without a body is not carried by the denotation
+  mod alloc where
+    opaque struct Global has Copy where
+
+  mod vec where
+    trait impl «<std::vec::Vec<T, A> as std::ops::Index<I>>» where
+      @[shape_only]
+      native fun index {T} {I} {A} {Output}(_1 : &Vector<T>, _2 : I) -> &Output
+
+verex namespace associated_generic_call where
+  use alloc::alloc::Global
+  use alloc::vec::«<std::vec::Vec<T, A> as std::ops::Index<I>>»::index
+
+  fun first {T}(values : &Vector<T>) -> &T :=
+    index::<T, usize, Global, T>(values, 0usize)
