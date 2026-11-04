@@ -42,8 +42,8 @@ deserialize-u256	1	VM	170	0.823	1.025	57539.5
 no-op-fee-payer	1	VM	170	0.911	1.020	3027.6
 no-op-fee-payer	100	VM	170	0.795	1.030	58498.7
 simple-script	1	VM	170	0.807	1.025	62591.1
-vector-trim-append-len3000-size1	1	VM	170	0.847	1.037	1230.0
-vector-remove-insert-len3000-size1	1	VM	170	0.849	1.043	1541.0
+vector-trim-append-len3000-size1	1	VM	170	0.847	1.037	905.0
+vector-remove-insert-len3000-size1	1	VM	170	0.849	1.043	1042.8
 order-book-no-matches50-markets	1	VM	170	0.836	1.038	5822.7
 order-book-balanced-matches25-pct50-markets	1	VM	170	0.874	1.039	5822.7
 order-book-balanced-matches80-pct50-markets	1	VM	170	0.859	1.056	6109.3
