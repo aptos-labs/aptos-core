@@ -1179,7 +1179,7 @@ mod tests {
             max_items_per_shard: vec![max_items; NUM_STATE_SHARDS],
             max_bytes_per_shard: vec![max_bytes; NUM_STATE_SHARDS],
             refresh_interval_versions,
-            max_promotions_per_block: 0,
+            max_promotion_bytes_per_block: 0,
         });
         let bytes = bcs::to_bytes(&bcs::to_bytes(&config).unwrap()).unwrap();
         BaseStateOp::Creation(StateValue::new_legacy(bytes.into()))

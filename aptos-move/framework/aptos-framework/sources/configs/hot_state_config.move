@@ -64,7 +64,7 @@ module aptos_framework::hot_state_config {
         max_items_per_shard: vector<u64>,
         max_bytes_per_shard: vector<u64>,
         refresh_interval_versions: u64,
-        max_promotions_per_block: u64,
+        max_promotion_bytes_per_block: u64,
     }
 
     #[test_only]
@@ -77,7 +77,7 @@ module aptos_framework::hot_state_config {
             max_items_per_shard: std::vector::range(0, num_shards).map(|_| max_items),
             max_bytes_per_shard: std::vector::range(0, num_shards).map(|_| 1000),
             refresh_interval_versions: 100,
-            max_promotions_per_block: 10,
+            max_promotion_bytes_per_block: 10,
         }));
         config
     }

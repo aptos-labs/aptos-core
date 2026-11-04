@@ -469,6 +469,18 @@ pub static HOT_STATE_PROMOTIONS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static HOT_STATE_PROMOTION_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_hot_state_promotion_bytes_per_block",
+        // metric description
+        "Total size of the keys the block end info designates for hot state promotion",
+        // 64 B to 2 MiB.
+        exponential_buckets(/*start=*/ 64.0, /*factor=*/ 2.0, /*count=*/ 16).unwrap(),
+    )
+    .unwrap()
+});
+
 pub static NUM_INTERNED_TYPES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "num_interned_types",
