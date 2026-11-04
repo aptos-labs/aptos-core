@@ -5,12 +5,14 @@
 //!
 //! [`MemAddr`] is the single choke point: every read, write, copy, and slice
 //! view of VM memory goes through it, and no other mono-move crate holds a
-//! raw byte pointer. This allows runtime checks to be added in one place.
+//! raw byte pointer. This allows runtime checks to be added in one place;
+//! see [`checks`] for the checks, their tiers, and how they fail.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod addr;
 mod align;
+pub mod checks;
 mod scalar;
 
 pub use addr::MemAddr;
@@ -18,4 +20,5 @@ pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, checked_align_up_u32,
     MAX_ALIGN,
 };
+pub use checks::{CheckTier, MemFault, MemFaultKind, CHECK_TIER};
 pub use scalar::Scalar;
