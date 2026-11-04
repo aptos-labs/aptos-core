@@ -791,8 +791,12 @@ def finishTree {Γ : NRow} (mutables : Mutables Γ) (shape : ResultShape) :
 /-- `Function.denoteWith` as a tree. -/
 def Function.tree (calls : CallTree (unit := unit)) (fuel : Nat) (f : Function unit)
     (args : HList f.params) : Tree f.result.carrier :=
-  (f.body.tree calls fuel (initialEnv f.params f.locals f.frame_eq args)).bind
+  let body := (f.body.tree calls fuel (initialEnv f.params f.locals f.frame_eq args)).bind
     (finishTree f.mutables f.result)
+  match f.scopedMethods with
+  | [] => body
+  | _ :: _ =>
+      if scopedValues unit f.scopedMethods (HList.encode args).toArray then body else .stuck
 
 end Term
 
@@ -1368,12 +1372,24 @@ include callsMean in
 /-- A function's tree means its denotation, at every call meaning its tree means. -/
 theorem Function.tree_means (f : Function unit) (args : HList f.params) :
     (Function.tree calls fuel f args).Means (f.denoteWith meanings args) := by
-  refine Tree.means_bind (Term.tree_means meanings calls fuel callsMean f.body _) fun flow => ?_
-  cases flow with
-  | value value env => exact resolve_means (Tree.means_ok _) env f.mutables
-  | return_ result env => exact resolve_means (Tree.means_ok _) env f.mutables
-  | break_ nest env => exact rfl
-  | continue_ nest env => exact rfl
+  have body :
+      ((f.body.tree calls fuel (initialEnv f.params f.locals f.frame_eq args)).bind
+        (finishTree f.mutables f.result)).Means
+      (Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
+        (f.result.finish f.mutables)) := by
+    exact Tree.means_bind (Term.tree_means meanings calls fuel callsMean f.body _) fun flow =>
+      match flow with
+      | .value _ env => resolve_means (Tree.means_ok _) env f.mutables
+      | .return_ _ env => resolve_means (Tree.means_ok _) env f.mutables
+      | .break_ .. => rfl
+      | .continue_ .. => rfl
+  cases scopes : f.scopedMethods with
+  | nil => simpa only [Function.tree, Function.denoteWith, scopes] using body
+  | cons head tail =>
+      simp only [Function.tree, Function.denoteWith, scopes]
+      split
+      · exact body
+      · rfl
 
 end TermMeans
 

@@ -415,6 +415,9 @@ structure Context where
   instance, in the contract's frame: the values of a type parameter are
   native values of its argument's native type. -/
   typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]
+  /-- Read a declaration at these arguments rather than substituting its native
+  reading: callable Unit results may erase a result slot. -/
+  readAtArguments : Bool := false
   /-- Inside the body of a recursive specification function's definition. -/
   definition : Option RecursiveDefinition := none
   /-- In a contract, what a known target's contract states at a frame and, for a
@@ -513,7 +516,12 @@ def Context.ntyOf? (context : Context) (typeId : TypeId) :
       let nty ← VerexIR.Proofs.Denote.ntyOf context.unit context.namespaceId typeId
       if context.typeArgumentTypes.isEmpty then some nty else
         let row ← context.typeArgumentTypes.toList.mapM id
-        some (nty.subst (VerexIR.Proofs.Denote.NRow.ofList row))
+        let env := VerexIR.Proofs.Denote.NRow.ofList row
+        if context.readAtArguments then
+          VerexIR.Proofs.Denote.ntyOfFuel (VerexIR.Proofs.Denote.unitTypes context.unit)
+            context.unit env (VerexIR.Proofs.Denote.typeFuel context.unit)
+            context.namespaceId typeId
+        else some (nty.subst env)
 
 def domainOf (ty : IrTy) : Domain :=
   match ty with
@@ -2005,6 +2013,9 @@ structure DefinitionShape where
   reads : SpecReads
   /-- The native types of the type arguments the definition is at. -/
   typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]
+  /-- Read a declaration at these arguments rather than substituting its native
+  reading: callable Unit results may erase a result slot. -/
+  readAtArguments : Bool := false
   domains : Array Domain
   resultDomain : Domain
   localTypes : Array IrTy

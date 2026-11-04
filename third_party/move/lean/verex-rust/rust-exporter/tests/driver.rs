@@ -279,6 +279,40 @@ fn method_evidence_native_behavior() {
     );
     native_behavior(
         "evidence-unit",
+        "fnonce_adapters",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::shared(value), value);
+            assert_eq!(fixture::mutable(value), value.wrapping_add(2));
+            assert_eq!(fixture::pair(value), (value.wrapping_add(2), true));
+            fixture::unit(value);
+        }
+    "#,
+    );
+    native_behavior(
+        "evidence-unit",
+        "fnonce_forward",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::scalar(value), value.wrapping_add(1));
+            assert_eq!(fixture::counter(value), value.wrapping_add(1));
+            assert_eq!(fixture::pair(value), (value.wrapping_add(1), true));
+        }
+    "#,
+    );
+    native_behavior(
+        "evidence-unit",
+        "static_fnonce",
+        r#"
+        for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
+            assert_eq!(fixture::scalar(value), value.wrapping_add(1));
+            assert_eq!(fixture::pair(value), (value.wrapping_add(1), true));
+            fixture::unit(value);
+        }
+    "#,
+    );
+    native_behavior(
+        "evidence-unit",
         "static_fn",
         r#"
         for value in [0u64, 41, u64::MAX - 1, u64::MAX] {
@@ -392,6 +426,37 @@ fn refuses_a_trait_call_that_depends_on_a_type_parameter() {
 }
 
 #[test]
+fn exports_borrowed_to_consuming_closure_adapters() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/opaque-unit/fnmut_boundaries.exp.json");
+    let text = fs::read_to_string(path).expect("read consuming adapter baseline");
+    let unit: serde_json::Value = serde_json::from_str(&text).expect("parse adapter baseline");
+    let names = unit["tables"]["names"].as_array().unwrap();
+    let adapters = unit["namespaces"][0]["functions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|function| {
+            names[function["name"]["index"].as_u64().unwrap() as usize]["name"]
+                .as_str()
+                .unwrap()
+                .starts_with("__fnonce_adapter_")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(adapters.len(), 2);
+    for adapter in adapters {
+        assert!(
+            adapter["body"]["cfg"]["graph"]["blocks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|block| block["terminator"].get("drop").is_some()),
+            "receiver must be dropped after invocation"
+        );
+    }
+}
+
+#[test]
 fn exports_a_declared_fn_call_through_a_type_parameter() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/raw-unit/closure_generic_call.exp.json");
@@ -479,4 +544,71 @@ fn refuses_a_body_for_a_type_only_it_states() {
     ] {
         assert_refusal("local_types.exp.json", reason);
     }
+}
+
+#[test]
+fn borrowed_dictionaries_are_scoped_but_owned_dictionaries_are_not() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/evidence-unit/fnonce_forward.exp.json");
+    let text = fs::read_to_string(path).expect("read generic forwarding baseline");
+    let unit: serde_json::Value = serde_json::from_str(&text).expect("parse forwarding baseline");
+    let names = unit["tables"]["names"].as_array().unwrap();
+    let mut adapters = 0;
+    for function in unit["namespaces"][0]["functions"].as_array().unwrap() {
+        let name = names[function["name"]["index"].as_u64().unwrap() as usize]["name"]
+            .as_str()
+            .unwrap();
+        let attributes = function["attributes"].as_array().unwrap();
+        let assigned = |marker: &str| {
+            attributes
+                .iter()
+                .filter_map(|attribute| {
+                    let assignment = &attribute["assign"];
+                    (assignment["name"] == marker).then_some(assignment["value"].clone())
+                })
+                .collect::<Vec<_>>()
+        };
+        let scoped = assigned("scoped_method_evidence");
+        let method = assigned("method_evidence");
+        assert!(
+            scoped.iter().all(|index| method.contains(index)),
+            "scoped needs method evidence"
+        );
+        if name == "once" {
+            assert_eq!(method.len(), 1);
+            assert!(scoped.is_empty(), "owned FnOnce has no borrowed receiver");
+        } else if name == "shared" || name == "mutable" || name == "forward" || name == "relay" {
+            assert_eq!(scoped.len(), 1, "borrowed callable needs scoped receiver");
+        } else if name == "direct" {
+            assert_eq!(method.len(), 1);
+            assert!(
+                scoped.is_empty(),
+                "unrelated borrowed bounds stay unrestricted"
+            );
+        } else if name.starts_with("__fn_to_fnmut_forward_") {
+            assert_eq!(
+                scoped.len(),
+                1,
+                "scope propagates through shared-to-mutable adapters"
+            );
+        } else if name.starts_with("__borrowed_to_fnonce_") {
+            adapters += 1;
+            assert_eq!(
+                scoped.len(),
+                1,
+                "captured borrowed dictionary needs scoped receiver"
+            );
+            assert_eq!(assigned("consuming_method_adapter"), scoped);
+            assert!(
+                function["body"]["cfg"]["graph"]["blocks"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|block| block["terminator"].get("drop").is_some()),
+                "consuming adapter drops its receiver"
+            );
+        }
+    }
+    assert_eq!(adapters, 2, "shared and mutable generic adapters");
+    assert!(!text.contains(r#""opaque": {"#));
 }

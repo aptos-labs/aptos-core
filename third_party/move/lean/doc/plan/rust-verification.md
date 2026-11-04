@@ -145,8 +145,9 @@ rather than interning an unrelated receiver/result cross product.
 
 Closures capturing mutable references retain the existing refusal when an opaque
 generic contract would have to transfer to a type containing a loan. No loan or
-receiver state is erased to make that call verify. `FnOnce` dictionaries,
-general associated-type equalities and conditional method contracts remain open.
+receiver state is erased to make that call verify. Consuming `FnOnce` dictionaries
+are described below; general associated-type equalities and conditional method
+contracts remain open.
 Tuple-returning callbacks use the target's packed result throughout the native
 function type, invocation, and generic contract transport. The `tuple_callbacks`
 fixtures cover opaque forwarding, generic results instantiated by tuples,
@@ -170,8 +171,78 @@ axiom or an extra receiver-state output in `ensures_of`.
 multiple independent bounds, and repeated unit-returning calls. Native Rust,
 strict differential execution, dictionary validation, source proofs, and false
 contract/panic regressions exercise the implementation. The formerly refused
-`closure_generic_call` fixture is now a positive export regression. `FnOnce`,
-higher-ranked bounds and conditional method contracts remain outside this slice.
+`closure_generic_call` fixture is now a positive export regression. Consuming
+`FnOnce` dictionaries are a separate slice below; higher-ranked bounds and
+conditional method contracts remain open.
+
+### Consuming `FnOnce` dictionaries
+
+A declared `F: FnOnce(A) -> R` bound supplies an explicit dictionary taking `F`
+by value. Generic helpers forward that dictionary without adding a `Copy` bound
+or specializing the body. Concrete evidence targets a closure's `call_once`
+body, retaining its non-`Copy` captured values and the receiver's consumption.
+The existing method contract still requires a non-panicking, memory-preserving
+invocation; owned receivers use the same checked invocation semantics.
+
+`static_fnonce` covers opaque generic helpers and forwarding, generic arguments
+and results, scalar and tuple results, and nullary unit calls. Native execution,
+strict differential checks, validation of malformed dictionaries, and source
+proofs exercise the slice. `FnOnceEvidence` checks reuse of the generic proof.
+False caller contracts and a potentially panicking consuming callback are
+rejected. Concrete `Fn` and `FnMut` closure bodies use checked consuming
+adapters: borrow the owned receiver, call the original body, then explicitly
+drop the receiver. Generated contracts preserve the callback's behavior; for a
+mutable target they existentially retain its final receiver state. The
+`fnonce_adapters` fixtures cover scalar, tuple, and unit-returning callbacks,
+with false-contract regressions and strict differential execution. The source
+proof fixture also instantiates the generic helpers' result `R` with `()`, as
+described below.
+
+Generic `Fn`/`FnMut` dictionary forwarding to `FnOnce` uses a checked
+receiver-noescape requirement. The validator certifies that the receiver loan
+cannot escape through the result or mutable writebacks; supplying a dictionary
+requires that receipt and recursively checked captured dictionaries. The
+interpreter and denotation enforce the same requirement at function entry.
+The exporter propagates it only along dictionary paths used by consuming
+adapters. `fnonce_forward` exercises scalar and tuple results, mutable receiver
+updates, and forwarding through shared and mutable adapters. Unmarked or
+escaping dictionaries remain rejected. Destructor effects,
+mutable-reference capture transfer, and conditional method contracts remain
+outside this slice.
+
+### Generic callable Unit results
+
+A generic callable result `R` instantiated with `()` now has the same empty
+native result row as an explicitly Unit-returning callable. A shared `&Unit`
+result retains its returned slot and sharing mark. Since substituting Unit in
+the generic row does not erase that slot, the compiler checks whether the
+native reading agrees with substitution before reusing a generic theorem.
+Unit placeholders for lifetime and const binders do not trigger this check;
+only Unit in a type-parameter slot can erase a callable result slot.
+
+For supported opaque helpers, it compiles the existing body at the requested
+frame and independently proves the same authored contract there. The caller
+uses that checked contract, preserving opacity, preconditions, and mutable
+receiver effects. This keeps one generic source body; it does not claim reuse
+of the generic theorem across incompatible rows. Transferable instantiations
+continue to use the existing generic proof path.
+
+The bounded opaque path requires reference-free type arguments and acyclic
+bodies whose calls are callable invocations. Borrowed receiver parameters are
+supported. Direct function-call chains, loops, body specifications or
+assumptions, and model state remain unsupported in this path; carrying their
+conditions into an independently checked specialization is still follow-up
+work. A native declaration whose contract does not transfer to the Unit reading
+also remains unsupported: this path requires a body to check.
+
+`SourceVerify/fnonce_adapters` now calls the opaque generic `mutable_call` and
+`once` helpers at `R = ()`; the dedicated unit-only helper workaround is gone.
+`VerexSL.Tests.GenericUnitResults` checks Unit and non-Unit proofs, preservation
+of a mutable receiver update, rejection of a missing helper precondition, and
+the shared-Unit result row. It also checks a scoped dictionary at the Unit
+specialization and rejects missing scoped evidence. Generic borrowed-to-consuming
+forwarding at `R = ()` still encounters the direct-call-chain limitation of this
+specialization path.
 
 ### Generic `Fn` to `FnMut` forwarding
 
@@ -195,10 +266,13 @@ in Cargo module-file discovery; their specifications are supplied separately.
 The `fn_forward` fixtures cover generic and tuple results, argument forwarding,
 repeated calls, multiple independent bounds, and nullary unit calls. Source
 proofs are split into `fn_forward`, `_multi`, `_unit`, and `_tuple` to keep each
-unit small. The repeated unit-returning case uses a transparent `FnMut` helper;
-its fully opaque version currently exceeds the automatic solver budget.
-`_errors` rejects false results, a false implementation contract,
-and a potentially panicking callback. The combined evidence fixture remains
+unit small. The repeated unit-returning case verifies with both helpers opaque
+at the default solver budget. Frame lookup compares hypotheses at reducible
+transparency, avoiding evaluation of unrelated invocation semantics or frame
+instantiations. `_errors` rejects false results, a false implementation contract,
+and a potentially panicking callback; `_unit_errors` rejects false receiver
+changes, denial of the forwarded callback's behavior, and a behavioral claim
+about a callback that was never called. The combined evidence fixture remains
 subject to the strict differential-execution gate. The denotation evaluator now
 constructs generic closures only after checking their frames, carries those
 frames through calls, decodes captures separately, and retains the supplied
@@ -732,11 +806,12 @@ unless the reference is returned. The term runs as a tree of its outcomes
 (`Term.tree`, `VerexRust/Tests/DenoteEval.lean`), proved to mean the denotation
 (`checked_tree_means`), with choices of prophecies and compiled calls inlined.
 Generic calls use a specialized compile and transport arguments and results through the skolem
-codecs; invocation reads the target of a function value without captures or
-runtime type instantiations. The theorem relates the tree to this inlined
-compiled-body meaning, not to runtime dispatch or compiler correctness. Closure
-captures, generic closure construction, globals and functions over strings remain
-outside this evaluator's coverage: their trees are `unknown`, or they have no
+codecs. Invocation decodes captures and retains runtime type frames; generic
+closure construction checks frame coherence before evaluating the target.
+The evidence fixtures require every tested input to be conclusive. The theorem
+relates the tree to this inlined compiled-body meaning, not to runtime dispatch
+or compiler correctness. Globals, missing dependency bodies, and functions over
+strings still have coverage gaps: their trees can be `unknown`, or they have no
 inputs. Rust's `as` wraps and rustc spells no checked cast, so `Term.cast` is reached by an authored unit
 (`VerexRust/Tests/Programs/DifferentialCasts.lean`). `run_sound` and `run_complete` relate the
 interpreter to `BigStep`.
@@ -932,14 +1007,20 @@ captured state and is not a valid encoding. A closure carrying mutable reference
 must retain the existing substitution and loan checks. Library combinators get
 contracts with the bound declared as data; `Map<I, F>` is a modeled struct like
 step 3c's `Iter`. The `Fn` and `FnMut` evidence slices are implemented as described
-above; consuming `FnOnce` evidence remains open.
+above, along with consuming `FnOnce` bodies. Adapting borrowed receivers to
+consuming evidence is supported for concrete closure bodies and generic
+borrowed dictionaries carrying a checked receiver-noescape requirement. The
+requirement covers both returned values and mutable writebacks, and follows
+captured dictionaries. A generic result type alone cannot
+justify releasing the receiver loan before dropping the owned closure;
+`Check/Closures/ReceiverEscape.lean` pins this rejection boundary.
 
 | Stage | Gate |
 |---|---|
 | 1 Closure items, untupled direct calls, printed closure expressions | fixed point and `verify` of a direct call, a once-called closure, a loop in a closure; the differential check covers them |
-| 2 `&mut` and move upvars | `FnMut` over a counter verifies; an `Fn` closure over a `&mut` upvar is rejected |
+| 2 `&mut` and move upvars | `FnMut` over a counter and shared-reading `Fn` closures over borrowed or moved `&mut` holders verify; opaque generic transfer of loan-containing captures remains restricted |
 | 3 Specifications on closures | `spec call` with a `loop 1` invariant verifies; `no panic` reported on the closure |
-| 4 `Fn*` evidence for own generics | `FnMut` arguments, generic/struct/tuple results, forwarding and receiver adapters; declared `Fn` shared receivers; `FnOnce` bounds remain open |
+| 4 `Fn*` evidence for own generics | `FnMut` arguments, generic/struct/tuple results, forwarding and receiver adapters; declared `Fn` shared receivers and consuming `FnOnce` bodies; concrete consuming adapters; bounded opaque `R = ()` contracts; generic borrowed-to-consuming forwarding with checked receiver scope |
 | 5 Library combinators | `Option::map` verifies; a `for` over `iter().map(..)` with an invariant verifies |
 | 6 Function pointers as evidence, then `dyn Fn` | a function pointer verifies; `dyn Fn` rejected at its location until then |
 
@@ -1146,8 +1227,22 @@ trusts it; only contracts stating with it are trusted.
 
 **Strings.** `String` stays `@[model(string)]`: a `vector u8` model would make every
 clause a byte computation. Stage 1 adds `stringConcat`, `stringBytes` and `charEncode`,
-with `push_str`, `push` and `as_bytes` contracts in those terms. `from_utf8` and `chars`
-as a step 3c iterator model are stage 2.
+with `push_str`, `push` and `as_bytes` contracts in those terms.
+
+Borrowed `core::str::from_utf8` now has a bounded logical UTF-8 validity
+relation: a string witness has both the input's byte length and its exact
+`stringBytes`. Its native contract characterizes success with that relation and
+preserves successful bytes and length. The length equality excludes oversized
+logical strings, whose `stringBytes` definition falls back to an empty vector.
+Source checks prove decoding `str::as_bytes` succeeds and verify successful
+bytes/length preservation; negative checks reject false success, failure, and
+empty-output claims. Source verification checks library-spec retention; the rendering regression
+checks the exported dependency signatures and source roundtrip.
+This uses the existing trusted native-library-contract boundary, not a proof of
+the standard library decoder. It adds no decoder primitive or axioms. Concrete
+malformed-byte proofs, error offsets, owned `String::from_utf8`, and `chars` as a
+step 3c iterator model remain stage 2. Strings still have no differential samples,
+and the denotation evaluator does not yet execute string length.
 
 **Which MIR is verified.** The exporter pins `-Copt-level=0` and `-Zub-checks=no`, so a
 source has one MIR whatever the user's profile. The bridge reads promoted MIR;
@@ -1177,10 +1272,14 @@ Rust counterparts of Move benchmark problems (`math64`, `bit_vector`,
 on the same algorithms in both languages.
 
 `rust_math64`, `rust_bit_vector`, `rust_simple_map` and `rust_lower_bound` are in
-`bench/problems.toml`. Writing them as a Rust programmer would found what stops
-real code, by how much it blocks:
+`bench/problems.toml`. The following table records the initial obstacles found
+when writing those benchmarks; it is historical, not the current support matrix.
+Panic macros, ordinary constants, ordering, `?`, and direct closures now have
+positive and negative source-verification fixtures. Closure-based iterator
+combinators and general trait evidence remain open; generic associated constants
+are also distinct from the ordinary constants now supported.
 
-| Stops | Construct | Where |
+| Initially stopped | Construct | Original boundary |
 |---|---|---|
 | Most functions | `assert!`, `panic!`, `expect`, `debug_assert!`, `assert_eq!`, `static` | export: constant types |
 | Most crates | `const` items, `u64::MAX` | export: `Unevaluated` |

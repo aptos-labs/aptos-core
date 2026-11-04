@@ -89,6 +89,8 @@ mutual
         if arguments.size != declaration.signature.parameters.size then
           failAt handle.namespaceId declaration.loc
             (.argumentArity declaration.signature.parameters.size arguments.size)
+        unless scopedArguments unit declaration arguments do
+          failAt handle.namespaceId declaration.loc .unscopedMethodEvidence
         if BigStep.runtimeProvided unit handle declaration then
           -- A function the runtime provides, without a body or a role of a
           -- table owner, runs as the runtime implements it.

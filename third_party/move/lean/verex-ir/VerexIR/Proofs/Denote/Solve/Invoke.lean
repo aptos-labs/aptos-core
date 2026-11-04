@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Proofs.Denote.Solve.Decide
+import VerexIR.Proofs.ReceiverScoped
 
 /-!
 # The solver: normalization, splits, behaviors, and invocations
@@ -1135,9 +1136,12 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
       unless ← closesBy premise.mvarId! (← `(tactic|
           ((try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm]) <;>
-            first
+            verex_split_hypotheses <;> (repeat apply And.intro) <;> first
               | assumption
               | (apply VerexIR.Proofs.MethodContract.of_instantiate _ (by decide)
+                 simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
+                 assumption)
+              | (apply VerexIR.Proofs.ReceiverScopedMethod.of_instantiate _
                  simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
                  assumption)
               | verex_leaf))) do
@@ -1384,6 +1388,93 @@ def scalarAt? (facts : Array Lean.Expr) (goal : MVarId) : TacticM Bool := do
 /-- Whether a function value is a known one (`LiteralValue`). -/
 private def isKnownFunction (e : Lean.Expr) : MetaM Bool :=
   return isLiteralValue (← getEnv) e.consumeMData
+
+/-- Read a literal through the frame conversions introduced by generic calls.
+The conversion preserves the actual closure, so no receipt is recomputed or
+assumed at a different frame. -/
+private def scopedClosureEquation? : Nat → Lean.Expr → MetaM (Option Lean.Expr)
+  | 0, _ => pure none
+  | fuel + 1, value => do
+      let value := value.consumeMData
+      if let some literal ← literalValue? value then return some literal.closed
+      if value.isAppOf ``functionOfGeneric then
+        return some (mkAppN (mkConst ``functionOfGeneric_closure) value.getAppArgs)
+      unless value.isAppOfArity ``ResultShape.functionOfSkolem 8 do return none
+      let some closed ← scopedClosureEquation? fuel (value.getArg! 7) | return none
+      let transported := mkAppN (mkConst ``ResultShape.closure_functionOfSkolem) value.getAppArgs
+      return some (← mkAppM ``Eq.trans #[transported, closed])
+
+/-- A scoped dictionary is either a checked literal or a forwarded assumption.
+The refinement follows the actual closure, including captured dictionaries. -/
+def receiverScopedMethod? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.ReceiverScopedMethod 7 do return none
+  for declaration in ← getLCtx do
+    if declaration.isImplementationDetail then continue
+    for fact in ← conjuncts declaration.toExpr do
+      if ← isDefEq (← inferType fact) target then
+        goal.assign fact
+        return some []
+  if let some closed ← scopedClosureEquation? 16 (target.getArg! 6) then
+    let rule ← mkAppOptM ``VerexIR.Proofs.ReceiverScopedMethod.of_closure_scoped
+      #[target.getArg! 0, target.getArg! 1, target.getArg! 2,
+        target.getArg! 3, target.getArg! 4, target.getArg! 5, target.getArg! 6, none, closed]
+    return some (← goal.apply rule)
+  if let some (θ, outer) ← (do
+      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := target.getArg! 2
+        | return none
+      return some (θ, outer)) then
+    let rule ← mkAppOptM ``VerexIR.Proofs.ReceiverScopedMethod.of_instantiate
+      #[target.getArg! 0, target.getArg! 1, outer, θ,
+        target.getArg! 3, target.getArg! 4, target.getArg! 5, target.getArg! 6]
+    return some (← goal.apply rule)
+  return none
+
+/-- Check a literal's receipt and recursively discharge its captured dictionary
+requirements. Unknown function values need an explicit scoped assumption. -/
+def receiverScopedClosure? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.ReceiverScopedClosure 2 do return none
+  for declaration in ← getLCtx do
+    if declaration.isImplementationDetail then continue
+    for fact in ← conjuncts declaration.toExpr do
+      let type ← inferType fact
+      unless type.isAppOf ``VerexIR.Proofs.ReceiverScopedMethod ||
+          type.isAppOf ``VerexIR.Proofs.ReceiverScopedClosure do continue
+      if ← isDefEq type target then
+        goal.assign fact
+        return some []
+  let raw ← withTransparency .all <| whnf (target.getArg! 1)
+  unless raw.isAppOfArity ``VerexIR.RuntimeValue.closure 4 do return none
+  -- Project the target and mask before deciding the receipt. Generic closure
+  -- records also contain open frame/capture values which these fields ignore.
+  let handle ← withTransparency .all <| whnf (raw.getArg! 0)
+  let mask ← withTransparency .all <| whnf (raw.getArg! 1)
+  let requirements ← mkAppM ``VerexIR.Proofs.scopedDictionaryCaptures?
+    #[target.getArg! 0, handle, mask, raw.getArg! 3]
+  let values ← withTransparency .all <| whnf requirements
+  unless values.isAppOfArity ``Option.some 2 do return none
+  let rule ← mkAppOptM ``VerexIR.Proofs.ReceiverScopedClosure.checked
+    #[target.getArg! 0, handle, mask, raw.getArg! 2,
+      raw.getArg! 3, values.appArg!]
+  let saved ← saveState
+  try
+    let [receipt, shape, requirements, captured] ← goal.apply rule
+      | throwError "unexpected scoped receiver obligations"
+    unless ← closesBy receipt (← `(tactic| decide +kernel)) do
+      throwError "the callback has no checked receiver receipt"
+    unless ← closesBy shape (← `(tactic| first | assumption | decide +kernel)) do
+      throwError "the callback has no checked closure shape"
+    requirements.refl
+    setGoals [captured]
+    evalTactic (← `(tactic| try simp only [List.mem_reverse, List.mem_cons, List.not_mem_nil, forall_eq_or_imp,
+      forall_false, forall_const, and_true]))
+    return some (← getGoals)
+  catch error =>
+    saved.restore
+    if verex.solverDebug.get (← getOptions) then
+      IO.println s!"scoped receiver receipt: {← error.toMessageData.toString}"
+    return none
 
 /-- A dictionary's contract is proved at the caller's frame, then by the
 ordinary verified-target invocation rule at every argument and memory. -/

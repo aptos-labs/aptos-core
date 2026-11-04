@@ -63,7 +63,7 @@ VerexE2ETests/SourceVerify/no_panic.spec.lean:25:6: error: verex verification fa
 VerexE2ETests/SourceVerify/no_panic.spec.lean:45:3: error: no path takes `when aborts at op 2`; the paths' decisions: [aborts at op 1]
 VerexE2ETests/SourceVerify/no_panic.spec.lean:44:8: error: verex verification failed: the proof of `unrouted` does not establish its specification
 VerexE2ETests/SourceVerify/no_panic.spec.lean:64:1: error: `no panic when aborts at op 1` is not established: the operation `s = s / d` at VerexE2ETests/SourceVerify/no_panic.rs:68:9 may panic
-  from: n.val ≤ 10; fst✝¹ = some val✝¹; val✝¹.val < n.val; fst✝ = some val✝; d.val = 0
+  from: n.val ≤ 10; val✝¹.val < n.val; d.val = 0
 VerexE2ETests/SourceVerify/no_panic.spec.lean:64:6: error: verex verification failed: the automatic verification of `in_loop` failed; provide a proof in the module:
   verify in_loop by lean =>
     verex_obligations

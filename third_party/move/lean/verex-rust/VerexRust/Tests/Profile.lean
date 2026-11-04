@@ -1873,7 +1873,8 @@ def checkStaticMethodEvidence (fixture : String) (genericNames : Array String) (
 #eval checkStaticMethodEvidence "static_fnmut" #["apply_mut", "forward", "apply_bool", "apply_unit"] 3
 
 /-- Declared Fn dictionaries borrow their receiver immutably, including two
-independent bounds and a generic result. A value receiver is still invalid. -/
+independent bounds and a generic result. Changing its receiver type must still
+fail the ordinary invocation checks. -/
 def checkSharedMethodEvidence : IO Unit := do
   let text ← readBaselineJson "rust-exporter/tests/evidence-unit/static_fn.exp.json"
   let raw ← match Import.decodeJson text with
@@ -1901,15 +1902,52 @@ def checkSharedMethodEvidence : IO Unit := do
                 .function (parameters.set! 0 reference.referent) result abilities
             | other => other } }
         match validate malformed with
-          | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
-              throw <| IO.userError s!"wrong value-receiver diagnostic: {repr errors}"
-          | .ok _ => throw <| IO.userError "method evidence with a value receiver was accepted"
+          | .error errors => unless errors.any (·.code == "VIR-SEMANTIC-TYPE") do
+              throw <| IO.userError s!"wrong receiver-mismatch diagnostic: {repr errors}"
+          | .ok _ => throw <| IO.userError "shared dictionary with a mismatched receiver was accepted"
   unless count == 5 do throw <| IO.userError s!"expected five Fn dictionaries, got {count}"
   unless (prepareExecution #[semantics] unit).isOk do
     throw <| IO.userError "shared evidence is not executable"
 
 #guard_msgs in
 #eval checkSharedMethodEvidence
+
+/-- Consuming dictionaries take F by value without granting it Copy. Their
+ordinary invocation signature and marker bounds remain checked. -/
+def checkConsumingMethodEvidence : IO Unit := do
+  let text ← readBaselineJson "rust-exporter/tests/evidence-unit/static_fnonce.exp.json"
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error error => throw <| IO.userError error
+  let unit ← match validate raw with
+    | .ok unit => pure unit
+    | .error errors => throw <| IO.userError s!"consuming evidence rejected: {repr errors}"
+  let mut count := 0
+  for function in raw.namespaces[0]!.functions do
+    for attr in function.attributes do
+      if let .assign "method_evidence" (.constant (.integer index)) _ := attr then
+        count := count + 1
+        let parameter := function.signature.parameters[index.toNat]!
+        let some (.function parameters _ _) := raw.tables.types[parameter.typeUse.typeId.index]?
+          | throw <| IO.userError "missing consuming dictionary type"
+        unless parameters[0]? == some function.signature.parameters[0]!.typeUse.typeId do
+          throw <| IO.userError "consuming dictionary does not take the original receiver by value"
+        if function.signature.generics[0]!.abilities.contains .copy then
+          throw <| IO.userError "consuming receiver gained a Copy bound"
+        let malformed := { raw with tables := { raw.tables with
+          types := raw.tables.types.modify parameter.typeUse.typeId.index fun type => match type with
+            | .function _ result abilities => .function #[] result abilities
+            | other => other } }
+        match validate malformed with
+          | .error errors => unless errors.any (·.code == "VIR-METHOD-EVIDENCE") do
+              throw <| IO.userError s!"wrong missing-receiver diagnostic: {repr errors}"
+          | .ok _ => throw <| IO.userError "consuming dictionary without a receiver was accepted"
+  unless count == 3 do throw <| IO.userError s!"expected three consuming dictionaries, got {count}"
+  unless (prepareExecution #[semantics] unit).isOk do
+    throw <| IO.userError "consuming evidence is not executable"
+
+#guard_msgs in
+#eval checkConsumingMethodEvidence
 
 /-- Native expectations also hold through dictionary captures, receiver adapters,
 argument tuples and generic/aggregate results in the interpreter. -/

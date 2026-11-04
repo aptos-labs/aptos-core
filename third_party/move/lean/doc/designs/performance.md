@@ -387,14 +387,14 @@ In the order of expected gain:
   avoid the smart unfolding of `NTy.carrier`; a deeper change to
   `Types.lean`.
 
-An existential witness tries a position a hypothesis states the element of
-(`statedReads`, read by `verex_lookup_read`) after every other candidate, since a
-failed attempt spends the leaf's budget on what those decide. Against trying it
-right after the positions the context's lookup facts read, the order saves 0.03% of
-heartbeats on the four Rust benchmark problems, 1.3509G against 1.3512G, nearly all
-in `rust_bit_vector`, with the same verdicts; failing leaves and Move problems are
-not measured. The reads are computed once per context: a search asks for them per
-premise, and the scan walks every hypothesis.
+For an existential containing an array lookup, witness search first tries
+positions whose elements a hypothesis states (`statedReads`, read by
+`verex_lookup_read`). This reaches the available read witness before unrelated
+integers and bounds can exhaust the search budget. Other existential shapes
+retain the late read-position fallback. The reads are computed once per
+context: a search asks for them per premise, and the scan walks every
+hypothesis. `LiteralOptionalReads` checks the ordering with a valid read and
+many unrelated certified integers.
 
 ### Fixed costs
 

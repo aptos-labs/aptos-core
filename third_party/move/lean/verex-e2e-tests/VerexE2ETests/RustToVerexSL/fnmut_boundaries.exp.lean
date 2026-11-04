@@ -33,8 +33,10 @@ verex namespace fnmut_boundaries where
     callback : &F, __trait_Fn_call : Fn(&F) -> u64 has Copy, Drop
   ) -> u64 := invoke(__trait_Fn_call, callback)
 
-  @[refused = "call of `std::ops::FnOnce::call_once` in `fnmut_boundaries::once` at line 25:5 depends on a type parameter and needs trait evidence: rustc selects its implementation only at a concrete type"]
-  native fun once {F}(callback : F) -> u64
+  @[method_evidence = 1]
+  fun once {F}(
+    callback : F, __trait_FnOnce_call_once : Fn(F) -> u64 has Copy, Drop
+  ) -> u64 := invoke(__trait_FnOnce_call_once, callback)
 
   @[method_evidence = 1]
   fun apply {F}(
@@ -61,5 +63,3 @@ verex namespace fnmut_boundaries where
   fun «__fnmut_adapter_adapter::{closure#0}»(
     self : &mut «adapter::{closure#0}»<lifetime _>
   ) -> u64 := «adapter::{closure#0}»::call(&*self)
-
--- no denotation for `once`: a function without a body is not carried by the denotation

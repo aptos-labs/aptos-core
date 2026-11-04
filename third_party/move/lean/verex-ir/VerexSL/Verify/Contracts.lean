@@ -1190,7 +1190,8 @@ def quoteMutables {Γ : NRow} : Mutables Γ → MetaM Lean.Expr
 def quoteFunction {unit : ValidatedUnit} (unitExpr : Lean.Expr) (f : Function unit)
     (params locals frame frameEq body mutables : Lean.Expr) : MetaM Lean.Expr :=
   return mkAppN (mkConst ``Function.mk)
-    #[unitExpr, params, locals, frame, frameEq, ← quoteShape f.result, body, mutables]
+    #[unitExpr, params, locals, frame, frameEq, ← quoteShape f.result, body, mutables,
+      toExpr f.scopedMethods]
 
 /-! ## Names -/
 
@@ -1589,7 +1590,8 @@ instantiation. -/
 def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (params : NRow) (result : ResultShape)
-    (nativeModel : Option NativeModel := none) (stored : Contract.StoredInvariants := {}) :
+    (nativeModel : Option NativeModel := none) (stored : Contract.StoredInvariants := {})
+    (atArguments : Option NRow := none) :
     MetaM Lean.Expr :=
   -- A contract is over a unit and a frame at it; one stating a behavioral
   -- predicate over an executable unit of it as well.
@@ -1605,7 +1607,7 @@ def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : Validate
       buildContract unit ⟨namespaceIndex⟩ ns declaration signature
         (types := types) (typeInstantiation := typeInstantiation)
         (nativeModel := nativeModel) (executable := executable) (requiresMeaning := requiresMeaning)
-        (stored := stored)
+        (stored := stored) (atArguments := atArguments)
         (directContract := some (directContractOf unit stored executable requiresMeaning #[]))
     -- One stating `requires_of` takes the table of declared preconditions
     -- at the unit, last.

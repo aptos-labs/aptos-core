@@ -282,3 +282,7 @@ pub fn boxes(value: u32, shared: &Box<u32>, exclusive: &mut Box<u32>) -> u32 {
     *exclusive.as_mut() = *made;
     *shared.as_ref()
 }
+
+pub fn string_from_utf8(bytes: &[u8]) -> Result<&str, std::str::Utf8Error> {
+    std::str::from_utf8(bytes)
+}

@@ -1,48 +1,9 @@
-VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:4:6: error: verification failed with a residual obligation:
-case refine_3.right
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-«native_alloc::vec::Vec::insert» :
-  ∀ {Θ : VerexIR.Proofs.Denote.Skolems unit} {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)},
-    VerexIR.Proofs.Satisfies
-      (VerexIR.Proofs.Denote.propheticMeaning executable✝ typeInstantiation
-        { namespaceId := { index := 1 }, functionId := { index := 3 } } «alloc::vec::Vec::insert».params
-        «alloc::vec::Vec::insert».shape)
-      («alloc::vec::Vec::insert».typedContract typeInstantiation)
-values : (VerexIR.Proofs.Denote.NTy.int 32 false).vector.carrier
-at : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-value✝ : (VerexIR.Proofs.Denote.NTy.int 32 false).carrier
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed permitted : True
-value : (VerexIR.Proofs.Denote.NTy.int 32 false).vector.carrier
-insert_returns : «at».val ≤ ↑values.values.size
-insert_ensures_1 :
-  VerexIR.Proofs.Obligation "library_vec_edit_errors.rs.lean" 1184 1216
-    (↑values.values.size < 18446744073709551615)
-insert_ensures_2 :
-  VerexIR.Proofs.Obligation "library_vec_edit_errors.rs.lean" 1225 1264
-    (↑value.values.size = ↑values.values.size + 1)
-insert_ensures_3 :
-  VerexIR.Proofs.Obligation "library_vec_edit_errors.rs.lean" 1273 1320
-    (∀ (k : Int),
-      0 ≤ k →
-        k < «at».val →
-          value.values[k.toNat]?.getD { val := 0, fits := ⋯ } = values.values[k.toNat]?.getD { val := 0, fits := ⋯ })
-insert_ensures_4 :
-  VerexIR.Proofs.Obligation "library_vec_edit_errors.rs.lean" 1329 1349
-    (value.values[«at».val.toNat]?.getD { val := 0, fits := ⋯ } = value✝)
-insert_ensures_5 :
-  VerexIR.Proofs.Obligation "library_vec_edit_errors.rs.lean" 1358 1422
-    (∀ (k : Int),
-      «at».val ≤ k →
-        k < ↑values.values.size →
-          value.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } =
-            values.values[k.toNat]?.getD { val := 0, fits := ⋯ })
-⊢ «at».val < ↑values.values.size
+VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:4:6: error: the continuation after call 1 of `alloc::vec::Vec::insert` is not established
 VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `insert_at` failed; provide a proof in the module:
   verify insert_at by lean =>
     verex_obligations
     verex_on
-    | leaf => verex_prepare; sorry
+    | after_call_1_of_insert => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_vec_edit_errors.spec.lean:9:3: error: the specification clause `aborts_if at > old(values).length` is not established

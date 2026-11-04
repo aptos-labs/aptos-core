@@ -1271,7 +1271,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       else #[])) #[]
   let methodEvidenceErrors := ns.functions.flatMap fun function =>
     function.attributes.filterMap fun attr => do
-      let .assign "method_evidence" value _ := attr | none
+      let .assign key value _ := attr | none
+      if key != "method_evidence" && key != "scoped_method_evidence" then none else
       let valid := Id.run do
         unless function.profile == .rust do return false
         let .constant (.integer index) := value | return false
@@ -1279,11 +1280,19 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
         let some parameter := function.signature.parameters[index.toNat]? | return false
         let some (.function parameters _ _) := unit.tables.types[parameter.typeUse.typeId.index]?
           | return false
-        let some (receiver : TypeId) := parameters[0]? | return false
-        let some (.reference _) := unit.tables.types[receiver.index]? | return false
+        -- The receiver is explicit, including an owned receiver for consuming
+        -- methods. Ordinary type and invocation checks validate its use.
+        if parameters.isEmpty then return false
+        if key == "scoped_method_evidence" then
+          unless function.attributes.any (fun
+            | .assign "method_evidence" (.constant (.integer other)) _ => other == index
+            | _ => false) do return false
+          let some (receiver : TypeId) := parameters[0]? | return false
+          let some (Ty.reference _) := unit.tables.types[receiver.index]? | return false
+          if function.body matches .absent then return false
         return true
       if valid then none else some (.at "VIR-METHOD-EVIDENCE"
-        "method evidence must name a parameter of type Fn(&T, ...) -> R or Fn(&mut T, ...) -> R" function.loc)
+        "method evidence must name a function-typed parameter with an explicit receiver" function.loc)
   let declErrors := (ns.functions.flatMap fun function =>
       #[function] ++ function.shapes.map function.atShape).foldl (fun ds function =>
     let functionBinders := binderKinds function.signature.generics
@@ -2194,6 +2203,13 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferInstantiations unit)) unit.dependencies unit.evidence unit.indexes
     unit.resolution
+  -- A scoped dictionary annotation is a requirement, never a certificate.
+  -- Check all supplied values before borrow analysis may shorten its receiver loan.
+  let receiverSummaries := ReceiverNoEscape.summaries unit
+  let scopedErrors := unit.namespaces.flatMap fun ns =>
+    ns.functions.flatMap (ReceiverNoEscape.supplyDiagnostics unit receiverSummaries ns)
+  if scopedErrors.any (·.severity == .error) then
+    throw (dedupDiagnostics scopedErrors)
   -- Definite initialization and the borrow analysis run exactly once here;
   -- preparation copies the certificates instead of re-running the analyses.
   -- Initialization failures are validate errors. Borrow-analysis rejections
@@ -2211,6 +2227,7 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
             initializationOutcome ns.identity ⟨index⟩ ns function
           let (functionBorrowDs, borrowCert) :=
             borrowOutcome ns.identity ⟨index⟩ unit ns function
+              (ReceiverNoEscape.summaryParameters receiverSummaries ns.identity function.name)
           (initDs ++ functionInitDs,
             match initCert with | some c => inits.push c | none => inits,
             match borrowCert with

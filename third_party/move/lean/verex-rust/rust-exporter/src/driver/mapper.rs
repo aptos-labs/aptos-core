@@ -73,7 +73,9 @@ struct UnitMapper {
     adts: Vec<AdtNames>,
     closures: Vec<ClosureNames>,
     fnmut_adapters: Vec<(usize, QualifiedRef)>,
-    shared_evidence_adapters: Vec<(usize, usize, QualifiedRef)>,
+    fnonce_adapters: Vec<(usize, QualifiedRef)>,
+    evidence_adapters: Vec<(usize, usize, bool, QualifiedRef)>,
+    scoped_evidence: BTreeSet<(usize, usize)>,
     types: TypeLayout,
     scopes: Scopes,
     namespaces: CrateNamespaces,
@@ -513,9 +515,16 @@ fn item_predicates(definition: DefId) -> Vec<rustc_public::ty::Binder<PredicateK
     predicates
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EvidenceReceiver {
+    Shared,
+    Mutable,
+    Owned,
+}
+
 /// A method dictionary retains its receiver as an ordinary argument. In
 /// particular, a mutable receiver is never encoded as a captured, stateless
-/// function. Local single-method traits and declared Fn/FnMut bounds use this interface.
+/// function. Local single-method traits and declared Fn/FnMut/FnOnce bounds use this interface.
 #[derive(Clone)]
 struct MethodEvidence {
     method: FnDef,
@@ -523,18 +532,21 @@ struct MethodEvidence {
     receiver: RustTy,
     name: String,
     tupled: bool,
-    mutable_receiver: bool,
+    receiver_kind: EvidenceReceiver,
     result: RustTy,
     parameters: Vec<RustTy>,
 }
 
 impl MethodEvidence {
-    /// Whether this shared dictionary supplies the requested mutable call.
+    /// Whether a borrowed dictionary supplies a weaker callable receiver mode.
     fn forwards_to(&self, required: &Self) -> bool {
         required.tupled
-            && required.mutable_receiver
             && self.tupled
-            && !self.mutable_receiver
+            && match required.receiver_kind {
+                EvidenceReceiver::Mutable => self.receiver_kind == EvidenceReceiver::Shared,
+                EvidenceReceiver::Owned => self.receiver_kind != EvidenceReceiver::Owned,
+                EvidenceReceiver::Shared => false,
+            }
             && self.arguments == required.arguments
             && self.result == required.result
     }
@@ -564,10 +576,13 @@ impl MethodEvidence {
     }
 
     fn receiver_type(&self) -> RustTy {
+        if self.receiver_kind == EvidenceReceiver::Owned {
+            return self.receiver;
+        }
         RustTy::from_rigid_kind(RigidTy::Ref(
             erased(),
             self.receiver,
-            if self.mutable_receiver {
+            if self.receiver_kind == EvidenceReceiver::Mutable {
                 Mutability::Mut
             } else {
                 Mutability::Not
@@ -591,7 +606,8 @@ fn declared_method_evidence(definition: DefId) -> Vec<MethodEvidence> {
         }
         let trait_ = predicate.trait_ref.def_id;
         let shared = Some(trait_) == polyfill::fn_trait();
-        if shared || Some(trait_) == polyfill::fn_mut_trait() {
+        let owned = Some(trait_) == polyfill::fn_once_trait();
+        if shared || owned || Some(trait_) == polyfill::fn_mut_trait() {
             let arguments = predicate.trait_ref.args();
             let [GenericArgKind::Type(receiver), GenericArgKind::Type(tuple)] =
                 arguments.0.as_slice()
@@ -630,7 +646,7 @@ fn declared_method_evidence(definition: DefId) -> Vec<MethodEvidence> {
             let Some(result) = result else { continue };
             let method = trait_.associated_items().into_iter().find_map(|item| {
                 matches!(&item.kind, AssocKind::Fn { name, has_self: true }
-                    if name == if shared { "call" } else { "call_mut" })
+                    if name == if shared { "call" } else if owned { "call_once" } else { "call_mut" })
                 .then_some(FnDef(item.def_id.0))
             });
             if let Some(method) = method
@@ -644,12 +660,20 @@ fn declared_method_evidence(definition: DefId) -> Vec<MethodEvidence> {
                     receiver: *receiver,
                     name: if shared {
                         "__trait_Fn_call"
+                    } else if owned {
+                        "__trait_FnOnce_call_once"
                     } else {
                         "__trait_FnMut_call_mut"
                     }
                     .to_owned(),
                     tupled: true,
-                    mutable_receiver: !shared,
+                    receiver_kind: if shared {
+                        EvidenceReceiver::Shared
+                    } else if owned {
+                        EvidenceReceiver::Owned
+                    } else {
+                        EvidenceReceiver::Mutable
+                    },
                     result,
                     parameters: parameters.clone(),
                 });
@@ -697,7 +721,7 @@ fn declared_method_evidence(definition: DefId) -> Vec<MethodEvidence> {
             receiver,
             name: format!("__trait_{}_{}", last_segment(&trait_.name()), name),
             tupled: false,
-            mutable_receiver: true,
+            receiver_kind: EvidenceReceiver::Mutable,
             result: *output,
             parameters: vec![],
         };
@@ -2445,6 +2469,8 @@ impl UnitMapper {
             .cloned()
             .collect::<Vec<_>>();
         let mut shared_adapters = BTreeSet::new();
+        let mut scoped_evidence = BTreeSet::new();
+        let mut evidence_flows = Vec::new();
         for (item_index, (item, body)) in items.iter().zip(&bodies).enumerate() {
             let locals = &body.mapped_locals;
             for block in &body.blocks {
@@ -2462,19 +2488,66 @@ impl UnitMapper {
                     continue;
                 };
                 if let Some(evidence) = method_evidence.get(&resolved.name()) {
-                    for required in evidence.iter().map(|e| e.instantiate(&arguments)) {
-                        if required.tupled && required.mutable_receiver {
+                    for (required_index, declared) in evidence.iter().enumerate() {
+                        let required = declared.instantiate(&arguments);
+                        // Match evidence_for's choice: exact dictionaries take
+                        // precedence over borrowed receiver adapters.
+                        let available = &method_evidence[&item.name()];
+                        let exact = available.iter().position(|entry| {
+                            entry.method == required.method && entry.arguments == required.arguments
+                        });
+                        let supplying = exact.or_else(|| {
+                            available
+                                .iter()
+                                .position(|entry| entry.forwards_to(&required))
+                        });
+                        if let Some(supplying) = supplying {
+                            if exact.is_none() && required.receiver_kind == EvidenceReceiver::Owned
+                            {
+                                scoped_evidence.insert((item_index, supplying));
+                            } else if required.tupled
+                                && required.receiver_kind != EvidenceReceiver::Owned
+                            {
+                                let callee_index = identities
+                                    .iter()
+                                    .position(|name| *name == resolved.name())
+                                    .ok_or("local method evidence has no item")?;
+                                evidence_flows.push((
+                                    (callee_index, required_index),
+                                    (item_index, supplying),
+                                ));
+                            }
+                        }
+                        if required.tupled {
                             for (index, available) in
                                 method_evidence[&item.name()].iter().enumerate()
                             {
                                 if available.forwards_to(&required) {
-                                    shared_adapters.insert((item_index, index));
+                                    shared_adapters.insert((
+                                        item_index,
+                                        index,
+                                        required.receiver_kind == EvidenceReceiver::Owned,
+                                    ));
                                 }
                             }
                         }
                         dictionary_types.push(required);
                     }
                 }
+            }
+        }
+        // A scoped callee requirement follows the dictionary supplied by its
+        // caller, including Fn-to-FnMut forwarding. Unrelated borrowed bounds
+        // retain the existing, unrestricted method-evidence interface.
+        loop {
+            let mut changed = false;
+            for (required, supplying) in &evidence_flows {
+                if scoped_evidence.contains(required) {
+                    changed |= scoped_evidence.insert(*supplying);
+                }
+            }
+            if !changed {
+                break;
             }
         }
         for evidence in &dictionary_types {
@@ -2550,7 +2623,7 @@ impl UnitMapper {
             let Some((closure, _)) = closure_of(*item) else {
                 continue;
             };
-            if item_names[index] != "call" || !dictionary_types.iter().any(|e| e.tupled && e.mutable_receiver &&
+            if item_names[index] != "call" || !dictionary_types.iter().any(|e| e.tupled && e.receiver_kind == EvidenceReceiver::Mutable &&
                 matches!(e.receiver.kind(), TyKind::RigidTy(RigidTy::Closure(def, _)) if def == closure)) {
                 continue;
             }
@@ -2574,11 +2647,46 @@ impl UnitMapper {
             name_ids.insert(format!("{}::__fnmut_adapter", item.name()), target.clone());
             fnmut_adapters.push((index, target));
         }
-        let mut shared_evidence_adapters = Vec::new();
-        for (item_index, evidence_index) in shared_adapters {
+        let mut fnonce_adapters = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let Some((closure, _)) = closure_of(*item) else {
+                continue;
+            };
+            if item_names[index] == "call_once" || !dictionary_types.iter().any(|e|
+                e.tupled && e.receiver_kind == EvidenceReceiver::Owned &&
+                matches!(e.receiver.kind(), TyKind::RigidTy(RigidTy::Closure(def, _)) if def == closure)) {
+                continue;
+            }
+            let name = NameId::new(names.len());
+            let mut adapter_name = format!("__fnonce_adapter_{}", item_scopes[index].join("::"));
+            while names
+                .iter()
+                .any(|name| name.scope.is_empty() && name.name == adapter_name)
+            {
+                adapter_name.push('_');
+            }
+            names.push(QualifiedName {
+                name: adapter_name,
+                scope: vec![],
+                namespace_id: NamespaceId::new(0),
+            });
+            let target = QualifiedRef {
+                name,
+                namespace_id: NamespaceId::new(0),
+            };
+            name_ids.insert(format!("{}::__fnonce_adapter", item.name()), target.clone());
+            fnonce_adapters.push((index, target));
+        }
+        let mut evidence_adapters = Vec::new();
+        for (item_index, evidence_index, consuming) in shared_adapters {
+            let prefix = if consuming {
+                "__borrowed_to_fnonce"
+            } else {
+                "__fn_to_fnmut"
+            };
             let name = NameId::new(names.len());
             let mut adapter_name = format!(
-                "__fn_to_fnmut_{}_{evidence_index}",
+                "{prefix}_{}_{evidence_index}",
                 item_scopes[item_index]
                     .iter()
                     .chain(std::iter::once(&item_names[item_index]))
@@ -2602,13 +2710,10 @@ impl UnitMapper {
                 namespace_id: NamespaceId::new(0),
             };
             name_ids.insert(
-                format!(
-                    "{}::__fn_to_fnmut_{evidence_index}",
-                    items[item_index].name()
-                ),
+                format!("{}::{prefix}_{evidence_index}", items[item_index].name()),
                 target.clone(),
             );
-            shared_evidence_adapters.push((item_index, evidence_index, target));
+            evidence_adapters.push((item_index, evidence_index, consuming, target));
         }
         for function in &dependency_functions {
             let namespace_id = namespaces.id(&function.definition.krate().name)?;
@@ -2687,7 +2792,9 @@ impl UnitMapper {
             adts,
             closures,
             fnmut_adapters,
-            shared_evidence_adapters,
+            fnonce_adapters,
+            evidence_adapters,
+            scoped_evidence,
             types,
             scopes,
             namespaces,
@@ -2757,7 +2864,7 @@ impl UnitMapper {
             let mapped = mapper.map()?;
             expression_ranges.push(expression_start..self.arenas.expressions.len());
             let evidence_count = self.method_evidence.get(&identity).map_or(0, Vec::len);
-            let evidence_attributes = (0..evidence_count)
+            let mut evidence_attributes: Vec<_> = (0..evidence_count)
                 .map(|index| Attribute::Assign {
                     loc: Some(function_loc),
                     name: "method_evidence".to_owned(),
@@ -2768,6 +2875,23 @@ impl UnitMapper {
                     },
                 })
                 .collect();
+            // Only forwarding paths that consume a borrowed callable need the
+            // receiver-scoping refinement; ordinary Fn/FnMut remain unchanged.
+            for evidence_index in 0..evidence_count {
+                if self.scoped_evidence.contains(&(index, evidence_index)) {
+                    evidence_attributes.push(Attribute::Assign {
+                        loc: Some(function_loc),
+                        name: "scoped_method_evidence".to_owned(),
+                        value: AttributeValue::Constant {
+                            value: ConstValue::Integer {
+                                value: Number::from(
+                                    mapped.parameters.len() - evidence_count + evidence_index,
+                                ),
+                            },
+                        },
+                    });
+                }
+            }
             functions.push(FunctionDecl {
                 alignment: AlignmentId::new(index),
                 attributes: evidence_attributes,
@@ -2819,19 +2943,24 @@ impl UnitMapper {
             });
         }
 
-        // Rust's Fn-to-FnMut adapter reborrows its mutable receiver as shared.
-        // Keep it as a checked body so both invocation and verification see the
-        // same receiver conversion; never relabel the shared closure's type.
-        let adapters = self
-            .fnmut_adapters
-            .iter()
-            .map(|(index, target)| (*index, None, target))
-            .chain(
-                self.shared_evidence_adapters
-                    .iter()
-                    .map(|(index, evidence, target)| (*index, Some(*evidence), target)),
-            );
-        for (index, evidence_index, target) in adapters {
+        // Receiver conversions are checked bodies, not relabeled function
+        // types. Consuming adapters borrow the owned closure, invoke its actual
+        // body, and explicitly drop the receiver after the borrow ends.
+        let adapters =
+            self.fnmut_adapters
+                .iter()
+                .map(|(index, target)| (*index, None, false, target))
+                .chain(
+                    self.fnonce_adapters
+                        .iter()
+                        .map(|(index, target)| (*index, None, true, target)),
+                )
+                .chain(self.evidence_adapters.iter().map(
+                    |(index, evidence, consuming, target)| {
+                        (*index, Some(*evidence), *consuming, target)
+                    },
+                ));
+        for (index, evidence_index, consuming, target) in adapters {
             let expression_start = self.arenas.expressions.len();
             let mut original = functions[index].clone();
             let loc = original.loc;
@@ -2878,11 +3007,29 @@ impl UnitMapper {
                     },
                     loc: None,
                 }];
+                if consuming || self.scoped_evidence.contains(&(index, evidence_index)) {
+                    // A borrowed dictionary cannot retain its receiver, which a
+                    // consuming adapter drops after the invocation.
+                    original.attributes.push(Attribute::Assign {
+                        name: "scoped_method_evidence".to_owned(),
+                        value: AttributeValue::Constant {
+                            value: ConstValue::Integer {
+                                value: Number::from(dictionary_index),
+                            },
+                        },
+                        loc: None,
+                    });
+                }
                 // Source verification synthesizes and proves the forwarding
                 // contract for this checked body; this is not a trusted axiom.
                 original.attributes.push(Attribute::Assign {
                     loc: None,
-                    name: "shared_method_adapter".to_owned(),
+                    name: if consuming {
+                        "consuming_method_adapter"
+                    } else {
+                        "shared_method_adapter"
+                    }
+                    .to_owned(),
                     value: AttributeValue::Constant {
                         value: ConstValue::Integer {
                             value: Number::from(dictionary_index),
@@ -2927,7 +3074,12 @@ impl UnitMapper {
                     id
                 };
             let mut signature = original.signature.clone();
-            signature.parameters[0].type_use.type_id = mutable_type;
+            signature.parameters[0].type_use.type_id = if consuming {
+                shared.referent
+            } else {
+                mutable_type
+            };
+            signature.parameters[0].mutable = consuming && shared.kind == ReferenceKind::Mutable;
             let mut locals = signature
                 .parameters
                 .iter()
@@ -2935,19 +3087,28 @@ impl UnitMapper {
                 .map(|(index, p)| LocalDecl {
                     id: LocalId::new(index),
                     loc,
-                    mutable: false,
+                    mutable: p.mutable,
                     name: p.name.clone(),
                     type_use: p.type_use.clone(),
                 })
                 .collect::<Vec<_>>();
             let receiver = self.arenas.place(LocalId::new(0));
-            let deref = PlaceId::new(self.arenas.places.len());
-            self.arenas.places.push(Place::Deref { base: receiver });
+            let deref = if consuming {
+                receiver
+            } else {
+                let deref = PlaceId::new(self.arenas.places.len());
+                self.arenas.places.push(Place::Deref { base: receiver });
+                deref
+            };
             let receiver = self
                 .arenas
                 .expression(loc, shared_type, ExprKind::Operation {
                     operation: Operation::Borrow {
-                        kind: BorrowKind::Immutable,
+                        kind: if consuming && shared.kind == ReferenceKind::Mutable {
+                            BorrowKind::Mutable
+                        } else {
+                            BorrowKind::Immutable
+                        },
                         place: deref,
                     },
                     arguments: vec![],
@@ -3041,6 +3202,49 @@ impl UnitMapper {
                     instantiations: vec![],
                     surface: None,
                 });
+            // Unit has no observable payload. Returning its literal avoids
+            // retaining a dead call-result temporary across the receiver drop.
+            let result = if consuming && result_type.type_id == self.types.unit {
+                self.arenas
+                    .expression(loc, result_type.type_id, ExprKind::Value {
+                        source_constant: None,
+                        value: ConstValue::Unit,
+                    })
+            } else {
+                result
+            };
+            let mut blocks = vec![
+                RawBasicBlock {
+                    loc,
+                    statements: vec![],
+                    terminator: RawTerminator::Call {
+                        call,
+                        destination: Some(RawCallDestination {
+                            place: result_place,
+                            target: BlockId::new(1),
+                        }),
+                        unwind: RawUnwindAction::Unreachable,
+                    },
+                },
+                RawBasicBlock {
+                    loc,
+                    statements: vec![],
+                    terminator: RawTerminator::Return {
+                        values: vec![result],
+                    },
+                },
+            ];
+            if consuming {
+                blocks.insert(1, RawBasicBlock {
+                    loc,
+                    statements: vec![],
+                    terminator: RawTerminator::Drop {
+                        place: self.arenas.place(LocalId::new(0)),
+                        target: BlockId::new(2),
+                        unwind: RawUnwindAction::Unreachable,
+                    },
+                });
+            }
             functions.push(FunctionDecl {
                 name: target.name,
                 signature,
@@ -3049,27 +3253,7 @@ impl UnitMapper {
                 body: RawBody::Cfg {
                     graph: RawCfg {
                         entry: BlockId::new(0),
-                        blocks: vec![
-                            RawBasicBlock {
-                                loc,
-                                statements: vec![],
-                                terminator: RawTerminator::Call {
-                                    call,
-                                    destination: Some(RawCallDestination {
-                                        place: result_place,
-                                        target: BlockId::new(1),
-                                    }),
-                                    unwind: RawUnwindAction::Unreachable,
-                                },
-                            },
-                            RawBasicBlock {
-                                loc,
-                                statements: vec![],
-                                terminator: RawTerminator::Return {
-                                    values: vec![result],
-                                },
-                            },
-                        ],
+                        blocks,
                     },
                 },
                 ..original
@@ -7194,34 +7378,38 @@ impl<'a> FunctionMapper<'a> {
         }) {
             return self.evidence_operand(index, loc);
         }
-        // Fn entails FnMut. Derive the mutable dictionary with a checked body
-        // that invokes the original Fn dictionary through a shared reborrow.
+        // Derive a weaker callable dictionary with a checked adapter body.
+        // Consuming adapters require scoped evidence for their borrowed receiver.
         if evidence.tupled
-            && evidence.mutable_receiver
             && let Some(index) = self
                 .method_evidence
                 .get(self.identity)
                 .and_then(|methods| methods.iter().position(|entry| entry.forwards_to(evidence)))
         {
-            let key = format!("{}::__fn_to_fnmut_{index}", self.identity);
+            let prefix = if evidence.receiver_kind == EvidenceReceiver::Owned {
+                "__borrowed_to_fnonce"
+            } else {
+                "__fn_to_fnmut"
+            };
+            let key = format!("{}::{prefix}_{index}", self.identity);
             let function = self
                 .name_ids
                 .get(&key)
                 .cloned()
-                .ok_or("missing generic Fn-to-FnMut adapter")?;
+                .ok_or("missing generic callable receiver adapter")?;
             let dictionary = self.evidence_operand(index, loc)?;
             let arguments = match self.item.ty().kind() {
                 TyKind::RigidTy(RigidTy::FnDef(_, arguments)) => arguments,
                 TyKind::RigidTy(RigidTy::Closure(_, arguments)) => {
                     GenericArgs(closure_arguments(&arguments)?.0)
                 },
-                _ => return Err("Fn-to-FnMut adapter has no generic environment".to_owned()),
+                _ => return Err("callable adapter has no generic environment".to_owned()),
             };
             let mut instantiations = self.types.generic_arguments(&arguments, loc)?;
             instantiations.extend(self.bound_lifetime_arguments(self.identity)?);
             let mask = 1u64
                 .checked_shl((1 + evidence.parameters.len()) as u32)
-                .ok_or("too many Fn-to-FnMut adapter parameters")?;
+                .ok_or("too many callable adapter parameters")?;
             return Ok(self.arenas.expression(
                 loc,
                 self.types.method_evidence_type(evidence)?,
@@ -7235,8 +7423,16 @@ impl<'a> FunctionMapper<'a> {
                 },
             ));
         }
-        let (resolved, arguments) =
-            resolve_callee(self.item.0, evidence.method, &evidence.arguments)?;
+        let (resolved, arguments) = if evidence.tupled
+            && evidence.receiver_kind == EvidenceReceiver::Owned
+        {
+            let TyKind::RigidTy(RigidTy::Closure(closure, arguments)) = receiver.kind() else {
+                return Err("consuming callable evidence requires a concrete closure".to_owned());
+            };
+            (FnDef(closure.def_id()), arguments)
+        } else {
+            resolve_callee(self.item.0, evidence.method, &evidence.arguments)?
+        };
         let arguments = if evidence.tupled {
             let TyKind::RigidTy(RigidTy::Closure(closure, closure_args)) = receiver.kind() else {
                 return Err("callable evidence requires a concrete closure".to_owned());
@@ -7265,7 +7461,14 @@ impl<'a> FunctionMapper<'a> {
                 .ok_or("too many captured method dictionaries")?;
         }
         let target_name = if evidence.tupled
-            && evidence.mutable_receiver
+            && evidence.receiver_kind == EvidenceReceiver::Owned
+            && self
+                .name_ids
+                .contains_key(&format!("{name}::__fnonce_adapter"))
+        {
+            format!("{name}::__fnonce_adapter")
+        } else if evidence.tupled
+            && evidence.receiver_kind == EvidenceReceiver::Mutable
             && self
                 .name_ids
                 .contains_key(&format!("{name}::__fnmut_adapter"))

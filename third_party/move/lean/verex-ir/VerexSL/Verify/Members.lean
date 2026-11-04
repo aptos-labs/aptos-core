@@ -759,6 +759,7 @@ private def publishCompiled (segments : Array String) (unit : ValidatedUnit)
     addAbbrev (artifacts ++ `shape) (← quoteShape compiled.result)
   addAbbrev (artifacts ++ `body) (← quoteTerm semantics compiled.body)
   addAbbrev (artifacts ++ `mutables) (← quoteMutables compiled.mutables)
+  addAbbrev (artifacts ++ `scopedMethods) (toExpr compiled.scopedMethods)
   addAbbrev (artifacts ++ `compiled)
     (← quoteFunction semantics compiled params locals row (mkConst (artifacts ++ `frame_eq))
       (mkConst (artifacts ++ `body))
@@ -2515,13 +2516,13 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
     contractTargets := contractTargets
     contracts := contracts }
 
-/-- The calls at type arguments holding a mutable reference, through every body the proof
-inlines: each callee is compiled at them, one kernel-evaluated compilation per distinct
-arguments, and inlined, so the proof meets its body at the caller's rows. A generic contract
-does not transfer to them, so a callee reasoned about only through its contract has no
-reading there: a native, an opaque function, one on a cycle of calls. -/
+/-- Calls whose native reading does not commute with generic substitution. A
+transparent callee is compiled and inlined at its arguments. A supported opaque
+Unit specialization instead receives an independently checked contract theorem;
+natives and cycles still require a transferable generic contract. -/
 private def collectInstances (m : Member) (members : Array FunctionHandle)
-    (found : Callees m.unit) : CommandElabM (Callees m.unit) := do
+    (found : Callees m.unit)
+    (verifyOpaque : FunctionHandle → TypeArgs → Function m.unit → String → CommandElabM Name) : CommandElabM (Callees m.unit) := do
   let { reference, segments, function, generic, .. } := m
   let unit := m.unit
   let mut callees := found
@@ -2536,14 +2537,18 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
     let some calleeDeclaration := calleeNs.functions[callee.functionId.index]?
       | throwErrorAt reference "a callee is out of range"
     let calleeKey := functionKey unit callee
-    let refuse (what : String) : CommandElabM Unit :=
+    let refuse (what : String) : CommandElabM Unit := do
+      if θ.1.refFree && θ.1.toList.contains .unit then
+        throwErrorAt reference m!"`{function}` calls `{calleeKey}` at a Unit specialization, \
+          and `{calleeKey}` is {what}: its generic contract does not transfer to that reading"
       throwErrorAt reference m!"`{function}` calls `{calleeKey}` at a reference type argument, \
         and `{calleeKey}` is {what}: a generic contract does not transfer to a mutable \
         reference, so it has no reading there"
     if calleeDeclaration.body == .absent then refuse "native"
-    if isOpaque calleeDeclaration then refuse "opaque"
+    if isOpaque calleeDeclaration && (!θ.1.refFree || !θ.1.toList.contains .unit) then
+      refuse "opaque"
     if onCallCycle unit callee then refuse "on a cycle of calls"
-    if usedThroughContract unit callee calleeNs calleeDeclaration then
+    if !isOpaque calleeDeclaration && usedThroughContract unit callee calleeNs calleeDeclaration then
       refuse "used through its contract"
     let compiled ← match compileFunctionAt unit callee (some θ) with
       | .ok compiled => pure compiled
@@ -2552,6 +2557,13 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
             m!"no denotation for the callee `{calleeKey}` at a reference type argument: {reason}"
     let key := s!"{calleeKey}_at_{typeArgumentsSpelling θ.1}"
     liftTermElabM (publishCompiled segments unit key callee compiled (some θ))
+    if isOpaque calleeDeclaration then
+      let theoremName ← verifyOpaque callee θ compiled key
+      callees := { callees with
+        instances := callees.instances.push (callee, calleeDeclaration, θ, compiled)
+        calleePairs := callees.calleePairs.push (← theoremPair (← handleSyntax callee)
+          calleeKey theoremName) }
+      continue
     callees := { callees with
       instances := callees.instances.push (callee, calleeDeclaration, θ, compiled)
       calleePairs := callees.calleePairs.push (← `(term| PProd.mk $(← handleSyntax callee)
@@ -2953,6 +2965,7 @@ private def assumptionDefinitions (m : Member)
   let { ns, declaration, handle, artifacts, unitTerm, .. } := m
   let unit := m.unit
   let compiled := m.compiled
+  let scopedMethodsTerm := rootIdent (artifacts ++ `scopedMethods)
   if (← getEnv).contains (artifacts ++ `assumptions) then return
   let table ← liftTermElabM <| withExecutableSkolems unit fun executable skolems => do
     let types ← Contract.frameTypes skolems
@@ -2969,23 +2982,29 @@ private def assumptionDefinitions (m : Member)
         (executable : VerexIR.Validation.ExecutableUnit $unitTerm)
         [VerexIR.Proofs.Denote.Skolems $unitTerm]
         (meanings : VerexIR.Proofs.Denote.Meanings executable) :=
-      fun (args : VerexIR.Proofs.Denote.HList $paramsTerm) => VerexIR.Proofs.Spec.bind
+      fun (args : VerexIR.Proofs.Denote.HList $paramsTerm) =>
+        if VerexIR.scopedValues $unitTerm $scopedMethodsTerm
+            (VerexIR.Proofs.Denote.HList.encode args).toArray then VerexIR.Proofs.Spec.bind
         (VerexIR.Proofs.Denote.Term.denote meanings
           (ρ := $shapeTerm) (Γ := $row) $bodyIdent
           (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
-        (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)))
+        (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)
+        else VerexIR.Proofs.Spec.stuck))
   elabCommand (← `(command|
     noncomputable def $assumedIdent (executable : VerexIR.Validation.ExecutableUnit $unitTerm)
         [VerexIR.Proofs.Denote.Skolems $unitTerm]
         (meanings : VerexIR.Proofs.Denote.Meanings executable) (reader : $readerType) :=
-      fun (args : VerexIR.Proofs.Denote.HList $paramsTerm) => VerexIR.Proofs.Spec.bind
+      fun (args : VerexIR.Proofs.Denote.HList $paramsTerm) =>
+        if VerexIR.scopedValues $unitTerm $scopedMethodsTerm
+            (VerexIR.Proofs.Denote.HList.encode args).toArray then VerexIR.Proofs.Spec.bind
         VerexIR.Proofs.Spec.get fun start => VerexIR.Proofs.Spec.bind
           (VerexIR.Proofs.Denote.Term.denote
             ({ meanings with assumption := $tableIdent reader args start } :
               VerexIR.Proofs.Denote.Meanings executable)
             (ρ := $shapeTerm) (Γ := $row) $bodyIdent
             (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
-          (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)))
+          (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)
+        else VerexIR.Proofs.Spec.stuck))
 
 /-- The hypotheses the theorems take, as binders and as the arguments
 instantiating them: the natives assumed, the functions whose in-body
@@ -3262,6 +3281,152 @@ private def proofTactics (script? : Option AuthoredScript)
       pure (← `(tactic| skip), tactic)
   | none => pure (solveTactic, ← `(tactic| skip))
 
+/-- Prove an opaque adapter's contract independently at its concrete reading.
+The caller receives only this checked contract theorem, never its body. Richer
+bodies keep the existing rejection until their instance-scoped conditions are
+carried as well. -/
+private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
+    (θ : TypeArgs) (compiled : Function caller.unit) (key : String) : CommandElabM Name := do
+  let unit := caller.unit
+  let some ns := unit.namespaces[handle.namespaceId.index]?
+    | throwError "an opaque instance has no namespace"
+  let some declaration := ns.functions[handle.functionId.index]?
+    | throwError "an opaque instance has no declaration"
+  let unsupported := declaresGhosts unit || statesAssumptions ns declaration ||
+    !(compiled.body.callees #[]).isEmpty || !(compiled.body.instances #[]).isEmpty ||
+    compiled.body.foldCalls (fun _ _ _ found => found)
+      (fun kind _ found => found || kind == "loop") false ||
+    (match declaration.body with
+      | .structured root => !(bodySpecifications ns root (fun _ => true)).isEmpty
+      | _ => true)
+  if unsupported then
+    throwErrorAt caller.reference "an opaque instance with calls, loops, body specifications, \
+      or model state needs instance-scoped contract support"
+  -- Fresh contracts and proof names cannot be supplied by a source metaprogram.
+  let proofName ← liftTermElabM (mkFreshUserName (Name.str caller.namespaceName s!"{key}_checked"))
+  let contractName := proofName ++ `contract
+  let m : Member := { caller with
+    function := key, script? := none, cycle := #[], namespaceIndex := handle.namespaceId.index,
+    ns, declaration, handle, compiled, model := false, family := true, generic := true,
+    framed := false, ownAssumptions := false, artifacts := Name.str caller.namespaceName key,
+    base := (← getCurrNamespace) ++ Name.str caller.namespaceName key,
+    handleTerm := ← handleSyntax handle }
+  discard <| liftTermElabM (auditedUnit caller.segments unit)
+  let stored ← ensureStoredInvariant caller.segments unit
+  liftTermElabM do
+    addAbbrev contractName (← typedContractOf unit handle.namespaceId.index ns
+      (ContractView.implementation.of declaration) compiled.params compiled.result
+      (stored := stored) (atArguments := some θ.1))
+  let contract ← atUnit caller.segments unit contractName (rootIdent contractName) none
+    #[← `(term| typeInstantiation)]
+  let (nativeBinders, _, _, _, assumesTyping) ← theoremHypotheses m #[] #[] #[]
+  let pattern ← argumentPattern unit declaration compiled.params
+  let assumed := mkIdent `assumed
+  let permitted := mkIdent `permitted
+  let introduction ← introductionTactic m stored pattern assumed permitted
+  let unitFact ← unitFactTactic m assumesTyping
+  let (solve, _) ← solverTactics m #[(handle, ns, declaration, compiled)] #[] #[] #[] #[] #[]
+  let scopedEntry ← if compiled.scopedMethods.isEmpty then `(tactic| skip) else `(tactic| (
+    have verexScopedEntry := $assumed:ident
+    simp only [VerexIR.Proofs.ReceiverScopedMethod, VerexIR.Proofs.ReceiverScopedClosure]
+      at verexScopedEntry
+    simp only [VerexIR.Proofs.Denote.HList.encode_cons, VerexIR.Proofs.Denote.HList.encode_nil,
+      VerexIR.Proofs.Denote.NTy.encode_function, List.all_cons, List.all_nil,
+      List.getElem?_toArray, List.getElem?_cons_zero, List.getElem?_cons_succ,
+      Option.any_some, Int.reduceLT, Int.reduceToNat, Bool.and_true,
+      ite_true, ite_false, verexScopedEntry]
+    all_goals clear verexScopedEntry))
+  let artifacts := Name.str caller.namespaceName key
+  let body := rootIdent (artifacts ++ `body)
+  let row := rootIdent (artifacts ++ `row)
+  let params := rootIdent (artifacts ++ `params)
+  let locals := rootIdent (artifacts ++ `locals)
+  let frameEq := rootIdent (artifacts ++ `frame_eq)
+  let shape := rootIdent (artifacts ++ `shape)
+  let mutables := rootIdent (artifacts ++ `mutables)
+  let scopedMethodsTerm := rootIdent (artifacts ++ `scopedMethods)
+  let compiledTerm := rootIdent (artifacts ++ `compiled)
+  let certificate := rootIdent (artifacts ++ `compiled_eq)
+  let argumentsName := contractName ++ `arguments
+  liftTermElabM do addAbbrev argumentsName (← quoteTypeArgs θ)
+  let substitution := rootIdent argumentsName
+  let unitTerm := caller.unitTerm
+  let handleTerm := m.handleTerm
+  let budget := Syntax.mkNumLit (toString
+    ((heartbeatBudget? declaration).getD (verex.verifyHeartbeats.get (← getOptions))))
+  let leafBudget := Syntax.mkNumLit (toString
+    ((leafHeartbeatBudget? declaration).getD (verex.leafHeartbeats.get (← getOptions))))
+  let command ← `(command|
+    set_option Elab.async false in
+    set_option maxHeartbeats $budget:num in
+    set_option verex.leafHeartbeats $leafBudget:num in
+    theorem $(mkIdent proofName)
+        {registry : VerexIR.Validation.SemanticsRegistry}
+        {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
+        (prepared : VerexIR.Validation.prepareExecution registry
+          $(mkIdent caller.unitDefinition) = .ok executable)
+        {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}
+        {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)} $nativeBinders* :
+        VerexIR.Proofs.Satisfies
+          (VerexIR.Proofs.Denote.propheticMeaningAt executable (some $substitution)
+            typeInstantiation $handleTerm $params $shape) $contract := by
+      apply VerexIR.Proofs.Denote.satisfies_propheticMeaningAt executable
+        (some $substitution) typeInstantiation $handleTerm $compiledTerm $certificate
+      change VerexIR.Proofs.Satisfies
+        (fun args => if VerexIR.scopedValues $unitTerm $scopedMethodsTerm
+            (VerexIR.Proofs.Denote.HList.encode args).toArray then VerexIR.Proofs.Spec.bind
+          (VerexIR.Proofs.Denote.Term.denote
+            (VerexIR.Proofs.Denote.closedMeanings executable typeInstantiation)
+            (ρ := $shape) (Γ := $row) $body
+            (VerexIR.Proofs.Denote.initialEnv $params $locals $frameEq args))
+          (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutables $shape)
+          else VerexIR.Proofs.Spec.stuck) _
+      $unitFact:tactic
+      apply VerexIR.Proofs.satisfies_of_wp
+      $introduction:tactic
+      all_goals
+        (simp only [$body:ident, $row:ident, $params:ident, $locals:ident,
+          $shape:ident, $mutables:ident, $scopedMethodsTerm:ident, VerexIR.scopedValues,
+          List.all_nil, $(rootIdent contractName):ident, vir_denote_norm,
+          reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
+          String.reduceNe] at $assumed:ident $permitted:ident ⊢
+         all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
+         all_goals $scopedEntry:tactic
+         all_goals verex_normalize at $permitted:ident ⊢
+         all_goals $solve:tactic))
+  let before := countErrors (← get).messages
+  elabCommand command
+  if countErrors (← get).messages > before then
+    throwErrorAt caller.reference "the opaque callee's specialized contract did not verify"
+  let fullName := (← getCurrNamespace) ++ proofName
+  for axiomName in (← axiomsOf #[fullName]).toArray do
+    unless #[``propext, ``Classical.choice, ``Quot.sound,
+        ``compileFunction_agrees, ``compileFunction_least_cycle].contains axiomName do
+      throwError m!"opaque instance `{fullName}` depends on unapproved axiom `{axiomName}`"
+  -- As for ordinary native proofs, inspect generated artifacts for forbidden
+  -- bookkeeping dependencies. The agreement theorem remains the semantic bridge.
+  let mut pending := #[fullName, artifacts ++ `compiled_eq, artifacts ++ `compiled]
+  let mut visited : NameSet := {}
+  while let some name := pending.back? do
+    pending := pending.pop
+    if visited.contains name then continue
+    visited := visited.insert name
+    let some info := (← getEnv).find? name
+      | throwError m!"missing opaque instance artifact `{name}`"
+    let expressions := match info.value? (allowOpaque := true) with
+      | some value => #[info.type, value]
+      | none => #[info.type]
+    for dependency in getUsedConstantsDedup expressions do
+      if #[``sorryAx, ``VerexIR.RuntimeFrame,
+          ``VerexIR.SemanticOperations.FreshGlobalLoanIds,
+          ``VerexIR.SemanticOperations.LoanDiscipline,
+          ``VerexIR.SemanticOperations.globalLoanKeyIn?,
+          ``VerexIR.SemanticOperations.removeGlobalLoan].contains dependency then
+        throwError m!"opaque instance artifact `{name}` retains forbidden dependency `{dependency}`"
+      if fullName.isPrefixOf dependency || proofName.isPrefixOf dependency ||
+          artifacts.isPrefixOf dependency then pending := pending.push dependency
+  return fullName
+
 /-- The theorems carrying the typed theorem to the runtime: the function's
 semantics satisfies its contract, and so does its run, at every
 instantiation coherent with the frame its type arguments induce for a
@@ -3443,6 +3608,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let frameEqTerm := rootIdent (Name.str (Name.str namespaceName function) "frame_eq")
   let shapeTerm := rootIdent (Name.str (Name.str namespaceName function) "shape")
   let mutablesTerm := rootIdent (Name.str (Name.str namespaceName function) "mutables")
+  let scopedMethodsTerm := rootIdent (Name.str (Name.str namespaceName function) "scopedMethods")
   let compiledEqIdent := rootIdent (compiledEqName segments function)
   let typedContract := rootIdent (typedContractName segments function)
   let publicContract := rootIdent (contractName segments function)
@@ -3577,13 +3743,29 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let suffix := attemptSuffix (← getEnv) base
   let attempt := typedVerified ++ suffix
   let attemptFull := base ++ `typedVerified ++ suffix
+  let bodyMeaning ← `(term|
+    fun args => VerexIR.Proofs.Spec.bind
+      (VerexIR.Proofs.Denote.Term.denote $meanings (ρ := $shapeTerm) (Γ := $row)
+        $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
+      (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm))
+  -- An empty entry check reduces definitionally to true. Omit it from the
+  -- generated goal so ordinary proofs need no extra simplifier proof terms.
+  let checkedMeaning ← if compiled.scopedMethods.isEmpty then pure bodyMeaning else `(term|
+    fun args => if VerexIR.scopedValues $unitTerm $scopedMethodsTerm
+        (VerexIR.Proofs.Denote.HList.encode args).toArray then ($bodyMeaning) args
+      else VerexIR.Proofs.Spec.stuck)
   let typedStatement ← atRuntime (← `(term|
-        VerexIR.Proofs.Satisfies
-          (fun args => VerexIR.Proofs.Spec.bind
-            (VerexIR.Proofs.Denote.Term.denote $meanings (ρ := $shapeTerm) (Γ := $row)
-              $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
-            (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm))
-          $contract))
+    VerexIR.Proofs.Satisfies $checkedMeaning $contract))
+  let scopedEntry ← if compiled.scopedMethods.isEmpty then `(tactic| skip) else `(tactic| (
+    have verexScopedEntry := $assumed:ident
+    simp only [VerexIR.Proofs.ReceiverScopedMethod, VerexIR.Proofs.ReceiverScopedClosure]
+      at verexScopedEntry
+    simp only [VerexIR.Proofs.Denote.HList.encode_cons, VerexIR.Proofs.Denote.HList.encode_nil,
+      VerexIR.Proofs.Denote.NTy.encode_function, List.all_cons, List.all_nil,
+      List.getElem?_toArray, List.getElem?_cons_zero, List.getElem?_cons_succ,
+      Option.any_some, Int.reduceLT, Int.reduceToNat, Bool.and_true,
+      ite_true, ite_false, verexScopedEntry]
+    all_goals clear verexScopedEntry))
   let markReturns ← if script?.isSome then `(tactic| verex_mark_returns) else `(tactic| skip)
   let typedCommand ← withRef (script?.map (·.tactic.raw) |>.getD reference) do `(command|
     set_option Elab.async true in
@@ -3603,12 +3785,14 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
         verex_timed "setup introduction" $introduction:tactic
         all_goals
         (verex_timed "setup unfold" (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
-          $shapeTerm:ident, $mutablesTerm:ident, $typedContract:ident, vir_denote_norm,
+          $shapeTerm:ident, $mutablesTerm:ident, $scopedMethodsTerm:ident, VerexIR.scopedValues,
+          List.all_nil, $typedContract:ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
           String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢)
          -- The function assumes its preconditions; their markers locate
          -- them for its callers only.
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
+         all_goals $scopedEntry:tactic
          all_goals verex_timed "setup normalize" (verex_normalize at $permitted:ident ⊢)
          all_goals $automaticTactic:tactic)
         -- A variant the setup refutes leaves the script no goal.
@@ -3805,7 +3989,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
       directTargets.foldl (fun found (callee, typeArgs) => recordGenericCall unit callee typeArgs none found)
         (compiled.body.foldCalls (recordGenericCall unit) (fun _ _ found => found) #[])
     contractTargets := contractClosureTargets unit handle.namespaceId ns declaration }
-  callees ← collectInstances m members callees
+  callees ← collectInstances m members callees (verifyOpaqueInstance m)
   callees := { callees with calleePairs := callees.calleePairs ++ callees.behaviorPairs }
   -- Each generic call at the empty instantiation instantiates its callee's
   -- frame as the runtime computes it: a kernel-checked literal the call's

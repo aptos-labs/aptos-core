@@ -166,7 +166,7 @@ VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:62:6: error: verex veri
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:67:1: error: `no panic when aborts at abort 3` is not established: the panic `assert!(c != 0, "c is zero")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:101:5 may panic
-  from: attempt_1._verexJoinEntry_1_7 prepared✝ a b c snd✝ initialState✝ assumed permitted () (some a, some b, some c, some entry, ()) initialState✝; c.val = 0
+  from: a = false; 0 ≤ b.val / 3; b.val / 3 ≤ 18446744073709551615; entry.val = b.val / 3; c.val = 0
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:67:6: error: verex verification failed: the automatic verification of `join_assert` failed; provide a proof in the module:
   verify join_assert by lean =>
     verex_obligations
@@ -175,7 +175,7 @@ VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:67:6: error: verex veri
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:71:1: error: `no panic when aborts at abort 3` is not established: the panic `panic!("small")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:115:5 may panic
-  from: attempt_1._verexJoinEntry_1_7 prepared✝ a b snd✝ initialState✝ assumed permitted () (some a, some b, some entry, ()) initialState✝; entry.val ≤ 100
+  from: a = false; 0 ≤ b.val / 3; b.val / 3 ≤ 18446744073709551615; entry.val = b.val / 3; entry.val ≤ 100
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:71:6: error: verex verification failed: the automatic verification of `join_panic` failed; provide a proof in the module:
   verify join_panic by lean =>
     verex_obligations

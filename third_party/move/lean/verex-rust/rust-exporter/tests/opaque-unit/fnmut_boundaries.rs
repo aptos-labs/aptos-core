@@ -34,3 +34,17 @@ pub fn adapter(value: u64) -> u64 {
     let mut callback = || value;
     apply(&mut callback)
 }
+
+// Borrowed closure bodies still need consuming adapters for FnOnce evidence.
+pub fn shared_once(value: u64) -> u64 {
+    let callback = move || value;
+    shared(&callback);
+    once(callback)
+}
+
+pub fn mutable_once(value: u64) -> u64 {
+    let mut state = value;
+    let mut callback = move || { state = state.wrapping_add(1); state };
+    apply(&mut callback);
+    once(callback)
+}

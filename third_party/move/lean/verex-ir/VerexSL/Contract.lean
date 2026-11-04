@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL.Contract.Clauses
+import VerexIR.Proofs.ReceiverScoped
 
 /-!
 # Generated contracts from VIR specifications
@@ -3247,8 +3248,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (requiresMeaning : Option Lean.Expr := none)
     (stored : StoredInvariants := {})
     (directContract : Option (VerexIR.FunctionHandle → Lean.Expr → Option Lean.Expr →
-      MetaM DirectContract) := none) :
+      MetaM DirectContract) := none)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM Lean.Expr := do
+  let typeArgumentTypes := atArguments.map (fun row => row.toList.toArray.map some) |>.getD #[]
+  let readAtArguments := atArguments.isSome
   let uses := frameUses unit namespaceId declaration
   -- The data invariants of stored resources hold of the memory a function
   -- reaches, at entry and at exit, as the Move Prover assumes them at entry
@@ -3299,13 +3303,13 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if parameter.name.isEmpty then s!"argument{index}" else parameter.name))
       (ns.typeId parameter.typeUse.typeId) (allowReference := true)
   let resultSlots ← declaration.signature.results.mapIdxM fun index result =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if declaration.signature.results.size == 1 then "result"
         else s!"result{index}"))
       (ns.typeId result.typeId) (allowReference := true)
@@ -3333,7 +3337,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let labelDefinitions := stateDefinitions ns declaration.contract
   let contextOf (state : Lean.Expr) (bound : Array SlotBinders) : Context :=
     { unit, namespaceId, ns
-      types := types, typeInstantiation := typeInstantiation
+      types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
       locals := padLocals (bound.map fun binders => some binders.entry)
       localTypes := functionLocalTypes
       localNames := declaration.locals.map (·.name)
@@ -3378,7 +3382,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             resultBinders unit resultSlots signature result
           let context : Context :=
             { unit, namespaceId, ns
-              types := types, typeInstantiation := typeInstantiation
+              types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
               locals := padLocals (parameterBound.map fun binders => some binders.current)
               localTypes := functionLocalTypes
               localNames := declaration.locals.map (·.name)
@@ -3589,6 +3593,14 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             conjuncts := conjuncts.push (← mkAppM'
               (mkAppN (mkConst ``VerexIR.Proofs.MethodContract)
                 ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+              #[row, sharing, shape, value])
+          if declaration.profile == .rust && declaration.attributes.any (fun
+              | .assign "scoped_method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false) then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.ReceiverScopedMethod)
+                ((← frameLeading signature.skolems) ++ #[signature.skolems]))
               #[row, sharing, shape, value])
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>

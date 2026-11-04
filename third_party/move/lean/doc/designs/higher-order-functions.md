@@ -77,6 +77,36 @@ captures to have their parameter types. Closures compare as the VM compares
 them, by qualified function name first; the runtime reads names through the
 unit, not handle indexes.
 
+### Scoped Rust method receivers
+
+Generic borrowed-to-consuming adapters need an explicit receiver-scope
+requirement. `scoped_method_evidence = i`, alongside `method_evidence = i`,
+requires that dictionary parameter `i` cannot let its receiver borrow escape.
+It is an obligation, not evidence that an arbitrary callable has this property.
+
+The borrow checker derives a receiver receipt by tracking receiver-dependent
+values through aliases, reborrows, aggregates and calls. A returned dependency
+or a write into externally owned storage prevents a receipt, including a write
+from a call returning unit. Calls through a scoped dictionary may end only the
+receiver's private loan; incoming loans and loans lent by other arguments remain.
+Unknown or recursive dependent calls are conservatively refused.
+The analysis shares callee summaries and memoizes expression results within
+each fixed-point pass. A changed set of receiver-dependent locals starts a new
+expression table, so shared expression graphs do not duplicate traversal or
+reuse results from an earlier taint state.
+
+Supplying a dictionary requires a checked literal or an unmodified scoped
+parameter. A literal must have a receiver receipt and satisfy every scoped
+requirement captured by its target. This bounded slice rejects open dictionary
+requirements and unsupported provenance instead of inferring scope from the
+structural function type. The public `ReceiverScopedMethod` contract exposes the
+same checked refinement, which is preserved through generic frame substitution.
+Function entry checks the refinement too, so externally supplied runtime
+closures cannot bypass the requirement. Ordinary `Fn`/`FnMut` dictionaries only
+acquire it when a consuming adaptation needs it.
+Functions without scoped requirements retain the original denotation directly;
+the empty requirement list needs no guard in their generated proof goals.
+
 ## Runtime
 
 `closureValue` evaluates the captures and builds the closure with its mask

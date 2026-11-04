@@ -104,6 +104,14 @@ pub(super) fn fn_mut_trait() -> Option<rustc_public::ty::TraitDef> {
     })
 }
 
+pub(super) fn fn_once_trait() -> Option<rustc_public::ty::TraitDef> {
+    ty::tls::with(|tcx| {
+        tcx.lang_items()
+            .fn_once_trait()
+            .map(|id| rustc_public::ty::TraitDef(stable(id)))
+    })
+}
+
 pub(super) fn fn_once_output() -> Option<DefId> {
     ty::tls::with(|tcx| tcx.lang_items().fn_once_output().map(stable))
 }

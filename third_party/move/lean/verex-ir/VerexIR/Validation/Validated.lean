@@ -257,6 +257,8 @@ structure BorrowCertificate where
   parameters : Array ReferenceParameterFact
   loans : Array CheckedLoanFact
   lifetimeRelations : Array LifetimeRelationFact
+  /-- Reference parameters checked not to escape, conditional on scoped dictionary requirements. -/
+  receiverNoEscape : Array Nat := #[]
   /-- The body's places that dereference a shared reference, ascending. A
   shared reference is the observed value itself, so the semantics reads
   such a place as its base. -/
@@ -359,6 +361,11 @@ def loanFacts (functionId : FunctionId) : Array CheckedLoanFact :=
   -- through the array's list.
   ((ns.borrowCertificates.toList.find? fun certificate =>
     certificate.functionId == functionId).map (·.loans)).getD #[]
+
+/-- Checked receiver slots of a body, conditional on its scoped dictionaries. -/
+def receiverNoEscape (functionId : FunctionId) : Array Nat :=
+  ((ns.borrowCertificates.toList.find? fun certificate =>
+    certificate.functionId == functionId).map (·.receiverNoEscape)).getD #[]
 
 /-- Where a location of the namespace is, in its own tables. -/
 def location? (loc : LocId) : Option Location := ns.localTables.locations[loc.index]?

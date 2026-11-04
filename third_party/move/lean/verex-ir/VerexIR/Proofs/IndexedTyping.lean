@@ -149,12 +149,12 @@ def ntyFuel : NRow → Nat → NamespaceId → TypeId → Option NTy
       | .typeParameter index => some (env.getD index (.param index))
       | .function arguments result _ => do
           let parameters ← arguments.toList.mapM (ntyFuel env fuel namespaceId)
-          let results ← match ← view.lookup namespaceId result with
-            | .unit => some []
-            | _ => (fun τ => [τ]) <$> ntyFuel env fuel namespaceId result
-          let resultIds ← match ← view.lookup namespaceId result with
-            | .unit => some []
-            | _ => some [result]
+          let isUnit : Bool := match ← view.lookup namespaceId result with
+            | .unit => true
+            | .typeParameter index => env.getD index (.param index) == .unit
+            | _ => false
+          let results ← if isUnit then some [] else (fun τ => [τ]) <$> ntyFuel env fuel namespaceId result
+          let resultIds := if isUnit then [] else [result]
           some (.function (NRow.ofList parameters)
             { parameters := arguments.toList.map (sharedReference view.lookup namespaceId)
               results := resultIds.map (sharedReference view.lookup namespaceId) }

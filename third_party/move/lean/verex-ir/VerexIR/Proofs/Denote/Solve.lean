@@ -1909,6 +1909,14 @@ private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   if ← scalarAt? (← contextFacts goal) goal then
     charge "scalar rows" stageStart
     return true
+  if let some remaining ← receiverScopedMethod? goal then
+    queue remaining provenance (← withTargetClause goal clauses)
+    charge "scoped method contract" stageStart
+    return true
+  if let some remaining ← receiverScopedClosure? goal then
+    queue remaining provenance (← withTargetClause goal clauses)
+    charge "scoped closure receipt" stageStart
+    return true
   if let some remaining ← methodContract? goal then
     setGoals remaining
     evalTactic (← `(tactic| all_goals (try verex_normalize)))
@@ -2786,23 +2794,26 @@ theorem. `isDenoted` says the goal is a run `denotedRun` reads. -/
 private def callStep (ctx : SolveContext) (step : SolveStep) (isDenoted : Bool) : SolveM Bool := do
   let goal := step.goal
   let some (handle, action) ← callGoal? goal ctx.callees | return false
-  -- A call at type arguments holding a mutable reference is inlined at them, and any
-  -- other call of the callee has no business with that compilation.
+  -- A specialized call uses its own compilation or independently checked
+  -- contract theorem; another instance of the callee cannot supply either.
   let substitution? := if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 10 then
     some (action.getArg! 4) else none
   let some (_, calleeName, theoremProof) ← ctx.callees.findM? fun (candidate, _, proof) =>
       goal.withContext do
         unless ← isDefEq candidate handle do return false
-        let stated := match_expr ← inferType proof with
-          | Eq _ compilation _ =>
-              if compilation.isAppOfArity ``VerexIR.Proofs.Denote.compileFunctionAt 3 then
-                some (compilation.getArg! 2)
-              else none
-          | _ => none
-        match substitution?, stated with
-        | none, none => return true
-        | some wanted, some found => isDefEq wanted found
-        | _, _ => return false
+        forallTelescope (← inferType proof) fun _ statement => do
+          let stated := match_expr statement with
+            | Eq _ compilation _ =>
+                if compilation.isAppOfArity ``VerexIR.Proofs.Denote.compileFunctionAt 3 then
+                  some (compilation.getArg! 2) else none
+            | VerexIR.Proofs.Satisfies _ _ _ _ meaning _ =>
+                if meaning.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 9 then
+                  some (meaning.getArg! 4) else none
+            | _ => none
+          match substitution?, stated with
+          | none, none => return true
+          | some wanted, some found => isDefEq wanted found
+          | _, _ => return false
     | throwError m!"no verified callee for {handle}"
   -- A native at a shape stands by the hypothesis of the shape its call matches.
   let atShape ← goal.withContext do

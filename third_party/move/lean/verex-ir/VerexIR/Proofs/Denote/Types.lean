@@ -621,12 +621,15 @@ def ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
       | .typeParameter index => some (env.getD index (.param index))
       | .function arguments result _ => do
           let parameters ← arguments.toList.mapM (ntyOfFuel types unit env fuel namespaceId)
-          let results ← match ← types namespaceId result with
-            | .unit => some []
-            | _ => (fun τ => [τ]) <$> ntyOfFuel types unit env fuel namespaceId result
-          let resultIds ← match ← types namespaceId result with
-            | .unit => some []
-            | _ => some [result]
+          -- A generic result instantiated with Unit has the same empty row as
+          -- an explicitly Unit-returning callable. A reference to Unit still
+          -- returns one value, even though its native carrier erases to Unit.
+          let isUnit : Bool := match ← types namespaceId result with
+            | .unit => true
+            | .typeParameter index => env.getD index (.param index) == .unit
+            | _ => false
+          let results ← if isUnit then some [] else (fun τ => [τ]) <$> ntyOfFuel types unit env fuel namespaceId result
+          let resultIds := if isUnit then [] else [result]
           some (.function (NRow.ofList parameters)
             { parameters := arguments.toList.map (sharedReference types namespaceId)
               results := resultIds.map (sharedReference types namespaceId) }

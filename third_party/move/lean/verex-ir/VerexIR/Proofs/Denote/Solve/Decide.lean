@@ -2340,6 +2340,21 @@ elab_rules : tactic
       let some proof ← decideInstance (body.beta #[witness]) premise reads | return false
       assignWitnessed goal #[(domain, body, witness)] proof
       return true
+    -- An array witness is most directly stated by a read in the context.
+    -- Try those positions before unrelated locals can exhaust the bounded
+    -- witness search. Other existential shapes retain the late fallback.
+    let statedWitness : TacticM Bool := do
+      unless domain.isConstOf ``Int do return false
+      let mut positions : Array Lean.Expr := #[]
+      for (lookup, _) in ← statedReads goal do
+        let position ← intPosition (lookup.getArg! 6)
+        unless positions.contains position do positions := positions.push position
+      for position in positions do
+        if ← attempt position (← `(tactic| verex_witness_premise)) then return true
+      return false
+    let readsArray := (body.find? (·.isAppOfArity ``GetElem?.getElem? 7)).isSome
+    if readsArray then
+      if ← statedWitness then return
     -- An integer the body bounds, such as a mutable parameter's value between
     -- two increments. A literal bound, such as a limit of the binder's type
     -- every bounded binder states, is tried after the context's values: a
@@ -2376,15 +2391,8 @@ elab_rules : tactic
       if ← attempt position (← `(tactic| verex_witness_premise)) then return
     for value in literalBounds do
       if ← attempt value (← `(tactic| verex_witness_premise)) then return
-    -- A position whose element a hypothesis states, after every other candidate: a
-    -- failed attempt spends the leaf's budget on what those decide.
-    if domain.isConstOf ``Int then
-      let mut stated : Array Lean.Expr := #[]
-      for (lookup, _) in ← statedReads goal do
-        let position ← intPosition (lookup.getArg! 6)
-        unless stated.contains position do stated := stated.push position
-      for position in stated do
-        if ← attempt position (← `(tactic| verex_witness_premise)) then return
+    if !readsArray then
+      if ← statedWitness then return
     -- Prefer witnesses from the predicate and context before enumerating
     -- execution points. A label is an existential, including in caller-side
     -- contracts with no callee points; arithmetic can construct its value

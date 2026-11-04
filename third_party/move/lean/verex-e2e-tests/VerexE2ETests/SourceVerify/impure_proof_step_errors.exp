@@ -1,3 +1,1 @@
 VerexE2ETests/SourceVerify/impure_proof_step_errors.spec.lean:9:12: error: VEREX-SPEC-IMPURE-CALL: cannot call impure function `advance` (mutates through a reference)
-VerexE2ETests/SourceVerify/impure_proof_step_errors.spec.lean:9:12: error: the step's expression is not lowered
-VerexE2ETests/SourceVerify/impure_proof_step_errors.spec.lean:7:8: error: verex verification failed: the proof of `check` does not establish its specification

@@ -4,6 +4,7 @@
 import VerexIR.Validation.Diagnostic
 import VerexIR.Validation.PlaceIndex
 import VerexIR.Validation.Validated
+import VerexIR.Validation.ReceiverNoEscape
 
 /-!
 # Conservative structured-loan analysis
@@ -1854,8 +1855,17 @@ mutual
                   -- The callee is unknown: the result may carry any loan an
                   -- argument lends.
                   | .call .invoke =>
+                      let receiverScoped := (arguments[0]?).any
+                        (ReceiverNoEscape.scopedInvocationAt ns exprId)
                       let directLoans := if typeMayContainReference ns expression.typeId then
-                        argumentsFlow.observed else #[]
+                        argumentsFlow.observed.filter fun (loan : LoanFact) =>
+                          -- Only the receiver's private loan ends. A loan also
+                          -- lent by another argument or the callable remains.
+                          loan.canEscape || !receiverScoped ||
+                            !(arguments[1]?).any (loanFlowsFromExpression ns loan) ||
+                            (arguments.zipIdx).any (fun (argument, index) =>
+                              index != 1 && loanFlowsFromExpression ns loan argument)
+                        else #[]
                       callResultFlow ns exprId expression afterArguments argumentsFlow.observed
                         directLoans
                   | _ =>
@@ -2938,7 +2948,7 @@ unsupported local-loan coverage diagnostics, and the proof-facing local-loan
 receipt exactly when the analysis accepts the function. -/
 def borrowOutcome (namespaceId : NamespaceId) (functionId : FunctionId)
     (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (function : FunctionDecl FunctionBody) :
+    (function : FunctionDecl FunctionBody) (receiverNoEscape : Array Nat := #[]) :
     Array Diagnostic × Option BorrowCertificate :=
   match function.body with
   | .absent => (#[], none)
@@ -2964,7 +2974,8 @@ def borrowOutcome (namespaceId : NamespaceId) (functionId : FunctionId)
                     (function.locals[holder.index]?).any fun declared =>
                       (referenceType? ns declared.type.typeId).isNone }
                 else none }
-          lifetimeRelations := relations })
+          lifetimeRelations := relations
+          receiverNoEscape := receiverNoEscape })
       else (diagnostics, none)
 
 end VerexIR.Validation

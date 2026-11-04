@@ -1122,7 +1122,7 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
       operands₂ (variantMismatch?_evaluate_none mismatch₂) mismatch₂ mismatch_eq
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
+      evaluatedState finalState control outcome namespace_eq declaration_eq scoped_eq provided_eq frame_eq
       body_eq body_step outcome_eq hole_free finalize_eq ih_body
     intro ρ offset frontier inside inert inert' state₂ shifted arguments_within
     obtain ⟨β, γ, base⟩ := shifted.renames.base
@@ -1135,13 +1135,14 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     · rw [← finalize_eq]
       exact finalizeFunctionState_mirror shifted evaluatedShifted executable declaration.profile
         final_within outcome
-    · exact .body _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq declaration_eq provided_eq
+    · exact .body _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq declaration_eq
+        (by simpa only [scopedArguments_rename] using scoped_eq) provided_eq
         (by rw [initialFrame?_rename, frame_eq]; rfl) body_eq body₂
         (by rw [finishControl?_rename, outcome_eq]; rfl)
         (by rw [Outcome.holeFree_rename]; exact hole_free) rfl
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq scoped_eq provided_eq native_eq hole_free
     intro ρ offset frontier inside inert inert' state₂ shifted arguments_within
     obtain ⟨finalState₂, finalShifted, outcome_within, native₂⟩ :
         ∃ state₂', StateRenamed ρ offset frontier inside inert inert' finalState state₂' ∧
@@ -1155,6 +1156,7 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
           arguments_within
     exact ⟨finalState₂, finalShifted, outcome_within,
       .native _ _ _ _ _ _ _ _ namespace_eq declaration_eq (by rw [Array.size_map]; exact arity_eq)
+        (by simpa only [scopedArguments_rename] using scoped_eq)
         provided_eq native₂ (by rw [Outcome.holeFree_rename]; exact hole_free)⟩
 
 theorem Array.map_rename_of_plain {values : Array RuntimeValue} (ρ : Nat → Nat)

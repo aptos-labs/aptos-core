@@ -274,9 +274,22 @@ def CompileNamespace.readingAgrees (ns : CompileNamespace) (unit : ValidatedUnit
   decide (ns.ntyAt unit θ namespaceId typeId =
     (NTy.subst θ) <$> ns.declaredNty unit namespaceId typeId)
 
+/-- Unit in a type binder can erase a generic callable result slot. Lifetime and
+constant binders also use Unit placeholders, but no value type reads those slots.
+Missing declaration/binder information is conservatively treated as a real argument. -/
+def hasUnitTypeArgument (unit : ValidatedUnit) (handle : FunctionHandle) (θ : NRow) : Bool :=
+  θ.toList.zipIdx.any fun (argument, index) =>
+    argument == .unit &&
+      match unit.namespaces[handle.namespaceId.index]? >>= fun source =>
+          source.functions[handle.functionId.index]? >>= fun declaration =>
+            declaration.signature.generics[index]? with
+      | some binder => binder.kind == .typeArg
+      | none => true
+
 /-- Whether the reading of each function pending at its type arguments, and of what it calls at
-theirs, agrees with their substitution. Type arguments mentioning no mutable reference always
-do, and running out of fuel counts as disagreeing. -/
+theirs, agrees with their substitution. Mutable references and Unit arguments need this
+check: substituting Unit in a generic callable result row does not erase its slot, whereas
+reading that callable at Unit does. Running out of fuel counts as disagreeing. -/
 def CompileNamespace.framesAgree (ns : CompileNamespace) (unit : ValidatedUnit) :
     Nat → List (FunctionHandle × NRow) → List (FunctionHandle × NRow) → Bool
   | 0, _, _ => false
@@ -301,14 +314,16 @@ def CompileNamespace.framesAgree (ns : CompileNamespace) (unit : ValidatedUnit) 
           | some next =>
               types.all (ns.readingAgrees unit θ handle.namespaceId) &&
                 ns.framesAgree unit fuel
-                  (next.filter (fun call => !call.2.refAbsent) ++ rest) ((handle, θ) :: seen)
+                  (next.filter (fun call => !call.2.refAbsent || hasUnitTypeArgument unit call.1 call.2) ++ rest)
+                  ((handle, θ) :: seen)
 
 /-- Whether a function's generic contract or theorem transfers to type arguments: their values
 hold no loan, and reading the function at them agrees with substituting them, over everything its
 reading depends on. A call that does is `Term.callGeneric`, any other `Term.callInstance`. -/
 def CompileNamespace.transfers (ns : CompileNamespace) (unit : ValidatedUnit)
     (handle : FunctionHandle) (θ : NRow) : Bool :=
-  θ.refFree && (θ.refAbsent || ns.framesAgree unit (unitFuel unit) [(handle, θ)] [])
+  θ.refFree && ((θ.refAbsent && !hasUnitTypeArgument unit handle θ) ||
+    ns.framesAgree unit (unitFuel unit) [(handle, θ)] [])
 
 /-- The resource type a type identifier denotes, read through the view's
 type table: its native type and its declaration's type arguments. -/
@@ -2407,7 +2422,7 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
   -- A parameter's reference resolves where the function leaves it: in its
   -- own slot or in a local it was moved into.
   let mutables ← mutableSlots frame 0 allLocals.length
-  .ok { params, locals, frame, frame_eq := rfl, result, body, mutables }
+  .ok { params, locals, frame, frame_eq := rfl, result, body, mutables, scopedMethods := scopedMethodIndices declaration.attributes }
 
 /-- The location of the innermost node of a function's body a compilation's
 rejection comes from, for its message; `none` where the function as a whole is

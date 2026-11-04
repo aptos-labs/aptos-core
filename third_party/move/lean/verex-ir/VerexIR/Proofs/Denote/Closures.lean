@@ -1307,6 +1307,24 @@ def coherentByEvaluation (condition : Lean.Expr) : MetaM (Option Lean.Expr) := d
     #[unitExpr, functions, family, handle, typeInstantiation, decided])
 
 open Lean Meta in
+/-- Expose frame aliases without unfolding unrelated invocation semantics.
+The subsequent comparisons also stay reducible: even a different frame can
+contain expensive definitions of its instantiation or carriers. -/
+private def frameHypothesisType (type : Lean.Expr) : MetaM Lean.Expr := do
+  withReducible <| whnf (← instantiateMVars type)
+
+private def isClosureFrameType (type : Lean.Expr) : Bool :=
+  type.isAppOf ``ClosureFrame ||
+    (type.isAppOfArity ``And 2 && (type.getArg! 0).isAppOf ``Coherent)
+
+open Lean Meta in
+/-- Accept an explicitly opened frame as well as the named predicate, opening
+only the expected outer conjunction before the reducible comparison. -/
+private def matchesClosureFrame (type frame : Lean.Expr) : MetaM Bool := do
+  let expected ← if type.isAppOf ``And then whnf frame else pure frame
+  withReducible (isDefEq type expected)
+
+open Lean Meta in
 /-- A proof of a frame's coherence: a hypothesis the closure's creation took,
 or evaluation. -/
 def coherentProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
@@ -1315,9 +1333,12 @@ def coherentProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
     #[unitExpr, functions, family, handle, typeInstantiation]
   let local? ← (← getLCtx).findDeclRevM? fun declaration => do
     if declaration.isImplementationDetail then return none
-    if ← isDefEq declaration.type condition then return some declaration.toExpr
-    if ← isDefEq declaration.type frame then
-      return some (← mkAppM ``And.left #[declaration.toExpr])
+    let type ← frameHypothesisType declaration.type
+    if type.isAppOf ``Coherent then
+      if ← withReducible (isDefEq type condition) then return some declaration.toExpr
+    if isClosureFrameType type then
+      if ← matchesClosureFrame type frame then
+        return some (← mkAppM ``And.left #[declaration.toExpr])
     return none
   match local? with
   | some proof => return some proof
@@ -1331,7 +1352,9 @@ def closureFrameProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
     | return none
   let local? ← (← getLCtx).findDeclRevM? fun declaration => do
     if declaration.isImplementationDetail then return none
-    if ← isDefEq declaration.type condition then return some declaration.toExpr
+    let type ← frameHypothesisType declaration.type
+    if isClosureFrameType type then
+      if ← matchesClosureFrame type condition then return some declaration.toExpr
     return none
   if let some proof := local? then return some proof
   let some coherent ← coherentByEvaluation

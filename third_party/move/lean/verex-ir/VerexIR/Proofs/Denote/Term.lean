@@ -3,6 +3,7 @@
 
 import VerexIR.Proofs.Denote.ReturnedStorage
 import VerexIR.Semantics.Frames
+import VerexIR.Semantics.ScopedMethods
 
 /-!
 # Typed terms and their denotation
@@ -2595,6 +2596,12 @@ structure Function (unit : Validation.ValidatedUnit) where
   body : Term unit result frame result.bodyType
   /-- The mutable-reference parameters, resolved at exit. -/
   mutables : Mutables frame
+  /-- Scoped dictionary parameters, checked before evaluating the body. -/
+  scopedMethods : List Int := []
+
+@[simp, vir_denote_norm] theorem scopedValues_nil
+    (unit : VerexIR.Validation.ValidatedUnit) (arguments : Array VerexIR.RuntimeValue) :
+    VerexIR.scopedValues unit [] arguments = true := rfl
 
 /-- The function result a body outcome denotes, after the mutable-reference
 parameters it still holds are resolved.  Loop control that escapes the body
@@ -2612,8 +2619,12 @@ def Function.denoteWith {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarri
     {executable : VerexIR.Validation.ExecutableUnit unit} [Skolems unit]
     (meanings : Meanings executable) (f : Function unit) (args : HList f.params) :
     Comp unit f.result.carrier :=
-  Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
+  let body := Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
     (f.result.finish f.mutables)
+  match f.scopedMethods with
+  | [] => body
+  | _ :: _ =>
+      if scopedValues unit f.scopedMethods (HList.encode args).toArray then body else Spec.stuck
 
 /-- The denotation of a function on native arguments, every call meaning
 its callee's prophetic meaning.  Stated directly: every transport unifies
@@ -2622,9 +2633,12 @@ def Function.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers 
     (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) (f : Function unit) (args : HList f.params) :
     Comp unit f.result.carrier :=
-  Spec.bind (f.body.denote (closedMeanings executable typeInstantiation)
-      (initialEnv f.params f.locals f.frame_eq args))
-    (f.result.finish f.mutables)
+  let body := Spec.bind (f.body.denote (closedMeanings executable typeInstantiation)
+    (initialEnv f.params f.locals f.frame_eq args)) (f.result.finish f.mutables)
+  match f.scopedMethods with
+  | [] => body
+  | _ :: _ =>
+      if scopedValues unit f.scopedMethods (HList.encode args).toArray then body else Spec.stuck
 
 /-- The meaning of calls routing one function to `self`: its handle at its
 own signature means `self`, every other call `rest`. -/

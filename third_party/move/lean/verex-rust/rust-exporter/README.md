@@ -72,7 +72,7 @@ parameter after the function's generics, named after the associated item, and a
 call instantiates it by unifying the declared signature with the call's operand
 and destination types. A call this does not bind is an export error at the call.
 Parameter-dependent dispatch uses explicit dictionaries for local single-method
-`&mut self` traits returning unit and for declared `Fn` and `FnMut` bounds. Other trait
+`&mut self` traits returning unit and for declared `Fn`, `FnMut`, and `FnOnce` bounds. Other trait
 interfaces still require checked evidence (`tests/fixtures/generic_trait_call.rs`).
 
 Export evaluates each constant a body uses and reads the result through the
@@ -393,13 +393,35 @@ Generic forwarding from `Fn` to `FnMut` uses a checked adapter that captures
 that shared dictionary and reborrows its mutable receiver. The
 `shared_method_adapter` attribute identifies the captured dictionary parameter;
 Rust source verification generates and proves receiver-preservation and
-behavioral specifications for both adapter kinds. `closure_method_adapter`
-identifies the concrete shared closure target. Users specify the source closure's
+behavioral specifications for these borrowing adapters. `closure_method_adapter`
+identifies the concrete closure target, including consuming adapters described below. Users specify the source closure's
 `call` method; they do not write specifications naming generated adapters.
 Generated-contract diagnostics point into the rendered verification file. `evidence-unit/fn_forward` exercises this forwarding
 with arguments, multiple bounds, repeated calls, generic/tuple results, and unit
-results. `FnOnce` bounds remain unsupported. The
-`fixtures/evidence_composition` fixture covers these combinations through native
+results. Declared `FnOnce` bounds supply a dictionary taking `F` by value;
+`evidence-unit/static_fnonce` covers consuming closure bodies, generic forwarding,
+non-`Copy` captures, scalar/tuple results, and unit calls. Concrete `Fn` and
+`FnMut` closures use checked consuming adapters that borrow the receiver for
+the original call and explicitly drop it afterward. Their generated contracts
+retain the invocation, existentially including the final mutable receiver.
+`evidence-unit/fnonce_adapters` checks these conversions. Source verification
+also accepts the generic result `R = ()` in opaque `mutable_call` and `once`
+helpers: it independently checks the helper's contract at the Unit frame and
+keeps the opaque call boundary. The source proof fixture no longer needs
+unit-only helpers. This specialized proof path requires reference-free type
+arguments and acyclic bodies without direct function calls, loops, body
+specifications or assumptions, or model state; borrowed receiver parameters
+remain supported. Native contracts that do not transfer to the Unit reading
+cannot use this body-checking path. See the
+[generic callable Unit result plan](../../doc/plan/rust-verification.md#generic-callable-unit-results).
+
+Generic borrowed dictionaries can also supply consuming evidence when the
+validator checks that the receiver borrow cannot escape through results or
+mutable writes. `evidence-unit/fnonce_forward` covers these adapters and their
+forwarding paths; the runtime and proof contract enforce the same checked
+dictionary requirement. Generic Unit-result forwarding through direct-call
+chains remains outside the bounded specialization path described above.
+The `fixtures/evidence_composition` fixture covers these combinations through native
 execution, interpreter expectations, and source round-trip.
 `raw-unit/evidence_arguments` additionally exercises arguments, receiver adapters,
 multiple bounds, and struct results in the differential suite. The evaluator also

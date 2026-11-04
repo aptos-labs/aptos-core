@@ -26,10 +26,10 @@ namespace VerexIR.Rust.SourceVerify
 
 open VerexSL.SourceVerify
 
-/-- Checked forwarding contracts for exporter-generated Fn-to-FnMut bodies.
-These are ordinary specifications: verification must prove them from the
-adapter's shared invocation, including preservation of the mutable receiver.
-The marker never grants a theorem or changes the body's semantics. -/
+/-- Checked contracts for exporter-generated receiver adapters. Borrowing
+adapters preserve the receiver; consuming adapters expose the invocation and,
+for mutable targets, existentially retain its final receiver state. These are
+ordinary specifications proved from the body, never granted by the marker. -/
 private def adapterSpecs (unit : VerexIR.Validation.ValidatedUnit)
     (source : System.FilePath) : Except String (Array Companion) := do
   let some ns := unit.namespaces[0]? | return #[]
@@ -38,36 +38,50 @@ private def adapterSpecs (unit : VerexIR.Validation.ValidatedUnit)
     let marker (key : String) := function.attributes.findSome? (fun
       | .assign name (.constant (.integer index)) _ => if name == key then some index else none
       | _ => none)
-    let dictionaryIndex := marker "shared_method_adapter"
+    let dictionaryIndex := marker "shared_method_adapter" <|> marker "consuming_method_adapter"
     let closureTarget := function.attributes.findSome? (fun
       | .assign "closure_method_adapter" (.constant (.string target)) _ => some target
       | _ => none)
     if dictionaryIndex.isNone && closureTarget.isNone then continue
     let parameters := function.signature.parameters
-    let some receiver := parameters[0]? | throw "shared adapter has no receiver"
-    let some name := ns.nameOf function.name | throw "shared adapter has no name"
-    unless name.scope.isEmpty do throw "shared adapter must be at crate scope"
-    let (callable, parameterCount) ← match dictionaryIndex, closureTarget with
+    let some receiver := parameters[0]? | throw "receiver adapter has no receiver"
+    let some name := ns.nameOf function.name | throw "receiver adapter has no name"
+    unless name.scope.isEmpty do throw "receiver adapter must be at crate scope"
+    let (callable, parameterCount, targetReceiver) ← match dictionaryIndex, closureTarget with
       | some index, none => do
           unless parameters.size ≥ 2 && index == Int.ofNat (parameters.size - 1) do
-            throw "shared adapter dictionary must be its final parameter"
-          let some dictionary := parameters.back? | throw "shared adapter has no dictionary"
-          pure (s!"«{dictionary.name}»", parameters.size - 1)
+            throw "receiver adapter dictionary must be its final parameter"
+          let some dictionary := parameters.back? | throw "receiver adapter has no dictionary"
+          let some (.function arguments _ _) := unit.tables.types[dictionary.typeUse.typeId.index]?
+            | throw "adapter dictionary is not a function"
+          let some targetReceiver := arguments[0]? | throw "adapter dictionary has no receiver"
+          pure (s!"«{dictionary.name}»", parameters.size - 1, targetReceiver)
       | none, some qualified => do
           let some target := ns.functions.find? (fun candidate =>
               (ns.nameOf candidate.name).any fun name =>
                 "::".intercalate (name.scope.push name.name).toList == qualified)
             | throw "closure adapter target is missing"
-          pure (← VerexSL.Print.declaredFunctionText unit ns target, parameters.size)
-      | _, _ => throw "shared adapter has conflicting targets"
-    let some result := function.signature.results[0]? | throw "shared adapter has no result"
+          let some targetReceiver := target.signature.parameters[0]? | throw "adapter target has no receiver"
+          pure (← VerexSL.Print.declaredFunctionText unit ns target, parameters.size, targetReceiver.typeUse.typeId)
+      | _, _ => throw "receiver adapter has conflicting targets"
+    let some result := function.signature.results[0]? | throw "receiver adapter has no result"
     let outputs := match unit.tables.types[result.typeId.index]? with
       | some .unit => #[]
       | some (.tuple elements) => elements.mapIdx fun index _ => s!"spec.result[{index}]"
       | _ => #["result"]
+    let consuming := !(unit.tables.types[receiver.typeUse.typeId.index]?.any (· matches .reference _))
+    let mutableTarget := unit.tables.types[targetReceiver.index]?.any (fun
+      | .reference reference => reference.kind == .mutable
+      | _ => false)
+    let mut finalReceiver := "__verex_final_receiver"
+    while parameters.any (·.name == finalReceiver) || function.signature.generics.any (·.name == finalReceiver) do
+      finalReceiver := finalReceiver ++ "_"
+    let receiverType ← if consuming && mutableTarget then
+        VerexSL.Print.specificationTypeText unit ns function.signature.generics receiver.typeUse.typeId
+      else pure ""
     let receiver := s!"«{receiver.name}»"
     let mut inputs := #[s!"old({receiver})"]
-    let mut mutated := #[]
+    let mut mutated := if consuming && mutableTarget then #[s!"«{finalReceiver}»"] else #[]
     for parameter in parameters.extract 1 parameterCount do
       let name := s!"«{parameter.name}»"
       match unit.tables.types[parameter.typeUse.typeId.index]? with
@@ -78,10 +92,13 @@ private def adapterSpecs (unit : VerexIR.Validation.ValidatedUnit)
             else inputs := inputs.push name
         | _ => inputs := inputs.push name
     let arguments := inputs ++ outputs ++ mutated
+    let preservation := if consuming then "" else s!"  ensures {receiver} == old({receiver})\n"
+    let quantified := if consuming && mutableTarget then
+        s!"exists («{finalReceiver}» : {receiverType}), "
+      else ""
     specifications := specifications.push s!"spec «{name.name}» where
   pragma opaque
-  ensures {receiver} == old({receiver})
-  ensures ensures_of<{callable}>({", ".intercalate arguments.toList})
+{preservation}  ensures {quantified}ensures_of<{callable}>({", ".intercalate arguments.toList})
 "
   if specifications.isEmpty then return #[]
   return #[{
@@ -119,7 +136,8 @@ def moduleFiles (unit : VerexIR.Validation.ValidatedUnit)
   -- crate-scoped names must not make a module file appear to declare root items.
   let sourceFunctions := ns.functions.filter fun function =>
     !function.attributes.any (fun attr => attr matches
-      .assign "shared_method_adapter" _ _ | .assign "closure_method_adapter" _ _)
+      .assign "shared_method_adapter" _ _ | .assign "consuming_method_adapter" _ _ |
+      .assign "closure_method_adapter" _ _)
   let declarations := sourceFunctions.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.structs.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++
     ns.constants.map (fun declaration => (scopeOf declaration.name, declaration.loc)) ++

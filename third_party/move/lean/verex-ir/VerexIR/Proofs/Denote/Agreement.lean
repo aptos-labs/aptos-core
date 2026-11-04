@@ -130,6 +130,20 @@ theorem satisfies_propheticMeaning {unit : ValidatedUnit} [FunctionCarriers unit
   satisfies_of_refines (compileFunction_agrees executable handle none f compiled typeInstantiation)
     verified
 
+/-- A contract proved independently over a specialized body holds at that
+same frame; callers may use its contract without inlining the body. -/
+theorem satisfies_propheticMeaningAt {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (substitution : Option TypeArgs) (typeInstantiation : Array (TypeId × TypeId))
+    (handle : FunctionHandle) (f : Function unit)
+    (compiled : compileFunctionAt unit handle substitution = .ok f)
+    (contract : Contract (Memory unit) Failure (HList f.params) f.result.carrier)
+    (verified : Satisfies (f.denote executable typeInstantiation) contract) :
+    Satisfies (propheticMeaningAt executable substitution typeInstantiation handle
+      f.params f.result) contract :=
+  satisfies_of_refines
+    (compileFunction_agrees executable handle substitution f compiled typeInstantiation) verified
+
 /-- Contracts established over the bodies of a cycle's members at every
 slot, each assuming every slot's contract of the calls to the members, hold
 of their prophetic meanings. -/

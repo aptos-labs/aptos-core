@@ -1129,6 +1129,8 @@ inductive InterpreterError where
   | unknownConstant (reference : QualifiedRef)
   | functionHasNoBody (function : FunctionHandle)
   | argumentArity (expected actual : Nat)
+  /-- A scoped dictionary argument has no checked receiver receipt. -/
+  | unscopedMethodEvidence
   | resultArity (expected actual : Nat)
   /-- A function's results hold a loan hole outside a borrow. -/
   | returnedLoanHole
@@ -1161,6 +1163,7 @@ def InterpreterError.code : InterpreterError → String
   | .unknownConstant _ => "VIR-EXEC-CONSTANT"
   | .functionHasNoBody _ => "VIR-EXEC-NO-BODY"
   | .argumentArity .. => "VIR-EXEC-ARGUMENT-ARITY"
+  | .unscopedMethodEvidence => "VIR-EXEC-UNSCOPED-METHOD-EVIDENCE"
   | .resultArity .. => "VIR-EXEC-RESULT-ARITY"
   | .returnedLoanHole => "VIR-EXEC-RETURNED-HOLE"
   | .uninitializedLocal _ => "VIR-EXEC-UNINITIALIZED-LOCAL"

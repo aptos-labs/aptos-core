@@ -38,8 +38,9 @@ query tracked in [rust-lang/rust#161892](https://github.com/rust-lang/rust/issue
 and will be deleted with a one-line call-site switch when the pinned toolchain
 includes the upstream method.
 
-The `FnMut` evidence slice additionally reads the compiler identities of the
-`FnMut` trait, `FnOnce::Output`, `Copy`, and `Drop` through confined bridge helpers. The pinned
+The callable evidence slices additionally read the compiler identities of the
+`Fn`, `FnMut`, and `FnOnce` traits, `FnOnce::Output`, `Copy`, and `Drop` through
+confined bridge helpers. The pinned
 public API exposes their predicates but no language-item lookup. These helpers
 return public IDs only; replace them when a public identity query is available.
 `std::process::abort` is identified by its compiler diagnostic item; the abort

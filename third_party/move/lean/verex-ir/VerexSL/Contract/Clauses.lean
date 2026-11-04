@@ -2796,6 +2796,12 @@ where
           finalValues := finalValues.push (← nativeOfClause carriers τ (← translate finalContext final))
         let result ← match invocation.shape, declared.toList with
           | .none, [] => pure (mkConst ``Unit.unit)
+          | .none, [output] =>
+              unless context.readAtArguments && (← context.exprType output) == .unit do
+                throwError "`ensures_of` names one value for the function's result"
+              -- The generic contract names R's value; R = Unit erases its
+              -- returned slot but still has its unique, checked Unit value.
+              nativeOfClause carriers .unit (← translate context output)
           | .one (.tuple elements), outputs =>
               -- The source predicate spells a tuple's result elements
               -- separately; the invocation carries one packed tuple.
