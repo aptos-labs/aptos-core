@@ -77,9 +77,10 @@ pub struct HotStateConfigV1 {
     /// Refresh `hot_since_version` of a hot item when it's accessed again after this many
     /// versions, to keep frequently read items from being evicted.
     pub refresh_interval_versions: u64,
-    /// Max number of read-only keys promoted by the block epilogue, to keep it from being too
-    /// heavy.
-    pub max_promotions_per_block: u64,
+    /// Max total size of the read-only keys promoted by the block epilogue, as measured by
+    /// `StateKey::size`. The epilogue txn carries each of them in both its payload and its write
+    /// set, and a key can be large, so capping the count alone doesn't bound the txn size.
+    pub max_promotion_bytes_per_block: u64,
 }
 
 #[cfg(test)]
@@ -94,7 +95,7 @@ mod tests {
             max_items_per_shard: vec![250_000; NUM_STATE_SHARDS],
             max_bytes_per_shard: vec![1 << 30; NUM_STATE_SHARDS],
             refresh_interval_versions: 100_000,
-            max_promotions_per_block: 10_240,
+            max_promotion_bytes_per_block: 512 * 1024,
         });
 
         let mut configs = HashMap::new();
@@ -116,7 +117,7 @@ mod tests {
                 max_items_per_shard,
                 max_bytes_per_shard,
                 refresh_interval_versions: 0,
-                max_promotions_per_block: 0,
+                max_promotion_bytes_per_block: 0,
             })
         };
         let valid = || vec![1; NUM_STATE_SHARDS];

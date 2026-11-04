@@ -164,7 +164,7 @@ mod tests {
             max_items_per_shard,
             max_bytes_per_shard,
             refresh_interval_versions,
-            max_promotions_per_block: 0,
+            max_promotion_bytes_per_block: 0,
         });
         bcs::to_bytes(&bcs::to_bytes(&config).unwrap()).unwrap()
     }
