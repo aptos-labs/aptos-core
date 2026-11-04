@@ -16,6 +16,7 @@ its hole keeps every position typed.
 
 namespace VerexIR
 
+
 /-- The referent type of each live mutable loan. -/
 abbrev LoanTypes := Nat → Option SemTy
 
@@ -53,12 +54,6 @@ def FrameInstantiation (ns : ValidatedNamespace) (required : Array TypeId)
     ArgumentsClosed ns (instantiateGenericArguments outer typeArguments) env ∧
     ∀ typeId ∈ required,
       (instantiatePlaceFieldType? ns (instantiateGenericArguments outer typeArguments) typeId).isSome
-
-/-- A type without its outer shared references: a shared reference is the
-value it observes. -/
-def SemTy.unshared : SemTy → SemTy
-  | .reference .shared referent => referent.unshared
-  | type => type
 
 /-- The semantic types of the fields a nominal value holds beyond its declared
 ones: a table owner's entries, pairs of its key and value type arguments
@@ -189,9 +184,14 @@ mutual
     | shared (value : RuntimeValue) (referent : SemTy)
         (value_typed : HasType unit loans value referent) :
         HasType unit loans value (.reference .shared referent)
-    /-- What a settled borrow leaves where it rested: a reference whose loan
-    has ended, which nothing dereferences (`dereferenceBorrow?`). -/
-    | dead (referent : SemTy) : HasType unit loans .unit (.reference .mutable referent)
+    /-- A shared view of a mutable reference holds what it refers to
+    (`RuntimeValue.observe`), no borrow or hole itself: only a shared
+    dereference reads it, and a mutable one is stuck on it. -/
+    | observed (value : RuntimeValue) (referent : SemTy) (settled : value.live = false)
+        (value_typed : HasType unit loans value referent) :
+        HasType unit loans value (.reference .mutable referent)
+    /-- What a settled borrow leaves, at the reference's type only. -/
+    | dead (referent : SemTy) : HasType unit loans .retired (.reference .mutable referent)
     /-- A hole stands where a live mutable loan took its value from, at the
     loan's referent type, observed through shared references or not. -/
     | hole (loan : Nat) (referent type : SemTy) (loan_eq : loans loan = some referent)
@@ -262,6 +262,8 @@ theorem HasType.weaken {unit : Validation.ValidatedUnit} {smaller larger : LoanT
       .borrow loan current referent (extends_ loan referent loan_eq)
         (HasType.weaken extends_ current_typed)
   | .shared value referent value_typed => .shared value referent (HasType.weaken extends_ value_typed)
+  | .observed value referent settled value_typed =>
+      .observed value referent settled (HasType.weaken extends_ value_typed)
   | .dead referent => .dead referent
   | .hole loan referent type loan_eq same inhabited =>
       .hole loan referent type (extends_ loan referent loan_eq) same inhabited
@@ -294,6 +296,130 @@ theorem HasType.inhabited {unit : Validation.ValidatedUnit} {loans : LoanTypes}
   | _, .unit | _, .bool _ | _, .character _ _ | _, .string _ | _, .bytes _
   | _, .integer _ _ _ _ | _, .address _ | _, .signer _ | _, .tuple _ _ _
   | _, .vector _ _ _ _ _ | _, .nominal .. | _, .closure .. | _, .borrow .. | _, .dead _
-  | _, .unitEmptyTuple | _, .emptyTupleUnit | _, .ghost _ _ _ => by simp [SemTy.unshared]
+  | _, .observed .. | _, .unitEmptyTuple | _, .emptyTupleUnit | _, .ghost _ _ _ => by
+      simp [SemTy.unshared]
+
+private theorem observeList_of_plain : (values : List RuntimeValue) →
+    (∀ value ∈ values, value.observe = value) → RuntimeValue.observeList values = values
+  | [], _ => by rw [RuntimeValue.observeList]
+  | head :: tail, plain => by
+      rw [RuntimeValue.observeList, plain head (by simp),
+        observeList_of_plain tail fun value member => plain value (by simp [member])]
+
+/-- A plain value holds no borrow or hole: observing it is the identity. -/
+theorem SemanticOperations.Plain.observe_eq {value : RuntimeValue} :
+    SemanticOperations.Plain value → value.observe = value
+  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _ | .bytes _ => by
+      rw [RuntimeValue.observe]
+  | .vector elements plain => by
+      rw [RuntimeValue.observe, observeList_of_plain _ fun value member =>
+        Plain.observe_eq (plain value (by simpa using member))]
+  | .tuple elements plain => by
+      rw [RuntimeValue.observe, observeList_of_plain _ fun value member =>
+        Plain.observe_eq (plain value (by simpa using member))]
+  | .nominal _ _ fields plain => by
+      rw [RuntimeValue.observe, observeList_of_plain _ fun value member =>
+        Plain.observe_eq (plain value (by simpa using member))]
+  | .closure _ _ _ captures plain => by
+      rw [RuntimeValue.observe, observeList_of_plain _ fun value member =>
+        Plain.observe_eq (plain value (by simpa using member))]
+  | .ghost _ plain => by
+      rw [RuntimeValue.observe, plain.observe_eq]
+  | .retired => by rw [RuntimeValue.observe]
+
+/-- An observation at a mutable reference type: what it refers to, or what a retired
+borrow left. -/
+theorem HasType.observedAt {unit : Validation.ValidatedUnit} {loans : LoanTypes}
+    {value : RuntimeValue} {referent : SemTy} (typed : HasType unit loans value.observe referent) :
+    HasType unit loans value.observe (.reference .mutable referent) := by
+  rcases value.observe_live with settled | retired
+  · exact .observed _ referent settled typed
+  · rw [retired]
+    exact .dead referent
+
+mutual
+/-- What a shared view holds of a typed value without a hole is typed the same. -/
+theorem HasType.observe {unit : Validation.ValidatedUnit} {loans : LoanTypes}
+    {value : RuntimeValue} {type : SemTy} (typed : HasType unit loans value type)
+    (holeless : value.holeless = true) : HasType unit loans value.observe type := by
+  match typed with
+  | .unit => rw [RuntimeValue.observe]; exact .unit
+  | .bool value => rw [RuntimeValue.observe]; exact .bool value
+  | .character value valid => rw [RuntimeValue.observe]; exact .character value valid
+  | .string value => rw [RuntimeValue.observe]; exact .string value
+  | .bytes value => rw [RuntimeValue.observe]; exact .bytes value
+  | .integer value width signed fits =>
+      rw [RuntimeValue.observe]; exact .integer value width signed fits
+  | .address value => rw [RuntimeValue.observe]; exact .address value
+  | .signer value => rw [RuntimeValue.observe]; exact .signer value
+  | .tuple values types elements =>
+      rw [RuntimeValue.holeless] at holeless
+      rw [RuntimeValue.observe]
+      exact .tuple _ types (by simpa using HasTypes.observe elements holeless)
+  | .vector values element length length_matches elements =>
+      rw [RuntimeValue.holeless] at holeless
+      rw [RuntimeValue.observe]
+      refine .vector _ element length ?_ (by simpa using HasTypeEach.observe elements holeless)
+      simpa [RuntimeValue.observeList_length] using length_matches
+  | .nominal source variant fields name arguments declaringNamespace declared fieldTypes
+      ghostTypes name_eq declaration_eq fieldTypes_resolve ghostTypes_resolve fields_typed =>
+      rw [RuntimeValue.holeless] at holeless
+      rw [RuntimeValue.observe]
+      exact .nominal source variant _ name arguments declaringNamespace declared fieldTypes
+        ghostTypes name_eq declaration_eq fieldTypes_resolve ghostTypes_resolve
+        (by simpa using HasTypes.observe fields_typed holeless)
+  | .closure function mask instantiation captures parameters result targetNs declaration
+      arguments allParameters results namespace_eq declaration_eq signature_eq faithful
+      mask_bound captures_typed parameters_eq packs =>
+      rw [RuntimeValue.holeless] at holeless
+      rw [RuntimeValue.observe]
+      exact .closure function mask instantiation _ parameters result targetNs declaration
+        arguments allParameters results namespace_eq declaration_eq signature_eq faithful
+        mask_bound (by simpa using HasTypes.observe captures_typed holeless) parameters_eq packs
+  | .borrow _ current referent _ current_typed =>
+      rw [RuntimeValue.holeless] at holeless
+      rw [RuntimeValue.observe]
+      exact (HasType.observe current_typed holeless).observedAt
+  | .shared _ referent value_typed => exact .shared _ referent (HasType.observe value_typed holeless)
+  | .observed value referent _ value_typed =>
+      exact (HasType.observe value_typed holeless).observedAt
+  | .dead referent =>
+      rw [RuntimeValue.observe]
+      exact .dead referent
+  | .hole .. => simp [RuntimeValue.holeless] at holeless
+  | .unitEmptyTuple => rw [RuntimeValue.observe]; exact .unitEmptyTuple
+  | .emptyTupleUnit =>
+      rw [RuntimeValue.observe]
+      simpa [RuntimeValue.observeList] using (HasType.emptyTupleUnit : HasType unit loans _ _)
+  | .ghost contents slot plain =>
+      rw [RuntimeValue.observe]
+      exact .ghost _ slot (by rw [plain.observe_eq]; exact plain)
+
+theorem HasTypes.observe {unit : Validation.ValidatedUnit} {loans : LoanTypes}
+    {values : List RuntimeValue} {types : List SemTy} (typed : HasTypes unit loans values types)
+    (holeless : RuntimeValue.holelessList values = true) :
+    HasTypes unit loans (RuntimeValue.observeList values) types := by
+  match typed with
+  | .nil =>
+      rw [RuntimeValue.observeList]
+      exact .nil
+  | .cons head tail =>
+      rw [RuntimeValue.holelessList, Bool.and_eq_true] at holeless
+      rw [RuntimeValue.observeList]
+      exact .cons (HasType.observe head holeless.1) (HasTypes.observe tail holeless.2)
+
+theorem HasTypeEach.observe {unit : Validation.ValidatedUnit} {loans : LoanTypes}
+    {values : List RuntimeValue} {type : SemTy} (typed : HasTypeEach unit loans values type)
+    (holeless : RuntimeValue.holelessList values = true) :
+    HasTypeEach unit loans (RuntimeValue.observeList values) type := by
+  match typed with
+  | .nil =>
+      rw [RuntimeValue.observeList]
+      exact .nil
+  | .cons head tail =>
+      rw [RuntimeValue.holelessList, Bool.and_eq_true] at holeless
+      rw [RuntimeValue.observeList]
+      exact .cons (HasType.observe head holeless.1) (HasTypeEach.observe tail holeless.2)
+end
 
 end VerexIR

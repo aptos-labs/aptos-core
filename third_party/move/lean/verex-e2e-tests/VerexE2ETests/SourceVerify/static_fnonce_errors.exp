@@ -1,0 +1,46 @@
+VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:18:3: error: the specification clause `ensures result != value` is not established
+VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
+  verify wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:26:6: error: verification failed with a residual obligation:
+case refine_1.refine_4
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+verexMethodArguments :
+  VerexIR.Proofs.Denote.HList
+    (VerexIR.Proofs.Denote.NRow.cons
+      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 2 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            VerexIR.Proofs.Denote.NRow.nil
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+          VerexIR.Proofs.Denote.NRow.nil))
+      VerexIR.Proofs.Denote.NRow.nil)
+verexMethodInitial : VerexIR.Proofs.Denote.Memory unit
+error : VerexIR.Proofs.Failure
+a✝ :
+  VerexIR.Proofs.Obligation "static_fnonce_errors.rs.lean" 1696 1727
+    (verexMethodArguments.fst.fst.fst.val = 0)
+⊢ False
+VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:26:6: error: verex verification failed: the automatic verification of `panicking` failed; provide a proof in the module:
+  verify panicking by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

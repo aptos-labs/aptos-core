@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/lifetime_generic_calls_errors.spec.lean:9:5: error: the specification clause `ensures result != self.r` is not established
+VerexE2ETests/SourceVerify/lifetime_generic_calls_errors.spec.lean:8:8: error: verex verification failed: the automatic verification of `Generic::again` failed; provide a proof in the module:
+  verify Generic::again by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/lifetime_generic_calls_errors.spec.lean:12:3: error: the specification clause `ensures result != h.r` is not established
+VerexE2ETests/SourceVerify/lifetime_generic_calls_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `use_inner` failed; provide a proof in the module:
+  verify use_inner by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/lifetime_generic_calls_errors.spec.lean:18:3: error: the specification clause `ensures result != h.r` is not established
+VerexE2ETests/SourceVerify/lifetime_generic_calls_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `use_unspecified` failed; provide a proof in the module:
+  verify use_unspecified by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

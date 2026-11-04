@@ -78,23 +78,6 @@ def ghostInitSite (namespaceIndex expressionIndex k : Nat) : Nat :=
 def notCarried (what : String) : Except String α :=
   .error s!"{what} is not carried by the denotation"
 
-/-- Why a function cannot be the target of a function value: its result is
-a tuple, which a function type states as a row of results and a result shape as
-one type (`doc/designs/higher-order-functions.md`, "Function values of
-tuple-returning functions"). -/
-def closureTargetRefusal (targetNs : ValidatedNamespace)
-    (target : FunctionDecl FunctionBody) : Option String :=
-  match target.signature.results.toList with
-  | [result] => match (targetNs.typeOf result.typeId) with
-    | some (.tuple elements) =>
-        let name := ((targetNs.nameOf target.name).map (·.name)).getD "?"
-        let holdsReference := elements.any fun element =>
-          targetNs.tables.types[element.index]? matches some (.reference _)
-        some s!"a function value of `{name}` is not supported: `{name}` returns a tuple\
-          {if holdsReference then " holding a reference" else ""}"
-    | _ => none
-  | _ => none
-
 /-- A namespace as a compilation reads it. The kernel evaluates a
 compilation and reads a plain array in time linear in the index, so the
 arenas and the type table are viewed as balanced trees, built once per
@@ -118,6 +101,9 @@ structure CompileNamespace where
   typeFuel : Nat
   fuel : Nat
   placeFuel : Nat
+  /-- The type arguments a function is compiled at, where its body is read at a type
+  argument holding a mutable reference; `nty` applies them. -/
+  substitution : Option NRow := none
 
 /-- Move function-valued fields carry a checked modification frame, empty
 unless explicitly declared. Only a function type at the field has one, not an
@@ -159,7 +145,8 @@ def CompileNamespace.of (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (ns : ValidatedNamespace) : CompileNamespace :=
   ⟨ns, namespaceId, .ofArray ns.expressions, .ofArray ns.places, .ofArray ns.patterns,
     .ofArray ns.tables.types, deathIndex unit namespaceId, sharedDereferenceIndex unit namespaceId,
-    invariantIndex unit, VerexIR.Proofs.Denote.typeFuel unit, unitFuel unit, ns.places.size + 1⟩
+    invariantIndex unit, VerexIR.Proofs.Denote.typeFuel unit, unitFuel unit, ns.places.size + 1,
+    none⟩
 
 /-- Whether a value of a type carries a data invariant at any depth. -/
 def CompileNamespace.carriesInvariant (ns : CompileNamespace) (τ : NTy) : Bool :=
@@ -174,7 +161,7 @@ def CompileNamespace.ownedRoot? (ns : CompileNamespace) : Nat → PlaceId → Op
       match ns.places.get? place.index with
       | some (.localVar localId) => some localId
       | some (.field base _ _) | some (.index base _) | some (.subslice base ..)
-      | some (.downcast base _) => ns.ownedRoot? fuel base
+      | some (.unsize base) | some (.downcast base _) => ns.ownedRoot? fuel base
       | _ => none
 
 /-- The local a loan borrows from without a dereference. -/
@@ -210,13 +197,133 @@ def CompileNamespace.sharedAt (ns : CompileNamespace) (operand : ExprId) : Bool 
   | some expression => isSharedReferenceType ns.source (ns.source.typeId expression.typeId) ns.types.get?
   | none => false
 
-/-- The native type a type identifier denotes, read through the view's type
-table for its own namespace. -/
-def CompileNamespace.nty (ns : CompileNamespace) (unit : ValidatedUnit)
+/-- The native type a type identifier denotes in its own scope, read through the
+view's type table for its own namespace: what a callee's signature states. -/
+def CompileNamespace.declaredNty (ns : CompileNamespace) (unit : ValidatedUnit)
     (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
   ntyOfFuel (fun owner typeId => if owner == ns.namespaceId then ns.types.get? typeId.index
       else unitTypes unit owner typeId)
-    unit ns.typeFuel namespaceId typeId
+    unit .nil ns.typeFuel namespaceId typeId
+
+/-- The native type a type identifier denotes at a substitution. A shared view erases
+after the substitution: `&T` at `T := &mut u32` holds a `u32`, in a declaration's fields too. -/
+def CompileNamespace.ntyAt (ns : CompileNamespace) (unit : ValidatedUnit) (θ : NRow)
+    (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
+  ntyOfFuel (fun owner typeId => if owner == ns.namespaceId then ns.types.get? typeId.index
+      else unitTypes unit owner typeId)
+    unit θ ns.typeFuel namespaceId typeId
+
+/-- The native type a type identifier denotes in the function compiled: at its
+substitution, if any. -/
+def CompileNamespace.nty (ns : CompileNamespace) (unit : ValidatedUnit)
+    (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
+  match ns.substitution with
+  | none => ns.declaredNty unit namespaceId typeId
+  | some θ => ns.ntyAt unit θ namespaceId typeId
+
+/-- The types and the calls of the expressions below a root of a namespace's arena, each
+read through the namespace. -/
+def frameExpressionReads (source : ValidatedNamespace) : Nat → ExprId →
+    Array TypeId × Array (QualifiedRef × Array GenericArgument) →
+    Array TypeId × Array (QualifiedRef × Array GenericArgument)
+  | 0, _, found => found
+  | fuel + 1, id, found => match source.expressions[id.index]? with
+    | none => found
+    | some expression =>
+        let typeArguments := fun (arguments : Array GenericArgument) =>
+          (source.genericArguments arguments).filterMap fun argument => match argument with
+            | .typeArg value => some value.typeId
+            | _ => none
+        let found := (found.1.push (source.typeId expression.typeId), found.2)
+        let found := match expression.kind with
+          | .operation (.call (.function reference)) instantiations _ _
+          | .operation (.call (.closure reference _)) instantiations _ _ =>
+              (found.1 ++ typeArguments instantiations,
+                found.2.push (reference, source.genericArguments instantiations))
+          | .operation _ instantiations _ _ => (found.1 ++ typeArguments instantiations, found.2)
+          | _ => found
+        (expressionChildren expression.kind).foldl (init := found) fun found child =>
+          frameExpressionReads source fuel child found
+
+/-- What a function's reading depends on: the types of its signature, its locals, its contract
+and its body, and the calls of the last two. None of a function with contracts at shapes, whose
+generics are the shapes' own. -/
+def functionFrameReads (unit : ValidatedUnit) (handle : FunctionHandle) :
+    Option (Array TypeId × Array (QualifiedRef × Array GenericArgument)) := do
+  let source ← unit.namespaces[handle.namespaceId.index]?
+  let declaration ← source.functions[handle.functionId.index]?
+  guard declaration.shapes.isEmpty
+  let contract := declaration.contract
+  let declared := (declaration.signature.parameters.map (·.typeUse.typeId)) ++
+    (declaration.signature.results.map (·.typeId)) ++ (declaration.locals.map (·.type.typeId)) ++
+    (contract.reads.map (·.typeId))
+  let conditions := contract.conditions.foldl (init := contract.modifies) fun roots condition =>
+    condition.auxiliary.foldl (fun roots auxiliary => roots.push auxiliary.2)
+      (roots.push condition.expression)
+  let conditions := contract.parameterFrames.foldl (init := conditions) fun roots frame =>
+    roots ++ frame.modifies
+  let roots := match declaration.body with
+    | .structured root => conditions.push root
+    | .absent => conditions
+  return roots.foldl (init := (declared.map source.typeId, #[])) fun found root =>
+    frameExpressionReads source (source.expressions.size + 1) root found
+
+/-- Whether reading a type at `θ` agrees with substituting `θ` in its declared reading. -/
+def CompileNamespace.readingAgrees (ns : CompileNamespace) (unit : ValidatedUnit) (θ : NRow)
+    (namespaceId : NamespaceId) (typeId : TypeId) : Bool :=
+  decide (ns.ntyAt unit θ namespaceId typeId =
+    (NTy.subst θ) <$> ns.declaredNty unit namespaceId typeId)
+
+/-- Unit in a type binder can erase a generic callable result slot. Lifetime and
+constant binders also use Unit placeholders, but no value type reads those slots.
+Missing declaration/binder information is conservatively treated as a real argument. -/
+def hasUnitTypeArgument (unit : ValidatedUnit) (handle : FunctionHandle) (θ : NRow) : Bool :=
+  θ.toList.zipIdx.any fun (argument, index) =>
+    argument == .unit &&
+      match unit.namespaces[handle.namespaceId.index]? >>= fun source =>
+          source.functions[handle.functionId.index]? >>= fun declaration =>
+            declaration.signature.generics[index]? with
+      | some binder => binder.kind == .typeArg
+      | none => true
+
+/-- Whether the reading of each function pending at its type arguments, and of what it calls at
+theirs, agrees with their substitution. Mutable references and Unit arguments need this
+check: substituting Unit in a generic callable result row does not erase its slot, whereas
+reading that callable at Unit does. Running out of fuel counts as disagreeing. -/
+def CompileNamespace.framesAgree (ns : CompileNamespace) (unit : ValidatedUnit) :
+    Nat → List (FunctionHandle × NRow) → List (FunctionHandle × NRow) → Bool
+  | 0, _, _ => false
+  | _ + 1, [], _ => true
+  | fuel + 1, (handle, θ) :: rest, seen =>
+      if seen.any (fun other => other.1 == handle && decide (other.2 = θ)) then
+        ns.framesAgree unit fuel rest seen
+      else match functionFrameReads unit handle with
+      | none => false
+      | some (types, calls) =>
+          let next : Option (List (FunctionHandle × NRow)) :=
+            calls.toList.mapM fun (reference, arguments) => do
+              let callee ← resolveFunction? unit handle.namespaceId reference
+              let inner ← arguments.toList.mapM fun (argument : GenericArgument) =>
+                match argument with
+                | .typeArg value => ns.ntyAt unit θ handle.namespaceId value.typeId
+                | .lifetime _ | .const _ => some NTy.unit
+                | .evidence _ => none
+              return (callee, NRow.ofList inner)
+          match next with
+          | none => false
+          | some next =>
+              types.all (ns.readingAgrees unit θ handle.namespaceId) &&
+                ns.framesAgree unit fuel
+                  (next.filter (fun call => !call.2.refAbsent || hasUnitTypeArgument unit call.1 call.2) ++ rest)
+                  ((handle, θ) :: seen)
+
+/-- Whether a function's generic contract or theorem transfers to type arguments: their values
+hold no loan, and reading the function at them agrees with substituting them, over everything its
+reading depends on. A call that does is `Term.callGeneric`, any other `Term.callInstance`. -/
+def CompileNamespace.transfers (ns : CompileNamespace) (unit : ValidatedUnit)
+    (handle : FunctionHandle) (θ : NRow) : Bool :=
+  θ.refFree && ((θ.refAbsent && !hasUnitTypeArgument unit handle θ) ||
+    ns.framesAgree unit (unitFuel unit) [(handle, θ)] [])
 
 /-- The resource type a type identifier denotes, read through the view's
 type table: its native type and its declaration's type arguments. -/
@@ -316,6 +423,9 @@ def literalValue : (τ : NTy) → ConstValue → Except String τ.groundCarrier
   | .address, .address value => .ok value
   | .string, .string value => .ok value
   | .bytes, .bytes value => .ok value
+  | .char, .character value =>
+      if valid : isUnicodeScalar value = true then .ok ⟨value, valid⟩
+      else .error "a character literal is not a Unicode scalar value"
   | .tuple elements, .tuple values => literalRow elements values.toList
   | .vector element, .vector values => do
       let values := (← values.toList.mapM (literalValue element)).toArray
@@ -344,6 +454,8 @@ def Proj.append : {τ σ υ : NTy} → Proj τ σ → Proj σ υ → Proj τ υ
   | _, _, _, .nil, rest => rest
   | _, _, _, .deref path, rest => .deref (path.append rest)
   | _, _, _, .field x path, rest => .field x (path.append rest)
+  | _, _, _, .element x path, rest => .element x (path.append rest)
+  | _, _, _, .arrayIndex position path, rest => .arrayIndex position (path.append rest)
   | _, _, _, .index position path, rest => .index position (path.append rest)
   | _, _, _, .variant choices path, rest => .variant choices (path.append rest)
   | _, _, _, .ghost path, rest => .ghost (path.append rest)
@@ -362,8 +474,9 @@ def Choices.partial {names : List String} {rows : NRows} {τ : NTy}
 /-- Whether a path steps into a field some variant lacks. -/
 def Proj.mayMismatch : {τ σ : NTy} → Proj τ σ → Bool
   | _, _, .nil => false
-  | _, _, .deref path | _, _, .field _ path | _, _, .index _ path | _, _, .ghost path =>
-      path.mayMismatch
+  | _, _, .deref path | _, _, .field _ path | _, _, .element _ path | _, _, .index _ path
+  | _, _, .arrayIndex _ path
+  | _, _, .ghost path => path.mayMismatch
   | _, _, .variant choices path => choices.partial || path.mayMismatch
 
 /-- The failure a pattern mismatch makes (`patternMismatch?`), its codes the
@@ -498,8 +611,29 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
                 else notCarried "an element index from the end of another place"
           match component, path with
           | .vector σ, path => .ok ⟨root, σ, x, path.append (.index position .nil)⟩
+          | .array σ _, path => .ok ⟨root, σ, x, path.append (.arrayIndex position .nil)⟩
+          | .tuple elements, path =>
+              let .literal index := position
+                | notCarried "a tuple element at a position that is not a literal"
+              let some ⟨σ, element⟩ := Var.ofIndex elements index
+                | .error "a tuple element place is out of range"
+              .ok ⟨root, σ, x, path.append (.element element .nil)⟩
           | _, _ => notCarried "an element place on a non-vector"
       | _ => notCarried "a place of this kind"
+
+/-- Whether a value holds a mutable reference, so a read of its local as a
+value moves it out of the slot, which then resolves nothing. -/
+def NTy.movesOut : NTy → Bool
+  | .ref _ => true
+  | .tuple elements => !elements.refFree
+  | .struct _ _ fields => !fields.refFree
+  | .enum _ _ _ rows _ => !rows.refFree
+  | .vector element | .array element _ => !element.refFree
+  | .table key value => !key.refFree || !value.refFree
+  | .ghost slot => !slot.refFree
+  | .nominal _ arguments _ => !arguments.refFree
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _
+  | .function _ _ _ => false
 
 /-- Whether the components of a tuple hold references only at their top. -/
 def NRow.componentsLendable : NRow → Bool
@@ -507,17 +641,44 @@ def NRow.componentsLendable : NRow → Bool
   | .cons (.ref referent) rest => referent.refFree && rest.componentsLendable
   | .cons τ rest => τ.refFree && rest.componentsLendable
 
-/-- Whether a value's references are where the prophetic meaning lends
-them: at its top, or as components of a tuple. -/
-def NTy.lendable : NTy → Bool
+/-- Whether a function value's parameter takes its references where an
+invocation reads them: at its top, or as components of a tuple. -/
+def NTy.lendableAtTop : NTy → Bool
   | .ref referent => referent.refFree
   | .tuple elements => elements.componentsLendable
   | τ => τ.refFree
+
+mutual
+  /-- Whether a value's references are where the prophetic meaning lends them:
+  behind references, and in tuples, structs and enums' variants. -/
+  def NTy.lendable : NTy → Bool
+    | .ref referent => referent.lendable
+    | .tuple elements => NRow.lendable elements
+    | .struct _ _ fields => NRow.lendable fields
+    | .enum _ _ _ rows _ => NRows.lendable rows
+    | τ => τ.refFree
+
+  /-- Whether the references of a row of values are where they are lent. -/
+  def NRow.lendable : NRow → Bool
+    | .nil => true
+    | .cons τ rest => τ.lendable && NRow.lendable rest
+
+  /-- Whether the references of an enum's variants are where they are lent. -/
+  def NRows.lendable : NRows → Bool
+    | .nil => true
+    | .cons fields rest => NRow.lendable fields && NRows.lendable rest
+end
 
 /-- Whether a result's references are lendable. -/
 def ResultShape.lendable : ResultShape → Bool
   | .none => true
   | .one τ => τ.lendable
+
+/-- Whether a function value's result takes its references where an invocation
+reads them. -/
+def ResultShape.lendableAtTop : ResultShape → Bool
+  | .none => true
+  | .one τ => τ.lendableAtTop
 
 /-- The loan facts of a function's borrow certificate, looked up once per
 compiled function: the kernel evaluates the compilation, so a loan death
@@ -525,27 +686,87 @@ reads its loan from these rather than searching every certificate. -/
 def loanFactsOf (unit : ValidatedUnit) (handle : FunctionHandle) : Array CheckedLoanFact :=
   ((unit.namespaces[handle.namespaceId.index]?).map (·.loanFacts handle.functionId)).getD #[]
 
+/-- The typed path certificate steps name into a value of a type. -/
+def holderProj (unit : ValidatedUnit) (ns : CompileNamespace) :
+    (τ : NTy) → List LoanProjection → Except String ((σ : NTy) × Proj τ σ)
+  | τ, [] => .ok ⟨τ, .nil⟩
+  | .tuple elements, .index (some position) :: rest => do
+      let some ⟨σ, x⟩ := Var.ofIndex elements position
+        | .error "a holder's path names a tuple element out of range"
+      let ⟨target, path⟩ ← holderProj unit ns σ rest
+      .ok ⟨target, .element x path⟩
+  | .struct source _ fields, .field name :: rest => do
+      let some fieldName := sourceFieldName? ns.source name
+        | .error "a holder's path names a field without a name"
+      let some index := handleFieldIndex? unit source none fieldName
+        | .error "a holder's path names an unknown field"
+      let some ⟨σ, x⟩ := Var.ofIndex fields index
+        | .error "a holder's path names a field out of range"
+      let ⟨target, path⟩ ← holderProj unit ns σ rest
+      .ok ⟨target, .field x path⟩
+  | .enum source _ names rows _, .downcast variant :: .field name :: rest => do
+      let some variantName := sourceFieldName? ns.source variant
+        | .error "a holder's path names a variant without a name"
+      let some fieldName := sourceFieldName? ns.source name
+        | .error "a holder's path names a field without a name"
+      let some index := handleFieldIndex? unit source (some variantName) fieldName
+        | .error "a holder's path names an unknown field"
+      let some ⟨σs, which⟩ := Which.ofName names rows variantName
+        | .error "a holder's path names an unknown variant"
+      let some ⟨σ, x⟩ := Var.ofIndex σs index
+        | .error "a holder's path names a field out of range"
+      let ⟨target, path⟩ ← holderProj unit ns σ rest
+      .ok ⟨target, .variant (.cons which x .nil) path⟩
+  | _, _ => notCarried "a loan held inside an aggregate"
+
+/-- The deaths of a loan at the paths an aggregate holder holds it. A path to
+a component without references observes the loan through an erased shared
+borrow and resolves nothing. -/
+def holderDeaths (unit : ValidatedUnit) (ns : CompileNamespace) (ρ : ResultShape) {Γ : NRow}
+    {τ : NTy} (x : Var Γ τ) (paths : List (Array LoanProjection)) :
+    Except String (List (Term unit ρ Γ .unit)) := do
+  if paths.isEmpty then notCarried "a loan held inside an aggregate"
+  paths.filterMapM fun steps => do
+    let ⟨target, path⟩ ← holderProj unit ns τ steps.toList
+    match target, path with
+    | .ref _, path => .ok (some (Term.resolveAt x path))
+    | target, _ =>
+        if target.refFree then .ok none else notCarried "a loan held inside an aggregate"
+
 /-- The effect of ending loans, `none` when it resolves nothing. A loan's
-death resolves the reference wherever it is held; a holder whose slot is
-empty passed it on, and a loan consumed by a call has no holder here, since
-the callee resolves it.  A holder without references observes the loan
-through an erased shared borrow and resolves nothing. -/
-def deathEffect (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (ρ : ResultShape)
-    (Γ : NRow) (ended : Array LoanId) :
+death resolves the reference wherever it is held, at its path in an
+aggregate; a holder whose slot is empty passed it on, and a loan consumed by
+a call has no holder here, since the callee resolves it.  A holder without
+references observes the loan through an erased shared borrow and resolves
+nothing. -/
+def deathEffect (unit : ValidatedUnit) (ns : CompileNamespace)
+    (loanFacts : Array CheckedLoanFact) (ρ : ResultShape) (Γ : NRow) (anchor : ExprId)
+    (before : Bool) (ended : Array LoanId) :
     Except String (Option (Term unit ρ Γ .unit)) := do
   -- Innermost first, as `settleLoans` ends them.
   let deaths ← ended.toList.reverse.mapM fun loan => do
-    let some holders := (loanFacts[loan.index]?).map (·.holders)
+    let some fact := loanFacts[loan.index]?
       | .error "a loan death names an unknown loan"
-    holders.toList.filterMapM fun holder => do
+    let records := fact.deaths.toList.filter fun death =>
+      death.anchor == anchor && death.before == before
+    let holders := records.foldl (init := []) fun holders death =>
+      death.holders.toList.foldl (fun holders holder =>
+        if holders.contains holder then holders else holders ++ [holder]) holders
+    holders.flatMapM fun holder => do
       let some ⟨σ, x⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
       match σ, x with
-      | .ref _, x => .ok (some (Term.resolve (ρ := ρ) x))
-      | σ, _ => if σ.refFree then .ok none else notCarried "a loan held inside an aggregate"
+      | .ref _, x => .ok [Term.resolve (ρ := ρ) x]
+      | σ, x =>
+          if σ.refFree then return []
+          let paths := records.flatMap fun death =>
+            (death.holderPaths.toList.filter fun path => path.1 == holder).map fun path => path.2
+          holderDeaths unit ns ρ x (paths.eraseDups)
   -- Once resolved, a local a loan mutated owes its invariant: a mutation
   -- ends where its loan dies. A borrow of global memory ends its write.
   let checks ← ended.toList.reverse.filterMapM fun loan => do
     let some fact := loanFacts[loan.index]? | .error "a loan death names an unknown loan"
+    unless fact.deaths.any fun death =>
+        death.anchor == anchor && death.before == before && !death.alone do return none
     let site := loopSite ns.namespaceId.index fact.expression.index
     if ns.writesGlobal fact then return some (Term.memoryWritten (ρ := ρ) (Γ := Γ) site)
     let some lender := ns.lender? fact | .ok none
@@ -561,10 +782,10 @@ resolve first, those after it once it produced its value. -/
 def withDeaths (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (id : ExprId)
     (node : Compiled unit ρ Γ) : Except String (Compiled unit ρ Γ) := do
   let some deaths := ns.deaths.find? id.index | .ok node
-  let node ← match ← deathEffect ns loanFacts ρ Γ deaths.after, node with
+  let node ← match ← deathEffect unit ns loanFacts ρ Γ id false deaths.after, node with
     | some effect, .at τ term => .ok (.at τ (.seqAfter term effect))
     | _, node => .ok node
-  match ← deathEffect ns loanFacts ρ Γ deaths.before with
+  match ← deathEffect unit ns loanFacts ρ Γ id true deaths.before with
   | some effect => .ok (node.map fun _ term => .drop effect term)
   | none => .ok node
 
@@ -602,6 +823,197 @@ def heldLocal? (ns : CompileNamespace) (operand : ExprId) : Option LocalId :=
       | some (.localVar localId) => some localId
       | _ => none
   | _ => none
+
+/-- Whether a type is logical only: it types specification values, never
+executable ones, so no body reads a local of it. -/
+def logicalOnly (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : TypeId) : Bool :=
+  match unit.namespaces[namespaceId.index]?.bind (·.tables.types[typeId.index]?) with
+  | some (.integer .unbounded _) | some .range | some (.typeDomain _)
+  | some (.resourceDomain ..) | some .stateDomain => true
+  | _ => false
+
+/-- Whether a type reaches the declaration `target`, through type arguments and
+declared fields. -/
+private def typeReachesHandle (unit : ValidatedUnit) (target : StructHandle) :
+    Nat → List StructHandle → NamespaceId → TypeId → Bool
+  | 0, _, _, _ => false
+  | depth + 1, visited, nsId, tid =>
+      match unitTypes unit nsId tid with
+      | some (.nominal name arguments) =>
+          let inArgs := arguments.any fun arg => match arg with
+            | .typeArg value =>
+                typeReachesHandle unit target depth visited nsId value.typeId
+            | _ => false
+          if inArgs then true
+          else
+            match unit.namespaces[nsId.index]?.bind (fun ns => resolveNominal? unit ns name) with
+            | some handle =>
+                handle == target ||
+                if visited.contains handle then false
+                else
+                  (unit.namespaces[handle.namespaceId.index]?).any fun owner =>
+                    (owner.structs[handle.structId]?).any fun decl =>
+                      let allFields := decl.fields.toList ++
+                        decl.variants.toList.flatMap (·.fields.toList)
+                      allFields.any fun field =>
+                        typeReachesHandle unit target depth (handle :: visited)
+                          handle.namespaceId (owner.typeId field.type.typeId)
+            | none => false
+      | some (.reference ref) =>
+          typeReachesHandle unit target depth visited nsId ref.referent
+      | some (.tuple elements) =>
+          elements.toList.any (typeReachesHandle unit target depth visited nsId)
+      | some (.vector elem _) =>
+          typeReachesHandle unit target depth visited nsId elem
+      | _ => false
+
+/-- Whether a field of the declaration reaches the declaration again. -/
+private def isNominalRecursive (unit : ValidatedUnit) (handle : StructHandle) (depth : Nat) : Bool :=
+  (unit.namespaces[handle.namespaceId.index]?).any fun owner =>
+    (owner.structs[handle.structId]?).any fun decl =>
+      let allFields := decl.fields.toList ++ decl.variants.toList.flatMap (·.fields.toList)
+      allFields.any fun field =>
+        typeReachesHandle unit handle depth [handle] handle.namespaceId
+          (owner.typeId field.type.typeId)
+
+/-- The recursive nominal type a type holds, for the rejection's message. -/
+private def nominalIn? (unit : ValidatedUnit) :
+    Nat → NamespaceId → TypeId → Option String
+  | 0, _, _ => none
+  | depth + 1, nsId, tid =>
+      match unitTypes unit nsId tid with
+      | some (.nominal name _) =>
+          unit.namespaces[nsId.index]?.bind fun ns =>
+            (resolveNominal? unit ns name).bind fun handle =>
+              if isNominalRecursive unit handle (depth + 1) then
+                unit.namespaces[handle.namespaceId.index]?.bind fun targetNs =>
+                  targetNs.structs[handle.structId]?.bind fun decl =>
+                    targetNs.nameOf decl.name |>.map (·.name)
+              else none
+      | some (.reference ref) => nominalIn? unit depth nsId ref.referent
+      | some (.tuple elements) => elements.toList.findSome? (nominalIn? unit depth nsId)
+      | some (.vector elem _) => nominalIn? unit depth nsId elem
+      | _ => none
+
+/-- The native types of a function's locals. A specification local (a
+quantifier's binder) keeps an empty slot. -/
+def CompileNamespace.localTypes? (view : CompileNamespace) (unit : ValidatedUnit)
+    (namespaceId : NamespaceId) (declaration : FunctionDecl FunctionBody) : Option (List NTy) :=
+  declaration.locals.toList.mapM fun localDecl =>
+    let typeId := view.source.typeId localDecl.type.typeId
+    match view.nty unit namespaceId typeId with
+    | some τ => some τ
+    | none => if logicalOnly unit namespaceId typeId then some .unit else none
+
+/-! ## Drops
+
+A drop has no effect on the values a body reads, as in the runtime. A
+destructor's effects are outside the denotation, so a drop that could run one
+has none (`doc/plan/rust-verification.md`, "Drops"). -/
+
+/-- Whether dropping a value of a type could run a destructor: one the unit states,
+or a function value's captures'. A type parameter's is the theorem's assumption
+(`doc/status/assumptions.md`). -/
+def holdsDestructor (unit : ValidatedUnit) (τ : NTy) : Bool :=
+  τ.owns fun
+    | some source, _ =>
+        ((unit.namespaces[source.namespaceId.index]?).bind (·.structs[source.structId]?)).any
+          (·.properties.any (·.tag == destructorTag))
+    | none, some _ => false
+    | none, none => true
+
+/-- The drops and calls of a body. -/
+def CompileNamespace.dropsAndCalls (ns : CompileNamespace) : Nat → ExprId → List Expr → List Expr
+  | 0, _, found => found
+  | fuel + 1, id, found =>
+      match ns.expressions.get? id.index with
+      | none => found
+      | some expression =>
+          let found := match expression.kind with
+            | .operation (.drop _) .. | .operation (.call (.function _)) ..
+            | .operation (.call (.closure ..)) .. => expression :: found
+            | _ => found
+          match expression.kind with
+          | .spec _ => found
+          | kind => (expressionChildren kind).foldl
+              (fun found child => ns.dropsAndCalls fuel child found) found
+
+/-- The parameters of callees a function hands its type parameter `index` to,
+or `none` where a body drops it, or where it cannot say: a function without a
+body. -/
+def handedOn? (unit : ValidatedUnit) (function : FunctionHandle) (index : Nat) :
+    Option (List (FunctionHandle × Nat)) := do
+  let ns ← unit.namespaces[function.namespaceId.index]?
+  let view := CompileNamespace.of unit function.namespaceId ns
+  let declaration ← ns.functions[function.functionId.index]?
+  let .structured root := declaration.body | none
+  let Γ := NRow.ofList (← view.localTypes? unit function.namespaceId declaration)
+  let holds := NTy.owns fun _ parameter => parameter == some index
+  (view.dropsAndCalls view.fuel root []).foldlM (init := []) fun found expression =>
+    match expression.kind with
+    | .operation (.drop place) .. =>
+        match compilePlace unit Γ view view.placeFuel place with
+        | .ok ⟨_, σ, _, _⟩ => if holds σ then none else some found
+        | .error _ => none
+    | .operation (.call (.function reference)) instantiations _ _
+    | .operation (.call (.closure reference _)) instantiations _ _ => do
+        let handle ← resolveFunction? unit function.namespaceId reference
+        -- A binder's position is its index, and a lifetime holds nothing.
+        let θ ← instantiations.toList.mapM fun argument => match argument with
+          | .typeArg value => view.nty unit function.namespaceId value.typeId
+          | .lifetime _ => some .unit
+          | _ => none
+        some (θ.zipIdx.foldl (init := found) fun found (τ, parameter) =>
+          if holds τ then (handle, parameter) :: found else found)
+    | _ => some found
+
+/-- Whether running a function can drop its type parameters in `pending`,
+directly or through the generic calls it makes. Out of fuel it says it can. -/
+def dropsParameter (unit : ValidatedUnit) :
+    Nat → List (FunctionHandle × Nat) → List (FunctionHandle × Nat) → Bool
+  | 0, _, _ => true
+  | _ + 1, _, [] => false
+  | fuel + 1, visited, (function, index) :: pending =>
+      if visited.contains (function, index) then dropsParameter unit fuel visited pending
+      else match handedOn? unit function index with
+        | none => true
+        | some next => dropsParameter unit fuel ((function, index) :: visited) (next ++ pending)
+
+/-- Whether a call instantiates a type parameter its callee drops at a type with
+a destructor, or at one holding a mutable reference, whose prophecy the drop would
+resolve where the callee has no place for it. A shared reference as the argument has
+neither, whatever it refers to. -/
+def CompileNamespace.dropsDestructor (ns : CompileNamespace) (unit : ValidatedUnit)
+    (callee : FunctionHandle) (typeArgs : List GenericArgument) (θ : NRow) : Bool :=
+  ns.source.profile == some .rust &&
+    (typeArgs.zip θ.toList).zipIdx.any fun ((argument, τ), index) =>
+      match argument with
+      | .typeArg argument =>
+          !isSharedReferenceType ns.source argument.typeId ns.types.get? &&
+            (holdsDestructor unit τ || !τ.refFree) && dropsParameter unit ns.fuel [] [(callee, index)]
+      | _ => false
+
+/-- The public Rust theorem's restriction on instantiated parameters that the
+function can drop, directly or through callees. Until effectful drop is modelled,
+such an argument may neither run a destructor nor hold an unresolved mutable loan.
+This is a check on the instantiated types, not a claim that arbitrary Rust drop
+glue is pure. Alignment of those types with Rust remains the frontend obligation. -/
+def DroppedTypeArgumentsTrivial (unit : ValidatedUnit) (handle : FunctionHandle)
+    (θ : TypeArgs) : Prop :=
+  ∀ index, index < θ.1.toList.length →
+    dropsParameter unit (unit.namespaces.foldl (fun n ns => n + ns.expressions.size + 1) 1)
+      [] [(handle, index)] = true →
+    holdsDestructor unit (θ.1.getD index .unit) = false ∧
+      (θ.1.getD index .unit).refFree = true
+
+/-- A generic instantiation in the caller's types over all binder positions: no
+carrier reads a lifetime's or a constant's position, which holds a placeholder. -/
+def CompileNamespace.instantiation? (ns : CompileNamespace) (unit : ValidatedUnit)
+    (namespaceId : NamespaceId) (arguments : List GenericArgument) : Option NRow :=
+  NRow.ofList <$> arguments.mapM fun argument => match argument with
+    | .typeArg value => ns.nty unit namespaceId value.typeId
+    | .lifetime _ | .const _ => some .unit
+    | .evidence _ => none
 
 mutual
 /-- The typed pattern of a validated one at the type of the value it matches. -/
@@ -668,6 +1080,36 @@ def neverArms {ρ : ResultShape} {Γ : NRow} {σ : NTy} (mismatch : Option Failu
   | (arm, pattern, some guard, body) :: rest, τ =>
       .guarded arm pattern guard (body τ) (neverArms mismatch rest τ)
 
+/-- Patterns matching every value of a row, binding nothing. -/
+def Pats.wildcards {Γ : NRow} : (σs : NRow) → Pats Γ σs
+  | .nil => .nil
+  | .cons _ σs => .cons .wildcard (Pats.wildcards σs)
+
+/-- One arm per listed variant of an enum, each the variant's declared
+discriminant; every variant is listed, so no value falls through. -/
+def discriminantArms {ρ : ResultShape} {Γ : NRow} (unit : ValidatedUnit) (handle : StructHandle)
+    {source : StructHandle} {arguments : NRow} {all : List String} {distinct : all.Nodup}
+    {width : Nat} {signed : Bool} (rows : NRows) : List String →
+    Except String (Arms unit ρ Γ (.enum source arguments all rows distinct) (.int width signed))
+  | [] => .ok (.nil none)
+  | name :: names => do
+      let some ⟨σs, choice⟩ := Which.ofName all rows name
+        | .error "a discriminant names an unknown variant"
+      let some value := variantDiscriminant? unit handle name
+        | notCarried "a discriminant of a variant declaring none"
+      let literal ← compileLiteral (.int width signed) (.integer value)
+      .ok (.cons none (.variant choice (Pats.wildcards σs)) literal
+        (← discriminantArms unit handle rows names))
+
+/-- A bitwise operation on signed integers: on their bit patterns, read back. -/
+def signedBitwise {ρ : ResultShape} {Γ : NRow} {width : Nat} (op : BitOp)
+    (left right : Term unit ρ Γ (.int width true)) :
+    Except String (Term unit ρ Γ (.int width true)) :=
+  if nonzero : width ≠ 0 then
+    .ok (.wrap nonzero (.bitwise op (.wrap nonzero left : Term unit ρ Γ (.int width false))
+      (.wrap nonzero right)))
+  else .error "an integer has no width"
+
 mutual
   /-- The term of one expression: its node's, with the loan deaths at it. -/
   def compileExpr (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
@@ -694,10 +1136,8 @@ mutual
         | .localVar localId =>
             let some τ := τ? | notCarried "a local of type never"
             let x ← Var.at? Γ localId.index τ
-            -- A mutable reference used as a value moves out of its slot.
-            match τ with
-            | .ref _ => .ok (.at τ (.take x))
-            | _ => .ok (.at τ (.var x))
+            -- A value holding a mutable reference moves out of its slot.
+            if τ.movesOut then .ok (.at τ (.take x)) else .ok (.at τ (.var x))
         | .constant reference =>
             let some τ := τ? | notCarried "a constant of type never"
             let some handle := resolveConstant? unit namespaceId reference
@@ -721,38 +1161,61 @@ mutual
             let some callee := calleeNs.functions[handle.functionId.index]?
               | .error "a callee is out of range"
             let some parameters := callee.signature.parameters.toList.mapM fun parameter =>
-                ns.nty unit handle.namespaceId (calleeNs.typeId parameter.typeUse.typeId)
+                ns.declaredNty unit handle.namespaceId (calleeNs.typeId parameter.typeUse.typeId)
               | notCarried "the type of a callee parameter"
             unless parameters.all NTy.lendable do notCarried "a reference inside an aggregate"
             let parameters := NRow.ofList parameters
             let shape ← match callee.signature.results.toList with
               | [] => .ok ResultShape.none
-              | [result] => match ns.nty unit handle.namespaceId (calleeNs.typeId result.typeId) with
+              | [result] => match ns.declaredNty unit handle.namespaceId (calleeNs.typeId result.typeId) with
                   | some τ => .ok (ResultShape.one τ)
                   | none => notCarried "the type of a callee result"
               | _ => notCarried "a callee with several results"
             unless shape.lendable do notCarried "a reference inside an aggregate"
-            if instantiations.isEmpty then
+            -- No value reads a lifetime argument, so a call with only those
+            -- runs as one with no type arguments.
+            if instantiations.all (· matches .lifetime _) then
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 parameters
               let value : Term unit ρ Γ shape.bodyType :=
                 .call (loopSite namespaceId.index id.index) handle shape arguments
               match τ? with
               | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
-              | none => notCarried "a call of type never"
+              | none => .ok (.never fun _ => .drop value .unreachable)
             else
-              let some typeArgs := (ns.source.genericArguments instantiations).toList.mapM
-                  fun argument => match argument with
-                  | .typeArg value => some value
-                  | _ => none
-                | notCarried "a generic argument that is not a type"
-              let some θ := typeArgs.mapM fun value => ns.nty unit namespaceId value.typeId
-                | notCarried "the type of a type argument"
-              let θ := NRow.ofList θ
-              unless θ.refFree do notCarried "a reference type argument"
+              let typeArgs := ns.source.genericArguments instantiations
+              let some θ := ns.instantiation? unit namespaceId typeArgs.toList
+                | notCarried "the type of a generic argument"
+              if ns.dropsDestructor unit handle typeArgs.toList θ then
+                notCarried (if θ.refFree then
+                  "a call dropping a type parameter at a type with a destructor"
+                  else "a call dropping a type parameter at a type holding a mutable reference")
               let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
                   some ⟨θ, inhabitable⟩ else none
                 | notCarried "a type argument without values"
+              -- Where no generic theorem transfers, the callee is read at the type arguments.
+              unless ns.transfers unit handle θ.1 do
+                let instanceAt := ns.ntyAt unit θ.1 handle.namespaceId
+                let some parameters := callee.signature.parameters.toList.mapM
+                    fun parameter => instanceAt (calleeNs.typeId parameter.typeUse.typeId)
+                  | notCarried "the type of a callee parameter"
+                let parameters := NRow.ofList parameters
+                let shape ← match callee.signature.results.toList with
+                  | [] => .ok ResultShape.none
+                  | [result] => match instanceAt (calleeNs.typeId result.typeId) with
+                      | some τ => .ok (ResultShape.one τ)
+                      | none => notCarried "the type of a callee result"
+                  | _ => notCarried "a callee with several results"
+                unless NRow.lendable parameters && shape.lendable do
+                  notCarried "a reference inside an aggregate"
+                let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
+                  arguments.toList parameters
+                let value : Term unit ρ Γ shape.bodyType :=
+                  .callInstance (loopSite namespaceId.index id.index) handle typeArgs θ shape
+                    arguments
+                return ← match τ? with
+                  | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
+                  | none => .ok (.never fun _ => .drop value .unreachable)
               -- The signature θ instantiates, evaluated here; the node keeps the evidence.
               let parameters' := NRow.subst θ.1 parameters
               let shape' := shape.subst θ.1
@@ -761,11 +1224,11 @@ mutual
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 parameters'
               let value : Term unit ρ Γ shape'.bodyType :=
-                .callGeneric (loopSite namespaceId.index id.index) handle typeArgs.toArray θ shape
+                .callGeneric (loopSite namespaceId.index id.index) handle typeArgs θ shape
                   shape' resolved arguments
               match τ? with
               | some τ => .ok (.at τ (← Compiled.at? τ (.at shape'.bodyType value)))
-              | none => notCarried "a call of type never"
+              | none => .ok (.never fun _ => .drop value .unreachable)
         | .operation (.call (.closure reference mask)) instantiations captures _ =>
             let some τ := τ? | notCarried "a closure of type never"
             let .function _ shared results := τ
@@ -776,9 +1239,8 @@ mutual
               | .error "a closure target's namespace is out of range"
             let some target := targetNs.functions[handle.functionId.index]?
               | .error "a closure's target is out of range"
-            if let some refusal := closureTargetRefusal targetNs target then throw refusal
             let some targetParameters := target.signature.parameters.toList.mapM fun parameter =>
-                ns.nty unit handle.namespaceId (targetNs.typeId parameter.typeUse.typeId)
+                ns.declaredNty unit handle.namespaceId (targetNs.typeId parameter.typeUse.typeId)
               | notCarried "the type of a closure target's parameter"
             let ⟨captured, supplied, weave⟩ := Weave.ofMask mask targetParameters
             unless weave.mask == mask do notCarried "a mask beyond its target's parameters"
@@ -801,21 +1263,18 @@ mutual
                 else notCarried "a closure whose shared parameters are not its target's"
               else notCarried "a closure whose rows are not its target's"
             else
-              let some typeArgs := (ns.source.genericArguments instantiations).toList.mapM
-                  fun argument => match argument with
-                  | .typeArg value => some value
-                  | _ => none
-                | notCarried "a generic argument that is not a type"
-              let some θ := typeArgs.mapM fun value => ns.nty unit namespaceId value.typeId
-                | notCarried "the type of a type argument"
-              let θ := NRow.ofList θ
-              unless θ.refFree do notCarried "a reference type argument"
+              let typeArgs := ns.source.genericArguments instantiations
+              let some θ := ns.instantiation? unit namespaceId typeArgs.toList
+                | notCarried "the type of a generic argument"
+              unless ns.transfers unit handle θ do notCarried "a reference type argument"
+              if ns.dropsDestructor unit handle typeArgs.toList θ then
+                notCarried "a closure dropping a type parameter at a type with a destructor"
               let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
                   some ⟨θ, inhabitable⟩ else none
                 | notCarried "a type argument without values"
               let shape ← match target.signature.results.toList with
                 | [] => .ok ResultShape.none
-                | [result] => match ns.nty unit handle.namespaceId (targetNs.typeId result.typeId) with
+                | [result] => match ns.declaredNty unit handle.namespaceId (targetNs.typeId result.typeId) with
                     | some σ => .ok (ResultShape.one σ)
                     | none => notCarried "the type of a closure target's result"
                 | _ => notCarried "a closure target with several results"
@@ -835,7 +1294,7 @@ mutual
                   let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
                     captures.toList captured'
                   let value : Term unit ρ Γ (.function supplied' shared shape'.row) :=
-                    .closureGeneric handle weave typeArgs.toArray θ shape shape' shared rows sharing
+                    .closureGeneric handle weave typeArgs θ shape shape' shared rows sharing
                       below resolved captures
                   .ok (.at τ (← Compiled.at? τ (.at (.function supplied' shared shape'.row) value)))
                 else notCarried "a closure target whose signature names foreign type parameters"
@@ -849,13 +1308,13 @@ mutual
             let some (.function parameters shared results) :=
                 ns.nty unit namespaceId (ns.source.typeId callableExpression.typeId)
               | notCarried "an invocation of a value that is not a function"
-            unless parameters.toList.all NTy.lendable do
+            unless parameters.toList.all NTy.lendableAtTop do
               notCarried "a reference inside an aggregate"
             let shape ← match results.toList with
               | [] => .ok ResultShape.none
               | [result] => .ok (ResultShape.one result)
               | _ => notCarried "a function value with several results"
-            unless shape.lendable do notCarried "a reference inside an aggregate"
+            unless shape.lendableAtTop do notCarried "a reference inside an aggregate"
             let function ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel callable).at?
               (.function parameters shared shape.row)
             let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments parameters
@@ -863,7 +1322,7 @@ mutual
               .invoke (loopSite namespaceId.index id.index) shape function arguments
             match τ? with
             | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
-            | none => notCarried "an invocation of type never"
+            | none => .ok (.never fun _ => .drop value .unreachable)
         | .operation (.borrow .mutable _) _ _ _ =>
             let some τ := τ? | notCarried "a borrow of type never"
             match expression.kind with
@@ -1182,12 +1641,39 @@ mutual
         match ns.place? place with
         | some (.localVar localId) => do
             let x ← Var.at? Γ localId.index τ
-            match consume, τ with
-            | true, .ref _ => .ok (.at τ (.take x))
-            | _, _ => .ok (.at τ (.var x))
+            if consume && τ.movesOut then .ok (.at τ (.take x)) else .ok (.at τ (.var x))
+        -- Validation admits only a shared borrow of an unsize place.
+        | some (.unsize base) => do
+            let ⟨_, baseType, _, _⟩ ← compilePlace unit Γ ns fuel base
+            let ⟨σ, array⟩ := (← compileRead unit Γ ns false fuel baseType base).some
+            match σ, array with
+            | .array element _, array =>
+                if equal : NTy.vector element = τ then .ok (.at τ (equal ▸ .arrayVector array))
+                else .error "an unsize read has an unexpected type"
+            | _, _ => notCarried "an unsize place on a non-array"
         | _ => do
             let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns fuel place
-            if equal : component = τ then .ok (.at τ (.readPlace (ns.mismatchOn path) x (equal ▸ path)))
+            if equal : component = τ then
+              if consume && ns.substitution.isSome && τ.movesOut then
+                -- Validation reads a reference moved out of an aggregate as a reborrow
+                -- through it, so its component stays true; a type parameter did not show
+                -- it there.
+                match component, path with
+                | .ref referent, path =>
+                    let reborrow := path.append (.deref .nil)
+                    .ok (.at (.ref referent) (.borrowPlace (ns.mismatchOn reborrow) x reborrow))
+                | _, _ =>
+                    notCarried "a move of a value holding a mutable reference out of an aggregate"
+              -- Validation leaves such a move only where an overwrite follows it.
+              else
+                let read : Except String (Compiled unit ρ Γ) :=
+                  .ok (.at τ (.readPlace (ns.mismatchOn path) x (equal ▸ path)))
+                if consume then
+                  match τ, equal with
+                  | .ref σ, equal =>
+                      .ok (.at (.ref σ) (.takeAt (ns.mismatchOn path) x (equal ▸ path)))
+                  | _, _ => read
+                else read
             else .error "a place read has an unexpected type"
 
   /-- An argument row at the expected types. -/
@@ -1293,7 +1779,15 @@ mutual
     | fuel + 1, origin, τ, .copy place, [] => compileRead unit Γ ns false fuel τ place
     | fuel + 1, origin, τ, .move place, [] => compileRead unit Γ ns true fuel τ place
     | fuel + 1, origin, τ, .read place, [] => compileRead unit Γ ns false fuel τ place
-    | fuel + 1, origin, τ, .borrow .immutable place, [] => compileRead unit Γ ns false fuel τ place
+    | fuel + 1, origin, τ, .borrow .immutable place, [] => do
+        -- A shared view holds no loan: what the place holds, observed.
+        match compilePlace unit Γ ns fuel place with
+        | .ok ⟨_, component, x, path⟩ =>
+            if component = τ then compileRead unit Γ ns false fuel τ place
+            else if equal : component.erase = τ then
+              .ok (.at τ (equal ▸ .observe (.readPlace (ns.mismatchOn path) x path)))
+            else compileRead unit Γ ns false fuel τ place
+        | .error _ => compileRead unit Γ ns false fuel τ place
     | fuel + 1, origin, .ref referent, .borrow .mutable place, [] => do
         let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns fuel place
         if equal : component = referent then
@@ -1317,8 +1811,10 @@ mutual
         -- A shared borrow of a computed value is that value: a shared
         -- reference denotes its referent, as a shared borrow of a place
         -- denotes the place's read.
-        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ
-        .ok (.at τ value)
+        let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
+        if equal : σ = τ then .ok (.at τ (equal ▸ value))
+        else if equal : σ.erase = τ then .ok (.at τ (equal ▸ .observe value))
+        else .error "a shared borrow has an unexpected type"
     | fuel + 1, origin, τ, .reference (.freeze _), [operand] => do
         -- Freezing a shared reference reads it.
         if ns.sharedAt operand then
@@ -1328,8 +1824,11 @@ mutual
         -- resolves its prophecy.
         let some localId := heldLocal? ns operand
           | notCarried "a freeze of a reference that no local holds"
-        let x ← Var.at? Γ localId.index (.ref τ)
-        .ok (.at τ (.deref (.var x)))
+        let some ⟨.ref σ, x⟩ := Var.ofIndex Γ localId.index
+          | .error "a freeze's local is not a mutable reference"
+        if equal : σ = τ then .ok (.at τ (equal ▸ .deref (.var x)))
+        else if equal : σ.erase = τ then .ok (.at τ (equal ▸ .observe (.deref (.var x))))
+        else .error "a freeze has an unexpected type"
     | fuel + 1, origin, .unit, .reference .mutate, [target, value] => do
         let some { kind := .localVar localId, .. } := ns.expressions.get? target.index
           | notCarried "a mutation of a reference that is not a local"
@@ -1384,6 +1883,21 @@ mutual
             let mismatch := if choices.partial then mismatchFailure? ns.source.profile else none
             .ok (.at τ (.payload mismatch choices operand))
         | _, _ => notCarried "a variant field selection on a non-enum"
+    -- A discriminant is the declared value of the variant the operand holds.
+    | fuel + 1, origin, .int width signed, .data (.discriminant reference), [operand] => do
+        let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
+        match σ, operand with
+        | .enum source _ names rows _, operand =>
+            let some handle := resolveStruct? unit namespaceId reference
+              | .error "a discriminant does not resolve"
+            unless handle = source do .error "a discriminant's declaration differs from its type"
+            .ok (.at (.int width signed)
+              (.caseOf operand (← discriminantArms unit handle rows names)))
+        | _, _ => notCarried "a discriminant of a non-enum"
+    | fuel + 1, _, .unit, .drop place, [] => do
+        let ⟨_, σ, _, _⟩ ← compilePlace unit Γ ns fuel place
+        if holdsDestructor unit σ then notCarried "a drop at a type with a destructor"
+        .ok (.at .unit (.lit ()))
     | _ + 1, _, _, operation, _ => notCarried (describeKind (.operation operation #[] #[] none))
 
   /-- A pure primitive at its declared result type. -/
@@ -1469,6 +1983,76 @@ mutual
         let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width false)
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width false)
         .ok (.at (.int width false) (.bitwise .xor left right))
+    | fuel + 1, origin, .int width true, .bitwiseAnd, [left, right] =>
+        compileSignedBitwise unit loanFacts ρ Γ ns namespaceId fuel width .and left right
+    | fuel + 1, origin, .int width true, .bitwiseOr, [left, right] =>
+        compileSignedBitwise unit loanFacts ρ Γ ns namespaceId fuel width .or left right
+    | fuel + 1, origin, .int width true, .bitwiseXor, [left, right] =>
+        compileSignedBitwise unit loanFacts ρ Γ ns namespaceId fuel width .xor left right
+    | fuel + 1, origin, .bool, .bitwiseAnd, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? .bool
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .bool
+        .ok (.at .bool (.logical true left right))
+    | fuel + 1, origin, .bool, .bitwiseOr, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? .bool
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .bool
+        .ok (.at .bool (.logical false left right))
+    | fuel + 1, origin, .bool, .bitwiseXor, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? .bool
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .bool
+        .ok (.at .bool (.equal true left right))
+    -- The complement of a bit pattern: `ones - value`, where ones reads as `-1`
+    -- at a signed type; the wrap is idle.
+    | fuel + 1, origin, .int width signed, .bitwiseNot, [operand] => do
+        let ones ← compileLiteral (.int width signed)
+          (.integer (if signed then -1 else 2 ^ width - 1))
+        let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at?
+          (.int width signed)
+        .ok (.at (.int width signed) (.modular .subtract ones operand))
+    | fuel + 1, origin, .int width signed, .negate, [operand] => do
+        let zero ← compileLiteral (.int width signed) (.integer 0)
+        let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at?
+          (.int width signed)
+        .ok (.at (.int width signed) (.modular .subtract zero operand))
+    | fuel + 1, origin, .int width signed, .divide, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
+        .ok (.at (.int width signed)
+          (.divideUnchecked (loopSite namespaceId.index origin.index) false left right))
+    | fuel + 1, origin, .int width signed, .modulo, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
+        .ok (.at (.int width signed)
+          (.divideUnchecked (loopSite namespaceId.index origin.index) true left right))
+    | fuel + 1, _, .tuple (.cons (.int width signed) (.cons .bool .nil)), .overflowingAdd, [left, right] =>
+        compileOverflowing unit loanFacts ρ Γ ns namespaceId fuel width signed .add left right
+    | fuel + 1, _, .tuple (.cons (.int width signed) (.cons .bool .nil)), .overflowingSubtract, [left, right] =>
+        compileOverflowing unit loanFacts ρ Γ ns namespaceId fuel width signed .subtract left right
+    | fuel + 1, _, .tuple (.cons (.int width signed) (.cons .bool .nil)), .overflowingMultiply, [left, right] =>
+        compileOverflowing unit loanFacts ρ Γ ns namespaceId fuel width signed .multiply left right
+    | fuel + 1, origin, τ, .shiftLeft, [value, distance] =>
+        compileUncheckedShift unit loanFacts ρ Γ ns namespaceId fuel origin τ true value distance
+    | fuel + 1, origin, τ, .shiftRight, [value, distance] =>
+        compileUncheckedShift unit loanFacts ρ Γ ns namespaceId fuel origin τ false value distance
+    | fuel + 1, origin, .int width' signed', .cast, [value] => do
+        let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
+        if nonzero : width' ≠ 0 then
+          match σ, value with
+          | .int _ _, value => .ok (.at (.int width' signed') (.wrap nonzero value))
+          | .char, value => .ok (.at (.int width' signed') (.wrap nonzero (.charCode value)))
+          | _, _ => notCarried "a cast from a non-integer"
+        else .error "an integer has no width"
+    | fuel + 1, origin, .char, .cast, [value] => do
+        let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
+        match σ, value with
+        | .int _ _, value => .ok (.at .char (.charOf (loopSite namespaceId.index origin.index) value))
+        | _, _ => notCarried "a cast to a character from a non-integer"
+    | fuel + 1, origin, .char, .checkedCast failure, [value] => do
+        let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
+        match σ, value with
+        | .int _ _, value =>
+            .ok (.at .char (.charOfChecked (loopSite namespaceId.index origin.index) failure value))
+        | _, _ => notCarried "a cast to a character from a non-integer"
     | fuel + 1, origin, τ, .checkedShiftLeft failure, [value, distance] =>
         compileShift unit loanFacts ρ Γ ns namespaceId fuel origin τ true failure value distance
     | fuel + 1, origin, τ, .checkedShiftRight failure, [value, distance] =>
@@ -1477,7 +2061,18 @@ mutual
         let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
         match σ, value with
         | .int _ _, value => .ok (.at (.int width' signed') (.cast (loopSite namespaceId.index origin.index) failure value))
+        | .char, value =>
+            .ok (.at (.int width' signed') (.cast (loopSite namespaceId.index origin.index) failure (.charCode value)))
         | _, _ => notCarried "a cast from a non-integer"
+    | fuel + 1, origin, .array τ length, .vector, elements => do
+        let count := elements.length
+        unless count = length do .error "an array literal's size differs from its type's"
+        let elements ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel elements
+          (NRow.replicate count τ)
+        .ok (.at (.array τ length) (.arrayOf (.vectorLit count elements)))
+    | fuel + 1, origin, .array τ length, .repeatVector, [value] => do
+        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? τ
+        .ok (.at (.array τ length) (.arrayOf (.repeatVector length value)))
     | fuel + 1, origin, .vector τ, .vector, elements => do
         let count := elements.length
         let elements ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel elements
@@ -1492,6 +2087,8 @@ mutual
         let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector _, vector => .ok (.at (.int 64 false) (.length vector))
+        | .array _ _, array => .ok (.at (.int 64 false) (.length (.arrayVector array)))
+        | .string, value => .ok (.at (.int 64 false) (.stringLength value))
         | _, _ => notCarried "a length of a non-vector"
     | fuel + 1, origin, _, .index, [vector, position] => do
         let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
@@ -1501,6 +2098,11 @@ mutual
             match π, position with
             | .int _ _, position => .ok (.at τ (.index (loopSite namespaceId.index origin.index) vector position))
             | _, _ => notCarried "an element read at a non-integer position"
+        | .array τ _, array =>
+            match π, position with
+            | .int _ _, position =>
+                .ok (.at τ (.index (loopSite namespaceId.index origin.index) (.arrayVector array) position))
+            | _, _ => notCarried "an element read at a non-integer position"
         | _, _ => notCarried "an element read of a non-vector"
     | fuel + 1, origin, .unit, .checkVectorIndex failure, [vector, position] => do
         let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
@@ -1509,6 +2111,12 @@ mutual
         | .vector _, vector =>
             match π, position with
             | .int _ _, position => .ok (.at .unit (.checkIndex (loopSite namespaceId.index origin.index) failure vector position))
+            | _, _ => notCarried "a bounds check at a non-integer position"
+        | .array _ _, array =>
+            match π, position with
+            | .int _ _, position =>
+                .ok (.at .unit (.checkIndex (loopSite namespaceId.index origin.index) failure
+                  (.arrayVector array) position))
             | _, _ => notCarried "a bounds check at a non-integer position"
         | _, _ => notCarried "a bounds check of a non-vector"
     | fuel + 1, origin, _, .pushVector, [vector, element] => do
@@ -1646,20 +2254,70 @@ mutual
         | .int width signed, left => do
             let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
             .ok (.at .bool (.compare op left right))
-        | _, _ => notCarried "a comparison of non-integers"
+        | .char, left => do
+            let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .char
+            .ok (.at .bool (.compare op (.charCode left) (.charCode right)))
+        -- Booleans order `false` before `true`.
+        | .bool, left => do
+            let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .bool
+            .ok (.at .bool (match op with
+              | .less => .logical true (.not left) right
+              | .greater => .logical true left (.not right)
+              | .lessEqual => .logical false (.not left) right
+              | .greaterEqual => .logical false left (.not right)))
+        | _, _ => notCarried "a comparison of this type"
     | _ + 1, _, _, _, _ => notCarried "a comparison at a non-Boolean type"
 
   def compileShift (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → ExprId → NTy → Bool → ThrowKind → ExprId → ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _, _, _, _ => .error "the compiler ran out of fuel"
-    | fuel + 1, origin, .int width false, left, failure, value, distance => do
-        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? (.int width false)
+    | fuel + 1, origin, .int width signed, left, failure, value, distance => do
+        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? (.int width signed)
+        let ⟨σ, distance⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel distance).some
+        let site := loopSite namespaceId.index origin.index
+        match σ, distance with
+        | .int _ true, distance =>
+            .ok (.at (.int width signed) (.shiftSigned site left failure value distance))
+        | .int _ false, distance =>
+            match signed, value with
+            | false, value => .ok (.at (.int width false) (.shift site left failure value distance))
+            | true, value => .ok (.at (.int width true) (.shiftSigned site left failure value distance))
+        | _, _ => notCarried "a shift by a non-integer distance"
+    | _ + 1, _, _, _, _, _, _ => notCarried "a shift of a non-integer"
+
+  def compileUncheckedShift (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
+      Nat → ExprId → NTy → Bool → ExprId → ExprId → Except String (Compiled unit ρ Γ)
+    | 0, _, _, _, _, _ => .error "the compiler ran out of fuel"
+    | fuel + 1, origin, .int width signed, left, value, distance => do
+        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? (.int width signed)
         let ⟨σ, distance⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel distance).some
         match σ, distance with
-        | .int _ false, distance => .ok (.at (.int width false) (.shift (loopSite namespaceId.index origin.index) left failure value distance))
-        | _, _ => notCarried "a shift by a signed or non-integer distance"
-    | _ + 1, _, _, _, _, _, _ => notCarried "a shift of a signed integer"
+        | .int _ _, distance =>
+            .ok (.at (.int width signed)
+              (.shiftUnchecked (loopSite namespaceId.index origin.index) left value distance))
+        | _, _ => notCarried "a shift by a non-integer distance"
+    | _ + 1, _, _, _, _, _ => notCarried "a shift of a non-integer"
+
+  def compileSignedBitwise (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
+      Nat → (width : Nat) → BitOp → ExprId → ExprId → Except String (Compiled unit ρ Γ)
+    | 0, _, _, _, _ => .error "the compiler ran out of fuel"
+    | fuel + 1, width, op, left, right => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width true)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width true)
+        .ok (.at (.int width true) (← signedBitwise op left right))
+
+  def compileOverflowing (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
+      Nat → (width : Nat) → (signed : Bool) → ModularOp → ExprId → ExprId →
+        Except String (Compiled unit ρ Γ)
+    | 0, _, _, _, _, _ => .error "the compiler ran out of fuel"
+    | fuel + 1, width, signed, op, left, right => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
+        .ok (.at (.tuple (.cons (.int width signed) (.cons .bool .nil))) (.overflowing op left right))
 end
 
 
@@ -1669,23 +2327,60 @@ def compileNamespaceAt? (unit : ValidatedUnit) (namespaceId : NamespaceId) :
     Option CompileNamespace :=
   (unit.namespaces[namespaceId.index]?).map (CompileNamespace.of unit namespaceId)
 
-/-- The mutable-reference slots among the `count` slots from `index`. -/
+/-- `CompileNamespace.transfers`, of a function of a unit. -/
+def transfersAt (unit : ValidatedUnit) (handle : FunctionHandle) (θ : NRow) : Bool :=
+  (compileNamespaceAt? unit handle.namespaceId).any (·.transfers unit handle θ)
+
+mutual
+  /-- The paths to the mutable references a value holds, not through one. -/
+  def NTy.referencePaths : (τ : NTy) → Except String (List ((σ : NTy) × Proj τ (.ref σ)))
+    | .ref σ => .ok [⟨σ, .nil⟩]
+    | .tuple elements => do
+        return (← NRow.referencePaths elements).map fun ⟨σ, _, x, path⟩ => ⟨σ, .element x path⟩
+    | .struct source arguments fields => do
+        return (← NRow.referencePaths fields).map fun ⟨σ, _, x, path⟩ =>
+          ⟨σ, .field (source := source) (arguments := arguments) x path⟩
+    | .enum source arguments names rows distinct => do
+        return (← NRows.referencePaths names rows).map fun ⟨σ, _, _, which, x, path⟩ =>
+          ⟨σ, .variant (source := source) (arguments := arguments) (distinct := distinct)
+            (.cons which x .nil) path⟩
+    | τ => if τ.refFree then .ok [] else notCarried "a reference inside an aggregate"
+
+  /-- The paths to the mutable references a row's values hold. -/
+  def NRow.referencePaths : (row : NRow) →
+      Except String (List ((σ : NTy) × (τ : NTy) × Var row τ × Proj τ (.ref σ)))
+    | .nil => .ok []
+    | .cons τ rest => do
+        let here := (← NTy.referencePaths τ).map fun ⟨σ, path⟩ => ⟨σ, τ, .here, path⟩
+        let later := (← NRow.referencePaths rest).map fun ⟨σ, ν, x, path⟩ => ⟨σ, ν, .there x, path⟩
+        return here ++ later
+
+  /-- The paths to the mutable references an enum's variants hold. -/
+  def NRows.referencePaths : (names : List String) → (rows : NRows) →
+      Except String (List ((σ : NTy) × (ν : NTy) × (fields : NRow) ×
+        Which names rows fields × Var fields ν × Proj ν (.ref σ)))
+    | _, .nil => .ok []
+    | [], .cons _ _ => .ok []
+    | _ :: names, .cons fields rest => do
+        let here := (← NRow.referencePaths fields).map fun ⟨σ, ν, x, path⟩ =>
+          ⟨σ, ν, fields, .here, x, path⟩
+        let later := (← NRows.referencePaths names rest).map fun ⟨σ, ν, row, which, x, path⟩ =>
+          ⟨σ, ν, row, .there which, x, path⟩
+        return here ++ later
+end
+
+/-- The mutable references among the `count` slots from `index`, in their
+slots or at paths in them. -/
 def mutableSlots (Γ : NRow) : Nat → Nat → Except String (Mutables Γ)
   | _, 0 => .ok .nil
   | index, count + 1 => do
       let rest ← mutableSlots Γ (index + 1) count
       match Var.ofIndex Γ index with
       | some ⟨.ref _, x⟩ => .ok (.cons x rest)
-      | some _ => .ok rest
+      | some ⟨τ, x⟩ =>
+          if τ.refFree then .ok rest else
+          return (← NTy.referencePaths τ).foldr (fun ⟨_, path⟩ rest => .at x path rest) rest
       | none => .error "a parameter is out of range"
-
-/-- Whether a type is logical only: it types specification values, never
-executable ones, so no body reads a local of it. -/
-def logicalOnly (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : TypeId) : Bool :=
-  match unit.namespaces[namespaceId.index]?.bind (·.tables.types[typeId.index]?) with
-  | some (.integer .unbounded _) | some .range | some (.typeDomain _)
-  | some (.resourceDomain ..) | some .stateDomain => true
-  | _ => false
 
 /-- The compiled function a handle names in its namespace's view, or the
 construct that stops it. -/
@@ -1694,15 +2389,14 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
   let some declaration := view.source.functions[handle.functionId.index]?
     | .error "a function is out of range"
   let .structured root := declaration.body | notCarried "a function without a body"
-  -- A specification local (a quantifier's binder) keeps an empty slot.
-  let some allLocals := declaration.locals.toList.mapM fun localDecl =>
-      match view.nty unit handle.namespaceId (view.source.typeId localDecl.type.typeId) with
-      | some τ => some τ
-      | none =>
-          if logicalOnly unit handle.namespaceId (view.source.typeId localDecl.type.typeId) then
-            some .unit
-          else none
-    | notCarried "the type of a local"
+  let some allLocals := view.localTypes? unit handle.namespaceId declaration
+    | match declaration.locals.toList.findSome? fun localDecl =>
+          let typeId := view.source.typeId localDecl.type.typeId
+          if (view.nty unit handle.namespaceId typeId).isSome then none
+          else if logicalOnly unit handle.namespaceId typeId then none
+          else nominalIn? unit (typeFuel unit) handle.namespaceId typeId with
+      | some name => .error s!"recursion through `{name}` is not carried by the denotation"
+      | none => notCarried "the type of a local"
   let paramCount := declaration.signature.parameters.size
   if paramCount > allLocals.length then .error "fewer locals than parameters" else
   let params := NRow.ofList (allLocals.take paramCount)
@@ -1728,7 +2422,31 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
   -- A parameter's reference resolves where the function leaves it: in its
   -- own slot or in a local it was moved into.
   let mutables ← mutableSlots frame 0 allLocals.length
-  .ok { params, locals, frame, frame_eq := rfl, result, body, mutables }
+  .ok { params, locals, frame, frame_eq := rfl, result, body, mutables, scopedMethods := scopedMethodIndices declaration.attributes }
+
+/-- The location of the innermost node of a function's body a compilation's
+rejection comes from, for its message; `none` where the function as a whole is
+rejected. -/
+partial def rejectionSite? (unit : ValidatedUnit) (handle : FunctionHandle) (reason : String) :
+    Option LocId := do
+  let view ← compileNamespaceAt? unit handle.namespaceId
+  let declaration ← view.source.functions[handle.functionId.index]?
+  let .structured root := declaration.body | none
+  let Γ := NRow.ofList (← view.localTypes? unit handle.namespaceId declaration)
+  let ρ ← match declaration.signature.results.toList with
+    | [] => some ResultShape.none
+    | [result] => ResultShape.one <$> view.nty unit handle.namespaceId result.typeId
+    | _ => none
+  let rec search (id : ExprId) : Option LocId := do
+    let expression ← view.expressions.get? id.index
+    if expression.kind matches .spec _ then none
+    match (expressionChildren expression.kind).findSome? search with
+    | some site => some site
+    | none =>
+        match compileExpr unit (loanFactsOf unit handle) ρ Γ view handle.namespaceId view.fuel id with
+        | .error rejection => if rejection == reason then some expression.loc else none
+        | .ok _ => none
+  search root
 
 /-- The compiled function a handle names, or the construct that stops it:
 its denotation, which agrees with its runtime meaning. A unit declaring
@@ -1750,6 +2468,28 @@ def compileModelFunction (unit : ValidatedUnit)
   | none => .error "a namespace is out of range"
   | some view => compileFunctionIn unit view handle
 
+/-- A namespace's view read at type arguments. -/
+def CompileNamespace.at (view : CompileNamespace) (θ : TypeArgs) : CompileNamespace :=
+  { view with substitution := some θ.1 }
+
+/-- A function compiled at a substitution: `compileFunction` without one. At type
+arguments `θ` its body is read at them, under the same frames and certificates. -/
+def compileFunctionAt (unit : ValidatedUnit) (handle : FunctionHandle) :
+    Option TypeArgs → Except String (Function unit)
+  | none => compileFunction unit handle
+  | some θ =>
+      if declaresGhosts unit then
+        .error "a unit declaring ghost fields is verified through its model"
+      else match compileNamespaceAt? unit handle.namespaceId with
+      | none => .error "a namespace is out of range"
+      | some view => compileFunctionIn unit (view.at θ) handle
+
+theorem compileFunctionAt_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
+    {view : CompileNamespace} (noGhosts : declaresGhosts unit = false)
+    (viewed : compileNamespaceAt? unit handle.namespaceId = some view) (θ : TypeArgs) :
+    compileFunctionAt unit handle (some θ) = compileFunctionIn unit (view.at θ) handle := by
+  simp [compileFunctionAt, noGhosts, viewed]
+
 theorem compileFunction_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
     {view : CompileNamespace} (noGhosts : declaresGhosts unit = false)
     (viewed : compileNamespaceAt? unit handle.namespaceId = some view) :
@@ -1759,20 +2499,30 @@ theorem compileFunction_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
 /-- `frameInstantiation` read through a namespace's view: its types indexed,
 iterated as the list they are. -/
 def frameInstantiationIn (view : CompileNamespace) (outer : Array (TypeId × TypeId))
-    (typeArgs : Array TypeUse) : Array (TypeId × TypeId) :=
+    (typeArgs : Array GenericArgument) : Array (TypeId × TypeId) :=
   if typeArgs.isEmpty then #[] else
     VerexIR.SemanticOperations.invocationTypeInstantiationIn view.source view.types
-      view.source.tables.types.toList outer (typeArgs.map .typeArg)
+      view.source.tables.types.toList outer typeArgs
 
 theorem frameInstantiation_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
     {view : CompileNamespace} (viewed : compileNamespaceAt? unit handle.namespaceId = some view)
-    (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) :
+    (outer : Array (TypeId × TypeId)) (typeArgs : Array GenericArgument) :
     frameInstantiation unit handle outer typeArgs = frameInstantiationIn view outer typeArgs := by
   simp only [compileNamespaceAt?, Option.map_eq_some_iff] at viewed
   obtain ⟨ns, found, rfl⟩ := viewed
   simp only [frameInstantiation, VerexIR.SemanticOperations.callTypeInstantiation,
     frameInstantiationIn, CompileNamespace.of, found, Array.map_eq_empty_iff, Array.isEmpty_iff,
     VerexIR.SemanticOperations.invocationTypeInstantiationIn_eq]
+
+/-- A substitution leaves the frame instantiation as the view reads it: a frame is the
+runtime's, over the source's own types. -/
+theorem frameInstantiation_of_substituted_view {unit : ValidatedUnit} {handle : FunctionHandle}
+    {view : CompileNamespace} (viewed : compileNamespaceAt? unit handle.namespaceId = some view)
+    (substitution : Option NRow) (outer : Array (TypeId × TypeId))
+    (typeArgs : Array GenericArgument) :
+    frameInstantiation unit handle outer typeArgs =
+      frameInstantiationIn { view with substitution } outer typeArgs :=
+  frameInstantiation_of_view viewed outer typeArgs
 
 /-- A view's types are its source's, indexed. -/
 theorem types_of_view {unit : ValidatedUnit} {namespaceId : NamespaceId} {view : CompileNamespace}
@@ -1782,6 +2532,14 @@ theorem types_of_view {unit : ValidatedUnit} {namespaceId : NamespaceId} {view :
   obtain ⟨ns, _, rfl⟩ := viewed
   rfl
 
+/-- A substitution leaves a view's types its source's: `nty` applies it to what it reads. -/
+theorem types_of_substituted_view {unit : ValidatedUnit} {namespaceId : NamespaceId}
+    {view : CompileNamespace} (viewed : compileNamespaceAt? unit namespaceId = some view)
+    (substitution : Option NRow) :
+    ({ view with substitution } : CompileNamespace).types =
+      .ofArray ({ view with substitution } : CompileNamespace).source.tables.types :=
+  types_of_view (view := view) viewed
+
 /-- The frame instantiation of a generic call, from a checked certificate: the
 callee namespace's types as a literal table, its lifetimes' kinds indexed,
 its key map, and the witnesses of this instantiation, all verified by the
@@ -1790,14 +2548,14 @@ theorem frameInstantiationIn_eq_of_check {view : CompileNamespace} {table : Arra
     {kinds : Validation.IndexedArena LifetimeKind}
     {map : Validation.KeyMap} {witnesses : Array Validation.Witness}
     {tree : Validation.IndexedArena Validation.Witness}
-    (typeArgs : Array TypeUse) (nonempty : typeArgs.isEmpty = false)
+    (typeArgs : Array GenericArgument) (nonempty : typeArgs.isEmpty = false)
     (viewTypes : view.types = .ofArray view.source.tables.types)
     (tableEq : view.source.tables.types = table)
     (kindsEq : Validation.IndexedArena.ofArray (Validation.lifetimeKinds view.source) = kinds)
     (correct : Validation.Correct view.types table.size map)
     (treeEq : Validation.IndexedArena.ofArray witnesses = tree)
     (checked : Validation.checkAll kinds view.types map
-      (VerexIR.SemanticOperations.instantiateGenericArguments #[] (typeArgs.map .typeArg))
+      (VerexIR.SemanticOperations.instantiateGenericArguments #[] typeArgs)
       tree table.size = true)
     (sizes : witnesses.size = table.size)
     (depths : witnesses.toList.all (fun witness => decide (witness.depth ≤ table.size)) = true) :

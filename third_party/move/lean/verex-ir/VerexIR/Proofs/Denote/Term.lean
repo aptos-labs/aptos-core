@@ -3,6 +3,7 @@
 
 import VerexIR.Proofs.Denote.ReturnedStorage
 import VerexIR.Semantics.Frames
+import VerexIR.Semantics.ScopedMethods
 
 /-!
 # Typed terms and their denotation
@@ -271,6 +272,12 @@ inductive Proj : NTy → NTy → Type where
   | field {source : StructHandle} {arguments fields : NRow} {σ τ : NTy} (x : Var fields σ)
       (rest : Proj σ τ) : Proj (.struct source arguments fields) τ
   | index {τ σ : NTy} (position : PlaceIndex) (rest : Proj τ σ) : Proj (.vector τ) σ
+  /-- An array's element. -/
+  | arrayIndex {τ σ : NTy} {length : Nat} (position : PlaceIndex) (rest : Proj τ σ) :
+      Proj (.array τ length) σ
+  /-- A tuple's element at its literal position. -/
+  | element {elements : NRow} {σ τ : NTy} (x : Var elements σ) (rest : Proj σ τ) :
+      Proj (.tuple elements) τ
   /-- The field the variants of an enum share at their chosen positions. -/
   | variant {source : StructHandle} {arguments : NRow} {names : List String} {rows : NRows}
       {distinct : names.Nodup} {σ τ : NTy} (choices : Choices names rows σ) (rest : Proj σ τ) :
@@ -386,6 +393,10 @@ def Proj.get? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → τ.
   | _, _, .nil, value => some value
   | _, _, .deref rest, value => rest.get? env value.1
   | _, _, .field x rest, value => rest.get? env (x.select value)
+  | _, _, .element x rest, value => rest.get? env (x.select value)
+  | _, _, .arrayIndex position rest, value =>
+      (position.resolve? env value.vector.values.size).bind fun index =>
+        value.vector.values[index]?.bind fun element => rest.get? env element
   | _, _, .index position rest, value =>
       (position.resolve? env value.values.size).bind fun index =>
         value.values[index]?.bind fun element => rest.get? env element
@@ -401,6 +412,13 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
       (rest.set? env replacement value.1).map fun current => (current, value.2)
   | _, _, .field x rest, replacement, value =>
       (rest.set? env replacement (x.select value)).map fun component => x.update component value
+  | _, _, .element x rest, replacement, value =>
+      (rest.set? env replacement (x.select value)).map fun component => x.update component value
+  | _, _, .arrayIndex position rest, replacement, value =>
+      (position.resolve? env value.vector.values.size).bind fun index =>
+        value.vector.values[index]?.bind fun element =>
+          (rest.set? env replacement element).map fun updated =>
+            ⟨value.vector.set index updated, value.size_set index updated⟩
   | _, _, .index position rest, replacement, value =>
       (position.resolve? env value.values.size).bind fun index =>
         value.values[index]?.bind fun element =>
@@ -418,6 +436,22 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
     {σ τ : NTy} (x : Var fields σ) (rest : Proj σ τ)
     (value : (NTy.struct source arguments fields).carrier) :
     (Proj.field x rest).get? env value = rest.get? env (x.select value) := rfl
+@[simp] theorem Proj.get?_arrayIndex {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} {length : Nat}
+    (position : PlaceIndex) (rest : Proj τ σ) (value : (NTy.array τ length).carrier) :
+    (Proj.arrayIndex position rest).get? env value =
+      (position.resolve? env value.vector.values.size).bind fun index =>
+        value.vector.values[index]?.bind fun element => rest.get? env element := rfl
+@[simp] theorem Proj.set?_arrayIndex {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} {length : Nat}
+    (position : PlaceIndex) (rest : Proj τ σ) (replacement : σ.carrier)
+    (value : (NTy.array τ length).carrier) :
+    (Proj.arrayIndex position rest).set? env replacement value =
+      (position.resolve? env value.vector.values.size).bind fun index =>
+        value.vector.values[index]?.bind fun element =>
+          (rest.set? env replacement element).map fun updated =>
+            ⟨value.vector.set index updated, value.size_set index updated⟩ := rfl
+@[simp] theorem Proj.get?_element {Γ : NRow} (env : HEnv Γ) {elements : NRow}
+    {σ τ : NTy} (x : Var elements σ) (rest : Proj σ τ) (value : (NTy.tuple elements).carrier) :
+    (Proj.element x rest).get? env value = rest.get? env (x.select value) := rfl
 @[simp] theorem Proj.get?_index {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (position : PlaceIndex)
     (rest : Proj τ σ) (value : (NTy.vector τ).carrier) :
     (Proj.index position rest).get? env value =
@@ -444,6 +478,11 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
     {σ τ : NTy} (x : Var fields σ) (rest : Proj σ τ) (replacement : τ.carrier)
     (value : (NTy.struct source arguments fields).carrier) :
     (Proj.field x rest).set? env replacement value =
+      (rest.set? env replacement (x.select value)).map fun component => x.update component value := rfl
+@[simp] theorem Proj.set?_element {Γ : NRow} (env : HEnv Γ) {elements : NRow}
+    {σ τ : NTy} (x : Var elements σ) (rest : Proj σ τ) (replacement : τ.carrier)
+    (value : (NTy.tuple elements).carrier) :
+    (Proj.element x rest).set? env replacement value =
       (rest.set? env replacement (x.select value)).map fun component => x.update component value := rfl
 @[simp] theorem Proj.set?_index {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (position : PlaceIndex)
     (rest : Proj τ σ) (replacement : σ.carrier) (value : (NTy.vector τ).carrier) :
@@ -685,6 +724,42 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       (value : Term unit ρ Γ (.int width false))
       (distance : Term unit ρ Γ (.int distanceWidth false)) :
       Term unit ρ Γ (.int width false)
+  /-- A checked shift of any other operands, the distance's range first. -/
+  | shiftSigned {Γ : NRow} {width distanceWidth : Nat} {signed distanceSigned : Bool} (site : Nat)
+      (left : Bool) (failure : ThrowKind) (value : Term unit ρ Γ (.int width signed))
+      (distance : Term unit ρ Γ (.int distanceWidth distanceSigned)) :
+      Term unit ρ Γ (.int width signed)
+  /-- A shift with no outcome where its distance is out of range. -/
+  | shiftUnchecked {Γ : NRow} {width distanceWidth : Nat} {signed distanceSigned : Bool}
+      (site : Nat) (left : Bool) (value : Term unit ρ Γ (.int width signed))
+      (distance : Term unit ρ Γ (.int distanceWidth distanceSigned)) :
+      Term unit ρ Γ (.int width signed)
+  /-- A quotient (`modulo` false) or remainder wrapped into the width, with no
+  outcome at a zero divisor. -/
+  | divideUnchecked {Γ : NRow} {width : Nat} {signed : Bool} (site : Nat) (modulo : Bool)
+      (left right : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.int width signed)
+  /-- A modular operation's value with whether its exact result left the width. -/
+  | overflowing {Γ : NRow} {width : Nat} {signed : Bool} (op : ModularOp)
+      (left right : Term unit ρ Γ (.int width signed)) :
+      Term unit ρ Γ (.tuple (.cons (.int width signed) (.cons .bool .nil)))
+  /-- An integer wrapped into another width: the `as` cast. -/
+  | wrap {Γ : NRow} {width : Nat} {signed : Bool} {width' : Nat} {signed' : Bool}
+      (nonzero : width' ≠ 0) (value : Term unit ρ Γ (.int width signed)) :
+      Term unit ρ Γ (.int width' signed')
+  /-- A character's code point. -/
+  | charCode {Γ : NRow} (value : Term unit ρ Γ .char) : Term unit ρ Γ (.int 32 false)
+  /-- The character of a code point, with no outcome where it is no Unicode
+  scalar value. -/
+  | charOf {Γ : NRow} {width : Nat} {signed : Bool} (site : Nat)
+      (value : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ .char
+  /-- The character of a code point, throwing where it is no Unicode scalar
+  value. -/
+  | charOfChecked {Γ : NRow} {width : Nat} {signed : Bool} (site : Nat) (failure : ThrowKind)
+      (value : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ .char
+  /-- A string's length in bytes, wrapped into the width. -/
+  | stringLength {Γ : NRow} (value : Term unit ρ Γ .string) : Term unit ρ Γ (.int 64 false)
+  /-- What follows a value of type `!`: no run gets here. -/
+  | unreachable {Γ : NRow} {τ : NTy} : Term unit ρ Γ τ
   /-- Checked conversion between integer types. -/
   | cast {Γ : NRow} {width : Nat} {signed : Bool} {width' : Nat} {signed' : Bool}
       (site : Nat) (failure : ThrowKind)
@@ -724,14 +799,20 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   | call {Γ : NRow} {σs : NRow} (site : Nat) (handle : FunctionHandle) (shape : ResultShape)
       (arguments : Args unit ρ Γ σs) : Term unit ρ Γ shape.bodyType
   /-- A call with type arguments: the callee's own signature `σs` and
-  `shape`, the arguments `θ` in the caller's types, the VIR type
+  `shape`, the arguments `θ` in the caller's types, the VIR generic
   arguments that instantiate the callee's frame, and the signature `θ`
   instantiates, evaluated by the compiler. -/
   | callGeneric {Γ : NRow} {σs σs' : NRow} (site : Nat) (handle : FunctionHandle)
-      (typeArgs : Array TypeUse) (θ : TypeArgs) (shape shape' : ResultShape)
+      (typeArgs : Array GenericArgument) (θ : TypeArgs) (shape shape' : ResultShape)
       (resolved : (NRow.subst θ.1 σs == σs' && shape.subst θ.1 == shape') = true)
       (arguments : Args unit ρ Γ σs') :
       Term unit ρ Γ shape'.bodyType
+  /-- A call at a type argument holding a mutable reference: the callee's rows
+  substituted at `θ`, so its references are lent where its type says, and the VIR
+  generic arguments that instantiate its frame. -/
+  | callInstance {Γ : NRow} {σs : NRow} (site : Nat) (handle : FunctionHandle)
+      (typeArgs : Array GenericArgument) (θ : TypeArgs) (shape : ResultShape)
+      (arguments : Args unit ρ Γ σs) : Term unit ρ Γ shape.bodyType
   /-- A closure of a function without type arguments over evaluated
   captures: the target and how its parameters are captured or supplied. -/
   | closure {Γ full captured supplied : NRow} (handle : FunctionHandle)
@@ -744,10 +825,10 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       Term unit ρ Γ (.function supplied shared results)
   /-- A closure with type arguments: the weave of the target's own
   parameters, its own result shape, the arguments `θ` in the caller's types,
-  the VIR type arguments that instantiate its frame, and the rows `θ`
+  the VIR generic arguments that instantiate its frame, and the rows `θ`
   instantiates, evaluated by the compiler. -/
   | closureGeneric {Γ full captured supplied captured' supplied' : NRow} (handle : FunctionHandle)
-      (weave : Weave full captured supplied) (typeArgs : Array TypeUse) (θ : TypeArgs)
+      (weave : Weave full captured supplied) (typeArgs : Array GenericArgument) (θ : TypeArgs)
       (shape shape' : ResultShape) (shared : Sharing)
       (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
       (sharing : closureShared unit handle weave.mask = shared)
@@ -799,12 +880,23 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   reference used as a value moves, so a function's exit and a loan's death
   resolve only the references a slot still holds. -/
   | take {Γ : NRow} {τ : NTy} (x : Var Γ τ) : Term unit ρ Γ τ
+  /-- A mutable reference moved out of a place an overwrite follows, the loan's only
+  holder from then on: the run clears the component, and the place keeps `(π, π)`, whose
+  value nothing reads and whose resolution assumes nothing. -/
+  | takeAt {Γ : NRow} {τ σ : NTy} (mismatch : Option Failure) (x : Var Γ τ)
+      (path : Proj τ (.ref σ)) : Term unit ρ Γ (.ref σ)
   /-- The death of the reference a local holds: execution continues only
   where its current value is its prophecy.  An empty slot resolves
   nothing; the reference moved on and resolves where it dies. -/
   | resolve {Γ : NRow} {τ : NTy} (x : Var Γ (.ref τ)) : Term unit ρ Γ .unit
+  /-- The death of the reference a local holds at a path; nothing where the
+  slot is empty or the path reaches no component. -/
+  | resolveAt {Γ : NRow} {τ σ : NTy} (x : Var Γ τ) (path : Proj τ (.ref σ)) : Term unit ρ Γ .unit
   /-- Replace the current value of the mutable reference a local holds. -/
   | mutate {Γ : NRow} {τ : NTy} (x : Var Γ (.ref τ)) (value : Term unit ρ Γ τ) : Term unit ρ Γ .unit
+  /-- What a shared view of a value holds, each mutable reference as its current
+  value. -/
+  | observe {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ τ) : Term unit ρ Γ τ.erase
   /-- Read the component of a local a path reaches. -/
   | readPlace {Γ : NRow} {τ σ : NTy} (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ σ) :
       Term unit ρ Γ σ
@@ -818,6 +910,16 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       Term unit ρ Γ (.ref σ)
   /-- A vector of listed elements. -/
   | vectorLit {Γ : NRow} {τ : NTy} (count : Nat) (elements : Args unit ρ Γ (NRow.replicate count τ)) :
+      Term unit ρ Γ (.vector τ)
+  /-- An array's vector: its length a fact from here on. -/
+  | arrayVector {Γ : NRow} {τ : NTy} {length : Nat} (array : Term unit ρ Γ (.array τ length)) :
+      Term unit ρ Γ (.vector τ)
+  /-- A vector of an array's length as the array, with no outcome at another
+  length. -/
+  | arrayOf {Γ : NRow} {τ : NTy} {length : Nat} (vector : Term unit ρ Γ (.vector τ)) :
+      Term unit ρ Γ (.array τ length)
+  /-- A vector holding one value `count` times. -/
+  | repeatVector {Γ : NRow} {τ : NTy} (count : Nat) (value : Term unit ρ Γ τ) :
       Term unit ρ Γ (.vector τ)
   /-- The length of a vector, which its bound fits in `u64`. -/
   | length {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) : Term unit ρ Γ (.int 64 false)
@@ -961,6 +1063,8 @@ slots whose references it resolves at every exit. -/
 inductive Mutables (Γ : NRow) : Type where
   | nil : Mutables Γ
   | cons {τ : NTy} (x : Var Γ (.ref τ)) (rest : Mutables Γ) : Mutables Γ
+  /-- A reference an aggregate slot holds at a path. -/
+  | at {τ σ : NTy} (x : Var Γ τ) (path : Proj τ (.ref σ)) (rest : Mutables Γ) : Mutables Γ
 
 /-- Resolve every mutable reference the function still holds where it
 leaves, a parameter's in its slot or in a local it was moved into, then
@@ -972,6 +1076,11 @@ def Mutables.resolve {Γ : NRow} {α : Type} : Mutables Γ → HEnv Γ → Comp 
       | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
           rest.resolve env next
       | none => rest.resolve env next
+  | .at x path rest, env, next =>
+      match (x.get env).bind (path.get? env) with
+      | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
+          rest.resolve env next
+      | none => rest.resolve env next
 
 @[simp] theorem Mutables.resolve_nil {Γ : NRow} {α : Type} (env : HEnv Γ) (next : Comp unit α) :
     (Mutables.nil : Mutables Γ).resolve env next = next := rfl
@@ -979,6 +1088,13 @@ def Mutables.resolve {Γ : NRow} {α : Type} : Mutables Γ → HEnv Γ → Comp 
     (rest : Mutables Γ) (env : HEnv Γ) (next : Comp unit α) :
     (Mutables.cons x rest).resolve env next =
       match x.get env with
+      | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
+          rest.resolve env next
+      | none => rest.resolve env next := rfl
+@[simp] theorem Mutables.resolve_at {Γ : NRow} {α : Type} {τ σ : NTy} (x : Var Γ τ)
+    (path : Proj τ (.ref σ)) (rest : Mutables Γ) (env : HEnv Γ) (next : Comp unit α) :
+    (Mutables.at x path rest).resolve env next =
+      match (x.get env).bind (path.get? env) with
       | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
           rest.resolve env next
       | none => rest.resolve env next := rfl
@@ -993,16 +1109,21 @@ and each argument's prophecy is its export with every returned reference's
 hole filled by that reference's prophecy. -/
 
 mutual
-/-- The runtime value of a native value whose outermost mutable references
-are lent under loans taken in order.  A reference passes its current value,
-or with `prophecies` its prophecy, under its loan; a tuple lends its
+/-- The runtime value of a native value whose mutable references are lent
+under loans taken in order.  A reference passes its current value, or with
+`prophecies` its prophecy, under its loan, with the references that value
+holds lent after it; a tuple, a struct and an enum's active variant lend their
 components; any other value is its encoding.  Returns the unused loans. -/
 def NTy.lend : (τ : NTy) → Bool → τ.carrier → List Nat → Option (RuntimeValue × List Nat)
   | .ref σ, prophecies, value, loan :: loans =>
-      some (.borrow loan (σ.encode (if prophecies then value.2 else value.1)), loans)
+      (σ.lend prophecies (if prophecies then value.2 else value.1) loans).map fun lent =>
+        (.borrow loan lent.1, lent.2)
   | .ref _, _, _, [] => none
   | .tuple elements, prophecies, values, loans =>
       (NRow.lend elements prophecies values loans).map fun lent => (.tuple lent.1.toArray, lent.2)
+  | .struct source _ fields, prophecies, values, loans =>
+      (NRow.lend fields prophecies values loans).map fun lent =>
+        (.nominal source none lent.1.toArray, lent.2)
   | .unit, _, value, loans => some (NTy.encode .unit value, loans)
   | .bool, _, value, loans => some (NTy.encode .bool value, loans)
   | .int width signed, _, value, loans => some (NTy.encode (.int width signed) value, loans)
@@ -1011,16 +1132,29 @@ def NTy.lend : (τ : NTy) → Bool → τ.carrier → List Nat → Option (Runti
   | .signer, _, value, loans => some (NTy.encode .signer value, loans)
   | .string, _, value, loans => some (NTy.encode .string value, loans)
   | .bytes, _, value, loans => some (NTy.encode .bytes value, loans)
-  | .struct source arguments fields, _, value, loans =>
-      some (NTy.encode (.struct source arguments fields) value, loans)
-  | .enum source arguments names rows distinct, _, value, loans =>
-      some (NTy.encode (.enum source arguments names rows distinct) value, loans)
+  | .char, _, value, loans => some (NTy.encode .char value, loans)
+  | .enum source _ names rows _, prophecies, value, loans =>
+      lendVariant source names rows prophecies value loans
   | .vector element, _, value, loans => some (NTy.encode (.vector element) value, loans)
+  | .array element length, _, value, loans => some (NTy.encode (.array element length) value, loans)
   | .table key value, _, entries, loans => some (NTy.encode (.table key value) entries, loans)
   | .ghost slot, _, value, loans => some (NTy.encode (.ghost slot) value, loans)
   | .param index, _, value, loans => some (NTy.encode (.param index) value, loans)
   | .function parameters shared results, _, value, loans =>
       some (NTy.encode (.function parameters shared results) value, loans)
+  | .nominal source arguments productive, _, value, loans =>
+      some (NTy.encode (.nominal source arguments productive) value, loans)
+
+/-- The runtime value of an enum's value: its active variant's fields lent. -/
+def lendVariant (source : StructHandle) : (names : List String) → (rows : NRows) → Bool →
+    variantCarrier names rows → List Nat → Option (RuntimeValue × List Nat)
+  | _, .nil, _, value, _ => nomatch value
+  | [], .cons _ _, _, value, _ => nomatch value
+  | name :: _, .cons fields _, prophecies, .inl values, loans =>
+      (NRow.lend fields prophecies values loans).map fun lent =>
+        (.nominal source (some name) lent.1.toArray, lent.2)
+  | _ :: names, .cons _ rest, prophecies, .inr later, loans =>
+      lendVariant source names rest prophecies later loans
 
 /-- The runtime values of a row lent under loans taken in order. -/
 def NRow.lend : (row : NRow) → Bool → HList row → List Nat →
@@ -1030,6 +1164,10 @@ def NRow.lend : (row : NRow) → Bool → HList row → List Nat →
       (τ.lend prophecies values.1 loans).bind fun head =>
         (NRow.lend rest prophecies values.2 head.2).map fun tail => (head.1 :: tail.1, tail.2)
 end
+
+attribute [vir_denote_norm] NTy.viewed HList.viewed variantViewed
+attribute [vir_denote_norm] NTy.observe HList.observe variantObserve
+attribute [vir_denote_norm] NTy.unerase HList.unerase variantUnerase
 
 /-- The runtime argument row of native arguments lent under exactly the
 given loans: each argument reference passes its current value. -/
@@ -1050,55 +1188,56 @@ def ResultShape.lend : (shape : ResultShape) → Bool → shape.carrier → List
       | some (raw, []) => some #[raw]
       | _ => Option.none
 
-/-- Every argument reference resolves at its prophecy: either the callee
+mutual
+/-- Every reference a value holds resolves at its prophecy: either the callee
 exported its loan with a value that, with the returned references' holes
-filled from `returned`, is the prophecy's encoding, or the callee returned
-the loan itself, carrying the prophecy. -/
+filled from `returned`, is the prophecy lent, or the callee returned the loan
+itself, carrying the prophecy.  What a prophecy holds in turn stays lent under
+its own loans, which travel with it. -/
+def NTy.resolves : (τ : NTy) → τ.carrier → List Nat → Array RuntimeValue →
+    List (Nat × RuntimeValue) → Prop
+  | .ref σ, value, loan :: loans, returned, exports =>
+      ∃ lent, σ.lend false value.2 loans = some lent ∧
+        match exportedRaw? loan exports with
+        | some exported =>
+            VerexIR.SemanticOperations.resolveReturnedBorrows returned exported = lent.1
+        | none => ∃ entry ∈ returned.toList,
+            (loan, lent.1) ∈ (VerexIR.SemanticOperations.outermostBorrows entry).toList
+  | .ref _, _, [], _, _ => False
+  | .tuple elements, values, loans, returned, exports =>
+      argumentsResolve elements values loans returned exports
+  | .struct _ _ fields, values, loans, returned, exports =>
+      argumentsResolve fields values loans returned exports
+  | .enum _ _ names rows _, value, loans, returned, exports =>
+      variantResolves names rows value loans returned exports
+  | .unit, _, _, _, _ | .bool, _, _, _, _ | .int _ _, _, _, _, _ | .num, _, _, _, _
+  | .address, _, _, _, _ | .signer, _, _, _, _ | .string, _, _, _, _ | .bytes, _, _, _, _
+  | .char, _, _, _, _ | .vector _, _, _, _, _
+  | .array _ _, _, _, _, _ | .table _ _, _, _, _, _ | .ghost _, _, _, _, _
+  | .param _, _, _, _, _ | .function _ _ _, _, _, _, _ | .nominal _ _ _, _, _, _, _ => True
+
+/-- Every reference an enum's active variant holds resolves at its prophecy. -/
+def variantResolves : (names : List String) → (rows : NRows) → variantCarrier names rows →
+    List Nat → Array RuntimeValue → List (Nat × RuntimeValue) → Prop
+  | _, .nil, value, _, _, _ => nomatch value
+  | [], .cons _ _, value, _, _, _ => nomatch value
+  | _ :: _, .cons fields _, .inl values, loans, returned, exports =>
+      argumentsResolve fields values loans returned exports
+  | _ :: names, .cons _ rest, .inr later, loans, returned, exports =>
+      variantResolves names rest later loans returned exports
+
+/-- Every reference a row of values holds resolves at its prophecy, under the
+loans the row was lent, taken in order. -/
 def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array RuntimeValue →
     List (Nat × RuntimeValue) → Prop
   | .nil, _, _, _, _ => True
-  | .cons (.ref σ) rest, values, loan :: loans, returned, exports =>
-      (match exportedRaw? loan exports with
-        | some exported =>
-            VerexIR.SemanticOperations.resolveReturnedBorrows returned exported =
-              σ.encode values.1.2
-        | none => ∃ entry ∈ returned.toList,
-            (loan, σ.encode values.1.2) ∈
-              (VerexIR.SemanticOperations.outermostBorrows entry).toList) ∧
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.ref _) _, _, [], _, _ => False
-  | .cons .unit rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons .bool rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.int _ _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons .num rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons .address rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons .signer rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons .string rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons .bytes rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.tuple _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.struct _ _ _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.ghost _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.enum _ _ _ _ _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.vector _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.table _ _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.param _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
-  | .cons (.function _ _ _) rest, values, loans, returned, exports =>
-      argumentsResolve rest values.2 loans returned exports
+  | .cons τ rest, values, loans, returned, exports =>
+      match τ.lend false values.1 loans with
+      | some lent =>
+          τ.resolves values.1 loans returned exports ∧
+            argumentsResolve rest values.2 lent.2 returned exports
+      | none => False
+end
 
 /-- A start state for a call lending references under loans: distinct
 loans below the allocation frontier, none registered to a global, and fresh
@@ -1116,7 +1255,7 @@ abbrev CalleeMeaning : Type :=
 /-- What a call with type arguments denotes, at the callee's own signature
 under the family its type arguments induce. -/
 abbrev GenericMeaning [Θ : Skolems unit] : Type :=
-  FunctionHandle → Array TypeUse → (θ : TypeArgs) → (σs : NRow) → (shape : ResultShape) →
+  FunctionHandle → Array GenericArgument → (θ : TypeArgs) → (σs : NRow) → (shape : ResultShape) →
     @HList (Skolems.instantiate θ Θ).toCarriers σs → Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
 
 /-- The big-step run of a callee: from any admissible start whose globals and
@@ -1181,6 +1320,28 @@ theorem propheticMeaning_of_coherent {unit : VerexIR.Validation.ValidatedUnit} [
     propheticMeaning executable typeInstantiation handle σs shape args =
       propheticRun executable typeInstantiation handle σs shape args := by
   simp only [propheticMeaning, coherent, true_and]
+
+/-- The prophetic meaning of a callee compiled at a substitution. Without one it is
+`propheticMeaning`. At `θ` the rows are already substituted and the run lends at them,
+in the ambient family, while the frame's agreement on the callee's own types is at the
+family `θ` induces, where its type parameters are the arguments. -/
+def propheticMeaningAt {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
+    (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
+    (substitution : Option TypeArgs) (typeInstantiation : Array (TypeId × TypeId))
+    (handle : FunctionHandle) (σs : NRow) (shape : ResultShape) (args : HList σs) :
+    Comp unit shape.carrier :=
+  match substitution with
+  | none => propheticMeaning executable typeInstantiation handle σs shape args
+  | some θ =>
+      { ok := fun initial result final =>
+          @Coherent unit _ (Skolems.instantiate θ Θ) handle typeInstantiation ∧
+            (propheticRun executable typeInstantiation handle σs shape args).ok initial result final
+        aborts := fun initial error =>
+          @Coherent unit _ (Skolems.instantiate θ Θ) handle typeInstantiation ∧
+            (propheticRun executable typeInstantiation handle σs shape args).aborts initial error
+        undefined := fun initial =>
+          @Coherent unit _ (Skolems.instantiate θ Θ) handle typeInstantiation ∧
+            (propheticRun executable typeInstantiation handle σs shape args).undefined initial }
 
 /-- The function value of a closure: its target, mask, and type
 instantiation, with the captures' encodings. -/
@@ -1387,54 +1548,81 @@ def closureRun {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
 
 omit [Skolems unit] in
 /-- The type instantiation of a callee's frame, computed from the caller's
-and the call's type arguments as the runtime does. -/
+and the call's generic arguments as the runtime does. -/
 def frameInstantiation (unit : VerexIR.Validation.ValidatedUnit) (handle : FunctionHandle)
-    (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) : Array (TypeId × TypeId) :=
-  VerexIR.SemanticOperations.callTypeInstantiation unit handle outer (typeArgs.map .typeArg)
+    (outer : Array (TypeId × TypeId)) (typeArgs : Array GenericArgument) :
+    Array (TypeId × TypeId) :=
+  VerexIR.SemanticOperations.callTypeInstantiation unit handle outer typeArgs
 
 omit [Skolems unit] in
-/-- Calls whose type arguments name the same types, wherever they occur,
-share a frame. -/
+/-- Calls whose generic arguments name the same types and lifetimes, wherever
+they occur, share a frame. -/
 theorem frameInstantiation_congr {unit : VerexIR.Validation.ValidatedUnit}
-    {handle : FunctionHandle} {outer : Array (TypeId × TypeId)} {left right : Array TypeUse}
-    (same : left.toList.map (·.typeId) = right.toList.map (·.typeId)) :
+    {handle : FunctionHandle} {outer : Array (TypeId × TypeId)}
+    {left right : Array GenericArgument}
+    (same : left.toList.map GenericArgument.eraseLoc =
+      right.toList.map GenericArgument.eraseLoc) :
     frameInstantiation unit handle outer left = frameInstantiation unit handle outer right := by
-  have same : left.map (·.typeId) = right.map (·.typeId) := by
+  have same : left.map GenericArgument.eraseLoc = right.map GenericArgument.eraseLoc := by
     apply Array.ext'
     simpa only [Array.toList_map] using same
-  have erase (typeArgs : Array TypeUse) :
-      (typeArgs.map GenericArgument.typeArg).map GenericArgument.eraseLoc =
-        (typeArgs.map (·.typeId)).map fun typeId => .typeArg ⟨typeId, ⟨0⟩⟩ := by
-    simp only [Array.map_map]
-    rfl
   unfold frameInstantiation
-  rw [← VerexIR.SemanticOperations.callTypeInstantiation_eraseLoc, erase, same, ← erase,
+  rw [← VerexIR.SemanticOperations.callTypeInstantiation_eraseLoc, same,
     VerexIR.SemanticOperations.callTypeInstantiation_eraseLoc]
+
+/-- Whether the arguments are one per binder, each of its binder's kind. -/
+def argumentsOfKinds : List BinderKind → List GenericArgument → Bool
+  | [], [] => true
+  | .typeArg :: binders, .typeArg _ :: arguments
+  | .const :: binders, .const _ :: arguments
+  | .lifetime :: binders, .lifetime _ :: arguments
+  | .evidence :: binders, .evidence _ :: arguments => argumentsOfKinds binders arguments
+  | _, _ => false
+
+/-- Arguments for type binders alone are type arguments. -/
+theorem argumentsOfKinds_types : (binders : List BinderKind) → (arguments : List GenericArgument) →
+    argumentsOfKinds binders arguments = true → binders.all (· == .typeArg) = true →
+    ∃ uses : List TypeUse, arguments = uses.map .typeArg ∧ uses.length = binders.length
+  | [], [], _, _ => ⟨[], rfl, rfl⟩
+  | .typeArg :: binders, .typeArg use :: arguments, kinds, types => by
+      simp only [List.all_cons, Bool.and_eq_true] at types
+      obtain ⟨uses, same, sizes⟩ := argumentsOfKinds_types binders arguments kinds types.2
+      exact ⟨use :: uses, by simp [same], by simp [sizes]⟩
+  | .const :: _, _, _, types | .lifetime :: _, _, _, types | .evidence :: _, _, _, types => by
+      simp only [List.all_cons, Bool.and_eq_true] at types
+      exact absurd types.1 (by decide)
+  | [], _ :: _, kinds, _ | _ :: _, [], kinds, _ => by
+      simp [argumentsOfKinds] at kinds
+  | .typeArg :: _, .const _ :: _, kinds, _ | .typeArg :: _, .lifetime _ :: _, kinds, _
+  | .typeArg :: _, .evidence _ :: _, kinds, _ => by
+      simp [argumentsOfKinds] at kinds
 
 omit [Skolems unit] in
 /-- The instantiations a generic function runs in: the empty one, where it
-runs on its own, or a call's frame, from the caller's frame and one type
-argument per type parameter. -/
-def FrameOf (unit : VerexIR.Validation.ValidatedUnit) (handle : FunctionHandle) (arity : Nat)
-    (typeInstantiation : Array (TypeId × TypeId)) : Prop :=
-  typeInstantiation = #[] ∨ ∃ outer typeArgs, typeArgs.size = arity ∧
+runs on its own, or a call's frame, from the caller's frame and one generic
+argument per binder. -/
+def FrameOf (unit : VerexIR.Validation.ValidatedUnit) (handle : FunctionHandle)
+    (binders : List BinderKind) (typeInstantiation : Array (TypeId × TypeId)) : Prop :=
+  typeInstantiation = #[] ∨ ∃ outer typeArgs, argumentsOfKinds binders typeArgs.toList = true ∧
     typeInstantiation = frameInstantiation unit handle outer typeArgs
 
 omit [Skolems unit] in
 theorem FrameOf.empty {unit : VerexIR.Validation.ValidatedUnit} {handle : FunctionHandle}
-    {arity : Nat} : FrameOf unit handle arity #[] := .inl rfl
+    {binders : List BinderKind} : FrameOf unit handle binders #[] := .inl rfl
 
 omit [Skolems unit] in
 theorem FrameOf.frame {unit : VerexIR.Validation.ValidatedUnit} {handle : FunctionHandle}
-    {arity : Nat} {outer : Array (TypeId × TypeId)} {typeArgs : Array TypeUse}
-    (sizes : typeArgs.size = arity) :
-    FrameOf unit handle arity (frameInstantiation unit handle outer typeArgs) :=
-  .inr ⟨outer, typeArgs, sizes, rfl⟩
+    {binders : List BinderKind} {outer : Array (TypeId × TypeId)}
+    {typeArgs : Array GenericArgument}
+    (kinds : argumentsOfKinds binders typeArgs.toList = true) :
+    FrameOf unit handle binders (frameInstantiation unit handle outer typeArgs) :=
+  .inr ⟨outer, typeArgs, kinds, rfl⟩
 
 omit [Skolems unit] in
 theorem FrameOf.rewrite {unit : VerexIR.Validation.ValidatedUnit} {handle : FunctionHandle}
-    {arity : Nat} {left right : Array (TypeId × TypeId)} (frame : FrameOf unit handle arity left)
-    (same : left = right) : FrameOf unit handle arity right :=
+    {binders : List BinderKind} {left right : Array (TypeId × TypeId)}
+    (frame : FrameOf unit handle binders left)
+    (same : left = right) : FrameOf unit handle binders right :=
   same ▸ frame
 
 omit [Skolems unit] in
@@ -1442,21 +1630,29 @@ omit [Skolems unit] in
 caller's namespace, runs in the caller's frame; at the empty frame as the
 runtime computes it for the call (`empty`). -/
 theorem frameInstantiation_own {unit : VerexIR.Validation.ValidatedUnit}
-    {caller callee : FunctionHandle} {arity : Nat}
-    {own : Array TypeUse} {typeInstantiation : Array (TypeId × TypeId)}
-    (same : callee.namespaceId = caller.namespaceId) (sizes : own.size = arity)
+    {caller callee : FunctionHandle} {binders : List BinderKind}
+    {own : Array GenericArgument} {typeInstantiation : Array (TypeId × TypeId)}
+    (same : callee.namespaceId = caller.namespaceId) (sizes : own.size = binders.length)
+    (types : binders.all (· == .typeArg) = true)
     (parameters : VerexIR.SemanticOperations.ownParametersIn unit caller own = true)
     (empty : frameInstantiation unit callee #[] own = #[])
-    (frame : FrameOf unit caller arity typeInstantiation) :
+    (frame : FrameOf unit caller binders typeInstantiation) :
     frameInstantiation unit callee typeInstantiation own = typeInstantiation := by
-  rcases frame with rfl | ⟨outer, typeArgs, size, rfl⟩
+  rcases frame with rfl | ⟨outer, typeArgs, kinds, rfl⟩
   · exact empty
   · unfold VerexIR.SemanticOperations.ownParametersIn at parameters
     split at parameters
     · rename_i ns namespaceOf
+      obtain ⟨uses, ownUses, typed⟩ :=
+        VerexIR.SemanticOperations.ownParameters_spec parameters
+      obtain ⟨arguments, argumentsUses, count⟩ := argumentsOfKinds_types _ _ kinds types
+      have typeArgsUses : typeArgs = arguments.toArray.map .typeArg := by
+        apply Array.ext'
+        simpa using argumentsUses
+      subst ownUses
+      subst typeArgsUses
       exact VerexIR.SemanticOperations.callTypeInstantiation_own_parameters unit ns caller callee
-        outer typeArgs own namespaceOf same (by omega)
-        (VerexIR.SemanticOperations.ownParameters_spec parameters)
+        outer _ uses namespaceOf same (by simp_all) typed
     · cases parameters
 
 /-- The closed meaning of calls with type arguments: the callee's
@@ -1467,6 +1663,21 @@ def closedGeneric {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers un
     (typeInstantiation : Array (TypeId × TypeId)) : GenericMeaning :=
   fun handle typeArgs θ σs shape args =>
     @propheticMeaning _ _ executable (Skolems.instantiate θ ‹_›)
+      (frameInstantiation unit handle typeInstantiation typeArgs) handle σs shape args
+
+/-- What a call at a type argument holding a mutable reference denotes, over the
+callee's substituted rows. -/
+abbrev InstanceMeaning [Skolems unit] : Type :=
+  FunctionHandle → Array GenericArgument → (θ : TypeArgs) → (σs : NRow) → (shape : ResultShape) →
+    HList σs → Comp unit shape.carrier
+
+/-- The closed meaning of such calls: the callee's prophetic meaning at `θ`, under
+its frame's instantiation, computed from the caller's as the runtime does. -/
+def closedInstance {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
+    (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId)) : InstanceMeaning :=
+  fun handle typeArgs θ σs shape args =>
+    propheticMeaningAt executable (some θ)
       (frameInstantiation unit handle typeInstantiation typeArgs) handle σs shape args
 
 /-- What invoking a function value denotes: of a value of a function type,
@@ -1506,6 +1717,8 @@ structure Meanings {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers u
   site, over the packed value and the state. -/
   ghostInit : Nat → Option ((τ : NTy) × (σ : NTy) × (τ.carrier → Memory unit → Option σ.carrier)) :=
     fun _ => none
+  /-- What a call at a type argument holding a mutable reference means. -/
+  atInstance : InstanceMeaning
 
 /-- Every call its callee's prophetic meaning, a call with type arguments
 under the instantiation its frame computes from `typeInstantiation`. -/
@@ -1513,7 +1726,8 @@ under the instantiation its frame computes from `typeInstantiation`. -/
     (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) : Meanings executable :=
   ⟨propheticMeaning executable #[], closedGeneric executable typeInstantiation,
-    closureMeaning executable, typeInstantiation, fun _ => none, fun _ => none, fun _ => none⟩
+    closureMeaning executable, typeInstantiation, fun _ => none, fun _ => none, fun _ => none,
+    closedInstance executable typeInstantiation⟩
 
 /-- The outcome of a closed computation, back in the enclosing locals. -/
 def Flow.rebase {ρ : ResultShape} {Γ : NRow} {α : Type} (env : HEnv Γ) :
@@ -1843,7 +2057,7 @@ shape and the type arguments, which name the meaning of its invocation at the
 family they induce. -/
 def closureOfGeneric (unit : VerexIR.Validation.ValidatedUnit) [FunctionCarriers unit]
     [Skolems unit]
-    (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) (θ : TypeArgs)
+    (outer : Array (TypeId × TypeId)) (typeArgs : Array GenericArgument) (θ : TypeArgs)
     {full captured supplied : NRow} (weave : Weave full captured supplied) (_shape : ResultShape)
     (handle : FunctionHandle) (captures : HList (NRow.subst θ.1 captured)) : ClosureValue :=
   closureOf handle weave.mask (frameInstantiation unit handle outer typeArgs) captures
@@ -1853,7 +2067,7 @@ closure of `closureOfGeneric`, carrying the target's own weave and result
 shape and the type arguments, which name the meaning of its invocation. -/
 def functionOfGeneric (unit : VerexIR.Validation.ValidatedUnit) [FunctionCarriers unit]
     [Skolems unit]
-    (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) (θ : TypeArgs)
+    (outer : Array (TypeId × TypeId)) (typeArgs : Array GenericArgument) (θ : TypeArgs)
     {full captured supplied : NRow} (weave : Weave full captured supplied) (shape : ResultShape)
     (shared : Sharing) (handle : FunctionHandle) (captures : HList (NRow.subst θ.1 captured))
     (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
@@ -1864,7 +2078,7 @@ def functionOfGeneric (unit : VerexIR.Validation.ValidatedUnit) [FunctionCarrier
 
 /-- A created generic function value's runtime closure is the closure
 created. -/
-theorem functionOfGeneric_closure (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse)
+theorem functionOfGeneric_closure (outer : Array (TypeId × TypeId)) (typeArgs : Array GenericArgument)
     (θ : TypeArgs) {full captured supplied : NRow} (weave : Weave full captured supplied)
     (shape : ResultShape) (shared : Sharing) (handle : FunctionHandle)
     (captures : HList (NRow.subst θ.1 captured))
@@ -1884,7 +2098,7 @@ def ClosureFrame (unit : VerexIR.Validation.ValidatedUnit) [FunctionCarriers uni
 /-- A closure of a target with type parameters, at a frame coherent with the
 instantiation its caller's frame computes, is typed at the caller's rows: the
 frame's resolution of its target's own rows (`closureRowsIn?_coherent`). -/
-theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse)
+theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Array GenericArgument)
     (θ : TypeArgs) {full captured supplied : NRow} (weave : Weave full captured supplied)
     (shape : ResultShape) {handle : FunctionHandle} {shared : Sharing}
     (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
@@ -1900,15 +2114,16 @@ theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Ar
   refine ⟨?_, sharing, frame.2⟩
   rw [atFrame, ResultShape.row_subst]
 
-/-- The outcome of a variant mismatch: the profile's throw, or none. -/
+/-- The outcome of a place or selection that resolves nothing: the profile's
+throw, or else undefined, which a proof must rule out by the check before it. -/
 def mismatchOutcome {α : Type} : Option Failure → Comp unit α
   | some failure => Spec.abort failure
-  | none => Spec.bottom
+  | none => Spec.stuck
 
 @[simp] theorem mismatchOutcome_some {α : Type} (failure : Failure) :
     (mismatchOutcome (some failure) : Comp unit α) = Spec.abort failure := rfl
 @[simp] theorem mismatchOutcome_none {α : Type} :
-    (mismatchOutcome none : Comp unit α) = Spec.bottom := rfl
+    (mismatchOutcome none : Comp unit α) = Spec.stuck := rfl
 
 mutual
 /-- The denotation of a term: its outcome with the locals after it. -/
@@ -1955,6 +2170,51 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
         Flow.bind (distance.denote meanings env) fun d env =>
           Spec.bind (opAt site (if left then checkedShiftLeft failure v d
             else checkedShiftRight failure v d)) fun result => Spec.pure (.value result env)
+  | _, .int width signed, .shiftSigned site left failure value distance, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        Flow.bind (distance.denote meanings env) fun d env =>
+          opAt site (if 0 ≤ d.val ∧ d.val < (width : Int) then
+            Spec.pure (.value ⟨wrapInt width signed (if left then Int.shiftLeft v.val d.val.toNat
+              else Int.shiftRight v.val d.val.toNat), wrapInt_fits _ _ _ v.width_nonzero⟩ env)
+          else abortAt site (Failure.ofInts failure #[d.val]))
+  | _, .int width signed, .shiftUnchecked site left value distance, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        Flow.bind (distance.denote meanings env) fun d env =>
+          opAt site (if 0 ≤ d.val ∧ d.val < (width : Int) then
+            Spec.pure (.value ⟨wrapInt width signed (if left then Int.shiftLeft v.val d.val.toNat
+              else Int.shiftRight v.val d.val.toNat), wrapInt_fits _ _ _ v.width_nonzero⟩ env)
+          else Spec.stuck)
+  | _, .int width signed, .divideUnchecked site modulo left right, env =>
+      Flow.bind (left.denote meanings env) fun l env =>
+        Flow.bind (right.denote meanings env) fun r env =>
+          opAt site (if r.val = 0 then Spec.stuck
+          else Spec.pure (.value ⟨wrapInt width signed (if modulo then l.val.tmod r.val else l.val.tdiv r.val),
+            wrapInt_fits _ _ _ l.width_nonzero⟩ env))
+  | _, _, .overflowing op left right, env =>
+      Flow.bind (left.denote meanings env) fun l env =>
+        Flow.bind (right.denote meanings env) fun r env =>
+          Spec.pure (.value ((op.run l r, (op.overflows l r, ())) :
+            HList (.cons (.int _ _) (.cons .bool .nil))) env)
+  | _, .int width' signed', .wrap nonzero value, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        Spec.pure (.value ⟨wrapInt width' signed' v.val, wrapInt_fits _ _ _ nonzero⟩ env)
+  | _, _, .charCode value, env =>
+      Flow.bind (value.denote meanings env) fun v env => Spec.pure (.value (SpecChar.code v) env)
+  | _, _, .charOf site value, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        opAt site (if valid : 0 ≤ v.val ∧ isUnicodeScalar v.val.toNat = true then
+          Spec.pure (.value ⟨v.val.toNat, valid.2⟩ env)
+        else Spec.stuck)
+  | _, _, .charOfChecked site failure value, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        opAt site (if valid : 0 ≤ v.val ∧ isUnicodeScalar v.val.toNat = true then
+          Spec.pure (.value ⟨v.val.toNat, valid.2⟩ env)
+        else abortAt site (Failure.ofInts failure #[v.val]))
+  | _, _, .stringLength value, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        Spec.pure (.value ⟨wrapInt 64 false (v : String).utf8ByteSize,
+          wrapInt_fits _ _ _ (by decide)⟩ env)
+  | _, _, .unreachable, _ => Spec.bottom
   | _, .int width' signed', .cast site failure value, env =>
       Flow.bind (value.denote meanings env) fun v env =>
         Spec.bind (opAt site (checkedInt failure width' signed' v.val)) fun result =>
@@ -1992,6 +2252,10 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
           fun result => Spec.pure (.value (shape'.toBody
             (cast (congrArg ResultShape.carrier (resolvedCall resolved).2)
               (ResultShape.ofSkolem θ shape result))) env)
+  | _, _, .callInstance site handle typeArgs θ shape arguments, env =>
+      Flow.bind (arguments.denote meanings env) fun values env =>
+        Spec.bind (callAt site (meanings.atInstance handle typeArgs θ _ shape values)) fun result =>
+          Spec.pure (.value (shape.toBody result) env)
   | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
       captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
@@ -2038,12 +2302,19 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
       Flow.bind (scrutinee.denote meanings env) fun value env => arms.denote meanings value env
   | _, _, .deref value, env =>
       Flow.bind (value.denote meanings env) fun v env => Spec.pure (.value v.1 env)
+  | _, _, @Term.observe _ _ _ τ value, env =>
+      Flow.bind (value.denote meanings env) fun v env => Spec.pure (.value (τ.observe v) env)
   | _, _, .take x, env =>
       match x.get env with
       | some value => Spec.pure (.value value (x.clear env))
       | none => Spec.bottom
   | _, _, .resolve x, env =>
       match x.get env with
+      | some reference =>
+          Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ => Spec.pure (.value () env)
+      | none => Spec.pure (.value () env)
+  | _, _, .resolveAt x path, env =>
+      match (x.get env).bind (path.get? env) with
       | some reference =>
           Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ => Spec.pure (.value () env)
       | none => Spec.pure (.value () env)
@@ -2057,6 +2328,16 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
       | some value =>
           match path.get? env value with
           | some component => Spec.pure (.value component env)
+          | none => mismatchOutcome mismatch
+      | none => Spec.bottom
+  | _, _, .takeAt mismatch x path, env =>
+      match x.get env with
+      | some value =>
+          match path.get? env value with
+          | some reference =>
+              match path.set? env (reference.2, reference.2) value with
+              | some cleared => Spec.pure (.value reference (x.set cleared env))
+              | none => mismatchOutcome mismatch
           | none => mismatchOutcome mismatch
       | none => Spec.bottom
   | _, _, .writePlace mismatch x path value, env =>
@@ -2083,6 +2364,19 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
         match SpecVector.ofArray? (HList.toListOf count values).toArray with
         | some vector => Spec.pure (.value vector env)
         | none => Spec.bottom
+  | _, _, @Term.arrayVector _ _ _ _ length array, env =>
+      Flow.bind (array.denote meanings env) fun a env =>
+        Spec.bind (Spec.assume (a.vector.values.size = length)) fun _ =>
+          Spec.pure (.value a.vector env)
+  | _, .array _ length, .arrayOf vector, env =>
+      Flow.bind (vector.denote meanings env) fun values env =>
+        if sized : values.values.size = length then Spec.pure (.value ⟨values, sized⟩ env)
+        else Spec.stuck
+  | _, _, .repeatVector count value, env =>
+      Flow.bind (value.denote meanings env) fun v env =>
+        match SpecVector.ofArray? (Array.replicate count v) with
+        | some vector => Spec.pure (.value vector env)
+        | none => Spec.stuck
   | _, _, .length vector, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Spec.pure (.value (vectorLength values) env)
@@ -2302,6 +2596,12 @@ structure Function (unit : Validation.ValidatedUnit) where
   body : Term unit result frame result.bodyType
   /-- The mutable-reference parameters, resolved at exit. -/
   mutables : Mutables frame
+  /-- Scoped dictionary parameters, checked before evaluating the body. -/
+  scopedMethods : List Int := []
+
+@[simp, vir_denote_norm] theorem scopedValues_nil
+    (unit : VerexIR.Validation.ValidatedUnit) (arguments : Array VerexIR.RuntimeValue) :
+    VerexIR.scopedValues unit [] arguments = true := rfl
 
 /-- The function result a body outcome denotes, after the mutable-reference
 parameters it still holds are resolved.  Loop control that escapes the body
@@ -2319,8 +2619,12 @@ def Function.denoteWith {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarri
     {executable : VerexIR.Validation.ExecutableUnit unit} [Skolems unit]
     (meanings : Meanings executable) (f : Function unit) (args : HList f.params) :
     Comp unit f.result.carrier :=
-  Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
+  let body := Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
     (f.result.finish f.mutables)
+  match f.scopedMethods with
+  | [] => body
+  | _ :: _ =>
+      if scopedValues unit f.scopedMethods (HList.encode args).toArray then body else Spec.stuck
 
 /-- The denotation of a function on native arguments, every call meaning
 its callee's prophetic meaning.  Stated directly: every transport unifies
@@ -2329,9 +2633,12 @@ def Function.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers 
     (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) (f : Function unit) (args : HList f.params) :
     Comp unit f.result.carrier :=
-  Spec.bind (f.body.denote (closedMeanings executable typeInstantiation)
-      (initialEnv f.params f.locals f.frame_eq args))
-    (f.result.finish f.mutables)
+  let body := Spec.bind (f.body.denote (closedMeanings executable typeInstantiation)
+    (initialEnv f.params f.locals f.frame_eq args)) (f.result.finish f.mutables)
+  match f.scopedMethods with
+  | [] => body
+  | _ :: _ =>
+      if scopedValues unit f.scopedMethods (HList.encode args).toArray then body else Spec.stuck
 
 /-- The meaning of calls routing one function to `self`: its handle at its
 own signature means `self`, every other call `rest`. -/
@@ -2409,7 +2716,7 @@ omit [Skolems unit] in
 signature means `self` at the family the call induces and the callee's frame
 instantiation, every other call `rest`. -/
 def routeGeneric [Θ : Skolems unit] (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
-    (self : SelfFamily unit π ρ) (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId))
+    (self : SelfFamily unit π ρ) (frame : FunctionHandle → Array GenericArgument → Array (TypeId × TypeId))
     (rest : GenericMeaning) : GenericMeaning :=
   fun callee typeArgs θ σs shape args =>
     if routed : callee = handle ∧ σs = π ∧ shape = ρ then
@@ -2419,8 +2726,8 @@ def routeGeneric [Θ : Skolems unit] (handle : FunctionHandle) (π : NRow) (ρ :
 omit [Skolems unit] in
 @[simp] theorem routeGeneric_self [Θ : Skolems unit] (handle : FunctionHandle) (π : NRow)
     (ρ : ResultShape) (self : SelfFamily unit π ρ)
-    (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId)) (rest : GenericMeaning)
-    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers π) :
+    (frame : FunctionHandle → Array GenericArgument → Array (TypeId × TypeId)) (rest : GenericMeaning)
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers π) :
     routeGeneric handle π ρ self frame rest handle typeArgs θ π ρ args =
       self (Skolems.instantiate θ Θ) (frame handle typeArgs) args := by
   simp [routeGeneric]
@@ -2428,8 +2735,8 @@ omit [Skolems unit] in
 omit [Skolems unit] in
 theorem routeGeneric_other [Θ : Skolems unit] {handle callee : FunctionHandle} {π σs : NRow}
     {ρ shape : ResultShape} (self : SelfFamily unit π ρ)
-    (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId)) (rest : GenericMeaning)
-    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
+    (frame : FunctionHandle → Array GenericArgument → Array (TypeId × TypeId)) (rest : GenericMeaning)
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
     (other : callee ≠ handle) :
     routeGeneric handle π ρ self frame rest callee typeArgs θ σs shape args =
       rest callee typeArgs θ σs shape args := by
@@ -2498,6 +2805,8 @@ def cycleMeanings {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers un
     (@closureMeaning _ _ executable (familySkolems slot.family))
     (familyInstantiation typeInstantiation slot.family) (fun _ => none) (fun _ => none)
     (fun _ => none)
+    (@closedInstance _ _ executable (familySkolems slot.family)
+      (familyInstantiation typeInstantiation slot.family))
 
 omit [Skolems unit] in
 /-- The weakest precondition through a verified callee: what its theorem
@@ -2898,7 +3207,7 @@ attribute [vir_denote] Which.project?_eq_some_iff
 -- transparency, as a call's result type does.
 vir_denote_equations Term.denote Args.denote Arms.denote
 attribute [vir_denote] Term.denote Args.denote Arms.denote Function.denote ResultShape.ofBody NTy.ofGround
-  closedGeneric
+  closedGeneric closedInstance
   HList.ofGround
   ResultShape.toBody
   ResultShape.finish Flow.iterate Flow.rebase Flow.bind_pure_value Flow.bind_pure_return
@@ -2907,9 +3216,11 @@ attribute [vir_denote] Term.denote Args.denote Arms.denote Function.denote Resul
   AbortsAt_true Taken_true
   wp_armAt armIn_some armIn_none Matched_true wp_dispatchAt Dispatched_true
   finish_value finish_return finish_break
-  finish_continue Mutables.resolve_nil Mutables.resolve_cons Option.bind_some Option.bind_none
-  Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_index Proj.get?_variant Proj.get?_ghost
-  Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_index Proj.set?_variant Proj.set?_ghost
+  finish_continue Mutables.resolve_nil Mutables.resolve_cons Mutables.resolve_at Option.bind_some
+  Option.bind_none
+  Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_element Proj.get?_index Proj.get?_variant
+  Proj.get?_ghost Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_element Proj.set?_index
+  Proj.set?_variant Proj.set?_ghost
   arbitraryIn ghostInitAt
   Choices.update?_nil Choices.update?_cons PlaceIndex.resolve?_literal
   PlaceIndex.resolve?_slot PlaceIndex.resolve?_fromEnd HEnv.slotInt?_int_zero HEnv.slotInt?_succ
@@ -2947,15 +3258,18 @@ def describeValue : {τ : NTy} → τ.groundCarrier → String
   | .signer, value => s!"signer {(value : String)}"
   | .string, value => s!"{repr (value : String)}"
   | .bytes, value => s!"{repr (value : Array UInt8)}"
+  | .char, value => s!"char {(value : SpecChar).val}"
   | .tuple _, _ => "(..)"
   | .struct _ _ _, _ => "{..}"
   | .enum _ _ _ _ _, _ => "variant{..}"
   | .vector _, value => s!"[{value.values.size} elements]"
+  | .array _ length, _ => s!"[{length} elements]"
   | .table _ _, value => s!"[{value.entries.length} entries]"
   | .ghost _, _ => "ghost(..)"
   | .ref _, _ => "&mut(..)"
   | .param index, _ => s!"T{index}"
   | .function _ _ _, value => value.elim
+  | .nominal _ _ _, _ => "nominal(..)"
 
 /-- A readable rendering of destructuring targets. -/
 def Vars.describe {Γ : NRow} : {σs : NRow} → Vars Γ σs → String
@@ -3000,6 +3314,24 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .bitwise op left right => s!"({left.describe} {repr op} {right.describe})"
   | _, _, .shift _ left failure value distance =>
       s!"({value.describe} {if left then "<<" else ">>"} {distance.describe} ! {repr failure})"
+  | _, _, .shiftSigned _ left failure value distance =>
+      s!"({value.describe} {if left then "<<" else ">>"} {distance.describe} ! {repr failure})"
+  | _, _, .shiftUnchecked _ left value distance =>
+      s!"({value.describe} {if left then "<<" else ">>"} {distance.describe})"
+  | _, _, .divideUnchecked _ modulo left right =>
+      s!"({left.describe} {if modulo then "%" else "/"} {right.describe})"
+  | _, _, .overflowing op left right =>
+      s!"overflowing({left.describe} {repr op} {right.describe})"
+  | _, _, @Term.wrap _ _ _ _ _ width signed _ value =>
+      s!"({value.describe} as int {width} {signed})"
+  | _, _, .charCode value => s!"({value.describe} as code)"
+  | _, _, .charOf _ value => s!"({value.describe} as char)"
+  | _, _, .charOfChecked _ failure value => s!"({value.describe} as char ! {repr failure})"
+  | _, _, .arrayVector array => array.describe
+  | _, _, .arrayOf vector => vector.describe
+  | _, _, .repeatVector count value => s!"[{value.describe}; {count}]"
+  | _, _, .stringLength value => s!"{value.describe}.length"
+  | _, _, .unreachable => "unreachable"
   | _, _, @Term.cast _ _ _ _ _ width signed _ failure value =>
       s!"({value.describe} as int {width} {signed} ! {repr failure})"
   | _, _, .ite _ condition thenBranch elseBranch =>
@@ -3027,6 +3359,9 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .callGeneric _ handle typeArgs _ _ _ _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types>\
         ({arguments.describe})"
+  | _, _, .callInstance _ handle typeArgs _ _ arguments =>
+      s!"call {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types, \
+        instance>({arguments.describe})"
   | _, _, .tuple elements => s!"({elements.describe})"
   | _, _, .pack source _ fields => s!"{repr source} \{{fields.describe}}"
   | _, _, .variant source _ _ choice fields => s!"{repr source}::{choice.name} \{{fields.describe}}"
@@ -3035,16 +3370,19 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .payload _ _ value => s!"{value.describe}.payload"
   | _, _, .letRow targets value body =>
       s!"(let ({targets.describe}) := {value.describe}; {body.describe})"
+  | _, _, .takeAt _ x _ => s!"move local{x.index}.path"
   | _, _, .letFields targets value body =>
       s!"(let \{{targets.describe}} := {value.describe}; {body.describe})"
   | _, _, .caseOf scrutinee arms => s!"(match {scrutinee.describe} with {arms.describe})"
   | _, _, .deref value => s!"*{value.describe}"
   | _, _, .mutate x value => s!"(*local{x.index} := {value.describe})"
+  | _, _, .observe value => s!"observe {value.describe}"
   | _, _, .readPlace _ x _ => s!"local{x.index}.path"
   | _, _, .writePlace _ x _ value => s!"(local{x.index}.path := {value.describe})"
   | _, _, .borrowPlace _ x _ => s!"&mut local{x.index}.path"
   | _, _, .take x => s!"move local{x.index}"
   | _, _, .resolve x => s!"resolve local{x.index}"
+  | _, _, .resolveAt x _ => s!"resolve local{x.index}.path"
   | _, _, .vectorLit _ elements => s!"vector[{elements.describe}]"
   | _, _, .length vector => s!"{vector.describe}.length"
   | _, _, .signerAddress signer => s!"{signer.describe}.address"

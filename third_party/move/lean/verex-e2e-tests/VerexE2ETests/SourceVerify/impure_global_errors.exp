@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/.verex/impure_global_errors.move.lean:26:23: error: VEREX-SPEC-IMPURE-CALL: cannot call impure function `added` (publishes to global storage)

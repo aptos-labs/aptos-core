@@ -206,7 +206,7 @@ mutual
 theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (closed : ∀ index, allowed index = true → (types index).paramFree = true) :
     (τ : NTy) → τ.paramsAll allowed = true → (τ.substWith types).paramFree = true
-  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ => rfl
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ | .char, _ => rfl
   | .param index, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       exact closed index mentioned
@@ -226,6 +226,9 @@ theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
   | .vector element, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed element mentioned]
+  | .array element _, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed element mentioned]
   | .table key value, mentioned => by
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed key mentioned.1,
@@ -241,6 +244,9 @@ theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.substWith, NTy.paramFree, Bool.and_eq_true,
         NRow.paramFree_substWith closed parameters mentioned.1,
         NRow.paramFree_substWith closed results mentioned.2, and_self]
+  | .nominal _ arguments _, mentioned => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.substWith, NTy.paramFree, NRow.paramFree_substWith closed arguments mentioned]
 
 theorem NRow.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (closed : ∀ index, allowed index = true → (types index).paramFree = true) :
@@ -271,8 +277,12 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (τ : NTy) → τ.paramsAll allowed = true → τ.refFree = true →
       (τ.substWith types).refFree = true
   | .unit, _, _ | .bool, _, _ | .int _ _, _, _ | .num, _, _ | .address, _, _ | .signer, _, _
-  | .string, _, _ | .bytes, _, _ => rfl
+  | .string, _, _ | .bytes, _, _ | .char, _, _ => rfl
   | .function _ _ _, _, _ => rfl
+  | .nominal _ arguments _, mentioned, free => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.refFree] at free
+      simp only [NTy.substWith, NTy.refFree, NRow.refFree_substWith plain arguments mentioned free]
   | .param index, mentioned, _ => by
       simp only [NTy.paramsAll] at mentioned
       exact plain index mentioned
@@ -292,6 +302,10 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.substWith, NTy.refFree,
         NRows.refFree_substWith plain rows mentioned.2 free]
   | .vector element, mentioned, free => by
+      simp only [NTy.paramsAll] at mentioned
+      simp only [NTy.refFree] at free
+      simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain element mentioned free]
+  | .array element _, mentioned, free => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.refFree] at free
       simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain element mentioned free]

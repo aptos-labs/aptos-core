@@ -81,6 +81,34 @@ only. A function always states its result type, `-> Unit` included, and
 its body follows `:=` — an expression, or a `do` block. Module-level
 `pragma` items and `use`/`friend` items stand among the declarations.
 
+A Rust crate is one namespace, written `verex namespace`, and its modules are
+scopes inside it. A scope is an item, reopenable, and its keyword says what it
+names: `mod m where` a module, `impl Counter where` the type of an inherent impl,
+`trait Step where` a trait, `trait impl «<…>» where` a trait impl, by the path
+rustc prints. Inside a scope declarations are named bare; a path resolves from the
+innermost scope outward to the namespace root.
+
+```lean
+impl Counter where
+  spec add where
+    ensures result == self.value + amount
+
+mod area where
+  spec square where
+    ensures result == side * side
+```
+
+The specification file of a Rust module holds its items directly; an inline
+`mod m { … }` is a nested `mod m where` block. A proof file names a target by its
+path, `verify area::square`.
+
+A Rust closure's struct and body are not items of a rendering: its construction
+spells them (`closure «f::{closure#0}» {u0 : lifetime} (c : &[u0] u32 := &c) fun
+call(self : …, a : u32) -> u32 := …`), and a call is `«f::{closure#0}»::call(&g, 1u32)`. Without a specification the body
+is inlined at its calls. With `impl «f::{closure#0}» where spec call where` it is
+verified on its own, with `self.c` an upvar and its own `loop k` and `no panic`, and its
+callers use the contract.
+
 ## Expressions and control
 
 The expression language is Move 2's: `&T` and `&mut T` parameters, `x.f`
@@ -210,8 +238,9 @@ The clauses:
   [Verification](#verification).
 
 In a clause, `old(e)` reads `e` at entry, `result` is the returned value,
-and a `&mut` parameter read plainly is its final value, so `increased(old(c),
-c)` compares the value at entry with the value at exit. For a returned
+`spec.result[i]` component `i` of a tuple result, and a `&mut` parameter read
+plainly is its final value, so `increased(old(c), c)` compares the value at
+entry with the value at exit. For a returned
 mutable reference, `final(result)` names the value its lender holds once the
 caller's writes through it end. A specification function takes values, so
 a `&mut` argument passes its value, before or after as spelled:
@@ -235,6 +264,23 @@ spec apply where
   aborts_if aborts_of<f>(x)
   ensures ensures_of<f>(x, result)
 ```
+
+A function without a body in the Rust profile, as a dependency's, can state its
+contract at a shape of its generics. A bare name that is one of the function's
+binders is a variable of the shape, at any position, and any other bare name must
+name a type. A shape has one type per type binder, and spells no lifetime binder.
+The clauses read the parameters and the result at the shape:
+
+```lean
+native fun index {T} {I} {A} {Output}(_1 : &Vec<T, A>, _2 : I) -> &Output
+spec index at {T} {usize} {A} {T} where
+  ensures result == vec_at(_1, _2)
+```
+
+A call uses the shape its type arguments match, its own type parameters staying
+what they are: a caller's `{T}` matches `{T}`, not `{u32}`. Shapes one
+instantiation could match, a contract without `at` among them, are an error at
+the later item, and a call matching none is rejected at its location.
 
 ### Specification functions
 
@@ -305,6 +351,18 @@ fun fees(periods : u64) -> u64 := do
 The `where` region may bind logical names with `let` for the invariants
 after it. Without an invariant, `pragma unroll = N` in the function's spec
 block verifies the loop for at most `N` iterations.
+
+A Rust body lives in its own file, so its specification file states the
+invariants in the function's spec block, as `loop k where`, `k` counting the
+rendered body's loops from 1:
+
+```lean
+spec fees where
+  ensures result == 5 * periods
+  loop 1 where
+    invariant i <= periods
+    invariant total == 5 * i
+```
 
 ### Lemmas
 

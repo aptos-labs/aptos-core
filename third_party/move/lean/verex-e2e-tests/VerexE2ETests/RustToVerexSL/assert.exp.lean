@@ -5,4 +5,4 @@ import VerexSL
 
 verex namespace «assert» where
   fun divide(dividend : u32, divisor : u32) -> u32 :=
-    if divisor == 0u32 then panic() else dividend / divisor
+    core.prim.checkedDividePanic(dividend, divisor)

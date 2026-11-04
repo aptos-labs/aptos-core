@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Semantics.LoanRenamingEffects
+import VerexIR.Semantics.ScopedMethods
 
 /-!
 # Function boundaries under loan renaming
@@ -12,6 +13,71 @@ mirroring states (`finalizeFunctionState_mirror`).
 -/
 
 namespace VerexIR
+
+mutual
+private theorem plain?_rename (ρ : Nat → Nat) (value : RuntimeValue) :
+    SemanticOperations.plain? (value.rename ρ) = SemanticOperations.plain? value := by
+  cases value <;> simp only [RuntimeValue.rename, SemanticOperations.plain?]
+  all_goals first
+    | exact plainList?_rename ρ _
+    | exact plain?_rename ρ _
+termination_by sizeOf value
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
+
+private theorem plainList?_rename (ρ : Nat → Nat) (values : List RuntimeValue) :
+    SemanticOperations.plainList? (RuntimeValue.renameList ρ values) =
+      SemanticOperations.plainList? values := by
+  cases values with
+  | nil => simp only [RuntimeValue.renameList]
+  | cons value values =>
+      simp only [RuntimeValue.renameList, SemanticOperations.plainList?]
+      rw [plain?_rename ρ value, plainList?_rename ρ values]
+termination_by sizeOf values
+end
+
+@[simp] theorem receiverScopedShape_rename (unit : Validation.ValidatedUnit)
+    (handle : FunctionHandle) (mask : Nat) (instantiation : Array (TypeId × TypeId))
+    (captures : Array RuntimeValue) (ρ : Nat → Nat) :
+    receiverScopedShape unit handle mask instantiation (captures.map (·.rename ρ)) =
+      receiverScopedShape unit handle mask instantiation captures := by
+  unfold receiverScopedShape
+  split
+  · rfl
+  · split
+    · rfl
+    · rw [Array.all_map]
+      simp only [Array.size_map, Function.comp_def, plain?_rename]
+
+/-- Receiver receipts and captured dictionary checks do not depend on loan names. -/
+theorem receiverScopedValue_rename (unit : Validation.ValidatedUnit) (ρ : Nat → Nat)
+    (value : RuntimeValue) :
+    receiverScopedValue unit (value.rename ρ) = receiverScopedValue unit value := by
+  cases value <;> simp only [RuntimeValue.rename, receiverScopedValue]
+  case closure handle mask instantiation captures =>
+    rw [RuntimeValue.renameList_eq_map]
+    simp only [← List.map_toArray, Array.toArray_toList, receiverScopedShape_rename,
+      Array.map_map]
+    congr 2
+    apply congrArg (scopedDictionaryCaptures? unit handle mask)
+    apply Array.map_congr_left
+    intro capture member
+    exact receiverScopedValue_rename unit ρ capture
+termination_by sizeOf value
+
+@[simp] theorem scopedArguments_rename (unit : Validation.ValidatedUnit)
+    (declaration : FunctionDecl Validation.FunctionBody) (arguments : Array RuntimeValue) (ρ : Nat → Nat) :
+    scopedArguments unit declaration (arguments.map (·.rename ρ)) =
+      scopedArguments unit declaration arguments := by
+  unfold scopedArguments scopedValues
+  congr 1
+  funext index
+  split
+  · rfl
+  · simp only [Array.getElem?_map, Option.any_map]
+    congr 1
+    funext value
+    exact receiverScopedValue_rename unit ρ value
+
 
 variable {inside : Nat → Prop}
 
@@ -170,7 +236,7 @@ theorem maskReturnedBorrows_rename (injective : Function.Injective ρ) (loans : 
   | .ghost contents =>
       rw [RuntimeValue.rename_ghost, maskReturnedBorrows, maskReturnedBorrows,
         RuntimeValue.rename_ghost, maskReturnedBorrows_rename injective loans contents]
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ | .loanHole _ => simp [maskReturnedBorrows]
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -221,7 +287,7 @@ theorem maskReturnedBorrows_within (loans : Array Nat) (value : RuntimeValue)
       simp only [RuntimeValue.within_closure, List.mem_toArray] at above ⊢
       exact maskReturnedBorrowList_within loans captures.toList (fun value member =>
         above value (Array.mem_toList_iff.mp member))
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ | .loanHole _ => rw [maskReturnedBorrows]; exact above
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)
@@ -438,7 +504,7 @@ theorem RuntimeValue.holeFree?_rename (value : RuntimeValue) :
         RuntimeValue.holeFree?_rename contents]
   | .borrow loan current => simp [RuntimeValue.holeFree?]
   | .loanHole loan => simp [RuntimeValue.holeFree?]
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .retired | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => simp [RuntimeValue.holeFree?]
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); try omega)

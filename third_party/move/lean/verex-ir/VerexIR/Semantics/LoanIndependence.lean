@@ -194,19 +194,23 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     intro namespaceId frame state exprId startFrame startState nodeFrame nodeState control
       finalFrame finalState before_eq node_step after_eq ih
     intro ρ offset frontier inside inert inert' state₂ shifted frame_within
-    have settled := settleLoans_rename (loans := (loanDeathsAt unit namespaceId exprId).before)
-      shifted frame_within
+    have settled := settleDeaths_rename (unit := unit) (namespaceId := namespaceId)
+      (loans := (loanDeathsAt unit namespaceId exprId).before)
+      (places := (deadPlacesAt unit namespaceId exprId).before) shifted frame_within
     rw [before_eq] at settled
-    generalize start_eq : settleLoans (loanDeathsAt unit namespaceId exprId).before
-      (frame.rename ρ) state₂ = start₂ at settled
+    generalize start_eq : settleDeaths unit namespaceId (loanDeathsAt unit namespaceId exprId).before
+      (deadPlacesAt unit namespaceId exprId).before (frame.rename ρ) state₂ = start₂ at settled
     obtain ⟨startFrame₂, startState₂⟩ := start₂
     obtain ⟨rfl, startShifted, start_within⟩ := settled
     obtain ⟨nodeState₂, nodeShifted, node_within, control_within, node_step₂⟩ :=
       ih ρ offset frontier inside inert inert' startState₂ startShifted start_within
-    have after := settleAfter_rename (loans := (loanDeathsAt unit namespaceId exprId).after)
+    have after := settleAfter_rename (unit := unit) (namespaceId := namespaceId)
+      (loans := (loanDeathsAt unit namespaceId exprId).after)
+      (places := (deadPlacesAt unit namespaceId exprId).after)
       (control := control) nodeShifted node_within
     rw [after_eq] at after
-    generalize final_eq : settleAfter (loanDeathsAt unit namespaceId exprId).after
+    generalize final_eq : settleAfter unit namespaceId (loanDeathsAt unit namespaceId exprId).after
+      (deadPlacesAt unit namespaceId exprId).after
       (control.rename ρ) (nodeFrame.rename ρ) nodeState₂ = final₂ at after
     obtain ⟨finalFrame₂, finalState₂⟩ := final₂
     obtain ⟨rfl, finalShifted, final_within⟩ := after
@@ -1118,7 +1122,7 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
       operands₂ (variantMismatch?_evaluate_none mismatch₂) mismatch₂ mismatch_eq
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
+      evaluatedState finalState control outcome namespace_eq declaration_eq scoped_eq provided_eq frame_eq
       body_eq body_step outcome_eq hole_free finalize_eq ih_body
     intro ρ offset frontier inside inert inert' state₂ shifted arguments_within
     obtain ⟨β, γ, base⟩ := shifted.renames.base
@@ -1131,13 +1135,14 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     · rw [← finalize_eq]
       exact finalizeFunctionState_mirror shifted evaluatedShifted executable declaration.profile
         final_within outcome
-    · exact .body _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq declaration_eq provided_eq
+    · exact .body _ _ _ _ _ _ _ _ _ _ _ _ _ namespace_eq declaration_eq
+        (by simpa only [scopedArguments_rename] using scoped_eq) provided_eq
         (by rw [initialFrame?_rename, frame_eq]; rfl) body_eq body₂
         (by rw [finishControl?_rename, outcome_eq]; rfl)
         (by rw [Outcome.holeFree_rename]; exact hole_free) rfl
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq scoped_eq provided_eq native_eq hole_free
     intro ρ offset frontier inside inert inert' state₂ shifted arguments_within
     obtain ⟨finalState₂, finalShifted, outcome_within, native₂⟩ :
         ∃ state₂', StateRenamed ρ offset frontier inside inert inert' finalState state₂' ∧
@@ -1151,6 +1156,7 @@ theorem shifts {unit : ValidatedUnit} {executable : ExecutableUnit unit}
           arguments_within
     exact ⟨finalState₂, finalShifted, outcome_within,
       .native _ _ _ _ _ _ _ _ namespace_eq declaration_eq (by rw [Array.size_map]; exact arity_eq)
+        (by simpa only [scopedArguments_rename] using scoped_eq)
         provided_eq native₂ (by rw [Outcome.holeFree_rename]; exact hole_free)⟩
 
 theorem Array.map_rename_of_plain {values : Array RuntimeValue} (ρ : Nat → Nat)

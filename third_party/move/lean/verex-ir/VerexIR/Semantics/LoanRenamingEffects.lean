@@ -57,10 +57,10 @@ theorem borrowRuntimePlaceAt?_mirror (shifted : StateRenamed ρ offset frontier 
       · cases borrow
       rw [if_neg ‹_›, read_rename]
       obtain ⟨read, read_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-      simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-      obtain ⟨rfl, rfl, rfl⟩ := borrow
-      exact ⟨state₂, by rw [read_eq]; rfl, shifted, frame_within,
-        readRuntimePlace?_within shifted frame_within read_eq⟩
+      obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some borrow
+      refine ⟨state₂, ?_, shifted, frame_within, RuntimeValue.observe_within _ _⟩
+      rw [read_eq]
+      simp [RuntimeValue.view?_rename, RuntimeValue.view?_of_holeless holeless, RuntimeValue.rename_observe]
   | mutable =>
       simp only [Option.bind_eq_bind, Option.bind_some] at borrow ⊢
       split at borrow
@@ -431,10 +431,20 @@ theorem evaluatePlaceOperation?_mirror
             rw [if_pos ‹_›]
             exact ⟨state₂, by simp [RuntimeFrame.rename, Array.map_setIfInBounds], shifted,
               frame_within.clearLocal _, current_within⟩
-          · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
-            obtain ⟨rfl, rfl, rfl⟩ := evaluate
-            rw [if_neg ‹_›]
-            exact ⟨state₂, rfl, shifted, frame_within, current_within⟩
+          · rw [if_neg ‹_›]
+            cases current with
+            | borrow loan held =>
+                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
+                obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                obtain ⟨loan_within, -⟩ := (RuntimeValue.within_borrow _ _ _).mp current_within
+                obtain ⟨cleared₂, clear_eq, clearShifted, clearAbove⟩ :=
+                  clearBorrowValue_rename shifted frame_within loan_within
+                simp only [RuntimeValue.rename_borrow, clear_eq]
+                exact ⟨cleared₂, rfl, clearShifted, clearAbove, current_within⟩
+            | _ =>
+                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
+                obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                exact ⟨state₂, by simp, shifted, frame_within, current_within⟩
       · cases evaluate
   | drop place =>
       simp only [evaluatePlaceOperation?, Array.isEmpty_map, Option.bind_eq_bind] at evaluate ⊢
@@ -499,9 +509,9 @@ theorem evaluatePlaceOperation?_mirror
               · have operand_within := arguments_within operand (by simp)
                 simp only [List.map_toArray, List.map_cons, List.map_nil]
                 rw [evaluatePlaceOperation?_sharedBorrow] at evaluate ⊢
-                simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
-                obtain ⟨rfl, rfl, rfl⟩ := evaluate
-                exact ⟨state₂, rfl, shifted, frame_within, operand_within⟩
+                obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate
+                exact ⟨state₂, by simp [RuntimeValue.view?_rename, RuntimeValue.view?_of_holeless holeless, RuntimeValue.rename_observe], shifted,
+                  frame_within, RuntimeValue.observe_within _ _⟩
               · cases evaluate
           | mutable => cases evaluate
           | profile _ => cases evaluate
@@ -566,11 +576,10 @@ theorem evaluatePlaceOperation?_mirror
                       simp only [RuntimeValue.rename_borrow] at evaluate ⊢
                       split at evaluate
                       · cases evaluate
-                      · simp only [Option.some.injEq, Prod.mk.injEq] at evaluate
-                        obtain ⟨rfl, rfl, rfl⟩ := evaluate
+                      · obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some evaluate
                         rw [if_neg ‹_›]
-                        simp only [RuntimeValue.within_borrow] at operand_within
-                        exact ⟨state₂, rfl, shifted, frame_within, operand_within.2⟩
+                        exact ⟨state₂, by simp [RuntimeValue.view?_rename, RuntimeValue.view?_of_holeless holeless, RuntimeValue.rename_observe],
+                          shifted, frame_within, RuntimeValue.observe_within _ _⟩
                   | _ => cases evaluate
               | _ => cases evaluate
           · unfold evaluatePlaceOperation? at evaluate

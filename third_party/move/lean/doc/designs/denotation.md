@@ -131,8 +131,8 @@ discipline.
 
 ## What the denotation carries
 
-Scalars and checked arithmetic, comparisons, Boolean operations, unsigned
-`&`, checked shifts and casts, constants, `if`, `let`, blocks, `abort`,
+Scalars and checked arithmetic, comparisons, Boolean operations, bitwise
+operations, checked shifts and casts, constants, `if`, `let`, blocks, `abort`,
 `assert`, early `return`, assignment, `break`/`continue` (labeled too),
 loops with `invariant` clauses, direct calls, the Rust profile's modular
 arithmetic (`Term.modular`), tuples, structs, enums with variant tests and
@@ -146,6 +146,33 @@ places, literals, `index` with its abort, the bounds check the lowering
 emits, `push`, `insert`, `remove`, `swap`, `concat`, `slice`,
 `reverseSlice`, `contains`, `indexOf`, `destroyEmpty`; a construction
 exceeding the bound is undefined). A rejection names the construct.
+
+**Rust's primitives.** `usize` and `isize` are `NTy.int` at the unit's
+`target_pointer_width`; `.length` stays at width 64 and another width is
+rejected. `!` has no values, so its slot's carrier is the unit, and what
+follows a call returning it is `Term.unreachable`, no outcome. A lifetime or
+constant argument of a nominal keeps its binder's position at the unit type;
+no carrier reads it, and a shared reference in a field is its referent. A
+tuple's element is a place (`Proj.element`). `char` is `SpecChar`, a Unicode
+scalar value with its certificate, encoded as `.character`. An array is
+`NTy.array element length`, carried by `SpecArray`, a vector with the fact of
+its length: the certificate is what keeps the agreement over every native
+argument, and reading its vector (`Term.arrayVector`) states the fact as a
+hypothesis. A length past the vectors' bound has no native type, as
+validation lets it through and the runtime does not stop at it. The `as` cast is `Term.wrap`, the runtime's `modularInteger`.
+Bitwise operations on signed integers are the unsigned ones on the bit patterns
+(`signedBitwise`), bitwise not is `ones - value`, `<` on Booleans is `!a && b`,
+a discriminant read is a match with one arm per variant. An overflowing
+operation is the row of its value and flag (`Term.overflowing`). An unchecked
+operation is the partial operation it is: `Spec.stuck` outside its domain,
+where the runtime has no outcome (`Term.divideUnchecked`,
+`Term.shiftUnchecked`, `Term.charOf`), so the theorem owes the domain.
+A place or variant selection that resolves nothing, an element out of range or
+a variant not held, is `Spec.stuck` too where the profile has no mismatch throw
+(`mismatchOutcome`): the runtime has no outcome, the check before it rules the
+path out, and a lowering that misses the check fails verification. A borrow's
+prophecy of the wrong shape stays `Spec.bottom`: it is no execution, not an
+obligation.
 
 **Loops.** A loop carries a state invariant beside the local frame: the
 store and registry when the body has no global effect, the pending set when
@@ -395,8 +422,9 @@ a step proof binds a whole local's prophecy as the value written back,
 `x'` (`doc/plan/proof-language.md`, "Semantics and lowering"), any other
 proof drops it. Both are generic in the value's type and carry no family,
 so the rule needs no instance. A loan's death
-resolves each of its holders that still holds a reference; a holder it
-moved from resolves nothing. A loop that only writes through a reference
+resolves the holders that death records, an aggregate at the path recorded
+with it (`Term.resolveAt`); a holder it moved from resolves nothing. Validation
+guarantees none of them is read from the anchor on (`VIR-SEMANTIC-LOAN-DEATH`). A loop that only writes through a reference
 local keeps its prophecy. Callees are collected through every inlined
 body, since a callee returning a reference is inlined. The rule-1 audit
 forbids the loan predicates (`FreshStorageLoanIds`, `LoanDiscipline`,
@@ -414,7 +442,12 @@ reference's prophecy, the export of every argument loan in `s₁.pending`
 (returned loans' holes replaced by their prophecies) encodes the
 argument's prophecy, and `final` is `s₁` with the loan fields of
 `initial`; `aborts` and `undefined` likewise. `compileFunction_agrees` is
-`Spec.Equiv (f.denote unit args) (propheticMeaning unit handle f args)`.
+`Spec.Refines (propheticMeaningAt σ handle args) (f.denote args)` for
+`compileFunctionAt unit handle σ = .ok f`. Without a substitution `σ` this is
+`compileFunction` and `propheticMeaning`. At type arguments `θ` holding a mutable
+reference, the rows are substituted and the run lends at them, so lending follows the
+`.ref` type, and the frame agrees with the runtime at the family `θ` induces
+(`Coherent` at `Skolems.instantiate θ Θ`).
 
 Intrinsic maps ([`intrinsic-maps.md`](intrinsic-maps.md)): the runtime's
 values are read up to `normalize`, which replaces every well-formed value
@@ -438,9 +471,12 @@ assumed.
   `final(result)`; such a contract drops the value-view premise. A callee
   returning `&mut` whose contract does not read `final` keeps the value
   view, so a caller reasons over its denotation through the agreement.
-- References at the top level of a parameter or result, and components of
-  a result tuple, are carried; a reference inside an aggregate is rejected
-  by name.
+- References in a parameter or result are carried behind references and in
+  tuples and structs. A clause reads a value holding references through them,
+  compositionally: in `ensures` bare `h.r` of a by-value `h` is the prophecy and
+  `old(h).r` the current value (`NTy.viewed`), and a returned one is read at its
+  current values under the same value-view premise. A vector holding one, and a
+  shared reference to a value holding a mutable one, are rejected by name.
 
 ## Recursion and cycles
 
@@ -525,9 +561,31 @@ use its contract and never prove an instance of their own.
 - **Agreement.** `compileFunction_agrees` and `compileFunction_least_cycle`
   are stated over every family and instantiation: a skolem value is only
   moved, compared by its encoding, stored, and lent as a `Plain` encoding.
-- **Not carried by design.** A type argument that is a reference (Rust) is
-  not `Plain`: such an instance is specialized. Type-dependent natives
-  (`type_info`) are not carried.
+- **Instances at a reference.** A type argument holding a mutable reference
+  (Rust) is not `Plain`, and no generic theorem transfers to it: dropping the
+  parameter resolves a prophecy the generic proof never saw. Such a call is
+  `Term.callInstance`, and the callee is compiled at the arguments
+  (`compileFunctionAt unit handle (some θ)`, one kernel-evaluated compilation
+  per distinct `θ`) and inlined, verified monomorphically. `compileFunction_agrees`
+  covers it, `compileFunction_least_cycle` and the `refFree` transfer theorems do
+  not: a callee dropping the parameter is rejected at the call (`dropsDestructor`),
+  and a native, opaque or recursive callee at such a type is rejected, its generic
+  contract not transferring. A move of a holder out of an aggregate has no carrier;
+  a reference moved out of one is read as a reborrow through it, as validation does
+  where the type shows it. A shared reference over the argument denotes the erased
+  argument at the instance, except inside a nominal, whose fields are declared once.
+- **Observations.** `compileFunction_agrees` holds at a shared view: a shared borrow
+  yields `value.observe`, typed at the referent by `HasType.observed`, and `&T` denotes
+  `erase T`. `erase` and `observe` are identities on reference-free types, so a Move
+  function's denotation does not change. An observation holds no loan: the prophecy
+  resolution does not see it, and a run reading through a live borrow is stuck, which
+  validation excludes.
+- **Transfers.** A mutable reference moved out of a component an overwrite follows is
+  `Term.takeAt`: the run clears the component and the term leaves `(π, π)`, unread and
+  trivially resolved. A death of a place alone resolves that place and the run reconciles
+  the reference it holds with its lender at the same anchor, the loan going on.
+- **Not carried by design.** Type-dependent natives (`type_info`) are not
+  carried.
 
 ## Discipline
 
@@ -536,7 +594,8 @@ use its contract and never prove an instance of their own.
   naming it, and a case of the induction that cannot be closed is such a
   construct.
 - No `sorry` in `denote_agrees`; the named axioms stating it are removed
-  by proving it, never extended.
+  by proving it. `compileFunction_agrees` is one family over substitutions, without
+  one exactly the agreement of `compileFunction`; it takes no other extension.
 - Cost is gated per target by `DenotePerformance.exp`; caps are not raised
   to count a port as done.
 - Every `denote` case ships with its induction case. A false `ensures` on

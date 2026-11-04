@@ -116,11 +116,13 @@ partial def spelledNTy (τ : Lean.Expr) : Bool :=
   | some ``VerexIR.Proofs.Denote.NTy.enum, #[_, arguments, _, rows, _] =>
       spelledNRow arguments && spelledNRows rows
   | some ``VerexIR.Proofs.Denote.NTy.vector, #[element] => spelledNTy element
+  | some ``VerexIR.Proofs.Denote.NTy.array, #[element, _] => spelledNTy element
   | some ``VerexIR.Proofs.Denote.NTy.table, #[key, value] => spelledNTy key && spelledNTy value
   | some ``VerexIR.Proofs.Denote.NTy.ref, #[referent] => spelledNTy referent
   | some ``VerexIR.Proofs.Denote.NTy.ghost, #[slot] => spelledNTy slot
   | some ``VerexIR.Proofs.Denote.NTy.function, #[parameters, _, results] =>
       spelledNRow parameters && spelledNRow results
+  | some ``VerexIR.Proofs.Denote.NTy.nominal, #[_, arguments, _] => spelledNRow arguments
   | _, _ => false
 
 partial def spelledNRow (row : Lean.Expr) : Bool :=
@@ -169,11 +171,15 @@ partial def substituteNTy (θ : Lean.Expr) (τ : Lean.Expr) : Option Lean.Expr :
   | some ``VerexIR.Proofs.Denote.NTy.vector | some ``VerexIR.Proofs.Denote.NTy.ref |
       some ``VerexIR.Proofs.Denote.NTy.ghost =>
       pure (mkApp τ.getAppFn (← substituteNTy θ (← args[0]?)))
+  | some ``VerexIR.Proofs.Denote.NTy.array =>
+      pure (mkApp2 τ.getAppFn (← substituteNTy θ (← args[0]?)) (← args[1]?))
   | some ``VerexIR.Proofs.Denote.NTy.table =>
       pure (mkApp2 τ.getAppFn (← substituteNTy θ (← args[0]?)) (← substituteNTy θ (← args[1]?)))
   | some ``VerexIR.Proofs.Denote.NTy.function =>
       pure (mkApp3 τ.getAppFn (← substituteNRow θ (← args[0]?)) (← args[1]?)
         (← substituteNRow θ (← args[2]?)))
+  | some ``VerexIR.Proofs.Denote.NTy.nominal =>
+      pure (mkApp3 τ.getAppFn (← args[0]?) (← substituteNRow θ (← args[1]?)) (← args[2]?))
   | _ => if spelledNTy τ then some τ else none
 
 partial def substituteNRow (θ : Lean.Expr) (row : Lean.Expr) : Option Lean.Expr := do

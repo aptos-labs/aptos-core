@@ -1,0 +1,1 @@
+VerexE2ETests/SourceVerify/closure_loop_numbers_errors.spec.lean:14:3: error: VEREX-SPEC-LOOP: `only_closure_loop` has no loop 1: its body has 0 loops

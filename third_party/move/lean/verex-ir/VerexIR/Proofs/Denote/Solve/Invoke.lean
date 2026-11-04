@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Proofs.Denote.Solve.Decide
+import VerexIR.Proofs.ReceiverScoped
 
 /-!
 # The solver: normalization, splits, behaviors, and invocations
@@ -521,6 +522,8 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
     let action := target.getArg! 3
     if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 then
       return some (action.getArg! 5, action)
+    if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 10 then
+      return some (action.getArg! 6, action)
     let head := action.getAppFn
     if head.isFVar && callees.any (·.1 == head) then return some (head, action)
     return none
@@ -870,7 +873,7 @@ private def behaviorView? (statement : Lean.Expr) : Option BehaviorView :=
 /-- A known function value (`LiteralValue`: a construction or a closure
 site's constructor) inside an expression. -/
 private def literalFunction? (environment : Environment) (e : Lean.Expr) : Option Lean.Expr :=
-  e.find? (isLiteralValue environment)
+  e.find? (fun value => isLiteralValue environment value || value.isAppOf ``functionOfGeneric)
 
 /-- The executable unit an invocation meaning runs: the closures' meaning
 over it (`closureMeaning`); none for a model's meaning. -/
@@ -969,13 +972,97 @@ private def closureWeave? (literal : LiteralValue) :
   let (some captured, some supplied) := (rows[1]?, rows[2]?) | return none
   return some (weave, captured, supplied)
 
+/-- Instantiate a generic closure target's theorem at its actual frame,
+including captured evidence, before reading its postcondition. -/
+private def genericBehavior? (view : BehaviorView) (stated : Lean.Expr)
+    (callees : Array (Lean.Expr × String × Lean.Expr)) :
+    TacticM (Option (Lean.Expr × Array Lean.Expr × Lean.Expr)) := do
+  let function := view.function.consumeMData
+  unless function.isAppOfArity ``functionOfGeneric 15 && view.run?.isSome do return none
+  let θ := function.getArg! 5
+  let weave := function.getArg! 9
+  let shape := function.getArg! 10
+  let shared := function.getArg! 11
+  let handle := function.getArg! 12
+  let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
+      unless ← isDefEq candidate handle do return false
+      forallTelescope (← inferType proof) fun _ statement =>
+        pure (statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6)
+    | return none
+  let (theoremArguments, _, statement) ← forallMetaTelescope (← inferType theoremProof)
+  let meaning := statement.getArg! 4
+  unless meaning.isAppOf ``propheticMeaning do return none
+  let frame ← mkAppM ``Skolems.instantiate #[θ, function.getArg! 2]
+  unless ← isDefEq (meaning.getArg! 3) frame do return none
+  let verified ← instantiateMVars (mkAppN theoremProof theoremArguments)
+  let free ← decidedTrue (mkApp (mkConst ``NRow.refFree) (← mkAppM ``Subtype.val #[θ]))
+  let capturedFree ← decidedTrue (mkApp (mkConst ``NRow.refFree) (function.getArg! 7))
+  let instantiation ← mkAppM ``frameInstantiation #[function.getArg! 0, handle,
+    function.getArg! 3, function.getArg! 4]
+  let coherentType ← mkAppOptM ``Coherent #[function.getArg! 0, function.getArg! 1,
+    frame, handle, instantiation]
+  let some coherent ← coherentProof? coherentType | return none
+  let some executable := executableOf? view.invoke | return none
+  for (actual, expected, label) in #[(meaning.getArg! 2, executable, "executable"),
+      (meaning.getArg! 3, frame, "frame"), (meaning.getArg! 4, instantiation, "instantiation"),
+      (meaning.getArg! 6, function.getArg! 6, "parameters"), (meaning.getArg! 7, shape, "result")] do
+    unless ← withTransparency .all <| isDefEq actual expected do
+      if verex.solverDebug.get (← getOptions) then
+        logInfo m!"generic behavior {label} mismatch: {actual} versus {expected}"
+      return none
+  let verified ← instantiateMVars verified
+  let implication ← mkAppAtFrame ``VerexIR.Proofs.ensuresOf_generic_verified
+    (function.getArg! 0) executable (function.getArg! 2) #[θ, free, weave,
+    capturedFree, shape, handle, function.getArg! 3, function.getArg! 4, coherent,
+    function.getArg! 13, shared, function.getArg! 14, view.arguments, verified, stated]
+  return some (theoremProof, theoremArguments, implication)
+
+private def literalBehavior? (view : BehaviorView) (stated type executable : Lean.Expr)
+    (callees : Array (Lean.Expr × String × Lean.Expr)) :
+    TacticM (Option (Lean.Expr × Array Lean.Expr × Lean.Expr)) := do
+  let some found := literalFunction? (← getEnv) view.function | return none
+  let some closure ← literalValue? found | return none
+  let some (weave, captured, _) ← closureWeave? closure | return none
+  let handle := closure.handle
+  -- A target the call rule inlines is listed by its theorem as well.
+  let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
+      unless ← isDefEq candidate handle do return false
+      forallTelescope (← inferType proof) fun _ statement =>
+        pure (statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6)
+    | return none
+  let (theoremArguments, _, statement) ← forallMetaTelescope (← inferType theoremProof)
+  unless statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6 do return none
+  let meaning := statement.getArg! 4
+  unless meaning.isAppOf ``propheticMeaning do return none
+  -- Fix the target theorem's family before unifying its dependent contract.
+  -- Scalar argument carriers alone do not determine this implicit family.
+  unless ← isDefEq (meaning.getArg! 3) closure.frame do return none
+  let verified ← instantiateMVars (mkAppN theoremProof theoremArguments)
+  -- A closure of a target without type arguments runs at the empty
+  -- instantiation, which the runtime frame is coherent with.
+  let coherent ← mkAppM ``coherent_runtime #[type.getArg! 0, handle]
+  let capturedFree ← decidedTrue (mkApp (mkConst ``NRow.refFree) captured)
+  let rule := if view.run?.isSome then ``VerexIR.Proofs.ensuresOf_closureOf_verified
+    else ``VerexIR.Proofs.abortsOf_closureOf_verified
+  let implication? ← try
+      some <$> mkAppAtFrame rule (type.getArg! 0) executable closure.frame
+        #[weave, capturedFree, coherent, closure.captures, view.arguments, verified, stated,
+          closure.closed]
+    catch ex =>
+      if verex.solverDebug.get (← getOptions) then
+        IO.println s!"behavior dispatch skipped: {← ex.toMessageData.toString}"
+      pure none
+  let some implication := implication? | return none
+  return some (theoremProof, theoremArguments, implication)
+
 /-- What a leaf learns from `ensures_of` and `aborts_of` of a closure whose
 target, weave, and captures it sees, and whose target is a verified
 callee: where the leaf establishes the target's precondition at the woven
 arguments, what the target's contract ensures of the run, or the failures it
 permits (`ensuresOf_closureOf_verified`, `abortsOf_closureOf_verified`).
 `none` where the requires meaning closes the goal. -/
-def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr)) :
+partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr))
+    (handled : Array Lean.Expr := #[]) :
     TacticM (Option MVarId) := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
   -- `requires_of`: the value's requires meaning.
@@ -993,6 +1080,17 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
     -- A predicate under premises the leaf holds, as a caller's contract
     -- states it under the absence of the failures it declares.
     let mut type ← instantiateMVars (← hypothesis.getType)
+    -- Expose a composed receiver transition before dispatching its concrete
+    -- dictionaries. Do this in the existing hypothesis traversal so ordinary
+    -- leaves pay no additional context scan.
+    let proposition := unmarked type
+    if (proposition.isAppOf ``Exists || proposition.isAppOf ``And) &&
+        (proposition.find? (fun e => e.isAppOf ``VerexIR.Proofs.EnsuresOf)).isSome &&
+        (literalFunction? (← getEnv) proposition).isSome then
+      current ← current.replaceLocalDeclDefEq hypothesis proposition
+      let cases ← current.cases hypothesis
+      let #[next] := cases | throwError "a behavioral conjunction has multiple alternatives"
+      return ← dispatchBehavior next.mvarId callees handled
     unless states type do continue
     let mut stated := Lean.Expr.fvar hypothesis
     let mut held := true
@@ -1006,49 +1104,24 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
       stated := mkApp4 (mkConst ``Iff.mp) type type.appArg!
         (mkAppN (mkConst ``VerexIR.Proofs.Obligation_iff) type.getAppArgs) stated
       type := type.appArg!
+    if handled.contains type then continue
     let some view := behaviorView? type | continue
     -- A predicate over a model's invocation meaning is read by its run
     -- (`modelDenotedRun`).
     let some executable := executableOf? view.invoke | continue
-    let some found := literalFunction? (← getEnv) view.function | continue
-    let some closure ← literalValue? found | continue
-    let some (weave, captured, _) ← closureWeave? closure | continue
-    let handle := closure.handle
-    -- A target the call rule inlines is listed by its theorem as well.
-    let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
-        unless ← isDefEq candidate handle do return false
-        forallTelescope (← inferType proof) fun _ statement =>
-          pure (statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6)
-      | continue
-    let (theoremArguments, _, statement) ← forallMetaTelescope (← inferType theoremProof)
-    unless statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6 do continue
-    let meaning := statement.getArg! 4
-    unless meaning.isAppOf ``propheticMeaning do continue
-    -- Fix the target theorem's family before unifying its dependent contract.
-    -- Scalar argument carriers alone do not determine this implicit family.
-    unless ← isDefEq (meaning.getArg! 3) closure.frame do continue
-    let verified ← instantiateMVars (mkAppN theoremProof theoremArguments)
-    -- A closure of a target without type arguments runs at the empty
-    -- instantiation, which the runtime frame is coherent with.
-    let coherent ← mkAppM ``coherent_runtime #[type.getArg! 0, handle]
-    let capturedFree ← decidedTrue (mkApp (mkConst ``NRow.refFree) captured)
-    let rule := if view.run?.isSome then ``VerexIR.Proofs.ensuresOf_closureOf_verified
-      else ``VerexIR.Proofs.abortsOf_closureOf_verified
-    let implication? ← try
-        some <$> mkAppAtFrame rule (type.getArg! 0) executable closure.frame
-          #[weave, capturedFree, coherent, closure.captures, view.arguments, verified, stated,
-            closure.closed]
-      catch ex =>
-        if verex.solverDebug.get (← getOptions) then
-          IO.println s!"behavior dispatch skipped: {← ex.toMessageData.toString}"
-        pure none
-    let some implication := implication? | continue
+    let dispatched ← if view.function.consumeMData.isAppOf ``functionOfGeneric then
+        genericBehavior? view stated callees
+      else literalBehavior? view stated type executable callees
+    let some (theoremProof, theoremArguments, implication) := dispatched | continue
     -- The natives the target's theorem assumes, the caller assumes too.
     let mut assumed := true
     for argument in theoremArguments do
       if let .mvar id ← instantiateMVars argument then
         unless ← id.isAssigned do
-          try id.assumption catch _ => assumed := false
+          try id.assumption catch _ =>
+            if (← instantiateMVars (← id.getType)).isAppOf ``FrameOf then
+              unless ← closesBy id (← `(tactic| exact FrameOf.frame rfl)) do assumed := false
+            else assumed := false
     unless assumed do
       if verex.solverDebug.get (← getOptions) then IO.println "behavior dispatch: theorem assumptions missing"
       continue
@@ -1062,7 +1135,16 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
       let .forallE _ premiseType _ _ ← whnfR (← inferType fact) | established := false; break
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
       unless ← closesBy premise.mvarId! (← `(tactic|
-          ((try simp only [$lemmas,*, Weave.compose, vir_denote_norm]) <;> verex_leaf))) do
+          ((try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm]) <;>
+            verex_split_hypotheses <;> (repeat apply And.intro) <;> first
+              | assumption
+              | (apply VerexIR.Proofs.MethodContract.of_instantiate _ (by decide)
+                 simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
+                 assumption)
+              | (apply VerexIR.Proofs.ReceiverScopedMethod.of_instantiate _
+                 simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
+                 assumption)
+              | verex_leaf))) do
         established := false
         break
       fact := mkApp fact (← instantiateMVars premise)
@@ -1076,10 +1158,19 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
       setGoals [current]
       -- The failures a contract permits, each absent: the negated
       -- disjunction as the conjunction of the negations.
-      evalTactic (← `(tactic| simp only [$lemmas,*, Weave.compose, vir_denote_norm,
-        not_false_eq_true, true_implies, not_or] at $(mkIdent `verexBehavior):ident))
+      -- A captured dictionary's behavioral predicate is stated in the
+      -- adapter's instantiated frame. Transport it back to the caller before
+      -- the leaf compares it with an abstract callback's own behavior.
+      evalTactic (← `(tactic| simp only [$lemmas,*, Weave.subst, Weave.compose, ResultShape.toSkolem,
+        vir_transport, vir_denote_norm, not_false_eq_true, true_implies, not_or]
+        at $(mkIdent `verexBehavior):ident))
       current ← getMainGoal
     catch _ => state.restore
+    -- A forwarding contract can itself state a concrete callback's behavior.
+    -- Read that fact through its verified target too. Keep the observations
+    -- already dispatched so a contract repeating its own run is not expanded
+    -- again; abstract callback facts simply remain for the leaf deciders.
+    return ← dispatchBehavior current callees (handled.push type)
   return some current
 
 /-- Whether a statement reads a behavioral predicate. -/
@@ -1298,6 +1389,117 @@ def scalarAt? (facts : Array Lean.Expr) (goal : MVarId) : TacticM Bool := do
 private def isKnownFunction (e : Lean.Expr) : MetaM Bool :=
   return isLiteralValue (← getEnv) e.consumeMData
 
+/-- Read a literal through the frame conversions introduced by generic calls.
+The conversion preserves the actual closure, so no receipt is recomputed or
+assumed at a different frame. -/
+private def scopedClosureEquation? : Nat → Lean.Expr → MetaM (Option Lean.Expr)
+  | 0, _ => pure none
+  | fuel + 1, value => do
+      let value := value.consumeMData
+      if let some literal ← literalValue? value then return some literal.closed
+      if value.isAppOf ``functionOfGeneric then
+        return some (mkAppN (mkConst ``functionOfGeneric_closure) value.getAppArgs)
+      unless value.isAppOfArity ``ResultShape.functionOfSkolem 8 do return none
+      let some closed ← scopedClosureEquation? fuel (value.getArg! 7) | return none
+      let transported := mkAppN (mkConst ``ResultShape.closure_functionOfSkolem) value.getAppArgs
+      return some (← mkAppM ``Eq.trans #[transported, closed])
+
+/-- A scoped dictionary is either a checked literal or a forwarded assumption.
+The refinement follows the actual closure, including captured dictionaries. -/
+def receiverScopedMethod? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.ReceiverScopedMethod 7 do return none
+  for declaration in ← getLCtx do
+    if declaration.isImplementationDetail then continue
+    for fact in ← conjuncts declaration.toExpr do
+      if ← isDefEq (← inferType fact) target then
+        goal.assign fact
+        return some []
+  if let some closed ← scopedClosureEquation? 16 (target.getArg! 6) then
+    let rule ← mkAppOptM ``VerexIR.Proofs.ReceiverScopedMethod.of_closure_scoped
+      #[target.getArg! 0, target.getArg! 1, target.getArg! 2,
+        target.getArg! 3, target.getArg! 4, target.getArg! 5, target.getArg! 6, none, closed]
+    return some (← goal.apply rule)
+  if let some (θ, outer) ← (do
+      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := target.getArg! 2
+        | return none
+      return some (θ, outer)) then
+    let rule ← mkAppOptM ``VerexIR.Proofs.ReceiverScopedMethod.of_instantiate
+      #[target.getArg! 0, target.getArg! 1, outer, θ,
+        target.getArg! 3, target.getArg! 4, target.getArg! 5, target.getArg! 6]
+    return some (← goal.apply rule)
+  return none
+
+/-- Check a literal's receipt and recursively discharge its captured dictionary
+requirements. Unknown function values need an explicit scoped assumption. -/
+def receiverScopedClosure? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.ReceiverScopedClosure 2 do return none
+  for declaration in ← getLCtx do
+    if declaration.isImplementationDetail then continue
+    for fact in ← conjuncts declaration.toExpr do
+      let type ← inferType fact
+      unless type.isAppOf ``VerexIR.Proofs.ReceiverScopedMethod ||
+          type.isAppOf ``VerexIR.Proofs.ReceiverScopedClosure do continue
+      if ← isDefEq type target then
+        goal.assign fact
+        return some []
+  let raw ← withTransparency .all <| whnf (target.getArg! 1)
+  unless raw.isAppOfArity ``VerexIR.RuntimeValue.closure 4 do return none
+  -- Project the target and mask before deciding the receipt. Generic closure
+  -- records also contain open frame/capture values which these fields ignore.
+  let handle ← withTransparency .all <| whnf (raw.getArg! 0)
+  let mask ← withTransparency .all <| whnf (raw.getArg! 1)
+  let requirements ← mkAppM ``VerexIR.Proofs.scopedDictionaryCaptures?
+    #[target.getArg! 0, handle, mask, raw.getArg! 3]
+  let values ← withTransparency .all <| whnf requirements
+  unless values.isAppOfArity ``Option.some 2 do return none
+  let rule ← mkAppOptM ``VerexIR.Proofs.ReceiverScopedClosure.checked
+    #[target.getArg! 0, handle, mask, raw.getArg! 2,
+      raw.getArg! 3, values.appArg!]
+  let saved ← saveState
+  try
+    let [receipt, shape, requirements, captured] ← goal.apply rule
+      | throwError "unexpected scoped receiver obligations"
+    unless ← closesBy receipt (← `(tactic| decide +kernel)) do
+      throwError "the callback has no checked receiver receipt"
+    unless ← closesBy shape (← `(tactic| first | assumption | decide +kernel)) do
+      throwError "the callback has no checked closure shape"
+    requirements.refl
+    setGoals [captured]
+    evalTactic (← `(tactic| try simp only [List.mem_reverse, List.mem_cons, List.not_mem_nil, forall_eq_or_imp,
+      forall_false, forall_const, and_true]))
+    return some (← getGoals)
+  catch error =>
+    saved.restore
+    if verex.solverDebug.get (← getOptions) then
+      IO.println s!"scoped receiver receipt: {← error.toMessageData.toString}"
+    return none
+
+/-- A dictionary's contract is proved at the caller's frame, then by the
+ordinary verified-target invocation rule at every argument and memory. -/
+def methodContract? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.MethodContract 8 do return none
+  for declaration in ← getLCtx do
+    if declaration.isImplementationDetail then continue
+    for fact in ← conjuncts declaration.toExpr do
+      if ← isDefEq (← inferType fact) target then
+        goal.assign fact
+        return some []
+  if let some (θ, outer) ← (do
+      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := target.getArg! 3
+        | return none
+      return some (θ, outer)) then
+    let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+      (← mkEq (mkApp (mkConst ``NRow.refFree) (← mkAppM ``Subtype.val #[θ])) (mkConst ``Bool.true))
+    let rule ← mkAppOptM ``VerexIR.Proofs.MethodContract.of_instantiate
+      #[target.getArg! 0, target.getArg! 1, target.getArg! 2, outer, θ, free,
+        target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7]
+    return some (← goal.apply rule)
+  let (_, next) ← goal.introN 2 [`verexMethodArguments, `verexMethodInitial]
+  return some [next]
+
 /-- An invocation of a function value the proof does not see: the rule with
 the theorem's typing assumptions (`wp_closureMeaning_unseen_at`). Its
 runs and aborts remain, stated by the behavioral predicates. -/
@@ -1308,6 +1510,20 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
     let action := (target.getArg! 3).consumeMData
     unless action.isAppOfArity ``closureMeaning 9 do return none
     if ← isKnownFunction (action.getArg! 7) then return none
+    let mut methodFacts := #[]
+    for declaration in ← getLCtx do
+      if declaration.isImplementationDetail then continue
+      unless (declaration.type.find? (·.isConstOf ``VerexIR.Proofs.MethodContract)).isSome do continue
+      methodFacts := methodFacts ++ (← conjuncts declaration.toExpr)
+    for fact in methodFacts do
+      unless (← inferType fact).isAppOf ``VerexIR.Proofs.MethodContract do continue
+      let saved ← saveState
+      try
+        let rule ← mkAppM ``VerexIR.Proofs.MethodContract.invoke #[fact, action.getArg! 8]
+        let [next] ← goal.apply rule | saved.restore; continue
+        let (_, next) ← next.introN 2 [`verexResult, `verexEnsures]
+        return some [next]
+      catch _ => saved.restore
     let original ← saveState
     let result ← do
       -- A closure read from a resource gets its field frame from that value's
@@ -1513,7 +1729,7 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     let held ← mkFreshExprSyntheticOpaqueMVar heldType
     unless ← closesBy held.mvarId! (← `(tactic| (
         intro _ _ $(mkIdent `verexTyped):ident
-        (try simp only [$lemmas,*, Weave.compose, vir_denote_norm])
+        (try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm])
         all_goals (try constructor)
         all_goals verex_leaf))) do
       throwError "the target's theorem does not apply everywhere"
@@ -1521,7 +1737,7 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     let framed ← mkFreshExprSyntheticOpaqueMVar framedType
     unless ← closesBy framed.mvarId! (← `(tactic| (
         intro _ _ _ _ $(mkIdent `verexFrame):ident
-        (try simp only [$lemmas,*, Weave.compose, vir_denote_norm]
+        (try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm]
           at $(mkIdent `verexFrame):ident ⊢)
         first
         | exact $(mkIdent `verexFrame)

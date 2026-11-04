@@ -174,9 +174,12 @@ statements and call/drop/assert/cleanup terminators; the structurizer
 classifies storage lifetime markers, place mentions, and user-type
 ascriptions as inert administration and erases them after validation, and
 under `panic=abort` lowers ordinary bounds, overflow, division, and remainder
-assertions to explicit panic branches. Destructive and provenance-sensitive
-statements, cleanup edges, and exceptional terminators are rejection
-boundaries.
+assertions to explicit panic branches. Before that, a region of blocks all of
+whose paths reach a call that does not return collapses to `abort`
+(`Import/PanicRegions.lean`). `unreachable` is not a panic path: it says a path
+cannot happen, and leaves the graph only together with such a call. Destructive and
+provenance-sensitive statements, cleanup edges, and exceptional terminators outside
+a region are rejection boundaries.
 
 ## Compilation units and dependencies
 
@@ -184,10 +187,15 @@ The checked object is a compilation unit, not an isolated module: calls,
 friends, abilities, specifications, and intrinsic bindings refer across
 module boundaries. A unit holds a version, one interned `Tables` snapshot,
 profile configurations, owned namespaces, dependency interfaces, and import
-evidence. A namespace is a language-neutral hierarchical declaration
-container of which a Move module, Rust crate or module, and generated Verex
-namespace are profile-specific views; the core does not bake Move
-address/module identity into every declaration.
+evidence. A namespace is a language-neutral declaration container of which
+a Move module, a Rust crate, and a generated Verex namespace are
+profile-specific views; the core does not bake Move address/module identity
+into every declaration. A namespace declares its scopes, naming scopes
+inside it: the modules of a Rust crate, which refer to each other in cycles
+while crates form a DAG, so a crate stays one namespace, and the types,
+traits, and trait impls its associated functions belong to (`Vec::push` is
+`push` in scope `vec::Vec` of `alloc`). Only a module contains scopes. A name
+carries the scope it is declared in, a path relative to its namespace.
 
 The `Tables` snapshot contains the identities referenced by owned namespaces
 and dependency interfaces, once per unit. Owned namespaces occupy the leading
@@ -277,8 +285,8 @@ interned type has no source range, so occurrences use a located `TypeUse`
 in signatures, fields, locals, casts, and generic arguments. A namespace is
 a finite, deterministic record of its declarations by kind (constants,
 structs, associated items, traits, implementations, functions, specification
-functions and variables, invariants, intrinsics, comments), its arenas, its
-imports, profile metadata, attributes, and pragmas. Trait and implementation
+functions and variables, invariants, intrinsics, comments), its scopes, its
+arenas, its imports, profile metadata, attributes, and pragmas. Trait and implementation
 declarations are ordinary core declaration tables referenced through checked
 IDs, not profile payloads. Declaration arrays retain source order.
 
@@ -309,9 +317,11 @@ freeze form a typed reference-operation family. A direct local read is
 non-consuming; validation infers the access of a value type without `Copy`:
 a selection or index of it with `Copy` copies its place, the operand of an
 observer (discriminant, variant test, length, index check) reads it, and
-otherwise the local is moved; a reference local keeps its read. Field and
-variant operations carry strong qualified references; enum variants may
-record an observable integer discriminant distinct from array position.
+otherwise the local is moved. A reference without `Copy` is moved too, except
+as the operand an observer or a reference operation takes at rest; a reference
+with `Copy` keeps its read. Field and variant operations carry strong qualified
+references; enum variants may record an observable integer discriminant
+distinct from array position.
 
 The specification language is core: contract clauses and the
 `forall`/`exists`/choice quantifiers are typed nodes; mathematical integers,
@@ -333,7 +343,7 @@ literals core constants. An elided Move lifetime produces a fresh core
 the same table. Lifetime constraints, inference, and profile-specific borrow
 checking are separate checked passes.
 
-Places are first-class (local, dereference, field, index, subslice,
+Places are first-class (local, dereference, field, index, subslice, unsize,
 downcast) because both lowerings need them and Rust moves and borrows cannot
 be value-only expressions. Operations distinguish move, copy, borrow kinds,
 read, write, assert, and drop. `GlobalKind` makes keyed storage first-class
@@ -674,8 +684,8 @@ or is superseded by a recorded decision.
 | Drop flags, cleanup scopes, panic behavior, and unwinding beyond fixed `panic=abort` | Rust M4; full unwinding separately approved |
 | Authoritative resolution, whole-unit semantic type checking, lifetime constraints, and the rest of VIR borrow checking: general non-lexical loan death, dependency and unknown aggregate alias propagation, nominal variance, use-site region constraints | VIR Phase 2; Rust M3 |
 | Freshness and alignment: binding retained import-evidence statements to source, configuration, and semantic hashes; the Rust import receipt in the validated-unit proof boundary | Rust M1.5; M7 before a theorem about an external Rust artifact |
-| Raw pointers, allocation and provenance, unsafe cells and unions, explicit UB semantics | Rust M5 ([`unsafe-pointers.md`](../plan/unsafe-pointers.md)) |
-| Prophetic-reference residue: a loan-typing environment for walker-level preservation, non-lexical loan death, two-phase borrows, interior mutability ([`prophetic-references.md`](prophetic-references.md)) | The evaluator induction; Rust M3; a two-phase/interior-mutability design before `Cell`-style constructs |
+| Raw pointers, allocation and provenance, unsafe cells and unions, explicit UB semantics | Rust M5 ([`unsafe-pointers.md`](unsafe-pointers.md)) |
+| Prophetic-reference residue: a loan-typing environment for walker-level preservation, non-lexical loan death, two-phase borrows, interior mutability ([`prophetic-references.md`](prophetic-references.md), [`interior-mutability.md`](interior-mutability.md)) | The evaluator induction; Rust M3; [`interior-mutability.md`](interior-mutability.md) and a two-phase-borrow design before `Cell`-style and two-phase constructs |
 | Source printers and round trips: normalization of validation-only bodies, Move/Verex-native alpha-equivalence, Move/Verex source maps, cross-language location fidelity, corpus-wide round trips | VIR Phase 6; Rust M2/M7 |
 | Materialized `StructuredUnit`, `ResolvedUnit`, `TypedUnit` stages and the full staged API | With authoritative resolution and typing |
 

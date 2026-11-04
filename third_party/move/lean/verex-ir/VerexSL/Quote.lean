@@ -138,6 +138,7 @@ deriving instance ToExpr for FieldDecl
 deriving instance ToExpr for VariantDecl
 deriving instance ToExpr for GhostFieldDecl
 deriving instance ToExpr for StructDecl
+deriving instance ToExpr for ShapeContract
 deriving instance ToExpr for FunctionDecl
 deriving instance ToExpr for AssociatedItemKind
 deriving instance ToExpr for AssociatedItemDecl
@@ -151,8 +152,11 @@ deriving instance ToExpr for SpecVarDecl
 deriving instance ToExpr for NamespaceInvariant
 deriving instance ToExpr for IntrinsicBinding
 deriving instance ToExpr for IntrinsicDecl
+deriving instance ToExpr for ScopeKind
+deriving instance ToExpr for ScopeDecl
 deriving instance ToExpr for Namespace
 deriving instance ToExpr for FunctionBody
+deriving instance ToExpr for LoanProjection
 deriving instance ToExpr for LoanDeath
 deriving instance ToExpr for ValueOrders
 deriving instance ToExpr for Holding

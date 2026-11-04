@@ -5,14 +5,12 @@ edition = "2024"
 publish = false
 
 [features]
-default = ["extra"]
+default = ["extra", "dependency-call"]
 extra = []
+# A call into the dependency crate, which declares its function in the unit.
+dependency-call = []
 
 [dependencies]
 verex-rust-cargo-fixture-dependency = { path = "dependency" }
-
-[package.metadata.cargo-machete]
-# Exercise dependency compilation without exporting the dependency's functions.
-ignored = ["verex-rust-cargo-fixture-dependency"]
 
 [workspace]

@@ -55,7 +55,8 @@ theorem HasType.plain {unit : ValidatedUnit} {value : RuntimeValue} {type : SemT
         HasTypes.plain typed value (Array.mem_toList_iff.mpr member)
   | .borrow _ _ _ loan_eq _ => nomatch loan_eq
   | .shared _ _ typed => HasType.plain typed
-  | .dead _ => .unit
+  | .observed _ _ _ typed => HasType.plain typed
+  | .dead _ => .retired
   | .hole _ _ _ loan_eq _ _ => nomatch loan_eq
   | .unitEmptyTuple => .unit
   | .emptyTupleUnit => .tuple #[] fun _ member => nomatch member
@@ -289,7 +290,7 @@ def Denote.NRow.mutable : NRow → List Bool
 none, as a function's parameters are. -/
 def Denote.NRow.lentFlat : NRow → Bool
   | .nil => true
-  | .cons (.ref _) rest => rest.lentFlat
+  | .cons (.ref σ) rest => σ.refFree && rest.lentFlat
   | .cons τ rest => τ.refFree && rest.lentFlat
 
 /-- A row without references is flat. -/
@@ -387,12 +388,13 @@ theorem Denote.NRow.lend_lentFlat : (row : NRow) → row.lentFlat = true → (va
   | .cons τ rest, flat, values, loans => by
       cases τ with
       | ref σ =>
-          simp only [NRow.lentFlat] at flat
+          simp only [NRow.lentFlat, Bool.and_eq_true] at flat
           cases loans with
           | nil => rfl
           | cons loan loans =>
-              simp only [NRow.lend, NTy.lend, Option.bind_some, NRow.mutable, HList.entries,
-                lendMutable, NRow.lend_lentFlat rest flat values.2 loans, ite_false,
+              simp only [NRow.lend, NTy.lend, NTy.lend_refFree σ flat.1, Option.map_some,
+                Option.bind_some, NRow.mutable, HList.entries,
+                lendMutable, NRow.lend_lentFlat rest flat.2 values.2 loans, ite_false,
                 Bool.false_eq_true]
       | _ =>
           simp only [NRow.lentFlat, Bool.and_eq_true] at flat
@@ -422,7 +424,8 @@ theorem Denote.ResultShape.lend_settled : (shape : ResultShape) → shape.row.le
       cases τ with
       | ref σ =>
           simp only [ResultShape.Settled] at settled
-          cases loans <;> simp [ResultShape.lend, NTy.lend, settled]
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
+          cases loans <;> simp [ResultShape.lend, NTy.lend, NTy.lend_refFree σ flat, settled]
       | _ =>
           simp only [NRow.lentFlat, Bool.and_true] at flat
           simp only [ResultShape.lend, NTy.lend_refFree _ flat]
@@ -439,11 +442,12 @@ theorem Denote.ResultShape.readResults_lend : (shape : ResultShape) → shape.ro
   | .one τ, flat, result, loans, results, lent => by
       cases τ with
       | ref σ =>
+          simp only [ResultShape.row, NRow.lentFlat, Bool.and_true] at flat
           match loans, lent with
           | [], lent => simp [ResultShape.lend, NTy.lend] at lent
           | loan :: rest, lent =>
-              cases rest <;> simp only [ResultShape.lend, NTy.lend, Option.some.injEq,
-                reduceCtorEq] at lent
+              cases rest <;> simp only [ResultShape.lend, NTy.lend, NTy.lend_refFree σ flat,
+                Option.map_some, Option.some.injEq, reduceCtorEq] at lent
               subst lent
               simp only [NRow.mutable, List.toList_toArray, readResults, ite_false,
                 RuntimeValue.observe, RuntimeValue.observe_of_plain (NTy.encode_plain σ result.1),
@@ -1044,8 +1048,9 @@ def Denote.NTy.scalarType? : NTy → Option SemTy
   | .signer => some .signer
   | .string => some .string
   | .bytes => some .bytes
-  | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .table _ _ | .ghost _ | .ref _
-  | .param _ | .function .. => none
+  | .char => some .character
+  | .unit | .tuple _ | .struct .. | .enum .. | .vector _ | .array _ _ | .table _ _ | .ghost _ | .ref _
+  | .param _ | .function .. | .nominal .. => none
 
 theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
     [Skolems unit] {loans : LoanTypes} :
@@ -1071,10 +1076,13 @@ theorem Denote.NTy.encode_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
       simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar; exact .string value
   | .bytes, _, scalar, value => by
       simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar; exact .bytes value
+  | .char, _, scalar, value => by
+      simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar
+      exact .character value.val value.valid
   | .unit, _, scalar, _ | .tuple _, _, scalar, _ | .struct .., _, scalar, _
-  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .table _ _, _, scalar, _
+  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .array _ _, _, scalar, _ | .table _ _, _, scalar, _
   | .ghost _, _, scalar, _ | .ref _, _, scalar, _ | .param _, _, scalar, _
-  | .function .., _, scalar, _ => by
+  | .function .., _, scalar, _ | .nominal .., _, scalar, _ => by
       simp [NTy.scalarType?] at scalar
 
 theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [FunctionCarriers unit]
@@ -1119,10 +1127,16 @@ theorem Denote.NTy.decode_of_hasType {unit : ValidatedUnit} [FunctionCarriers un
       cases typed with
       | bytes value => exact ⟨value, rfl⟩
       | hole => simp [RuntimeValue.holeFree?] at *
+  | .char, _, scalar, value, typed, _ => by
+      simp only [NTy.scalarType?, Option.some.injEq] at scalar; subst scalar
+      cases typed with
+      | character value valid => exact ⟨⟨value, valid⟩, rfl⟩
+      | hole => simp [RuntimeValue.holeFree?] at *
   | .unit, _, scalar, _, _, _ | .tuple _, _, scalar, _, _, _ | .struct .., _, scalar, _, _, _
-  | .enum .., _, scalar, _, _, _ | .vector _, _, scalar, _, _, _ | .table _ _, _, scalar, _, _, _
+  | .enum .., _, scalar, _, _, _ | .vector _, _, scalar, _, _, _ | .array _ _, _, scalar, _, _, _
+  | .table _ _, _, scalar, _, _, _
   | .ghost _, _, scalar, _, _, _ | .ref _, _, scalar, _, _, _ | .param _, _, scalar, _, _, _
-  | .function .., _, scalar, _, _, _ =>
+  | .function .., _, scalar, _, _, _ | .nominal .., _, scalar, _, _, _ =>
     by
       simp [NTy.scalarType?] at scalar
 
@@ -1132,11 +1146,11 @@ theorem Denote.NTy.normalize_encode_scalar {unit : ValidatedUnit} [FunctionCarri
     (τ : NTy) → {type : SemTy} → τ.scalarType? = some type → (value : τ.carrier) →
       SemanticOperations.normalize unit (τ.encode value) = τ.encode value
   | .bool, _, _, _ | .int _ _, _, _, _ | .num, _, _, _ | .address, _, _, _ | .signer, _, _, _
-  | .string, _, _, _ | .bytes, _, _, _ => by simp
+  | .string, _, _, _ | .bytes, _, _, _ | .char, _, _, _ => by simp
   | .unit, _, scalar, _ | .tuple _, _, scalar, _ | .struct .., _, scalar, _
-  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .table _ _, _, scalar, _
+  | .enum .., _, scalar, _ | .vector _, _, scalar, _ | .array _ _, _, scalar, _ | .table _ _, _, scalar, _
   | .ghost _, _, scalar, _ | .ref _, _, scalar, _ | .param _, _, scalar, _
-  | .function .., _, scalar, _ => by simp [NTy.scalarType?] at scalar
+  | .function .., _, scalar, _ | .nominal .., _, scalar, _ => by simp [NTy.scalarType?] at scalar
 
 /-- A value typed at a scalar type normalizes to itself: it is a scalar or a
 hole. -/
@@ -1574,6 +1588,51 @@ theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
     (references : parameters.refFree = false) :
     FramedAt executable parameters shared shape frame function :=
   fun free => by simp [references] at free
+
+/-- The first static method dictionary's checked contract: every invocation
+is defined, cannot panic, and preserves global memory. Mutable receiver state
+remains in the arguments' prophecies; it is not required to stay unchanged.
+Concrete dictionaries discharge this obligation using their target's theorem. -/
+def MethodContract {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (parameters : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
+  ∀ (args : HList parameters) (initial : Memory unit),
+    wp (closureMeaning executable parameters shared shape function args)
+      (fun _ final => final = initial) (fun _ => False) initial
+
+theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
+    {shared : Sharing} {shape : ResultShape}
+    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (checked : MethodContract executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
+      (shape.functionOfSkolem θ parameters shared function)) :
+    @MethodContract unit _ executable (Skolems.instantiate θ Θ)
+      parameters shared shape function := by
+  intro args initial
+  rw [closureMeaning_instantiate executable θ free parameters shared shape function args]
+  simpa only [wp_bind, wp_pure] using checked (HList.ofSkolem θ parameters args) initial
+
+/-- Use a checked dictionary without assuming reference-free arguments. The
+success hypothesis retains the entire receiver transition in `EnsuresOf`. -/
+theorem MethodContract.invoke {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
+    {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {function : (NTy.function parameters shared shape.row).carrier}
+    (checked : MethodContract executable parameters shared shape function)
+    (args : HList parameters) {initial : Memory unit}
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    (returns : ∀ result,
+      EnsuresOf (closureMeaning executable) parameters shared shape function args result initial initial →
+      ensures result initial) :
+    wp (closureMeaning executable parameters shared shape function args) ensures aborts initial := by
+  have safe := checked args initial
+  refine ⟨fun result final run => ?_, fun error run => False.elim (safe.2.1 error run), safe.2.2⟩
+  have same := safe.1 result final run
+  subst final
+  exact returns result run
 
 /-- A literal closure keeps a frame where every run of its target from
 typed memory, at any arguments, keeps it: the frame its body establishes,

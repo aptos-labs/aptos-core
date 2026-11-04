@@ -447,6 +447,15 @@ example:
 - Move global storage is organized by resource family and address; Rust state
   may include allocations and interior-mutable cells.
 - Move has abilities; Rust has ownership, destruction, traits, and lifetimes.
+  The Rust profile reads `Copy` as the `copy` ability and drops every value;
+  the property `struct.destructor` states which nominals run a destructor of
+  their own, or hide one (an opaque type); what a visible field reaches is read
+  from its type, a type the library models among them, and
+  until M4 a drop or a generic call that could run one has no denotation.
+  A struct with a `Copy` impl applying it to its own parameters declares
+  `copy`, which an instantiation has where its type arguments are `Copy`, as
+  `#[derive(Copy)]` states it; a generic parameter's abilities only constrain
+  instantiations.
 
 Two functions with the same body producer can therefore still live in
 different semantic profiles.  Conversely, Lean and MIR frontends can produce
@@ -1106,11 +1115,11 @@ until it lands, is rejected, or is superseded by a recorded decision.
 | Deferred item | Reactivate by |
 |---|---|
 | Approval and publication of RawUnit JSON v1 as an external compatibility contract | M0, before fixtures beyond the supported mirror become compatibility artifacts |
-| Public function predicate query (function `where` clauses and const-function binder types are not exposed by Rustc Public) | M0; filed upstream as [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892); public queries are requested rather than reading `rustc_middle` |
+| Retire the confined Rustc Public polyfill | Replace `driver/polyfill.rs` wrappers with public queries when the pinned toolchain incorporates [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892); the mapper continues to use only public types |
 | Remaining MIR-to-RawUnit mapper forms: symbolic const-dependent types, destructive/provenance administration exposed by Rustc Public, constrained and const generic functions | M1 once their metadata is public; M4 adds cleanup and effectful drop glue |
 | Checked implementation-selection evidence and dictionary interpretation (`EvidenceId` is opaque) | M2, before trait method calls execute or transfer contracts and proofs |
 | Destructive/provenance nodes, cleanup edges, pointer-alignment assertions, and reachable `unreachable` blocks, rejected by structurization | M4 for destruction, cleanup, and richer panic behavior; M5 for retag/provenance and alignment assertions |
-| Drop flags, cleanup scopes, and unwinding (only `panic=abort` with unreachable-unwind drops is structurized) | M4 drop effects and flags; full unwinding is a separately approved milestone |
+| Cleanup scopes and unwinding (only `panic=abort` with unreachable-unwind drops is structurized; its drop flags are boolean locals that definite initialization relates to the values they guard) | M4 drop effects; full unwinding is a separately approved milestone |
 | A proof-grade semantic-body/alignment receipt (the cache digest binds inputs, not alignment) | the shared proof-facing receipt gate; M7 before source-level theorem claims |
 | Raw pointers, unsafe operations, allocation/provenance, and UB (rejected at the first unsupported node, no partial JSON) | M5, U0–U2 |
 | Trait objects, specialization, higher-ranked bounds outside the initial fragment, async/coroutines, FFI, inline assembly | separately scoped post-M2/M5 milestones with core/profile classification first |
@@ -1131,8 +1140,8 @@ until it lands, is rejected, or is superseded by a recorded decision.
 - Implement the `verex-rust-export` driver against the pinned Rustc Public
   toolchain.  It must serialize a detached Rust-profile `RawUnit` in its
   post-analysis callback and return `Compilation::Stop`.  The mapper makes no
-  direct `rustc_middle` queries; startup-only bridge dependencies stay confined
-  to the driver crate.
+  direct `rustc_middle` queries; temporary compiler queries stay confined to
+  the driver's `polyfill.rs` module.
 - Demonstrate the selected post-analysis optimized generic body shape, source
   origins, generic predicates, direct callee identity, drop/cleanup data, and
   raw-pointer tags on that corpus.  Any absent query is a documented blocker
@@ -1209,7 +1218,8 @@ without relying on the user's Rust toolchain, and a repeated build is cached.
 
 ### M4 — Drop and panic
 
-- Add explicit destruction and drop-flag behavior.
+- Add explicit destruction: a drop runs its type's drop glue and the
+  destructor's effects.
 - Implement the fixed `panic=abort` terminal semantics; do not support
   unwinding or `catch_unwind` in this slice.
 - Ensure guard and destructor effects are visible to proofs.

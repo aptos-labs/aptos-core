@@ -92,10 +92,36 @@ theorem NTy.lend_refFree : (τ : NTy) → τ.refFree = true → (prophecies : Bo
       simp only [NTy.refFree] at free
       simp only [NTy.lend, NRow.lend_refFree elements free prophecies values loans, Option.map_some,
         NTy.encode_tuple, HList.encode]
+  | .struct source arguments fields, free, prophecies, values, loans => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.lend, NRow.lend_refFree fields free prophecies values loans, Option.map_some,
+        NTy.encode_struct, HList.encode]
+  | .enum source arguments names rows distinct, free, prophecies, value, loans => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.lend]
+      exact lendVariant_refFree source arguments names rows distinct free prophecies value loans
   | .unit, _, _, _, _ | .bool, _, _, _, _ | .int _ _, _, _, _, _ | .num, _, _, _, _ | .address, _, _, _, _
-  | .signer, _, _, _, _ | .string, _, _, _, _ | .bytes, _, _, _, _ | .struct _ _ _, _, _, _, _
-  | .enum _ _ _ _ _, _, _, _, _ | .vector _, _, _, _, _ | .table _ _, _, _, _, _
-  | .ghost _, _, _, _, _ | .param _, _, _, _, _ | .function _ _ _, _, _, _, _ => rfl
+  | .signer, _, _, _, _ | .string, _, _, _, _ | .bytes, _, _, _, _ | .char, _, _, _, _
+  | .vector _, _, _, _, _ | .array _ _, _, _, _, _ | .table _ _, _, _, _, _
+  | .ghost _, _, _, _, _ | .param _, _, _, _, _ | .function _ _ _, _, _, _, _
+  | .nominal _ _ _, _, _, _, _ => rfl
+
+/-- An enum's value without references lends as its encoding, taking no loan. -/
+theorem lendVariant_refFree (source : StructHandle) (arguments : NRow) :
+    (names : List String) → (rows : NRows) → (distinct : names.Nodup) → rows.refFree = true →
+    (prophecies : Bool) → (value : variantCarrier names rows) → (loans : List Nat) →
+    lendVariant source names rows prophecies value loans =
+      some (NTy.encode (.enum source arguments names rows distinct) value, loans)
+  | _, .nil, _, _, _, value, _ => nomatch value
+  | [], .cons _ _, _, _, _, value, _ => nomatch value
+  | name :: names, .cons fields rest, distinct, free, prophecies, .inl values, loans => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      simp only [lendVariant, NRow.lend_refFree fields free.1 prophecies values loans,
+        Option.map_some, NTy.encode_enum_inl]
+  | name :: names, .cons fields rest, distinct, free, prophecies, .inr later, loans => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      simp only [lendVariant, NTy.encode_enum_inr]
+      exact lendVariant_refFree source arguments names rest _ free.2 prophecies later loans
 
 /-- A row without references lends as its encoding, taking no loan. -/
 theorem NRow.lend_refFree : (row : NRow) → row.refFree = true → (prophecies : Bool) →
@@ -299,13 +325,67 @@ theorem Weave.composeList_injective : {full captured supplied : NRow} →
 
 /-! ## Resolution -/
 
+mutual
+/-- A value without references resolves nothing. -/
+theorem NTy.resolves_refFree : (τ : NTy) → τ.refFree = true → (value : τ.carrier) →
+    (loans : List Nat) → (returned : Array RuntimeValue) → (exports : List (Nat × RuntimeValue)) →
+    τ.resolves value loans returned exports
+  | .ref _, free, _, _, _, _ => by simp [NTy.refFree] at free
+  | .tuple elements, free, values, loans, returned, exports => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.resolves]
+      exact argumentsResolve_refFree elements free values loans returned exports
+  | .struct _ _ fields, free, values, loans, returned, exports => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.resolves]
+      exact argumentsResolve_refFree fields free values loans returned exports
+  | .enum _ _ names rows _, free, value, loans, returned, exports => by
+      simp only [NTy.refFree] at free
+      simp only [NTy.resolves]
+      exact variantResolves_refFree names rows free value loans returned exports
+  | .unit, _, _, _, _, _ | .bool, _, _, _, _, _ | .int _ _, _, _, _, _, _ | .num, _, _, _, _, _
+  | .address, _, _, _, _, _ | .signer, _, _, _, _, _ | .string, _, _, _, _, _
+  | .bytes, _, _, _, _, _ | .char, _, _, _, _, _
+  | .vector _, _, _, _, _, _ | .array _ _, _, _, _, _, _ | .table _ _, _, _, _, _, _
+  | .ghost _, _, _, _, _, _ | .param _, _, _, _, _, _ | .function _ _ _, _, _, _, _, _
+  | .nominal _ _ _, _, _, _, _, _ => by
+      simp only [NTy.resolves]
+
+/-- A row without references resolves nothing. -/
+theorem argumentsResolve_refFree : (row : NRow) → row.refFree = true → (values : HList row) →
+    (loans : List Nat) → (returned : Array RuntimeValue) → (exports : List (Nat × RuntimeValue)) →
+    argumentsResolve row values loans returned exports
+  | .nil, _, _, _, _, _ => by simp only [argumentsResolve]
+  | .cons τ rest, free, values, loans, returned, exports => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      simp only [argumentsResolve, NTy.lend_refFree τ free.1]
+      exact ⟨NTy.resolves_refFree τ free.1 _ _ _ _,
+        argumentsResolve_refFree rest free.2 _ _ _ _⟩
+
+/-- An enum's value without references resolves nothing. -/
+theorem variantResolves_refFree : (names : List String) → (rows : NRows) → rows.refFree = true →
+    (value : variantCarrier names rows) → (loans : List Nat) → (returned : Array RuntimeValue) →
+    (exports : List (Nat × RuntimeValue)) → variantResolves names rows value loans returned exports
+  | _, .nil, _, value, _, _, _ => nomatch value
+  | [], .cons _ _, _, value, _, _, _ => nomatch value
+  | _ :: _, .cons fields _, free, .inl values, loans, returned, exports => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      simp only [variantResolves]
+      exact argumentsResolve_refFree fields free.1 values loans returned exports
+  | _ :: names, .cons _ rest, free, .inr later, loans, returned, exports => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      simp only [variantResolves]
+      exact variantResolves_refFree names rest free.2 later loans returned exports
+end
+
 /-- A reference-free argument resolves nothing. -/
 theorem argumentsResolve_cons_refFree {τ : NTy} {rest : NRow} (free : τ.refFree = true)
     (values : HList (.cons τ rest)) (loans : List Nat) (returned : Array RuntimeValue)
     (exports : List (Nat × RuntimeValue)) :
     argumentsResolve (.cons τ rest) values loans returned exports ↔
       argumentsResolve rest values.2 loans returned exports := by
-  cases τ <;> simp_all [NTy.refFree, argumentsResolve]
+  simp only [argumentsResolve, NTy.lend_refFree τ free]
+  exact and_iff_right (NTy.resolves_refFree τ free _ _ _ _)
 
 /-- The woven arguments resolve as the supplied ones. -/
 theorem Weave.argumentsResolve_compose : {full captured supplied : NRow} →
@@ -321,9 +401,10 @@ theorem Weave.argumentsResolve_compose : {full captured supplied : NRow} →
       exact rest.argumentsResolve_compose free.2 captures.2 args loans returned exports
   | _, _, _, @Weave.supplied τ _ _ _ rest, free, captures, args, loans, returned, exports => by
       rw [Weave.compose]
-      cases τ <;> cases loans <;>
-        simp only [argumentsResolve,
-          rest.argumentsResolve_compose free captures args.2 _ returned exports]
+      simp only [argumentsResolve]
+      split
+      · simp only [rest.argumentsResolve_compose free captures args.2 _ returned exports]
+      · exact Iff.rfl
 
 /-! ## The meaning of a known closure -/
 
@@ -551,20 +632,40 @@ theorem NTy.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : N
       NTy.lend (τ.subst θ.1) prophecies value loans
   | .ref referent, prophecies, value, loan :: loans => by
       cases prophecies <;>
-        simp only [NTy.lend, NTy.toSkolem, NTy.encode_toSkolem, Bool.false_eq_true,
+        simp only [NTy.lend, NTy.toSkolem, NTy.lend_toSkolem θ free referent, Bool.false_eq_true,
           ite_false, ite_true]
   | .ref _, _, _, [] => rfl
   | .tuple elements, prophecies, values, loans => by
       simp only [NTy.lend, NTy.toSkolem, NRow.lend_toSkolem θ free elements]
+  | .struct source arguments fields, prophecies, values, loans => by
+      simp only [NTy.lend, NTy.subst, NTy.toSkolem, NRow.lend_toSkolem θ free fields]
+  | .enum source arguments names rows distinct, prophecies, value, loans => by
+      simp only [NTy.lend, NTy.subst, NTy.toSkolem]
+      exact lendVariant_toSkolem θ free source names rows prophecies value loans
   | .param index, prophecies, value, loans => by
       rw [NTy.lend_refFree ((NTy.param index).subst θ.1)
         (NRow.getD_refFree θ.1 free index _ rfl) prophecies value loans]
       simp only [NTy.lend, NTy.encode_toSkolem]
   | .unit, _, _, _ | .bool, _, _, _ | .int _ _, _, _, _ | .num, _, _, _ | .address, _, _, _
-  | .signer, _, _, _ | .string, _, _, _ | .bytes, _, _, _ | .struct _ _ _, _, _, _
-  | .enum _ _ _ _ _, _, _, _ | .vector _, _, _, _ | .table _ _, _, _, _
-  | .ghost _, _, _, _ | .function _ _ _, _, _, _ => by
+  | .signer, _, _, _ | .string, _, _, _ | .bytes, _, _, _ | .char, _, _, _
+  | .vector _, _, _, _ | .array _ _, _, _, _ | .table _ _, _, _, _
+  | .ghost _, _, _, _ | .function _ _ _, _, _, _ | .nominal _ _ _, _, _, _ => by
       simp only [NTy.lend, NTy.subst, NTy.encode_toSkolem]
+
+/-- An enum's value lends at the target's family as at the caller's types. -/
+theorem lendVariant_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) (source : StructHandle) :
+    (names : List String) → (rows : NRows) → (prophecies : Bool) →
+    (value : variantCarrier names (NRows.subst θ.1 rows)) → (loans : List Nat) →
+    @lendVariant _ _ (Skolems.instantiate θ Θ) source names rows prophecies
+        (variantCarrier.toSkolem θ names rows value) loans =
+      lendVariant source names (NRows.subst θ.1 rows) prophecies value loans
+  | _, .nil, _, value, _ => nomatch value
+  | [], .cons _ _, _, value, _ => nomatch value
+  | _ :: _, .cons fields _, prophecies, .inl values, loans => by
+      simp only [variantCarrier.toSkolem, lendVariant, NRow.lend_toSkolem θ free fields]
+  | _ :: names, .cons _ rest, prophecies, .inr later, loans => by
+      simp only [variantCarrier.toSkolem, lendVariant]
+      exact lendVariant_toSkolem θ free source names rest prophecies later loans
 
 /-- A row lends at the target's family as at the caller's types. -/
 theorem NRow.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (row : NRow) →
@@ -577,6 +678,52 @@ theorem NRow.lend_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (row :
         NRow.lend_toSkolem θ free rest]
 end
 
+mutual
+/-- A value resolves at the target's family as at the caller's types. -/
+theorem NTy.resolves_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (τ : NTy) →
+    (value : (τ.subst θ.1).carrier) → (loans : List Nat) → (returned : Array RuntimeValue) →
+    (exports : List (Nat × RuntimeValue)) →
+    (@NTy.resolves _ _ (Skolems.instantiate θ Θ) τ (NTy.toSkolem θ τ value) loans returned exports ↔
+      NTy.resolves (τ.subst θ.1) value loans returned exports)
+  | .ref referent, value, loan :: loans, returned, exports => by
+      simp only [NTy.resolves, NTy.subst, NTy.toSkolem, NTy.lend_toSkolem θ free referent]
+  | .ref _, _, [], _, _ => Iff.rfl
+  | .tuple elements, values, loans, returned, exports => by
+      simp only [NTy.resolves, NTy.subst, NTy.toSkolem]
+      exact argumentsResolve_toSkolem θ free elements values loans returned exports
+  | .struct _ _ fields, values, loans, returned, exports => by
+      simp only [NTy.resolves, NTy.subst, NTy.toSkolem]
+      exact argumentsResolve_toSkolem θ free fields values loans returned exports
+  | .enum _ _ names rows _, value, loans, returned, exports => by
+      simp only [NTy.resolves, NTy.subst, NTy.toSkolem]
+      exact variantResolves_toSkolem θ free names rows value loans returned exports
+  | .param index, value, loans, returned, exports => by
+      simp only [NTy.resolves, true_iff]
+      exact NTy.resolves_refFree _ (NRow.getD_refFree θ.1 free index _ rfl) _ _ _ _
+  | .unit, _, _, _, _ | .bool, _, _, _, _ | .int _ _, _, _, _, _ | .num, _, _, _, _
+  | .address, _, _, _, _ | .signer, _, _, _, _ | .string, _, _, _, _ | .bytes, _, _, _, _
+  | .char, _, _, _, _ | .vector _, _, _, _, _
+  | .array _ _, _, _, _, _ | .table _ _, _, _, _, _ | .ghost _, _, _, _, _
+  | .function _ _ _, _, _, _, _ | .nominal _ _ _, _, _, _, _ => by
+      simp only [NTy.resolves, NTy.subst]
+
+/-- An enum's value resolves at the target's family as at the caller's types. -/
+theorem variantResolves_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
+    (names : List String) → (rows : NRows) →
+    (value : variantCarrier names (NRows.subst θ.1 rows)) → (loans : List Nat) →
+    (returned : Array RuntimeValue) → (exports : List (Nat × RuntimeValue)) →
+    (@variantResolves _ _ (Skolems.instantiate θ Θ) names rows
+        (variantCarrier.toSkolem θ names rows value) loans returned exports ↔
+      variantResolves names (NRows.subst θ.1 rows) value loans returned exports)
+  | _, .nil, value, _, _, _ => nomatch value
+  | [], .cons _ _, value, _, _, _ => nomatch value
+  | _ :: _, .cons fields _, .inl values, loans, returned, exports => by
+      simp only [variantCarrier.toSkolem, variantResolves]
+      exact argumentsResolve_toSkolem θ free fields values loans returned exports
+  | _ :: names, .cons _ rest, .inr later, loans, returned, exports => by
+      simp only [variantCarrier.toSkolem, variantResolves]
+      exact variantResolves_toSkolem θ free names rest later loans returned exports
+
 /-- Arguments resolve at the target's family as at the caller's types. -/
 theorem argumentsResolve_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) : (σs : NRow) →
     (values : HList (NRow.subst θ.1 σs)) → (loans : List Nat) → (returned : Array RuntimeValue) →
@@ -586,21 +733,12 @@ theorem argumentsResolve_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
       argumentsResolve (NRow.subst θ.1 σs) values loans returned exports)
   | .nil, _, _, _, _ => Iff.rfl
   | .cons τ rest, values, loans, returned, exports => by
-      have later := argumentsResolve_toSkolem θ free rest
-      cases τ with
-      | ref referent =>
-          cases loans with
-          | nil => simp only [argumentsResolve]
-          | cons loan loans =>
-              simp only [argumentsResolve, NTy.subst, HList.toSkolem, NTy.toSkolem,
-                NTy.encode_toSkolem, later]
-      | param index =>
-          refine Iff.trans ?_ (argumentsResolve_cons_refFree (τ := (NTy.param index).subst θ.1)
-            (rest := NRow.subst θ.1 rest) (NRow.getD_refFree θ.1 free index _ rfl) values loans
-            returned exports).symm
-          simp only [argumentsResolve, HList.toSkolem]
-          exact later values.2 loans returned exports
-      | _ => simp only [argumentsResolve, NTy.subst, HList.toSkolem, later]
+      simp only [argumentsResolve, HList.toSkolem, NRow.subst, NTy.lend_toSkolem θ free τ,
+        NTy.resolves_toSkolem θ free τ]
+      split
+      · simp only [argumentsResolve_toSkolem θ free rest]
+      · exact Iff.rfl
+end
 
 /-- A result in the caller's view lends as it does at the target's family. -/
 theorem ResultShape.lend_ofSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
@@ -907,6 +1045,31 @@ theorem satisfies_specialized (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
     simp only [Spec.pure_undefined, and_false, exists_false, or_false] at undefined
     exact defined undefined
 
+/-- The type arguments a shape stands for where its variables take the type
+arguments `θ`. -/
+@[reducible] def TypeArgs.atShape (shape θ : TypeArgs) : TypeArgs :=
+  ⟨NRow.subst θ.1 shape.1, NRow.inhabitable_subst θ.1 θ.2 shape.1 shape.2⟩
+
+omit [Θ : Skolems unit] in
+/-- A meaning satisfying a contract satisfies every contract equivalent to
+it. What a call through a contract at a shape uses, whose statement is read in
+the caller's view already. -/
+theorem satisfies_of_equivalent {Args Result : Type}
+    {meaning : Args → Comp unit Result}
+    {stated specialized : Contract (Memory unit) Failure Args Result}
+    (verified : Satisfies meaning stated) (equivalent : Contract.Equivalent specialized stated) :
+    Satisfies meaning specialized := by
+  intro args initial assumed required
+  obtain ⟨normal, failing, defined⟩ := verified args initial
+    ((equivalent.assumes args initial).mp assumed) ((equivalent.requires args initial).mp required)
+  refine ⟨fun result final ok => ?_, fun error aborted => ?_, defined⟩
+  obtain ⟨established, kept, proper⟩ := normal result final ok
+  exact ⟨fun excused => (equivalent.ensures args initial _ _).mpr
+      (established fun aborting => excused ((equivalent.mayAbort args initial).mpr aborting)),
+    (equivalent.frame args initial _ _).mpr kept,
+    fun aborting => proper ((equivalent.mustAbort args initial).mp aborting)⟩
+  exact (equivalent.aborts args initial error).mpr (failing error aborted)
+
 /-- A call at the frame type arguments induce, through the meaning at the
 caller's types (`specializedMeaning`): its arguments read in the caller's
 view, its result carried back into the callee's. -/
@@ -972,6 +1135,9 @@ theorem NTy.refFree_subst (θ : NRow) (free : θ.refFree = true) : (τ : NTy) �
   | .vector element, typeFree => by
       simp only [NTy.refFree] at typeFree
       simp only [NTy.refFree, NTy.refFree_subst θ free element typeFree]
+  | .array element _, typeFree => by
+      simp only [NTy.refFree] at typeFree
+      simp only [NTy.refFree, NTy.refFree_subst θ free element typeFree]
   | .table key value, typeFree => by
       simp only [NTy.refFree, Bool.and_eq_true] at typeFree
       simp [NTy.refFree, NTy.refFree_subst θ free key typeFree.1,
@@ -979,7 +1145,10 @@ theorem NTy.refFree_subst (θ : NRow) (free : θ.refFree = true) : (τ : NTy) �
   | .ghost slot, typeFree => by
       simp only [NTy.refFree] at typeFree
       simp only [NTy.refFree, NTy.refFree_subst θ free slot typeFree]
-  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _
+  | .nominal _ arguments _, typeFree => by
+      simp only [NTy.refFree] at typeFree
+      simp only [NTy.refFree, NRow.refFree_subst θ free arguments typeFree]
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _ | .bytes, _ | .char, _
   | .function _ _ _, _ => rfl
 
 theorem NRow.refFree_subst (θ : NRow) (free : θ.refFree = true) : (row : NRow) →
@@ -1008,7 +1177,7 @@ theorem closureMeaning_closureOfGeneric {unit : VerexIR.Validation.ValidatedUnit
     (θ : TypeArgs) (free : θ.1.refFree = true) {full captured supplied : NRow}
     (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
     (shape : ResultShape) (handle : FunctionHandle) (outer : Array (TypeId × TypeId))
-    (typeArgs : Array TypeUse)
+    (typeArgs : Array GenericArgument)
     (coherent : @Coherent unit _ (Skolems.instantiate θ Θ) handle
       (frameInstantiation unit handle outer typeArgs))
     (captures : HList (NRow.subst θ.1 captured)) (shared : Sharing)
@@ -1138,6 +1307,24 @@ def coherentByEvaluation (condition : Lean.Expr) : MetaM (Option Lean.Expr) := d
     #[unitExpr, functions, family, handle, typeInstantiation, decided])
 
 open Lean Meta in
+/-- Expose frame aliases without unfolding unrelated invocation semantics.
+The subsequent comparisons also stay reducible: even a different frame can
+contain expensive definitions of its instantiation or carriers. -/
+private def frameHypothesisType (type : Lean.Expr) : MetaM Lean.Expr := do
+  withReducible <| whnf (← instantiateMVars type)
+
+private def isClosureFrameType (type : Lean.Expr) : Bool :=
+  type.isAppOf ``ClosureFrame ||
+    (type.isAppOfArity ``And 2 && (type.getArg! 0).isAppOf ``Coherent)
+
+open Lean Meta in
+/-- Accept an explicitly opened frame as well as the named predicate, opening
+only the expected outer conjunction before the reducible comparison. -/
+private def matchesClosureFrame (type frame : Lean.Expr) : MetaM Bool := do
+  let expected ← if type.isAppOf ``And then whnf frame else pure frame
+  withReducible (isDefEq type expected)
+
+open Lean Meta in
 /-- A proof of a frame's coherence: a hypothesis the closure's creation took,
 or evaluation. -/
 def coherentProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
@@ -1146,9 +1333,12 @@ def coherentProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
     #[unitExpr, functions, family, handle, typeInstantiation]
   let local? ← (← getLCtx).findDeclRevM? fun declaration => do
     if declaration.isImplementationDetail then return none
-    if ← isDefEq declaration.type condition then return some declaration.toExpr
-    if ← isDefEq declaration.type frame then
-      return some (← mkAppM ``And.left #[declaration.toExpr])
+    let type ← frameHypothesisType declaration.type
+    if type.isAppOf ``Coherent then
+      if ← withReducible (isDefEq type condition) then return some declaration.toExpr
+    if isClosureFrameType type then
+      if ← matchesClosureFrame type frame then
+        return some (← mkAppM ``And.left #[declaration.toExpr])
     return none
   match local? with
   | some proof => return some proof
@@ -1162,7 +1352,9 @@ def closureFrameProof? (condition : Lean.Expr) : MetaM (Option Lean.Expr) := do
     | return none
   let local? ← (← getLCtx).findDeclRevM? fun declaration => do
     if declaration.isImplementationDetail then return none
-    if ← isDefEq declaration.type condition then return some declaration.toExpr
+    let type ← frameHypothesisType declaration.type
+    if isClosureFrameType type then
+      if ← matchesClosureFrame type condition then return some declaration.toExpr
     return none
   if let some proof := local? then return some proof
   let some coherent ← coherentByEvaluation

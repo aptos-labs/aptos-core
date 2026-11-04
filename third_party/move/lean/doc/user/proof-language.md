@@ -22,6 +22,10 @@ Verifying `f` means discharging its *obligations*:
   returning path owes that no abort condition holds, keyed `aborts_if k` for each
   clause: `on aborts_if k` names the clause on every path, aborting and returning,
   and `when aborts at …` or `when returns` selects one side;
+- where no clause permits a failure and the function may not fail, that no path
+  fails: `no abort` for a Move function under `aborts_if_is_strict`, `no panic`
+  for a Rust function; a selector takes one path out (`on no panic when aborts
+  at op 3`);
 - each `requires` clause of every callee, owed at each call
   (`requires 1 of iter_next at call 2` is the first precondition of
   `iter_next`, owed at its second call in the body; `requires at invoke 1`

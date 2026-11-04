@@ -8,6 +8,10 @@ Move source -> compiler-v2 XAST -> validated Move VIR -> VerexSL or error
 Rust source -> rustc MIR exporter -> validated Rust VIR -> VerexSL or error
 ```
 
+A Rust baseline also lowers its rendering back and compiles each function
+to its denotation, as verification does; a function with none is listed after
+the source with the construct that stops it (`-- no denotation for …`).
+
 Inputs and expectations are side by side in feature directories:
 
 ```text

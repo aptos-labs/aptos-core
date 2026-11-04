@@ -53,6 +53,7 @@ unit's closure sites are their join (`closureSites`), each namespace's mapped
 through its links, the instances reached from the closed functions, and each
 site's rows computed in the unit, so finding them compiles no body.
 Verification names a function of the unit by its name in the unit's module,
+after the scopes it is in,
 or its path-qualified name in another namespace. A callee of another module
 is inlined like a module's own; one used through its contract (opaque) is
 verified in the importing unit as well. A clause authored in another

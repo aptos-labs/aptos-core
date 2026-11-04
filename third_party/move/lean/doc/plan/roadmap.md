@@ -20,9 +20,6 @@ Designs: [`denotation.md`](../designs/denotation.md),
   function read through the runtime frame for an invariant applying it to
   move; the transport of a definition taking types but no frame (SC2);
   addresses as `u256` values.
-- **Quantifier syntax aligned with Move.** VerexSL's `∀ (i : T), P` should
-  move toward Move's spelling, `forall i: T @ P`, with `forall` and `@`
-  also accepted as symbol tokens.
 - **Function values as native data**: [`native-function-values.md`](native-function-values.md),
   steps 2b and 3. Ordered with the proof language
   ([`proof-language.md`](proof-language.md)): that plan's L0–L2
@@ -83,7 +80,7 @@ Designs: [`denotation.md`](../designs/denotation.md),
   units whose owners are all tables.
 - **Denotation coverage not carried.** Signed bitwise operations, `bytes`
   and fixed-length vectors, unspecified pure callees used as summaries,
-  references inside an aggregate, range patterns over characters; generics:
+  references inside an enum, range patterns over characters; generics:
   the storage-aliasing instances, a generic caller of a callee whose storage
   depends on a type parameter, generic storage instantiated at a struct, the
   Rust profile denotations. Unmeasured: kernel `rfl` against `simp only
@@ -177,8 +174,9 @@ Design: [`vir-design.md`](../designs/vir-design.md).
   consumer outside this repository depends on it.
 - Prophetic residue: a loan-typing environment for walker-level
   preservation through a live borrow; non-lexical loan death; a design for
-  two-phase borrows and interior mutability before such constructs are
-  admitted.
+  two-phase borrows before two-phase constructs are admitted (interior
+  mutability is designed in
+  [`interior-mutability.md`](../designs/interior-mutability.md)).
 - The secure Lean-source discovery TODO in `vir-design.md`, before
   Lean-source discovery is a production compiler feature.
 
@@ -216,13 +214,16 @@ Design: [`monovm-link-design.md`](../designs/monovm-link-design.md).
 
 ## 7. Rust frontend
 
-Design: [`rust-mir-design.md`](../designs/rust-mir-design.md); proposal
-[`unsafe-pointers.md`](unsafe-pointers.md).
+Design: [`rust-mir-design.md`](../designs/rust-mir-design.md); proposals
+[`rust-verification.md`](rust-verification.md) (closing the verification
+gaps of the safe slice), [`unsafe-pointers.md`](../designs/unsafe-pointers.md),
+and [`interior-mutability.md`](../designs/interior-mutability.md).
 
-- The M0 gate is blocked upstream: `FnDef` exposes no predicates and there
-  is no const-fn binder type query
-  ([rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892));
-  the answer stays an upstream query, not a private `rustc_middle` read.
+- The missing M0 queries are supplied by the confined
+  [`rustc_public` polyfill](rustc-public-polyfill.md), an accepted temporary
+  exception until [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892)
+  is fixed in the pinned toolchain. Replace and remove its helpers as the public
+  queries become available. Compiler-private types must not cross the bridge.
 - Then M1 mapper completion and Charon differential tests; M1.5 a prebuilt
   exporter and sysroot distribution (today the managed path builds the
   exporter from the checkout); M2 contracts and `verify` for Rust through
@@ -234,8 +235,9 @@ Design: [`rust-mir-design.md`](../designs/rust-mir-design.md); proposal
   nominal variance, the remaining use-site constraints, returned-reference
   region precision (argument-changing recursive and external result-source
   selection stays conservative); M4 drops and panics: cleanup edges,
-  `Resume`, effectful drop glue and drop flags are rejection boundaries
-  today; M5 the unsafe profile; M6 library models; M7 alignment proofs.
+  `Resume` and effectful drop glue are rejection boundaries today; only
+  trivial drops have a denotation. M5 the unsafe profile; M6 library models; M7
+  alignment proofs.
 
 ## 8. Surface and backends
 
@@ -280,7 +282,7 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
 - Unsupported, diagnosed: explicit enum-field write frames; write frames at
   dependency-interface boundaries. Not scheduled: closures whose targets
   return references; function types as type arguments
-  (`Option<|u64|u64>`); Rust capturing closures and `Fn*` traits.
+  (`Option<|u64|u64>`); Rust `Fn*` traits ([`rust-verification.md`](rust-verification.md), step 3d).
 - **State labels.** Reads of a removed resource's contents under a label
   (`unmodified_memory_at_label::swap`); a free label with no defining
   operation (`nonlinear_cfg_error`); a witness for a target without a
@@ -290,6 +292,26 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
 - **Ghost fields (G4b).** Modular theorems, the unit model as one least
   fixed point, the agreement up to ghost contents; generic functions and
   closure targets in the model; the remaining C8 tests.
+
+## Backburner
+
+Wanted, and deferred on purpose: taken up only when no track above needs
+the work.
+
+- **Quantifier syntax aligned with Move.** VerexSL's `∀ (i : T), P` should
+  move toward Move's spelling, `forall i: T @ P`, with `forall` and `@`
+  also accepted as symbol tokens.
+- **Stale loop references in Rust specifications.** How a specification
+  file notices that a loop it addresses moved. Loops are `loop k` as the
+  proof language numbers them; Move detects no shift, and the proposed
+  anchor spells the loop's condition (`rust-verification.md`, open
+  decision 1). A labeled loop (`'outer: loop`) could anchor by its label,
+  as VerexSL's `loop @outer`; MIR carries no labels, so the exporter would
+  take the label from the loop's source span.
+- **Full and faithful position tracking.** Preserve exact source spans
+  through lowering, rendering, and obligation generation down to
+  sub-expressions (as the Move Prover does), rather than relying on post-hoc
+  AST shape alignment and clause-level obligation ranges.
 
 ## Not scheduled
 

@@ -88,16 +88,17 @@ theorem Subsumes.fill {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
   subst loan_eq'
   exact typed.transport same
 
-/-- A retired borrow: the unit a settled borrow leaves is a dead reference. -/
+/-- A retired borrow is a dead reference. -/
 theorem Subsumes.clear {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
-    {current : RuntimeValue} : Subsumes unit loans .unit (.borrow loan current) := by
+    {current : RuntimeValue} : Subsumes unit loans .retired (.borrow loan current) := by
   intro type typed
   exact go typed
 where
   go : ∀ {type : SemTy}, HasType unit loans (.borrow loan current) type →
-      HasType unit loans .unit type
+      HasType unit loans .retired type
     | _, .borrow _ _ referent _ _ => .dead referent
     | _, .shared _ _ typed => .shared _ _ (go typed)
+    | _, .observed _ _ settled _ => by simp [RuntimeValue.live] at settled
 
 /-- A borrow whose current is replaced by a value of its loan's referent. -/
 theorem Subsumes.rewrite {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
@@ -115,6 +116,7 @@ where
         subst loan_eq'
         exact .borrow _ _ _ loan_eq typed
     | _, .shared _ _ typed => .shared _ _ (go typed)
+    | _, .observed _ _ settled _ => by simp [RuntimeValue.live] at settled
 
 theorem rewriteFirstList_length {f : RuntimeValue → Option RuntimeValue} :
     ∀ {values rewritten : List RuntimeValue}, rewriteFirstList f values = some rewritten →
@@ -172,6 +174,21 @@ private theorem rewriteFirst_via {value replacement : RuntimeValue} {type : SemT
       rw [matched, Option.none_or] at rewrite
       exact inside rewrite
 
+omit node in
+/-- Rewriting inside a value keeps its form. -/
+theorem rewriteChildren_live {f : RuntimeValue → Option RuntimeValue} :
+    {value replacement : RuntimeValue} → rewriteChildren f value = some replacement →
+      replacement.live = value.live
+  | .vector _, _, rewrite | .tuple _, _, rewrite | .nominal .., _, rewrite | .closure .., _, rewrite
+  | .borrow .., _, rewrite => by
+      simp only [rewriteChildren, Option.map_eq_some_iff] at rewrite
+      obtain ⟨_, _, rfl⟩ := rewrite
+      rfl
+  | .ghost _, _, rewrite | .loanHole _, _, rewrite | .unit, _, rewrite | .bool _, _, rewrite
+  | .character _, _, rewrite | .integer _, _, rewrite | .address _, _, rewrite
+  | .signer _, _, rewrite | .string _, _, rewrite | .bytes _, _, rewrite => by
+      simp [rewriteChildren] at rewrite
+
 include node in
 mutual
 /-- Rewriting inside the children of a value with a node-subsuming `f`
@@ -208,6 +225,8 @@ theorem rewriteChildren_typed :
       exact .borrow _ _ _ loan_eq (rewriteFirst_via node current_typed rewritten_eq
         (rewriteChildren_typed current_typed))
   | _, _, _, .shared _ _ inner, inside => .shared _ _ (rewriteChildren_typed inner inside)
+  | _, _, _, .observed _ _ settled inner, inside =>
+      .observed _ _ (rewriteChildren_live inside ▸ settled) (rewriteChildren_typed inner inside)
   | _, _, _, .unit, inside | _, _, _, .bool _, inside | _, _, _, .character _ _, inside
   | _, _, _, .string _, inside | _, _, _, .bytes _, inside | _, _, _, .integer _ _ _ _, inside
   | _, _, _, .address _, inside | _, _, _, .signer _, inside | _, _, _, .dead _, inside
@@ -342,6 +361,7 @@ theorem findChildren_typed :
   | _, _, _, .borrow _ _ _ _ current_typed, query =>
       findFirst_via node current_typed query (findChildren_typed current_typed)
   | _, _, _, .shared _ _ inner, query => findChildren_typed inner query
+  | _, _, _, .observed _ _ _ inner, query => findChildren_typed inner query
   | _, _, _, .unit, query | _, _, _, .bool _, query | _, _, _, .character _ _, query
   | _, _, _, .string _, query | _, _, _, .bytes _, query | _, _, _, .integer _ _ _ _, query
   | _, _, _, .address _, query | _, _, _, .signer _, query | _, _, _, .dead _, query
@@ -397,6 +417,7 @@ theorem collectChildren_typed :
   | _, _, _, .borrow _ _ _ _ current_typed, member =>
       collectPruned_via node current_typed member (collectChildren_typed current_typed)
   | _, _, _, .shared _ _ inner, member => collectChildren_typed inner member
+  | _, _, _, .observed _ _ _ inner, member => collectChildren_typed inner member
   | _, _, _, .unit, member | _, _, _, .bool _, member | _, _, _, .character _ _, member
   | _, _, _, .string _, member | _, _, _, .bytes _, member | _, _, _, .integer _ _ _ _, member
   | _, _, _, .address _, member | _, _, _, .signer _, member | _, _, _, .dead _, member
@@ -641,6 +662,7 @@ where
           (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
             typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ _ inner => .observed _ _ rfl (go inner)
 
 private theorem vectorIndex_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
     {elements : Array RuntimeValue} {index : Nat} {part part' : RuntimeValue}
@@ -655,6 +677,7 @@ where
           (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
             typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ _ inner => .observed _ _ rfl (go inner)
 
 private theorem tupleIndex_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
     {elements : Array RuntimeValue} {index : Nat} {part part' : RuntimeValue}
@@ -669,6 +692,7 @@ where
         .tuple _ _ (by simpa [Array.set!_eq_setIfInBounds, Array.toList_setIfInBounds] using
           typed.set_subsumes (by simpa using part_eq) subsumes)
     | _, _, same, .shared _ _ inner => .shared _ _ (go same inner)
+    | _, _, same, .observed _ _ _ inner => .observed _ _ rfl (go same inner)
     | _, _, same, .emptyTupleUnit => by subst same; simp at part_eq
 
 private theorem deref_subsumes {unit : ValidatedUnit} {loans : LoanTypes} {loan : Nat}
@@ -679,6 +703,7 @@ where
       HasType unit loans (.borrow loan current') type
     | _, .borrow _ _ referent loan_eq typed => .borrow _ _ _ loan_eq (subsumes referent typed)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ settled _ => by simp [RuntimeValue.live] at settled
 
 private theorem subslice_subsumes {unit : ValidatedUnit} {loans : LoanTypes}
     {elements inner : Array RuntimeValue} {first last : Nat}
@@ -716,6 +741,7 @@ where
           · obtain ⟨_, _, rfl⟩ := Array.mem_extract_iff_getElem.mp (Array.mem_toList_iff.mp member)
             exact typed.mem _ (by simp)
     | _, .shared _ _ inner => .shared _ _ (go inner)
+    | _, .observed _ _ _ inner => .observed _ _ rfl (go inner)
 
 /-- Writing a value with every type of the one a path reaches keeps every
 type of the whole. -/
@@ -1187,16 +1213,55 @@ theorem settleLoans_typed {unit : ValidatedUnit} {loans : LoanTypes}
 
 /-- Ending a node's loans after a value, or skipping them, keeps frame and
 state typed. -/
-theorem settleAfter_typed {unit : ValidatedUnit} {loans : LoanTypes}
-    {ns : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
-    {frame : RuntimeFrame} {state : RuntimeState} {ended : Array LoanId} {control : Control}
+theorem retirePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns ns' : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
+    {frame : RuntimeFrame} {state : RuntimeState} {place : LocalId × List LoanProjection}
     (frameTyped : TypedFrame unit loans ns locals env frame)
     (stateTyped : TypedState unit loans inert state) :
-    TypedFrame unit loans ns locals env (settleAfter ended control frame state).1 ∧
-      TypedState unit loans inert (settleAfter ended control frame state).2 := by
+    TypedFrame unit loans ns locals env (retirePlace unit ns' frame state place).1 ∧
+      TypedState unit loans inert (retirePlace unit ns' frame state place).2 := by
+  unfold retirePlace
+  split
+  · split
+    · rename_i current current_eq
+      obtain ⟨referent, loan_eq, current_typed⟩ :=
+        findBorrowValue?_typed frameTyped stateTyped current_eq
+      obtain ⟨cleared, clearedState⟩ := clearBorrowValue_typed (loan := _) frameTyped stateTyped
+      exact applyWriteBack_typed cleared clearedState loan_eq current_typed
+    · exact ⟨frameTyped, stateTyped⟩
+  · exact ⟨frameTyped, stateTyped⟩
+
+theorem settleDeaths_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
+    {frame : RuntimeFrame} {state : RuntimeState} {namespaceId : NamespaceId}
+    {ended : Array LoanId} {places : Array (LocalId × List LoanProjection)}
+    (frameTyped : TypedFrame unit loans ns locals env frame)
+    (stateTyped : TypedState unit loans inert state) :
+    TypedFrame unit loans ns locals env (settleDeaths unit namespaceId ended places frame state).1 ∧
+      TypedState unit loans inert (settleDeaths unit namespaceId ended places frame state).2 := by
+  have settled := settleLoans_typed (ended := ended) frameTyped stateTyped
+  unfold settleDeaths
+  dsimp only
+  split
+  · refine Array.foldl_preserves
+      (fun (pair : RuntimeFrame × RuntimeState) =>
+        TypedFrame unit loans ns locals env pair.1 ∧ TypedState unit loans inert pair.2) _ _
+      _ settled fun _ _ _ held => retirePlace_typed held.1 held.2
+  · exact settled
+
+theorem settleAfter_typed {unit : ValidatedUnit} {loans : LoanTypes}
+    {ns : ValidatedNamespace} {locals : Array LocalDecl} {env : Array SemArg}
+    {frame : RuntimeFrame} {state : RuntimeState} {namespaceId : NamespaceId}
+    {ended : Array LoanId} {places : Array (LocalId × List LoanProjection)} {control : Control}
+    (frameTyped : TypedFrame unit loans ns locals env frame)
+    (stateTyped : TypedState unit loans inert state) :
+    TypedFrame unit loans ns locals env
+        (settleAfter unit namespaceId ended places control frame state).1 ∧
+      TypedState unit loans inert
+        (settleAfter unit namespaceId ended places control frame state).2 := by
   unfold settleAfter
   split
-  · exact settleLoans_typed frameTyped stateTyped
+  · exact settleDeaths_typed frameTyped stateTyped
   · exact ⟨frameTyped, stateTyped⟩
 
 /-- Settling the loans whose holes die with a frame keeps it typed. -/
@@ -1261,6 +1326,15 @@ theorem maskReturnedBorrowList_length (masked : Array Nat) :
   | _ :: values => by simp [maskReturnedBorrowList, maskReturnedBorrowList_length masked values]
 
 mutual
+/-- Masking keeps a value neither a borrow nor a hole. -/
+theorem maskReturnedBorrows_live {loans : Array Nat} :
+    {value : RuntimeValue} → value.live = false → (maskReturnedBorrows loans value).live = false
+  | .borrow .., settled | .loanHole _, settled => by simp [RuntimeValue.live] at settled
+  | .vector _, _ | .tuple _, _ | .nominal .., _ | .closure .., _ | .ghost _, _ | .unit, _ | .bool _, _
+  | .character _, _ | .integer _, _ | .address _, _ | .signer _, _ | .string _, _ | .bytes _, _ => by
+      unfold maskReturnedBorrows
+      rfl
+
 /-- Masking returned borrows keeps every type of a value: a masked borrow
 leaves a dead reference. -/
 theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
@@ -1295,11 +1369,19 @@ theorem maskReturnedBorrows_typed {unit : ValidatedUnit} {loans : LoanTypes}
       · exact .dead referent
       · exact .borrow _ _ _ loan_eq current_typed
   | _, _, .shared _ _ inner => .shared _ _ (maskReturnedBorrows_typed inner)
+  | _, _, .observed _ _ settled inner =>
+      .observed _ _ (maskReturnedBorrows_live settled) (maskReturnedBorrows_typed inner)
   | _, _, .unit | _, _, .bool _ | _, _, .character _ _ | _, _, .string _ | _, _, .bytes _
-  | _, _, .integer _ _ _ _ | _, _, .address _ | _, _, .signer _ | _, _, .dead _
-  | _, _, .hole _ _ _ _ _ _ | _, _, .unitEmptyTuple => by
+  | _, _, .integer _ _ _ _ | _, _, .address _ | _, _, .signer _
+  | _, _, .hole _ _ _ _ _ _ => by
       unfold maskReturnedBorrows
       constructor <;> assumption
+  | _, _, .dead referent => by
+      unfold maskReturnedBorrows
+      exact .dead referent
+  | _, _, .unitEmptyTuple => by
+      unfold maskReturnedBorrows
+      exact .unitEmptyTuple
   | _, _, .emptyTupleUnit => by
       unfold maskReturnedBorrows
       simpa [maskReturnedBorrowList] using HasType.emptyTupleUnit
@@ -1435,6 +1517,7 @@ theorem mutateBorrow?_typed {unit : ValidatedUnit} {loans : LoanTypes}
       | borrow _ _ _ loan_eq' _ =>
           rw [loan_eq, Option.some.injEq] at loan_eq'
           exact loan_eq'
+      | observed _ _ settled _ => simp [RuntimeValue.live] at settled
     subst same
     split at mutate
     · rename_i updated update_eq
@@ -1554,9 +1637,8 @@ theorem borrowRuntimePlace?_shared_typed {unit : ValidatedUnit} {loans : LoanTyp
   split at borrow
   · cases borrow
   obtain ⟨value, read, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-  simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-  obtain ⟨rfl, rfl, rfl⟩ := borrow
-  exact ⟨rfl, rfl, .shared _ _ (placeTyped.read read)⟩
+  obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some borrow
+  exact ⟨rfl, rfl, .shared _ _ ((placeTyped.read read).observe holeless)⟩
 
 /-- A mutable borrow mints a loan at the place's type: its hole stays in
 the place, and the borrow carries the value. -/
@@ -1763,9 +1845,8 @@ theorem borrowRuntimePlace?_global_typed {referenceType : ReferenceType} {kind :
       split at borrow
       · cases borrow
       obtain ⟨read, read_eq, borrow⟩ := Option.bind_eq_some_iff.mp borrow
-      simp only [Option.some.injEq, Prod.mk.injEq] at borrow
-      obtain ⟨rfl, rfl, rfl⟩ := borrow
-      exact ⟨loans, .refl _, frameTyped, stateTyped, .shared _ _ (reads _ read_eq)⟩
+      obtain ⟨rfl, rfl, holeless, rfl⟩ := RuntimeValue.view?_map_some borrow
+      exact ⟨loans, .refl _, frameTyped, stateTyped, .shared _ _ ((reads _ read_eq).observe holeless)⟩
   | mutable =>
       simp only [StaticTyping.borrowedKind, Option.some.injEq] at kind_eq
       subst kind_eq

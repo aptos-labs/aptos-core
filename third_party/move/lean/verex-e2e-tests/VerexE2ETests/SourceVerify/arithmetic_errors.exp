@@ -1,0 +1,43 @@
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:6:1: error: `no panic when aborts at op 1` is not established: the operation `a + b` at VerexE2ETests/SourceVerify/arithmetic_errors.rs:4:49 may panic
+  from: ¬(0 ≤ a.val + b.val ∧ a.val + b.val ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:6:6: error: verex verification failed: the automatic verification of `add_usize` failed; provide a proof in the module:
+  verify add_usize by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:11:3: error: the specification clause `ensures result == a + b + 1` is not established
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:9:6: error: verex verification failed: the automatic verification of `add_isize` failed; provide a proof in the module:
+  verify add_isize by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:13:1: error: `no panic when aborts at op 1` is not established: the operation `a / b` at VerexE2ETests/SourceVerify/arithmetic_errors.rs:6:41 may panic
+  from: b.val = 0
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:13:6: error: verex verification failed: the automatic verification of `div_u32` failed; provide a proof in the module:
+  verify div_u32 by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:17:3: error: the specification clause `ensures result == 254 - a` is not established
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `not_u8` failed; provide a proof in the module:
+  verify not_u8 by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:19:1: error: `no panic when aborts at op 1` is not established: the operation `a << n` at VerexE2ETests/SourceVerify/arithmetic_errors.rs:8:38 may panic
+  from: 8 ≤ n.val
+VerexE2ETests/SourceVerify/arithmetic_errors.spec.lean:19:6: error: verex verification failed: the automatic verification of `shl_u8` failed; provide a proof in the module:
+  verify shl_u8 by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

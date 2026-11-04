@@ -41,7 +41,34 @@ def loanDeathsIn (loans : Array CheckedLoanFact) (anchor : ExprId) (deaths : Anc
     AnchorDeaths :=
   loans.toList.zipIdx.foldl (init := deaths) fun deaths (loan, index) =>
     loan.deaths.toList.foldl (init := deaths) fun deaths death =>
-      if death.anchor == anchor then deaths.add death.before ⟨index⟩ else deaths
+      if death.anchor == anchor && !death.alone then deaths.add death.before ⟨index⟩ else deaths
+
+/-- The places dying alone at an anchor, the loans they hold going on: a local and the
+path from it to the reference it holds. -/
+structure DeadPlaces where
+  before : Array (LocalId × List LoanProjection) := #[]
+  after : Array (LocalId × List LoanProjection) := #[]
+  deriving Inhabited
+
+/-- The places a function's loans record dying alone at an anchor. -/
+def deadPlacesIn (loans : Array CheckedLoanFact) (anchor : ExprId) (dead : DeadPlaces := {}) :
+    DeadPlaces :=
+  loans.foldl (init := dead) fun dead loan =>
+    loan.deaths.foldl (init := dead) fun dead death =>
+      if death.anchor != anchor || !death.alone then dead else
+      let places := death.holders.toList.flatMap fun holder =>
+        match death.holderPaths.toList.filter (·.1 == holder) with
+        | [] => [(holder, [])]
+        | paths => paths.map fun path => (holder, path.2.toList)
+      if death.before then { dead with before := dead.before ++ places.toArray }
+      else { dead with after := dead.after ++ places.toArray }
+
+/-- The places dying alone at an expression of a namespace. -/
+def deadPlacesAt (unit : ValidatedUnit) (namespaceId : NamespaceId) (anchor : ExprId) :
+    DeadPlaces :=
+  unit.borrowCertificates.foldl (init := {}) fun dead certificate =>
+    if certificate.namespaceId == namespaceId then deadPlacesIn certificate.loans anchor dead
+    else dead
 
 /-- The loan deaths anchored at an expression of a namespace, recorded by
 the borrow certificates of its functions. -/
@@ -104,8 +131,8 @@ def sortByIndex {α : Type} (entries : List (Nat × α)) : List (Nat × α) :=
   sortByIndexFuel entries.length entries
 
 /-- The loan deaths of a namespace indexed by anchor, answering what
-`loanDeathsAt` does at each: a compilation the kernel evaluates looks an
-anchor up in logarithmic time instead of scanning every certificate. -/
+`loanDeathsAt` does at each, and the deaths of places alone, which only a compilation
+reads: it looks an anchor up in logarithmic time instead of scanning every certificate. -/
 def deathIndex (unit : ValidatedUnit) (namespaceId : NamespaceId) : KeyTree AnchorDeaths :=
   let certificates := ((unit.namespaces[namespaceId.index]?).map (·.borrowCertificates)).getD #[]
   let entries := certificates.toList.foldl (init := []) fun entries certificate =>

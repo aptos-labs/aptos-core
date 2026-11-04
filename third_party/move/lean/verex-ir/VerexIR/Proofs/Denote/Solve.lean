@@ -225,7 +225,8 @@ leaf pipeline, or report the clause it owes and admit it. Whether it was
 decided, and the cost of the complete attempt. -/
 private def solveLeaf (normalization : Simp.Context × Simp.SimprocsArray)
     (goal : MVarId) (provenance : Option Provenance)
-    (clauses : Array ObligationRange) (entries : Array Name := #[])
+    (clauses : Array ObligationRange) (decisions : Array Decision)
+    (entries : Array Name := #[])
     (owners? : Option (Array SharedBudgets.OwnerId) := none)
     (entryOpened : Bool := false) (owed : Option OwedAttribution := none) :
     TacticM (Bool × Array (String × Nat)) := do
@@ -240,6 +241,10 @@ private def solveLeaf (normalization : Simp.Context × Simp.SimprocsArray)
   let (reported, rejectedClauses) ← (← targetState).leafReports.get
   let repeated := !ranges.isEmpty && ranges.all fun range =>
     rejectedClauses.contains (provenance, range)
+  -- The failing paths of one key differ by their sites: each is attempted.
+  let repeated ← if repeated then
+      pure !(← leafKey goal provenance clauses (← (← targetState).clauseRanges.get)).isNoFailure
+    else pure false
   let leafBudget := verex.leafHeartbeats.get (← getOptions) * 1000
   let exhausted ← IO.mkRef false
   let saved ← saveState
@@ -375,8 +380,12 @@ private def solveLeaf (normalization : Simp.Context × Simp.SimprocsArray)
     -- A shared suffix's leaf is reported for each arrival it answers for.
     let mut reported := reported
     for (origin, owing) in attributed owed provenance clauses do
-      let name := (← leafKey goal origin owing (← (← targetState).clauseRanges.get)).tag.toString
-      reported ← recordAutomaticReports name <| reportObligation goal origin owing reported
+      let key ← leafKey goal origin owing (← (← targetState).clauseRanges.get)
+      let selector := if key.isNoFailure then
+          ((abortSiteOf? decisions).map fun site => s!" when {(Decision.aborts site).text}").getD ""
+        else ""
+      reported ← recordAutomaticReports s!"{key.tag}{selector}" <|
+        reportObligation goal origin owing decisions reported
     let mut rejectedClauses := rejectedClauses
     for range in ranges do
       unless rejectedClauses.contains (provenance, range) do
@@ -1900,6 +1909,20 @@ private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   if ← scalarAt? (← contextFacts goal) goal then
     charge "scalar rows" stageStart
     return true
+  if let some remaining ← receiverScopedMethod? goal then
+    queue remaining provenance (← withTargetClause goal clauses)
+    charge "scoped method contract" stageStart
+    return true
+  if let some remaining ← receiverScopedClosure? goal then
+    queue remaining provenance (← withTargetClause goal clauses)
+    charge "scoped closure receipt" stageStart
+    return true
+  if let some remaining ← methodContract? goal then
+    setGoals remaining
+    evalTactic (← `(tactic| all_goals (try verex_normalize)))
+    queue (← getGoals) provenance (← withTargetClause goal clauses)
+    charge "method contract" stageStart
+    return true
   if let some remaining ← routedClosureFrame? goal then
     queue remaining provenance (← withTargetClause goal clauses)
     charge "closure frame" stageStart
@@ -2029,13 +2052,20 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
   let lemmas ← compiledUnfoldLemmas compiled
   let target ← goal.withContext (instantiateMVars (← goal.getType))
   let action := target.getArg! 3
+  let atSubstitution := action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 10
   -- The rule at the call's own arguments; its left side is the goal up
   -- to unfolding the compiled callee's signature, which the kernel
   -- checks — unifying the two here would unfold them in `isDefEq`.
-  let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_propheticMeaning_of_compiled)
-    #[action.getArg! 0, action.getArg! 1, action.getArg! 2, action.getArg! 3, action.getArg! 4,
-      action.getArg! 5, compiled, theoremProof, action.getArg! 8, target.getArg! 4,
-      target.getArg! 5, target.getArg! 6]
+  let rule := if atSubstitution then
+      mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_propheticMeaningAt_of_compiled)
+        #[action.getArg! 0, action.getArg! 1, action.getArg! 2, action.getArg! 3, action.getArg! 4,
+          action.getArg! 5, action.getArg! 6, compiled, theoremProof, action.getArg! 9,
+          target.getArg! 4, target.getArg! 5, target.getArg! 6]
+    else
+      mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_propheticMeaning_of_compiled)
+        #[action.getArg! 0, action.getArg! 1, action.getArg! 2, action.getArg! 3, action.getArg! 4,
+          action.getArg! 5, compiled, theoremProof, action.getArg! 8, target.getArg! 4,
+          target.getArg! 5, target.getArg! 6]
   let next ← goal.withContext do
     let .forallE _ premise _ _ := ← whnfR (← inferType rule)
       | throwError "the agreement rule does not take the callee's denotation"
@@ -2043,10 +2073,13 @@ private def inlineCompiled (ctx : SolveContext) (step : SolveStep) (handle : Lea
     goal.assign (mkApp rule next)
     pure next.mvarId!
   setGoals [next]
-  unless ← enterCallee ctx step handle calleeName (action.getArg! 0) (action.getArg! 3)
-      (action.getArg! 8) (target.getArg! 6) do
-    charge "call" stageStart
-    return
+  -- A generic contract's conditions do not transfer to a substitution's rows: the body
+  -- at them stands alone.
+  unless atSubstitution do
+    unless ← enterCallee ctx step handle calleeName (action.getArg! 0) (action.getArg! 3)
+        (action.getArg! 8) (target.getArg! 6) do
+      charge "call" stageStart
+      return
   let sizeBefore ← if ctx.debug then do
       let goal ← getMainGoal
       pure (← goal.withContext do pure (treeSize (← instantiateMVars (← goal.getType)) 100000000))
@@ -2261,6 +2294,42 @@ private def specializedCall? (specializations : Array Lean.Expr) (theoremProof p
     saved.restore
   return none
 
+/-- The callee's satisfaction of its contract at a shape, specialized at the
+call's type arguments, where the shape's hypothesis `hypothesis` matches the
+call `action`: the meaning at the call's types, the equivalence whose generic
+contract the hypothesis states, with its type arguments, and the caller's frame.
+The hypothesis and the equivalence are at the shape's variables, whose
+arguments the matching equivalence gives. -/
+private def shapeCall? (specializations : Array Lean.Expr) (hypothesis action : Lean.Expr) :
+    MetaM (Option (Lean.Expr × Lean.Expr × Lean.Expr)) := do
+  unless action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 do return none
+  let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := action.getArg! 3 | return none
+  let meaning := action.appFn!
+  let saved ← saveState
+  let (arguments, _, statement) ← forallMetaTelescope (← inferType hypothesis)
+  let_expr VerexIR.Proofs.Satisfies _ _ _ _ stands read := statement | return none
+  unless stands.isAppOfArity ``VerexIR.Proofs.Denote.specializedMeaning 7 do return none
+  let_expr VerexIR.Proofs.Contract.ofSkolem _ _ _ _ _ _ contract := read | return none
+  let some head := contract.getAppFn.constName? | return none
+  for equivalence in specializations do
+    let attempt ← saveState
+    let (bound, _, equivalent) ← forallMetaTelescope (← inferType equivalence)
+    let_expr VerexIR.Proofs.Contract.Equivalent _ _ _ _ specialized stated := equivalent | continue
+    let_expr VerexIR.Proofs.Contract.ofSkolem _ _ _ _ _ _ generic := stated | continue
+    unless generic.getAppFn.constName? == some head do continue
+    if (← isDefEq read stated) && (← isDefEq (stands.getArg! 3) θ) then
+      let expected ← mkAppOptM ``VerexIR.Proofs.Denote.specializedMeaning
+        #[none, none, some outer, some θ, none, none, some meaning]
+      if ← isDefEq stands expected then
+        let satisfied ← mkAppOptM ``VerexIR.Proofs.Denote.satisfies_of_equivalent
+          #[none, none, none, none, none, none, none,
+            some (mkAppN hypothesis arguments), some (mkAppN equivalence bound)]
+        let statement ← mkAppM ``VerexIR.Proofs.Satisfies #[expected, ← instantiateMVars specialized]
+        return some (θ, outer, ← mkExpectedTypeHint (← instantiateMVars satisfied) statement)
+    attempt.restore
+  saved.restore
+  return none
+
 /-- A statement's conclusion, under its binders and premises, marked as
 what a path owes after the site (`AfterAt`). -/
 private partial def markConclusion (site : Nat) : Lean.Expr → Lean.Expr
@@ -2291,7 +2360,8 @@ the callee's contract specialized at its type arguments, where one is
 given: its arguments and result at the caller's types. -/
 private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName : String)
     (theoremProof proofType : Lean.Expr) (theoremArguments : Array Lean.Expr)
-    (proofSyntax : TSyntax `term) : SolveM Unit := do
+    (proofSyntax : TSyntax `term)
+    (atShape : Option (Lean.Expr × Lean.Expr × Lean.Expr) := none) : SolveM Unit := do
   let { goal, clauses, stageStart, .. } := step
   -- The theorem's meaning is the call's: its frame and instantiation are
   -- the call's, found before the rule's types are unified.
@@ -2317,7 +2387,7 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
   timedStep "call-hold" do heldRef.set (← holdContinuations parts)
   let held ← heldRef.get
   let goal ← getMainGoal
-  let specialized? ← goal.withContext do
+  let specialized? ← if atShape.isSome then pure atShape else goal.withContext do
     specializedCall? ctx.specializations theoremProof (← instantiateMVars proofType)
   let (theoremProof, proofType, proofSyntax) ← match specialized? with
     | some (θ, outer, proof) => goal.withContext do
@@ -2723,10 +2793,54 @@ inlined by the agreement theorem where it is unspecified, else by its
 theorem. `isDenoted` says the goal is a run `denotedRun` reads. -/
 private def callStep (ctx : SolveContext) (step : SolveStep) (isDenoted : Bool) : SolveM Bool := do
   let goal := step.goal
-  let some (handle, _) ← callGoal? goal ctx.callees | return false
-  let some (_, calleeName, theoremProof) ← ctx.callees.findM? fun (candidate, _, _) =>
-      goal.withContext (isDefEq candidate handle)
+  let some (handle, action) ← callGoal? goal ctx.callees | return false
+  -- A specialized call uses its own compilation or independently checked
+  -- contract theorem; another instance of the callee cannot supply either.
+  let substitution? := if action.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 10 then
+    some (action.getArg! 4) else none
+  let some (_, calleeName, theoremProof) ← ctx.callees.findM? fun (candidate, _, proof) =>
+      goal.withContext do
+        unless ← isDefEq candidate handle do return false
+        forallTelescope (← inferType proof) fun _ statement => do
+          let stated := match_expr statement with
+            | Eq _ compilation _ =>
+                if compilation.isAppOfArity ``VerexIR.Proofs.Denote.compileFunctionAt 3 then
+                  some (compilation.getArg! 2) else none
+            | VerexIR.Proofs.Satisfies _ _ _ _ meaning _ =>
+                if meaning.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaningAt 9 then
+                  some (meaning.getArg! 4) else none
+            | _ => none
+          match substitution?, stated with
+          | none, none => return true
+          | some wanted, some found => isDefEq wanted found
+          | _, _ => return false
     | throwError m!"no verified callee for {handle}"
+  -- A native at a shape stands by the hypothesis of the shape its call matches.
+  let atShape ← goal.withContext do
+    let isShape ← forallTelescope (← inferType theoremProof) fun _ statement => do
+      let_expr VerexIR.Proofs.Satisfies _ _ _ _ stands _ := statement | return false
+      return stands.isAppOfArity ``VerexIR.Proofs.Denote.specializedMeaning 7
+    unless isShape do return none
+    let target ← instantiateMVars (← goal.getType)
+    let action := (target.getArg! 3).consumeMData
+    let mut found := none
+    for (candidate, name, hypothesis) in ctx.callees do
+      unless ← isDefEq candidate handle do continue
+      if let some call ← shapeCall? ctx.specializations hypothesis action then
+        found := some (name, call)
+        break
+    let some match_ := found
+      | throwError m!"no contract at a shape of the callee stands for the call {action}"
+    return some match_
+  if let some (calleeName, θ, outer, proof) := atShape then
+    let continuations := (← get).regions.map (·.node.name)
+    let goal ← if isDenoted then pure goal else namedCall goal true continuations
+    let proofType ← goal.withContext (do instantiateMVars (← inferType proof))
+    let proofSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax proof)
+    setGoals [goal]
+    applyCallTheorem ctx { step with goal := goal } calleeName proof proofType #[] proofSyntax
+      (some (θ, outer, proof))
+    return true
   -- Where the proof states a behavioral predicate, the call shows one
   -- of the function value naming its target (`wp_named`).
   let throughContract ← goal.withContext do
@@ -3059,7 +3173,7 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
     recordRuntimeValues m!"the leaf `{(← leafKey goal provenance clauses ctx.names).text}`" goal
   let entries := (← get).regions.filterMap (fun region => region.node.relation?.map (·.constName!))
   let owners := (← get).activeOwners.map (·.2)
-  let (closed, costs) ← solveLeaf ctx.normalization goal provenance clauses entries
+  let (closed, costs) ← solveLeaf ctx.normalization goal provenance clauses (← get).activeDecisions entries
     (if (← get).activeSummary then some owners else none)
     (← get).activeEntryOpened (← get).activeOwed
   modify fun s => { s with stageCost := s.stageCost ++ costs }
@@ -3862,6 +3976,10 @@ syntax "(" num ", " str ", " num ", " num ")" : preconditionNumber
 number among the target's sites of the kind, and a label. -/
 declare_syntax_cat sourceSite
 syntax "(" num ", " str ", " num ", " str ")" : sourceSite
+/-- A site a failing path names: the selector's words and its source range. -/
+declare_syntax_cat failureSite
+syntax "(" str ", " str ", " num ", " num ")" : failureSite
+syntax "(" &"expansion" str ", " str ", " num ", " num ")" : failureSite
 /-- An invariant clause by its key and its source range. -/
 declare_syntax_cat invariantClause
 syntax "(" str ", " str ", " num ", " num ")" : invariantClause
@@ -3876,6 +3994,7 @@ syntax obligationArguments := solveFlag* " [" term,* "]"
   (" writing" " [" ghostWriteSite,* "]")? (" naming" " [" obligationName,* "]")?
   (" calling" " [" callSite,* "]")? (" numbering" " [" preconditionNumber,* "]")?
   (" siting" " [" sourceSite,* "]")? (" keying" " [" invariantClause,* "]")?
+  (" faulting" " [" failureSite,* "]")?
 
 /-- Where a selector says a path aborts (`AbortSite`): `call 1 of g`, `call
 2` among all calls, `abort 1`, `op 3`, `invoke 1`. -/
@@ -3958,7 +4077,7 @@ private def elabObligationArguments (arguments : TSyntax ``obligationArguments) 
       $[requiring [$required:term,*]]? $[writing [$writes:ghostWriteSite,*]]?
       $[naming [$named:obligationName,*]]? $[calling [$calls':callSite,*]]?
       $[numbering [$numbered:preconditionNumber,*]]? $[siting [$sited:sourceSite,*]]?
-      $[keying [$keyed:invariantClause,*]]?) => do
+      $[keying [$keyed:invariantClause,*]]? $[faulting [$faulted:failureSite,*]]?) => do
       let loops := some loops
       if verex.solverDebug.get (← getOptions) then
         logInfo m!"normalized verification condition:\n{← getMainGoal}"
@@ -4039,6 +4158,17 @@ private def elabObligationArguments (arguments : TSyntax ``obligationArguments) 
               kind.getString)
         | _ => throwError "an invariant clause must be `(key, file, start, end)`"
       (← targetState).invariantKeys.set invariantKeys
+      let failureSites ← ((faulted.map (·.getElems)).getD #[]).mapM fun
+        | `(failureSite| ($selector:str, $file:str, $start:num, $stop:num)) =>
+            pure (selector.getString,
+              ({ file := file.getString, startByte := start.getNat, endByte := stop.getNat } :
+                ObligationRange), false)
+        | `(failureSite| (expansion $selector:str, $file:str, $start:num, $stop:num)) =>
+            pure (selector.getString,
+              ({ file := file.getString, startByte := start.getNat, endByte := stop.getNat } :
+                ObligationRange), true)
+        | _ => throwError "a failure site must be `(selector, file, start, end)`"
+      (← targetState).failureSites.set failureSites
       let sites ← ((sited.map (·.getElems)).getD #[]).mapM fun
         | `(sourceSite| ($site:num, $kind:str, $number:num, $label:str)) =>
             pure (site.getNat, kind.getString, number.getNat, label.getString)
@@ -4659,11 +4789,12 @@ elab "verex_solve" : tactic => focusGoal do
   for goal in ← getGoals do
     let (provenance, clauses) := ((← (← targetState).leafOrigins.get)[goal]?).getD (none, #[])
     discard <| solveLeaf normalization goal provenance clauses
+      (((← (← targetState).leafDecisions.get)[goal]?).getD #[])
   setGoals []
 
 /-- An obligation's key (`ObligationKey`), as a proof addresses it:
 `ensures 1`, `invariant 2 step`, `requires 1 of iter_next at call 2`,
-`data invariant`. A key of one word is written as a tag. A callee's
+`data invariant`, `no panic`. A key of one word is written as a tag. A callee's
 precondition no clause of it states, such as a data invariant of an
 argument, has no number (`requires of borrow at call 1`). -/
 declare_syntax_cat verexKey (behavior := symbol)
@@ -4680,6 +4811,8 @@ syntax (name := keyStoredInvariant) &"stored" &"invariant" (num)? : verexKey
 syntax (name := keyLemmaRequires) &"lemma" &"requires" : verexKey
 syntax (name := keyGhostDomain) &"ghost" &"domain" : verexKey
 syntax (name := keyAfterCall) &"after" verexSite : verexKey
+syntax (name := keyNoPanic) &"no" &"panic" : verexKey
+syntax (name := keyNoAbort) &"no" &"abort" : verexKey
 
 /-- A point as a key or a step spells it: `at` and a point (`entry`, `exit`,
 `loop k entry|step`), or `after` and a site. -/
@@ -4738,6 +4871,8 @@ def keyPattern {m : Type → Type} [Monad m] [MonadError m] (stx : Syntax) : m O
       unless site.raw[2].getNumArgs == 2 do
         throwErrorAt site "an obligation after a call names its callee (`after call k of g`)"
       pure { kind := "after", callee := site.raw[2][1].getId.toString, call := number }
+  | `(verexKey| no panic) => pure { kind := "no panic" }
+  | `(verexKey| no abort) => pure { kind := "no abort" }
   | _ => throwErrorAt stx "unexpected obligation key"
 
 /-- `verex_step_routing [all] k, …`: the obligations a proof's `on` steps

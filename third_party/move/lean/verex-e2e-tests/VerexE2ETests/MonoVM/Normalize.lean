@@ -128,7 +128,7 @@ where
     | .closure .. => .unmodeled "closure"
     | .ghost _ => .unmodeled "ghost slot"
     | .borrow _ _ => .unmodeled "reference"
-    | .loanHole _ => .unmodeled "reference"
+    | .loanHole _ | .retired => .unmodeled "reference"
 
 /-- Whether two normalized outcomes diverge, which is what a fixture baseline
 marks as an error.

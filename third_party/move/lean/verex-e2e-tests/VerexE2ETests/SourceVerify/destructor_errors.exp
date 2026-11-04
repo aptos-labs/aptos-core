@@ -1,0 +1,5 @@
+VerexE2ETests/SourceVerify/destructor_errors.rs:19:32: error: no denotation for `consume`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/destructor_errors.rs:21:38: error: no denotation for `consume_field`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/destructor_errors.rs:23:48: error: no denotation for `consume_holder`: a drop at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/destructor_errors.rs:36:5: error: no denotation for `forget_guard`: a call dropping a type parameter at a type with a destructor is not carried by the denotation
+VerexE2ETests/SourceVerify/destructor_errors.rs:40:5: error: no denotation for `forget_guard_through`: a call dropping a type parameter at a type with a destructor is not carried by the denotation

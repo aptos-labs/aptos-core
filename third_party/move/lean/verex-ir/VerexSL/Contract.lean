@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL.Contract.Clauses
+import VerexIR.Proofs.ReceiverScoped
 
 /-!
 # Generated contracts from VIR specifications
@@ -58,12 +59,21 @@ private def slotOf (context : Context) (name : Name) (typeId : TypeId)
     | .reference reference => do
         unless allowReference do
           throwError "a result of reference type is not supported in generated contracts"
-        let some referent := context.unit.tables.types[reference.referent.index]?
-          | throwError "reference referent type {reference.referent.index} is out of range"
+        -- A shared reference holds what it refers to, through any reference there.
+        let rec seenThrough : Nat → TypeId → TypeId
+          | 0, id => id
+          | fuel + 1, id => match context.unit.tables.types[id.index]? with
+            | some (.reference inner) => seenThrough fuel inner.referent
+            | _ => id
+        let referentId := if reference.kind == .shared then
+            seenThrough context.unit.tables.types.size reference.referent
+          else reference.referent
+        let some referent := context.unit.tables.types[referentId.index]?
+          | throwError "reference referent type {referentId.index} is out of range"
         let kind := match reference.kind with
           | .shared => SlotKind.sharedRef
           | .mutable => SlotKind.mutableRef
-        pure (kind, referent, reference.referent)
+        pure (kind, referent, referentId)
     | declared => pure (SlotKind.plain, declared, typeId)
   return { name, kind, physical, nty := ← context.nativeType physicalId }
 
@@ -247,6 +257,33 @@ private def pragmaEnabled (contract : VerexIR.FunctionContract) (name : String) 
     | .assign pragmaName (.constant (.bool true)) _ => pragmaName == name
     | _ => false
 
+/-- Whether `aborts_if_is_strict` is in effect for a function, by its contract
+or its module. -/
+private def abortsStrictly (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Bool :=
+  pragmaEnabled declaration.contract "aborts_if_is_strict" || declaration.pragmas.any fun
+    | .assign name (.constant (.bool true)) _ => name == "aborts_if_is_strict"
+    | _ => false
+
+/-- The key of the obligation a function's failing paths owe where no clause
+permits them, shared by the profiles (`doc/plan/proof-language.md`, "Obligation
+addressing"): Rust's implicit clause, or a strict Move function's `False`. -/
+def noFailureKey? (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Option String :=
+  let states (kind : VerexIR.ConditionKind) := declaration.contract.conditions.any fun condition =>
+    condition.kind == kind && !isImplicitNoPanic condition
+  if states .abortsIf then none
+  else if declaration.contract.conditions.any isImplicitNoPanic then some "no panic"
+  else if !states .abortsWith && abortsStrictly declaration && declaration.body != .absent then
+    some "no abort"
+  else none
+
+/-- Where that obligation is located: the function's `spec` item, or the
+function where it has none. -/
+def noFailureRange (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : ObligationRange :=
+  locRange ns (declaration.contract.loc.getD declaration.loc)
+
 /-- The expressions a function's verification reads: the conditions of its
 contract and its body. -/
 private def functionRoots (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
@@ -368,9 +405,12 @@ def frameUses (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               .specification (.remove _) | .specification (.update _) =>
               if let some (some resource) := inner[0]? then
                 unless memory.contains resource do memory := memory.push resource
-                if operation matches .global (.borrow .mutable) | .global .take |
-                    .global .publish | .specification (.publish _) |
-                    .specification (.remove _) | .specification (.update _) then
+                let writes := match operation with
+                  | .global kind => kind.writesMemory
+                  | .specification (.publish _) | .specification (.remove _) |
+                      .specification (.update _) => true
+                  | _ => false
+                if writes then
                   unless written.contains resource do written := written.push resource
           | .specification (.functionCall reference _) =>
               if let some typeArguments := inner.mapM (fun argument => argument) then
@@ -591,8 +631,8 @@ private def reachFrom (unit : ValidatedUnit) (roots : List (VerexIR.NamespaceId 
   let ((reached, resources), complete) := reachFold unit roots (false, #[])
     fun (reached, resources) operation instantiations =>
       let counts := match operation with
-        | .global (.borrow .mutable) | .global .take | .global .publish => true
-        | .global _ | .specification (.global _) | .specification (.publish _) |
+        | .global kind => kind.writesMemory || !writes
+        | .specification (.global _) | .specification (.publish _) |
             .specification (.remove _) | .specification (.update _) => !writes
         | _ => false
       if !counts then (reached, resources) else
@@ -620,7 +660,7 @@ private def qualifiedName? (unit : ValidatedUnit) (reference : VerexIR.Qualified
     Option String := do
   let path ← unit.tables.namespaces[reference.namespaceId.index]?
   let qualified ← unit.tables.names[reference.name.index]?
-  some ("::".intercalate (path.segments.toList ++ [qualified.name]))
+  some ("::".intercalate (path.segments.toList ++ [SpecTypes.scopedSpelling qualified]))
 
 /-- The functions of `names` a function applies, in code or in a
 specification, at any depth (`reachFold`); past the walk's bound, all of
@@ -852,7 +892,11 @@ private def invariantModifiedResources (ns : ValidatedNamespace)
 private def groupConditions (ns : ValidatedNamespace)
     (conditions : Array VerexIR.Condition) : MetaM ClauseGroups := do
   let mut groups : ClauseGroups := {}
+  -- The implicit `False` adds nothing beside a clause permitting a panic.
+  let statesAborts := conditions.any fun condition =>
+    condition.kind == .abortsIf && !isImplicitNoPanic condition
   for condition in conditions do
+    if statesAborts && isImplicitNoPanic condition then continue
     let range := conditionRange ns condition
     match condition.kind with
     | .requires => groups := { groups with
@@ -1914,11 +1958,12 @@ def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namesp
     (entryLocals : Array (Option Lean.Expr) := #[]) (entryState : Option Lean.Expr := none)
     (state : Option Lean.Expr := none) (executable : Option Lean.Expr := none)
     (kind : VerexIR.ConditionKind := .loopInvariant)
-    (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[]) :
+    (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[])
+    (finalLocals oldFinalLocals : Array (Option Lean.Expr) := #[]) :
     MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
-    types, state, oldState := some oldState,
+    finalLocals, oldFinalLocals, types, state, oldState := some oldState,
     anchorLocals := entryLocals, anchorState := entryState, labeledAnchors, executable }
   let mut clauses ← block.conditions.filterMapM fun condition => do
     if condition.kind != kind then return none
@@ -2035,6 +2080,13 @@ private def referenceParts (skolems referent value : Lean.Expr) : MetaM (Lean.Ex
   return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier value,
     mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) carrier carrier value)
 
+/-- A native value holding references as a clause reads it at entry, or with
+`prophecies` at exit (`NTy.viewed`). -/
+private def viewedNative (skolems : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
+    MetaM Lean.Expr := do
+  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) (← frameCarriers skolems)
+    (toExpr prophecies) ty value
+
 /-- The clause binders of the parameters, read off the native arguments.  A
 mutable reference's entry is its current value and its exit its prophecy. -/
 private def parameterBinders (skolems : Lean.Expr) (slots : Array Slot) (types : Array Lean.Expr)
@@ -2047,10 +2099,28 @@ private def parameterBinders (skolems : Lean.Expr) (slots : Array Slot) (types :
     match slot.kind with
     | .mutableRef =>
         let (current, prophecy) ← referenceParts skolems ty.appArg! value
+        -- A referent holding references is read at each end of this loan: what
+        -- it holds keeps its own loans.
+        let (current, prophecy) ← if slot.nty.refFree then pure (current, prophecy) else
+          pure (← viewedNative skolems false ty.appArg! current,
+            ← viewedNative skolems false ty.appArg! prophecy)
         return { entry := ← domain.binderOfNative current, entryNative := current
                  exit := some (← domain.binderOfNative prophecy), exitNative := some prophecy }
-    | .plain | .sharedRef =>
-        return { entry := ← domain.binderOfNative value, entryNative := value }
+    | .plain =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A value holding references is read through them, compositionally.
+        let entry ← viewedNative skolems false ty value
+        let exit ← viewedNative skolems true ty value
+        return { entry := ← domain.binderOfNative entry, entryNative := entry
+                 exit := some (← domain.binderOfNative exit), exitNative := some exit }
+    | .sharedRef =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A shared view holds no loan: a clause reads what it holds as current.
+        let entry := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
+          (← frameCarriers skolems) (← quoteNTy slot.nty) value
+        return { entry := ← domain.binderOfNative entry, entryNative := entry }
 
 /-- Whether the expression tree at `root` reads a returned reference's final
 value. -/
@@ -2303,8 +2373,15 @@ private def resultBinders (unit : ValidatedUnit) (slots : Array Slot)
                     exit := some final, exitNative := some prophecy }],
           #[← mkEq prophecy current], #[some final], #[])
       let .tuple elements := slot.physical
-        | return (#[{ entry := ← domain.binderOfNative result, entryNative := result }], #[],
-            #[none], #[])
+        | if slot.nty.refFree then
+            return (#[{ entry := ← domain.binderOfNative result, entryNative := result }], #[],
+              #[none], #[])
+          -- A value holding references: read at its current values, each
+          -- reference's prophecy being its current value.
+          let current ← viewedNative signature.skolems false ty result
+          let prophecy ← viewedNative signature.skolems true ty result
+          return (#[{ entry := ← domain.binderOfNative current, entryNative := current }],
+            #[← mkEq prophecy current], #[none], #[])
       -- A Move tuple: each component's binder, a returned reference's its
       -- current value, and its final value its prophecy.
       let values ← rowProjections signature.skolems result signature.resultComponentTypes
@@ -2478,24 +2555,42 @@ private def orderResult (context : Context)
   let order ← structuralOrderTerm context leftSlot.nty left.currentNative right.currentNative
   mkEq resultBinders.entryNative (← orderingTerm context resultSlot.physical order)
 
-/-- Locate one function of a registered unit by its key: its name in the
-unit's module, or its path-qualified name in another namespace. -/
+/-- A function's own name, after the scopes of its namespace it is in. -/
+private def functionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  let qualified? : Option VerexIR.QualifiedName := do
+    let ns ← unit.namespaces[handle.namespaceId.index]?
+    let declaration ← ns.functions[handle.functionId.index]?
+    ns.nameOf declaration.name
+  (qualified?.map fun name => "::".intercalate (name.scope.push name.name).toList).getD ""
+
+/-- A function's path-qualified name, in every namespace. -/
+def qualifiedFunctionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
+  "::".intercalate (path.push (functionName unit handle)).toList
+
+/-- A function's name relative to a unit: its name in the unit's module,
+namespace 0, by its scopes there, and its path-qualified name in another
+namespace. -/
+def functionKey (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
+  if handle.namespaceId.index == 0 then functionName unit handle
+  else qualifiedFunctionName unit handle
+
+/-- Locate one function of a registered unit by its key, or its path-qualified
+name in the unit's module. -/
 def findFunction? (unit : ValidatedUnit) (key : String) :
     Option (Nat × ValidatedNamespace × Nat ×
       VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) := do
-  let parts := (key.splitOn "::").toArray
-  let path := parts.pop
-  let name := parts.back?.getD key
+  -- A scope's segment may hold `::`, a function's name does not.
+  let name := (key.splitOn "::").getLast?.getD key
   for h : namespaceIndex in [0:unit.namespaces.size] do
     let ns := unit.namespaces[namespaceIndex]
-    let owned := if path.isEmpty then namespaceIndex == 0 else
-      unit.tables.namespaces[ns.unitIdentity.index]?.map (·.segments) == some path
-    unless owned do continue
     for h : index in [0:ns.functions.size] do
       let declaration := ns.functions[index]
       if let some qualified := ns.nameOf declaration.name then
         if qualified.name == name then
-          return (namespaceIndex, ns, index, declaration)
+          let handle : VerexIR.FunctionHandle := { namespaceId := ⟨namespaceIndex⟩, functionId := ⟨index⟩ }
+          if functionKey unit handle == key || qualifiedFunctionName unit handle == key then
+            return (namespaceIndex, ns, index, declaration)
   none
 
 /-- A byte vector literal of a text, as a clause's `b"…"` denotes one. -/
@@ -2643,7 +2738,8 @@ def representationRead? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     | fuel + 1, some (.field base reference _) | fuel + 1, some (.ghostField base reference _) =>
         owner? reference <|> placeOwner? base fuel
     | fuel + 1, some (.deref base) | fuel + 1, some (.index base _)
-    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.downcast base _) =>
+    | fuel + 1, some (.subslice base ..) | fuel + 1, some (.unsize base)
+    | fuel + 1, some (.downcast base _) =>
         placeOwner? base fuel
   let mut pending := #[root]
   let mut visited : Array Nat := #[]
@@ -3152,8 +3248,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (requiresMeaning : Option Lean.Expr := none)
     (stored : StoredInvariants := {})
     (directContract : Option (VerexIR.FunctionHandle → Lean.Expr → Option Lean.Expr →
-      MetaM DirectContract) := none) :
+      MetaM DirectContract) := none)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM Lean.Expr := do
+  let typeArgumentTypes := atArguments.map (fun row => row.toList.toArray.map some) |>.getD #[]
+  let readAtArguments := atArguments.isSome
   let uses := frameUses unit namespaceId declaration
   -- The data invariants of stored resources hold of the memory a function
   -- reaches, at entry and at exit, as the Move Prover assumes them at entry
@@ -3200,18 +3299,17 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   -- value of the model's uninterpreted function at its arguments, so two
   -- calls at equal arguments agree and a clause naming the function speaks
   -- about the same value.
-  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict" ||
-    inEffect "aborts_if_is_strict" || nativeModel.isSome || mapRole.isSome
+  let isStrict := abortsStrictly declaration || nativeModel.isSome || mapRole.isSome
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if parameter.name.isEmpty then s!"argument{index}" else parameter.name))
       (ns.typeId parameter.typeUse.typeId) (allowReference := true)
   let resultSlots ← declaration.signature.results.mapIdxM fun index result =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], types := types,
-             typeInstantiation := typeInstantiation }
+             typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments }
       (Name.mkSimple (if declaration.signature.results.size == 1 then "result"
         else s!"result{index}"))
       (ns.typeId result.typeId) (allowReference := true)
@@ -3239,7 +3337,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let labelDefinitions := stateDefinitions ns declaration.contract
   let contextOf (state : Lean.Expr) (bound : Array SlotBinders) : Context :=
     { unit, namespaceId, ns
-      types := types, typeInstantiation := typeInstantiation
+      types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
       locals := padLocals (bound.map fun binders => some binders.entry)
       localTypes := functionLocalTypes
       localNames := declaration.locals.map (·.name)
@@ -3284,7 +3382,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             resultBinders unit resultSlots signature result
           let context : Context :=
             { unit, namespaceId, ns
-              types := types, typeInstantiation := typeInstantiation
+              types := types, typeInstantiation := typeInstantiation, typeArgumentTypes, readAtArguments
               locals := padLocals (parameterBound.map fun binders => some binders.current)
               localTypes := functionLocalTypes
               localNames := declaration.locals.map (·.name)
@@ -3378,7 +3476,9 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
             -- Strictness supplies an implicit `aborts_if false`. In partial
             -- mode it is sufficient only, just like an explicit clause;
             -- it imposes no coverage requirement on an actual abort.
-            (if isStrict && !isPartial then mkConst ``False else mkConst ``True)
+            (if !isStrict || isPartial then mkConst ``True
+             else if declaration.body == .absent then mkConst ``False
+             else markObligation (noFailureRange ns declaration) (mkConst ``False))
           mkLambdaFVars #[arguments, state, failureBinder] permitted
         else
           let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
@@ -3474,24 +3574,46 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           -- The value is typed by its carrier; an invocation's rows that
           -- mention the frame's type parameters are decided where the frame
           -- resolves them to scalars.
-          for invoked in #[row, type.getArg! 2] do
+          let methodEvidence := declaration.profile == .rust &&
+            declaration.attributes.any (fun
+              | .assign "method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false)
+          for invoked in (if methodEvidence then #[] else #[row, type.getArg! 2]) do
             if mentionsInvocableParameter invoked then
               conjuncts := conjuncts.push
                 (mkAppN (mkConst ``VerexIR.Proofs.ScalarAt)
                   ((← frameLeading signature.skolems) ++ #[signature.skolems, invoked]))
           -- Over a model, the frame is of the model's invocations.
           let invoke? ← modelInvoke? executable signature.skolems
+          -- A compiler-generated static method dictionary carries a checked
+          -- non-panicking, memory-preserving contract. Unlike the ordinary
+          -- function-value frame, this obligation applies to mutable receivers.
+          if methodEvidence then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.MethodContract)
+                ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+              #[row, sharing, shape, value])
+          if declaration.profile == .rust && declaration.attributes.any (fun
+              | .assign "scoped_method_evidence" (.constant (.integer parameter)) _ =>
+                  parameter == Int.ofNat index
+              | _ => false) then
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.ReceiverScopedMethod)
+                ((← frameLeading signature.skolems) ++ #[signature.skolems]))
+              #[row, sharing, shape, value])
           match declaration.contract.parameterFrames.find? (·.parameter.index == index) with
           | none =>
-              conjuncts := conjuncts.push (← match invoke? with
-                | some invoke =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
-                      ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
-                      #[row, sharing, shape, value]
-                | none =>
-                    mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
-                      ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
-                      #[row, sharing, shape, value])
+              unless methodEvidence do
+                conjuncts := conjuncts.push (← match invoke? with
+                  | some invoke =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf)
+                        ((← frameLeading signature.skolems) ++ #[signature.skolems, invoke]))
+                        #[row, sharing, shape, value]
+                  | none =>
+                      mkAppM' (mkAppN (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
+                        ((← frameLeading signature.skolems) ++ #[executable, signature.skolems]))
+                        #[row, sharing, shape, value])
           | some frame =>
               -- The closed frame but for the targets, the formals bound to
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.
@@ -3544,25 +3666,6 @@ private partial def pathSegments (stx : Syntax) : Array String :=
 
 private def pathName (segments : Array String) : Name :=
   segments.foldl (fun name segment => Name.str name segment) .anonymous
-
-/-- A function's own name, without its namespace path. -/
-private def functionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  let qualified? : Option VerexIR.QualifiedName := do
-    let ns ← unit.namespaces[handle.namespaceId.index]?
-    let declaration ← ns.functions[handle.functionId.index]?
-    ns.nameOf declaration.name
-  (qualified?.map (·.name)).getD ""
-
-/-- A function's path-qualified name, in every namespace. -/
-def qualifiedFunctionName (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
-  "::".intercalate (path.push (functionName unit handle)).toList
-
-/-- A function's name relative to a unit: its own name in the unit's module,
-namespace 0, and its path-qualified name in another namespace. -/
-def functionKey (unit : ValidatedUnit) (handle : VerexIR.FunctionHandle) : String :=
-  if handle.namespaceId.index == 0 then functionName unit handle
-  else qualifiedFunctionName unit handle
 
 /-- The prelude model a native is read by, beside what its specification
 states: the Move Prover's prelude defines a native whatever its
@@ -3685,14 +3788,8 @@ def ensureUnitDefinition (namespaceSegments : Array String)
     (unit : ValidatedUnit) : CommandElabM Name := do
   let name := unitName namespaceSegments
   if (← getEnv).contains name then return name
-  -- A theorem holds of the unit as preparation admits it: a unit the static
-  -- checker refuses would make every theorem about it vacuous.
-  let failures := VerexIR.Validation.StaticTyping.unitFailures unit
-    (VerexIR.Validation.targetPointerWidth? unit)
-  unless failures.isEmpty do
-    throwError m!"the unit is not statically typed, so preparation refuses it:\n\
-      {"\n".intercalate failures.toList}"
-  -- Nor may preparation refuse its loans.
+  -- A theorem holds of the unit as preparation admits it. Preparation may not
+  -- refuse its loans; typing reads the certificates a rejection withholds.
   -- A rejection is located in its namespace's tables; a loan-death
   -- diagnostic has no location.
   let loanErrors : Array (Option ValidatedNamespace × VerexIR.Validation.Diagnostic) :=
@@ -3714,6 +3811,12 @@ def ensureUnitDefinition (namespaceSegments : Array String)
       pure s!"{d.code}: {d.message} at {position}{String.join related}"
     throwError m!"the borrow analysis rejects the unit, so preparation refuses it:\n\
       {"\n".intercalate lines}"
+  -- A unit the static checker refuses would make every theorem about it vacuous.
+  let failures := VerexIR.Validation.StaticTyping.unitFailures unit
+    (VerexIR.Validation.targetPointerWidth? unit)
+  unless failures.isEmpty do
+    throwError m!"the unit is not statically typed, so preparation refuses it:\n\
+      {"\n".intercalate failures.toList}"
   -- Nor may execution preparation refuse it under every registry.
   let refusals := VerexIR.Validation.executionRefusals unit
   unless refusals.isEmpty do

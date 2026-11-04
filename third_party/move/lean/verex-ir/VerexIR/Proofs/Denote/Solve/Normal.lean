@@ -630,13 +630,13 @@ mutual
 none of its parts is a type parameter's or a function value's, compared by an
 erasure, or a ghost slot, which equality ignores. -/
 def NTy.comparesByValue : NTy → Bool
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => true
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => true
   | .tuple row | .struct _ _ row => NRow.comparesByValue row
   | .enum _ _ _ rows _ => NRows.comparesByValue rows
-  | .vector element => element.comparesByValue
+  | .vector element | .array element _ => element.comparesByValue
   | .table key value => key.comparesByValue && value.comparesByValue
   | .ref referent => referent.comparesByValue
-  | .ghost _ | .param _ | .function _ _ _ => false
+  | .ghost _ | .param _ | .function _ _ _ | .nominal _ _ _ => false
 
 def NRow.comparesByValue : NRow → Bool
   | .nil => true
@@ -667,6 +667,7 @@ theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left ri
   | .signer, _, _, _ => by simp [NTy.equal]
   | .string, _, _, _ => by simp [NTy.equal]
   | .bytes, _, _, _ => by simp [NTy.equal]
+  | .char, _, _, _ => by simp [NTy.equal]
   | .tuple row, plain, left, right => by
       simp only [NTy.equal]
       exact HList.equal_iff_eq row (by simpa [NTy.comparesByValue] using plain) left right
@@ -683,6 +684,12 @@ theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left ri
         (NTy.equal_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
       exact ⟨fun same => SpecVector.ext (Array.toList_inj.mp same),
         fun same => congrArg (·.values.toList) same⟩
+  | .array element _, plain, left, right => by
+      simp only [NTy.equal]
+      rw [listEqual_iff_eq _
+        (NTy.equal_iff_eq element (by simpa [NTy.comparesByValue] using plain))]
+      exact ⟨fun same => SpecArray.ext (SpecVector.ext (Array.toList_inj.mp same)),
+        fun same => congrArg (·.vector.values.toList) same⟩
   | .table key value, plain, left, right => by
       have plains : key.comparesByValue = true ∧ value.comparesByValue = true := by
         simpa [NTy.comparesByValue] using plain
@@ -694,7 +701,8 @@ theorem NTy.equal_iff_eq : (τ : NTy) → τ.comparesByValue = true → (left ri
   | .ref referent, plain, left, right => by
       have plain : referent.comparesByValue = true := by simpa [NTy.comparesByValue] using plain
       simp only [NTy.equal, Bool.and_eq_true, NTy.equal_iff_eq referent plain, Prod.ext_iff]
-  | .ghost _, plain, _, _ | .param _, plain, _, _ | .function _ _ _, plain, _, _ => by
+  | .ghost _, plain, _, _ | .param _, plain, _, _ | .function _ _ _, plain, _, _
+  | .nominal _ _ _, plain, _, _ => by
       simp [NTy.comparesByValue] at plain
 
 /-- Rows comparing by value compare as the equation of the rows. -/
@@ -1445,6 +1453,14 @@ simproc [vir_denote_norm] literalOptionalCertifiedRead (VerexIR.SpecInt.val _) :
 
 attribute [vir_denote_norm] Option.bind_fun_some
 
+/-- A lookup followed by a total step resolves nothing exactly where the lookup
+does: a place the check before it resolves is refuted by that check's fact. -/
+theorem option_bind_some_eq_none_iff {α β : Type} (o : Option α) (f : α → β) :
+    (o.bind fun a => some (f a)) = none ↔ o = none := by
+  cases o <;> simp
+
+attribute [vir_denote_norm] option_bind_some_eq_none_iff
+
 /-- A quantifier over a range with literal bounds is its instances, one per
 position, when the range is short (at most 64 positions): the first position
 is split off until the range is empty, each step decided by the kernel. -/
@@ -2053,6 +2069,27 @@ simproc [vir_denote_norm] valuesOfNest
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.wrapInt_unsigned
   VerexIR.Proofs.Denote.wrapInt_signed VerexIR.Proofs.Denote.ModularOp.run_val
   VerexIR.Proofs.Denote.BitOp.run_val
+-- Rust's primitives: a flag as the exact result's range, a character's validity
+-- as its code point's.
+attribute [vir_denote_norm] VerexIR.Proofs.Denote.ModularOp.overflows_unsigned_succ
+  VerexIR.Proofs.Denote.ModularOp.overflows_signed_succ VerexIR.Proofs.Denote.ModularOp.eval_add
+  VerexIR.Proofs.Denote.ModularOp.eval_subtract VerexIR.Proofs.Denote.ModularOp.eval_multiply
+  VerexIR.Proofs.Denote.isUnicodeScalar_eq_true
+/-- What `pop` leaves after `push`: the vector pushed to. -/
+theorem SpecVector_extract_push_size {α : Type} (vector : VerexIR.SpecVector α) (element : α)
+    (length : Nat) (room : vector.values.size + 1 < 2 ^ 64) (whole : length = vector.values.size) :
+    (vector.push element).extract 0 length = vector := by
+  subst whole
+  apply VerexIR.SpecVector.ext
+  simp only [VerexIR.SpecVector.values_extract, VerexIR.SpecVector.values_push element room]
+  apply Array.ext
+  · simp
+  · intro position _ inner
+    simp only [Array.getElem_extract, Nat.zero_add]
+    exact Array.getElem_push_lt inner
+
+attribute [vir_denote_norm] SpecVector_extract_push_size
+
 attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   VerexIR.Proofs.wp_abort VerexIR.Proofs.wp_given VerexIR.Proofs.Spec.pure_bind
   VerexIR.Proofs.Spec.abort_bind VerexIR.Proofs.Denote.wp_abortAt VerexIR.Proofs.Denote.wp_opAt

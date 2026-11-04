@@ -120,6 +120,7 @@ theorem constTyped_subst {pointerWidth : Option Nat} :
           exact constsTyped_subst elements.toList types typed
       | _ => simp [constTyped] at typed
   | .profile _, type, typed => by simp [constTyped] at typed
+  | .opaque _, type, typed => by simp [constTyped] at typed
 
 theorem constsTypedEach_subst {pointerWidth : Option Nat} :
     ∀ (values : List ConstValue) (type : SemTy), constsTypedEach pointerWidth values type = true →
@@ -431,10 +432,8 @@ theorem selected_subst {operand result : SemTy} {field field' : SemTy → Bool}
   · exact .inl (step _ direct)
   · right
     split at through
-    · rename_i kind _ resultKind referent
-      simp only [Bool.and_eq_true] at through
-      simp only [SemTy.subst, Bool.and_eq_true]
-      exact ⟨through.1, step _ through.2⟩
+    · simp only [SemTy.subst]
+      exact step _ through
     · cases through
 
 end Context
@@ -564,6 +563,19 @@ theorem placeType_subst {context : Context} :
               simp only [SemTy.subst, Option.some.injEq, Prod.mk.injEq] at found ⊢
               obtain ⟨rfl, rfl⟩ := found
               exact ⟨rfl, rfl⟩
+          | _ => simp at found
+      | unsize base =>
+          simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at found ⊢
+          obtain ⟨⟨baseType, baseVariant⟩, base_eq, found⟩ := found
+          refine ⟨_, placeType_subst fuel base_eq, ?_⟩
+          cases baseType with
+          | vector element length =>
+              cases length with
+              | none => simp at found
+              | some _ =>
+                  simp only [SemTy.subst, Option.some.injEq, Prod.mk.injEq] at found ⊢
+                  obtain ⟨rfl, rfl⟩ := found
+                  exact ⟨rfl, rfl⟩
           | _ => simp at found
       | downcast base variantId =>
           simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at found ⊢

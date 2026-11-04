@@ -1,0 +1,40 @@
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:5:3: error: the specification clause `ensures result != a` is not established
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:4:6: error: verex verification failed: the automatic verification of `keep` failed; provide a proof in the module:
+  verify keep by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:8:3: error: the specification clause `ensures result != pair[0]` is not established
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:7:6: error: verex verification failed: the automatic verification of `first_of` failed; provide a proof in the module:
+  verify first_of by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:11:3: error: the specification clause `ensures result != b` is not established
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:10:6: error: verex verification failed: the automatic verification of `between` failed; provide a proof in the module:
+  verify between by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:14:3: error: the specification clause `ensures result != x` is not established
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:13:6: error: verex verification failed: the automatic verification of `named_beside` failed; provide a proof in the module:
+  verify named_beside by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:17:3: error: the specification clause `ensures result == a` is not established
+VerexE2ETests/SourceVerify/impl_trait_params_false.spec.lean:16:6: error: verex verification failed: the automatic verification of `at_two_types` failed; provide a proof in the module:
+  verify at_two_types by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

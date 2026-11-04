@@ -3,7 +3,7 @@
   "evidence": [
     {
       "description": "rustc accepted this crate through analysis and exposed optimized generic MIR for a 64-bit pointer target",
-      "producer": "verex-rust-export via rustc Public",
+      "producer": "verex-rust-export via rustc Public (+ rustc_internal polyfill for rust-lang/rust#161892)",
       "trusted": true
     }
   ],
@@ -331,6 +331,17 @@
       "pragmas": [],
       "profile": "rust",
       "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "implementation",
+          "loc": {
+            "index": 11
+          },
+          "path": [
+            "<drop::Token as std::ops::Drop>"
+          ]
+        }
+      ],
       "specFunctions": [],
       "specVars": [],
       "structs": [
@@ -377,7 +388,13 @@
           "name": {
             "index": 2
           },
-          "properties": [],
+          "properties": [
+            {
+              "payload": "",
+              "profile": "rust",
+              "tag": "struct.destructor"
+            }
+          ],
           "variants": []
         }
       ],
@@ -402,7 +419,7 @@
         ]
       ],
       "profile": "rust",
-      "version": 2
+      "version": 5
     }
   ],
   "tables": {
@@ -580,6 +597,19 @@
           "startByte": 90
         },
         "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 120,
+          "file": {
+            "index": 0
+          },
+          "startByte": 101
+        },
+        "related": []
       }
     ],
     "names": [
@@ -587,7 +617,10 @@
         "name": "drop",
         "namespaceId": {
           "index": 0
-        }
+        },
+        "scope": [
+          "<drop::Token as std::ops::Drop>"
+        ]
       },
       {
         "name": "consume",
@@ -671,6 +704,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 6
+    "minor": 9
   }
 }

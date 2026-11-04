@@ -68,6 +68,7 @@ def ConstValue.fingerprint : ConstValue → List Nat
   | .vector elements => 7 :: ConstValue.fingerprintList elements.toList
   | .tuple elements => 8 :: ConstValue.fingerprintList elements.toList
   | .profile _ => [9]
+  | .opaque _ => [10]
 def ConstValue.fingerprintList : List ConstValue → List Nat
   | [] => [100]
   | value :: rest => 101 :: (ConstValue.fingerprint value ++ ConstValue.fingerprintList rest)

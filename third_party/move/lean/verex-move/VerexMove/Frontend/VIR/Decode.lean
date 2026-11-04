@@ -96,6 +96,7 @@ private def surfaceSyntax : Option VerexIR.SurfaceSyntax → Except String (Opti
   | none => pure none
   | some .receiverCall => pure (some .receiverCall)
   | some .indexNotation => pure (some .indexNotation)
+  | some .componentMove => fail "a mutable reference moved out of an aggregate has no Move XAST"
   | some (.extension value) =>
       fail s!"surface extension `{value.tag}` cannot be projected as Move XAST"
 
@@ -268,6 +269,8 @@ mutual
           (.call .index [] [base, index] (some .indexNotation)), resultType)
     | .subslice .. =>
         fail "subslice place borrows cannot be projected as Move XAST"
+    | .unsize _ =>
+        fail "unsize place borrows cannot be projected as Move XAST"
     | .downcast .. =>
         fail "enum-downcast place borrows cannot be projected as Move XAST"
 

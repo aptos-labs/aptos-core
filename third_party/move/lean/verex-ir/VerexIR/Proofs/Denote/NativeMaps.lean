@@ -259,9 +259,11 @@ theorem NTy.equal_scalar (handles : Bool) : (τ : NTy) → τ.isScalar = true �
   | .signer, _, _, _ => by simp [NTy.equal, NTy.read]
   | .string, _, _, _ => by simp [NTy.equal, NTy.read]
   | .bytes, _, _, _ => by simp [NTy.equal, NTy.read]
+  | .char, _, _, _ => by simp [NTy.equal, NTy.read]
   | .tuple _, scalar, _, _ | .struct _ _ _, scalar, _, _ | .enum _ _ _ _ _, scalar, _, _
-  | .vector _, scalar, _, _ | .table _ _, scalar, _, _ | .ghost _, scalar, _, _
-  | .ref _, scalar, _, _ | .param _, scalar, _, _ | .function _ _ _, scalar, _, _ => by
+  | .vector _, scalar, _, _ | .array _ _, scalar, _, _ | .table _ _, scalar, _, _ | .ghost _, scalar, _, _
+  | .ref _, scalar, _, _ | .param _, scalar, _, _ | .function _ _ _, scalar, _, _
+  | .nominal _ _ _, scalar, _, _ => by
       simp [NTy.isScalar] at scalar
 
 omit [Carriers] in
@@ -299,8 +301,9 @@ theorem NTy.read_injective : (τ : NTy) → Function.Injective (NTy.read τ)
       have := congrArg (Carriers.reads index).unread same
       simp only [NTy.read] at this
       rwa [(Carriers.reads index).unread_read, (Carriers.reads index).unread_read] at this
-  | .unit | .bool | .address | .signer | .string | .bytes | .tuple _ | .struct _ _ _
-  | .enum _ _ _ _ _ | .vector _ | .table _ _ | .ghost _ | .ref _ | .function _ _ _ =>
+  | .unit | .bool | .address | .signer | .string | .bytes | .char | .tuple _ | .struct _ _ _
+  | .enum _ _ _ _ _ | .vector _ | .array _ _ | .table _ _ | .ghost _ | .ref _ | .function _ _ _
+  | .nominal _ _ _ =>
       fun _ _ same => same
 
 /-- Tables are equal as their typed maps are. -/

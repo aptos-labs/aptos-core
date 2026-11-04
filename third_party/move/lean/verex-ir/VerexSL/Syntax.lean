@@ -88,7 +88,11 @@ private def kwSpec := Lean.Parser.symbol "spec"
 private def kwFun := Lean.Parser.nonReservedSymbol "fun" true
 private def kwNamespace := Lean.Parser.nonReservedSymbol "namespace" true
 private def kwModule := Lean.Parser.nonReservedSymbol "module" true
+private def kwMod := Lean.Parser.nonReservedSymbol "mod" true
+private def kwImpl := Lean.Parser.nonReservedSymbol "impl" true
+private def kwTrait := Lean.Parser.nonReservedSymbol "trait" true
 private def kwUsing := Lean.Parser.nonReservedSymbol "using" true
+private def kwOutlives := Lean.Parser.nonReservedSymbol "outlives" true
 private def kwWhere := Lean.Parser.nonReservedSymbol "where" true
 private def kwDecreases := Lean.Parser.nonReservedSymbol "decreases" true
 private def kwUse := Lean.Parser.symbol "use"
@@ -146,6 +150,9 @@ private def kwSpecEmptyVector := Lean.Parser.nonReservedSymbol "spec.emptyVector
 private def kwSpecSingletonVector := Lean.Parser.nonReservedSymbol "spec.singletonVector" true
 private def kwSpecUpdateVector := Lean.Parser.nonReservedSymbol "spec.updateVector" true
 private def kwSpecConcatVector := Lean.Parser.nonReservedSymbol "spec.concatVector" true
+private def kwSpecStringConcat := Lean.Parser.nonReservedSymbol "spec.stringConcat" true
+private def kwSpecStringBytes := Lean.Parser.nonReservedSymbol "spec.stringBytes" true
+private def kwSpecCharEncode := Lean.Parser.nonReservedSymbol "spec.charEncode" true
 private def kwSpecIndexOfVector := Lean.Parser.nonReservedSymbol "spec.indexOfVector" true
 private def kwSpecContainsVector := Lean.Parser.nonReservedSymbol "spec.containsVector" true
 private def kwSpecLengthVector := Lean.Parser.nonReservedSymbol "spec.lengthVector" true
@@ -193,12 +200,14 @@ private def kwCoreBorrowPlace := Lean.Parser.nonReservedSymbol "core.borrowPlace
 private def kwCoreAssignPlace := Lean.Parser.nonReservedSymbol "core.assignPlace" true
 private def kwCoreDrop := Lean.Parser.nonReservedSymbol "core.drop" true
 private def kwDowncast := Lean.Parser.nonReservedSymbol "downcast" true
+private def kwUnsize := Lean.Parser.nonReservedSymbol "unsize" true
 private def kwDropBuiltin := Lean.Parser.nonReservedSymbol "drop" true
 private def kwCopyBuiltin := Lean.Parser.nonReservedSymbol "copy" true
 private def kwReadBuiltin := Lean.Parser.nonReservedSymbol "core.read" true
 private def kwDiscriminant := Lean.Parser.nonReservedSymbol "discriminant" true
 private def kwInvoke := Lean.Parser.nonReservedSymbol "invoke" true
 private def kwFunctionValue := Lean.Parser.nonReservedSymbol "function" true
+private def kwClosureItem := Lean.Parser.nonReservedSymbol "closure" true
 private def kwCoreRefBorrow := Lean.Parser.nonReservedSymbol "core.ref.borrow" true
 private def kwCoreRefFreeze := Lean.Parser.nonReservedSymbol "core.ref.freeze" true
 private def kwCoreRefFreezeExplicit := Lean.Parser.nonReservedSymbol "core.ref.freezeExplicit" true
@@ -334,7 +343,7 @@ syntax (name := verexConstBinder)
 syntax (name := verexTypedConstBinder)
   "{" verexIdentifier ":" kwConst verexType "}" : verexGenericBinder
 syntax (name := verexLifetimeBinder)
-  "{" verexIdentifier ":" kwLifetime "}" : verexGenericBinder
+  "{" verexIdentifier ":" kwLifetime (kwOutlives verexLifetime,+)? "}" : verexGenericBinder
 syntax (name := verexEvidenceBinder)
   "{" verexIdentifier ":" kwEvidence "}" : verexGenericBinder
 
@@ -596,7 +605,8 @@ syntax (name := verexSpecificationVectorExpr) (priority := high)
   (kwSpecEmptyVector <|> kwSpecSingletonVector <|> kwSpecUpdateVector <|>
     kwSpecConcatVector <|> kwSpecIndexOfVector <|> kwSpecContainsVector <|>
     kwSpecLengthVector <|> kwSpecIndexVector <|> kwSpecSliceVector <|>
-    kwSpecInVectorRange <|> kwSpecVectorRange)
+    kwSpecInVectorRange <|> kwSpecVectorRange <|> kwSpecStringConcat <|> kwSpecStringBytes <|>
+    kwSpecCharEncode)
   (verexSpecificationTypeArgument)? "(" verexExpr,* ")" : verexExpr
 syntax (name := verexSpecificationEmptyVectorBuiltinExpr) (priority := high)
   kwSpecVec atomic("::" "<") verexType ">" "(" ")" : verexExpr
@@ -689,6 +699,10 @@ syntax (name := verexClosureExpr) (priority := high)
     ("," verexClosureSlot)* ")" : verexExpr
 syntax (name := verexInvokeSurfaceExpr) (priority := high)
   kwInvoke "(" verexExpr ("," verexExpr,+)? ")" : verexExpr
+/-- A captured value of a closure: its field, and the value it holds. -/
+declare_syntax_cat verexCapture
+syntax (name := verexCaptureSyntax)
+  verexFieldIdentifier ":" verexType ":=" verexExpr : verexCapture
 syntax (name := verexFunctionValueExpr) (priority := high)
   kwFunctionValue "[" verexType "]" "(" verexPath (verexTypeArguments)?
     ("," verexClosureSlot)* ")" : verexExpr
@@ -703,6 +717,11 @@ syntax:max (name := verexFieldPlace) verexPlace:max "." verexFieldIdentifier : v
 /-- The value of a place as the variant `Enum::Variant` names: its fields
 are that variant's. -/
 syntax (name := verexDowncastPlace) kwDowncast verexPlace kwAs verexPath : verexPlace
+/-- A place as the variant it names, which a field selection reads. -/
+syntax (name := verexDowncastExpr) kwDowncast verexPlace kwAs verexPath : verexExpr
+/-- The whole of a fixed vector place as a dynamic one, which only a borrow
+reads. -/
+syntax (name := verexUnsizeExpr) kwUnsize verexExpr:13 : verexExpr
 syntax:13 (name := verexBorrowPlaceSurfaceExpr)
   "&" (kwMut)? verexPlace:max : verexExpr
 syntax:13 (name := verexBorrowValueSurfaceExpr) (priority := low)
@@ -804,6 +823,21 @@ declare_syntax_cat verexParameter
 syntax (name := verexParameterSyntax)
   (kwMut)? verexIdentifier ":" verexType : verexParameter
 
+declare_syntax_cat verexAttribute
+declare_syntax_cat verexAttributeListSyntax
+syntax (name := verexAttributeSyntax)
+  verexIdentifier ("(" verexAttribute,+ ")")? : verexAttribute
+syntax (name := verexAttributeAssignmentSyntax)
+  verexIdentifier "=" (verexQualifiedName <|> num <|> str <|> verexIdentifier) : verexAttribute
+syntax (name := verexAttributeList) "@[" verexAttribute,+ "]" : verexAttributeListSyntax
+
+/-- A Rust closure: the struct of its captures with the value of each, and the
+function its call reaches, both named here and items of the enclosing module. -/
+syntax (name := verexClosureItemExpr) (priority := high)
+  kwClosureItem verexIdentifier verexGenericBinder* (kwHas verexAbility,+)?
+    "(" verexCapture,* ")" (verexAttributeListSyntax)? kwFun verexIdentifier verexGenericBinder*
+    "(" verexParameter,* ")" "->" verexType ":=" verexExpr : verexExpr
+
 declare_syntax_cat verexModifier
 syntax (name := verexPrivateModifier) kwPrivate : verexModifier
 syntax (name := verexPublicModifier) kwPublic : verexModifier
@@ -859,7 +893,7 @@ syntax (name := verexFieldSyntax) atomic(verexFieldIdentifier ":") verexType : v
 
 declare_syntax_cat verexVariant
 declare_syntax_cat verexDiscriminant
-syntax (name := verexVariantDiscriminant) "=" num : verexDiscriminant
+syntax (name := verexVariantDiscriminant) "=" ("-")? num : verexDiscriminant
 syntax (name := verexVariantSyntax)
   "|" verexIdentifier ("(" verexField,* ")")? (verexDiscriminant)? : verexVariant
 
@@ -870,16 +904,8 @@ syntax (name := verexNamespacePragmaItem)
   kwPragma (verexIdentifier <|> kwOpaque) ("=" verexExpr)? (";")? : verexItem
 syntax (name := verexConstantItem)
   (docComment)? kwConst verexIdentifier ":" verexType ":=" verexExpr : verexItem
-declare_syntax_cat verexAttribute
-declare_syntax_cat verexAttributeListSyntax
-syntax (name := verexAttributeSyntax)
-  verexIdentifier ("(" verexAttribute,+ ")")? : verexAttribute
-syntax (name := verexAttributeAssignmentSyntax)
-  verexIdentifier "=" (verexQualifiedName <|> num <|> str <|> verexIdentifier) : verexAttribute
-syntax (name := verexAttributeList) "@[" verexAttribute,+ "]" : verexAttributeListSyntax
-
 syntax (name := verexStructItem)
-  (docComment)? (verexAttributeListSyntax)? kwStruct verexIdentifier verexGenericBinder* (kwHas verexAbility,+)? kwWhere
+  (docComment)? (verexAttributeListSyntax)? (kwOpaque)? kwStruct verexIdentifier verexGenericBinder* (kwHas verexAbility,+)? kwWhere
     ppLine ppIndent(verexField*) : verexItem
 syntax (name := verexEnumItem)
   (docComment)? (verexAttributeListSyntax)? kwEnum verexIdentifier verexGenericBinder*
@@ -902,8 +928,17 @@ syntax (name := verexLemmaItem) (priority := high)
       (kwProof ppLine ppIndent(verexSpecStatement*))?) : verexItem
 syntax (name := verexContractItem)
   kwSpec verexIdentifier "{" verexClause* "}" : verexItem
+declare_syntax_cat verexContractLoop
+/-- The conditions of the function's `k`-th loop, in source order from 1. -/
+syntax (name := verexContractLoopSyntax)
+  kwLoop num kwWhere many1Indent(ppLine verexLoopSpecificationMember) : verexContractLoop
+declare_syntax_cat verexContractShape
+/-- The types of a shape of the function's generics, one per type parameter; a
+bare name that is one of the function's binders is a variable of the shape. -/
+syntax (name := verexContractShapeSyntax) " at " ("{" verexType "}")+ : verexContractShape
 syntax (name := verexContractWhereItem)
-  kwSpec verexIdentifier kwWhere ppLine ppIndent(verexClause*) : verexItem
+  kwSpec verexIdentifier (verexContractShape)? kwWhere ppLine
+    ppIndent((verexClause <|> verexContractLoop)*) : verexItem
 declare_syntax_cat verexNamespaceInvariantMember
 /-- An invariant of the module; a generic one at the instantiations of the
 memory a verification uses. -/
@@ -942,7 +977,19 @@ syntax (name := verexLeanStep) kwLean " => " Lean.Parser.Tactic.tacticSeq : vere
 syntax verexProofBlock := many1Indent(verexProofStep)
 /-- `verify! f` runs in the editor, where `verex.skip_verify` skips the others. -/
 syntax (name := verexVerifyItem)
-  ("verify!" <|> "verify") verexIdentifier ("by" verexProofBlock)? : verexItem
+  ("verify!" <|> "verify") verexPath ("by" verexProofBlock)? : verexItem
+
+declare_syntax_cat verexScopeKeyword
+syntax (name := verexModuleScope) kwMod : verexScopeKeyword
+syntax (name := verexInherentScope) kwImpl : verexScopeKeyword
+syntax (name := verexTraitScope) kwTrait : verexScopeKeyword
+syntax (name := verexImplementationScope) kwTrait kwImpl : verexScopeKeyword
+/-- A naming scope of a Rust namespace, reopenable; its keyword says what it
+names, and only a module holds other scopes. Its items lie deeper than the
+item itself, so a scope with no items ends at the next item. -/
+syntax (name := verexScopeItem)
+  verexScopeKeyword verexIdentifier kwWhere
+    (colGt ppLine ppIndent(manyIndent(verexItem)))? : verexItem
 
 syntax (name := verexNamespaceCommand)
   "verex" kwNamespace verexPath kwUsing verexProfile kwWhere

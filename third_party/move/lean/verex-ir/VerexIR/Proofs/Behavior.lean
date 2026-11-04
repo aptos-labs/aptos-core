@@ -49,14 +49,17 @@ def Denote.NTy.settle : (τ : NTy) → τ.carrier → τ.carrier
   | .signer, value => value
   | .string, value => value
   | .bytes, value => value
+  | .char, value => value
   | .tuple _, value => value
   | .struct _ _ _, value => value
   | .enum _ _ _ _ _, value => value
   | .vector _, value => value
+  | .array _ _, value => value
   | .table _ _, value => value
   | .ghost _, value => value
   | .param _, value => value
   | .function _ _ _, value => value
+  | .nominal _ _ _, value => value
 
 /-- A row of arguments, each settled. -/
 def Denote.HList.settle : (row : NRow) → HList row → HList row
@@ -757,8 +760,8 @@ theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs) (free : θ.1.
   | .param index, _ =>
       NTy.settle_self_of_refFree _ (NRow.getD_refFree θ.1 free index _ rfl) _
   | .ref _, _ | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
-  | .string, _ | .bytes, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .vector _, _
-  | .table _ _, _ | .ghost _, _ | .function _ _ _, _ => rfl
+  | .string, _ | .bytes, _ | .char, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .vector _, _ | .array _ _, _
+  | .table _ _, _ | .ghost _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
 
 theorem Denote.HList.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs) (free : θ.1.refFree = true) :
     (row : NRow) → (values : @HList (Carriers.instantiate θ Θ) row) →
@@ -796,9 +799,10 @@ theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
         (NRow.getD_refFree θ.1 free index _ rfl) (ResultShape.ofSkolem θ (.one (.param index)) value)
       exact ⟨fun _ => trivial, fun _ => settled⟩
   | .one .unit, _ | .one .bool, _ | .one (.int _ _), _ | .one .num, _ | .one .address, _
-  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one (.tuple _), _
-  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _
-  | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _ => Iff.rfl
+  | .one .signer, _ | .one .string, _ | .one .bytes, _ | .one .char, _ | .one (.tuple _), _
+  | .one (.struct _ _ _), _ | .one (.enum _ _ _ _ _), _ | .one (.vector _), _ | .one (.array _ _), _
+  | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _
+  | .one (.nominal _ _ _), _ => Iff.rfl
 
 /-- A result encodes alike in either view. -/
 theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] (θ : TypeArgs) : (shape : ResultShape) →
@@ -990,5 +994,45 @@ end Induced
 -- The solver reads behavioral predicates at concrete rows and results.
 attribute [vir_denote_norm] Denote.NTy.refFree Denote.NRow.refFree Denote.NRows.refFree
 attribute [vir_denote_norm] Denote.ResultShape.Settled Denote.NTy.settle Denote.HList.settle
+
+/-- A generic closure's verified target applies at the induced frame, with
+captured dictionaries woven into its ordinary arguments. -/
+theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Θ : Skolems unit]
+    (θ : TypeArgs) (free : θ.1.refFree = true) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (capturedFree : captured.refFree = true)
+    (shape : ResultShape) (handle : FunctionHandle) (outer : Array (TypeId × TypeId))
+    (typeArgs : Array GenericArgument)
+    (coherent : @Coherent unit _ (Skolems.instantiate θ Θ) handle
+      (frameInstantiation unit handle outer typeArgs))
+    (captures : HList (NRow.subst θ.1 captured)) (shared : Sharing)
+    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs) (NRow.subst θ.1 captured))
+    (args : HList (NRow.subst θ.1 supplied))
+    {result : (shape.subst θ.1).carrier} {pre post : Memory unit}
+    {contract : Contract (Memory unit) Failure
+      (@HList (Skolems.instantiate θ Θ).toCarriers full)
+      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    (verified : Satisfies
+      (@propheticMeaning unit _ executable (Skolems.instantiate θ Θ)
+        (frameInstantiation unit handle outer typeArgs) handle full shape) contract)
+    (ensures : EnsuresOf (closureMeaning executable) (NRow.subst θ.1 supplied) shared
+      (shape.subst θ.1) (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed)
+      args result pre post)
+    (assumed : contract.assumes (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
+    (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre) :
+    (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
+      contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+        (ResultShape.toSkolem θ shape result) post) ∧
+    contract.frame (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
+      (ResultShape.toSkolem θ shape result) post ∧
+    ¬contract.mustAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre := by
+  unfold EnsuresOf at ensures
+  rw [closureMeaning_closureOfGeneric executable θ free weave capturedFree shape handle outer typeArgs coherent] at ensures
+  rcases ensures with ⟨value, middle, run, same, state⟩
+  subst post
+  subst result
+  rw [NTy.toSkolem_ofSkolem_shape]
+  exact (verified _ pre assumed permitted).1 value middle run
 
 end VerexIR.Proofs

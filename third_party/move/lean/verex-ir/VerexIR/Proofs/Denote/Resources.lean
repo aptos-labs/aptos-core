@@ -200,12 +200,14 @@ def NTy.paramsBelow (bound : Nat) : NTy → Bool
   | .enum _ arguments _ rows _ =>
       NRow.paramsBelow bound arguments && NRows.paramsBelow bound rows
   | .vector element => NTy.paramsBelow bound element
+  | .array element _ => NTy.paramsBelow bound element
   | .table key value => NTy.paramsBelow bound key && NTy.paramsBelow bound value
   | .ref referent => NTy.paramsBelow bound referent
   | .ghost slot => NTy.paramsBelow bound slot
   | .function parameters _ results =>
       NRow.paramsBelow bound parameters && NRow.paramsBelow bound results
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes => true
+  | .nominal _ arguments _ => NRow.paramsBelow bound arguments
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => true
 
 def NRow.paramsBelow (bound : Nat) : NRow → Bool
   | .nil => true
@@ -325,6 +327,7 @@ theorem NTy.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
       exact agree index bounded
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
   | .bytes, _ => rfl
+  | .char, _ => rfl
   | .tuple elements, bounded => by
       simp only [NTy.paramsAll] at bounded
       simp only [NTy.subst, NTy.substWith, NRow.subst_eq_substWith θ f bound agree elements bounded]
@@ -337,6 +340,9 @@ theorem NTy.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
       simp only [NTy.subst, NTy.substWith, NRow.subst_eq_substWith θ f bound agree arguments bounded.1,
         NRows.subst_eq_substWith θ f bound agree rows bounded.2]
   | .vector element, bounded => by
+      simp only [NTy.paramsAll] at bounded
+      simp only [NTy.subst, NTy.substWith, NTy.subst_eq_substWith θ f bound agree element bounded]
+  | .array element _, bounded => by
       simp only [NTy.paramsAll] at bounded
       simp only [NTy.subst, NTy.substWith, NTy.subst_eq_substWith θ f bound agree element bounded]
   | .table key value, bounded => by
@@ -354,6 +360,10 @@ theorem NTy.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
       simp only [NTy.subst, NTy.substWith,
         NRow.subst_eq_substWith θ f bound agree parameters bounded.1,
         NRow.subst_eq_substWith θ f bound agree results bounded.2]
+  | .nominal _ arguments _, bounded => by
+      simp only [NTy.paramsAll] at bounded
+      simp only [NTy.subst, NTy.substWith,
+        NRow.subst_eq_substWith θ f bound agree arguments bounded]
 
 theorem NRow.subst_eq_substWith (θ : NRow) (f : Nat → NTy) (bound : Nat)
     (agree : ∀ index, index < bound → θ.getD index (.param index) = f index) :
@@ -653,57 +663,6 @@ theorem StoredCase.atFrame (Θ : Skolems unit) {σ : NTy} {params : NRow}
     rw [Θ.toRuntime_ofRuntime] at held
     exact held
 
-mutual
-/-- A substitution by inhabitable types keeps a type inhabitable. -/
-theorem NTy.inhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
-    (τ : NTy) → τ.inhabitable = true → (τ.subst θ).inhabitable = true
-  | .tuple elements, held => by
-      simp only [NTy.subst, NTy.inhabitable] at held ⊢
-      exact NRow.inhabitable_subst θ fits elements held
-  | .struct _ _ fields, held => by
-      simp only [NTy.subst, NTy.inhabitable] at held ⊢
-      exact NRow.inhabitable_subst θ fits fields held
-  | .enum _ _ names rows _, held => by
-      simp only [NTy.subst, NTy.inhabitable] at held ⊢
-      exact NRows.firstInhabitable_subst θ fits names rows held
-  | .ref referent, held => by
-      simp only [NTy.subst, NTy.inhabitable] at held ⊢
-      exact NTy.inhabitable_subst θ fits referent held
-  | .ghost slot, held => by
-      simp only [NTy.subst, NTy.inhabitable] at held ⊢
-      exact NTy.inhabitable_subst θ fits slot held
-  | .param index, _ => by
-      simp only [NTy.subst]
-      exact NRow.getD_inhabitable θ fits index (.param index) rfl
-  | .function _ _ _, held => by simp [NTy.inhabitable] at held
-  | .vector _, _ => rfl
-  | .table _ _, _ => rfl
-  | .unit, _ => rfl
-  | .bool, _ => rfl
-  | .int _ _, held => held
-  | .num, _ => rfl
-  | .address, _ => rfl
-  | .signer, _ => rfl
-  | .string, _ => rfl
-  | .bytes, _ => rfl
-
-theorem NRow.inhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
-    (row : NRow) → row.inhabitable = true → (NRow.subst θ row).inhabitable = true
-  | .nil, _ => rfl
-  | .cons τ rest, held => by
-      simp only [NRow.subst, NRow.inhabitable, Bool.and_eq_true] at held ⊢
-      exact ⟨NTy.inhabitable_subst θ fits τ held.1, NRow.inhabitable_subst θ fits rest held.2⟩
-
-theorem NRows.firstInhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
-    (names : List String) → (rows : NRows) → NRows.firstInhabitable names rows = true →
-      NRows.firstInhabitable names (rows.subst θ) = true
-  | _ :: _, .cons fields _, held => by
-      simp only [NRows.subst, NRows.firstInhabitable] at held ⊢
-      exact NRow.inhabitable_subst θ fits fields held
-  | [], _, held => by simp [NRows.firstInhabitable] at held
-  | _ :: _, .nil, held => by simp [NRows.firstInhabitable] at held
-end
-
 /-- The entries and substitutions of type arguments are inhabitable: what a
 stored value's resource arguments are, spelled as normalization leaves them. -/
 @[simp] theorem TypeArgs.getD_inhabitable (θ : TypeArgs) (index : Nat) (default : NTy)
@@ -717,9 +676,18 @@ stored value's resource arguments are, spelled as normalization leaves them. -/
 section Frames
 variable [Θ : Skolems unit]
 
+/-- The native type a frame gives a type identifier of a function: read at the frame's
+types for its type parameters, so that a view of one erases it (`ntyOfFuel`). -/
+def frameNty (unit : ValidatedUnit) [FunctionCarriers unit] [Skolems unit]
+    (handle : FunctionHandle) (typeId : TypeId) : Option NTy :=
+  ntyOfFuel (unitTypes unit) unit
+    (NRow.ofList ((List.range (typeArity unit handle)).map fun index =>
+      Skolems.resolve (.param index)))
+    (typeFuel unit) handle.namespaceId typeId
+
 /-- A function's frame agrees with its runtime type instantiation on the
 types it reads, as the runtime reads them: each type it requires
-(`requiredAt`), instantiated as the runtime does, is the frame's resolution
+(`requiredAt`), instantiated as the runtime does, is the frame's reading
 of it, as a native type and, for a resource type, with its arguments; and
 each of its type parameters, read at its node through the instantiation, is
 the frame's type for it.  The runtime instantiation maps only interned
@@ -737,7 +705,7 @@ structure Coherent (unit : ValidatedUnit) [FunctionCarriers unit]
     ntyOf unit handle.namespaceId typeId = some τ →
     τ.paramsBelow (typeArity unit handle) = true →
     ntyOf unit handle.namespaceId (instantiatedTypeId typeInstantiation typeId) =
-      some (Skolems.resolve τ)
+      frameNty unit handle typeId
   params : ∀ index < typeArity unit handle, ∀ node,
     paramNodeIn? unit handle.namespaceId index = some node →
     ntyOf unit handle.namespaceId (instantiatedTypeId typeInstantiation node) =
@@ -762,7 +730,7 @@ def coherentCheck (unit : ValidatedUnit) [FunctionCarriers unit]
       | some τ =>
           !τ.paramsBelow (typeArity unit handle) ||
             decide (ntyOf unit handle.namespaceId (instantiatedTypeId typeInstantiation typeId) =
-              some (Skolems.resolve τ)))) &&
+              frameNty unit handle typeId))) &&
   (List.range (typeArity unit handle)).all fun index =>
     match paramNodeIn? unit handle.namespaceId index with
     | none => true
@@ -819,6 +787,23 @@ theorem NRow.map_id : (row : NRow) → row.map (fun τ => τ) = row
   | .nil => rfl
   | .cons τ rest => congrArg (NRow.cons τ) (NRow.map_id rest)
 
+/-- The runtime frame's row for a function's type parameters leaves each parameter. -/
+theorem NRow.getD_ofList_params (arity index : Nat) :
+    (NRow.ofList ((List.range arity).map fun index => NTy.param index)).getD index (.param index) =
+      .param index := by
+  have read : ∀ (types : List NTy) (position : Nat) (fallback : NTy),
+      (NRow.ofList types).getD position fallback = types.getD position fallback := by
+    intro types
+    induction types with
+    | nil => intro _ _; rfl
+    | cons head tail ih =>
+        intro position fallback
+        cases position with
+        | zero => rfl
+        | succ position => simpa [NRow.ofList, NRow.getD] using ih position fallback
+  rw [read]
+  by_cases below : index < arity <;> simp [List.getD, below]
+
 /-- At the runtime frame, the empty instantiation is coherent: every type
 identifier denotes its own type, and every parameter stays. -/
 theorem coherent_runtime (unit : ValidatedUnit) [FunctionCarriers unit] (handle : FunctionHandle) :
@@ -830,7 +815,11 @@ theorem coherent_runtime (unit : ValidatedUnit) [FunctionCarriers unit] (handle 
     show some resource = some ⟨resource.type, resource.arguments.map fun τ => τ, .value⟩
     rw [NRow.map_id]
     rw [← resourceOf_kind named]
-  · rw [instantiatedTypeId_empty, named]
+  · rw [instantiatedTypeId_empty]
+    show ntyOf unit handle.namespaceId typeId = ntyOfFuel (unitTypes unit) unit
+      (NRow.ofList ((List.range (typeArity unit handle)).map fun index => NTy.param index))
+      (typeFuel unit) handle.namespaceId typeId
+    rw [ntyOfFuel_identity _ _ _ (NRow.getD_ofList_params (typeArity unit handle))]
     rfl
   · rw [instantiatedTypeId_empty, ntyOf_paramNode found]
     rfl

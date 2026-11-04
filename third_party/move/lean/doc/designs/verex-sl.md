@@ -152,6 +152,58 @@ identifiers instead of forcing guillemets. Numeric tuple fields keep their
 `.0`, `0 : T`, and `{ 0 := value }` spellings. Semantic round trip is
 alpha-equivalence for binders, not textual binder-name equality.
 
+### Scopes
+
+A Rust crate is one namespace, and a Rust module is a naming scope inside it,
+as a Lean `namespace` is; so is what an associated function belongs to. A name
+carries its scope, a path relative to the namespace (`QualifiedName.scope`), and
+the namespace declares its scopes with their locations and kinds
+(`Namespace.scopes`). Move names have none; a scope in a Move namespace is an
+error. A scope is an item of `verex namespace`, reopenable, and its keyword
+states its kind:
+
+```lean
+verex namespace shapes where
+  struct Counter where
+    value : u32
+
+  impl Counter where                  -- the type of an inherent impl
+    fun add (self : Counter, amount : u32) -> u32 := self.value + amount
+
+  mod area where                      -- a module; only a module nests scopes
+    fun square (side : u32) -> u32 := side * side
+
+  trait Step where                    -- a trait's methods
+    native fun step (value : u32) -> u32
+
+  trait impl «<shapes::Counter as std::ops::Drop>» where   -- a trait impl's
+    fun drop (_1 : &mut Counter) -> Unit := ()
+```
+
+The name of a scope is one opaque segment, as the exporter writes it, quoted
+where it is no identifier; the path of a trait impl is its rustc spelling. The
+keyword carries the kind, so reopening a scope with another keyword is an error
+(`VEREX-SCOPE-KIND`). `use`, `friend`, namespace pragmas and `spec module` belong
+to the namespace and are rejected in a scope.
+
+Inside a scope a declaration is named bare. A path resolves from the innermost
+scope outward: each enclosing scope with the path appended, then the namespace's
+`use` paths, then the namespace root, then a namespace of the unit by its own
+path, longest first, the rest of the path a scope in it. It looks for a declaration of the
+kind the use wants, so a struct and a scope may share a name, as `Counter` does.
+The rendering prints the shortest path that resolves back to its target, and the
+namespace's full path where an inner scope hides every shorter one. A
+`spec` item names a function of its own scope; a reopened block may state it.
+Proof files name targets by path from the namespace root (`verify area::square`,
+`verify Counter::add`), and a proof step's expression resolves as one in its
+function does.
+
+A dependency crate is a namespace of the unit with `pragma verify = false`,
+rendered before the crate that uses it. A function of it is `native fun`, the
+Rust property `function.dependency`, declared by its signature. A type whose shape
+the crate does not observe is `opaque struct`, the Rust property `struct.opaque`,
+which is neither constructed nor destructured.
+
 ## Grammar overview
 
 `[...]` is optional, `...` repetition, and capitalized words such as `Expr`
@@ -186,6 +238,10 @@ NamespaceItem ::=
   | SpecVarDecl
   | NamespaceCondition
   | IntrinsicDecl
+  | ScopeItem
+
+ScopeItem ::=
+  ("mod" | "impl" | "trait" | "trait" "impl") Ident "where" NamespaceItem*
 
 GenericBinder ::=
   "{" Ident ":" ("type" | "const" | "lifetime" | "evidence")
@@ -237,6 +293,7 @@ Place ::=
   | Place "[" Nat ".." Nat "]"
   | Place "[" Nat "..^" Nat "]"
   | "downcast" Place "as" Path "::" Ident
+  | "unsize" Place
 
 Expr ::=
   Const | Path | Ident | Operation
@@ -313,7 +370,10 @@ Verex exposes the four VIR binder sorts: `{T}`, `{N : const}`,
 binders, not implicit Lean arguments. An unannotated binder is a type
 binder; `: type` is written only for a phantom parameter
 (`{T : phantom type}`). Type binders may carry the core abilities
-(`{T has Copy, Drop, Store}`); other constraints use a `where` block:
+(`{T has Copy, Drop, Store}`). A lifetime binder may declare region bounds,
+for example `{a : lifetime outlives b, static}`; these lower to core
+`lifetimeOutlives` predicates and survive canonical printing and reimport.
+The general trait-constraint design uses a `where` block:
 
 ```lean
 where
@@ -380,7 +440,12 @@ language equals the enclosing namespace profile; the explicit cross-profile
 annotation `&[rust] 'a mut T` is reserved for the adapter design.
 Lifetimes are `'static`, named parameter lifetimes, `_` for inference, and
 generated local lifetimes; canonical printing may give a local lifetime a
-stable generated name when `_` would lose constraints.
+stable generated name when `_` would lose constraints. Every `_` of a namespace
+is its one inference lifetime: Move references carry no lifetimes, and a Rust
+body's regions are erased at export, into the one lifetime the rendered unit
+then has too, so that the borrow analysis reads the same lifetimes in both.
+A signature's named lifetimes stay, each one lifetime wherever it is mentioned. The
+borrow analysis relates them, and an elided lifetime in a signature relates to all.
 
 Dynamic and fixed vectors share one VIR constructor; the optional length is
 a closed nonnegative const. Tuples may be empty or unary. A function has one
@@ -512,12 +577,13 @@ output may suffix the name to keep identities visible.
 
 ```text
 p ::= x | *p | p.field | p[e] | p[start..stop] | p[start..^stop]
-    | downcast p as Type::Variant
+    | downcast p as Type::Variant | unsize p
 ```
 
 `p[start..^stop]` means `start .. length(p) - stop`. A downcast refines an
 enum place to one variant before selecting its fields; tuple fields use
-constant indexes. Ownership operations are explicit so partial moves and
+constant indexes. `unsize p` is the whole of a fixed vector as a dynamic one,
+which only a borrow reads: `&(unsize p)` is the coercion of `&[T; N]` to `&[T]`. Ownership operations are explicit so partial moves and
 non-consuming reads survive a fresh elaboration:
 
 ```lean
@@ -528,7 +594,8 @@ read(place)    -- non-consuming place read (Rust CopyForDeref)
 &place         -- shared reference
 &mut place     -- mutable reference
 place := value -- write through a place
-drop(place)    -- destroy a Drop value
+drop(place)    -- destroy a Drop value; in Rust, `@[destructor]` on a struct or
+               -- enum states its drop runs a destructor, which has no denotation
 ```
 
 The profile and the ability and borrow checker decide which are legal;
@@ -634,6 +701,8 @@ new Type { field := value }
 new Type::Variant { field := value }
 function[FnType](target, captures...)
 invoke(callable, arguments...)
+closure Name Binders (has Abilities)? (field : Type := value, ...)
+  fun call Binders (self : &Name<...>, parameters...) -> Result := body
 core.call_extension profile[...] targets[...] (arguments...)
 ```
 
@@ -655,8 +724,17 @@ A closure names an ordinary function and captures its parameter prefix; its
 result type is the residual function type. `invoke` takes the callable
 first. Direct calls and closure construction substitute type, const,
 lifetime, and evidence arguments and are checked against the full
-signature. Caller and target share a profile; a cross-profile call needs an
-explicit validated adapter.
+signature. A call spells only type arguments: each lifetime binder of its
+target takes the inference lifetime. Caller and target share a profile; a
+cross-profile call needs an explicit validated adapter.
+
+`closure` is a Rust closure, where the function around it first constructs it: it
+declares the struct `Name` of its captures, in the enclosing module, and the function in
+the struct's scope
+(`impl Name`), and constructs the struct with the values. Lowering makes both items of
+the module, so the function's body is a function of its own: its locals, sites and loop
+numbers are not those of the body around it, and `impl Name where spec call where`
+addresses its contract. The function is called as `Name::call(&g, 1u32)`.
 
 ## Primitive operations
 
@@ -839,6 +917,18 @@ from a specification position resolves to the derived interpretation; no
 separate `spec fun` is needed. Where no translation exists, the use is an
 error and the author provides a `spec fun` or an opaque model.
 
+The interpretation has no reading of an effect, so calling an impure function
+in a specification is an error at the call, naming what makes it impure, in
+every profile. A function with a body is impure when, transitively, the body
+borrows `&mut`, mutates or drops through a `&mut`, writes global storage, or
+calls a function value. One without a body is impure when its signature holds a
+`&mut`. A function taking `&mut` only to read through it stays callable, and so
+does one rebinding its own locals, which the reading threads. This goes beyond
+Move's `pureness_checker`, which accepts a global write and a function value,
+since either would be read as nothing here. The state operations of a
+specification (`publish`, `remove`, `update`) are values over labelled states,
+not effects.
+
 Abort behavior is not part of a derived specification function: assertions,
 explicit aborts, and arithmetic failures impose no condition on its logical
 result, and an aborting path has an unspecified value. The derived body is
@@ -954,6 +1044,55 @@ save_state_anchor!(n)` records the locals and state at its point, and
 `with_state_anchor!(n, e)` in a later assertion reads them as `old` inside
 `e`.
 
+A function's `spec` item can state a loop's conditions outside the body, for
+a body the item's file does not hold, as a Rust file's specification file does:
+
+```lean
+spec sum where
+  requires n <= 1000
+  loop 1 where
+    let bound := n
+    invariant i <= bound
+```
+
+`loop k` is the function's `k`-th loop in the rendered body's source order,
+from 1, as the proof language numbers it: a nested loop follows the loop
+around it, and a `for` is a loop that holds no invariants. Lowering places the
+conditions where an in-body loop specification goes, so a printed unit shows
+them in the loop, and its obligations are `invariant 2 of loop 1 entry` and
+`… step`, numbered among the function's invariants by their source order. A
+`loop k` the function does not have, or a second item for one loop, is an
+error at the item; a name the loop does not have in scope is an error at the
+clause. The item holds invariants and the `let` bindings they read; facts and
+proof steps at a loop are proof steps at its points (`at loop 1 entry`).
+
+A function without a body in the Rust profile can state its contract at shapes
+of its generics, each a `spec` item of its own:
+
+```lean
+native fun index {T} {I} {A} {Output}(_1 : &Vec<T, A>, _2 : I) -> &Output
+spec index at {T} {usize} {A} {T} where
+  requires _2 < vec_length(_1)
+  ensures result == vec_at(_1, _2)
+```
+
+`at` has one type per type binder of the function, in the order of its binders,
+and spells no lifetime binder, which is elided in the signature at the shape. A bare
+name that is one of the function's binders is a
+variable of the shape, here `T` and `A`, at any position, as `T` stands at
+`Output`; any other bare name must name a type (`VEREX-SHAPE-NAME`). The item is
+a generic contract over the variables, whose parameters and result are the function's
+at the shape, so `_2` is a `usize` and `result` a `&T`. A variable may repeat
+(`{T} {T}`). A call uses the shape its type arguments match, its own parameters
+rigid: `unwrap_or` at a caller's `{T}` matches `{T}` and not `{u32}`. Two shapes
+one instantiation could match are an error at the later item, and a contract
+without `at` overlaps every shape (`VIR-SHAPE-OVERLAP`). `{usize}` and the integer
+of its width are distinct shapes, which must state one contract. A call matching no shape
+has no contract and is rejected at its location, naming its type arguments and
+the shapes. A shape on a function with a body is rejected (`VIR-SHAPE-BODY`), as
+is a function value of a function with shapes. A shape holds pragmas and clauses,
+not `loop` items.
+
 Pragmas are the leading entries of a contract. Verex does not support Move
 schemas, so `include` is an ordinary identifier. Byte-vector pragma payloads
 use byte strings (`pragma bv = b"0"` is the byte 48).
@@ -1051,8 +1190,10 @@ evidence.
 Canonical output consumes only `ValidatedUnit`, checked registries, and
 source maps; prints headers, imports, binder sorts, and ambiguous operation
 kinds; prefers sugar only where re-elaboration selects the same
-constructor; names unnamed or colliding locals, lifetimes, and evidence
-stably; preserves every semantic node; prints structured bodies; emits a
+constructor; names unnamed or colliding locals, lifetimes (Rust's `'_` binder
+as `l<index>`), and evidence stably; declares a local `mut` where what follows
+its binding writes it or borrows it mutably; preserves every semantic node;
+prints structured bodies; emits a
 reverse source map from byte ranges to VIR IDs, provenance only in
 sidecars; and reports a located capability error rather than dropping a
 node. The required law is profile-aware alpha-equivalence:

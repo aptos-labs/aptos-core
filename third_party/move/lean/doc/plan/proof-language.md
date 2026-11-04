@@ -692,6 +692,7 @@ An obligation key is what `on` names and what every message prints:
 | Continuation after an aborting operation | an `after op j` point | none |
 | Loop invariant | `invariant k of loop j entry|step`: the clause and the loop's site index | `invariant_k_entry`, `invariant_k_step`, the loop not named |
 | In-body assertion | `assert k`: the `k`-th `spec assert` of the body | `assert_k` |
+| A function's failing paths no clause permits | `no panic` (Rust's implicit `aborts_if false`) or `no abort` (a strict Move function's `False`), located at the `spec` item, where the function has none at the function; no `aborts_if` number counts it; a selector takes paths out by their abort site (`on no panic when aborts at op 3`) | `leaf` |
 | Data, module, stored invariant; lemma requirement; unroll bound; ghost domain | the kind, and the site where several; `data invariant k` and `stored invariant k` the struct's own numbering of the clause, a stored invariant's only where an `on` names a clause, one goal otherwise; `data invariant k of S` routes a function constructing two struct types by the struct, for routing only | `data_invariant`, `module_invariant`, `stored_invariant`, `lemma_requires`, `unroll`, `ghost_domain` |
 | A path to any of these | the key with a selector, `when` and the decisions on the path | the traversal suffix `_1_8`, `.inl`, `_1`; `leaf`, `leaf_2`, `search_2_2` where no clause names the goal |
 
@@ -736,6 +737,15 @@ keeps the decisions. Two forms keep conditionals: a match of a move-only
 enum by value, which VerexSL has no non-consuming `match` for, and an arm
 testing more than one variant at a time (a nested pattern, a guard); their
 paths take `if` decisions.
+
+A failed `no panic` or `no abort` is reported at the `spec` item with the
+failing path's selector, its site's operation and source position, and the
+path's facts; the proof request asks for the selector (`| no_panic when aborts
+at op 1 => …`). The position is read off the source's unit: the rendering and
+the source run the sites of each shape in the same order
+(`renderedSiteOrigins`, `VerexSL/Verify/Contracts.lean`). Where they do not, a
+Move `v[i]`, which the source spells as a call of `vector::borrow`, the site
+stays at the rendering's position.
 
 A returning path owes that no abort condition holds: one obligation, `¬mustAbort`.
 The walker records the abort clause table's ranges on that leaf (its `clauses`,

@@ -3,6 +3,7 @@
 
 import Lean.Data.Json
 import VerexRust.Benchmark
+import VerexRust.Library
 import VerexRust.Profile
 
 /-!
@@ -50,6 +51,9 @@ structure ImportResult where
   unit : VerexIR.Validation.ValidatedUnit
   receipt : ImportCacheReceipt
   cacheHit : Bool
+  /-- The directory the unit's relative source names are relative to: the
+  workspace root of a Cargo import, whose compiler reads sources from there. -/
+  sourceRoot : Option System.FilePath := none
 
 /-- An imported Rust unit admitted by the executable semantic boundary. The
 validated unit is retained so source/proof consumers can share declaration and
@@ -111,6 +115,7 @@ private structure CargoMetadata where
   raw : String
   crateName : String
   localRoots : Array System.FilePath
+  workspaceRoot : System.FilePath
 
 private structure Exporter where
   binary : System.FilePath
@@ -245,13 +250,44 @@ private def artifactHash (path : System.FilePath) : IO String := do
   let bytes ← IO.FS.readBinFile path
   pure <| toString (appendHash 14695981039346656037 bytes)
 
+/-- The library beside the exporter's crate. -/
+def libraryRoot : IO System.FilePath := do
+  let root ← exporterRoot
+  let some package := root.parent
+    | throw <| IO.userError s!"the exporter crate {root} has no parent directory"
+  return package / "lib"
+
+/-- A validation diagnostic, at the source position of its location where the unit's
+tables and the source file give one. -/
+private def locatedDiagnostic (raw : Import.RawUnit)
+    (diagnostic : VerexIR.Validation.Diagnostic) : IO String := do
+  let text := s!"{diagnostic.code}: {diagnostic.message}"
+  let some range := (diagnostic.primary.bind (raw.tables.locations[·.index]?)).bind (·.primary)
+    | return text
+  let some file := raw.tables.files[range.file.index]? | return text
+  let source ← try IO.FS.readFile file.name catch _ => return s!"{file.name}: {text}"
+  let position := (Lean.FileMap.ofString source).toPosition ⟨range.startByte⟩
+  return s!"{file.name}:{position.line}:{position.column + 1}: {text}"
+
+/-- Validate an exporter artifact, the unit rewritten to the library's models
+first. The artifact itself stays the exporter's. -/
 private def decodeValidated (path : System.FilePath)
     (displayPath : System.FilePath := path) : IO VerexIR.Validation.ValidatedUnit := do
-  let text ← IO.FS.readFile path
-  match decodeAndValidate text with
+  let raw ← match Import.decodeJson (← IO.FS.readFile path) with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust RawUnit for `{displayPath}` does not decode: {message}"
+  let models := (← Library.readFiles (← libraryRoot)).flatMap (·.models)
+  let raw ← match Library.applyModels models raw with
+    | .ok raw => pure raw
+    | .error message => throw <| IO.userError s!"Rust RawUnit for `{displayPath}`: {message}"
+  match validate (Library.pruneOpaqueFunctions
+      (Library.refuseFunctions (Import.PanicRegions.collapseUnit raw))) with
   | .ok unit => pure unit
   | .error diagnostics =>
-      throw <| IO.userError s!"Rust RawUnit for `{displayPath}` did not validate: {repr diagnostics}"
+      let located ← diagnostics.mapM (locatedDiagnostic raw)
+      throw <| IO.userError s!"Rust RawUnit for `{displayPath}` did not validate:\n\
+        {"\n".intercalate located.toList}"
 
 private def cached? (output : System.FilePath) (key : String) :
     IO (Option (VerexIR.Validation.ValidatedUnit × String)) := do
@@ -346,7 +382,8 @@ private def parseCargoMetadata (text package : String) : Except String CargoMeta
           crateName := some (← (← targetJson.getObjVal? "name").getStr?)
   let some selectedCrateName := crateName
     | throw s!"Cargo metadata has no library target for package `{package}`"
-  pure { raw := text, crateName := selectedCrateName, localRoots }
+  let workspaceRoot ← json.getObjValAs? String "workspace_root"
+  pure { raw := text, crateName := selectedCrateName, localRoots, workspaceRoot }
 
 private def cargoMetadata (request : CargoImportRequest) (exporter : Exporter) : IO CargoMetadata := do
   let mut arguments := #["metadata", "--format-version=1", "--locked",
@@ -407,7 +444,7 @@ def importCargoCrate (request : CargoImportRequest) : IO ImportResult := do
       inputIdentity := s!"{manifest}#{request.package}"
       cacheKey := key
       artifactHash := hash }
-    return { unit, receipt, cacheHit := true }
+    return { unit, receipt, cacheHit := true, sourceRoot := metadata.workspaceRoot }
   let libraryPath ← exporterLibraryPath exporter.root
   let inheritedLibraryPath ← IO.getEnv "LD_LIBRARY_PATH"
   let libraryPath := inheritedLibraryPath.map (libraryPath ++ ":" ++ ·) |>.getD libraryPath
@@ -443,6 +480,6 @@ def importCargoCrate (request : CargoImportRequest) : IO ImportResult := do
       inputIdentity := s!"{manifest}#{request.package}"
       cacheKey := key
       artifactHash := hash }
-    pure { unit, receipt, cacheHit := false }
+    pure { unit, receipt, cacheHit := false, sourceRoot := metadata.workspaceRoot }
 
 end VerexIR.Rust.Driver

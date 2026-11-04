@@ -99,6 +99,7 @@ lake exe verex-move verify <file.move> --heartbeats 400 # default budget, thousa
 lake exe verex-move verify <package> --jobs 4            # targets proved at once per module
 cd ../verex-rust
 lake exe verex-rust verify <file.rs>                    # specifications in <file>.spec.lean
+lake exe verex-rust verify <Cargo.toml> --package <name> # a library crate, a .spec.lean per module file
 ```
 
 `verex-move verify` elaborates a package's targets one after another in one

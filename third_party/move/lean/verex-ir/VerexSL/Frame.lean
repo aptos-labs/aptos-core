@@ -24,4 +24,14 @@ def statesNothing (contract : VerexIR.FunctionContract) : Bool :=
   contract.conditions.isEmpty && contract.pragmas.isEmpty && contract.modifiesAll &&
     contract.modifies.isEmpty && contract.reads.isEmpty
 
+/-- The property of the `aborts_if false` lowering appends to every Rust
+contract, a name no source can spell. -/
+def implicitNoPanicProperty : String := "no panic"
+
+/-- Whether a condition is that clause. -/
+def isImplicitNoPanic (condition : VerexIR.Condition) : Bool :=
+  condition.properties.any fun
+    | .assign name (.constant (.bool true)) _ => name == implicitNoPanicProperty
+    | _ => false
+
 end VerexSL

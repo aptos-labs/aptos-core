@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/mutable_slice_errors.rs:8:1: error: execution preparation refuses the unit under every registry, so its theorems would be vacuous:
+VIR-SEMANTIC-BORROW-UNSIZED-HOLE: in fun through_unsize: a mutable slice of a vector is not yet supported

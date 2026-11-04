@@ -247,22 +247,42 @@ theorem callTypeInstantiation_own_parameters (unit : ValidatedUnit) (ns : Valida
     cases own[index]? <;> cases arguments[index]? <;> rfl
 
 /-- Whether `own` are the type parameters of a namespace, in order. -/
-def ownParameters (ns : ValidatedNamespace) (own : Array TypeUse) : Bool :=
+def ownParameters (ns : ValidatedNamespace) (own : Array GenericArgument) : Bool :=
   (List.range own.size).all fun index =>
     match own[index]? with
-    | some use => ns.tables.types[use.typeId.index]? == some (.typeParameter index)
-    | none => false
+    | some (.typeArg use) => ns.tables.types[use.typeId.index]? == some (.typeParameter index)
+    | _ => false
 
-theorem ownParameters_spec {ns : ValidatedNamespace} {own : Array TypeUse}
-    (checked : ownParameters ns own = true) (index : Nat) (bound : index < own.size) :
-    ns.tables.types[own[index].typeId.index]? = some (.typeParameter index) := by
+/-- The type parameters of a namespace, in order, are type arguments. -/
+theorem ownParameters_spec {ns : ValidatedNamespace} {own : Array GenericArgument}
+    (checked : ownParameters ns own = true) :
+    ∃ uses : Array TypeUse, own = uses.map .typeArg ∧ ∀ (index : Nat) (bound : index < uses.size),
+      ns.tables.types[uses[index].typeId.index]? = some (.typeParameter index) := by
   unfold ownParameters at checked
-  have := List.all_eq_true.mp checked index (List.mem_range.mpr bound)
-  simp only [Array.getElem?_eq_getElem bound] at this
-  exact beq_iff_eq.mp this
+  have entry (index : Nat) (bound : index < own.size) :
+      ∃ use, own[index] = .typeArg use ∧
+        ns.tables.types[use.typeId.index]? = some (.typeParameter index) := by
+    have := List.all_eq_true.mp checked index (List.mem_range.mpr bound)
+    simp only [Array.getElem?_eq_getElem bound] at this
+    split at this
+    · rename_i use same
+      exact ⟨use, Option.some.inj same, beq_iff_eq.mp this⟩
+    · cases this
+  let use (index : Fin own.size) : TypeUse := (entry index.1 index.2).choose
+  refine ⟨Array.ofFn use, ?_, ?_⟩
+  · apply Array.ext
+    · simp
+    · intro index left right
+      simp only [Array.getElem_map, Array.getElem_ofFn]
+      exact (entry index left).choose_spec.1
+  · intro index bound
+    simp only [Array.size_ofFn] at bound
+    simp only [Array.getElem_ofFn]
+    exact (entry index bound).choose_spec.2
 
 /-- Whether `own` are the type parameters of a function's namespace, in order. -/
-def ownParametersIn (unit : ValidatedUnit) (handle : FunctionHandle) (own : Array TypeUse) : Bool :=
+def ownParametersIn (unit : ValidatedUnit) (handle : FunctionHandle)
+    (own : Array GenericArgument) : Bool :=
   match unit.namespaces[handle.namespaceId.index]? with
   | some ns => ownParameters ns own
   | none => false

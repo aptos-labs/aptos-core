@@ -38,6 +38,139 @@ private def semantics : SemanticProfile := {
 
 private def typeUse (typeId loc : Nat) : TypeUse := { typeId := ⟨typeId⟩, loc := ⟨loc⟩ }
 
+/-- A function's lifetime at a binder of its own, for each local lifetime. -/
+private def declaredLifetime (locals : Array LifetimeId) (base : Nat) (lifetime : LifetimeId) :
+    StateM (Array Lifetime) LifetimeId := do
+  let some position := locals.idxOf? lifetime | return lifetime
+  let kind : LifetimeKind := .parameter (base + position)
+  match (← get).findIdx? (·.kind == kind) with
+  | some index => return ⟨index⟩
+  | none =>
+      let id : LifetimeId := ⟨(← get).size⟩
+      modify (·.push { kind, loc := ⟨0⟩ })
+      return id
+
+/-- A type at a function's lifetime binders, interned. -/
+private partial def declaredType (locals : Array LifetimeId) (base : Nat) (typeId : TypeId) :
+    StateM (Array Lifetime × Array Ty) TypeId := do
+  let lifetime (id : LifetimeId) : StateM (Array Lifetime × Array Ty) LifetimeId := do
+    let state ← get
+    let (id, lifetimes) := (declaredLifetime locals base id).run state.1
+    set (lifetimes, state.2)
+    return id
+  let some type := (← get).2[typeId.index]? | return typeId
+  let declared : Ty ← match type with
+    | .reference reference => do
+        let referent ← declaredType locals base reference.referent
+        pure (.reference { reference with referent, lifetime := ← lifetime reference.lifetime })
+    | .tuple elements => pure (.tuple (← elements.mapM (declaredType locals base)))
+    | .vector element length => pure (.vector (← declaredType locals base element) length)
+    | .nominal name arguments => do
+        let arguments ← arguments.mapM fun
+          | .lifetime id => do pure (.lifetime (← lifetime id))
+          | .typeArg use => do
+              pure (.typeArg { use with typeId := ← declaredType locals base use.typeId })
+          | argument => pure argument
+        pure (.nominal name arguments)
+    | type => pure type
+  match (← get).2.findIdx? (· == declared) with
+  | some index => return ⟨index⟩
+  | none =>
+      let id : TypeId := ⟨(← get).2.size⟩
+      modify fun (lifetimes, types) => (lifetimes, types.push declared)
+      return id
+
+/-- A fixture as the Rust exporter states it: its bodies' lifetimes inferred, and the
+signature of each function but the caller, the first, and the fields of each nominal,
+at lifetime binders of their own, which a use instantiates with the inferred lifetimes. -/
+private def asDeclared (raw : RawUnit) : RawUnit := Id.run do
+  let locals : Array LifetimeId := (raw.tables.lifetimes.zipIdx.filter
+    (·.1.kind == .local)).map (fun pair => ⟨pair.2⟩)
+  let mut tables : Array Lifetime × Array Ty :=
+    (raw.tables.lifetimes.map fun lifetime =>
+      if lifetime.kind == .local then { lifetime with kind := .inference } else lifetime,
+     raw.tables.types.map fun
+      | .nominal name arguments => .nominal name (arguments ++ locals.map .lifetime)
+      | type => type)
+  let mut namespaces := raw.namespaces
+  for (ns, namespaceIndex) in raw.namespaces.zipIdx do
+    let mut functions := ns.functions
+    for (function, index) in ns.functions.zipIdx do
+      if namespaceIndex == 0 && index == 0 then continue
+      let base := function.signature.generics.size
+      let (declared, next) := (do
+        let declaredUse (use : TypeUse) : StateM (Array Lifetime × Array Ty) TypeUse := do
+          pure { use with typeId := ← declaredType locals base use.typeId }
+        let parameters ← function.signature.parameters.mapM fun parameter => do
+          pure { parameter with typeUse := ← declaredUse parameter.typeUse }
+        let results ← function.signature.results.mapM declaredUse
+        let leading := function.signature.parameters.size
+        let declaredLocals ← function.locals.zipIdx.mapM fun (localDecl, position) => do
+          if position < leading then pure { localDecl with type := ← declaredUse localDecl.type }
+          else pure localDecl
+        let predicates ← function.signature.predicates.mapM fun
+          | .lifetimeOutlives longer shorter => do
+              let state ← get
+              let (longer, lifetimes) := (declaredLifetime locals base longer).run state.1
+              let (shorter, lifetimes) := (declaredLifetime locals base shorter).run lifetimes
+              set (lifetimes, state.2)
+              pure (.lifetimeOutlives longer shorter)
+          | predicate => pure predicate
+        pure (parameters, results, declaredLocals, predicates) :
+          StateM (Array Lifetime × Array Ty) _).run tables
+      tables := next
+      let (parameters, results, declaredLocals, predicates) := declared
+      let binders : Array GenericBinder := locals.zipIdx.map fun (_, position) =>
+        { name := s!"l{position}", kind := .lifetime, loc := function.loc }
+      functions := functions.set! index { function with
+        locals := declaredLocals
+        signature := { function.signature with
+          generics := function.signature.generics ++ binders
+          parameters, results, predicates } }
+    let mut structs := ns.structs
+    for (declaration, index) in ns.structs.zipIdx do
+      let base := declaration.generics.size
+      let declaredFields (fields : Array FieldDecl) :
+          StateM (Array Lifetime × Array Ty) (Array FieldDecl) :=
+        fields.mapM fun field => do
+          pure { field with type := { field.type with
+            typeId := ← declaredType locals base field.type.typeId } }
+      let (declared, next) := (do
+        let fields ← declaredFields declaration.fields
+        let variants ← declaration.variants.mapM fun variant => do
+          pure { variant with fields := ← declaredFields variant.fields }
+        pure (fields, variants) :
+          StateM (Array Lifetime × Array Ty) _).run tables
+      tables := next
+      let binders : Array GenericBinder := locals.zipIdx.map fun (_, position) =>
+        { name := s!"l{position}", kind := .lifetime, loc := declaration.loc }
+      structs := structs.set! index { declaration with
+        fields := declared.1, variants := declared.2
+        generics := declaration.generics ++ binders }
+    let expressions := ns.expressions.map fun expression =>
+      match expression.kind with
+      | .operation (.call (.function reference)) instantiations arguments surface =>
+          let instantiations := instantiations ++ locals.map .lifetime
+          let kind := .operation (.call (.function reference)) instantiations arguments surface
+          { expression with kind }
+      | .operation (.call (.constructor reference variant)) instantiations arguments surface =>
+          let instantiations := instantiations ++ locals.map .lifetime
+          let kind := .operation (.call (.constructor reference variant)) instantiations
+            arguments surface
+          { expression with kind }
+      | _ => expression
+    let patterns := ns.patterns.map fun pattern =>
+      match pattern.kind with
+      | .constructor name instantiations variant fields =>
+          let instantiations := instantiations ++ locals.map .lifetime
+          { pattern with kind := .constructor name instantiations variant fields }
+      | _ => pattern
+    namespaces := namespaces.set! namespaceIndex
+      { ns with functions, structs, expressions, patterns }
+  return { raw with
+    tables := { raw.tables with lifetimes := tables.1, types := tables.2 }
+    namespaces }
+
 private def fixture : RawUnit where
   tables := {
     files := #[{ name := "references.rs" }]
@@ -183,8 +316,7 @@ private def verifiable? : Option VerifiableUnit := do
           loans := #[{
             expression := ⟨1⟩
             lifetime := ⟨0⟩
-            holders := #[⟨1⟩]
-            deaths := #[{ anchor := ⟨7⟩ }]
+            deaths := #[{ anchor := ⟨7⟩, holders := #[⟨1⟩] }]
           }]
           lifetimeRelations := #[{ longer := ⟨0⟩, shorter := ⟨0⟩ }]
         },
@@ -319,8 +451,8 @@ private def manyDeathFixture (count : Nat) : RawUnit := Id.run do
 #guard match (validate #[schema] deathFixture).toOption with
   | some checked =>
       (checked.borrowCertificates.map BorrowCertificate.loans) == #[#[{
-        expression := ⟨1⟩, lifetime := ⟨0⟩, holders := #[⟨1⟩]
-        deaths := #[{ anchor := ⟨4⟩, before := true }] }]]
+        expression := ⟨1⟩, lifetime := ⟨0⟩
+        deaths := #[{ anchor := ⟨4⟩, before := true, holders := #[⟨1⟩] }] }]]
   | none => false
 
 -- The death is read at its anchor: preparation keeps every expression index.
@@ -579,6 +711,37 @@ private def runSubslice? (raw : RawUnit) : Option (Array RuntimeValue) := do
 
 #guard runSubslice? (subsliceFixture 1 1 true 2) ==
   some #[.integer 2, .integer 3]
+
+/-- A read of the whole of a local of the given length as a dynamic vector. -/
+private def unsizeFixture (length : Option ConstValue) : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  { fixture with
+    tables := { fixture.tables with types := fixture.tables.types ++ #[
+      .vector ⟨1⟩ length, .vector ⟨1⟩ none] }
+    namespaces := #[{
+      ns with
+      expressions := #[
+        { loc := ⟨0⟩, typeId := ⟨3⟩,
+          kind := .value (.vector #[.integer 1, .integer 2, .integer 3, .integer 4]) },
+        { loc := ⟨1⟩, typeId := ⟨0⟩, kind := .assign ⟨0⟩ ⟨0⟩ },
+        { loc := ⟨2⟩, typeId := ⟨4⟩, kind := .operation (.read ⟨1⟩) #[] #[] },
+        { loc := ⟨3⟩, typeId := ⟨4⟩, kind := .block #[⟨1⟩] (some ⟨2⟩) }]
+      places := #[.localVar ⟨0⟩, .unsize ⟨0⟩]
+      functions := #[{
+        ns.functions[0]! with
+        signature := { results := #[typeUse 4 10] }
+        body := .structured ⟨3⟩
+        locals := #[{
+          id := ⟨0⟩, name := "values", type := typeUse 3 10,
+          mutable := true, loc := ⟨10⟩ }] }] }] }
+
+#guard runSubslice? (unsizeFixture (some (.integer 4))) ==
+  some #[.integer 1, .integer 2, .integer 3, .integer 4]
+
+#guard match validate #[schema] (unsizeFixture none) with
+  | .error diagnostics => diagnostics.any fun diagnostic =>
+      diagnostic.code == "VIR-SEMANTIC-TYPE" && diagnostic.primary == some ⟨2⟩
+  | .ok _ => false
 
 private def movedSubsliceFixture : RawUnit :=
   let ns := (subsliceFixture 1 3 false 2).namespaces[0]!
@@ -844,9 +1007,11 @@ private def projectedSubsliceBorrowFixture (secondStart secondStop : Nat) : RawU
           { id := ⟨1⟩, name := "reference", type := typeUse 5 5,
             mutable := false, loc := ⟨5⟩ }] }] }] }
 
-#guard match validate #[schema] (projectedSubsliceBorrowFixture 2 4) with
-  | .error _ => false
-  | .ok checked => (prepareExecution #[semantics] checked).isOk
+-- A hole cannot sit in a slice of a vector, even of disjoint ranges.
+#guard preparationHasDiagnosticAt (projectedSubsliceBorrowFixture 2 4)
+    "VIR-SEMANTIC-BORROW-UNSIZED-HOLE" ⟨1⟩ &&
+  !preparationHasDiagnosticAt (projectedSubsliceBorrowFixture 2 4)
+    "VIR-SEMANTIC-BORROW-CONFLICT" ⟨2⟩
 
 #guard preparationHasDiagnosticAt (projectedSubsliceBorrowFixture 1 3)
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨2⟩
@@ -865,9 +1030,10 @@ private def projectedSubsliceIndexBorrowFixture (index : Nat) : RawUnit :=
       expressions := (ns.expressions.push indexExpression).set! 2 secondBorrow
       places := ns.places.push (.index ⟨0⟩ ⟨7⟩) }] }
 
-#guard match validate #[schema] (projectedSubsliceIndexBorrowFixture 2) with
-  | .error _ => false
-  | .ok checked => (prepareExecution #[semantics] checked).isOk
+#guard preparationHasDiagnosticAt (projectedSubsliceIndexBorrowFixture 2)
+    "VIR-SEMANTIC-BORROW-UNSIZED-HOLE" ⟨1⟩ &&
+  !preparationHasDiagnosticAt (projectedSubsliceIndexBorrowFixture 2)
+    "VIR-SEMANTIC-BORROW-CONFLICT" ⟨2⟩
 
 #guard preparationHasDiagnosticAt (projectedSubsliceIndexBorrowFixture 1)
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨2⟩
@@ -913,9 +1079,10 @@ private def subsliceLoanFixture (sameRange : Bool) : RawUnit :=
           { id := ⟨1⟩, name := "first", type := typeUse 5 5,
             mutable := false, loc := ⟨5⟩ }] }] }] }
 
-#guard match validate #[schema] (subsliceLoanFixture false) with
-  | .error _ => false
-  | .ok checked => (prepareExecution #[semantics] checked).isOk
+#guard preparationHasDiagnosticAt (subsliceLoanFixture false)
+    "VIR-SEMANTIC-BORROW-UNSIZED-HOLE" ⟨1⟩ &&
+  !preparationHasDiagnosticAt (subsliceLoanFixture false)
+    "VIR-SEMANTIC-BORROW-CONFLICT" ⟨2⟩
 
 #guard preparationHasDiagnosticAt (subsliceLoanFixture true)
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨2⟩
@@ -1561,11 +1728,11 @@ private def selectedCallResultFixture (readSelectedOwner : Bool) : RawUnit :=
               id := ⟨1⟩, name := "other", type := typeUse 3 13,
               mutable := false, loc := ⟨13⟩ } } }] }
 
-#guard match validate #[schema] (selectedCallResultFixture false) with
+#guard match validate #[schema] (asDeclared (selectedCallResultFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (selectedCallResultFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (selectedCallResultFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def selectedTuplePatternLoanFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -1938,11 +2105,11 @@ private def projectedCallResultCarrierLoanFixture (readSelectedOwner : Bool) : R
         signature := { callee.signature with results := #[typeUse 4 13] }
         body := .structured ⟨26⟩ } }] }
 
-#guard match validate #[schema] (projectedCallResultCarrierLoanFixture false) with
+#guard match validate #[schema] (asDeclared (projectedCallResultCarrierLoanFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedCallResultCarrierLoanFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedCallResultCarrierLoanFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def projectedMultiResultCarrierLoanFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -1954,11 +2121,11 @@ private def projectedMultiResultCarrierLoanFixture (readSelectedOwner : Bool) : 
         callee with signature := {
           callee.signature with results := #[typeUse 2 13, typeUse 3 13] } } }] }
 
-#guard match validate #[schema] (projectedMultiResultCarrierLoanFixture false) with
+#guard match validate #[schema] (asDeclared (projectedMultiResultCarrierLoanFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedMultiResultCarrierLoanFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedMultiResultCarrierLoanFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def projectedStructCallResultCarrierFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -1984,11 +2151,11 @@ private def projectedStructCallResultCarrierFixture (readSelectedOwner : Bool) :
           { loc := ⟨13⟩, name := ⟨3⟩, type := typeUse 2 13 },
           { loc := ⟨13⟩, name := ⟨4⟩, type := typeUse 3 13 }] }] }] }
 
-#guard match validate #[schema] (projectedStructCallResultCarrierFixture false) with
+#guard match validate #[schema] (asDeclared (projectedStructCallResultCarrierFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedStructCallResultCarrierFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedStructCallResultCarrierFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def projectedEnumCallResultCarrierFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -2012,11 +2179,11 @@ private def projectedEnumCallResultCarrierFixture (readSelectedOwner : Bool) : R
             { loc := ⟨13⟩, name := ⟨4⟩, type := typeUse 3 13 }] },
           { loc := ⟨13⟩, name := ⟨6⟩ }] }] }] }
 
-#guard match validate #[schema] (projectedEnumCallResultCarrierFixture false) with
+#guard match validate #[schema] (asDeclared (projectedEnumCallResultCarrierFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedEnumCallResultCarrierFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedEnumCallResultCarrierFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def projectedRecursiveCallResultCarrierFixture
@@ -2034,11 +2201,11 @@ private def projectedRecursiveCallResultCarrierFixture
           loc := ⟨13⟩, name := ⟨7⟩, fields := #[{
             loc := ⟨13⟩, name := ⟨8⟩, type := typeUse 4 13 }] } } }] }
 
-#guard match validate #[schema] (projectedRecursiveCallResultCarrierFixture false) with
+#guard match validate #[schema] (asDeclared (projectedRecursiveCallResultCarrierFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedRecursiveCallResultCarrierFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedRecursiveCallResultCarrierFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def projectedGenericCallResultCarrierFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -2064,11 +2231,11 @@ private def projectedGenericCallResultCarrierFixture (readSelectedOwner : Bool) 
         fields := ns.structs[0]!.fields.set! 0 {
           ns.structs[0]!.fields[0]! with type := typeUse 5 13 } } }] }
 
-#guard match validate #[schema] (projectedGenericCallResultCarrierFixture false) with
+#guard match validate #[schema] (asDeclared (projectedGenericCallResultCarrierFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedGenericCallResultCarrierFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedGenericCallResultCarrierFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def projectedGenericTypeCallResultCarrierFixture
@@ -2094,11 +2261,11 @@ private def projectedGenericTypeCallResultCarrierFixture
         fields := ns.structs[0]!.fields.set! 0 {
           ns.structs[0]!.fields[0]! with type := typeUse 5 13 } } }] }
 
-#guard match validate #[schema] (projectedGenericTypeCallResultCarrierFixture false) with
+#guard match validate #[schema] (asDeclared (projectedGenericTypeCallResultCarrierFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (projectedGenericTypeCallResultCarrierFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (projectedGenericTypeCallResultCarrierFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨19⟩
 
 private def predicatedCallResultFixture : RawUnit :=
@@ -2109,7 +2276,7 @@ private def predicatedCallResultFixture : RawUnit :=
       callee with signature := { callee.signature with predicates :=
         callee.signature.predicates.push <| .lifetimeOutlives ⟨1⟩ ⟨0⟩ } } }] }
 
-#guard preparationHasDiagnosticAt predicatedCallResultFixture
+#guard preparationHasDiagnosticAt (asDeclared predicatedCallResultFixture)
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def typeParameterCallResultFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -2138,11 +2305,12 @@ private def typeParameterCallResultFixture (readSelectedOwner : Bool) : RawUnit 
         locals := callee.locals.set! 0 {
           callee.locals[0]! with type := typeUse 4 13 } } }] }
 
-#guard match validate #[schema] (typeParameterCallResultFixture false) with
-  | .error _ => false
-  | .ok checked => (prepareExecution #[semantics] checked).isOk
+-- A type argument's regions are the caller's, which a bound the unit does not see may
+-- relate to the other parameter's: its lender is held too.
+#guard preparationHasDiagnosticAt (asDeclared (typeParameterCallResultFixture false))
+  "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
-#guard preparationHasDiagnosticAt (typeParameterCallResultFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (typeParameterCallResultFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def nominalCallResultFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -2196,11 +2364,11 @@ private def nominalCallResultFixture (readSelectedOwner : Bool) : RawUnit :=
               callee.locals[0]! with type := typeUse 4 13 }).set! 1 {
                 callee.locals[1]! with type := typeUse 5 13 } } }] }
 
-#guard match validate #[schema] (nominalCallResultFixture false) with
+#guard match validate #[schema] (asDeclared (nominalCallResultFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (nominalCallResultFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (nominalCallResultFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def recursiveNominalCallResultFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -2225,11 +2393,11 @@ private def recursiveNominalCallResultFixture (readSelectedOwner : Bool) : RawUn
           { loc := ⟨13⟩, name := ⟨7⟩, fields := #[{
               loc := ⟨13⟩, name := ⟨8⟩, type := typeUse 4 13 }] }] } }] }
 
-#guard match validate #[schema] (recursiveNominalCallResultFixture false) with
+#guard match validate #[schema] (asDeclared (recursiveNominalCallResultFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (recursiveNominalCallResultFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (recursiveNominalCallResultFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def genericRecursiveNominalCallResultFixture (readSelectedOwner : Bool) : RawUnit :=
@@ -2258,11 +2426,11 @@ private def genericRecursiveNominalCallResultFixture (readSelectedOwner : Bool) 
               ns.structs[0]!.variants[1]! with fields := #[{
                 loc := ⟨13⟩, name := ⟨8⟩, type := typeUse 7 13 }] } } }] }
 
-#guard match validate #[schema] (genericRecursiveNominalCallResultFixture false) with
+#guard match validate #[schema] (asDeclared (genericRecursiveNominalCallResultFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (genericRecursiveNominalCallResultFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (genericRecursiveNominalCallResultFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def changingGenericRecursiveNominalFixture : RawUnit :=
@@ -2270,7 +2438,7 @@ private def changingGenericRecursiveNominalFixture : RawUnit :=
   { raw with tables := { raw.tables with
       types := raw.tables.types.set! 7 (.nominal ⟨2⟩ #[.lifetime ⟨1⟩]) } }
 
-#guard match validate #[schema] changingGenericRecursiveNominalFixture with
+#guard match validate #[schema] (asDeclared changingGenericRecursiveNominalFixture) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
@@ -2300,11 +2468,11 @@ private def aggregateCallParameterFixture (predicated : Bool) : RawUnit :=
         locals := callee.locals.set! 1 {
           callee.locals[1]! with type := typeUse 4 13 } } }] }
 
-#guard match validate #[schema] (aggregateCallParameterFixture false) with
+#guard match validate #[schema] (asDeclared (aggregateCallParameterFixture false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (aggregateCallParameterFixture true)
+#guard preparationHasDiagnosticAt (asDeclared (aggregateCallParameterFixture true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def projectedTuplePatternLoanFixture : RawUnit :=
@@ -2502,15 +2670,15 @@ private def localAggregateCallFieldLoanFixture
         locals := #[{
           callee.locals[0]! with type := typeUse 4 13 }] } }] }
 
-#guard match validate #[schema] (localAggregateCallFieldLoanFixture false false) with
+#guard match validate #[schema] (asDeclared (localAggregateCallFieldLoanFixture false false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard match validate #[schema] (localAggregateCallFieldLoanFixture true true) with
+#guard match validate #[schema] (asDeclared (localAggregateCallFieldLoanFixture true true)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (localAggregateCallFieldLoanFixture false true)
+#guard preparationHasDiagnosticAt (asDeclared (localAggregateCallFieldLoanFixture false true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def crossNamespaceAggregateCallLoanFixture
@@ -2541,15 +2709,15 @@ private def crossNamespaceAggregateCallLoanFixture
         namespaceId := ⟨1⟩, name := "identity_pair" } }
     namespaces := #[source, target] }
 
-#guard match validate #[schema] (crossNamespaceAggregateCallLoanFixture false false) with
+#guard match validate #[schema] (asDeclared (crossNamespaceAggregateCallLoanFixture false false)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard match validate #[schema] (crossNamespaceAggregateCallLoanFixture true true) with
+#guard match validate #[schema] (asDeclared (crossNamespaceAggregateCallLoanFixture true true)) with
   | .error _ => false
   | .ok checked => (prepareExecution #[semantics] checked).isOk
 
-#guard preparationHasDiagnosticAt (crossNamespaceAggregateCallLoanFixture false true)
+#guard preparationHasDiagnosticAt (asDeclared (crossNamespaceAggregateCallLoanFixture false true))
   "VIR-SEMANTIC-BORROW-CONFLICT" ⟨17⟩
 
 private def aggregateCallLifetimeRelationFixture : RawUnit :=
@@ -2607,7 +2775,7 @@ private def aggregateCallResultLifetimeFixture : RawUnit :=
 
 private def aggregateCallResultLifetimeRelations? :
     Option (Array LifetimeRelationFact) := do
-  let checked ← (validate #[schema] aggregateCallResultLifetimeFixture).toOption
+  let checked ← (validate #[schema] (asDeclared aggregateCallResultLifetimeFixture)).toOption
   let executable ← (prepareExecution #[semantics] checked).toOption
   let certificate ← executable.borrowCertificates.find? (·.functionId == ⟨0⟩)
   some certificate.lifetimeRelations
@@ -2620,10 +2788,36 @@ private def loanHolders? (raw : RawUnit) : Option (Array LocalId) := do
   let executable ← (prepareExecution #[semantics] checked).toOption
   let certificate ← executable.borrowCertificates.find? (·.functionId == ⟨0⟩)
   let loan ← certificate.loans.find? (·.expression == ⟨1⟩)
-  some loan.holders
+  some (loan.deaths.foldl (fun holders death =>
+    death.holders.foldl (fun holders holder =>
+      if holders.contains holder then holders else holders.push holder) holders) #[])
 
-#guard loanHolders? (aliasedLoanFixture false) == some #[⟨1⟩, ⟨2⟩]
+-- The last holder moved the loan into a temporary: no place holds it at its death.
+#guard loanHolders? (aliasedLoanFixture false) == some #[]
 #guard loanHolders? (assignedLoanFixture false) == some #[⟨1⟩]
+
+-- Accepted units pass the check of their deaths.
+private def refusesLoanDeath (raw : RawUnit) : Bool :=
+  match validate #[schema] raw with
+  | .error _ => true
+  | .ok checked => match prepareExecution #[semantics] checked with
+    | .error diagnostics => diagnostics.any (·.code == "VIR-SEMANTIC-LOAN-DEATH")
+    | .ok _ => false
+
+#guard ![deathFixture, aliasedLoanFixture false, assignedLoanFixture false,
+  calledAliasLoanFixture false].any refusesLoanDeath
+
+-- The check reads the holders from the anchor on: the write through the reference
+-- reads it, the move of its lender does not.
+private def deathReadsHolder (death : LoanDeath) : Bool :=
+  match (validate #[schema] deathFixture).toOption with
+  | some checked => loanDeathReadsHolder checked.namespaces[0]! ⟨7⟩ death
+  | none => false
+
+#guard deathReadsHolder { anchor := ⟨3⟩, before := true, holders := #[⟨1⟩] }
+#guard deathReadsHolder { anchor := ⟨5⟩, before := true, holders := #[⟨1⟩] }
+#guard !deathReadsHolder { anchor := ⟨4⟩, before := true, holders := #[⟨1⟩] }
+#guard !deathReadsHolder { anchor := ⟨3⟩, holders := #[⟨1⟩] }
 
 private def escapingLocalLoanFixture : RawUnit :=
   let ns := fixture.namespaces[0]!

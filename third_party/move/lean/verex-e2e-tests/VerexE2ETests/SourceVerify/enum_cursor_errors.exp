@@ -1,0 +1,32 @@
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:13:3: error: the specification clause `ensures a == 1` is not established
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `enum_cursor_false` failed; provide a proof in the module:
+  verify enum_cursor_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:19:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:18:6: error: verex verification failed: the automatic verification of `enum_cursor_vacuous` failed; provide a proof in the module:
+  verify enum_cursor_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:31:3: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `local_enum_cursor_false` failed; provide a proof in the module:
+  verify local_enum_cursor_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:37:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_cursor_errors.spec.lean:36:6: error: verex verification failed: the automatic verification of `local_enum_cursor_vacuous` failed; provide a proof in the module:
+  verify local_enum_cursor_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

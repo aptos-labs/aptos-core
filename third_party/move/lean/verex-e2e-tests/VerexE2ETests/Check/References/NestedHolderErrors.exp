@@ -1,0 +1,15 @@
+VerexE2ETests/Check/References/NestedHolderErrors.lean:10:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-PARTIAL-MOVE: a value holding a mutable reference moved out of an aggregate is not supported at VerexE2ETests/Check/References/NestedHolderErrors.lean:19:14
+VerexE2ETests/Check/References/NestedHolderErrors.lean:26:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-CONFLICT: assignment conflicts with an active mutable loan at VerexE2ETests/Check/References/NestedHolderErrors.lean:37:5
+  active loan originates here: VerexE2ETests/Check/References/NestedHolderErrors.lean:31:36
+VerexE2ETests/Check/References/NestedHolderErrors.lean:44:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-OVERWRITE: a mutable reference the function's caller lends cannot be overwritten at VerexE2ETests/Check/References/NestedHolderErrors.lean:49:5
+VerexE2ETests/Check/References/NestedHolderErrors.lean:54:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-OVERWRITE: a mutable reference reached through a reference cannot be overwritten at VerexE2ETests/Check/References/NestedHolderErrors.lean:59:5
+VerexE2ETests/Check/References/NestedHolderErrors.lean:76:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-DROP: a drop of a mutable reference the function's caller lends is not supported at VerexE2ETests/Check/References/NestedHolderErrors.lean:78:5
+VerexE2ETests/Check/References/NestedHolderErrors.lean:83:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-DROP: a drop of a mutable reference the function's caller lends is not supported at VerexE2ETests/Check/References/NestedHolderErrors.lean:88:5
+VerexE2ETests/Check/References/NestedHolderErrors.lean:94:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+VIR-SEMANTIC-BORROW-OVERWRITE: a mutable reference the function's caller lends cannot be overwritten at VerexE2ETests/Check/References/NestedHolderErrors.lean:100:5

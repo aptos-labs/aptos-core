@@ -1,0 +1,157 @@
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:6:3: error: the specification clause `ensures 2 * result == n * (n + 1)` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `rev_range_sum` failed; provide a proof in the module:
+  verify rev_range_sum by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:13:3: error: the specification clause `ensures n > 0 ==> result == 0` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:12:6: error: verex verification failed: the automatic verification of `rev_first` failed; provide a proof in the module:
+  verify rev_first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:17:3: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `rev_inclusive_count` failed; provide a proof in the module:
+  verify rev_inclusive_count by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:26:15: error: the loop invariant `iter.iter.pos == 0 && iter.iter.slice == values && iter.iter.end == values.length` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:23:6: error: verex verification failed: the automatic verification of `rev_slice_count` failed; provide a proof in the module:
+  verify rev_slice_count by lean =>
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:30:3: error: the specification clause `ensures values.length > 0 ==> result == values[0]` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:29:6: error: verex verification failed: the automatic verification of `rev_slice_first` failed; provide a proof in the module:
+  verify rev_slice_first by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:1: error: `no panic when aborts at call 1 of next` is not established: the call `for (i, _x) in values.iter().enumerate() {
+        total += i;
+    }` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:44:5 may panic
+  from: ↑values.values.size ≤ 1000; iter_result_0 = values ∧ iter_result_1.val = 0 ∧ iter_result_2.val = ↑values.values.size; (enumerate_result_0_0, enumerate_result_0_1, enumerate_result_0_2, ()) = (iter_result_0, iter_result_1, iter_result_2, ()) ∧ enumerate_result_1.val = 0; ((into_iter_result_0_0, into_iter_result_0_1, into_iter_result_0_2, ()), into_iter_result_1, ()) = ((enumerate_result_0_0, enumerate_result_0_1, enumerate_result_0_2, ()), enumerate_result_1, ()); iter_0_1.val ≤ iter_0_2.val; total.val ≤ iter_1.val * 1000; iter_0_2.val = ↑values.values.size; iter_0_1.val < iter_0_2.val ∧ iter_1.val = 18446744073709551615
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:1: error: `no panic when aborts at op 1` is not established: the operation `total += i` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:45:9 may panic
+  from: ↑values.values.size ≤ 1000; iter_result_0 = values ∧ iter_result_1.val = 0 ∧ iter_result_2.val = ↑values.values.size; (enumerate_result_0_0, enumerate_result_0_1, enumerate_result_0_2, ()) = (iter_result_0, iter_result_1, iter_result_2, ()) ∧ enumerate_result_1.val = 0; ((into_iter_result_0_0, into_iter_result_0_1, into_iter_result_0_2, ()), into_iter_result_1, ()) = ((enumerate_result_0_0, enumerate_result_0_1, enumerate_result_0_2, ()), enumerate_result_1, ()); iter_0_1.val ≤ iter_0_2.val; total.val ≤ iter_1.val * 1000; iter_0_2.val = ↑values.values.size; ¬(iter_0_1.val < iter_0_2.val ∧ iter_1.val = 18446744073709551615); variant✝ next_at_1_result = "Some" ↔ iter_0_1.val < iter_0_2.val; (variant✝ next_at_1_result = "Some" → ((Option.map VerexIR.Proofs.Denote.Var.here.select (VerexIR.Proofs.Denote.Which.here.there.project? next_at_1_result)).getD ({ val := 0, fits := ⋯ }, { val := 0, fits := ⋯ }, ())).fst.val = iter_1.val) ∧ (variant✝ next_at_1_result = "Some" → ((Option.map VerexIR.Proofs.Denote.Var.here.select (VerexIR.Proofs.Denote.Which.here.there.project? next_at_1_result)).getD ({ val := 0, fits := ⋯ }, { val := 0, fits := ⋯ }, ())).snd.fst = values.values[iter_0_1.val.toNat]?.getD { val := 0, fits := ⋯ }); VerexIR.IntegerValueFits (VerexIR.IntWidth.bits 64) true entry✝¹²; attempt_1._verexJoinEntry_1_16 prepared✝ «native_core::primitive::slice::iter» «native_core::iter::traits::iterator::Iterator::enumerate» «native_core::iter::traits::collect::<I as std::iter::IntoIterator>::into_iter» «native_core::iter::adapters::enumerate::<std::iter::Enumerate<I> as std::iter::Iterator>::next.at_1» values assumed permitted final recursive✝ loopHypothesis✝ iter_result_0 iter_result_1 enumerate_result_0_0 enumerate_result_1 into_iter_result_0_0 into_iter_result_1 iter_result_2 iter_ensures_1 enumerate_result_0_1 into_iter_result_0_1 enumerate_result_0_2 enumerate_ensures_1 into_iter_result_0_2 into_iter_ensures_1 fst✝¹² fst✝¹¹ fst✝¹⁰ fst✝⁹ total iter_1 iter_0_1 iter_0_2 invariant_1_3 invariant_2 invariant_1_2 next_at_1_result next_at_1_returns next_ensures_1 next_ensures_2 { val := entry✝¹², fits := entry✝¹¹ } (some values, some total, some ((entry✝¹⁰, entry✝⁹, entry✝⁸, ()), entry✝⁷, ()), some (((entry✝⁶, entry✝⁵, entry✝⁴, ()), entry✝³, ()), (entry✝², entry✝¹, entry✝, ()), entry, ()), some next_at_1_result, fst✝¹⁰, fst✝⁹, ()) final; (if 0 = entry✝¹² then some (some values, some total, some ((entry✝¹⁰, entry✝⁹, entry✝⁸, ()), entry✝⁷, ()), some (((entry✝⁶, entry✝⁵, entry✝⁴, ()), entry✝³, ()), (entry✝², entry✝¹, entry✝, ()), entry, ()), some next_at_1_result, fst✝¹⁰, fst✝⁹, ()) else none) = none; ((fst✝¹, fst✝, PUnit.unit), PUnit.unit).fst = (fst✝³, fst✝², PUnit.unit); (if 1 = entry✝¹² then some (some values, some total, some ((entry✝¹⁰, entry✝⁹, entry✝⁸, ()), entry✝⁷, ()), some (((entry✝⁶, entry✝⁵, entry✝⁴, ()), entry✝³, ()), (entry✝², entry✝¹, entry✝, ()), entry, ()), some next_at_1_result, fst✝¹⁰, fst✝⁹, ()) else none) = some (fst✝⁸, some val✝, fst✝⁷, fst✝⁶, some (Sum.inr (Sum.inl ((fst✝¹, fst✝, PUnit.unit), PUnit.unit))), fst✝⁵, fst✝⁴, PUnit.unit); ¬(0 ≤ val✝.val + fst✝³.val ∧ val✝.val + fst✝³.val ≤ 18446744073709551615)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:35:3: error: the specification clause `ensures result <= values.length * 1000` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:38:15: error: the loop invariant `total <= iter.count * 1000` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `enumerate_sum` failed; provide a proof in the module:
+  verify enumerate_sum by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of next => verex_prepare; sorry
+    | no_panic when aborts at op 1 => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | invariant_2_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:42:3: error: the specification clause `ensures result < values.length ==> values[result + 1] == target` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:40:6: error: verex verification failed: the automatic verification of `position` failed; provide a proof in the module:
+  verify position by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:51:3: error: the specification clause `ensures result < n * 1000` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:49:6: error: verex verification failed: the automatic verification of `enumerate_range` failed; provide a proof in the module:
+  verify enumerate_range by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:58:3: error: the specification clause `ensures result == n / 2` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:57:6: error: verex verification failed: the automatic verification of `count_steps` failed; provide a proof in the module:
+  verify count_steps by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:64:3: error: the specification clause `ensures n > 0 ==> result == 1` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:63:6: error: verex verification failed: the automatic verification of `first_step` failed; provide a proof in the module:
+  verify first_step by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:67:1: error: `no panic when aborts at call 1 of step_by` is not established: the call `(0..n).step_by(step)` at VerexE2ETests/SourceVerify/library_iter_adapters_errors.rs:82:20 may panic
+  from: step.val = 0
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:67:6: error: verex verification failed: the automatic verification of `no_step` failed; provide a proof in the module:
+  verify no_step by lean =>
+    verex_obligations
+    verex_on
+    | no_panic when aborts at call 1 of step_by => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:72:3: error: the specification clause `ensures result < entries.length ==> entries[result].value == key` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:70:6: error: verex verification failed: the automatic verification of `find_entry` failed; provide a proof in the module:
+  verify find_entry by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:80:3: error: the specification clause `ensures values.length > 0 ==> result == values.length - 1` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:79:6: error: verex verification failed: the automatic verification of `last_rank` failed; provide a proof in the module:
+  verify last_rank by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:83:3: error: the specification clause `ensures values.length > 0 ==> result == 0` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:82:6: error: verex verification failed: the automatic verification of `last_of_enumerated` failed; provide a proof in the module:
+  verify last_of_enumerated by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:87:3: error: the specification clause `ensures result < values.length ==> ∀ (k in 0 .. result), values[k] != target` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:86:6: error: verex verification failed: the automatic verification of `last_position` failed; provide a proof in the module:
+  verify last_position by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:94:3: error: the specification clause `ensures result == contains(values, target)` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:98:15: error: the loop invariant `∀ (k in 0 .. iter.iter.end), values[k] != target` is not established at entry
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:93:6: error: verex verification failed: the automatic verification of `rev_contains` failed; provide a proof in the module:
+  verify rev_contains by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | invariant_3_entry => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:101:3: error: the specification clause `ensures result == values.length + 1` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:100:6: error: verex verification failed: the automatic verification of `rev_ranks` failed; provide a proof in the module:
+  verify rev_ranks by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:110:3: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:108:6: error: verex verification failed: the automatic verification of `enumerate_inclusive` failed; provide a proof in the module:
+  verify enumerate_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

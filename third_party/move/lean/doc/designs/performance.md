@@ -89,6 +89,17 @@ downstream rebuild from 4m24s to 1m44s (`Solve.lean` 104 s → 28 s,
 `Verify.lean` 72 s → 14 s). Profile the compiler stages before touching
 proofs for build latency.
 
+### Rust differential evaluator
+
+The generic-closure branch of `VerexRust/Tests/DenoteEval.lean` carries dependent
+frame and capture certificates through the mutually recursive evaluator. Its
+scoped elaboration allowance is deliberate; it does not raise source-verification
+budgets or change how many inputs the differential suite executes. The before/after
+module compilation measurements, heartbeat counts, source revisions and command
+are recorded in [the build-cost artifact](../status/rust-denote-eval-build.json).
+The measurement includes Lean's C generation, but excludes C compilation and
+linking; it is not a differential-suite execution timing.
+
 ### Modules split for edits
 
 Lake rebuilds every importer of a changed module and compiles the C of the
@@ -375,6 +386,15 @@ In the order of expected gain:
 - **Carrier unfolding in `simp`**: instances stated at the row type would
   avoid the smart unfolding of `NTy.carrier`; a deeper change to
   `Types.lean`.
+
+For an existential containing an array lookup, witness search first tries
+positions whose elements a hypothesis states (`statedReads`, read by
+`verex_lookup_read`). This reaches the available read witness before unrelated
+integers and bounds can exhaust the search budget. Other existential shapes
+retain the late read-position fallback. The reads are computed once per
+context: a search asks for them per premise, and the scan walks every
+hypothesis. `LiteralOptionalReads` checks the ordering with a valid read and
+many unrelated certified integers.
 
 ### Fixed costs
 

@@ -604,6 +604,7 @@ theorem constValue?_hasType {tables : Tables} {literal : ConstValue}
               cases ty <;> simp_all [isFirstSliceConst, isFirstSliceType]
               exact .bytes typeId bs ty_eq
           | profile p => simp [constValue?] at value_eq
+          | «opaque» _ => simp [constValue?] at value_eq
           | vector elements =>
               simp only [constValue?] at value_eq
               cases out_eq : Array.mapM (fun x => constValue? x.val) elements.attach with

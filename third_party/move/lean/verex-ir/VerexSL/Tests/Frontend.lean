@@ -1129,9 +1129,9 @@ elab "#guard_verex_frontend" : command => do
   match VerexSL.Print.render env rustImplicitCopy with
   | .error error => throwError "the Rust implicit-copy fixture did not render: {error}"
   | .ok printed =>
-      unless printed.contains "tuple_first(pair : (u32, Bool)) -> u32 := pair[0u32]" &&
+      unless printed.contains "tuple_first(pair : (u32, Bool)) -> u32 := pair.0" &&
           printed.contains "vector_first(values : &Vector<u32>) -> u32 := values[0usize]" &&
-          !printed.contains "core.read(pair[0u32])" &&
+          !printed.contains "core.read(pair.0)" &&
           !printed.contains "*values[0usize]" do
         throwError "Rust scalar reads lost their implicit-copy spelling:\n{printed}"
       match VerexSL.Print.formatSource env printed with
@@ -1405,3 +1405,25 @@ run_cmd do
     | throwError "formatted post-only label did not parse"
   unless printed == again do
     throwError "post-only label formatting is not stable"
+
+-- Lifetime constraints survive the surface round trip, including forward
+-- references to another binder and the static region.
+run_cmd do
+  let env ← getEnv
+  let source := "verex namespace lifetime_bounds where\n" ++
+    "  fun shorten {a : lifetime outlives b, static} {b : lifetime}" ++
+    "(x : &[a] u32) -> &[b] u32 := x\n"
+  let printed ← match VerexSL.Print.formatSource env source with
+    | .ok printed => pure printed
+    | .error error => throwError "lifetime bounds did not format: {error}"
+  unless printed.contains "outlives b, static" do
+    throwError "lifetime bounds disappeared: {printed}"
+  let .ok again := VerexSL.Print.formatSource env printed
+    | throwError "lifetime bounds did not re-import"
+  unless printed == again do
+    throwError "lifetime bounds are not a formatting fixed point"
+  for bound in ["missing", "_"] do
+    let invalid := "verex namespace invalid_bound where\n" ++
+      "  fun f {a : lifetime outlives " ++ bound ++ "}() -> u32 := 0\n"
+    if (VerexSL.Print.formatSource env invalid).isOk then
+      throwError "invalid lifetime bound `{bound}` was accepted"
