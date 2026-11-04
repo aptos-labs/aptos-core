@@ -22,7 +22,7 @@ pub async fn get_docker() -> Result<Docker> {
 
     // We have to specify the type because the compiler can't figure out the error
     // in the case where the system is Unix.
-    let out: Result<(Docker, bollard::system::Version), bollard::errors::Error> =
+    let out: Result<(Docker, bollard::models::SystemVersion), bollard::errors::Error> =
         match docker.version().await {
             Ok(version) => Ok((docker, version)),
             Err(err) => {
