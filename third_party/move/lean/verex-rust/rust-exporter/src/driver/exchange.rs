@@ -148,6 +148,26 @@ pub(super) struct NamespaceRef {
 pub(super) struct QualifiedName {
     pub name: String,
     pub namespace_id: NamespaceId,
+    /// The module path the name is declared in, relative to its namespace.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) struct ScopeDecl {
+    pub kind: ScopeKind,
+    pub loc: LocId,
+    pub path: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) enum ScopeKind {
+    Module,
+    Inherent,
+    Implementation,
+    Trait,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -611,7 +631,11 @@ id_type!(BlockId);
     rename_all_fields = "camelCase"
 )]
 pub(super) enum RawBody {
-    Cfg { graph: RawCfg },
+    /// A dependency function's: its body is not exported.
+    Absent,
+    Cfg {
+        graph: RawCfg,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -670,7 +694,7 @@ pub(super) struct FunctionDecl {
     pub origin: OriginId,
     pub pragmas: Vec<UnsupportedNode>,
     pub profile: Profile,
-    pub profile_data: Vec<UnsupportedNode>,
+    pub profile_data: Vec<ProfileValue>,
     pub signature: Signature,
 }
 
@@ -696,7 +720,7 @@ pub(super) struct VariantDecl {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct StructDecl {
-    pub abilities: Vec<UnsupportedNode>,
+    pub abilities: Vec<Ability>,
     pub attributes: Vec<UnsupportedNode>,
     pub contract: FunctionContract,
     pub doc: String,
@@ -706,8 +730,43 @@ pub(super) struct StructDecl {
     pub loc: LocId,
     pub locals: Vec<UnsupportedNode>,
     pub name: NameId,
-    pub properties: Vec<UnsupportedNode>,
+    pub properties: Vec<ProfileValue>,
     pub variants: Vec<VariantDecl>,
+}
+
+/// A profile-owned value: here the Rust profile's `struct.opaque` property.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) struct ProfileValue {
+    pub payload: String,
+    pub profile: Profile,
+    pub tag: String,
+}
+
+/// A declaration's pragma: here `verify = false` on a dependency crate's
+/// namespace, which is not a verification target.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(super) enum Attribute {
+    Assign {
+        loc: Option<LocId>,
+        name: String,
+        value: AttributeValue,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    deny_unknown_fields,
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(super) enum AttributeValue {
+    Constant { value: ConstValue },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -729,9 +788,10 @@ pub(super) struct RawNamespace {
     pub loc: LocId,
     pub patterns: Vec<UnsupportedNode>,
     pub places: Vec<Place>,
-    pub pragmas: Vec<UnsupportedNode>,
+    pub pragmas: Vec<Attribute>,
     pub profile: Option<Profile>,
     pub profile_metadata: Vec<UnsupportedNode>,
+    pub scopes: Vec<ScopeDecl>,
     pub spec_functions: Vec<UnsupportedNode>,
     pub spec_vars: Vec<UnsupportedNode>,
     pub structs: Vec<StructDecl>,

@@ -4,5 +4,6 @@
 import VerexSL
 
 verex namespace slice where
-  fun first(values : &Vector<u32>) -> u32 :=
-    if values.length > 0usize then values[0usize] else panic()
+  fun first(values : &Vector<u32>) -> u32 := values[0usize]
+
+-- no denotation for `first`: the type of an expression is not carried by the denotation

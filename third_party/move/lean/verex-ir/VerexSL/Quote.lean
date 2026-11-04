@@ -151,6 +151,8 @@ deriving instance ToExpr for SpecVarDecl
 deriving instance ToExpr for NamespaceInvariant
 deriving instance ToExpr for IntrinsicBinding
 deriving instance ToExpr for IntrinsicDecl
+deriving instance ToExpr for ScopeKind
+deriving instance ToExpr for ScopeDecl
 deriving instance ToExpr for Namespace
 deriving instance ToExpr for FunctionBody
 deriving instance ToExpr for LoanDeath

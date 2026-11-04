@@ -1040,6 +1040,15 @@ mutual
     | .shiftRight => match values.toList with
         | [value, amount] => pure s!"({value}).wrapping_shr(({amount}) as u32)"
         | _ => throw "validated shift has wrong source arity"
+    -- Rust's operators panic where these do.
+    | .checkedAdd .panic => binary "+"
+    | .checkedSubtract .panic => binary "-"
+    | .checkedMultiply .panic => binary "*"
+    | .checkedDivide .panic => binary "/"
+    | .checkedModulo .panic => binary "%"
+    | .checkedShiftLeft .panic => binary "<<"
+    | .checkedShiftRight .panic => binary ">>"
+    | .checkedNegate .panic => unary "-"
     | .checkedAdd _ | .checkedSubtract _ | .checkedMultiply _ | .checkedModulo _ |
         .checkedDivide _ | .checkedShiftLeft _ | .checkedShiftRight _ | .checkedNegate _ |
         .checkedCast _ | .slice | .range | .implies | .equivalent |
@@ -1331,14 +1340,20 @@ mutual
                   pure <| if lines.isEmpty then "{}" else
                     "{\n" ++ indent (lineSep lines) ++ "\n}"
     | .letDecl pattern value body =>
-        let pattern ← patternText context loops pattern (fuel - 1)
+        let patternSource ← patternText context loops pattern (fuel - 1)
         let body ← exprText context loops body (fuel - 1)
         match value with
         | none => pure body
+        -- The element access that follows a bounds check implies it in Rust.
         | some value =>
-            let value ← exprText context loops value (fuel - 1)
-            let binding := s!"{pattern} = {value};"
-            pure <| "{\n" ++ indent binding ++ "\n" ++ indent body ++ "\n}"
+            if (context.ns.expressions[value.index]?).any fun checked =>
+                checked.kind matches .operation (.primitive (.checkVectorIndex .panic)) .. then
+              pure <| markExpressionTree context value
+                (markPatternTree context pattern body (fuel - 1)) (fuel - 1)
+            else
+              let value ← exprText context loops value (fuel - 1)
+              let binding := s!"{patternSource} = {value};"
+              pure <| "{\n" ++ indent binding ++ "\n" ++ indent body ++ "\n}"
     | .ifElse condition thenBranch elseBranch =>
         let condition ← exprText context loops condition (fuel - 1)
         let thenBranch ← exprText context loops thenBranch (fuel - 1)
@@ -1525,6 +1540,8 @@ def renderWithSourceMap (unit : ValidatedUnit) : Except String RenderedSource :=
     throw "standard Rust source backend requires a Rust-profile namespace"
   unless unit.dependencies.isEmpty && ns.imports.isEmpty do
     throw "standard Rust source backend does not yet reconstruct dependency imports"
+  unless ns.scopes.isEmpty do
+    throw "standard Rust source backend does not yet reconstruct scopes"
   unless ns.profileMetadata.isEmpty && ns.attributes.isEmpty && ns.pragmas.isEmpty do
     throw "standard Rust source backend does not yet reconstruct namespace semantic metadata"
   unless ns.constants.isEmpty && ns.traits.isEmpty &&

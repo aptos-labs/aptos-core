@@ -50,6 +50,9 @@ structure ImportResult where
   unit : VerexIR.Validation.ValidatedUnit
   receipt : ImportCacheReceipt
   cacheHit : Bool
+  /-- The directory the unit's relative source names are relative to: the
+  workspace root of a Cargo import, whose compiler reads sources from there. -/
+  sourceRoot : Option System.FilePath := none
 
 /-- An imported Rust unit admitted by the executable semantic boundary. The
 validated unit is retained so source/proof consumers can share declaration and
@@ -111,6 +114,7 @@ private structure CargoMetadata where
   raw : String
   crateName : String
   localRoots : Array System.FilePath
+  workspaceRoot : System.FilePath
 
 private structure Exporter where
   binary : System.FilePath
@@ -346,7 +350,8 @@ private def parseCargoMetadata (text package : String) : Except String CargoMeta
           crateName := some (← (← targetJson.getObjVal? "name").getStr?)
   let some selectedCrateName := crateName
     | throw s!"Cargo metadata has no library target for package `{package}`"
-  pure { raw := text, crateName := selectedCrateName, localRoots }
+  let workspaceRoot ← json.getObjValAs? String "workspace_root"
+  pure { raw := text, crateName := selectedCrateName, localRoots, workspaceRoot }
 
 private def cargoMetadata (request : CargoImportRequest) (exporter : Exporter) : IO CargoMetadata := do
   let mut arguments := #["metadata", "--format-version=1", "--locked",
@@ -407,7 +412,7 @@ def importCargoCrate (request : CargoImportRequest) : IO ImportResult := do
       inputIdentity := s!"{manifest}#{request.package}"
       cacheKey := key
       artifactHash := hash }
-    return { unit, receipt, cacheHit := true }
+    return { unit, receipt, cacheHit := true, sourceRoot := metadata.workspaceRoot }
   let libraryPath ← exporterLibraryPath exporter.root
   let inheritedLibraryPath ← IO.getEnv "LD_LIBRARY_PATH"
   let libraryPath := inheritedLibraryPath.map (libraryPath ++ ":" ++ ·) |>.getD libraryPath
@@ -443,6 +448,6 @@ def importCargoCrate (request : CargoImportRequest) : IO ImportResult := do
       inputIdentity := s!"{manifest}#{request.package}"
       cacheKey := key
       artifactHash := hash }
-    pure { unit, receipt, cacheHit := false }
+    pure { unit, receipt, cacheHit := false, sourceRoot := metadata.workspaceRoot }
 
 end VerexIR.Rust.Driver

@@ -85,7 +85,7 @@ source does not show is in the status directory.
 |---|---|
 | [`doc/user/`](doc/user/) | The Verex Book: concise user documentation for VerexSL and the proof language, for expert users; not a replacement for the designs. |
 | [`doc/designs/`](doc/designs/) | The current designs (below). |
-| [`doc/plan/`](doc/plan/) | [`roadmap.md`](doc/plan/roadmap.md): what is open, by track, in priority order. Approved but unscheduled plans beside it ([`native-function-values.md`](doc/plan/native-function-values.md), [`unsafe-pointers.md`](doc/plan/unsafe-pointers.md)). |
+| [`doc/plan/`](doc/plan/) | [`roadmap.md`](doc/plan/roadmap.md): what is open, by track, in priority order. An approved but unscheduled plan beside it ([`native-function-values.md`](doc/plan/native-function-values.md)). |
 | [`doc/status/`](doc/status/) | [`prover-test-problems.md`](doc/status/prover-test-problems.md): what the Move Prover's tests show under Verex and why; [`assumptions.md`](doc/status/assumptions.md): the hypotheses of the public theorems nothing discharges; [`measurement-debts.md`](doc/status/measurement-debts.md); [`verification-benchmarks.md`](doc/status/verification-benchmarks.md): the nightly benchmark and its history. |
 | [`doc/historical/`](doc/historical/) | Executed or superseded designs, kept for their rationale, not updated. |
 | [`doc/talk/`](doc/talk/) | Talk sources and PDFs. |
@@ -101,6 +101,7 @@ Designs:
 - [`source-verification.md`](doc/designs/source-verification.md): `verex-move verify` / `verex-rust verify` / `move prove --lean`, proof files, pragmas, message mapping.
 - [`verex-sl.md`](doc/designs/verex-sl.md): the profile-aware Verex source language.
 - [`prophetic-references.md`](doc/designs/prophetic-references.md): the prophecy ownership model of references.
+- [`unsafe-pointers.md`](doc/designs/unsafe-pointers.md): raw pointers and checked memory beside the prophetic model: typed and byte allocations, `transmute` and unions, minted references as memory loans, what unsafe Rust is allowed, MonoVM's unsafe code mapped.
 - [`static-memory.md`](doc/designs/static-memory.md): one typed memory per resource type.
 - [`intrinsic-maps.md`](doc/designs/intrinsic-maps.md): the abstract map value of intrinsic map types, roles, validity, typed map lemmas.
 - [`ghost-fields.md`](doc/designs/ghost-fields.md): ghost fields and validity slots.
@@ -218,7 +219,9 @@ before a commit. Between edit batches, run the smoke
 suite described in [`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skills/verex-smoke/SKILL.md):
 `scripts/smoke.sh` builds in place and runs the fixtures that catch this
 stack's regressions, read-only against their `.exp`, with one pass/fail line
-each; it refuses `UB=1`. Green smoke is not a commit gate.
+each; it refuses `UB=1`. Green smoke is not a commit gate. For a change on the
+Rust path, `scripts/smoke.sh --rust` runs the Rust renderings and verified
+fixtures, the `verex-rust` suite and a small Move canary, in about 15 s warm.
 
 While iterating, build libraries, not executables: `lake build` in
 `verex-ir`, `lake build VerexMove` in `verex-move`, and `lake build

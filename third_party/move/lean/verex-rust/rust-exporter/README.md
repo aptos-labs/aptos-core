@@ -46,6 +46,27 @@ round-trip through both canonical source backends as non-semantic provenance.
 Artifact mode forces `-Cpanic=abort` after the supplied rustc arguments so its
 declared initial Rust profile cannot disagree with the body rustc analyzed.
 
+A crate is one namespace and its modules are scopes of it:
+`tests/raw-unit/modules.rs` names each function and type in the module path
+it is declared in, and the namespace declares those modules at their
+declarations. An associated function is named in the scope of its type
+(inherent impl), trait, or trait impl (`<Token as std::ops::Drop>` in
+`drop.rs`). Rustc Public does not say which definitions are modules, so a
+module is an enclosing definition that is neither a body nor the impl or trait
+of an associated item.
+
+`tests/raw-unit/dependency_types.rs` reaches `Option`, `Result`, and `Vec`:
+each dependency crate is a namespace after the crate's, stating
+`verify = false`, with the types the crate reaches. A type whose shape a body
+observes (constructs, matches, or projects) carries it; any other is opaque,
+marked `struct.opaque`. Dependency declarations have generated locations
+naming their definitions, since the unit does not record the toolchain's
+sources. `tests/raw-unit/dependency_calls.rs` calls dependency functions:
+each call is resolved as codegen resolves it (a trait method on a concrete
+type reaches its impl's method), and each called dependency function is
+declared by its generic signature without its body. A signature naming an
+associated type is rejected (`tests/fixtures/dependency_projection.rs`).
+
 `tests/fixtures/generic.rs` exercises the same callback with one generic trait
 body. The probe checks that it remains one unspecialized body and observes the
 core trait declaration, trait predicate, and direct `Step::step` callee.

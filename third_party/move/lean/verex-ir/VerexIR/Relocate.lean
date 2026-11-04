@@ -27,7 +27,7 @@ deriving instance Remap for
   ParameterFrame, FunctionContract, ConstantDecl, FieldDecl, VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl,
   AssociatedItemKind, AssociatedItemDecl, TraitDecl, AssociatedItemValue,
   AssociatedItemBinding, ImplDecl, SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant,
-  IntrinsicBinding, IntrinsicDecl, Namespace
+  IntrinsicBinding, IntrinsicDecl, ScopeKind, ScopeDecl, Namespace
 
 namespace Validation
 

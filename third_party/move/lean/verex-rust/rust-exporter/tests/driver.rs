@@ -45,6 +45,26 @@ fn run_fixture(name: &str) -> String {
     String::from_utf8(output.stderr).expect("exporter diagnostics are UTF-8")
 }
 
+/// Export a fixture as RawUnit JSON, expecting the export to fail; returns
+/// the exporter's diagnostics.
+fn export_failure(name: &str) -> String {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name);
+    let output = Command::new(env!("CARGO_BIN_EXE_verex-rust-export"))
+        .env("LD_LIBRARY_PATH", sysroot_library_path())
+        .args(["--output", "-", "--"])
+        .arg(fixture)
+        .args(["--crate-type=lib", "--edition=2024"])
+        .output()
+        .expect("run the Rustc Public exporter");
+    assert!(
+        !output.status.success(),
+        "exporter unexpectedly succeeded for {name}"
+    );
+    String::from_utf8(output.stderr).expect("exporter diagnostics are UTF-8")
+}
+
 fn update_baseline() -> bool {
     ["UPDATE_BASELINE", "UPBL", "UB"].iter().any(|name| {
         env::var(name)
@@ -199,4 +219,11 @@ fn observes_the_initial_mir_corpus_capabilities() {
 fn observes_unsupported_inline_assembly() {
     let output = run_fixture("unsupported.rs");
     assert!(output.contains("inline_asm=1"), "{output}");
+}
+
+#[test]
+fn rejects_a_dependency_signature_naming_an_associated_type() {
+    let output = export_failure("dependency_projection.rs");
+    assert!(output.contains("names the associated type"), "{output}");
+    assert!(output.contains("Index"), "{output}");
 }

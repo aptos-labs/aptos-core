@@ -19,7 +19,7 @@ version. A decoder must validate this value before constructing `RawUnit`.
 The defaults are the current version, which the codec and validation read. -/
 structure Version where
   major : Nat := 1
-  minor : Nat := 6
+  minor : Nat := 7
   deriving Repr, BEq, Inhabited
 
 /-- MIR unwind behavior detached from compiler-local block identities. -/
@@ -125,6 +125,8 @@ structure RawNamespaceInterface where
   /-- Specification-function signatures this namespace exports, likewise
   without bodies. -/
   specFunctions : Array SpecFunctionDecl := #[]
+  /-- The scopes its names are declared in, each after its parent. -/
+  scopes : Array ScopeDecl := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Unit-wide statement about an upstream producer, check, or assumption.

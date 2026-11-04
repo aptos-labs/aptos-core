@@ -100,6 +100,8 @@ def testBaselines : IO Unit := do
       if source.extension == some "move" && (← proofFile.pathExists) then
         Baseline.checkOutput (source.withExtension "proof.exp")
           (← editorReportsOf environment proofFile)
+    -- A selection of fixtures names sources alone.
+    if (← Baseline.selectedFixtures).isSome then return
     testStaleRendering environment directory
     for (name, package) in packages do
       let reports ← Baseline.withStagedDirectory package (directory / name)

@@ -8,6 +8,7 @@ import VerexSL.Modifiers
 import VerexSL.Profile
 import VerexSL.Reserved
 import VerexSL.Print.Layout
+import VerexSL.Print.Temporaries
 
 /-!
 # Canonical VerexSL source backend
@@ -100,7 +101,8 @@ private def fitsIndentedLine (value : String) : Bool :=
 
 
 
-private def sourceIdentifier (value : String) : String :=
+/-- A declaration's or scope's name as VerexSL source spells it. -/
+def sourceIdentifier (value : String) : String :=
   let value := if value.startsWith "$" then
       "_" ++ (value.drop 1).toString
     else if value.startsWith "'" then
@@ -808,6 +810,20 @@ private def isDivergingExpression (ns : ValidatedNamespace) (id : ExprId) : Bool
   | some expression => ns.tables.types[expression.typeId.index]? == some .never
   | none => false
 
+/-- Whether every path through an expression returns or panics. -/
+private partial def leavesOnEveryPath (ns : ValidatedNamespace) (id : ExprId) : Bool :=
+  match ns.expressions[id.index]? with
+  | some { kind := .return_ .., .. } | some { kind := .throw_ .., .. } => true
+  | some { kind := .block statements result, .. } =>
+      (statements ++ result.toArray).any (leavesOnEveryPath ns)
+  | some { kind := .letDecl _ value body, .. } =>
+      value.any (leavesOnEveryPath ns) || leavesOnEveryPath ns body
+  | some { kind := .ifElse _ thenBranch (some elseBranch), .. } =>
+      leavesOnEveryPath ns thenBranch && leavesOnEveryPath ns elseBranch
+  | some { kind := .match_ _ arms, .. } =>
+      !arms.isEmpty && arms.all (leavesOnEveryPath ns ·.body)
+  | _ => false
+
 /-- A control-flow expression used as an operand needs delimiters: operators,
 casts, and indexing all bind tighter than `if`, `match`, or a block. -/
 private def parenthesizedOperand (ns : ValidatedNamespace) (id : ExprId)
@@ -1073,6 +1089,9 @@ private structure Context where
   /-- Locals declared without initializer (`let mut x : T`), which are
   assigned as themselves, never substituted as compiler temporaries. -/
   declaredLocals : Array LocalId := #[]
+  /-- How often the function body reads and writes each local, which decides
+  where a compiler temporary may be written as its value. -/
+  uses : Temporaries.Uses := { reads := #[], writes := #[] }
   /-- Iterator whose canonical `for` body is currently being rendered.  It
   lets the source backend hide the increment inserted before a current-level
   `continue` by the surface lowerer. -/
@@ -1281,18 +1300,6 @@ private def selectionNeedsParentheses (context : Context) (value : VerexIR.Expr)
   | .operation (.reference .dereference) _ _ _ =>
       context.ns.profile != some Profile.move
   | _ => false
-
-/-- A compiler temporary subsequently used as the base of a place projection
-must remain storage. Substituting its value textually would turn, for example,
-`copy(*temporary)` into the invalid place `copy(*copy(value.field))`.
-Constants and temporaries consumed only as values remain safe to unfold. -/
-private def requiresTemporaryStorage (context : Context) (localId : LocalId) : Bool :=
-  context.ns.places.any fun place =>
-    let base? := match place with
-      | .deref base | .field base .. | .ghostField base .. | .index base _ | .subslice base .. |
-          .downcast base _ => some base
-      | .localVar _ => none
-    base?.any fun base => context.ns.places[base.index]? == some (.localVar localId)
 
 /-- The reborrow `&mut *local` of a local that holds a mutable reference:
 how validation spells a mutable reference copied into a call, which the
@@ -1572,7 +1579,8 @@ private partial def indexesChecked (context : Context) (fuel : Nat) (collection 
   | 0, _ | _, none => false
   | fuel + 1, some expression =>
     let direct := match expression.kind with
-      | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _ =>
+      | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _
+      | .operation (.copy place) _ _ _ | .operation (.move place) _ _ _ =>
           placeUnderCheck context collection index place
       -- An assignment evaluates its value before it resolves the place
       -- (`assignValue`), and the lowering of index sugar binds a value that is
@@ -1756,6 +1764,14 @@ private def placeContainsIndex (ns : ValidatedNamespace) : Nat → PlaceId → B
         some (.subslice base ..) => placeContainsIndex ns fuel base
     | _ => false
 
+/-- The place a projection's text is spelled on: a downcast has no spelling,
+so the place under it decides the delimiters. -/
+private def spelledPlace? (ns : ValidatedNamespace) (place : PlaceId) : Nat → Option VerexIR.Place
+  | 0 => none
+  | fuel + 1 => match ns.places[place.index]? with
+    | some (.downcast inner _) => spelledPlace? ns inner fuel
+    | other => other
+
 private partial def placeText (context : Context)
     (indexText : ExprId → Except String String) (id : PlaceId)
     (fuel : Nat := 0) : Except String String := do
@@ -1804,7 +1820,7 @@ private partial def placeText (context : Context)
       let baseText := if context.ns.profile == some .move then
           (borrowedReferentText? baseText).getD baseText
         else baseText
-      let baseText := match context.ns.profile, context.ns.places[base.index]? with
+      let baseText := match context.ns.profile, spelledPlace? context.ns base fuel with
         | some .move, some (.deref _) => baseText
         | _, some (.deref _) => s!"({baseText})"
         | _, _ => baseText
@@ -2056,69 +2072,6 @@ private def forwardedValue? (ns : ValidatedNamespace) (statements : Array ExprId
   let targetLocal ← localPlace? ns target
   if returnedLocal == targetLocal then some value else none
 
-/-- One rustc checked-arithmetic operation is represented in optimized MIR as
-an overflowing tuple, a test of tuple field `1`, and a panic branch returning
-tuple field `0` on success.  Keep that administrative shape out of canonical
-VerexSL while retaining its overflow-as-panic semantics. -/
-private structure CheckedArithmeticShape where
-  operation : PrimitiveOperation
-  arguments : Array ExprId
-  priorAssignments : Array (LocalId × ExprId)
-
-private def loadedIndexedLocal? (ns : ValidatedNamespace) (id : ExprId) :
-    Option (LocalId × Int) := do
-  let place ← loadedPlace? ns id
-  let .index base index ← ns.places[place.index]? | none
-  let .localVar localId ← ns.places[base.index]? | none
-  let indexExpr ← ns.expressions[index.index]?
-  let .value (.integer value) _ := indexExpr.kind | none
-  pure (localId, value)
-
-private partial def returnedValue? (ns : ValidatedNamespace) (id : ExprId)
-    (fuel : Nat) : Option ExprId := do
-  if fuel == 0 then none else
-  let expression ← ns.expressions[id.index]?
-  match expression.kind with
-  | .return_ #[value] => some value
-  | .block statements result =>
-      (forwardedValue? ns statements result).orElse fun _ => do
-        guard statements.isEmpty
-        returnedValue? ns (← result) (fuel - 1)
-  | .letDecl _ _ body => returnedValue? ns body (fuel - 1)
-  | _ => none
-
-private def checkedArithmeticShape? (context : Context) (statements : Array ExprId)
-    (result : Option ExprId) : Option CheckedArithmeticShape := do
-  guard (context.ns.profile == some .rust)
-  let resultExpr ← context.ns.expressions[(← result).index]?
-  let .ifElse condition failure (some success) := resultExpr.kind | none
-  let failureExpr ← context.ns.expressions[failure.index]?
-  let .throw_ .panic #[] := failureExpr.kind | none
-  let (overflowLocal, overflowIndex) ← loadedIndexedLocal? context.ns condition
-  guard (overflowIndex == 1)
-  let successValue ← returnedValue? context.ns success (context.ns.expressions.size + 1)
-  let (valueLocal, valueIndex) ← loadedIndexedLocal? context.ns successValue
-  guard (valueLocal == overflowLocal && valueIndex == 0)
-  let assignmentId ← statements.back?
-  let assignment ← context.ns.expressions[assignmentId.index]?
-  let .assign target value := assignment.kind | none
-  guard (localPlace? context.ns target == some overflowLocal)
-  let valueExpr ← context.ns.expressions[value.index]?
-  let .operation (.primitive overflowing) #[] arguments _ := valueExpr.kind | none
-  let operation ← match overflowing with
-    | .overflowingAdd => some (.checkedAdd .panic)
-    | .overflowingSubtract => some (.checkedSubtract .panic)
-    | .overflowingMultiply => some (.checkedMultiply .panic)
-    | _ => none
-  let preceding := statements.extract 0 (statements.size - 1)
-  let priorAssignments ← preceding.mapM fun statement => do
-    let statementExpr ← context.ns.expressions[statement.index]?
-    let .assign priorTarget priorValue := statementExpr.kind | none
-    let priorLocal ← localPlace? context.ns priorTarget
-    guard (compilerTemporaryLocal? context priorLocal)
-    pure (priorLocal, priorValue)
-  pure { operation, arguments, priorAssignments }
-
 mutual
   private partial def assignedValueToLocal? (ns : ValidatedNamespace) (node : ExprId)
       (targetLocal : LocalId) (fuel : Nat) : Option ExprId := do
@@ -2233,13 +2186,48 @@ private partial def firstWriteSequential? (ns : ValidatedNamespace) (node : Expr
         !value.any (writesLocal? ns · targetLocal (fuel - 1)) &&
           firstWriteSequential? ns body targetLocal (fuel - 1)
     | _ => false
+/-- Whether folding a region into the value it assigns to `targetLocal`
+keeps the region's behavior: each statement assigns a compiler temporary that
+may be written where it is read, except the last, which assigns
+`targetLocal`, and what follows only returns or continues with that value. -/
+private partial def foldableRegion (context : Context) (node : ExprId)
+    (targetLocal : LocalId) : Bool :=
+  let ns := context.ns
+  let assigned (id : ExprId) : Option (LocalId × ExprId) := do
+    let .assign target value := (← ns.expressions[id.index]?).kind | none
+    pure (← localPlace? ns target, value)
+  let returnsTarget (id : ExprId) : Bool :=
+    match ns.expressions[id.index]? with
+    | some { kind := .return_ #[returned], .. } =>
+        ((loadedPlace? ns returned).bind (localPlace? ns)) == some targetLocal
+    | _ => false
+  match ns.expressions[node.index]? with
+  | some { kind := .assign target _, .. } => localPlace? ns target == some targetLocal
+  | some { kind := .block statements result, .. } =>
+      let lastAssignsTarget := statements.back?.any fun last =>
+        (assigned last).any (·.1 == targetLocal)
+      let statementsFold := statements.zipIdx.all fun (statement, index) =>
+        match assigned statement with
+        | some (localId, value) =>
+            if localId == targetLocal then index + 1 == statements.size
+            else compilerTemporaryLocal? context localId &&
+              Temporaries.substitutable ns context.uses statements result index localId value
+        | none => false
+      statementsFold && match result with
+        | none => lastAssignsTarget
+        | some result =>
+            if lastAssignsTarget then returnsTarget result
+            else statements.isEmpty && foldableRegion context result targetLocal
+  | _ => false
+
 /-- rustc's return place is assigned in both sides of a branch before the
 continuation returns it.  Recover the source conditional instead of leaking
 the undeclared MIR return local into VerexSL. -/
-private def forwardedConditional? (ns : ValidatedNamespace)
+private def forwardedConditional? (context : Context)
     (statements : Array ExprId) (result : Option ExprId) :
     Option (ExprId × ExprId × Array (LocalId × ExprId) ×
       ExprId × Array (LocalId × ExprId)) := do
+  let ns := context.ns
   let [statementId] := statements.toList | none
   let statement ← ns.expressions[statementId.index]?
   let .ifElse condition thenBranch (some elseBranch) := statement.kind | none
@@ -2248,6 +2236,8 @@ private def forwardedConditional? (ns : ValidatedNamespace)
   let .return_ #[returned] := result.kind | none
   let returnedPlace ← loadedPlace? ns returned
   let returnedLocal ← localPlace? ns returnedPlace
+  guard (foldableRegion context thenBranch returnedLocal &&
+    foldableRegion context elseBranch returnedLocal)
   let fuel := ns.expressions.size + 1
   let thenValue ← assignedValueToLocal? ns thenBranch returnedLocal fuel
   let elseValue ← assignedValueToLocal? ns elseBranch returnedLocal fuel
@@ -2258,9 +2248,10 @@ private def forwardedConditional? (ns : ValidatedNamespace)
 /-- rustc lowers a value-producing `match` to a unit-valued switch whose arms
 assign the MIR return place, followed by a read of that place. Recover the
 value-producing source match so compiler-private `_0` never escapes. -/
-private def forwardedMatch? (ns : ValidatedNamespace)
+private def forwardedMatch? (context : Context)
     (statements : Array ExprId) (result : Option ExprId) :
-    Option (ExprId × Array (MatchArm × ExprId)) := do
+    Option (ExprId × Array (MatchArm × ExprId × Array (LocalId × ExprId))) := do
+  let ns := context.ns
   let [statementId] := statements.toList | none
   let statement ← ns.expressions[statementId.index]?
   let .match_ scrutinee arms := statement.kind | none
@@ -2270,12 +2261,22 @@ private def forwardedMatch? (ns : ValidatedNamespace)
   -- A switch arm may fall through to a shared MIR continuation which assigns
   -- the return place.  That continuation is the value of every arm which
   -- does not assign the place itself (notably a wildcard/default arm).
-  let continuationValue? := assignedValueToLocal? ns resultId returnedLocal fuel
+  let continuation? : Option (ExprId × Array (LocalId × ExprId)) := do
+    guard (foldableRegion context resultId returnedLocal)
+    pure (← assignedValueToLocal? ns resultId returnedLocal fuel,
+      (assignmentsBeforeLocal? ns resultId returnedLocal fuel).getD #[])
   let arms ← arms.mapM fun arm => do
-    let value ← (assignedValueToLocal? ns arm.body returnedLocal fuel).orElse fun _ =>
-      if writesLocal? ns arm.body returnedLocal fuel then some arm.body
-      else continuationValue?
-    pure (arm, value)
+    if foldableRegion context arm.body returnedLocal then
+      let value ← assignedValueToLocal? ns arm.body returnedLocal fuel
+      pure (arm, value, (assignmentsBeforeLocal? ns arm.body returnedLocal fuel).getD #[])
+    -- An arm that leaves on every path is its own value: its returns, in
+    -- the arm's tail, give the match's value.
+    else if leavesOnEveryPath ns arm.body then
+      pure (arm, arm.body, #[])
+    else
+      guard (ns.expressions[arm.body.index]?.any (·.kind matches .block #[] none))
+      let (value, assignments) ← continuation?
+      pure (arm, value, assignments)
   pure (scrutinee, arms)
 
 /-- rustc lowers a source `while condition { body }` whose continuation
@@ -2865,6 +2866,128 @@ private def uninitializedLocals (context : Context) (pattern : PatternId) (body 
       active := { active with declaredLocals := active.declaredLocals.push localId }
   return (declarations, active)
 
+/-- How control leaves a region, for each way whether a write of a local may
+have happened: normally, by `break`, or by `continue`, the last two with the
+loop depth relative to the region. -/
+private structure WrittenExits where
+  normal : Option Bool := none
+  breaks : Array (Nat × Bool) := #[]
+  continues : Array (Nat × Bool) := #[]
+  deriving Inhabited
+
+private def WrittenExits.merge (left right : WrittenExits) : WrittenExits where
+  normal := match left.normal, right.normal with
+    | some left, some right => some (left || right)
+    | some written, none | none, some written => some written
+    | none, none => none
+  breaks := left.breaks ++ right.breaks
+  continues := left.continues ++ right.continues
+
+/-- How control leaves `node` entered with `written`, after which writes of
+`targetLocal`. -/
+private partial def writtenExits (ns : ValidatedNamespace) (targetLocal : LocalId)
+    (written : Bool) (node : ExprId) : WrittenExits :=
+  let sequence (written : Bool) (items : Array ExprId) : WrittenExits :=
+    items.foldl (init := { normal := some written }) fun exits item =>
+      match exits.normal with
+      | none => exits
+      | some written =>
+          let next := writtenExits ns targetLocal written item
+          { next with
+            breaks := exits.breaks ++ next.breaks
+            continues := exits.continues ++ next.continues }
+  match ns.expressions[node.index]? with
+  | none => { normal := some written }
+  | some expression => match expression.kind with
+    | .assign target value =>
+        let exits := writtenExits ns targetLocal written value
+        { exits with normal := exits.normal.map fun written =>
+            written || localPlace? ns target == some targetLocal }
+    | .assignPattern pattern value =>
+        let exits := writtenExits ns targetLocal written value
+        { exits with normal := exits.normal.map fun written =>
+            written || patternBindsLocal? ns pattern targetLocal (ns.patterns.size + 1) }
+    | .block statements result => sequence written (statements ++ result.toArray)
+    | .letDecl _ value body => sequence written (value.toArray.push body)
+    | .operation _ _ arguments _ => sequence written arguments
+    | .ifElse condition thenBranch elseBranch =>
+        let afterCondition := writtenExits ns targetLocal written condition
+        match afterCondition.normal with
+        | none => afterCondition
+        | some written =>
+            let branches := (writtenExits ns targetLocal written thenBranch).merge <|
+              match elseBranch with
+              | some elseBranch => writtenExits ns targetLocal written elseBranch
+              | none => { normal := some written }
+            { branches with
+              breaks := afterCondition.breaks ++ branches.breaks
+              continues := afterCondition.continues ++ branches.continues }
+    | .match_ scrutinee arms =>
+        let afterScrutinee := writtenExits ns targetLocal written scrutinee
+        match afterScrutinee.normal with
+        | none => afterScrutinee
+        | some written =>
+            let armExits := arms.map fun arm =>
+              sequence written (arm.guard.toArray.push arm.body)
+            let merged := armExits.foldl (init := ({} : WrittenExits)) WrittenExits.merge
+            { merged with
+              breaks := afterScrutinee.breaks ++ merged.breaks
+              continues := afterScrutinee.continues ++ merged.continues }
+    | .loop _ body =>
+        -- A write in one iteration reaches the next through `continue`.
+        let first := writtenExits ns targetLocal written body
+        let carried := written || first.continues.any fun (depth, written) =>
+          depth == 0 && written
+        let body := if carried == written then first
+          else writtenExits ns targetLocal carried body
+        { normal := body.breaks.foldl (init := none) fun normal (depth, written) =>
+            if depth != 0 then normal
+            else some (normal.getD false || written)
+          breaks := body.breaks.filterMap fun (depth, written) =>
+            if depth == 0 then none else some (depth - 1, written)
+          continues := body.continues.filterMap fun (depth, written) =>
+            if depth == 0 then none else some (depth - 1, written) }
+    | .break_ depth value =>
+        let exits := sequence written value.toArray
+        match exits.normal with
+        | none => exits
+        | some written => { exits with normal := none, breaks := exits.breaks.push (depth, written) }
+    | .continue_ depth => { continues := #[(depth, written)] }
+    | .return_ values | .throw_ _ values =>
+        { sequence written values with normal := none }
+    | _ => { normal := some written }
+
+/-- Whether `node` writes `targetLocal` on a path that then completes `node`
+normally, so that code after `node` can read the value written; a write
+followed by a `return`, a panic, or a `continue` cannot. -/
+private def writeEscapes (ns : ValidatedNamespace) (node : ExprId) (targetLocal : LocalId) :
+    Bool :=
+  (writtenExits ns targetLocal false node).normal == some true
+
+/-- The compiler temporaries a statement writes inside its branches and code
+after it reads: declared before the statement, `let mut x : T`, so that its
+branches assign them and the later reads see them. A temporary an earlier
+statement of the block writes is bound there. -/
+private def branchDeclarations (context : Context) (earlier : Array ExprId)
+    (statement : ExprId) : Except String (Array String × Context) := do
+  let inner := Temporaries.Uses.of context.ns context.locals.size statement
+  let mut declarations := #[]
+  let mut active := context
+  for localId in context.temporaryLocals do
+    let readOutside := context.uses.reads[localId.index]?.getD 0 >
+      inner.reads[localId.index]?.getD 0
+    let writtenEarlier := earlier.any fun previous =>
+      writesLocal? context.ns previous localId (context.ns.expressions.size + 1)
+    if readOutside && !writtenEarlier && writeEscapes context.ns statement localId then
+      let some localDecl := context.locals[localId.index]?
+        | throw s!"VerexSL source references missing local {localId.index}"
+      let type ← typeText context.unit context.ns context.binders localDecl.type.typeId
+      declarations := declarations.push s!"let mut {← localName context localId} : {type}"
+      active := { active with
+        temporaryLocals := active.temporaryLocals.filter (· != localId)
+        declaredLocals := active.declaredLocals.push localId }
+  return (declarations, active)
+
 /-- The holder of a computed reference that one assignment writes through as
 a place, `let $t := e; (*$t).f := v`, which spells `e.f := v`. The holder
 roots the place through field projections and appears nowhere else. -/
@@ -2897,6 +3020,13 @@ private def referenceMutationText (context : Context) (referenceId : ExprId)
       selectsFieldThroughReference context referenceId then
     s!"{reference} := {value}"
   else s!"*({reference}) := {value}"
+
+/-- The value a folded `return` region gives: bare in tail position, else
+returned, delimited when it spans lines so that a following separator belongs
+to the `return`. -/
+private def returnedText (tailPosition : Bool) (value : String) : String :=
+  if tailPosition then value
+  else s!"return {if value.contains '\n' then s!"({value})" else value}"
 
 private partial def expressionText (context : Context) (id : ExprId)
     (fuel : Nat) (tailPosition : Bool := false) (statementPosition : Bool := false) :
@@ -3771,23 +3901,13 @@ private partial def expressionText (context : Context) (id : ExprId)
           else s!"{head}\n{indent s!"{loopBody}{statementTerminator context.ns loopBodyId loopBody}"}"
         let returned ← expressionText context returned (fuel - 1) true
         return s!"do\n{indent (lines #[whileText, s!"return {returned}"])}"
-      else if let some checked := checkedArithmeticShape? context statements result then
-        let active ← checked.priorAssignments.foldlM (init := context)
-          fun active (localId, valueId) => do
-            let value ← expressionText active valueId (fuel - 1)
-            let value := parenthesizedOperand active.ns valueId value
-            pure { active with
-              constantLocals := active.constantLocals.push (localId, value) }
-        let arguments ← checked.arguments.mapM
-          (expressionText active · (fuel - 1))
-        return s!"core.prim.{← primitiveText checked.operation}({commaSep arguments})"
       else if let some value := forwardedValue? context.ns statements result then
-        return ← expressionText context value (fuel - 1) true
+        return returnedText tailPosition (← expressionText context value (fuel - 1) true)
       -- Folding absorbs the branches' assignments, so only a temporary's
       -- may be absorbed: a declared local is assigned as itself.
       else if let some (condition, thenValue, thenAssignments,
           elseValue, elseAssignments) :=
-          (forwardedConditional? context.ns statements result).filter
+          (forwardedConditional? context statements result).filter
             fun (_, _, thenAssignments, _, elseAssignments) =>
               (thenAssignments ++ elseAssignments).all
                 (compilerTemporaryLocal? context ·.1) then
@@ -3803,21 +3923,25 @@ private partial def expressionText (context : Context) (id : ExprId)
         let condition ← expressionText context condition (fuel - 1)
         let thenValue ← renderForwarded thenValue thenAssignments
         let elseValue ← renderForwarded elseValue elseAssignments
-        return s!"if {condition} then {thenValue} else {elseValue}"
-      else if let some (scrutinee, arms) := forwardedMatch? context.ns statements result then
+        return returnedText tailPosition s!"if {condition} then {thenValue} else {elseValue}"
+      else if let some (scrutinee, arms) := forwardedMatch? context statements result then
         let scrutinee ← expressionText context scrutinee (fuel - 1)
-        let arms ← arms.mapM fun (arm, value) => do
+        let arms ← arms.mapM fun (arm, value, assignments) => do
           let guard ← match arm.guard with
             | none => pure ""
             | some guard => pure s!" if {← expressionText context guard (fuel - 1)}"
-          let value ← expressionText context value (fuel - 1) true
+          let active ← assignments.foldlM (init := context) fun active (localId, valueId) => do
+            let value ← expressionText active valueId (fuel - 1)
+            let value := parenthesizedOperand active.ns valueId value
+            pure { active with constantLocals := active.constantLocals.push (localId, value) }
+          let value ← expressionText active value (fuel - 1) true
           pure s!"| {← bindingPatternText context arm.pattern}{guard} => ({value})"
-        return s!"match {scrutinee} with\n{indent (lines arms)}"
+        return returnedText tailPosition s!"match {scrutinee} with\n{indent (lines arms)}"
       else
         let originalStatements := statements
-        let (active, statements) ← statements.foldlM
+        let (active, statements) ← statements.zipIdx.foldlM
           (init := (context, (#[] : Array String)))
-          fun (active, rendered) statement => do
+          fun (active, rendered) (statement, index) => do
             let temporary? : Option (LocalId × ExprId) := do
               let statementNode ← active.ns.expressions[statement.index]?
               let .assign place value := statementNode.kind | none
@@ -3825,26 +3949,39 @@ private partial def expressionText (context : Context) (id : ExprId)
               if compilerTemporaryLocal? active targetLocal then some (targetLocal, value) else none
             match temporary? with
             | some (targetLocal, valueId) =>
-                let requiresStorage := requiresTemporaryStorage active targetLocal
-                let value ← expressionText active valueId (fuel - 1)
-                if active.temporaryLocals.contains targetLocal &&
-                    (!numericTemporaryLocal? active targetLocal ||
-                      requiresStorage) then
-                  let name ← localName active targetLocal
-                  pure ({ active with temporaryLocals :=
-                    active.temporaryLocals.filter (· != targetLocal) },
-                    rendered.push s!"let {name} := {value};")
-                else
-                  -- The text takes the temporary's place wherever it is read,
+                let numeric := numericTemporaryLocal? active targetLocal
+                if numeric && !active.uses.projected targetLocal &&
+                    Temporaries.substitutable active.ns active.uses originalStatements result
+                      index targetLocal valueId then
+                  -- The text takes the temporary's place where it is read,
                   -- including under a field selection or an operator, so a
                   -- control-flow value carries the delimiters those need.
+                  let value ← expressionText active valueId (fuel - 1)
                   let value := parenthesizedOperand active.ns valueId value
                   pure ({ active with
                     constantLocals := active.constantLocals.push (targetLocal, value) },
                     rendered)
+                else if numeric && active.uses.unread targetLocal &&
+                    (active.ns.expressions[valueId.index]?.any fun value =>
+                      active.unit.tables.types[value.typeId.index]? == some .unit) then
+                  -- Nothing reads the temporary: its value is a statement.
+                  let value ← expressionText active valueId (fuel - 1) false true
+                  pure (active, rendered.push s!"{value}{
+                    statementTerminator active.ns valueId value}")
+                else
+                  let value ← expressionText active valueId (fuel - 1)
+                  let name ← localName active targetLocal
+                  if active.temporaryLocals.contains targetLocal then
+                    pure ({ active with temporaryLocals :=
+                      active.temporaryLocals.filter (· != targetLocal) },
+                      rendered.push s!"let {name} := {value};")
+                  else
+                    pure (active, rendered.push s!"{name} := {value};")
             | none =>
+                let (declarations, active) ←
+                  branchDeclarations active (originalStatements.extract 0 index) statement
                 let statementText ← expressionText active statement (fuel - 1) false true
-                pure (active, rendered.push s!"{statementText}{
+                pure (active, rendered ++ declarations.push s!"{statementText}{
                   statementTerminator active.ns statement statementText}")
         -- Control leaves the block at a diverging statement: a result behind
         -- one is unreachable and has no source spelling.
@@ -4029,9 +4166,13 @@ private partial def expressionText (context : Context) (id : ExprId)
             let (entries, result) ← collectTail active body (fuel - 1)
             pure (declarations ++ entries, result)
         | .block statements result =>
-            let rendered ← statements.mapM fun statement => do
-              let statementText ← expressionText active statement (fuel - 1) false true
-              pure s!"{statementText}{statementTerminator active.ns statement statementText}"
+            let (active, rendered) ← statements.zipIdx.foldlM
+              (init := (active, (#[] : Array String))) fun (active, rendered) (statement, index) => do
+                let (declarations, active) ←
+                  branchDeclarations active (statements.extract 0 index) statement
+                let statementText ← expressionText active statement (fuel - 1) false true
+                pure (active, rendered ++ declarations.push
+                  s!"{statementText}{statementTerminator active.ns statement statementText}")
             -- Control leaves the block at a diverging statement: the block
             -- result behind it is unreachable and has no source spelling.
             if statements.back?.any (isDivergingExpression active.ns) then
@@ -4200,21 +4341,42 @@ private partial def expressionText (context : Context) (id : ExprId)
           | some { kind := .block #[result] none, .. } =>
               isLoopExit result (fuel - 1)
           | _ => false
-      let rec guardedLoop? (node : ExprId) (fuel : Nat) : Option (ExprId × ExprId) := do
+      -- The guard's condition may first be computed into compiler
+      -- temporaries, which it reads where they may be written as their values.
+      let rec guardedLoop? (node : ExprId) (fuel : Nat) :
+          Option (Array (LocalId × ExprId) × ExprId × ExprId) := do
         guard (fuel > 0)
         let bodyNode ← context.ns.expressions[node.index]?
         match bodyNode.kind with
         | .ifElse condition thenBranch (some elseBranch) =>
             if isLoopExit elseBranch (fuel - 1) then
-              some (condition, thenBranch)
+              some (#[], condition, thenBranch)
             else none
         | .block #[] (some result)
         | .block #[result] none => guardedLoop? result (fuel - 1)
+        | .block statements (some result) =>
+            let (inner, condition, thenBranch) ← guardedLoop? result (fuel - 1)
+            guard inner.isEmpty
+            let computed ← statements.zipIdx.mapM fun (statement, index) => do
+              let .assign place value := (← context.ns.expressions[statement.index]?).kind
+                | none
+              let localId ← localPlace? context.ns place
+              guard (numericTemporaryLocal? context localId &&
+                !context.uses.projected localId &&
+                Temporaries.substitutable context.ns context.uses statements (some result)
+                  index localId value)
+              pure (localId, value)
+            pure (computed, condition, thenBranch)
         | _ => none
       let whileShape := if label.isNone then
           guardedLoop? body (context.ns.expressions.size + 1) else none
       match whileShape with
-      | some (condition, loopBody) =>
+      | some (computed, condition, loopBody) =>
+        let context ← computed.foldlM (init := context) fun active (localId, valueId) => do
+          let value ← expressionText active valueId (fuel - 1)
+          let value := parenthesizedOperand active.ns valueId value
+          pure { active with constantLocals := active.constantLocals.push (localId, value) }
+        let loopContext := { context with loopLabels := #[label] ++ context.loopLabels }
         let (invariants, condition) := match context.ns.expressions[condition.index]? with
           | some { kind := .block statements (some result), .. } =>
               let onlySpecifications := statements.all fun statement =>
@@ -4822,7 +4984,8 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     | .structured root =>
         let context : Context := {
           unit, ns, locals := declaration.locals, localNames
-          binders := declaration.signature.generics }
+          binders := declaration.signature.generics
+          uses := Temporaries.Uses.of ns declaration.locals.size root }
         let body ← expressionText context root (ns.expressions.size + 1) true
         let compact := s!"{signature} := {body}"
         if !signature.contains '\n' && body.startsWith "do\n" &&
@@ -4974,6 +5137,8 @@ where
         "profile configuration has no lossless spelling in the current VerexSL header"
     unless ns.imports.isEmpty do
       throw <| errorAt ns.localTables ns.loc "namespace imports are outside the current VerexSL printer"
+    unless ns.scopes.isEmpty do
+      throw <| errorAt ns.localTables ns.loc "scopes are outside the current VerexSL printer"
     let owner := (unit.tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
     let mut skippedComments := #[]
     let mut friends := #[]

@@ -11,3 +11,7 @@ verex namespace overflowing where
 
   fun multiply(left : u16, right : u16) -> (u16, Bool) :=
     overflowing_multiply(left, right)
+
+-- no denotation for `add`: primitive VerexIR.PrimitiveOperation.overflowingAdd at this type or arity is not carried by the denotation
+-- no denotation for `subtract`: primitive VerexIR.PrimitiveOperation.overflowingSubtract at this type or arity is not carried by the denotation
+-- no denotation for `multiply`: primitive VerexIR.PrimitiveOperation.overflowingMultiply at this type or arity is not carried by the denotation

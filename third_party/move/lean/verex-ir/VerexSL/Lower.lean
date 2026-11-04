@@ -1876,10 +1876,14 @@ private partial def lowerPlace (context : ExprContext) (source : Place) :
       return (← pushPlace (.localVar localId), typeId)
   | .deref base _ =>
       let (base, baseType) ← lowerPlace context base
-      let some (.reference reference) ← typeNode? baseType
-        | failAt "VEREX-PLACE-DEREF" "a dereferenced place must contain a reference"
-            (some span)
-      return (← pushPlace (.deref base), reference.referent)
+      match ← typeNode? baseType with
+      | some (.reference reference) => return (← pushPlace (.deref base), reference.referent)
+      | _ =>
+          -- The specification reading holds a reference as its referent.
+          unless context.specification do
+            failAt "VEREX-PLACE-DEREF" "a dereferenced place must contain a reference"
+              (some span)
+          return (base, baseType)
   | .field base field _ =>
       let variant := match base with
         | .downcast _ _ variant _ => some variant
@@ -2263,12 +2267,18 @@ private partial def lowerExpressionPlaceWith
   | .dereference base _ =>
       let (base, baseType, bindings, observe) ← lowerExpressionPlaceWith
         lowerIndex context base checkBounds captureLiteralIndexes
-      let some (.reference reference) ← typeNode? baseType
-        | failAt "VEREX-PLACE-DEREF"
-            "a dereferenced place must contain a reference" (some sourceSpan)
-      return (← pushPlace (.deref base), reference.referent, bindings, do
-        pushExpression loc reference.referent
-          (.operation (.reference .dereference) #[] #[← observe]))
+      match ← typeNode? baseType with
+      | some (.reference reference) =>
+          return (← pushPlace (.deref base), reference.referent, bindings, do
+            pushExpression loc reference.referent
+              (.operation (.reference .dereference) #[] #[← observe]))
+      | _ =>
+          -- The specification reading holds a reference as its referent, so
+          -- dereferencing it is the identity, as for a dereference expression.
+          unless context.specification do
+            failAt "VEREX-PLACE-DEREF"
+              "a dereferenced place must contain a reference" (some sourceSpan)
+          return (base, baseType, bindings, observe)
   | .field base field _ =>
       let (base, baseType, bindings, observe) ← lowerExpressionPlaceWith
         lowerIndex context base checkBounds captureLiteralIndexes
@@ -2330,13 +2340,15 @@ private partial def lowerExpressionPlaceWith
           let read ← pushExpression loc index.2 (.localVar slot)
           pure (read, bindings.push (pattern, index.1))
       let bindings ← if checkBounds && !context.specification &&
-          (← get).sourceNamespace.profile == .move &&
           ((← typeNode? baseType).any fun | .vector .. => true | _ => false) then do
           let unitType ← internType .unit
           -- This is a metadata observation, not a Copy of the elements.
           let collection ← observe
+          let failure : ThrowKind := match (← get).sourceNamespace.profile with
+            | .move => .moveVectorError
+            | _ => .panic
           let checked ← pushExpression loc unitType (.operation
-            (.primitive (.checkVectorIndex ThrowKind.moveVectorError.toVIR)) #[]
+            (.primitive (.checkVectorIndex failure.toVIR)) #[]
             #[collection, indexId])
           let pattern ← pushPattern { loc, typeId := unitType, kind := .wildcard }
           pure (bindings.push (pattern, checked))
@@ -3879,7 +3891,29 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
         if let some expected := expected then ensureType expected placeType span
         let id ← pushExpression loc placeType <| .operation (.copy place) #[] #[]
         return (id, placeType)
-  let value ← lowerExpr context none source
+  -- `.length` reads its receiver's referent. A Rust mutable reference has no
+  -- `Copy`, so a receiver place holding one is read through, not copied.
+  let throughMutable ← if !context.specification &&
+      (← get).sourceNamespace.profile == .rust && field == "length" then
+    match expressionPlace? source with
+    | some sourcePlace =>
+        if ← throughMutableReference context source then
+          let (place, placeType) ← lowerPlace context sourcePlace
+          match ← typeNode? placeType with
+          | some (.reference reference) =>
+              let referent ← pushPlace (.deref place)
+              pure (some (← pushExpression loc reference.referent
+                (.operation (.read referent) #[] #[]), reference.referent))
+          | some (.vector ..) =>
+              pure (some (← pushExpression loc placeType
+                (.operation (.read place) #[] #[]), placeType))
+          | _ => pure none
+        else pure none
+    | none => pure none
+  else pure none
+  let value ← match throughMutable with
+    | some value => pure value
+    | none => lowerExpr context none source
   let valueType ← typeNode? value.2
   let vectorElement? ← match valueType with
     | some (.vector element _) => pure (some element)

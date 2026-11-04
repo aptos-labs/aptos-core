@@ -331,6 +331,17 @@
       "pragmas": [],
       "profile": "rust",
       "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "implementation",
+          "loc": {
+            "index": 11
+          },
+          "path": [
+            "<drop::Token as std::ops::Drop>"
+          ]
+        }
+      ],
       "specFunctions": [],
       "specVars": [],
       "structs": [
@@ -580,6 +591,19 @@
           "startByte": 90
         },
         "related": []
+      },
+      {
+        "expansion": [],
+        "generatedBy": null,
+        "parent": null,
+        "primary": {
+          "endByte": 120,
+          "file": {
+            "index": 0
+          },
+          "startByte": 101
+        },
+        "related": []
       }
     ],
     "names": [
@@ -587,7 +611,10 @@
         "name": "drop",
         "namespaceId": {
           "index": 0
-        }
+        },
+        "scope": [
+          "<drop::Token as std::ops::Drop>"
+        ]
       },
       {
         "name": "consume",
@@ -671,6 +698,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 6
+    "minor": 7
   }
 }

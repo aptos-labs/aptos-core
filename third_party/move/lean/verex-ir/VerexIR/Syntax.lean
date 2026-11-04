@@ -93,10 +93,14 @@ instance : BEq NamespaceRef where
   beq left right := left.segments == right.segments
 
 /-- Interned declaration spelling paired with the namespace table entry that
-owns it. A `NameId` indexes an array of these values. -/
+owns it and the scope inside that namespace it is declared in. A `NameId`
+indexes an array of these values. -/
 structure QualifiedName where
   namespaceId : NamespaceId
   name : String
+  /-- A path of scopes relative to the namespace, empty at its root: the
+  Rust module a name of a crate is declared in. Move names have none. -/
+  scope : Array String := #[]
   deriving Repr, DecidableEq, Inhabited
 
 /-- Semantic reference to an interned name, carrying its expected namespace
@@ -1343,6 +1347,25 @@ structure IntrinsicDecl where
   specBindings : Array IntrinsicBinding := #[]
   deriving Repr, BEq, Inhabited
 
+/-- What a scope names: a module, or what associated functions belong to,
+the type of an inherent impl, a trait, or a trait impl. Only a module
+contains other scopes. -/
+inductive ScopeKind where
+  | module
+  | inherent
+  | implementation
+  | trait
+  deriving Repr, BEq, DecidableEq, Inhabited
+
+/-- A naming scope inside a namespace: a module of a Rust crate, or a type,
+trait, or trait impl of one. Its path is relative to the namespace, and `loc`
+is the location of its declaration. -/
+structure ScopeDecl where
+  loc : LocId
+  path : Array String
+  kind : ScopeKind := .module
+  deriving Repr, BEq, Inhabited
+
 /-- Complete declaration container and owner of namespace-local AST arenas.
 All interned files, locations, types, lifetimes, namespaces, and names live in
 the enclosing compilation unit's single `Tables` snapshot. `Body` selects the
@@ -1371,6 +1394,8 @@ structure Namespace (Body : Type) where
   intrinsics : Array IntrinsicDecl := #[]
   lemmas : Array LemmaDecl := #[]
   comments : Array Comment := #[]
+  /-- The scopes its names are declared in, each after its parent. -/
+  scopes : Array ScopeDecl := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Rebuild a function declaration at a different body stage, preserving every
@@ -1418,5 +1443,6 @@ def Namespace.withStage {α β : Type} (ns : Namespace α) (expressions : Array 
   intrinsics := ns.intrinsics
   lemmas := ns.lemmas
   comments := ns.comments
+  scopes := ns.scopes
 
 end VerexIR

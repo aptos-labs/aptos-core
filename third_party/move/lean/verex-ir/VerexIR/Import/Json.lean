@@ -50,9 +50,24 @@ instance : FromJson NamespaceRef where
       | .error _ => pure none
     pure { segments, alias }
 
+/-- A name at its namespace's root keeps its encoding without a scope. -/
+instance : ToJson QualifiedName where
+  toJson name := Json.mkObj <|
+    [("namespaceId", toJson name.namespaceId), ("name", toJson name.name)] ++
+    (if name.scope.isEmpty then [] else [("scope", toJson name.scope)])
+
+instance : FromJson QualifiedName where
+  fromJson? json := do
+    let namespaceId ← json.getObjValAs? NamespaceId "namespaceId"
+    let name ← json.getObjValAs? String "name"
+    let scope ← match json.getObjVal? "scope" with
+      | .ok value => fromJson? value
+      | .error _ => pure #[]
+    pure { namespaceId, name, scope }
+
 deriving instance ToJson, FromJson for
   SourceFile, SourceRange, Location, OriginKind, Origin, Trust, Alignment,
-  QualifiedName, QualifiedRef, Profile, ProfileValue,
+  QualifiedRef, Profile, ProfileValue,
   ProfileConfig, IntWidth, ReferenceKind, LifetimeKind, Lifetime, ReferenceType,
   ConstValue, TypeUse, GenericArgument, Ability, TraitRef, GenericPredicate, Ty,
   AttributeValue, Attribute, Comment, Tables, BorrowKind, ThrowKind, CallKind,
@@ -79,7 +94,7 @@ deriving instance ToJson, FromJson for
   VariantDecl, GhostFieldDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
   TraitDecl, AssociatedItemValue, AssociatedItemBinding, ImplDecl,
   SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant, IntrinsicBinding,
-  IntrinsicDecl, Namespace
+  IntrinsicDecl, ScopeKind, ScopeDecl, Namespace
 
 namespace Import
 

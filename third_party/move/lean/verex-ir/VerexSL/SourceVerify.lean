@@ -15,7 +15,8 @@ authored beside a source accompany the namespace rendered from it, whose
 `proof_file` pragma names the file:
 
 - a Rust file's specifications, its `.spec.lean`, are VerexSL items of the
-  namespace, spliced into its rendering;
+  namespace, spliced into its rendering; a module file's reopen the module's
+  scope (`mod a where`);
 - a Move file's proofs, its `.proof.lean`, are a Lean file of their own
   (`VerexSL.Proofs`). The namespace is registered with its verification
   deferred, and the proof file, elaborated over what its command left,
@@ -52,6 +53,9 @@ write it. -/
 structure Companion where
   path : System.FilePath
   namespaceId : NamespaceId
+  /-- The scope of the namespace its items belong to: the module a Rust module
+  file declares, empty for a crate root or a single file. -/
+  scope : Array String := #[]
   /-- The file's text; `none` when the file does not exist. -/
   text : Option String := none
   role : CompanionRole := .spliced
@@ -68,6 +72,9 @@ structure CompiledNamespaces where
 structure Request where
   unit : ValidatedUnit
   companions : Array Companion := #[]
+  /-- The directory the unit's relative source names are relative to: a
+  Cargo workspace's root; the current directory without one. -/
+  sourceRoot : Option System.FilePath := none
   /-- Where the generated VerexSL is written. -/
   output : System.FilePath
   /-- Write the rendering only, without elaborating it: for inspection and
@@ -329,18 +336,19 @@ private def fileMap (cache : IO.Ref (Std.HashMap String (Option FileMap))) (file
   cache.modify (·.insert file loaded)
   pure loaded
 
-/-- A companion's items, indented into their namespace, occupying the lines
-`firstLine` to `lastLine` of the generated file. -/
+/-- A companion's items, indented by `indent` into their namespace and
+scope, occupying the lines `firstLine` to `lastLine` of the generated file. -/
 private structure Splice where
   path : System.FilePath
   firstLine : Nat
   lastLine : Nat
+  indent : Nat
 
 private def spliceIndent : Nat := 2
 
-private def indentItems (text : String) : String :=
+private def indentItems (indent : Nat) (text : String) : String :=
   "\n".intercalate <| (text.splitOn "\n").map fun line =>
-    if line.trimAscii.isEmpty then "" else "".pushn ' ' spliceIndent ++ line
+    if line.trimAscii.isEmpty then "" else "".pushn ' ' indent ++ line
 
 /-- The sources of a unit, each the path its namespaces' tables name. -/
 private def sourceFiles (unit : ValidatedUnit) : Array String :=
@@ -349,12 +357,11 @@ private def sourceFiles (unit : ValidatedUnit) : Array String :=
       if found.contains file.name then found else found.push file.name
 
 /-- The `verex sources at` command recording the sources a rendering is made
-from, relative to the current directory, with the hashes of their content. -/
-private def sourcesCommand (unit : ValidatedUnit) : IO String := do
-  let directory ← IO.currentDir
+from, relative to `directory`, with the hashes of their content. -/
+private def sourcesCommand (unit : ValidatedUnit) (directory : System.FilePath) : IO String := do
   let mut lines := #[s!"verex sources at {(toString directory).quote}"]
   for file in sourceFiles unit do
-    let hash ← try some <$> VerexSL.Proofs.contentHash file catch _ => pure none
+    let hash ← try some <$> VerexSL.Proofs.contentHash (directory / file) catch _ => pure none
     if let some hash := hash then lines := lines.push s!"  {file.quote} {hash}"
   return "\n".intercalate lines.toList ++ "\n"
 
@@ -373,12 +380,17 @@ private def compose (prelude sources : String) (order : Array NamespaceId)
       for companion in companions do
         if companion.namespaceId != identity || companion.role != .spliced then continue
         let some text := companion.text | continue
-        let items := (indentItems text).trimAsciiEnd.toString
+        -- A module file's items reopen its scope, one `mod` per segment.
+        let indent := spliceIndent * (companion.scope.size + 1)
+        let items := (indentItems indent text).trimAsciiEnd.toString
         generated := generated ++ "\n"
+        for (segment, depth) in companion.scope.zipIdx do
+          generated := generated ++ "".pushn ' ' (spliceIndent * (depth + 1)) ++
+            s!"mod {Print.sourceIdentifier segment} where\n"
         let firstLine := (generated.splitOn "\n").length
         generated := generated ++ items ++ "\n"
         let lastLine := firstLine + (items.splitOn "\n").length - 1
-        splices := splices.push { path := companion.path, firstLine, lastLine }
+        splices := splices.push { path := companion.path, firstLine, lastLine, indent }
     while !generated.endsWith "\n\n" do generated := generated ++ "\n"
     (generated ++ sources, splices)
 
@@ -646,6 +658,12 @@ the proof files import, and, with `compiled`, the namespaces before the target
 (`importCompiled`). -/
 def run (environment : Environment) (request : Request) : IO (Array Report) := do
   let cache ← IO.mkRef ({} : Std.HashMap String (Option FileMap))
+  let root ← match request.sourceRoot with
+    | some root => pure root
+    | none => IO.currentDir
+  -- A source name as reported: under the source root, when one is named.
+  let display (file : String) : String :=
+    if request.sourceRoot.isSome then (root / file).toString else file
   let rendered ← Perf.withPhase .render do
     let order ← match Print.dependencyOrder request.unit (companionUses request.companions) with
       | .ok order => pure order
@@ -656,7 +674,7 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
     match Print.renderNamespaceParts environment request.unit order (imports := imports) with
     | .ok (prelude, namespaces) =>
         let (generated, splices) :=
-          compose prelude (← sourcesCommand request.unit) order namespaces request.companions
+          compose prelude (← sourcesCommand request.unit root) order namespaces request.companions
         if let some parent := request.output.parent then IO.FS.createDirAll parent
         IO.FS.writeFile request.output generated
         pure (Except.ok (generated, splices))
@@ -666,8 +684,9 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
     | .error error =>
         let report ← match error.location with
           | some (file, range) => do
-              let position := (← fileMap cache file.name).map (·.toPosition ⟨range.startByte⟩)
-              pure { file := file.name, line := position.map (·.line) |>.getD 1
+              let position := (← fileMap cache (root / file.name).toString).map
+                (·.toPosition ⟨range.startByte⟩)
+              pure { file := display file.name, line := position.map (·.line) |>.getD 1
                      column := position.map (·.column + 1) |>.getD 1
                      severity := .error, text := error.message }
           | none => pure { file := request.output.toString, line := 1, column := 1
@@ -717,7 +736,7 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
       | some splice => pure {
           file := splice.path.toString
           line := message.pos.line - splice.firstLine + 1
-          column := message.pos.column - spliceIndent + 1
+          column := message.pos.column - splice.indent + 1
           severity := message.severity, text }
       | none => do
           let fileMapOf ← if message.fileName == generatedName then pure generatedMap else
@@ -725,8 +744,8 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
           let start := (fileMapOf.ofPosition message.pos).byteIdx
           let stop := (message.endPos.map fileMapOf.ofPosition).map (·.byteIdx) |>.getD start
           let origin ← match innermost? entries message.fileName start stop with
-            | some entry => pure <| (← fileMap cache entry.file).map fun map =>
-                (entry.file, map.toPosition ⟨entry.origin.startByte⟩)
+            | some entry => pure <| (← fileMap cache (root / entry.file).toString).map fun map =>
+                (display entry.file, map.toPosition ⟨entry.origin.startByte⟩)
             | none => pure none
           pure <| match origin with
             | some (file, position) => {

@@ -489,6 +489,35 @@ private def closureStoreErrors (registry : ProfileRegistry) (unit : RawUnit) (ex
       | _, _ => #[]
   | _ => #[]
 
+/-- The profile and properties of the nominal a reference names, in the
+unit's namespaces or its dependencies' interfaces. -/
+private def nominalTraits? (unit : RawUnit) (reference : QualifiedRef) :
+    Option (Option Profile × Array ProfileValue) :=
+  let traits (profile : Option Profile) (structs : Array StructDecl) :=
+    (structs.find? (·.name == reference.name)).map fun struct => (profile, struct.properties)
+  (unit.namespaces.findSome? fun ns =>
+      if ns.identity == reference.namespaceId then traits ns.profile ns.structs else none).orElse
+    fun _ => unit.dependencies.findSome? fun dependency =>
+      if dependency.namespaceId == reference.namespaceId then
+        traits dependency.profile dependency.structs
+      else none
+
+/-- A nominal whose shape its unit does not see is neither constructed nor
+destructured. -/
+private def opaqueNominalErrors (registry : ProfileRegistry) (unit : RawUnit) (expr : Expr) :
+    Array Diagnostic :=
+  let target := match expr.kind with
+    | .operation (.call (.constructor callee _)) _ _ _
+    | .operation (.call (.destructor callee _)) _ _ _ => some callee
+    | _ => none
+  match target.bind (nominalTraits? unit) with
+  | some (some profile, properties) =>
+      if (profileSchema? registry profile).any (·.opaqueNominal properties) then
+        #[.error "VIR-NOMINAL-OPAQUE"
+          "an opaque nominal is neither constructed nor destructured" (some expr.loc)]
+      else #[]
+  | _ => #[]
+
 private def checkExprKind {β : Type} (registry : ProfileRegistry) (unit : RawUnit) (ns : Namespace β)
     (expr : Expr) : Array Diagnostic :=
   let childErrors := (expressionChildren expr.kind).foldl
@@ -502,7 +531,7 @@ private def checkExprKind {β : Type} (registry : ProfileRegistry) (unit : RawUn
               checkProfileValue registry unit value ProfileSchema.checkSurface
           | _ => #[]
         checkOperation registry unit ns expr.loc op ++ surfaceErrors ++
-          closureStoreErrors registry unit expr ++
+          closureStoreErrors registry unit expr ++ opaqueNominalErrors registry unit expr ++
           instantiations.foldl (fun ds argument =>
             ds ++ checkGenericArgument registry unit unit.tables argument) #[]
     | .letDecl pattern _ _ => checkPatternId ns pattern (some expr.loc)
@@ -903,6 +932,35 @@ private def checkTraitInheritanceAcyclic (ns : RawNamespace) : Array Diagnostic 
   (Array.range ns.traits.size).foldl (fun ds root =>
     ds ++ visit root root [] (ns.traits.size + 1)) #[]
 
+/-- The scopes of a namespace: each declared once with a nonempty path, after
+its parent, which is a module; and every name the namespace owns in a scope it
+declares. -/
+private def checkScopes (tables : Tables) (owner : NamespaceId) (scopes : Array ScopeDecl)
+    (anchor : Option LocId) : Array Diagnostic :=
+  let scopeText (path : Array String) := String.intercalate "::" path.toList
+  let scopeErrors := scopes.zipIdx.foldl (init := #[]) fun ds (scope, index) =>
+    let earlier := scopes.take index
+    let ds := ds ++ checkLoc tables scope.loc
+    let ds := if scope.path.isEmpty then
+      ds.push <| .at "VIR-SCOPE-EMPTY" "a scope has an empty path" scope.loc
+    else ds
+    let ds := if earlier.any (·.path == scope.path) then
+      ds.push <| .at "VIR-SCOPE-DUPLICATE"
+        s!"scope `{scopeText scope.path}` is declared more than once" scope.loc
+    else ds
+    -- Only a module contains scopes.
+    if scope.path.size > 1 && !earlier.any fun parent =>
+        parent.path == scope.path.pop && parent.kind == .module then
+      ds.push <| .at "VIR-SCOPE-PARENT"
+        s!"scope `{scopeText scope.path}` is not declared after its parent module" scope.loc
+    else ds
+  let declared := scopes.map (·.path)
+  tables.names.foldl (init := scopeErrors) fun ds name =>
+    if name.namespaceId != owner || name.scope.isEmpty || declared.contains name.scope then ds
+    else ds.push <| .error "VIR-SCOPE-UNDECLARED"
+      s!"`{name.name}` is named in scope `{scopeText name.scope}`, which namespace {owner.index} does not declare"
+      anchor
+
 private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     (expectedId : Nat) (ns : RawNamespace) : Array Diagnostic :=
   let importErrors := ns.imports.zipIdx.foldl (init := #[]) fun ds (id, index) =>
@@ -941,6 +999,7 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       (ns.specVars.map fun declaration => (declaration.name, declaration.loc)) ++
     checkDeclarationNames unit.tables ns.identity "lemma"
       (ns.lemmas.map fun declaration => (declaration.name, declaration.loc))
+  let scopeErrors := checkScopes unit.tables ns.identity ns.scopes (some ns.loc)
   let exprErrors := ns.expressions.foldl (fun ds expr =>
     ds ++ checkLoc unit.tables expr.loc ++ checkTypeId unit.tables expr.typeId (some expr.loc) ++
       checkExprKind registry unit ns expr) #[]
@@ -987,6 +1046,14 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
         ds ++ checkProfileValue registry unit value ProfileSchema.checkProperty) #[] ++
       checkAttributes registry unit unit.tables function.attributes ++
       checkRawBody registry unit ns function.locals.size function.loc function.body ++
+      (match (profileSchema? registry function.profile).bind (·.bodiless function.profileData) with
+       | some declared =>
+           if declared == (function.body matches .absent) then #[] else
+             #[.at "VIR-FUNCTION-BODY"
+               (if declared then "a function its profile declares bodiless has a body"
+                else "a function without a body is not declared bodiless by its profile")
+               function.loc]
+       | none => #[]) ++
       (match ns.profile with
        | some profile => if profile == function.profile then #[] else
            #[.at "VIR-PROFILE-MISMATCH" "function profile differs from its namespace profile" function.loc]
@@ -1206,7 +1273,7 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
   let surfaceErrors := checkAttributes registry unit unit.tables ns.attributes ++
     checkAttributes registry unit unit.tables ns.pragmas ++
     ns.comments.foldl (fun ds comment => ds ++ checkLoc unit.tables comment.loc) #[]
-  headerErrors ++ declarationNameErrors ++ exprErrors ++ patternErrors ++ placeErrors ++ arenaErrors ++
+  headerErrors ++ declarationNameErrors ++ scopeErrors ++ exprErrors ++ patternErrors ++ placeErrors ++ arenaErrors ++
     declErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
     implementationErrors ++ specFunctionErrors ++ specVarErrors ++ lemmaErrors ++ invariantErrors ++
     intrinsicErrors ++ traitCycleErrors ++ metadataErrors ++ surfaceErrors
@@ -1411,6 +1478,7 @@ private def checkDependencies (registry : ProfileRegistry) (unit : RawUnit) : Ar
     let ds := match dependency.profile with
       | some profile => ds ++ checkProfile unit profile
       | none => ds
+    let ds := ds ++ checkScopes unit.tables dependency.namespaceId dependency.scopes none
     let ds := dependency.functions.foldl (init := ds) fun ds function =>
       let ds := ds ++ checkLoc unit.tables function.loc ++
         checkName unit.tables function.name (some function.loc) ++
@@ -1738,9 +1806,13 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   let rawDiagnostics := checkUnit registry rawUnit
   if rawDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics rawDiagnostics)
+  let pointerWidth := do
+    let config ← profileConfig? rawUnit.profiles .rust
+    let option ← config.options.find? (·.1 == "target_pointer_width")
+    supportedTargetPointerWidth? option.2
   let structurized ← rawUnit.namespaces.zipIdx.mapM fun (ns, index) => do
     let (structuredNs, witnesses) ←
-      Import.Structurize.structurizeNamespace rawUnit.tables ⟨index⟩ ns
+      Import.Structurize.structurizeNamespace rawUnit.tables pointerWidth ⟨index⟩ ns
     return { ns := structuredNs
              witnesses
              expressionBase := ns.expressions.size
@@ -1776,7 +1848,8 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
       -- An interface declares signatures only, so every body is absent on
       -- both sides of this conversion.
       functions := dep.functions.map fun declaration => declaration.withBody .absent
-      specFunctions := dep.specFunctions })
+      specFunctions := dep.specFunctions
+      scopes := dep.scopes })
     (rawUnit.evidence.map fun evidence => {
       producer := evidence.producer
       description := evidence.description

@@ -9,3 +9,6 @@ verex namespace aggregate where
   fun first(pair : (u32, Bool)) -> u32 := pair[0u32]
 
   fun tuple(value : u32, flag : Bool) -> (u32, Bool) := (value, flag)
+
+-- no denotation for `array`: the type of the result is not carried by the denotation
+-- no denotation for `first`: an element place on a non-vector is not carried by the denotation

@@ -5,22 +5,29 @@
 
 use super::exchange::*;
 use rustc_public::{
-    crate_def::{CrateDef, CrateDefType},
+    crate_def::{CrateDef, CrateDefType, DefId},
     mir::{
+        mono::{Instance, InstanceKind},
+        visit::{Location as MirLocation, PlaceContext},
         AggregateKind, AssertMessage, BinOp, Body, BorrowKind as MirBorrowKind, CastKind,
-        ConstOperand, Mutability, Operand, PointerCoercion, ProjectionElem, Rvalue, Safety,
+        ConstOperand, Local, LocalDecl as MirLocalDecl, MirVisitor, Mutability, Operand,
+        Place as MirPlace, PointerCoercion, ProjectionElem, RawPtrKind, Rvalue, Safety,
         StatementKind, TerminatorKind, UnOp, UnwindAction, WithRetag,
     },
     target::MachineInfo,
     ty::{
-        Abi, AdtDef, AdtKind, ConstantKind, FnDef, FnSig, GenericArgKind, GenericParamDefKind,
-        IntTy, PolyFnSig, Region, RegionKind, RigidTy, Span, Ty as RustTy, TyConst, TyConstKind,
-        TyKind, UintTy, VariantIdx,
+        Abi, AdtDef, AdtKind, AssocContainer, ConstantKind, FnDef, FnSig, GenericArgKind,
+        GenericArgs, GenericParamDef, GenericParamDefKind, ImplDef, IntTy, PolyFnSig, Region,
+        RegionKind, RigidTy, Span, TraitDef, Ty as RustTy, TyConst, TyConstKind, TyKind, UintTy,
+        VariantIdx,
     },
-    CrateItem, ItemKind,
+    Crate, CrateItem, CrateNum, ItemKind,
 };
 use serde_json::Number;
-use std::{collections::BTreeMap, fs};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+};
 
 pub(super) fn raw_unit_json() -> Result<String, String> {
     let unit = UnitMapper::new()?.map()?;
@@ -37,12 +44,485 @@ pub(super) fn raw_unit_json() -> Result<String, String> {
 struct UnitMapper {
     items: Vec<CrateItem>,
     identities: Vec<String>,
-    name_ids: BTreeMap<String, NameId>,
+    /// Each callable function by its definition path: the local functions and
+    /// the dependency functions the bodies call.
+    name_ids: BTreeMap<String, QualifiedRef>,
+    dependency_functions: Vec<DependencyFunction>,
+    resolves_trait_calls: bool,
     names: Vec<QualifiedName>,
     adts: Vec<AdtNames>,
     types: TypeLayout,
+    scopes: Scopes,
+    namespaces: CrateNamespaces,
     sources: SourceTables,
     arenas: NamespaceArenas,
+}
+
+/// The scopes of the local crate's declarations: its modules, and the types,
+/// traits, and trait impls associated functions belong to. Rustc Public does
+/// not say which definitions are modules, so a module is an enclosing
+/// definition that is none of the others an item can be nested in: a body
+/// (function, constant, static) or the impl or trait of an associated item.
+struct Scopes {
+    enclosing: HashSet<DefId>,
+    /// Each scope, by its crate and path, with its kind and the span of its
+    /// declaration.
+    declarations: BTreeMap<(String, Vec<String>), (ScopeKind, Span)>,
+}
+
+fn last_segment(path: &str) -> String {
+    path.rsplit("::").next().unwrap_or(path).to_owned()
+}
+
+impl Scopes {
+    fn new() -> Self {
+        let local = rustc_public::local_crate();
+        let mut enclosing = rustc_public::all_local_items()
+            .iter()
+            .map(CrateDef::def_id)
+            .collect::<HashSet<_>>();
+        enclosing.extend(local.trait_decls().iter().map(CrateDef::def_id));
+        enclosing.extend(local.trait_impls().iter().map(CrateDef::def_id));
+        for adt in local.adts() {
+            enclosing.extend(adt.inherent_impls().iter().map(CrateDef::def_id));
+        }
+        for function in local.fn_defs() {
+            if function.associated_item().is_some() {
+                enclosing.extend(function.def_id().parent());
+            }
+        }
+        Self {
+            enclosing,
+            declarations: BTreeMap::new(),
+        }
+    }
+
+    fn declare(
+        &mut self,
+        krate: &str,
+        path: &[String],
+        kind: ScopeKind,
+        span: Span,
+    ) -> Result<(), String> {
+        let key = (krate.to_owned(), path.to_vec());
+        match self.declarations.get(&key) {
+            Some((existing, _)) if *existing != kind => Err(format!(
+                "scope `{}` is both a {existing:?} and a {kind:?} scope",
+                path.join("::")
+            )),
+            Some(_) => Ok(()),
+            None => {
+                self.declarations.insert(key, (kind, span));
+                Ok(())
+            },
+        }
+    }
+
+    /// The scope of a function: an associated function's is that of its
+    /// type (an inherent impl's items), its trait, or its trait impl.
+    fn function_scope(&mut self, function: FnDef) -> Result<Vec<String>, String> {
+        let krate = function.krate().name;
+        let Some(item) = function.associated_item() else {
+            return Ok(self.module_scope(&krate, function.def_id()));
+        };
+        let container = function
+            .def_id()
+            .parent()
+            .ok_or_else(|| format!("associated function `{}` has no container", function.name()))?;
+        let (krate, mut path, segment, kind, span) = match item.container {
+            AssocContainer::InherentImpl => match ImplDef(container).ty().kind() {
+                TyKind::RigidTy(RigidTy::Adt(adt, _)) => {
+                    let krate = adt.krate().name;
+                    let path = self.module_scope(&krate, adt.def_id());
+                    let name = last_segment(&adt.name());
+                    (krate, path, name, ScopeKind::Inherent, adt.span())
+                },
+                // A primitive type's inherent impls are in `core`; its
+                // associated functions are in the scope `primitive::<type>`.
+                TyKind::RigidTy(primitive) => {
+                    let name = primitive_name(&primitive).ok_or_else(|| {
+                        format!(
+                            "inherent impl `{}` is not on a nominal or primitive type",
+                            container.name()
+                        )
+                    })?;
+                    let path = vec!["primitive".to_owned()];
+                    self.declare(&krate, &path, ScopeKind::Module, container.span())?;
+                    (krate, path, name, ScopeKind::Inherent, container.span())
+                },
+                kind => {
+                    return Err(format!(
+                        "inherent impl `{}` is on the unsupported type {kind:?}",
+                        container.name()
+                    ));
+                },
+            },
+            AssocContainer::TraitImpl(_) => {
+                let path = self.module_scope(&krate, container);
+                let span = container.span();
+                (
+                    krate,
+                    path,
+                    container.name(),
+                    ScopeKind::Implementation,
+                    span,
+                )
+            },
+            AssocContainer::Trait => {
+                let path = self.module_scope(&krate, container);
+                let name = last_segment(&container.name());
+                (krate, path, name, ScopeKind::Trait, container.span())
+            },
+        };
+        path.push(segment);
+        self.declare(&krate, &path, kind, span)?;
+        Ok(path)
+    }
+
+    /// The module path of a definition relative to the crate root, each
+    /// module on it recorded.
+    fn module_scope(&mut self, krate: &str, definition: DefId) -> Vec<String> {
+        let mut modules = Vec::new();
+        let mut current = definition.parent();
+        while let Some(ancestor) = current {
+            current = ancestor.parent();
+            if current.is_some() && !self.enclosing.contains(&ancestor) {
+                modules.push(ancestor);
+            }
+        }
+        let mut path = Vec::with_capacity(modules.len());
+        for module in modules.into_iter().rev() {
+            path.push(last_segment(&module.name()));
+            self.declarations
+                .entry((krate.to_owned(), path.clone()))
+                .or_insert_with(|| (ScopeKind::Module, module.span()));
+        }
+        path
+    }
+}
+
+/// The generic parameters of a function in the order of rustc's generic
+/// arguments: its impl's or trait's, then its own.
+fn flattened_generics(function: FnDef) -> Result<Vec<GenericParamDef>, String> {
+    let own = function.generics_of();
+    let mut parameters = Vec::new();
+    if own.parent.is_some() {
+        let (item, container) = function
+            .associated_item()
+            .zip(function.def_id().parent())
+            .ok_or_else(|| {
+                format!(
+                    "function `{}` has parent generics but no impl or trait",
+                    function.name()
+                )
+            })?;
+        parameters = match item.container {
+            AssocContainer::Trait => {
+                TraitDef::declaration(&TraitDef(container))
+                    .generics_of()
+                    .params
+            },
+            AssocContainer::InherentImpl | AssocContainer::TraitImpl(_) => {
+                ImplDef(container).generics_of().params
+            },
+        };
+    }
+    if parameters.len() != own.parent_count {
+        return Err(format!(
+            "function `{}` has {} parent generic parameters, expected {}",
+            function.name(),
+            parameters.len(),
+            own.parent_count
+        ));
+    }
+    parameters.extend(own.params);
+    Ok(parameters)
+}
+
+/// The binder kind of a function's generic parameter. A synthetic
+/// (`impl Trait`) parameter has no binder of its own, and the pinned API does
+/// not expose a const parameter's type.
+fn binder_kind(function: &str, parameter: &GenericParamDef) -> Result<BinderKind, String> {
+    match parameter.kind {
+        GenericParamDefKind::Lifetime => Ok(BinderKind::Lifetime),
+        GenericParamDefKind::Type {
+            synthetic: false, ..
+        } => Ok(BinderKind::TypeArg),
+        GenericParamDefKind::Type {
+            synthetic: true, ..
+        } => Err(format!(
+            "function `{function}` has synthetic type parameter `{}`; `impl Trait` generic binders are not yet supported",
+            parameter.name
+        )),
+        GenericParamDefKind::Const { .. } => Err(format!(
+            "function `{function}` has const parameter `{}` whose declared type is not exposed by the pinned Rustc Public API",
+            parameter.name
+        )),
+    }
+}
+
+fn generic_binder(
+    function: &str,
+    parameter: GenericParamDef,
+    loc: LocId,
+) -> Result<GenericBinder, String> {
+    let kind = binder_kind(function, &parameter)?;
+    // Trait bounds are not exposed for functions by the pinned Rustc Public
+    // API (rust-lang/rust#161892), so no binder states its predicates.
+    Ok(GenericBinder {
+        abilities: vec![],
+        kind,
+        loc,
+        name: parameter.name,
+        predicates: vec![],
+        type_: None,
+    })
+}
+
+fn erased() -> Region {
+    Region {
+        kind: RegionKind::ReErased,
+    }
+}
+
+/// A type with its regions erased, as the types of MIR locals are.
+fn erase_regions(ty: RustTy) -> Result<RustTy, String> {
+    Ok(match ty.kind() {
+        TyKind::RigidTy(RigidTy::Ref(_, referent, mutability)) => {
+            RustTy::new_ref(erased(), erase_regions(referent)?, mutability)
+        },
+        TyKind::RigidTy(RigidTy::Adt(definition, arguments)) => {
+            let arguments = arguments
+                .0
+                .into_iter()
+                .map(|argument| {
+                    Ok(match argument {
+                        GenericArgKind::Lifetime(_) => GenericArgKind::Lifetime(erased()),
+                        GenericArgKind::Type(argument) => {
+                            GenericArgKind::Type(erase_regions(argument)?)
+                        },
+                        argument => argument,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            RustTy::from_rigid_kind(RigidTy::Adt(definition, GenericArgs(arguments)))
+        },
+        TyKind::RigidTy(RigidTy::Tuple(elements)) => RustTy::new_tuple(
+            &elements
+                .into_iter()
+                .map(erase_regions)
+                .collect::<Result<Vec<_>, String>>()?,
+        ),
+        TyKind::RigidTy(RigidTy::Slice(element)) => {
+            RustTy::from_rigid_kind(RigidTy::Slice(erase_regions(element)?))
+        },
+        TyKind::RigidTy(RigidTy::Array(element, length)) => {
+            RustTy::from_rigid_kind(RigidTy::Array(erase_regions(element)?, length))
+        },
+        _ => ty,
+    })
+}
+
+/// The associated type a type names, which VIR does not express.
+fn projection(ty: RustTy) -> Option<RustTy> {
+    match ty.kind() {
+        TyKind::Alias(..) => Some(ty),
+        TyKind::RigidTy(RigidTy::Ref(_, referent, _)) => projection(referent),
+        TyKind::RigidTy(RigidTy::Slice(element) | RigidTy::Array(element, _)) => {
+            projection(element)
+        },
+        TyKind::RigidTy(RigidTy::Tuple(elements)) => elements.into_iter().find_map(projection),
+        TyKind::RigidTy(RigidTy::Adt(_, arguments)) => {
+            arguments.0.into_iter().find_map(|argument| match argument {
+                GenericArgKind::Type(argument) => projection(argument),
+                _ => None,
+            })
+        },
+        _ => None,
+    }
+}
+
+/// The function a call reaches, as codegen resolves it: a trait method called
+/// on a concrete type resolves to its impl's method.
+fn resolve_callee(callee: FnDef, arguments: &GenericArgs) -> Result<(FnDef, GenericArgs), String> {
+    let instance = Instance::resolve(callee, arguments).map_err(|_| {
+        format!(
+            "callee `{}` selects an implementation on a type parameter; implementation-selection evidence is unavailable from the pinned Rustc Public API",
+            callee.name()
+        )
+    })?;
+    match instance.kind {
+        // An item instance is a function definition with its arguments.
+        InstanceKind::Item => Ok((FnDef(instance.def.def_id()), instance.args())),
+        InstanceKind::Intrinsic | InstanceKind::LlvmIntrinsic => Err(format!(
+            "callee `{}` is a compiler intrinsic",
+            callee.name()
+        )),
+        InstanceKind::Virtual { .. } => Err(format!(
+            "callee `{}` is dispatched dynamically",
+            callee.name()
+        )),
+        InstanceKind::Shim => Err(format!(
+            "callee `{}` is compiler-generated glue",
+            callee.name()
+        )),
+    }
+}
+
+/// A dependency function's parameter and result types, regions erased, or
+/// why its signature is outside the supported slice.
+fn dependency_signature(function: FnDef) -> Result<Vec<RustTy>, String> {
+    let signature = function.fn_sig().value;
+    if signature.c_variadic || signature.safety != Safety::Safe || signature.abi != Abi::Rust {
+        return Err(format!(
+            "dependency function `{}` is not a safe Rust-ABI function",
+            function.name()
+        ));
+    }
+    let types = signature
+        .inputs_and_output
+        .into_iter()
+        .map(erase_regions)
+        .collect::<Result<Vec<_>, String>>()?;
+    for ty in &types {
+        if let Some(alias) = projection(*ty) {
+            return Err(format!(
+                "dependency function `{}` names the associated type `{alias:?}`, which VIR does not yet express",
+                function.name()
+            ));
+        }
+        collect_type_adts(*ty, &[], &mut Vec::new()).map_err(|error| {
+            format!(
+                "dependency function `{}` has a signature outside the supported slice: {error}",
+                function.name()
+            )
+        })?;
+    }
+    Ok(types)
+}
+
+/// The Rust documentation's name of a primitive type that has inherent
+/// impls in `core`, the scope of its associated functions.
+fn primitive_name(ty: &RigidTy) -> Option<String> {
+    Some(match ty {
+        RigidTy::Bool => "bool".to_owned(),
+        RigidTy::Char => "char".to_owned(),
+        RigidTy::Int(kind) => format!("{kind:?}").to_lowercase(),
+        RigidTy::Uint(kind) => format!("{kind:?}").to_lowercase(),
+        RigidTy::Float(kind) => format!("{kind:?}").to_lowercase(),
+        RigidTy::Str => "str".to_owned(),
+        RigidTy::Slice(_) => "slice".to_owned(),
+        RigidTy::Array(..) => "array".to_owned(),
+        _ => return None,
+    })
+}
+
+/// Whether a path names the `Copy` trait. The pinned Rustc Public API has no
+/// lang-item query, so the exporter names the language items it maps by their
+/// defining path, as rustc prints it through `core` or its `std` re-export.
+fn is_copy_trait(name: &str) -> bool {
+    matches!(name, "core::marker::Copy" | "std::marker::Copy")
+}
+
+/// The ADTs of a crate with a `Copy` impl applying the ADT to the impl's own
+/// parameters in order: those every instantiation of which with `Copy`
+/// arguments is `Copy`, as `#[derive(Copy)]` states it. An impl for one
+/// instantiation (`impl Copy for S<u32>`) has no such statement.
+fn copy_adts(krate: &Crate) -> Vec<AdtDef> {
+    krate
+        .trait_impls()
+        .into_iter()
+        .filter_map(|implementation| {
+            let header = implementation.trait_impl().value;
+            if !is_copy_trait(&header.def_id.name()) {
+                return None;
+            }
+            let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = header.self_ty().kind()
+            else {
+                return None;
+            };
+            let general = arguments
+                .0
+                .iter()
+                .enumerate()
+                .all(|(index, argument)| match argument {
+                    GenericArgKind::Type(ty) => {
+                        matches!(ty.kind(), TyKind::Param(parameter) if parameter.index as usize == index)
+                    },
+                    GenericArgKind::Lifetime(region) => matches!(
+                        &region.kind,
+                        RegionKind::ReEarlyParam(parameter) if parameter.index as usize == index
+                    ),
+                    GenericArgKind::Const(_) => false,
+                });
+            general.then_some(definition)
+        })
+        .collect()
+}
+
+fn is_abort(name: &str) -> bool {
+    matches!(
+        name,
+        "core::intrinsics::abort" | "std::intrinsics::abort" | "std::process::abort"
+    )
+}
+
+/// Whether the mapper lowers a call to a VIR operation (an abort or a
+/// primitive) rather than mapping it as a call.
+fn lowered_callee(name: &str, arguments: &GenericArgs) -> bool {
+    arguments.0.is_empty()
+        && (is_abort(name) || is_string_length(name) || integer_method_primitive(name).is_some())
+}
+
+/// A dependency crate's function the bodies call, declared without its body.
+struct DependencyFunction {
+    definition: FnDef,
+    /// Its parameter and result types, regions erased.
+    signature: Vec<RustTy>,
+}
+
+/// The dependency functions the bodies call, each once, ordered by name, and
+/// whether a call of a trait method resolves to an impl's. A call whose
+/// callee cannot be declared is reported where it is mapped.
+fn collect_dependency_functions(bodies: &[Body]) -> (Vec<DependencyFunction>, bool) {
+    let mut functions: Vec<DependencyFunction> = Vec::new();
+    let mut resolves_trait_calls = false;
+    for body in bodies {
+        let locals = mapped_locals(body);
+        for block in &body.blocks {
+            let TerminatorKind::Call { func, .. } = &block.terminator.kind else {
+                continue;
+            };
+            let Ok(callee_type) = func.ty(&locals) else {
+                continue;
+            };
+            let TyKind::RigidTy(RigidTy::FnDef(definition, arguments)) = callee_type.kind() else {
+                continue;
+            };
+            if lowered_callee(&definition.name(), &arguments) {
+                continue;
+            }
+            let Ok((resolved, _)) = resolve_callee(definition, &arguments) else {
+                continue;
+            };
+            resolves_trait_calls |= resolved != definition;
+            if resolved.krate().is_local
+                || functions
+                    .iter()
+                    .any(|function| function.definition == resolved)
+            {
+                continue;
+            }
+            if let Ok(signature) = dependency_signature(resolved) {
+                functions.push(DependencyFunction {
+                    definition: resolved,
+                    signature,
+                });
+            }
+        }
+    }
+    functions.sort_by_key(|function| function.definition.name());
+    (functions, resolves_trait_calls)
 }
 
 fn function_def(item: CrateItem) -> Result<FnDef, String> {
@@ -69,59 +549,85 @@ impl UnitMapper {
             return Err("the Rust mapper requires at least one local function".to_owned());
         }
         for item in &items {
-            let generics = function_def(*item)?.generics_of();
-            if item.requires_monomorphization() && generics.params.is_empty() {
+            let generics = flattened_generics(function_def(*item)?)?;
+            if item.requires_monomorphization() && generics.is_empty() {
                 return Err(format!(
                     "function `{}` requires monomorphization without public generic binders",
                     item.name()
                 ));
             }
-            for parameter in &generics.params {
-                match parameter.kind {
-                    GenericParamDefKind::Lifetime
-                    | GenericParamDefKind::Type {
-                        synthetic: false, ..
-                    } => {},
-                    GenericParamDefKind::Type {
-                        synthetic: true, ..
-                    } => {
-                        return Err(format!(
-                            "function `{}` has synthetic type parameter `{}`; `impl Trait` generic binders are not yet supported",
-                            item.name(), parameter.name
-                        ));
-                    },
-                    GenericParamDefKind::Const { .. } => {
-                        return Err(format!(
-                            "function `{}` has const parameter `{}` whose declared type is not exposed by the pinned Rustc Public API",
-                            item.name(), parameter.name
-                        ));
-                    },
-                }
+            for parameter in &generics {
+                binder_kind(&item.name(), parameter)?;
             }
             if item.body().is_none() {
                 return Err(format!("function `{}` has no public MIR body", item.name()));
             }
         }
         let identities = items.iter().map(CrateDef::name).collect::<Vec<_>>();
-        let name_ids = identities
-            .iter()
-            .enumerate()
-            .map(|(index, identity)| (identity.clone(), NameId::new(index)))
-            .collect();
         let bodies = items
             .iter()
             .map(|item| item.body().expect("checked above"))
             .collect::<Vec<_>>();
-        let adt_defs = collect_adts(&bodies)?;
-        let (names, adts) = build_names(&identities, &adt_defs);
-        let types = TypeLayout::from_bodies(&items, &bodies, &adts)?;
+        let (dependency_functions, resolves_trait_calls) = collect_dependency_functions(&bodies);
+        let signature_types = dependency_functions
+            .iter()
+            .flat_map(|function| function.signature.iter().copied())
+            .collect::<Vec<_>>();
+        let reached = collect_adts(&bodies, &signature_types)?;
+        let namespaces = CrateNamespaces::new(
+            reached.iter().map(|adt| adt.definition.krate()).chain(
+                dependency_functions
+                    .iter()
+                    .map(|function| function.definition.krate()),
+            ),
+        )?;
+        let mut scopes = Scopes::new();
+        let item_scopes = items
+            .iter()
+            .map(|item| scopes.function_scope(function_def(*item)?))
+            .collect::<Result<Vec<_>, String>>()?;
+        let (mut names, adts) = build_names(
+            &identities,
+            &item_scopes,
+            &reached,
+            &mut scopes,
+            &namespaces,
+        )?;
+        let mut name_ids = identities
+            .iter()
+            .enumerate()
+            .map(|(index, identity)| {
+                (identity.clone(), QualifiedRef {
+                    name: NameId::new(index),
+                    namespace_id: NamespaceId::new(0),
+                })
+            })
+            .collect::<BTreeMap<_, _>>();
+        for function in &dependency_functions {
+            let namespace_id = namespaces.id(&function.definition.krate().name)?;
+            let name = NameId::new(names.len());
+            names.push(QualifiedName {
+                name: last_segment(&function.definition.name()),
+                namespace_id,
+                scope: scopes.function_scope(function.definition)?,
+            });
+            name_ids.insert(function.definition.name(), QualifiedRef {
+                name,
+                namespace_id,
+            });
+        }
+        let types = TypeLayout::from_bodies(&items, &bodies, &adts, &dependency_functions)?;
         Ok(Self {
             items,
             identities,
             name_ids,
+            dependency_functions,
+            resolves_trait_calls,
             names,
             adts,
             types,
+            scopes,
+            namespaces,
             sources: SourceTables::default(),
             arenas: NamespaceArenas::default(),
         })
@@ -136,35 +642,10 @@ impl UnitMapper {
             let identity = self.identities[index].clone();
             let body = item.body().expect("checked in UnitMapper::new");
             let function_loc = self.sources.intern(item.span())?;
-            let generics = function_def(item)?
-                .generics_of()
-                .params
+            let generics = flattened_generics(function_def(item)?)?
                 .into_iter()
-                .map(|parameter| {
-                    let kind = match parameter.kind {
-                        GenericParamDefKind::Lifetime => BinderKind::Lifetime,
-                        GenericParamDefKind::Type {
-                            synthetic: false, ..
-                        } => BinderKind::TypeArg,
-                        GenericParamDefKind::Type {
-                            synthetic: true, ..
-                        }
-                        | GenericParamDefKind::Const { .. } => {
-                            unreachable!(
-                                "unsupported function binders were rejected in UnitMapper::new"
-                            )
-                        },
-                    };
-                    GenericBinder {
-                        abilities: vec![],
-                        kind,
-                        loc: function_loc,
-                        name: parameter.name,
-                        predicates: vec![],
-                        type_: None,
-                    }
-                })
-                .collect();
+                .map(|parameter| generic_binder(&identity, parameter, function_loc))
+                .collect::<Result<Vec<_>, String>>()?;
             let mapped = FunctionMapper::new(
                 &body,
                 &self.types,
@@ -211,7 +692,152 @@ impl UnitMapper {
         }
 
         let namespace_loc = functions[0].loc;
-        let structs = map_structs(&self.adts, &self.types, &mut self.sources)?;
+        let mut structs = Vec::new();
+        // A dependency crate is a namespace of the unit holding the
+        // declarations the crate reaches; it is not a verification target.
+        let mut dependencies = Vec::with_capacity(self.namespaces.dependencies.len());
+        for (name, (_, namespace_id)) in &self.namespaces.dependencies {
+            dependencies.push(RawNamespace {
+                associated_items: vec![],
+                attributes: vec![],
+                comments: vec![],
+                constants: vec![],
+                doc: String::new(),
+                expressions: vec![],
+                functions: vec![],
+                identity: *namespace_id,
+                implementations: vec![],
+                imports: vec![],
+                intrinsics: vec![],
+                invariants: vec![],
+                lemmas: vec![],
+                loc: self.sources.dependency(name),
+                patterns: vec![],
+                places: vec![],
+                pragmas: vec![Attribute::Assign {
+                    loc: None,
+                    name: "verify".to_owned(),
+                    value: AttributeValue::Constant {
+                        value: ConstValue::Bool { value: false },
+                    },
+                }],
+                profile: Some(Profile::Rust),
+                profile_metadata: vec![],
+                scopes: vec![],
+                spec_functions: vec![],
+                spec_vars: vec![],
+                structs: vec![],
+                traits: vec![],
+            });
+        }
+        for (declaration, adt) in map_structs(&self.adts, &self.types, &mut self.sources)?
+            .into_iter()
+            .zip(&self.adts)
+        {
+            match adt.namespace_id.index {
+                0 => structs.push(declaration),
+                index => dependencies[index - 1].structs.push(declaration),
+            }
+        }
+        // A called dependency function is declared by its generic signature;
+        // its body is not exported.
+        for function in &self.dependency_functions {
+            let identity = function.definition.name();
+            let callee = self.name_ids[&identity].clone();
+            let loc = self.sources.dependency(&identity);
+            let origin = OriginId::new(origins.len());
+            origins.push(Origin {
+                description: "Rustc Public FnDef::fn_sig".to_owned(),
+                kind: OriginKind::RustMir,
+                location: loc,
+                source_identity: Some(identity.clone()),
+            });
+            let alignment = AlignmentId::new(alignments.len());
+            alignments.push(Alignment {
+                description: "Rustc Public generic signature without its body".to_owned(),
+                source: origin,
+                trust: Trust::Checked,
+            });
+            let generics = flattened_generics(function.definition)?
+                .into_iter()
+                .map(|parameter| generic_binder(&identity, parameter, loc))
+                .collect::<Result<Vec<_>, String>>()?;
+            let (output, inputs) = function
+                .signature
+                .split_last()
+                .ok_or_else(|| format!("dependency function `{identity}` has no result type"))?;
+            let parameters = inputs
+                .iter()
+                .enumerate()
+                .map(|(index, ty)| {
+                    Ok(Parameter {
+                        mutable: false,
+                        name: format!("_{}", index + 1),
+                        type_use: TypeUse {
+                            loc,
+                            type_id: self.types.id(*ty)?,
+                        },
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            let locals = parameters
+                .iter()
+                .enumerate()
+                .map(|(index, parameter)| LocalDecl {
+                    id: LocalId::new(index),
+                    loc,
+                    mutable: false,
+                    name: parameter.name.clone(),
+                    type_use: parameter.type_use.clone(),
+                })
+                .collect();
+            dependencies[callee.namespace_id.index - 1]
+                .functions
+                .push(FunctionDecl {
+                    alignment,
+                    attributes: vec![],
+                    body: RawBody::Absent,
+                    contract: empty_contract(),
+                    doc: String::new(),
+                    loc,
+                    locals,
+                    name: callee.name,
+                    origin,
+                    pragmas: vec![],
+                    profile: Profile::Rust,
+                    profile_data: vec![ProfileValue {
+                        payload: String::new(),
+                        profile: Profile::Rust,
+                        tag: "function.dependency".to_owned(),
+                    }],
+                    signature: Signature {
+                        generics,
+                        parameters,
+                        predicates: vec![],
+                        results: vec![TypeUse {
+                            loc,
+                            type_id: self.types.id(*output)?,
+                        }],
+                    },
+                });
+        }
+        let mut scopes = Vec::new();
+        for ((krate, path), (kind, span)) in std::mem::take(&mut self.scopes.declarations) {
+            let namespace_id = self.namespaces.id(&krate)?;
+            let scope = ScopeDecl {
+                kind,
+                loc: self.sources.declaration(
+                    namespace_id,
+                    &format!("{krate}::{}", path.join("::")),
+                    span,
+                )?,
+                path,
+            };
+            match namespace_id.index {
+                0 => scopes.push(scope),
+                index => dependencies[index - 1].scopes.push(scope),
+            }
+        }
         let comments = self.sources.comments();
         let local_crate = rustc_public::local_crate();
         let target_pointer_width = MachineInfo::target_pointer_width().bits();
@@ -225,40 +851,62 @@ impl UnitMapper {
                 name: lifetime.name.clone(),
             })
             .collect();
+        let mut evidence = vec![ImportEvidence {
+            description: format!(
+                "rustc accepted this crate through analysis and exposed optimized generic MIR for a {target_pointer_width}-bit pointer target"
+            ),
+            producer: "verex-rust-export via rustc Public".to_owned(),
+            trusted: true,
+        }];
+        if self.resolves_trait_calls {
+            evidence.push(ImportEvidence {
+                description: "calls of trait methods on concrete types resolve to their impls' methods as rustc's codegen resolves them".to_owned(),
+                producer: "verex-rust-export via rustc Public Instance::resolve".to_owned(),
+                trusted: true,
+            });
+        }
+        let mut namespace_refs = vec![NamespaceRef {
+            segments: vec![local_crate.name],
+        }];
+        namespace_refs.extend(
+            self.namespaces
+                .dependencies
+                .keys()
+                .map(|name| NamespaceRef {
+                    segments: vec![name.clone()],
+                }),
+        );
+        let mut namespaces = vec![RawNamespace {
+            associated_items: vec![],
+            attributes: vec![],
+            comments,
+            constants: vec![],
+            doc: String::new(),
+            expressions: self.arenas.expressions,
+            functions,
+            identity: NamespaceId::new(0),
+            implementations: vec![],
+            imports: vec![],
+            intrinsics: vec![],
+            invariants: vec![],
+            lemmas: vec![],
+            loc: namespace_loc,
+            patterns: vec![],
+            places: self.arenas.places,
+            pragmas: vec![],
+            profile: Some(Profile::Rust),
+            profile_metadata: vec![],
+            scopes,
+            spec_functions: vec![],
+            spec_vars: vec![],
+            structs,
+            traits: vec![],
+        }];
+        namespaces.extend(dependencies);
         Ok(RawUnit {
             dependencies: vec![],
-            evidence: vec![ImportEvidence {
-                description: format!(
-                    "rustc accepted this crate through analysis and exposed optimized generic MIR for a {target_pointer_width}-bit pointer target"
-                ),
-                producer: "verex-rust-export via rustc Public".to_owned(),
-                trusted: true,
-            }],
-            namespaces: vec![RawNamespace {
-                associated_items: vec![],
-                attributes: vec![],
-                comments,
-                constants: vec![],
-                doc: String::new(),
-                expressions: self.arenas.expressions,
-                functions,
-                identity: NamespaceId::new(0),
-                implementations: vec![],
-                imports: vec![],
-                intrinsics: vec![],
-                invariants: vec![],
-                lemmas: vec![],
-                loc: namespace_loc,
-                patterns: vec![],
-                places: self.arenas.places,
-                pragmas: vec![],
-                profile: Some(Profile::Rust),
-                profile_metadata: vec![],
-                spec_functions: vec![],
-                spec_vars: vec![],
-                structs,
-                traits: vec![],
-            }],
+            evidence,
+            namespaces,
             profiles: vec![ProfileConfig {
                 name: "rust".to_owned(),
                 options: vec![
@@ -278,13 +926,11 @@ impl UnitMapper {
                 lifetimes,
                 locations: self.sources.locations,
                 names: self.names,
-                namespaces: vec![NamespaceRef {
-                    segments: vec![local_crate.name],
-                }],
+                namespaces: namespace_refs,
                 origins,
                 types: self.types.types,
             },
-            version: Version { major: 1, minor: 6 },
+            version: Version { major: 1, minor: 7 },
         })
     }
 }
@@ -292,6 +938,12 @@ impl UnitMapper {
 struct AdtNames {
     definition: AdtDef,
     name: NameId,
+    namespace_id: NamespaceId,
+    /// Whether it is `Copy` wherever its type arguments are.
+    copy: bool,
+    /// A dependency's ADT the unit names without its shape; it has no
+    /// variants here.
+    opaque: bool,
     variants: Vec<VariantNames>,
 }
 
@@ -303,32 +955,187 @@ struct VariantNames {
     fields: Vec<NameId>,
 }
 
-fn collect_adts(bodies: &[Body]) -> Result<Vec<AdtDef>, String> {
-    let mut adts = Vec::new();
-    for body in bodies {
-        for local in body.locals() {
-            collect_type_adts(local.ty, &mut adts)?;
+/// Counts the mentions of one local.
+struct LocalMentions {
+    local: Local,
+    mentions: usize,
+}
+
+impl MirVisitor for LocalMentions {
+    fn visit_local(&mut self, local: &Local, _context: PlaceContext, _location: MirLocation) {
+        if *local == self.local {
+            self.mentions += 1;
         }
     }
-    adts.sort_by_key(CrateDef::name);
+}
+
+/// The locals of a body as they are mapped. rustc reads a slice's length for
+/// a bounds check through a pointer it creates for that read alone,
+/// `p = &raw const (fake) *r` followed by `PtrMetadata(p)`. A pointer local
+/// assigned only such borrows and used only by `PtrMetadata` is mapped as a
+/// shared borrow of the same place, whose metadata is the same length. The
+/// MIR validator does not enforce this use, so it is checked here; every
+/// other raw pointer remains unsupported.
+fn mapped_locals(body: &Body) -> Vec<MirLocalDecl> {
+    let mut locals = body.locals().to_vec();
+    for (index, declaration) in locals.iter_mut().enumerate() {
+        let TyKind::RigidTy(RigidTy::RawPtr(pointee, Mutability::Not)) = declaration.ty.kind()
+        else {
+            continue;
+        };
+        let mut permitted = 0;
+        let mut assigned = false;
+        for block in &body.blocks {
+            for statement in &block.statements {
+                match &statement.kind {
+                    StatementKind::Assign(place, rvalue)
+                        if place.local == index && place.projection.is_empty() =>
+                    {
+                        if matches!(rvalue, Rvalue::AddressOf(RawPtrKind::FakeForPtrMetadata, _)) {
+                            assigned = true;
+                            permitted += 1;
+                        }
+                    },
+                    StatementKind::Assign(
+                        _,
+                        Rvalue::UnaryOp(
+                            UnOp::PtrMetadata,
+                            Operand::Move(operand) | Operand::Copy(operand),
+                        ),
+                    ) if operand.local == index && operand.projection.is_empty() => permitted += 1,
+                    StatementKind::StorageLive(local) | StatementKind::StorageDead(local)
+                        if *local == index =>
+                    {
+                        permitted += 1
+                    },
+                    _ => {},
+                }
+            }
+        }
+        let mut mentions = LocalMentions {
+            local: index,
+            mentions: 0,
+        };
+        mentions.visit_body(body);
+        if assigned && mentions.mentions == permitted {
+            declaration.ty = RustTy::new_ref(
+                Region {
+                    kind: RegionKind::ReErased,
+                },
+                pointee,
+                Mutability::Not,
+            );
+        }
+    }
+    locals
+}
+
+/// The ADTs a body observes the shape of: those it constructs, reads the
+/// discriminant of, downcasts, or projects a field of.
+struct ObservedAdts<'a> {
+    locals: &'a [MirLocalDecl],
+    adts: Vec<AdtDef>,
+}
+
+impl ObservedAdts<'_> {
+    fn observe(&mut self, ty: RustTy) {
+        if let TyKind::RigidTy(RigidTy::Adt(definition, _)) = ty.kind()
+            && !self.adts.contains(&definition)
+        {
+            self.adts.push(definition);
+        }
+    }
+}
+
+impl MirVisitor for ObservedAdts<'_> {
+    fn visit_place(&mut self, place: &MirPlace, _context: PlaceContext, _location: MirLocation) {
+        for (index, projection) in place.projection.iter().enumerate() {
+            if matches!(
+                projection,
+                ProjectionElem::Downcast(_) | ProjectionElem::Field(..)
+            ) {
+                let base = MirPlace {
+                    local: place.local,
+                    projection: place.projection[..index].to_vec(),
+                };
+                if let Ok(ty) = base.ty(self.locals) {
+                    self.observe(ty);
+                }
+            }
+        }
+    }
+
+    fn visit_rvalue(&mut self, rvalue: &Rvalue, location: MirLocation) {
+        match rvalue {
+            Rvalue::Aggregate(AggregateKind::Adt(definition, ..), _)
+                if !self.adts.contains(definition) =>
+            {
+                self.adts.push(*definition)
+            },
+            Rvalue::Discriminant(place) => {
+                if let Ok(ty) = place.ty(self.locals) {
+                    self.observe(ty);
+                }
+            },
+            _ => {},
+        }
+        self.super_rvalue(rvalue, location);
+    }
+}
+
+/// An ADT the unit reaches. A dependency's ADT whose shape no body observes is
+/// opaque: the unit names it without its fields or variants.
+#[derive(Clone, Copy)]
+struct ReachedAdt {
+    definition: AdtDef,
+    opaque: bool,
+}
+
+/// The ADTs the bodies' locals and the called dependency functions'
+/// signatures reach.
+fn collect_adts(bodies: &[Body], signatures: &[RustTy]) -> Result<Vec<ReachedAdt>, String> {
+    let mut observed = Vec::new();
+    for body in bodies {
+        let locals = mapped_locals(body);
+        let mut visitor = ObservedAdts {
+            locals: &locals,
+            adts: observed,
+        };
+        visitor.visit_body(body);
+        observed = visitor.adts;
+    }
+    let mut adts = Vec::new();
+    for body in bodies {
+        for local in &mapped_locals(body) {
+            collect_type_adts(local.ty, &observed, &mut adts)?;
+        }
+    }
+    for ty in signatures {
+        collect_type_adts(*ty, &observed, &mut adts)?;
+    }
+    adts.sort_by_key(|adt| adt.definition.name());
     Ok(adts)
 }
 
-fn collect_type_adts(ty: RustTy, adts: &mut Vec<AdtDef>) -> Result<(), String> {
+fn collect_type_adts(
+    ty: RustTy,
+    observed: &[AdtDef],
+    adts: &mut Vec<ReachedAdt>,
+) -> Result<(), String> {
     match ty.kind() {
         TyKind::RigidTy(RigidTy::Tuple(elements)) => {
             for element in elements {
-                collect_type_adts(element, adts)?;
+                collect_type_adts(element, observed, adts)?;
             }
             Ok(())
         },
         TyKind::RigidTy(RigidTy::Array(element, _) | RigidTy::Slice(element)) => {
-            collect_type_adts(element, adts)
+            collect_type_adts(element, observed, adts)
         },
         TyKind::RigidTy(RigidTy::FnPtr(signature)) => {
             let signature = supported_function_pointer_signature(&signature)?;
             for type_ in &signature.inputs_and_output {
-                collect_type_adts(*type_, adts)?;
+                collect_type_adts(*type_, observed, adts)?;
             }
             Ok(())
         },
@@ -339,17 +1146,13 @@ fn collect_type_adts(ty: RustTy, adts: &mut Vec<AdtDef>) -> Result<(), String> {
         | TyKind::RigidTy(RigidTy::Uint(_))
         | TyKind::RigidTy(RigidTy::Int(_)) => Ok(()),
         TyKind::Param(_) => Ok(()),
-        TyKind::RigidTy(RigidTy::Ref(_, referent, _)) => collect_type_adts(referent, adts),
+        TyKind::RigidTy(RigidTy::Ref(_, referent, _)) => {
+            collect_type_adts(referent, observed, adts)
+        },
         TyKind::RigidTy(RigidTy::Adt(definition, arguments)) => {
-            if definition.krate() != rustc_public::local_crate() {
-                return Err(format!(
-                    "dependency ADT `{}` requires dependency namespace import",
-                    definition.name()
-                ));
-            }
             for argument in &arguments.0 {
                 if let GenericArgKind::Type(argument) = argument {
-                    collect_type_adts(*argument, adts)?;
+                    collect_type_adts(*argument, observed, adts)?;
                 }
             }
             if definition.kind() == AdtKind::Union {
@@ -359,13 +1162,17 @@ fn collect_type_adts(ty: RustTy, adts: &mut Vec<AdtDef>) -> Result<(), String> {
                     definition.kind()
                 ));
             }
-            if adts.contains(&definition) {
+            if adts.iter().any(|adt| adt.definition == definition) {
                 return Ok(());
             }
-            adts.push(definition);
-            for variant in definition.variants() {
-                for field in variant.fields() {
-                    collect_type_adts(field.ty(), adts)?;
+            let opaque = definition.krate() != rustc_public::local_crate()
+                && !observed.contains(&definition);
+            adts.push(ReachedAdt { definition, opaque });
+            if !opaque {
+                for variant in definition.variants() {
+                    for field in variant.fields() {
+                        collect_type_adts(field.ty(), observed, adts)?;
+                    }
                 }
             }
             Ok(())
@@ -393,31 +1200,53 @@ fn supported_function_pointer_signature(signature: &PolyFnSig) -> Result<&FnSig,
 
 fn build_names(
     identities: &[String],
-    definitions: &[AdtDef],
-) -> (Vec<QualifiedName>, Vec<AdtNames>) {
+    item_scopes: &[Vec<String>],
+    reached: &[ReachedAdt],
+    scopes: &mut Scopes,
+    namespaces: &CrateNamespaces,
+) -> Result<(Vec<QualifiedName>, Vec<AdtNames>), String> {
     let mut names = identities
         .iter()
-        .map(|identity| QualifiedName {
-            name: identity.rsplit("::").next().unwrap_or(identity).to_owned(),
+        .zip(item_scopes)
+        .map(|(identity, scope)| QualifiedName {
+            name: last_segment(identity),
             namespace_id: NamespaceId::new(0),
+            scope: scope.clone(),
         })
         .collect::<Vec<_>>();
-    let mut adts = Vec::with_capacity(definitions.len());
-    for definition in definitions {
+    let mut adts = Vec::with_capacity(reached.len());
+    let mut copy_by_crate = BTreeMap::<String, Vec<AdtDef>>::new();
+    for adt in reached {
+        let definition = adt.definition;
+        let krate = definition.krate();
+        let copy = copy_by_crate
+            .entry(krate.name.clone())
+            .or_insert_with(|| copy_adts(&krate))
+            .contains(&definition);
         let name = NameId::new(names.len());
-        let identity = definition.name();
+        let krate = definition.krate().name;
+        let namespace_id = namespaces.id(&krate)?;
+        // Variants and fields are named in the module of their type.
+        let scope = scopes.module_scope(&krate, definition.def_id());
         names.push(QualifiedName {
-            name: identity.rsplit("::").next().unwrap_or(&identity).to_owned(),
-            namespace_id: NamespaceId::new(0),
+            name: last_segment(&definition.name()),
+            namespace_id,
+            scope: scope.clone(),
         });
         let mut variants = Vec::new();
-        for (ordinal, variant) in definition.variants().into_iter().enumerate() {
+        let shape = if adt.opaque {
+            vec![]
+        } else {
+            definition.variants()
+        };
+        for (ordinal, variant) in shape.into_iter().enumerate() {
             let source_name = (definition.kind() == AdtKind::Enum).then(|| variant.name());
             let variant_name = source_name.as_ref().map(|source_name| {
                 let id = NameId::new(names.len());
                 names.push(QualifiedName {
                     name: source_name.clone(),
-                    namespace_id: NamespaceId::new(0),
+                    namespace_id,
+                    scope: scope.clone(),
                 });
                 id
             });
@@ -428,7 +1257,8 @@ fn build_names(
                     let id = NameId::new(names.len());
                     names.push(QualifiedName {
                         name: field.name,
-                        namespace_id: NamespaceId::new(0),
+                        namespace_id,
+                        scope: scope.clone(),
                     });
                     id
                 })
@@ -442,12 +1272,62 @@ fn build_names(
             });
         }
         adts.push(AdtNames {
-            definition: *definition,
+            definition,
             name,
+            namespace_id,
+            copy,
+            opaque: adt.opaque,
             variants,
         });
     }
-    (names, adts)
+    Ok((names, adts))
+}
+
+/// The namespaces of a unit: the local crate's first, then one per dependency
+/// crate the unit reaches, ordered by name.
+struct CrateNamespaces {
+    local: String,
+    dependencies: BTreeMap<String, (CrateNum, NamespaceId)>,
+}
+
+impl CrateNamespaces {
+    fn new(crates: impl IntoIterator<Item = Crate>) -> Result<Self, String> {
+        let local = rustc_public::local_crate().name;
+        let mut reached = BTreeMap::<String, CrateNum>::new();
+        for krate in crates {
+            if krate.is_local {
+                continue;
+            }
+            match reached.get(&krate.name) {
+                Some(id) if *id != krate.id => {
+                    return Err(format!("two dependency crates are named `{}`", krate.name));
+                },
+                Some(_) => {},
+                None => {
+                    reached.insert(krate.name, krate.id);
+                },
+            }
+        }
+        let dependencies = reached
+            .into_iter()
+            .enumerate()
+            .map(|(index, (name, id))| (name, (id, NamespaceId::new(index + 1))))
+            .collect();
+        Ok(Self {
+            local,
+            dependencies,
+        })
+    }
+
+    fn id(&self, krate: &str) -> Result<NamespaceId, String> {
+        if krate == self.local {
+            return Ok(NamespaceId::new(0));
+        }
+        self.dependencies
+            .get(krate)
+            .map(|(_, id)| *id)
+            .ok_or_else(|| format!("crate `{krate}` has no namespace"))
+    }
 }
 
 fn map_structs(
@@ -457,7 +1337,11 @@ fn map_structs(
 ) -> Result<Vec<StructDecl>, String> {
     adts.iter()
         .map(|adt| {
-            let loc = sources.intern(adt.definition.span())?;
+            let loc = sources.declaration(
+                adt.namespace_id,
+                &adt.definition.name(),
+                adt.definition.span(),
+            )?;
             let generics = adt
                 .definition
                 .generics_of()
@@ -486,7 +1370,9 @@ fn map_structs(
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-            let (fields, variants) = if adt.definition.kind() == AdtKind::Struct {
+            let (fields, variants) = if adt.opaque {
+                (vec![], vec![])
+            } else if adt.definition.kind() == AdtKind::Struct {
                 let names = adt.variants.first().ok_or_else(|| {
                     format!(
                         "struct `{}` has no field-bearing variant",
@@ -517,7 +1403,11 @@ fn map_structs(
                 (vec![], variants)
             };
             Ok(StructDecl {
-                abilities: vec![],
+                abilities: if adt.copy {
+                    vec![Ability::Copy]
+                } else {
+                    vec![]
+                },
                 attributes: vec![],
                 contract: empty_contract(),
                 doc: String::new(),
@@ -527,7 +1417,15 @@ fn map_structs(
                 loc,
                 locals: vec![],
                 name: adt.name,
-                properties: vec![],
+                properties: if adt.opaque {
+                    vec![ProfileValue {
+                        payload: String::new(),
+                        profile: Profile::Rust,
+                        tag: "struct.opaque".to_owned(),
+                    }]
+                } else {
+                    vec![]
+                },
                 variants,
             })
         })
@@ -552,7 +1450,8 @@ fn map_fields(
         .into_iter()
         .zip(&names.fields)
         .map(|(field, name)| {
-            let field_loc = sources.intern(field.span())?;
+            let field_loc =
+                sources.declaration(adt.namespace_id, &adt.definition.name(), field.span())?;
             Ok(FieldDecl {
                 doc: String::new(),
                 loc: field_loc,
@@ -620,6 +1519,7 @@ impl TypeLayout {
         items: &[CrateItem],
         bodies: &[Body],
         adts: &[AdtNames],
+        dependency_functions: &[DependencyFunction],
     ) -> Result<Self, String> {
         let mut needs_never = false;
         let mut needs_bool = false;
@@ -628,10 +1528,19 @@ impl TypeLayout {
         let mut needed_nominals = Vec::new();
         let mut needed_composites = Vec::new();
         let mut pending_references = Vec::new();
-        for body in bodies {
-            for local in body.locals() {
+        let locals = bodies.iter().flat_map(|body| {
+            mapped_locals(body)
+                .into_iter()
+                .map(|local| local.ty)
+                .collect::<Vec<_>>()
+        });
+        let signatures = dependency_functions
+            .iter()
+            .flat_map(|function| function.signature.iter().copied());
+        for ty in locals.chain(signatures) {
+            {
                 observe_type(
-                    local.ty,
+                    ty,
                     &mut needs_never,
                     &mut needs_bool,
                     &mut needs_character,
@@ -643,7 +1552,7 @@ impl TypeLayout {
                 )?;
             }
         }
-        for adt in adts {
+        for adt in adts.iter().filter(|adt| !adt.opaque) {
             for variant in adt.definition.variants() {
                 for field in variant.fields() {
                     observe_type(
@@ -666,6 +1575,12 @@ impl TypeLayout {
             let TyKind::RigidTy(RigidTy::Adt(definition, arguments)) = ty.kind() else {
                 continue;
             };
+            if adts
+                .iter()
+                .any(|adt| adt.definition == definition && adt.opaque)
+            {
+                continue;
+            }
             for variant in definition.variants() {
                 for field in variant.fields() {
                     observe_type(
@@ -733,8 +1648,13 @@ impl TypeLayout {
             })
             .collect::<Vec<_>>();
         let mut parameter_indices = Vec::new();
-        for item in items {
-            for parameter in function_def(*item)?.generics_of().params {
+        let functions = items.iter().map(|item| function_def(*item)).chain(
+            dependency_functions
+                .iter()
+                .map(|function| Ok(function.definition)),
+        );
+        for function in functions {
+            for parameter in flattened_generics(function?)? {
                 if matches!(parameter.kind, GenericParamDefKind::Type { .. }) {
                     parameter_indices.push(parameter.index);
                 }
@@ -1471,9 +2391,44 @@ struct SourceTables {
     file_ids: BTreeMap<String, FileId>,
     location_ids: BTreeMap<(usize, usize, usize), LocId>,
     generated_location_ids: BTreeMap<usize, LocId>,
+    dependency_location_ids: BTreeMap<String, LocId>,
 }
 
 impl SourceTables {
+    /// The location of a declaration: its span in the local crate, or, in a
+    /// dependency crate, whose sources the unit does not record, a generated
+    /// location naming the definition.
+    fn declaration(
+        &mut self,
+        namespace: NamespaceId,
+        definition: &str,
+        span: Span,
+    ) -> Result<LocId, String> {
+        if namespace.index == 0 {
+            self.intern(span)
+        } else {
+            Ok(self.dependency(definition))
+        }
+    }
+
+    /// The generated location of a definition in a dependency crate.
+    fn dependency(&mut self, definition: &str) -> LocId {
+        let description = format!("rustc dependency `{definition}`");
+        if let Some(id) = self.dependency_location_ids.get(&description) {
+            return *id;
+        }
+        let id = LocId::new(self.locations.len());
+        self.locations.push(Location {
+            expansion: vec![],
+            generated_by: Some(description.clone()),
+            parent: None,
+            primary: None,
+            related: vec![],
+        });
+        self.dependency_location_ids.insert(description, id);
+        id
+    }
+
     fn intern(&mut self, span: Span) -> Result<LocId, String> {
         let filename = span.get_filename();
         let file_id = match self.file_ids.get(&filename).copied() {
@@ -1805,8 +2760,9 @@ struct MappedFunction {
 
 struct FunctionMapper<'a> {
     body: &'a Body,
+    locals: Vec<MirLocalDecl>,
     types: &'a TypeLayout,
-    name_ids: &'a BTreeMap<String, NameId>,
+    name_ids: &'a BTreeMap<String, QualifiedRef>,
     adts: &'a [AdtNames],
     sources: &'a mut SourceTables,
     arenas: &'a mut NamespaceArenas,
@@ -1817,7 +2773,7 @@ impl<'a> FunctionMapper<'a> {
     fn new(
         body: &'a Body,
         types: &'a TypeLayout,
-        name_ids: &'a BTreeMap<String, NameId>,
+        name_ids: &'a BTreeMap<String, QualifiedRef>,
         adts: &'a [AdtNames],
         sources: &'a mut SourceTables,
         arenas: &'a mut NamespaceArenas,
@@ -1838,6 +2794,7 @@ impl<'a> FunctionMapper<'a> {
         }
         Ok(Self {
             body,
+            locals: mapped_locals(body),
             types,
             name_ids,
             adts,
@@ -1881,7 +2838,7 @@ impl<'a> FunctionMapper<'a> {
                         place,
                         variant_index,
                     } => {
-                        let place_type = place.ty(self.body.locals()).map_err(|error| {
+                        let place_type = place.ty(&self.locals).map_err(|error| {
                             format!("query set-discriminant place type: {error:?}")
                         })?;
                         let TyKind::RigidTy(RigidTy::Adt(definition, _)) = place_type.kind() else {
@@ -1925,7 +2882,7 @@ impl<'a> FunctionMapper<'a> {
                     },
                     StatementKind::AscribeUserType { place, .. } => {
                         let type_id = self.types.id(place
-                            .ty(self.body.locals())
+                            .ty(&self.locals)
                             .map_err(|error| format!("query ascribed place type: {error:?}"))?)?;
                         statements.push(RawStatement::AscribeUserType {
                             place: self.map_place(place)?,
@@ -1964,10 +2921,10 @@ impl<'a> FunctionMapper<'a> {
         let argument_count = self.body.arg_locals().len();
         let rust_order = (1..=argument_count)
             .chain(std::iter::once(0))
-            .chain(argument_count + 1..self.body.locals().len());
-        let mut locals = Vec::with_capacity(self.body.locals().len());
+            .chain(argument_count + 1..self.locals.len());
+        let mut locals = Vec::with_capacity(self.locals.len());
         for rust_local in rust_order {
-            let declaration = &self.body.locals()[rust_local];
+            let declaration = &self.locals[rust_local];
             let id = self.rust_to_vir[rust_local];
             let loc = self.sources.intern(declaration.span)?;
             let type_id = self.types.id(declaration.ty)?;
@@ -2018,7 +2975,7 @@ impl<'a> FunctionMapper<'a> {
             Rvalue::Use(operand, WithRetag::Yes) => self.map_operand(operand, loc),
             Rvalue::CopyForDeref(place) => {
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query copy-for-deref result type: {error:?}"))?)?;
                 let place = self.map_place(place)?;
                 Ok(self
@@ -2034,7 +2991,7 @@ impl<'a> FunctionMapper<'a> {
                 let left_id = self.map_operand(left, loc)?;
                 let right_id = self.map_operand(right, loc)?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query binary operation result type: {error:?}"))?)?;
                 let operation = primitive_operation(*operation)?;
                 Ok(self
@@ -2049,11 +3006,9 @@ impl<'a> FunctionMapper<'a> {
             Rvalue::CheckedBinaryOp(operation, left, right) => {
                 let left_id = self.map_operand(left, loc)?;
                 let right_id = self.map_operand(right, loc)?;
-                let result_type =
-                    self.types
-                        .id(rvalue.ty(self.body.locals()).map_err(|error| {
-                            format!("query checked binary operation result type: {error:?}")
-                        })?)?;
+                let result_type = self.types.id(rvalue.ty(&self.locals).map_err(|error| {
+                    format!("query checked binary operation result type: {error:?}")
+                })?)?;
                 let operation = match operation {
                     BinOp::Add => PrimitiveOperation::OverflowingAdd,
                     BinOp::Sub => PrimitiveOperation::OverflowingSubtract,
@@ -2074,10 +3029,10 @@ impl<'a> FunctionMapper<'a> {
             Rvalue::UnaryOp(operation, operand) => {
                 let argument = self.map_operand(operand, loc)?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query unary operation result type: {error:?}"))?)?;
                 if *operation == UnOp::PtrMetadata {
-                    let operand_type = operand.ty(self.body.locals()).map_err(|error| {
+                    let operand_type = operand.ty(&self.locals).map_err(|error| {
                         format!("query pointer-metadata operand type: {error:?}")
                     })?;
                     let TyKind::RigidTy(RigidTy::Ref(_, referent, _)) = operand_type.kind() else {
@@ -2115,7 +3070,7 @@ impl<'a> FunctionMapper<'a> {
                             surface: None,
                         }));
                 }
-                let kind = match (operation, operand.ty(self.body.locals())) {
+                let kind = match (operation, operand.ty(&self.locals)) {
                     (UnOp::Not, Ok(ty)) if is_bool(ty) => PrimitiveOperation::LogicalNot,
                     (UnOp::Not, Ok(ty)) if is_integer(ty) => PrimitiveOperation::BitwiseNot,
                     (UnOp::Neg, Ok(ty)) if is_signed_integer(ty) => PrimitiveOperation::Negate,
@@ -2140,7 +3095,7 @@ impl<'a> FunctionMapper<'a> {
                 target,
             ) => {
                 let source = operand
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query function-item cast source type: {error:?}"))?;
                 let TyKind::RigidTy(RigidTy::FnDef(definition, generic_arguments)) = source.kind()
                 else {
@@ -2156,7 +3111,7 @@ impl<'a> FunctionMapper<'a> {
                     );
                 }
                 let callee_name = definition.name();
-                let name = self.name_ids.get(&callee_name).copied().ok_or_else(|| {
+                let function = self.name_ids.get(&callee_name).cloned().ok_or_else(|| {
                     format!(
                         "function-pointer target `{callee_name}` is not a mapped local function"
                     )
@@ -2169,20 +3124,14 @@ impl<'a> FunctionMapper<'a> {
                         instantiations: vec![],
                         operation: Operation::Call {
                             // A function pointer captures nothing.
-                            kind: CallKind::Closure {
-                                function: QualifiedRef {
-                                    name,
-                                    namespace_id: NamespaceId::new(0),
-                                },
-                                mask: 0,
-                            },
+                            kind: CallKind::Closure { function, mask: 0 },
                         },
                         surface: None,
                     }))
             },
             Rvalue::Cast(CastKind::IntToInt, operand, target) => {
                 let source = operand
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query integer cast source type: {error:?}"))?;
                 let integer_cast = is_integer(source) && is_integer(*target);
                 let character_to_integer = is_character(source) && is_integer(*target);
@@ -2205,6 +3154,32 @@ impl<'a> FunctionMapper<'a> {
                         surface: None,
                     }))
             },
+            Rvalue::AddressOf(RawPtrKind::FakeForPtrMetadata, place) => {
+                // Only a pointer local `mapped_locals` types as a shared
+                // borrow reaches this: it is that borrow.
+                let referent = place
+                    .ty(&self.locals)
+                    .map_err(|error| format!("query metadata borrow type: {error:?}"))?;
+                let result_type = self.types.id(RustTy::new_ref(
+                    Region {
+                        kind: RegionKind::ReErased,
+                    },
+                    referent,
+                    Mutability::Not,
+                ))?;
+                let place = self.map_place(place)?;
+                Ok(self
+                    .arenas
+                    .expression(loc, result_type, ExprKind::Operation {
+                        arguments: vec![],
+                        instantiations: vec![],
+                        operation: Operation::Borrow {
+                            kind: BorrowKind::Immutable,
+                            place,
+                        },
+                        surface: None,
+                    }))
+            },
             Rvalue::Ref(_, borrow_kind, place) => {
                 let kind = match borrow_kind {
                     MirBorrowKind::Shared => BorrowKind::Immutable,
@@ -2215,7 +3190,7 @@ impl<'a> FunctionMapper<'a> {
                 };
                 let place = self.map_place(place)?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query borrow result type: {error:?}"))?)?;
                 Ok(self
                     .arenas
@@ -2228,7 +3203,7 @@ impl<'a> FunctionMapper<'a> {
             },
             Rvalue::Discriminant(place) => {
                 let place_type = place
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query discriminant place type: {error:?}"))?;
                 let TyKind::RigidTy(RigidTy::Adt(definition, _)) = place_type.kind() else {
                     return Err(format!(
@@ -2252,7 +3227,7 @@ impl<'a> FunctionMapper<'a> {
                         surface: None,
                     });
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query discriminant result type: {error:?}"))?)?;
                 Ok(self
                     .arenas
@@ -2263,7 +3238,7 @@ impl<'a> FunctionMapper<'a> {
                             kind: DataOperation::Discriminant {
                                 type_: QualifiedRef {
                                     name: adt.name,
-                                    namespace_id: NamespaceId::new(0),
+                                    namespace_id: adt.namespace_id,
                                 },
                             },
                         },
@@ -2272,10 +3247,10 @@ impl<'a> FunctionMapper<'a> {
             },
             Rvalue::Len(place) => {
                 let place_type = place
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query length place type: {error:?}"))?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query length result type: {error:?}"))?)?;
                 match place_type.kind() {
                     TyKind::RigidTy(RigidTy::Array(_, length)) => {
@@ -2320,7 +3295,7 @@ impl<'a> FunctionMapper<'a> {
                     .map(|operand| self.map_operand(operand, loc))
                     .collect::<Result<Vec<_>, _>>()?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query tuple result type: {error:?}"))?)?;
                 Ok(self
                     .arenas
@@ -2339,7 +3314,7 @@ impl<'a> FunctionMapper<'a> {
                     .map(|operand| self.map_operand(operand, loc))
                     .collect::<Result<Vec<_>, _>>()?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query array result type: {error:?}"))?)?;
                 Ok(self
                     .arenas
@@ -2355,7 +3330,7 @@ impl<'a> FunctionMapper<'a> {
             Rvalue::Repeat(operand, _) => {
                 let argument = self.map_operand(operand, loc)?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query repeated array result type: {error:?}"))?)?;
                 Ok(self
                     .arenas
@@ -2402,7 +3377,7 @@ impl<'a> FunctionMapper<'a> {
                     .map(|operand| self.map_operand(operand, loc))
                     .collect::<Result<Vec<_>, _>>()?;
                 let result_type = self.types.id(rvalue
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query aggregate result type: {error:?}"))?)?;
                 Ok(self
                     .arenas
@@ -2413,7 +3388,7 @@ impl<'a> FunctionMapper<'a> {
                             kind: CallKind::Constructor {
                                 constructor: QualifiedRef {
                                     name: adt.name,
-                                    namespace_id: NamespaceId::new(0),
+                                    namespace_id: adt.namespace_id,
                                 },
                                 variant: variant.source_name.clone(),
                             },
@@ -2429,7 +3404,7 @@ impl<'a> FunctionMapper<'a> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let rust_type = place
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query operand place type: {error:?}"))?;
                 let type_id = self.types.id(rust_type)?;
                 let place_id = self.map_place(place)?;
@@ -2445,17 +3420,22 @@ impl<'a> FunctionMapper<'a> {
                     Operand::Copy(_) if matches!(rust_type.kind(), TyKind::Param(_)) => {
                         Operation::Move { place: place_id }
                     },
-                    // `&mut T` is never Copy in Rust. Optimized MIR can still
-                    // use the `Copy` operand spelling for its final return-
-                    // forwarding use; rustc admission proves there is no
-                    // duplicating source use, so retain the consuming move.
+                    // `&mut T` is never Copy in Rust. Optimized MIR spells a
+                    // reborrow `&mut *r` as `copy r` once the reborrow is
+                    // propagated, also where `r` is used again; the reborrow
+                    // is the meaning of every such copy, the last one included.
                     Operand::Copy(_)
                         if matches!(
                             rust_type.kind(),
                             TyKind::RigidTy(RigidTy::Ref(_, _, Mutability::Mut))
                         ) =>
                     {
-                        Operation::Move { place: place_id }
+                        let referent = PlaceId::new(self.arenas.places.len());
+                        self.arenas.places.push(Place::Deref { base: place_id });
+                        Operation::Borrow {
+                            kind: BorrowKind::Mutable,
+                            place: referent,
+                        }
                     },
                     Operand::Copy(_) => Operation::Copy { place: place_id },
                     Operand::Move(_) => Operation::Move { place: place_id },
@@ -2505,7 +3485,7 @@ impl<'a> FunctionMapper<'a> {
             .copied()
             .ok_or_else(|| format!("MIR local {} is out of bounds", place.local))?;
         let mut current = self.arenas.place(local_id);
-        let mut current_type = self.body.locals()[place.local].ty;
+        let mut current_type = self.locals[place.local].ty;
         let mut selected_variant = None;
         for projection in &place.projection {
             current = match projection {
@@ -2557,7 +3537,7 @@ impl<'a> FunctionMapper<'a> {
                                 "tuple field {index} has MIR type {field_type:?}, expected {expected:?}"
                             ));
                         }
-                        let loc = self.sources.intern(self.body.locals()[place.local].span)?;
+                        let loc = self.sources.intern(self.locals[place.local].span)?;
                         let index_type =
                             self.types.integer_id(IntegerType::Unsigned(UintTy::U32))?;
                         let index_expression =
@@ -2615,7 +3595,7 @@ impl<'a> FunctionMapper<'a> {
                         base: current,
                         owner: QualifiedRef {
                             name: adt.name,
-                            namespace_id: NamespaceId::new(0),
+                            namespace_id: adt.namespace_id,
                         },
                         field,
                     });
@@ -2636,8 +3616,8 @@ impl<'a> FunctionMapper<'a> {
                     };
                     let index_local_id = self.local_id(*index_local)?;
                     let index_place = self.arenas.place(index_local_id);
-                    let index_loc = self.sources.intern(self.body.locals()[*index_local].span)?;
-                    let index_type = self.types.id(self.body.locals()[*index_local].ty)?;
+                    let index_loc = self.sources.intern(self.locals[*index_local].span)?;
+                    let index_type = self.types.id(self.locals[*index_local].ty)?;
                     let index_expression =
                         self.arenas
                             .expression(index_loc, index_type, ExprKind::Operation {
@@ -2660,7 +3640,7 @@ impl<'a> FunctionMapper<'a> {
                     min_length,
                     from_end,
                 } => {
-                    let loc = self.sources.intern(self.body.locals()[place.local].span)?;
+                    let loc = self.sources.intern(self.locals[place.local].span)?;
                     let index_type = self
                         .types
                         .integer_id(IntegerType::Unsigned(UintTy::Usize))?;
@@ -2807,7 +3787,7 @@ impl<'a> FunctionMapper<'a> {
             TerminatorKind::SwitchInt { discr, targets } => {
                 let scrutinee = self.map_operand(discr, loc)?;
                 let discr_type = discr
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query SwitchInt type: {error:?}"))?;
                 if is_bool(discr_type) {
                     let branches = targets.branches().collect::<Vec<_>>();
@@ -2859,18 +3839,13 @@ impl<'a> FunctionMapper<'a> {
                 unwind,
             } => {
                 let callee_type = func
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query callee type: {error:?}"))?;
                 if let TyKind::RigidTy(RigidTy::FnDef(definition, generic_arguments)) =
                     callee_type.kind()
                 {
                     let callee_name = definition.name();
-                    if matches!(
-                        callee_name.as_str(),
-                        "core::intrinsics::abort"
-                            | "std::intrinsics::abort"
-                            | "std::process::abort"
-                    ) {
+                    if is_abort(&callee_name) {
                         if !generic_arguments.0.is_empty() || !args.is_empty() || target.is_some() {
                             return Err(format!(
                                 "unexpected MIR shape for abort intrinsic `{callee_name}`"
@@ -2893,10 +3868,9 @@ impl<'a> FunctionMapper<'a> {
                                     "unexpected MIR argument count for `{callee_name}`"
                                 ));
                             };
-                            let argument_type =
-                                argument.ty(self.body.locals()).map_err(|error| {
-                                    format!("query `{callee_name}` receiver type: {error:?}")
-                                })?;
+                            let argument_type = argument.ty(&self.locals).map_err(|error| {
+                                format!("query `{callee_name}` receiver type: {error:?}")
+                            })?;
                             let TyKind::RigidTy(RigidTy::Ref(_, referent, _)) =
                                 argument_type.kind()
                             else {
@@ -2930,26 +3904,24 @@ impl<'a> FunctionMapper<'a> {
                         {
                             Operation::Primitive { kind }
                         } else {
-                            let name = self.name_ids.get(&callee_name).copied().ok_or_else(|| {
-                                if generic_arguments.0.is_empty() {
-                                    format!(
-                                        "direct callee `{callee_name}` is not a mapped local function"
-                                    )
-                                } else {
-                                    format!(
-                                        "generic or associated callee `{callee_name}` is not a mapped local function; function predicates and implementation-selection evidence are unavailable from the pinned Rustc Public API"
-                                    )
-                                }
-                            })?;
+                            let (resolved, resolved_arguments) =
+                                resolve_callee(definition, &generic_arguments)?;
+                            let resolved_name = resolved.name();
+                            let callee =
+                                self.name_ids.get(&resolved_name).cloned().ok_or_else(|| {
+                                    // A dependency function is declared unless its
+                                    // signature is outside the slice; say why.
+                                    match dependency_signature(resolved) {
+                                        Err(reason) => reason,
+                                        Ok(_) => format!(
+                                            "callee `{resolved_name}` is not a mapped function"
+                                        ),
+                                    }
+                                })?;
                             instantiations =
-                                self.types.generic_arguments(&generic_arguments, loc)?;
+                                self.types.generic_arguments(&resolved_arguments, loc)?;
                             Operation::Call {
-                                kind: CallKind::Function {
-                                    callee: QualifiedRef {
-                                        name,
-                                        namespace_id: NamespaceId::new(0),
-                                    },
-                                },
+                                kind: CallKind::Function { callee },
                             }
                         }
                     },
@@ -2964,7 +3936,7 @@ impl<'a> FunctionMapper<'a> {
                     kind => return Err(format!("unsupported callee type: {kind:?}")),
                 };
                 let result_type = self.types.id(destination
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query call destination type: {error:?}"))?)?;
                 let call = self
                     .arenas
@@ -3015,7 +3987,7 @@ impl<'a> FunctionMapper<'a> {
                     projection: vec![],
                 };
                 let return_type = return_place
-                    .ty(self.body.locals())
+                    .ty(&self.locals)
                     .map_err(|error| format!("query return place type: {error:?}"))?;
                 // Optimized MIR never assigns the unit return place of a
                 // `()` function. Its value is nevertheless determined, so

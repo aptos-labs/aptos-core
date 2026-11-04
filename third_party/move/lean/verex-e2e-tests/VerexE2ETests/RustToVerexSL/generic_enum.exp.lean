@@ -12,3 +12,5 @@ verex namespace generic_enum where
     match discriminant[Maybe<u32>, isize](value) with
       | 0 => fallback
       | 1 => value.0
+
+-- no denotation for `unwrap_or`: the type of an expression is not carried by the denotation

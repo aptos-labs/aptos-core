@@ -2042,8 +2042,16 @@ def bodySites (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceIndex :
   let mut counts : Std.HashMap String Nat := {}
   let mut sites := #[]
   let mut numbered : Array (VerexIR.Proofs.ObligationRange × Nat) := #[]
+  let mut checks : Array (VerexIR.Proofs.ObligationRange × Nat) := #[]
   for (kind, range, index) in ordered do
+    -- A `v[i]` is one operation: its element read is the site of its check.
+    if (kindOf ⟨index⟩).any (· matches .operation (.primitive .index) ..) then
+      if let some (_, number) := checks.find? (·.1 == range) then
+        sites := sites.push (loopSite namespaceIndex index, kind, number, "")
+        continue
     let number := counts.getD kind 0 + 1
+    if (kindOf ⟨index⟩).any (· matches .operation (.primitive (.checkVectorIndex _)) ..) then
+      checks := checks.push (range, number)
     counts := counts.insert kind number
     if kind == "match" then numbered := numbered.push (range, number)
     -- A lowered match has no site of its own, only its arms'.

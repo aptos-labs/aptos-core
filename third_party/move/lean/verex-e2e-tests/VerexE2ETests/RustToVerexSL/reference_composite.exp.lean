@@ -8,3 +8,5 @@ verex namespace reference_composite where
     let pair := (left, right)
     let _4 := copy(pair[0u32])
     *_4
+
+-- no denotation for `first_pair`: an element place on a non-vector is not carried by the denotation

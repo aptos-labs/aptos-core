@@ -447,6 +447,11 @@ example:
 - Move global storage is organized by resource family and address; Rust state
   may include allocations and interior-mutable cells.
 - Move has abilities; Rust has ownership, destruction, traits, and lifetimes.
+  The Rust profile reads `Copy` as the `copy` ability and drops every value.
+  A struct with a `Copy` impl applying it to its own parameters declares
+  `copy`, which an instantiation has where its type arguments are `Copy`, as
+  `#[derive(Copy)]` states it; a generic parameter's abilities only constrain
+  instantiations.
 
 Two functions with the same body producer can therefore still live in
 different semantic profiles.  Conversely, Lean and MIR frontends can produce
@@ -1110,7 +1115,7 @@ until it lands, is rejected, or is superseded by a recorded decision.
 | Remaining MIR-to-RawUnit mapper forms: symbolic const-dependent types, destructive/provenance administration exposed by Rustc Public, constrained and const generic functions | M1 once their metadata is public; M4 adds cleanup and effectful drop glue |
 | Checked implementation-selection evidence and dictionary interpretation (`EvidenceId` is opaque) | M2, before trait method calls execute or transfer contracts and proofs |
 | Destructive/provenance nodes, cleanup edges, pointer-alignment assertions, and reachable `unreachable` blocks, rejected by structurization | M4 for destruction, cleanup, and richer panic behavior; M5 for retag/provenance and alignment assertions |
-| Drop flags, cleanup scopes, and unwinding (only `panic=abort` with unreachable-unwind drops is structurized) | M4 drop effects and flags; full unwinding is a separately approved milestone |
+| Cleanup scopes and unwinding (only `panic=abort` with unreachable-unwind drops is structurized; its drop flags are boolean locals that definite initialization relates to the values they guard) | M4 drop effects; full unwinding is a separately approved milestone |
 | A proof-grade semantic-body/alignment receipt (the cache digest binds inputs, not alignment) | the shared proof-facing receipt gate; M7 before source-level theorem claims |
 | Raw pointers, unsafe operations, allocation/provenance, and UB (rejected at the first unsupported node, no partial JSON) | M5, U0–U2 |
 | Trait objects, specialization, higher-ranked bounds outside the initial fragment, async/coroutines, FFI, inline assembly | separately scoped post-M2/M5 milestones with core/profile classification first |
@@ -1209,7 +1214,8 @@ without relying on the user's Rust toolchain, and a repeated build is cached.
 
 ### M4 — Drop and panic
 
-- Add explicit destruction and drop-flag behavior.
+- Add explicit destruction: a drop runs its type's drop glue and the
+  destructor's effects.
 - Implement the fixed `panic=abort` terminal semantics; do not support
   unwinding or `catch_unwind` in this slice.
 - Ensure guard and destructor effects are visible to proofs.

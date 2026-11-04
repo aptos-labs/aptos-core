@@ -8,3 +8,5 @@ verex namespace subslice where
     if values.length >= 1usize then
       slice(*values, 1usize, values.length).length
     else 0usize
+
+-- no denotation for `tail_len`: the type of the result is not carried by the denotation

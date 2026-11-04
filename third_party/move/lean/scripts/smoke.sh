@@ -11,6 +11,7 @@
 #   scripts/smoke.sh --no-mvp        # skip the Move Prover tests (no cargo)
 #   scripts/smoke.sh --no-exe        # Lean fixtures only: no executable, no Move CLI
 #   scripts/smoke.sh --jobs N        # Lean processes at once (default below)
+#   scripts/smoke.sh --rust          # the Rust gate, with a small Move canary
 #   scripts/smoke.sh --list          # print the fixtures
 #
 # The Lean fixtures need only the libraries. They run as parallel processes,
@@ -102,6 +103,22 @@ MVP_TESTS=(
   verify_table.move
   data_invariant_in_map.move
 )
+# `--rust`: the Rust renderings and verified fixtures, the verex-rust suite, and
+# the Move fixtures that catch what a Rust change breaks in the code the two
+# profiles share: printing and lowering, site numbering, contracts, the solver.
+RUST_VERIFY=bounds,bounds_errors,references,references_errors
+RUST_MOVE_RENDERINGS=vectors,move2_index,loops
+RUST_CHECKS=(
+  Specifications/Addressing
+  Specifications/AbstractOwners
+  Specifications/InsertionMap
+  Calls/TrustedGeneric
+  Closures/InvariantBehavior
+)
+RUST_IR_TESTS=(
+  VerexSL/Tests/Points.lean
+  VerexSL/Tests/TypedMaps.lean
+)
 # The caps the Check driver elaborates under (VerexE2ETests/Check.lean).
 CHECK_HEARTBEATS=180000
 # The Lean fixtures' times in the previous run, longest scheduled first.
@@ -124,24 +141,49 @@ default_jobs() {
 
 run_mvp=1
 run_exe=1
+run_rust=0
+list_only=0
 jobs=${SMOKE_JOBS:-}
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-mvp) run_mvp=0 ;;
     --no-exe) run_exe=0; run_mvp=0 ;;
+    --rust) run_rust=1 ;;
     --jobs|-j)
       [ $# -ge 2 ] || { echo "smoke.sh: $1 needs a number" >&2; exit 2; }
       jobs=$2; shift ;;
-    --list)
-      printf 'check %s\n' "${CHECKS[@]}"; printf 'ir %s\n' "${IR_TESTS[@]}"
-      printf 'shared ir %s\n' "${SHARED_IR_TESTS[@]}"
-      printf 'shared check %s\n' "${SHARED_CHECKS[@]}"
-      printf 'verify %s\n' "${SOURCE_VERIFY[@]}"; printf 'mvp %s\n' "${MVP_TESTS[@]}"
-      exit 0 ;;
+    --list) list_only=1 ;;
     *) echo "smoke.sh: unknown argument $1" >&2; exit 2 ;;
   esac
   shift
 done
+if [ $run_rust = 1 ]; then
+  if [ $run_exe = 0 ]; then
+    echo "smoke.sh: --rust needs the e2e driver and the Move CLI; it cannot take --no-exe" >&2
+    exit 2
+  fi
+  run_mvp=0
+  CHECKS=("${RUST_CHECKS[@]}")
+  IR_TESTS=("${RUST_IR_TESTS[@]}")
+  SHARED_CHECKS=()
+  SHARED_IR_TESTS=()
+  DURATIONS="$DURATIONS-rust"
+fi
+if [ $list_only = 1 ]; then
+  [ ${#CHECKS[@]} = 0 ] || printf 'check %s\n' "${CHECKS[@]}"
+  [ ${#IR_TESTS[@]} = 0 ] || printf 'ir %s\n' "${IR_TESTS[@]}"
+  [ ${#SHARED_IR_TESTS[@]} = 0 ] || printf 'shared ir %s\n' "${SHARED_IR_TESTS[@]}"
+  [ ${#SHARED_CHECKS[@]} = 0 ] || printf 'shared check %s\n' "${SHARED_CHECKS[@]}"
+  printf 'verify %s\n' "${SOURCE_VERIFY[@]}"
+  if [ $run_rust = 1 ]; then
+    printf 'e2e %s\n' "rust renderings" "rust verify $RUST_VERIFY" \
+      "move renderings $RUST_MOVE_RENDERINGS"
+    echo "verex-rust suite"
+  else
+    printf 'mvp %s\n' "${MVP_TESTS[@]}"
+  fi
+  exit 0
+fi
 [ -n "$jobs" ] || jobs=$(default_jobs)
 case "$jobs" in
   ''|*[!0-9]*|0) echo "smoke.sh: --jobs expects a positive number, not '$jobs'" >&2; exit 2 ;;
@@ -218,7 +260,11 @@ step_report() { # key name lines-of-log-on-failure
 
 echo "smoke: building"
 build verex-ir
-build verex-e2e-tests VerexE2ETests
+if [ $run_rust = 1 ]; then
+  build verex-e2e-tests VerexE2ETests VerexE2ETestDriver
+else
+  build verex-e2e-tests VerexE2ETests
+fi
 
 # `verex-move verify` of a single Move file exports it with the standalone
 # Move CLI the e2e driver builds (CLAUDE.md, "Toolchains and setup"). The
@@ -236,11 +282,18 @@ if [ $run_exe = 1 ]; then
     cli_built=1
     export APTOS_MOVE_CLI="$REPO_ROOT/target/ci/move"
   fi
-  (
+  if [ $run_rust = 1 ]; then
+    # The Move renderings export with the CLI, so it comes before the fixtures.
     [ $cli_built = 0 ] || step cli build_move_cli
-    step exe build_executable
-  ) &
-  executable_pid=$!
+    (step exe build_executable) &
+    executable_pid=$!
+  else
+    (
+      [ $cli_built = 0 ] || step cli build_move_cli
+      step exe build_executable
+    ) &
+    executable_pid=$!
+  fi
 fi
 
 # The Lean fixtures: parallel arrays of the label, how to run, the source, and
@@ -258,6 +311,13 @@ for check in "${SHARED_CHECKS[@]}"; do
   fixture "shared check $check" shared-check "$source" \
     "$LEAN_ROOT/verex-e2e-tests/${source%.lean}.exp"
 done
+if [ $run_rust = 1 ]; then
+  # Each reports by its status: its output is shown only when it fails.
+  fixture "rust renderings" driver "rust|" /dev/null
+  fixture "rust verify" driver "verify|$RUST_VERIFY" /dev/null
+  fixture "move renderings (canary)" driver "move|$RUST_MOVE_RENDERINGS" /dev/null
+  fixture "verex-rust suite" rust-suite "" /dev/null
+fi
 
 run_fixture() { # index
   local index=$1 start; start=$(now_ms)
@@ -269,7 +329,23 @@ run_fixture() { # index
     check) cd "$LEAN_ROOT/verex-e2e-tests" && lake env lean "${caps[@]}" "${SOURCES[$index]}" ;;
     shared-check) cd "$LEAN_ROOT/verex-e2e-tests" &&
       lake env lean "${caps[@]}" -Dverex.sharedContinuations=true "${SOURCES[$index]}" ;;
+    driver)
+      local suite=${SOURCES[$index]%%|*} filter=${SOURCES[$index]#*|}
+      cd "$LEAN_ROOT/verex-e2e-tests" &&
+      env VEREX_E2E_SUITE="$suite" VEREX_E2E_MANAGED=1 ${filter:+VEREX_E2E_FILTER="$filter"} \
+        lake env .lake/build/bin/VerexE2ETestDriver ;;
+    rust-suite) cd "$LEAN_ROOT/verex-rust" && lake test ;;
   esac >"$TMP/$index.out" 2>&1
+  local status=$?
+  case ${KINDS[$index]} in
+    driver|rust-suite)
+      if [ $status = 0 ]; then
+        : >"$TMP/$index.out"
+      else
+        tail -40 "$TMP/$index.out" >"$TMP/$index.tail"
+        mv "$TMP/$index.tail" "$TMP/$index.out"
+      fi ;;
+  esac
   publish "$TMP/$index.ms" $(( $(now_ms) - start ))
 }
 

@@ -130,6 +130,142 @@ def Links.identity (tables : Tables) : Links :=
     namespaces := Array.range tables.namespaces.size
     lifetimes := Array.range tables.lifetimes.size, beyond := .of tables }
 
+/-- Checked backend input namespace whose functions contain only structured
+bodies (or are explicitly absent). `tables` is an immutable cached view of the
+owning compilation-unit table, whose entries hold unit identifiers; the
+body's identifiers reach it through `links`. -/
+structure ValidatedNamespace extends Namespace FunctionBody where
+  tables : Tables
+  links : Links
+  /-- The unit's value orders. A cached unit view, as `tables` is. -/
+  orders : ValueOrders := {}
+  /-- The patterns binding the locals validation added to hold mutable
+  references, with how each holds its reference. -/
+  holders : Array (PatternId × Holding) := #[]
+  deriving Repr, BEq, Inhabited
+
+namespace ValidatedNamespace
+
+variable (ns : ValidatedNamespace)
+
+/-- The unit identifier of a type identifier of the body. -/
+def typeId (id : TypeId) : TypeId := ns.links.typeId id
+
+/-- The unit identifier of a name identifier of the body. -/
+def nameId (id : NameId) : NameId := ns.links.nameId id
+
+/-- The unit identifier of a namespace identifier of the body. -/
+def namespaceId (id : NamespaceId) : NamespaceId := ns.links.namespaceId id
+
+/-- The type a type identifier of the body names, read in the unit's tables. -/
+abbrev typeOf (id : TypeId) : Option Ty := ns.tables.types[(ns.typeId id).index]?
+
+/-- The name a name identifier of the body names, read in the unit's tables. -/
+abbrev nameOf (id : NameId) : Option QualifiedName := ns.tables.names[(ns.nameId id).index]?
+
+/-- The namespace a namespace identifier of the body names. -/
+abbrev namespaceOf (id : NamespaceId) : Option NamespaceRef :=
+  ns.tables.namespaces[(ns.namespaceId id).index]?
+
+/-- A qualified reference of the body, as unit identifiers. -/
+def qualifiedRef (reference : QualifiedRef) : QualifiedRef :=
+  { namespaceId := ns.namespaceId reference.namespaceId, name := ns.nameId reference.name }
+
+/-- Generic arguments of the body, their types as unit identifiers. -/
+def genericArguments (arguments : Array GenericArgument) : Array GenericArgument :=
+  arguments.map fun argument => match argument with
+    | .typeArg value => .typeArg { value with typeId := ns.typeId value.typeId }
+    | argument => argument
+
+@[simp] theorem size_genericArguments (arguments : Array GenericArgument) :
+    (ns.genericArguments arguments).size = arguments.size := by
+  simp [genericArguments]
+
+theorem getElem?_genericArguments (arguments : Array GenericArgument) (index : Nat) :
+    (ns.genericArguments arguments)[index]? = arguments[index]?.map fun argument =>
+      match argument with
+      | .typeArg value => .typeArg { value with typeId := ns.typeId value.typeId }
+      | argument => argument := by
+  simp [genericArguments]
+
+@[simp] theorem genericArguments_typeArg (value : TypeUse) :
+    ns.genericArguments #[.typeArg value] =
+      #[.typeArg { value with typeId := ns.typeId value.typeId }] := by
+  simp [genericArguments]
+
+/-- The namespace's own unit identifier. -/
+abbrev unitIdentity : NamespaceId := ns.namespaceId ns.identity
+
+theorem typeId_of_lt {id : TypeId} (lt : id.index < ns.links.types.size) :
+    ns.typeId id = ⟨ns.links.types[id.index]⟩ := by
+  simp [typeId, Links.typeId, Array.getD, lt]
+
+theorem nameId_of_lt {id : NameId} (lt : id.index < ns.links.names.size) :
+    ns.nameId id = ⟨ns.links.names[id.index]⟩ := by
+  simp [nameId, Links.nameId, Array.getD, lt]
+
+theorem namespaceId_of_lt {id : NamespaceId} (lt : id.index < ns.links.namespaces.size) :
+    ns.namespaceId id = ⟨ns.links.namespaces[id.index]⟩ := by
+  simp [namespaceId, Links.namespaceId, Array.getD, lt]
+
+end ValidatedNamespace
+
+private def nameIn (tables : Tables) (id : NameId) : String :=
+  ((tables.names[id.index]?).map (·.name)).getD ""
+
+/-- Two qualified function names in the order Move compares function values:
+namespace path, addresses by the number they spell, then the function name. -/
+private def compareQualified (left right : Array String × String) : Ordering :=
+  (List.compareLex compareAddress left.1.toList right.1.toList).then (compare left.2 right.2)
+
+/-- The value orders of a unit's namespaces. -/
+def valueOrdersOf (tables : Tables) (namespaces : Array (Namespace FunctionBody)) : ValueOrders :=
+  let variants := namespaces.map fun ns => ns.structs.map fun declaration =>
+    declaration.variants.map fun variant => nameIn tables variant.name
+  let keys := namespaces.toList.zipIdx.flatMap fun (ns, namespaceIndex) =>
+    let path := (tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+    ns.functions.toList.zipIdx.map fun (function, functionIndex) =>
+      ((path, nameIn tables function.name), namespaceIndex, functionIndex)
+  let sorted := keys.mergeSort fun left right => compareQualified left.1 right.1 != .gt
+  let functions := sorted.zipIdx.foldl (init := namespaces.map (Array.replicate ·.functions.size 0))
+    fun ranks ((_, namespaceIndex, functionIndex), rank) =>
+      ranks.modify namespaceIndex (·.set! functionIndex rank)
+  { variants, functions }
+
+/-- Checked dependency summary copied into `ValidatedUnit` after unit
+validation. It is intentionally distinct from the frontend-constructible raw
+form so its schema can grow checked indexes and resolved declarations. -/
+structure ValidatedNamespaceInterface where
+  namespaceId : NamespaceId
+  profile : Option Profile := none
+  exportedNames : Array NameId := #[]
+  /-- Checked nominal declarations this dependency exports; see
+  `RawNamespaceInterface.structs`. -/
+  structs : Array StructDecl := #[]
+  /-- Checked function signatures this dependency exports, without bodies. -/
+  functions : Array (FunctionDecl FunctionBody) := #[]
+  /-- Checked specification-function signatures, likewise without bodies. -/
+  specFunctions : Array SpecFunctionDecl := #[]
+  /-- Its checked scopes; see `RawNamespaceInterface.scopes`. -/
+  scopes : Array ScopeDecl := #[]
+  deriving Repr, BEq, Inhabited
+
+/-- Checked copy of an upstream producer/check/assumption statement. This is
+retained for backend and theorem reporting; `trusted` remains an explicit
+assumption marker and is not upgraded into proof by VIR validation. -/
+structure ValidatedImportEvidence where
+  producer : String
+  description : String
+  trusted : Bool
+  deriving Repr, BEq, Inhabited
+
+/-- Derived unit summary created by validation. These counts are the initial
+index surface and can be extended without making frontends construct them. -/
+structure UnitIndexes where
+  namespaceCount : Nat
+  functionCounts : Array Nat
+  deriving Repr, BEq, Inhabited
+
 /-- How one raw CFG block is represented by the recovered expression tree.
 A block may occur at multiple tree positions when structurization duplicates
 a shared region. An empty array is reserved for a compiler-generated

@@ -230,6 +230,8 @@ def testBaselines (environment : Lean.Environment) : IO Unit := do
     throw <| IO.userError s!"no Move-to-VerexSL baselines found under {featureDir}"
   for source in sources do
     testSource environment source
+  -- A selection of fixtures names sources alone.
+  if (← Baseline.selectedFixtures).isSome then return
   withDependencyInputs packages.toList do
     for directory in packages do
       unless (← testPackage environment directory) > 0 do

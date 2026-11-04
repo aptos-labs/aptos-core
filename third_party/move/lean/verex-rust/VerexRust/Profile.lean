@@ -6,10 +6,13 @@ import VerexIR
 /-!
 # Initial Rust semantic profile
 
-M0 registers the Rust profile and deliberately admits no Rust-specific
-extension tag.  Core VIR values can already be validated under this profile;
-the MIR mapper will add supported Rust vocabulary only through a reviewed
-shared-VIR extension, never through an unchecked string payload.
+M0 registers the Rust profile and admits two Rust-specific tags: the property
+`struct.opaque` of a dependency's type whose shape the crate does not see,
+and the property `function.dependency` of a dependency's function, declared
+without its body.
+Core VIR values can already be validated under this profile; the MIR mapper
+adds supported Rust vocabulary only through a reviewed shared-VIR extension,
+never through an unchecked string payload.
 -/
 
 namespace VerexIR.Rust
@@ -38,6 +41,14 @@ def config : ProfileConfig :=
 private def unknown (kind : String) (value : ProfileValue) : Array Diagnostic :=
   #[.error "VIR-RUST-TAG" s!"unsupported Rust {kind} tag `{value.tag}`"]
 
+/-- A dependency's type the crate names without seeing its shape: it neither
+constructs, matches, nor projects it. -/
+def opaqueTag : String := "struct.opaque"
+
+/-- A dependency's function the crate calls, declared by its signature: its
+body is not exported. -/
+def dependencyTag : String := "function.dependency"
+
 def schema : ProfileSchema where
   profile := .rust
   name := profileName
@@ -58,7 +69,11 @@ def schema : ProfileSchema where
   checkType := unknown "type"
   checkOperation := unknown "operation"
   checkSurface := unknown "surface"
-  checkProperty := unknown "property"
+  checkProperty := fun value =>
+    if (value.tag == opaqueTag || value.tag == dependencyTag) && value.payload.isEmpty then #[]
+    else unknown "property" value
+  opaqueNominal := fun properties => properties.any (·.tag == opaqueTag)
+  bodiless := fun properties => some (properties.any (·.tag == dependencyTag))
 
 /-- M0 semantic policy for core-only Rust-profile fixtures. Rust-specific
 operations are not silently accepted until the profile inventory is added. -/
@@ -66,7 +81,10 @@ def semantics : SemanticProfile where
   profile := .rust
   name := profileName
   version := profileVersion
-  classify := fun _ _ => none
+  classify := fun site value => match site with
+    | .property =>
+        if value.tag == opaqueTag || value.tag == dependencyTag then some .frontendOnly else none
+    | _ => none
   rollbackThrow := fun _ => false
 
 /-- Validate an isolated Rust-profile raw unit. Multi-profile clients build a

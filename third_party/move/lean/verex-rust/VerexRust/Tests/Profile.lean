@@ -207,6 +207,181 @@ def checkRustExporterBaseline : IO Unit := do
 #guard_msgs in
 #eval checkRustExporterBaseline
 
+/-- A crate's modules are scopes of its one namespace, and so are the types
+whose inherent impls declare associated functions: each name carries the
+scope it is declared in, and the namespace declares its scopes, each after
+its parent module. Malformed scopes are rejected. -/
+def checkRustModuleScopes : IO Unit := do
+  let file := "modules.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
+  unless Import.encodeJson raw == text do
+    throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
+  let checked ← match validate raw with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let some ns := checked.namespaces[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its namespace"
+  unless ns.scopes.map (fun scope => (scope.path, scope.kind)) ==
+      #[(#["Pair"], .inherent), (#["inner"], .module), (#["inner", "nested"], .module)] do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its scopes"
+  let scopeOf (name : String) := checked.tables.names.find? (·.name == name) |>.map (·.scope)
+  unless scopeOf "first" == some #["Pair"] && scopeOf "helper" == some #[] &&
+      scopeOf "second" == some #["inner"] && scopeOf "id" == some #["inner", "nested"] &&
+      scopeOf "Wrapper" == some #["inner", "nested"] do
+    throw <| IO.userError s!"Rust exporter baseline {file} named a declaration in the wrong scope"
+  let some rawNs := raw.namespaces[0]?
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its namespace"
+  let rejects (scopes : Array ScopeDecl) (code : String) : Bool :=
+    match validate { raw with namespaces := raw.namespaces.set! 0 { rawNs with scopes } } with
+    | .ok _ => false
+    | .error diagnostics => diagnostics.any (·.code == code)
+  let pair := rawNs.scopes[0]!
+  let inner := rawNs.scopes[1]!
+  let nested := rawNs.scopes[2]!
+  unless rejects #[pair, inner] "VIR-SCOPE-UNDECLARED" &&
+      rejects #[pair, nested, inner] "VIR-SCOPE-PARENT" &&
+      rejects #[pair, { inner with kind := .inherent }, nested] "VIR-SCOPE-PARENT" &&
+      rejects #[pair, inner, nested, inner] "VIR-SCOPE-DUPLICATE" &&
+      rejects #[pair, inner, nested, { inner with path := #[] }] "VIR-SCOPE-EMPTY" do
+    throw <| IO.userError "malformed module scopes were not rejected"
+
+#guard_msgs in
+#eval checkRustModuleScopes
+
+/-- A dependency crate is a namespace of the unit, not a verification target,
+declaring the types the crate reaches in their modules' scopes. A type whose
+shape the crate observes (matches, constructs, or projects) carries it; any
+other is opaque, and constructing an opaque type is rejected. -/
+def checkRustDependencyTypes : IO Unit := do
+  let file := "dependency_types.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
+  unless Import.encodeJson raw == text do
+    throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
+  let checked ← match validate raw with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  unless (prepareExecution #[semantics] checked).isOk &&
+      (prepareVerification #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} does not prepare for execution \
+      and verification"
+  let nonTarget := checked.namespaces.extract 1 checked.namespaces.size |>.all fun ns =>
+    ns.pragmas == #[.assign "verify" (.constant (.bool false))]
+  let shape (name : String) : Option (Array String × Nat × Bool) :=
+    checked.namespaces.findSome? fun dependency =>
+      (dependency.structs.find? fun declaration =>
+          (checked.tables.names[declaration.name.index]?).any (·.name == name)).map
+        fun declaration =>
+          ((checked.tables.names[declaration.name.index]?.map (·.scope)).getD #[],
+            declaration.variants.size, declaration.properties.any (·.tag == opaqueTag))
+  unless checked.tables.namespaces.map (·.segments) ==
+        #[#["dependency_types"], #["alloc"], #["core"]] && nonTarget &&
+      shape "Option" == some (#["option"], 2, false) &&
+      shape "Result" == some (#["result"], 2, false) &&
+      shape "Vec" == some (#["vec"], 0, true) do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its dependency namespaces"
+  -- `wrap` constructs `Some`; with `Option` opaque, that construction is rejected.
+  let some core := raw.namespaces.find? fun ns =>
+      raw.tables.namespaces[ns.identity.index]?.map (·.segments) == some #["core"]
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its `core` namespace"
+  let opaqueStruct (declaration : StructDecl) : StructDecl :=
+    { declaration with
+      fields := #[], variants := #[], properties := #[{ profile := .rust, tag := opaqueTag }] }
+  let opaqueCore := { core with structs := core.structs.map opaqueStruct }
+  let masked := { raw with namespaces := raw.namespaces.map fun ns =>
+    if ns.identity == core.identity then opaqueCore else ns }
+  match validate masked with
+  | .error diagnostics =>
+      unless diagnostics.any (·.code == "VIR-NOMINAL-OPAQUE") do
+        throw <| IO.userError s!"constructing an opaque type was not rejected: {repr diagnostics}"
+  | .ok _ => throw <| IO.userError "constructing an opaque type was not rejected"
+
+#guard_msgs in
+#eval checkRustDependencyTypes
+
+/-- A dependency crate's function the crate calls is declared in its
+namespace by its generic signature, without its body, in the scope of its
+type, trait impl, or primitive type. A trait method called on a concrete type
+resolves to its impl's method, as codegen resolves it, which the unit's
+evidence states. -/
+def checkRustDependencyCalls : IO Unit := do
+  let file := "dependency_calls.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let raw ← match Import.decodeJson text with
+    | .ok raw => pure raw
+    | .error message =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not decode: {message}"
+  unless Import.encodeJson raw == text do
+    throw <| IO.userError s!"Rust exporter baseline {file} is not canonical RawUnit JSON v1"
+  let checked ← match validate raw with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let declared := checked.namespaces.extract 1 checked.namespaces.size |>.flatMap fun ns =>
+    ns.functions.filterMap fun function => do
+      let name ← checked.tables.names[function.name.index]?
+      guard <| function.body matches .absent
+      guard <| function.profileData.any (·.tag == dependencyTag)
+      return (name.scope, name.name, function.signature.generics.size)
+  let expected : Array (Array String × String × Nat) := #[
+    (#["vec", "Vec"], "len", 2), (#["vec", "Vec"], "push", 2),
+    (#["option", "<std::option::Option<T> as std::clone::Clone>"], "clone", 1),
+    (#["primitive", "u32"], "checked_add", 0), (#["option", "Option"], "unwrap_or", 1)]
+  unless declared == expected do
+    throw <| IO.userError s!"Rust exporter baseline {file} declared {repr declared}"
+  -- `or_zero` copies an `Option<u32>`, which is `Copy` since `u32` is.
+  unless (prepareExecution #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} does not prepare for execution"
+  unless checked.evidence.size == 2 do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its resolution evidence"
+  -- A Rust function has a body exactly when it is not a dependency's.
+  let rejects (namespaces : Array RawNamespace) : Bool :=
+    match validate { raw with namespaces } with
+    | .ok _ => false
+    | .error diagnostics => diagnostics.any (·.code == "VIR-FUNCTION-BODY")
+  let retag (index : Nat) (properties : Array ProfileValue) : Array RawNamespace :=
+    raw.namespaces.modify index fun ns =>
+      { ns with functions := ns.functions.modify 0 (fun function =>
+          { function with profileData := properties }) }
+  let some core := (raw.namespaces.zipIdx.find? fun (ns, index) =>
+      index > 0 && ns.functions.size > 0).map (·.2)
+    | throw <| IO.userError s!"Rust exporter baseline {file} lost its dependency functions"
+  unless rejects (retag core #[]) &&
+      rejects (retag 0 #[{ profile := .rust, tag := dependencyTag }]) do
+    throw <| IO.userError "a body contradicting `function.dependency` was not rejected"
+
+#guard_msgs in
+#eval checkRustDependencyCalls
+
+/-- A type with a `Copy` impl applying it to its own parameters carries the
+`copy` ability, conditional on its type arguments: the local `Point`, and
+`Option`, which is copied at `Option<u32>`. -/
+def checkRustCopyTypes : IO Unit := do
+  let file := "copy_types.exp.json"
+  let text ← readBaselineJson ("rust-exporter/tests/raw-unit" / file)
+  let checked ← match decodeAndValidate text with
+    | .ok checked => pure checked
+    | .error diagnostics =>
+        throw <| IO.userError s!"Rust exporter baseline {file} does not validate: {repr diagnostics}"
+  let abilities := checked.namespaces.flatMap fun ns => ns.structs.filterMap fun declaration =>
+    (checked.tables.names[declaration.name.index]?).map (·.name, declaration.abilities)
+  unless abilities == #[("Point", #[.copy]), ("Option", #[.copy])] &&
+      (prepareExecution #[semantics] checked).isOk &&
+      (prepareVerification #[semantics] checked).isOk do
+    throw <| IO.userError s!"Rust exporter baseline {file} lost its `Copy` types: {repr abilities}"
+
+#guard_msgs in
+#eval checkRustCopyTypes
+
 def checkRustExporterCallBaseline : IO Unit := do
   let file := "call.exp.json"
   let path : System.FilePath := "rust-exporter/tests/raw-unit" / file
@@ -607,7 +782,13 @@ def checkRustExporterDropBaseline : IO Unit := do
 private def hasStructurizedPanic (unit : ValidatedUnit) : Bool :=
   unit.namespaces.any fun ns =>
     (ns.functions.all fun function => function.body matches .structured _) &&
-      ns.expressions.any (·.kind == .throw_ .panic #[])
+      ns.expressions.any fun expression => match expression.kind with
+        | .throw_ .panic #[] => true
+        | .operation (.primitive primitive) _ _ _ => match primitive with
+          | .checkedDivide .panic | .checkedModulo .panic | .checkedNegate .panic
+          | .checkVectorIndex .panic => true
+          | _ => false
+        | _ => false
 
 def checkRustExporterAssertBaseline : IO Unit := do
   let file := "assert.exp.json"

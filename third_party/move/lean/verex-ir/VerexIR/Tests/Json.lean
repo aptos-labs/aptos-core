@@ -14,7 +14,7 @@ private def emptyUnit : RawUnit where
   namespaces := #[]
 
 private def emptyUnitJson : String :=
-  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":6}}"
+  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":7}}"
 
 #guard encodeJson emptyUnit == emptyUnitJson
 
@@ -31,8 +31,8 @@ private def jsonWithUnknownTopLevelField : String :=
 
 private def jsonWithUnknownNestedField : String :=
   (encodeJson emptyUnit).replace
-    "\"version\":{\"major\":1,\"minor\":6}"
-    "\"version\":{\"major\":1,\"minor\":6,\"patch\":0}"
+    "\"version\":{\"major\":1,\"minor\":7}"
+    "\"version\":{\"major\":1,\"minor\":7,\"patch\":0}"
 
 #guard match decodeJson jsonWithUnknownNestedField with
   | .error message => message == "unknown raw VIR JSON field `$.version.patch`"
@@ -40,13 +40,13 @@ private def jsonWithUnknownNestedField : String :=
 
 #guard match decodeJson
     ((encodeJson emptyUnit).replace
-      "\"version\":{\"major\":1,\"minor\":6}"
-      "\"version\":{\"major\":1,\"major\":1,\"minor\":6}") with
+      "\"version\":{\"major\":1,\"minor\":7}"
+      "\"version\":{\"major\":1,\"major\":1,\"minor\":7}") with
   | .error message => message.contains "duplicate JSON object field `major`"
   | .ok _ => false
 
 #guard match decodeJson
-    ("{\"version\":{\"major\":1,\"minor\":6}," ++ (encodeJson emptyUnit).drop 1) with
+    ("{\"version\":{\"major\":1,\"minor\":7}," ++ (encodeJson emptyUnit).drop 1) with
   | .error message => message.contains "duplicate JSON object field `version`"
   | .ok _ => false
 
@@ -80,8 +80,8 @@ private def malformedDocuments : Array String := #[
   (encodeJson emptyUnit).replace "\"tables\":{" "\"tables\":[",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":-1",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":1.5",
-  (encodeJson emptyUnit).replace "\"minor\":6" "\"minor\":\"0\"",
-  (encodeJson emptyUnit).replace "\"minor\":6" "\"patch\":0",
+  (encodeJson emptyUnit).replace "\"minor\":7" "\"minor\":\"0\"",
+  (encodeJson emptyUnit).replace "\"minor\":7" "\"patch\":0",
   (encodeJson profiledUnit).replace "\"profile\":\"rust\"" "\"profile\":\"unknown\""
 ]
 
@@ -97,6 +97,18 @@ private def bytes : ConstValue := .bytes #[0, 255]
 #guard match Lean.fromJson? (α := ConstValue) (Lean.toJson bytes) with
   | .ok decoded => decoded == bytes
   | .error _ => false
+
+/-- A name keeps its scope; a name at its namespace's root is encoded without
+one. -/
+private def scopedNames : Array QualifiedName := #[
+  { namespaceId := ⟨0⟩, name := "f", scope := #["a", "b"] },
+  { namespaceId := ⟨0⟩, name := "g" }]
+
+#guard match Lean.fromJson? (α := Array QualifiedName) (Lean.toJson scopedNames) with
+  | .ok decoded => decoded == scopedNames
+  | .error _ => false
+
+#guard (Lean.toJson scopedNames[1]!).compress == "{\"name\":\"g\",\"namespaceId\":{\"index\":0}}"
 
 private def genericArguments : Array GenericArgument := #[
   .typeArg { typeId := ⟨3⟩, loc := ⟨4⟩ },

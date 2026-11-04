@@ -33,6 +33,12 @@ structure ProfileSchema where
   /-- Whether a function with these profile properties and attributes may be
   the target of a closure with `store`. -/
   storableTarget : Array ProfileValue → Array Attribute → Bool := fun _ _ => true
+  /-- Whether a nominal with these profile properties has a shape its unit does
+  not see: a dependency's type the unit only names. -/
+  opaqueNominal : Array ProfileValue → Bool := fun _ => false
+  /-- Whether a function with these profile properties is declared without a
+  body; `none` where the profile does not regulate bodies. -/
+  bodiless : Array ProfileValue → Option Bool := fun _ => none
 
 abbrev ProfileRegistry := Array ProfileSchema
 

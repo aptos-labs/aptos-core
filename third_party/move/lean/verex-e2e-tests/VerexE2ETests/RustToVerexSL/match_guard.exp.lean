@@ -14,3 +14,5 @@ verex namespace match_guard where
         let candidate' := &value.0
         if *candidate' > 0u32 then value.0 else fallback
       | 0 => fallback
+
+-- no denotation for `positive_or`: the type of an expression is not carried by the denotation

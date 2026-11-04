@@ -1037,6 +1037,17 @@
       "pragmas": [],
       "profile": "rust",
       "profileMetadata": [],
+      "scopes": [
+        {
+          "kind": "inherent",
+          "loc": {
+            "index": 14
+          },
+          "path": [
+            "Counter"
+          ]
+        }
+      ],
       "specFunctions": [],
       "specVars": [],
       "structs": [
@@ -1350,7 +1361,10 @@
         "name": "add",
         "namespaceId": {
           "index": 0
-        }
+        },
+        "scope": [
+          "Counter"
+        ]
       },
       {
         "name": "call_method",
@@ -1433,6 +1447,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 6
+    "minor": 7
   }
 }

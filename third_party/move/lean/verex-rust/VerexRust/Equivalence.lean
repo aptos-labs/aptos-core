@@ -602,37 +602,24 @@ private def directFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId)
   if !loadedDereferenceOf? ns loadValue borrowLocal then none
   some { root, target, offset }
 
-private def checkedFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
-    Option FromEndLoadAdmin := do
-  let expression ← ns.expressions[expressionId.index]?
-  let .block initialStatements initialResult := expression.kind | none
-  let (statements, some resultId) :=
-    flattenedAdminBlock ns initialStatements initialResult (ns.expressions.size + 1) | none
-  let result ← ns.expressions[resultId.index]?
-  let .ifElse condition success (some panic) := result.kind | none
-  let conditionLocal ← loadedLocal? ns condition
-  let assignments ← statements.mapM (assignedLocal? ns)
-  let conditionValue ← (assignments.find? (·.1 == conditionLocal)).map (·.2)
-  let conditionExpression ← ns.expressions[conditionValue.index]?
-  let .operation (.primitive .less) _ conditionArguments _ := conditionExpression.kind | none
-  let [loadedIndex, loadedBound] := conditionArguments.toList | none
-  let indexLocal ← loadedLocal? ns loadedIndex
-  let boundLocal ← loadedLocal? ns loadedBound
-  let boundValue ← (assignments.find? (·.1 == boundLocal)).map (·.2)
-  let root ← lengthOfDereferencedLocal? ns boundValue
+/-- The root and offset an index local holds as `length(*root) - offset`. -/
+private def fromEndIndex? (ns : ValidatedNamespace) (assignments : Array (LocalId × ExprId))
+    (indexLocal : LocalId) : Option (LocalId × Nat) := do
   let indexValue ← (assignments.find? (·.1 == indexLocal)).map (·.2)
   let index ← ns.expressions[indexValue.index]?
   let .operation (.primitive .subtract) _ indexArguments _ := index.kind | none
   let [loadedLength, offsetId] := indexArguments.toList | none
   let lengthLocal ← loadedLocal? ns loadedLength
   let lengthValue ← (assignments.find? (·.1 == lengthLocal)).map (·.2)
-  if lengthOfDereferencedLocal? ns lengthValue != some root then none
+  let root ← lengthOfDereferencedLocal? ns lengthValue
   let offsetExpression ← ns.expressions[offsetId.index]?
   let .value (.integer offset) _ := offsetExpression.kind | none
   if offset < 0 then none
-  let panicExpression ← ns.expressions[panic.index]?
-  let .throw_ .panic panicArguments := panicExpression.kind | none
-  if !panicArguments.isEmpty then none
+  some (root, offset.toNat)
+
+/-- The borrow, load and forwarding of the element at an index local. -/
+private def fromEndSuccess? (ns : ValidatedNamespace) (success : ExprId) (root indexLocal : LocalId)
+    (offset : Nat) : Option FromEndLoadAdmin := do
   let successExpression ← ns.expressions[success.index]?
   let .block successStatements none := successExpression.kind | none
   let [borrowStatement, loadStatement, forwardStatement] := successStatements.toList | none
@@ -648,7 +635,24 @@ private def checkedFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId
   let forward ← ns.expressions[forwardStatement.index]?
   let .assign target forwardedValue := forward.kind | none
   if loadedLocal? ns forwardedValue != some valueLocal then none
-  some { root, target, offset := offset.toNat }
+  some { root, target, offset }
+
+private def checkedFromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
+    Option FromEndLoadAdmin := do
+  let expression ← ns.expressions[expressionId.index]?
+  let .block initialStatements initialResult := expression.kind | none
+  let (statements, some resultId) :=
+    flattenedAdminBlock ns initialStatements initialResult (ns.expressions.size + 1) | none
+  let result ← ns.expressions[resultId.index]?
+  let .letDecl _ (some check) success := result.kind | none
+  let checkExpression ← ns.expressions[check.index]?
+  let .operation (.primitive (.checkVectorIndex .panic)) _ checkArguments _ :=
+    checkExpression.kind | none
+  let [_, checkedIndex] := checkArguments.toList | none
+  let indexLocal ← loadedLocal? ns checkedIndex
+  let assignments ← statements.mapM (assignedLocal? ns)
+  let (root, offset) ← fromEndIndex? ns assignments indexLocal
+  fromEndSuccess? ns success root indexLocal offset
 
 private def fromEndLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
     Option FromEndLoadAdmin :=
@@ -745,6 +749,20 @@ private def checkedIndexLoad? (unit : ValidatedUnit) (state : LocalProjectionSta
     checkedIndexSuccess? unit state ns expressionId (ns.expressions.size + 1)
   if guardCount == 0 then none
   let value ← assignedValue? ns statements indexLocal
+  some { success, substitution := some (indexLocal, value) }
+
+/-- rustc holds a literal index in a temporary, and no check remains of an
+index below an array's literal length. -/
+private def literalIndexLoad? (ns : ValidatedNamespace) (expressionId : ExprId) :
+    Option CheckedIndexLoad := do
+  let expression ← ns.expressions[expressionId.index]?
+  let .block statements (some success) := expression.kind | none
+  let [statement] := statements.toList | none
+  let (indexLocal, value) ← assignedLocal? ns statement
+  let literal ← ns.expressions[value.index]?
+  let .value (.integer _) _ := literal.kind | none
+  let (_, index) ← directIndexedReturn? ns success
+  if loadedLocal? ns index != some indexLocal then none
   some { success, substitution := some (indexLocal, value) }
 
 /-! The standard-Rust renderer spells an enum discriminant and a downcast-field
@@ -1153,7 +1171,8 @@ mutual
       match ← fromEndLoadProjection? unit ns expressionId with
       | some normalized => return normalized
       | none => pure ()
-      if let some checked := checkedIndexLoad? unit (← get) ns expressionId then
+      if let some checked := (checkedIndexLoad? unit (← get) ns expressionId).orElse fun _ =>
+          literalIndexLoad? ns expressionId then
         let previous ← get
         let substitutions := match checked.substitution with
           | some substitution => #[substitution] ++ previous.valueSubstitutions

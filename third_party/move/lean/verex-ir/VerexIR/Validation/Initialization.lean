@@ -13,6 +13,12 @@ is initialized on every path to an expression. It is deliberately independent
 of Move/Rust ability rules: moving or dropping a supported local path consumes
 it in either profile, while a later assignment or pattern binding initializes
 it again.
+
+A boolean local assigned a literal also carries what is initialized while it
+holds `true`, and a branch on it assumes that. Rust's drop elaboration keeps
+such a flag for each value moved on some paths only and guards the value's drop
+with it. A borrowed local's later writes are not seen, so it carries nothing
+from its first borrow on.
 -/
 
 namespace VerexIR.Validation
@@ -29,7 +35,6 @@ private structure LocalInitialization where
   facts : Array (InitPath × Bool)
   deriving BEq, Inhabited
 
-private abbrev InitState := Array LocalInitialization
 
 private def pathPrefix (candidate path : InitPath) : Bool :=
   candidate.size <= path.size && (Array.range candidate.size).all fun index =>
@@ -47,11 +52,44 @@ private def setPath (entry : LocalInitialization) (path : InitPath)
     (initialized : Bool) : LocalInitialization :=
   { facts := (entry.facts.filter fun fact => !pathPrefix path fact.1).push (path, initialized) }
 
-private def mergeLocalInitialization (left right : LocalInitialization) : LocalInitialization :=
+private def combineLocalInitialization (combine : Bool → Bool → Bool)
+    (left right : LocalInitialization) : LocalInitialization :=
   let paths := (left.facts ++ right.facts).foldl (init := #[]) fun paths fact =>
     if paths.contains fact.1 then paths else paths.push fact.1
   { facts := paths.map fun path =>
-      (path, pathBaseInitialized left path && pathBaseInitialized right path) }
+      (path, combine (pathBaseInitialized left path) (pathBaseInitialized right path)) }
+
+/-- What holds on either of two paths. -/
+private def mergeLocals (left right : Array LocalInitialization) : Array LocalInitialization :=
+  Array.range (min left.size right.size) |>.map fun index =>
+    combineLocalInitialization (· && ·) left[index]! right[index]!
+
+/-- What holds when both hold. -/
+private def strengthenLocals (left right : Array LocalInitialization) :
+    Array LocalInitialization :=
+  Array.range (min left.size right.size) |>.map fun index =>
+    combineLocalInitialization (· || ·) left[index]! right[index]!
+
+/-- What the analysis knows of a local's boolean value. -/
+private inductive FlagFact where
+  | unknown
+  /-- The local was borrowed, so a write through the borrow may change it. -/
+  | escaped
+  | holdsFalse
+  /-- While the local holds `true`, these locals are initialized. -/
+  | whenTrue (locals : Array LocalInitialization)
+  deriving BEq, Inhabited
+
+private def mergeFlag : FlagFact → FlagFact → FlagFact
+  | .escaped, _ | _, .escaped => .escaped
+  | .unknown, _ | _, .unknown => .unknown
+  | .holdsFalse, fact | fact, .holdsFalse => fact
+  | .whenTrue left, .whenTrue right => .whenTrue (mergeLocals left right)
+
+private structure InitState where
+  locals : Array LocalInitialization := #[]
+  flags : Array FlagFact := #[]
+  deriving BEq, Inhabited
 
 private structure InitFlow where
   normal : Option InitState := none
@@ -60,9 +98,10 @@ private structure InitFlow where
   diagnostics : Array Diagnostic := #[]
   deriving Inhabited
 
-private def mergeState (left right : InitState) : InitState :=
-  Array.range (min left.size right.size) |>.map fun index =>
-    mergeLocalInitialization left[index]! right[index]!
+private def mergeState (left right : InitState) : InitState := {
+  locals := mergeLocals left.locals right.locals
+  flags := Array.range (min left.flags.size right.flags.size) |>.map fun index =>
+    mergeFlag left.flags[index]! right.flags[index]! }
 
 private def mergeNormal : Option InitState → Option InitState → Option InitState
   | none, state | state, none => state
@@ -81,7 +120,7 @@ private def uninitialized (loc : LocId) (localId : LocalId) : Diagnostic :=
 private def requireLocalPath (state : InitState) (loc : LocId) (localId : LocalId)
     (path : InitPath) :
     Array Diagnostic :=
-  match state[localId.index]? with
+  match state.locals[localId.index]? with
   | some entry => if pathInitialized entry path then #[] else #[uninitialized loc localId]
   | none => #[] -- Structural validation owns bounds errors.
 
@@ -91,20 +130,43 @@ private def requireLocal (state : InitState) (loc : LocId) (localId : LocalId) :
 
 private def requireLocalStoragePath (state : InitState) (loc : LocId) (localId : LocalId)
     (path : InitPath) : Array Diagnostic :=
-  match state[localId.index]? with
+  match state.locals[localId.index]? with
   | some entry => if pathBaseInitialized entry path then #[] else #[uninitialized loc localId]
   | none => #[]
 
-private def initializeLocal (state : InitState) (localId : LocalId) : InitState :=
-  match state[localId.index]? with
-  | some entry => state.set! localId.index (setPath entry #[] true)
-  | none => state
-
+/-- Change one local path's initialization, also in what each flag records
+for while it holds `true`; a write to a flag forgets its value. -/
 private def setLocalPath (state : InitState) (localId : LocalId) (path : InitPath)
     (initialized : Bool) : InitState :=
-  match state[localId.index]? with
-  | some entry => state.set! localId.index (setPath entry path initialized)
-  | none => state
+  let update (locals : Array LocalInitialization) :=
+    locals.modify localId.index (setPath · path initialized)
+  { locals := update state.locals
+    flags := state.flags.mapIdx fun index fact =>
+      if index == localId.index then
+        if fact matches .escaped then .escaped else .unknown
+      else match fact with
+        | .whenTrue locals => .whenTrue (update locals)
+        | fact => fact }
+
+private def initializeLocal (state : InitState) (localId : LocalId) : InitState :=
+  setLocalPath state localId #[] true
+
+/-- The flag now holds `value`; nothing initialized changed. -/
+private def setFlag (state : InitState) (flag : LocalId) (value : Bool) : InitState :=
+  { state with flags := state.flags.modify flag.index fun
+      | .escaped => .escaped
+      | _ => if value then .whenTrue state.locals else .holdsFalse }
+
+/-- The flag holds `value` here, as a branch on it shows. -/
+private def assumeFlag (state : InitState) (flag : LocalId) (value : Bool) : InitState :=
+  match state.flags[flag.index]?, value with
+  | some (.whenTrue locals), true => { state with locals := strengthenLocals state.locals locals }
+  | some .escaped, _ | none, _ => state
+  | some _, true => state
+  | some _, false => { state with flags := state.flags.set! flag.index .holdsFalse }
+
+private def escapeLocal (state : InitState) (localId : LocalId) : InitState :=
+  { state with flags := state.flags.modify localId.index fun _ => .escaped }
 
 private partial def initializePattern (ns : ValidatedNamespace) (state : InitState)
     (patternId : PatternId) : InitState :=
@@ -159,6 +221,22 @@ private partial def ownedLocalRoot? (ns : ValidatedNamespace) (placeId : PlaceId
       fuel + 1, some (.downcast base _) =>
       ownedLocalRoot? ns base fuel
   | _, some (.deref _) => none
+
+private def literalBool? (ns : ValidatedNamespace) (value : ExprId) : Option Bool :=
+  match ns.expressions[value.index]? with
+  | some { kind := .value (.bool literal) _, .. } => some literal
+  | _ => none
+
+/-- The local a branch condition reads whole. -/
+private def conditionLocal? (ns : ValidatedNamespace) (condition : ExprId) : Option LocalId :=
+  match ns.expressions[condition.index]? with
+  | some { kind := .localVar localId, .. } => some localId
+  | some { kind := .operation (.copy place) _ #[] _, .. }
+  | some { kind := .operation (.read place) _ #[] _, .. } =>
+      match ns.places[place.index]? with
+      | some (.localVar localId) => some localId
+      | _ => none
+  | _ => none
 
 private partial def placeIndexDiagnostics (ns : ValidatedNamespace) (state : InitState)
     (loc : LocId) (placeId : PlaceId) (fuel : Nat) : Array Diagnostic :=
@@ -228,8 +306,13 @@ mutual
                                 readPlace ns afterOperands expression.loc place)
                           | none => (some afterOperands,
                               readPlace ns afterOperands expression.loc place)
-                  | .copy place | .read place | .borrow _ place =>
+                  | .copy place | .read place =>
                       (some afterOperands, readPlace ns afterOperands expression.loc place)
+                  | .borrow _ place =>
+                      let escaped := match placeRoot? ns place (ns.places.size + 1) with
+                        | some (localId, _) => escapeLocal afterOperands localId
+                        | none => afterOperands
+                      (some escaped, readPlace ns afterOperands expression.loc place)
                   | .write place =>
                       let (afterWrite, errors) :=
                         writePlace ns afterOperands expression.loc place
@@ -256,6 +339,11 @@ mutual
                 let bodyState := if initializer.isSome then
                     initializePattern ns afterInitializer pattern
                   else afterInitializer
+                let bodyState :=
+                  match ns.patterns[pattern.index]?, initializer.bind (literalBool? ns) with
+                  | some { kind := .variable flag, .. }, some literal =>
+                      setFlag bodyState flag literal
+                  | _, _ => bodyState
                 let bodyFlow := analyzeExpr ns body bodyState
                 { bodyFlow with
                   breaks := initialized.breaks ++ bodyFlow.breaks
@@ -266,10 +354,13 @@ mutual
             match conditionFlow.normal with
             | none => conditionFlow
             | some branchState =>
-                let thenFlow := analyzeExpr ns thenBranch branchState
+                let (thenState, elseState) := match conditionLocal? ns condition with
+                  | some flag => (assumeFlag branchState flag true, assumeFlag branchState flag false)
+                  | none => (branchState, branchState)
+                let thenFlow := analyzeExpr ns thenBranch thenState
                 let elseFlow := match elseBranch with
-                  | some branch => analyzeExpr ns branch branchState
-                  | none => { normal := some branchState }
+                  | some branch => analyzeExpr ns branch elseState
+                  | none => { normal := some elseState }
                 let branches := mergeFlows thenFlow elseFlow
                 { branches with
                   breaks := conditionFlow.breaks ++ branches.breaks
@@ -286,7 +377,8 @@ mutual
                   breaks := scrutineeFlow.breaks ++ armsFlow.breaks
                   continues := scrutineeFlow.continues ++ armsFlow.continues
                   diagnostics := scrutineeFlow.diagnostics ++ armsFlow.diagnostics }
-        | .loop _ body => analyzeLoop ns body state state (state.size + 1)
+        | .loop _ body => analyzeLoop ns body state state
+            ((state.locals.size + 1) * (state.flags.size + 4))
         | .break_ nest value =>
             let valueFlow := match value with
               | some value => analyzeExpr ns value state
@@ -305,6 +397,9 @@ mutual
             | none => valueFlow
             | some afterValue =>
                 let (afterWrite, errors) := writePlace ns afterValue expression.loc place
+                let afterWrite := match ns.places[place.index]?, literalBool? ns value with
+                  | some (.localVar flag), some literal => setFlag afterWrite flag literal
+                  | _, _ => afterWrite
                 { normal := some afterWrite
                   breaks := valueFlow.breaks
                   continues := valueFlow.continues
@@ -373,12 +468,12 @@ end
 reuses the control-flow component of definite-initialization analysis; local
 state does not affect whether a return, throw, break, or continue is abrupt. -/
 def expressionCanFallThrough (ns : ValidatedNamespace) (expression : ExprId) : Bool :=
-  (analyzeExpr ns expression #[]).normal.isSome
+  (analyzeExpr ns expression {}).normal.isSome
 
 /-- Whether a loop body returns to the loop's head on no path: it neither
 completes normally nor continues the loop, so the loop runs it once. -/
 def loopBodyRunsOnce (ns : ValidatedNamespace) (body : ExprId) : Bool :=
-  let flow := analyzeExpr ns body #[]
+  let flow := analyzeExpr ns body {}
   flow.normal.isNone && !flow.continues.any (·.1 == 0)
 
 /-- Run definite-initialization once for one function: diagnose local reads
@@ -392,8 +487,10 @@ def initializationOutcome (namespaceId : NamespaceId) (functionId : FunctionId)
   match function.body with
   | .absent => (#[], none)
   | .structured root =>
-      let state := Array.range function.locals.size |>.map fun index =>
-        { facts := #[(#[], decide (index < function.signature.parameters.size))] }
+      let state : InitState := {
+        locals := Array.range function.locals.size |>.map fun index =>
+          { facts := #[(#[], decide (index < function.signature.parameters.size))] }
+        flags := Array.replicate function.locals.size .unknown }
       let diagnostics := (analyzeExpr ns root state).diagnostics
       if diagnostics.isEmpty then
         (#[], some {

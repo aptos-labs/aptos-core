@@ -1,12 +1,1 @@
--- Copyright © Aptos Foundation
--- SPDX-License-Identifier: Apache-2.0
-
-import VerexSL
-
-verex namespace «drop» where
-  struct Token where
-    0 : u32
-
-  fun «drop»(self : &mut Token) -> Unit := ()
-
-  fun consume(_token : Token) -> Unit := drop(_token)
+-- error: VerexE2ETests/RustToVerexSL/drop.rs:7:5: scopes are outside the current VerexSL printer

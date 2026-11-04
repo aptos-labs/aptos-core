@@ -134,10 +134,11 @@ value, universally quantified in the rule:
   a move where the copy is the local's last use
   (`normalizeReferenceCopies`), so one loan rests in one holder.
 - **Globals**: `borrow_global_mut` leaves the prophecy (relationally) or
-  the hole (executably) in the global slot. `RuntimeState.storageLoans`
-  records the storage key of a live global loan and rekeys it from an
-  outer loan to a returned reborrow. The key registry is write-back
-  metadata, not part of the reference value.
+  the hole (executably) in the global slot. `RuntimeState.globalLoans`
+  records the `GlobalKey` of a live global loan; when write-back
+  installs a value carrying a returned reborrow's hole, the entry moves
+  from the outer loan to that reborrow (`transferGlobalLoan`). The key
+  registry is write-back metadata, not part of the reference value.
 
 ### 2.3 Executable erasure
 

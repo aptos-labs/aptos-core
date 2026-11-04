@@ -1868,8 +1868,10 @@ private def primitiveHasAbility (profile : Profile) (ty : Ty) (ability : Ability
 
 /-- Decide the first-order ability rules shared by semantic preparation. Move
 uses declared abilities and structural propagation; Rust treats `Drop` as the
-default and `Copy` as explicit for nominal/function types. Trait predicates
-outside these four core abilities remain an evidence-checking milestone. -/
+default and `Copy` as explicit for nominal/function types. A Rust nominal's
+declared ability is conditional, as `#[derive]` states it: an instantiation
+has it when every type argument does. Trait predicates outside these four core
+abilities remain an evidence-checking milestone. -/
 private partial def typeHasAbilityFuel : Nat → ValidatedUnit → ValidatedNamespace →
     Profile → Array GenericBinder → TypeId → Ability → Option Bool
   | 0, _, _, _, _, _, _ => none
@@ -1888,6 +1890,13 @@ private partial def typeHasAbilityFuel : Nat → ValidatedUnit → ValidatedName
           let declared := if ownerProfile == .rust && ability == .drop then true
             else declaration.abilities.contains ability
           if !declared || declaration.generics.size != arguments.size then some false else
+          if ownerProfile == .rust then do
+            let checks ← arguments.mapM fun
+              | .typeArg argument =>
+                  typeHasAbilityFuel fuel unit ns ownerProfile generics argument.typeId ability
+              | _ => some true
+            some (checks.all id)
+          else
           let binderChecks ← (declaration.generics.zip arguments).mapM fun pair =>
             if pair.1.abilities.isEmpty then some true else match pair.2 with
             | .typeArg argument => do
@@ -1972,11 +1981,18 @@ private def structAbilityDiagnostics (unit : ValidatedUnit) (ns : ValidatedNames
     fields.foldl (fun ds field =>
       -- A declared Move ability of a generic declaration is conditional:
       -- fields that depend on a type parameter transfer the obligation to
-      -- each instantiation site instead of constraining the declaration.
-      -- Rust declarations require the explicit binder bound instead.
+      -- each instantiation site instead of constraining the declaration. A
+      -- Rust one is conditional on every type parameter having it, so its
+      -- fields have it where the parameters do.
+      let generics := if profile matches .rust then
+          declaration.generics.map fun binder =>
+            if binder.kind == .typeArg && !binder.abilities.contains requiredAbility then
+              { binder with abilities := binder.abilities.push requiredAbility }
+            else binder
+        else declaration.generics
       if ((profile matches .move) &&
             typeNeedsSubstitution ns.tables (ns.tables.types.size + 1) field.type.typeId) ||
-          typeHasAbility? unit ns profile declaration.generics field.type.typeId requiredAbility !=
+          typeHasAbility? unit ns profile generics field.type.typeId requiredAbility !=
             some false then ds
       else ds.push <| .at "VIR-SEMANTIC-ABILITY"
         s!"field type does not satisfy {repr requiredAbility} required by the declaration's {repr declaredAbility} ability"

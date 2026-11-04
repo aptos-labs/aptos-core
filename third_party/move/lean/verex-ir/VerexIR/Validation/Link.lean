@@ -639,7 +639,8 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
     namespaceId := dep.namespaceId, profile := dep.profile, exportedNames := dep.exportedNames
     structs := dep.structs
     functions := dep.functions.map (·.withBody .absent)
-    specFunctions := dep.specFunctions }
+    specFunctions := dep.specFunctions
+    scopes := dep.scopes }
   -- Every name a linked namespace uses must resolve in the unit, as it did
   -- in the unit that validated it.
   let nameId (namespaceIndex : Nat) (id : NameId) : NameId :=

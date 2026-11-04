@@ -5,3 +5,5 @@ import VerexSL
 
 verex namespace string_length where
   fun byte_length(value : &string) -> usize := value.length
+
+-- no denotation for `byte_length`: the type of the result is not carried by the denotation

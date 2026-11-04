@@ -174,6 +174,16 @@ spec max where
 The items are spliced into the rendered namespace, indented one level, so
 they may name every declaration of the crate.
 
+`verex-rust verify <Cargo.toml> --package <name>`, with the other arguments
+of `import-crate`, verifies a package's library crate. The crate is one
+namespace and its modules are scopes of it ([`vir-design.md`](vir-design.md)).
+Each file of a module has its specification file beside it (`src/a.spec.lean`
+for `src/a.rs`, `src/lib.spec.lean` for the root), whose items are spliced as a
+reopened `mod a where` block, so they name the module's declarations bare. An
+inline `mod m { … }` has no file of its own: its specifications are a nested
+`mod m where` block in those of the file declaring it. The crate's source
+names are relative to its Cargo workspace root, where rustc reads them.
+
 A native without a specification is read as the Move Prover reads it: by
 the model its prelude or translator gives the native, when it gives one,
 and otherwise not at all; a call to an unknown native is rejected ("has

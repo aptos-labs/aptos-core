@@ -46,7 +46,7 @@ structure ResolutionIndex where
 
 namespace ResolutionIndex
 
-/-- The first interned `NameId` with this name's owner and spelling. Duplicate
+/-- The first interned `NameId` with this name's owner, scope, and spelling. Duplicate
 table entries are legal raw input; resolution treats them as one name. -/
 def canonical (index : ResolutionIndex) (name : NameId) : NameId :=
   index.canonicalNames[name.index]?.getD name
@@ -96,9 +96,9 @@ def hasDependencyInterface (index : ResolutionIndex) (namespaceId : NamespaceId)
 
 private def canonicalizeNames (tables : Tables) : Array NameId := Id.run do
   let mut canonical := Array.mkEmpty tables.names.size
-  let mut seen : Std.HashMap (Nat × String) NameId := {}
+  let mut seen : Std.HashMap (Nat × Array String × String) NameId := {}
   for (name, index) in tables.names.zipIdx do
-    let key := (name.namespaceId.index, name.name)
+    let key := (name.namespaceId.index, name.scope, name.name)
     match seen[key]? with
     | some first => canonical := canonical.push first
     | none =>

@@ -6,3 +6,5 @@ import VerexSL
 verex namespace integer_cast where
   fun cast_values(unsigned : u32, signed : i16) -> (u8, u16, i32) :=
     (unsigned as u8, signed as u16, signed as i32)
+
+-- no denotation for `cast_values`: primitive VerexIR.PrimitiveOperation.cast at this type or arity is not carried by the denotation

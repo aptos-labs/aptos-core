@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import VerexRust.Driver
+import VerexRust.SourceVerify
 
 namespace VerexIR.Rust.Tests
 
@@ -72,8 +72,8 @@ def checkCargoImportDriver : IO Unit := do
     unless !first.cacheHit && second.cacheHit &&
         first.receipt == second.receipt && first.receipt.mode == .cargo &&
         !first.receipt.cacheKey.isEmpty && !first.receipt.artifactHash.isEmpty &&
-        first.unit.indexes.functionCounts == #[1] &&
-        second.unit.indexes.functionCounts == #[1] do
+        first.unit.indexes.functionCounts == #[4] &&
+        second.unit.indexes.functionCounts == #[4] do
       throw <| IO.userError
         "Cargo import driver did not export only the root library and reuse its fixture"
     let prepared ← match second.prepareExecution with
@@ -81,7 +81,7 @@ def checkCargoImportDriver : IO Unit := do
       | .error diagnostics =>
           throw <| IO.userError s!"Cargo Rust fixture did not prepare: {repr diagnostics}"
     let handle : VerexIR.FunctionHandle := { namespaceId := ⟨0⟩, functionId := ⟨0⟩ }
-    match VerexIR.Interpreter.run prepared.executable 16 handle #[] with
+    match VerexIR.Interpreter.run prepared.executable 64 handle #[] with
     | .ok (_, outcome) => unless outcome.value == .returned #[.bool true] do
         throw <| IO.userError "prepared Cargo import returned the wrong semantic value"
     | .error error =>
@@ -92,13 +92,24 @@ def checkCargoImportDriver : IO Unit := do
           throw <| IO.userError s!"Cargo Rust fixture did not prepare for verification: {repr diagnostics}"
     unless verification.cacheHit && prepared.receipt == second.receipt &&
         verification.receipt == second.receipt &&
-        verification.validated.indexes.functionCounts == #[1] &&
+        verification.validated.indexes.functionCounts == #[4] &&
         verification.validated.tables.locations == prepared.validated.tables.locations &&
-        prepared.executable.initializationCertificates.size == 1 &&
+        prepared.executable.initializationCertificates.size == 4 &&
         verification.verifiable.initializationCertificates ==
           prepared.executable.initializationCertificates do
       throw <| IO.userError
         "Cargo verification preparation did not retain import identity or initialization evidence"
+    -- The root and the module file `bounds.rs` have specification files; the
+    -- inline module `bounds::compare` has none of its own.
+    let some root := second.sourceRoot
+      | throw <| IO.userError "Cargo import did not name its workspace root"
+    let specs ← VerexIR.Rust.SourceVerify.crateSpecs second.unit root
+    let expected : Array (Array String × System.FilePath) := #[
+      (#[], root / "src" / "lib.spec.lean"), (#["bounds"], root / "src" / "bounds.spec.lean")]
+    unless specs.map (fun companion => (companion.scope, companion.path)) == expected &&
+        specs.all (·.text.isSome) do
+      throw <| IO.userError s!"Cargo specification files were not found by module: \
+        {specs.map fun companion => (companion.scope, companion.path)}"
 
 #guard_msgs in
 #eval checkImportDriver *> checkCargoImportDriver
