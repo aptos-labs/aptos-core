@@ -687,10 +687,10 @@ inferno = "0.12.8"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.15.0"
-jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
-jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
-jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
-jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
+jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.7.0" }
+jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.7.1" }
+jemalloc_pprof = { version = "0.9", features = ["symbolize"] }
+jemallocator = { package = "tikv-jemallocator", version = "0.7.0", features = [
     "profiling",
     "stats",
     "unprefixed_malloc_on_supported_platforms",
@@ -760,7 +760,7 @@ primitive-types = { version = "0.12.2" }
 proc-macro2 = "1.0.107"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.1", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.3", default-features = false }
 procfs = "0.18.0"
 project-root = "0.2.2"
 prometheus = { version = "0.14.0", default-features = false }
@@ -797,7 +797,7 @@ ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.11.0"
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
-rocksdb = { version = "0.24.0", features = ["lz4"] }
+rocksdb = { version = "0.25.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = { version = "0.28.0", default-features = false }

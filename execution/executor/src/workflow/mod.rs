@@ -13,6 +13,7 @@ use aptos_storage_interface::{
 use do_ledger_update::DoLedgerUpdate;
 use do_state_checkpoint::DoStateCheckpoint;
 
+pub mod do_collateral;
 pub mod do_get_execution_output;
 pub mod do_ledger_update;
 pub mod do_orders;
