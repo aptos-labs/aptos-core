@@ -6,7 +6,7 @@
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    sharded_jmt_state::PositionStateWithSummary, state_summary::LedgerStateSummary,
+    sharded_jmt_state::NativeStateWithSummary, state_summary::LedgerStateSummary,
     state_with_summary::LedgerWithSummary,
 };
 use derive_more::Deref;
@@ -25,7 +25,7 @@ impl StateCheckpointOutput {
         state_summary: LedgerStateSummary,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
         hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-        position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+        position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
         position_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
     ) -> Self {
         Self::new_impl(Inner {
@@ -39,7 +39,7 @@ impl StateCheckpointOutput {
 
     pub fn new_empty(
         parent_state_summary: LedgerStateSummary,
-        position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+        position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     ) -> Self {
         Self::new_impl(Inner {
             state_summary: parent_state_summary,
@@ -80,7 +80,7 @@ pub struct Inner {
     /// Native-position summary after this chunk (latest + last_checkpoint),
     /// computed at execution time, persisted at commit without recompute.
     /// `None` unless the position-state-root feature is on.
-    pub position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+    pub position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     /// Per-transaction position state root: `Some` at the checkpoint index,
     /// `None` elsewhere. `None` (the whole option) unless the feature is on.
     pub position_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,

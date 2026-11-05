@@ -11,7 +11,7 @@ use aptos_executor_types::{
 use aptos_storage_interface::{
     state_store::{
         collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
-        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        sharded_jmt_state::NativeStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
     LedgerSummary,
@@ -85,7 +85,7 @@ impl PartialStateComputeResult {
 
     pub fn ensure_result_position_state_summary(
         &self,
-    ) -> Result<Option<&LedgerWithSummary<PositionStateWithSummary>>> {
+    ) -> Result<Option<&LedgerWithSummary<NativeStateWithSummary>>> {
         self.ensure_state_checkpoint_output()
             .map(|out| out.position_state_summary.as_ref())
     }

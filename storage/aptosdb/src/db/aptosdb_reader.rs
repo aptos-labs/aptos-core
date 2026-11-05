@@ -7,7 +7,7 @@ use crate::{
         aptosdb_internal::{error_if_too_many_requested, gauged_api},
         AptosDB,
     },
-    native_store::buffered_state::{PositionLedgerStateWithSummary, PositionStateWithSummary},
+    native_store::buffered_state::{NativeLedgerStateWithSummary, NativeStateWithSummary},
     pruner::PrunerManager,
     schema::block_info::BlockInfoSchema,
 };
@@ -64,7 +64,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary> {
+    fn get_persisted_position_state_summary(&self) -> Result<NativeStateWithSummary> {
         gauged_api("get_persisted_position_state_summary", || {
             // Only reached with the feature on; fail fast rather than
             // fabricate an empty base.
@@ -76,7 +76,7 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_pre_committed_position_state_summary(&self) -> Result<PositionLedgerStateWithSummary> {
+    fn get_pre_committed_position_state_summary(&self) -> Result<NativeLedgerStateWithSummary> {
         gauged_api("get_pre_committed_position_state_summary", || {
             // Pre-committed tip from the buffered state (includes committed
             // writes not yet merklized).

@@ -24,7 +24,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree, SUBTREE_DROPPER};
 pub use aptos_storage_interface::state_store::sharded_jmt_state::{
-    PositionSlot, PositionStateWithSummary,
+    NativeSlot, NativeStateWithSummary,
 };
 use aptos_storage_interface::state_store::{
     sharded_jmt_state::ShardedJmtState, state_summary::StateSummary,
@@ -33,11 +33,7 @@ use aptos_storage_interface::state_store::{
 use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use std::sync::Arc;
 
-/// A native store's in-memory JMT + SMT state. Leaves carry only the key and
-/// value hash, so every store shares the position slot shape.
-pub type NativeStateWithSummary = PositionStateWithSummary;
 pub type NativeLedgerStateWithSummary = LedgerWithSummary<NativeStateWithSummary>;
-pub type PositionLedgerStateWithSummary = NativeLedgerStateWithSummary;
 
 pub fn new_empty_native_state<T: NativeStoreSpec>() -> NativeStateWithSummary {
     NativeStateWithSummary::new_empty(T::NAME)

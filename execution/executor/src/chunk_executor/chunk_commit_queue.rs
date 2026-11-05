@@ -17,7 +17,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     state_store::{
         collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
-        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+        sharded_jmt_state::NativeStateWithSummary, state::LedgerState,
         state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
     },
     DbReader, LedgerSummary,
@@ -53,7 +53,7 @@ pub struct ChunkCommitQueue {
     latest_state_summary: LedgerStateSummary,
     /// Native-position summary chained across chunks (the parent the next
     /// chunk rebases from). `None` when native position is disabled.
-    latest_position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+    latest_position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     /// `PositionOverlay` chained across chunks — the parent the next
     /// chunk extends from.
     ///
@@ -183,7 +183,7 @@ impl ChunkCommitQueue {
         &mut self,
     ) -> Result<(
         LedgerStateSummary,
-        Option<LedgerWithSummary<PositionStateWithSummary>>,
+        Option<LedgerWithSummary<NativeStateWithSummary>>,
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {

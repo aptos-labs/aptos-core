@@ -4,7 +4,7 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary,
+        sharded_jmt_state::NativeStateWithSummary,
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_with_summary::LedgerWithSummary,
@@ -398,8 +398,8 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
 /// block parent is available. The async merkle committer can lag the tip,
 /// so the two differ and must not be conflated.
 pub struct ProvablePositionStateSummary<'db> {
-    persisted: PositionStateWithSummary,
-    pre_committed: LedgerWithSummary<PositionStateWithSummary>,
+    persisted: NativeStateWithSummary,
+    pre_committed: LedgerWithSummary<NativeStateWithSummary>,
     db: &'db (dyn DbReader + Sync),
 }
 
@@ -417,7 +417,7 @@ impl<'db> ProvablePositionStateSummary<'db> {
     }
 
     /// The persisted position state: the floor new layers are built over.
-    pub fn persisted(&self) -> &PositionStateWithSummary {
+    pub fn persisted(&self) -> &NativeStateWithSummary {
         &self.persisted
     }
 
@@ -425,7 +425,7 @@ impl<'db> ProvablePositionStateSummary<'db> {
     /// or the first block after the feature is enabled. It includes committed
     /// writes the merklized snapshot may not yet reflect, so the computed root
     /// covers all prior position writes.
-    pub fn base(&self) -> &LedgerWithSummary<PositionStateWithSummary> {
+    pub fn base(&self) -> &LedgerWithSummary<NativeStateWithSummary> {
         &self.pre_committed
     }
 

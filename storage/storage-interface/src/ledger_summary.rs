@@ -3,7 +3,7 @@
 
 use crate::state_store::{
     collateral::CollateralOverlay, orders::OrderOverlay, positions::PositionOverlay,
-    sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
+    sharded_jmt_state::NativeStateWithSummary, state::LedgerState,
     state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
 };
 use aptos_config::config::HotStateConfig;
@@ -19,7 +19,7 @@ pub struct LedgerSummary {
     pub state_summary: LedgerStateSummary,
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
     /// Pre-committed native-position summary; `None` when position is disabled.
-    pub position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+    pub position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     /// Pre-committed position overlay; `None` when position is disabled.
     pub positions: Option<PositionOverlay>,
     /// Pre-committed order overlay; `None` when trading-native storage is off.
