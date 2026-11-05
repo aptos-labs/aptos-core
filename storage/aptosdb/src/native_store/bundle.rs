@@ -13,7 +13,7 @@ use crate::{
     native_store::{
         buffered_state::{
             native_state_at_version, new_empty_native_state, NativeLedgerStateWithSummary,
-            NativePersistedState, NativeProofReader, NativeStateWithSummary, PositionSlot,
+            NativePersistedState, NativeProofReader, NativeSlot, NativeStateWithSummary,
             MAX_NATIVE_WRITE_SETS_AFTER_SNAPSHOT,
         },
         kv_db::NativeKvDb,
@@ -546,10 +546,10 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
             .version()
             .filter(|v| (chunk_first..=chunk_last_inclusive).contains(v));
 
-        let mut pending: HashMap<HashValue, PositionSlot> = HashMap::new();
+        let mut pending: HashMap<HashValue, NativeSlot> = HashMap::new();
         let extend_on_base = |latest: &NativeStateWithSummary,
                               version: Version,
-                              updates: Vec<(HashValue, PositionSlot)>|
+                              updates: Vec<(HashValue, NativeSlot)>|
          -> Result<NativeStateWithSummary> {
             let proof_reader = NativeProofReader {
                 merkle_db: Arc::clone(&self.merkle_db),
@@ -581,8 +581,8 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
     }
 }
 
-fn leaf_update(key: &StateKey, value: Option<&StateValue>) -> PositionSlot {
-    PositionSlot {
+fn leaf_update(key: &StateKey, value: Option<&StateValue>) -> NativeSlot {
+    NativeSlot {
         state_key: key.clone(),
         value_hash: value.map(CryptoHash::hash),
         value: None,
@@ -592,7 +592,7 @@ fn leaf_update(key: &StateKey, value: Option<&StateValue>) -> PositionSlot {
 /// The latest-wins JMT leaf update per key across `write_sets`.
 fn latest_leaf_updates<T: NativeStoreSpec>(
     write_sets: &[WriteSet],
-) -> HashMap<HashValue, PositionSlot> {
+) -> HashMap<HashValue, NativeSlot> {
     write_sets
         .iter()
         .flat_map(T::write_set_ops)

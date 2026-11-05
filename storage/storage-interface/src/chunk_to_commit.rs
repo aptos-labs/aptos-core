@@ -5,7 +5,7 @@ use crate::state_store::{
     collateral::CollateralOverlay,
     orders::OrderOverlay,
     positions::PositionOverlay,
-    sharded_jmt_state::PositionStateWithSummary,
+    sharded_jmt_state::NativeStateWithSummary,
     state::LedgerState,
     state_summary::LedgerStateSummary,
     state_update_refs::StateUpdateRefs,
@@ -32,7 +32,7 @@ pub struct ChunkToCommit<'a> {
     /// Position summary computed at execution time (checkpoint stage), to
     /// be persisted/merklized at commit without recomputation. `None` when
     /// native position is disabled.
-    pub position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
+    pub position_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
     /// Position writes since the base, computed in the execution phase
     /// — earlier than `position_state_summary`, which is a checkpoint-stage
     /// product. Commit publishes this as the bundle's tip so the

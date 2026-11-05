@@ -9,7 +9,7 @@ use aptos_executor_types::{
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
-    sharded_jmt_state::{PositionSlot, PositionStateWithSummary},
+    sharded_jmt_state::{NativeSlot, NativeStateWithSummary},
     state_summary::{LedgerStateSummary, ProvablePositionStateSummary, ProvableStateSummary},
     state_with_summary::LedgerWithSummary,
 };
@@ -27,7 +27,7 @@ impl DoStateCheckpoint {
         persisted_state_summary: &'a ProvableStateSummary<'db>,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         known_hot_state_checkpoints: Option<Vec<Option<HashValue>>>,
-        parent_position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
+        parent_position_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
         persisted_position_state_summary: Option<&'a ProvablePositionStateSummary<'db>>,
         known_position_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
@@ -89,11 +89,11 @@ impl DoStateCheckpoint {
     /// it's deterministic across nodes.
     fn compute_position_checkpoint(
         execution_output: &ExecutionOutput,
-        parent: Option<&LedgerWithSummary<PositionStateWithSummary>>,
+        parent: Option<&LedgerWithSummary<NativeStateWithSummary>>,
         persisted: &ProvablePositionStateSummary,
         known_position_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<(
-        LedgerWithSummary<PositionStateWithSummary>,
+        LedgerWithSummary<NativeStateWithSummary>,
         Vec<Option<HashValue>>,
     )> {
         let _timer = OTHER_TIMERS.timer_with(&["get_position_checkpoint_hashes"]);
@@ -125,15 +125,15 @@ impl DoStateCheckpoint {
 
         // Collapse position writes (latest-per-key) over a version range into
         // SMT leaf updates.
-        let collect = |range: std::ops::Range<usize>| -> Vec<(HashValue, PositionSlot)> {
-            let mut latest: HashMap<HashValue, PositionSlot> = HashMap::new();
+        let collect = |range: std::ops::Range<usize>| -> Vec<(HashValue, NativeSlot)> {
+            let mut latest: HashMap<HashValue, NativeSlot> = HashMap::new();
             for i in range {
                 for (key, op) in execution_output.to_commit.transaction_outputs[i]
                     .write_set()
                     .native_position_iter()
                 {
                     let value_hash = op.as_write_op().as_state_value_opt().map(StateValue::hash);
-                    latest.insert(key.hash(), PositionSlot {
+                    latest.insert(key.hash(), NativeSlot {
                         state_key: key.clone(),
                         value_hash,
                         value: None,

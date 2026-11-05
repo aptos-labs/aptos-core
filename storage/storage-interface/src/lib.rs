@@ -48,7 +48,7 @@ use crate::{
         collateral::{CollateralOverlay, ShardedCollateralLayers},
         orders::{OrderOverlay, ShardedOrderLayers},
         positions::{PositionOverlay, ShardedPositionLayers},
-        sharded_jmt_state::PositionStateWithSummary,
+        sharded_jmt_state::NativeStateWithSummary,
         state::State,
         state_summary::StateSummary,
         state_with_summary::LedgerWithSummary,
@@ -392,7 +392,7 @@ pub trait DbReader: Send + Sync {
         /// proof source for computing the position state root. Errors when the
         /// feature is on but native-position storage is absent (i.e.
         /// `enable_trading_native` is off).
-        fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary>;
+        fn get_persisted_position_state_summary(&self) -> Result<NativeStateWithSummary>;
 
         /// The pre-committed position tip (latest + last_checkpoint), including
         /// committed writes the merklized snapshot in
@@ -401,7 +401,7 @@ pub trait DbReader: Send + Sync {
         /// block parent is available.
         fn get_pre_committed_position_state_summary(
             &self,
-        ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
+        ) -> Result<LedgerWithSummary<NativeStateWithSummary>>;
 
         /// Pre-committed position overlay. Errors when the feature is on
         /// but native-position storage is absent.
