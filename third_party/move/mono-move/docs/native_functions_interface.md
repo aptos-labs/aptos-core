@@ -277,6 +277,7 @@ Contract: **charge before work**. See [`vm_security_and_correctness.md`](vm_secu
 ## 12. Miscellaneous Open Items
 
 - **Runtime reference checks.** The current VM has an opt-in runtime reference checker for borrow-rule safety. Whether MonoMove keeps an equivalent is open.
+- **Debug mode.** `InterpreterOptions::enable_debugging` gates debug natives at runtime, where V1 uses the `testing` cargo feature. `ctx.debugging_enabled()` reports it, and `ctx.debug_stack_trace()` renders the callers of the function calling the native: the same frames V1 lists.
 
 ---
 
