@@ -33,7 +33,7 @@ struct CpuProfilerConfig {
 impl CpuProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
-            frequency: 100,
+            frequency: 997,
             svg_result_path: PathBuf::from("./profiling_results/cpu_flamegraph.svg"),
         })
     }

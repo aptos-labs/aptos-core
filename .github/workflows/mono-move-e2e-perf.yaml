@@ -35,6 +35,22 @@ on:
         type: choice
         options: [release, performance]
         default: release
+      WORKLOADS:
+        required: false
+        type: string
+        default: "no-op,apt-fa-transfer"
+      THREADS:
+        required: false
+        type: string
+        default: "2,4,8,16"
+      PIN:
+        required: false
+        type: boolean
+        default: true
+      PROFILE:
+        required: false
+        type: string
+        default: ""
   # Untrusted PR code runs on a self-hosted runner. Restricted to same-repo PRs
   # with the `mono-move-e2e-perf` label (forks excluded below); re-runs on each
   # push so a fix shows new numbers.
@@ -62,10 +78,6 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: ${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
-    concurrency:
-      group: execution-benchmark-${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
-      cancel-in-progress: false
-      queue: max
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
@@ -83,28 +95,41 @@ jobs:
       - name: Install python dependencies
         run: TABULATE_INSTALL=lib-only pip install tabulate==0.9.0
 
-      - name: Run mono-move e2e performance comparison
+      - name: Install samply
+        if: ${{ inputs.PROFILE != '' }}
+        continue-on-error: true
+        run: |
+          cargo install samply --locked
+          sudo -n sysctl -w kernel.perf_event_paranoid=1 || echo "could not lower perf_event_paranoid"
+          cat /proc/sys/kernel/perf_event_paranoid
+
+      - name: Run mono-move scaling sweep (experiment)
         id: perf
         env:
-          RUN_SOURCE: ci
-          RUNNER_NAME: ${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
           REPEATS: ${{ inputs.REPEATS || '3' }}
-          NUM_BLOCKS_PER_TEST: ${{ inputs.NUM_BLOCKS_PER_TEST || '30' }}
-          # This job's bands are the one-thread ones. The parallel job is
-          # .github/workflows/mono-move-e2e-perf-parallel.yaml.
-          EXECUTION_THREADS: "1"
-          SELF_COMPARE: ${{ inputs.SELF_COMPARE && '1' || '' }}
-          BUILD: ${{ inputs.BUILD || 'release' }}
+          BLOCKS: ${{ inputs.NUM_BLOCKS_PER_TEST || '30' }}
+          WORKLOADS: ${{ inputs.WORKLOADS || 'no-op,apt-fa-transfer' }}
+          THREADS: ${{ inputs.THREADS || '2,4,8,16' }}
+          PIN: ${{ inputs.PIN && '1' || '' }}
+          PROFILE: ${{ inputs.PROFILE || '' }}
           REPORT_PATH: ${{ runner.temp }}/mono-move-e2e-perf.md
         run: |
           set +e
-          python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_perf_test.py
+          python3 third_party/move/mono-move/testsuite/e2e-perf/scaling_sweep.py
           code=$?
           if [ ! -f "$REPORT_PATH" ]; then
-            printf '### mono-move e2e performance\n\nThe run produced no report (build or runtime error). See job logs.\n' \
-              > "$REPORT_PATH"
+            printf '### scaling sweep\n\nNo report. See job logs.\n' > "$REPORT_PATH"
           fi
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Upload profiles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: scaling-profiles
+          path: /tmp/scaling-sweep/prof/
+          if-no-files-found: ignore
 
       - name: Write step summary
         if: always()
