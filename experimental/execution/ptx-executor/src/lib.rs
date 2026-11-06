@@ -33,7 +33,7 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
-        BlockOutput, TransactionOutput,
+        BlockOutput, CacheInvalidationInfo, TransactionOutput,
     },
 };
 use aptos_vm::{
@@ -106,7 +106,11 @@ impl VMBlockExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(BlockOutput::new(ret, None))
+        Ok(BlockOutput::new(ret, None, None))
+    }
+
+    fn invalidate(&self, _info: &CacheInvalidationInfo) {
+        // No caches to invalidate.
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

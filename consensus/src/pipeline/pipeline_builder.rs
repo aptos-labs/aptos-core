@@ -29,6 +29,7 @@ use aptos_consensus_types::{
         TaskResult,
     },
     quorum_cert::QuorumCert,
+    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
@@ -591,6 +592,7 @@ impl PipelineBuilder {
             Self::execute(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
+                parent.commit_ledger_fut.clone(),
                 rand_check_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
@@ -927,10 +929,12 @@ impl PipelineBuilder {
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
+    /// 4. parent block commits if it requires cache invalidation
     /// What it does: Execute all transactions in block executor
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
+        parent_block_commit_fut: TaskFuture<CommitLedgerResult>,
         rand_check: TaskFuture<RandResult>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
@@ -940,6 +944,23 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
+
+        // A parent that requires cache invalidation (e.g., it published code)
+        // is invalidated at commit, so do not execute on top of it before.
+        if executor
+            .block_wait_for_commit(block.parent_id())
+            .map_err(anyhow::Error::from)?
+        {
+            // The parent committed as a prefix of its ordered batch, so caches
+            // were not invalidated.
+            if parent_block_commit_fut.await?.is_none() {
+                return Err(anyhow!(
+                    "Block {} requires cache invalidation, but was not committed as a tip",
+                    block.parent_id()
+                )
+                .into());
+            }
+        }
         let (user_txns, block_gas_limit, decryption_outcome) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
@@ -1384,7 +1405,15 @@ impl PipelineBuilder {
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
             let order_proof = order_proof_fut.await?;
-            block_store_callback(order_proof, ledger_info_with_sigs);
+            // A block that requires cache invalidation can be committed on its
+            // own, while its order proof is for the tip of its ordered batch.
+            // Vote data is a placeholder with order votes enabled.
+            let finality_proof = if order_proof.commit_info().id() == block.id() {
+                order_proof
+            } else {
+                WrappedLedgerInfo::new(VoteData::dummy(), ledger_info_with_sigs.clone())
+            };
+            block_store_callback(finality_proof, ledger_info_with_sigs);
         }
         Ok(())
     }
@@ -1458,5 +1487,199 @@ impl PipelineBuilder {
             format!("{epoch} {round} {block_id} commit ledger"),
         )
         .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::payload_manager::DirectMempoolPayloadManager;
+    use aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
+    use aptos_executor_types::ExecutorResult;
+    use aptos_types::{
+        aggregate_signature::AggregateSignature, block_executor::partitioner::ExecutableBlock,
+        block_info::BlockInfo,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    /// Executes every block. The parent requires cache invalidation iff
+    /// `wait_for_commit` is set.
+    struct MockExecutor {
+        wait_for_commit: bool,
+        may_execute: Arc<AtomicBool>,
+    }
+
+    impl BlockExecutorTrait for MockExecutor {
+        fn committed_block_id(&self) -> HashValue {
+            unimplemented!()
+        }
+
+        fn reset(&self) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+
+        fn execute_and_update_state(
+            &self,
+            _block: ExecutableBlock,
+            _parent_block_id: HashValue,
+            _onchain_config: BlockExecutorConfigFromOnchain,
+        ) -> ExecutorResult<()> {
+            assert!(self.may_execute.load(Ordering::SeqCst));
+            Ok(())
+        }
+
+        fn ledger_update(
+            &self,
+            _block_id: HashValue,
+            _parent_block_id: HashValue,
+        ) -> ExecutorResult<StateComputeResult> {
+            unimplemented!()
+        }
+
+        fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
+            unimplemented!()
+        }
+
+        fn commit_ledger(&self, _ledger_info: LedgerInfoWithSignatures) -> ExecutorResult<()> {
+            unimplemented!()
+        }
+
+        fn block_wait_for_commit(&self, _block_id: HashValue) -> ExecutorResult<bool> {
+            Ok(self.wait_for_commit)
+        }
+
+        fn finish(&self) {
+            unimplemented!()
+        }
+
+        fn state_view(&self, _block_id: HashValue) -> ExecutorResult<CachedStateView> {
+            unimplemented!()
+        }
+    }
+
+    fn ledger_info(commit_info: BlockInfo) -> LedgerInfoWithSignatures {
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(commit_info, HashValue::zero()),
+            AggregateSignature::empty(),
+        )
+    }
+
+    fn pending_parent_commit() -> (
+        oneshot::Sender<CommitLedgerResult>,
+        TaskFuture<CommitLedgerResult>,
+    ) {
+        let (tx, rx) = oneshot::channel();
+        let fut = async move { rx.await.map_err(|err| TaskError::from(anyhow!(err))) }
+            .boxed()
+            .shared();
+        (tx, fut)
+    }
+
+    async fn execute(
+        wait_for_commit: bool,
+        parent_block_commit_fut: TaskFuture<CommitLedgerResult>,
+        may_execute: Arc<AtomicBool>,
+    ) -> TaskResult<ExecuteResult> {
+        PipelineBuilder::execute(
+            spawn_ready_fut((Arc::new(vec![]), None, DecryptionOutcome::Disabled)),
+            spawn_ready_fut(Duration::ZERO),
+            parent_block_commit_fut,
+            spawn_ready_fut((None, false)),
+            Arc::new(MockExecutor {
+                wait_for_commit,
+                may_execute,
+            }),
+            Arc::new(Block::make_genesis_block()),
+            Arc::from(Vec::<AccountAddress>::new()),
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            0,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn execute_waits_for_parent_commit() {
+        let may_execute = Arc::new(AtomicBool::new(false));
+        let (tx, parent_commit) = pending_parent_commit();
+        let handle = tokio::spawn(execute(true, parent_commit, may_execute.clone()));
+        for _ in 0..100 {
+            tokio::task::yield_now().await;
+        }
+
+        // The executor asserts the block is not executed before this.
+        may_execute.store(true, Ordering::SeqCst);
+        tx.send(Some(ledger_info(BlockInfo::empty()))).unwrap();
+        assert!(handle.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn execute_does_not_wait_without_invalidation() {
+        let (_tx, parent_commit) = pending_parent_commit();
+        let may_execute = Arc::new(AtomicBool::new(true));
+        assert!(execute(false, parent_commit, may_execute).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn execute_rejects_parent_committed_as_prefix() {
+        let may_execute = Arc::new(AtomicBool::new(true));
+        assert!(execute(true, spawn_ready_fut(None), may_execute)
+            .await
+            .is_err());
+    }
+
+    /// Runs the post-commit stage of a block committed with `commit_proof`,
+    /// and returns the finality proof passed to the block store.
+    async fn post_commit_finality_proof(
+        block: Block,
+        order_proof: WrappedLedgerInfo,
+        commit_proof: LedgerInfoWithSignatures,
+    ) -> WrappedLedgerInfo {
+        let (tx, rx) = oneshot::channel();
+        PipelineBuilder::post_commit_ledger(
+            spawn_ready_fut(StateComputeResult::new_dummy()),
+            spawn_ready_fut(order_proof),
+            spawn_ready_fut(Some(commit_proof.clone())),
+            spawn_ready_fut(()),
+            spawn_ready_fut(()),
+            Arc::new(DirectMempoolPayloadManager::new()),
+            Box::new(move |finality_proof, _| {
+                let _ = tx.send(finality_proof);
+            }),
+            Arc::new(block),
+        )
+        .await
+        .unwrap();
+        let finality_proof = rx.await.unwrap();
+
+        // The block store merges the finality proof with the commit proof.
+        finality_proof
+            .create_merged_with_executed_state(commit_proof)
+            .unwrap();
+        finality_proof
+    }
+
+    #[tokio::test]
+    async fn post_commit_keeps_order_proof_of_tip() {
+        let block = Block::make_genesis_block();
+        let order_proof = WrappedLedgerInfo::new(
+            VoteData::dummy(),
+            ledger_info(block.gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None)),
+        );
+        let commit_proof = ledger_info(block.gen_block_info(HashValue::random(), 0, None));
+        let finality_proof =
+            post_commit_finality_proof(block, order_proof.clone(), commit_proof).await;
+        assert_eq!(finality_proof, order_proof);
+    }
+
+    #[tokio::test]
+    async fn post_commit_of_cut_block_uses_own_commit_proof() {
+        // The order proof is for the tip of the ordered batch, a later block.
+        let block = Block::make_genesis_block();
+        let block_id = block.id();
+        let order_proof =
+            WrappedLedgerInfo::new(VoteData::dummy(), ledger_info(BlockInfo::random(1)));
+        let commit_proof = ledger_info(block.gen_block_info(HashValue::random(), 0, None));
+        let finality_proof = post_commit_finality_proof(block, order_proof, commit_proof).await;
+        assert_eq!(finality_proof.commit_info().id(), block_id);
     }
 }
