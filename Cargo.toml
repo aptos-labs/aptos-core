@@ -594,7 +594,7 @@ codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 colored = "3.1.1"
 concurrent-queue = "2.2.0"
-console-subscriber = "0.3.0"
+console-subscriber = "0.4.1"
 core_affinity = "0.8.1"
 coset = "0.3"
 criterion = "0.8.2"
@@ -678,7 +678,25 @@ http-body-util = "0.1.1"
 httpmock = "0.9.0"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-util = { version = "0.1.3", features = ["client-legacy"] }
-image = "0.24.5"
+# The default `avif` feature is an AV1 encoder (rav1e). AVIF images are passed
+# through, never re-encoded.
+image = { version = "0.25.10", default-features = false, features = [
+    "rayon",
+    "bmp",
+    "dds",
+    "exr",
+    "ff",
+    "gif",
+    "hdr",
+    "ico",
+    "jpeg",
+    "png",
+    "pnm",
+    "qoi",
+    "tga",
+    "tiff",
+    "webp",
+] }
 imbl = "7.0.2"
 indexmap = "2.7.0"
 indicatif = "0.18.6"
@@ -756,7 +774,7 @@ pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 pretty = "0.12.5"
 pretty_assertions = "1.2.1"
 prettydiff = "0.9.0"
-primitive-types = { version = "0.12.2" }
+primitive-types = { version = "0.14.0" }
 proc-macro2 = "1.0.107"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
@@ -773,7 +791,7 @@ quick-junit = "0.8.0"
 quick_cache = "0.7.0"
 quote = "1.0.18"
 rand = "0.7.3"
-random_word = { version = "0.5.3", features = ["en"] }
+random_word = { version = "1.0.0", features = ["en"] }
 rapidhash = "4.5.1"
 rayon = "1.12.0"
 redis = { version = "0.22.3", features = [
@@ -837,7 +855,7 @@ strum = "0.28.0"
 strum_macros = "0.28.0"
 sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
-sysinfo = { version = "0.39.6", features = ["multithread"] }
+sysinfo = { version = "0.40.1", features = ["multithread"] }
 tar = "0.4.46"
 tempfile = "3.27.0"
 tera = "1.16.0"
