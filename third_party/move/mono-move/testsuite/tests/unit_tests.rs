@@ -1,18 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Runs a Move package's `#[test]` unit tests on mono-move and prints a
-//! coverage scoreboard. Each test below is just a different package path
-//! through the same entry point ([`unit_test::run_package_unit_tests`]).
-//!
-//! Tests mono-move can't run yet (missing natives, heap arguments, ...) are
-//! reported as *unsupported* and do not fail the run; only a test mono-move
-//! runs but gets wrong is a failure. Run with `--nocapture` to see the
-//! scoreboard.
+//! Runs the framework packages' Move unit tests on V1 and MonoMove, failing a
+//! test whose outcomes differ. Tests MonoMove cannot run yet are reported as
+//! unsupported, with a per-reason histogram; run with `--nocapture` to see it.
 
-use mono_move_testsuite::unit_test;
+mod common;
+
+use aptos_framework::extended_checks;
 use move_model::metadata::LanguageVersion;
-use move_package::BuildConfig;
+use move_package::{BuildConfig, CompilerConfig};
 use std::path::Path;
 
 fn run_tests_for_pkg(pkg: &str, use_latest_language: bool) {
@@ -20,25 +17,20 @@ fn run_tests_for_pkg(pkg: &str, use_latest_language: bool) {
         .join("../../../../aptos-move/framework")
         .join(pkg);
 
-    let mut build_config = BuildConfig::default();
+    let mut build_config = BuildConfig {
+        compiler_config: CompilerConfig {
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     if use_latest_language {
         let language_version = LanguageVersion::latest();
         let bytecode_version = language_version.infer_bytecode_version(None);
         build_config.compiler_config.language_version = Some(language_version);
         build_config.compiler_config.bytecode_version = Some(bytecode_version);
     }
-
-    let summary = unit_test::run_package_unit_tests(&path, build_config)
-        .unwrap_or_else(|err| panic!("failed to run {pkg} unit tests: {err}"));
-
-    println!("{}", summary.render());
-
-    assert!(
-        summary.failed.is_empty(),
-        "{} test(s) mono-move run produced the wrong result:\n{}",
-        summary.failed.len(),
-        summary.failed.join("\n"),
-    );
+    common::run_package_on_both(&path, build_config);
 }
 
 #[test]

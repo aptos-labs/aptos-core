@@ -1,12 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Shared helpers for loader integration tests.
-//!
-//! Provides an in-memory [`ModuleProvider`] backed by a `HashMap` of module
-//! bytes plus a per-package sibling index. Tests compile Move sources via
-//! [`crate::compile_move_modules`], serialize the resulting
-//! [`CompiledModule`]s, and populate the provider.
+//! An in-memory [`ModuleProvider`] backed by a map of module bytes plus
+//! a per-package sibling index.
 
 use bytes::Bytes;
 use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult};
@@ -14,7 +10,7 @@ use mono_move_loader::ModuleProvider;
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use std::collections::HashMap;
+use shared_dsa::UnorderedMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -37,8 +33,8 @@ impl IntoExecutionError for ModuleProviderError {
 
 #[derive(Clone, Default)]
 pub struct InMemoryModuleProvider {
-    module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
-    packages: HashMap<(AccountAddress, Identifier), Vec<Identifier>>,
+    module_bytes: UnorderedMap<(AccountAddress, Identifier), Bytes>,
+    packages: UnorderedMap<(AccountAddress, Identifier), Vec<Identifier>>,
     deserializer_config: DeserializerConfig,
     verifier_config: VerifierConfig,
 }
@@ -63,13 +59,12 @@ impl InMemoryModuleProvider {
         }
     }
 
-    /// Adds a module. The module's bytes are obtained by serializing the
-    /// provided [`CompiledModule`].
+    /// Serializes and stores `module` at its bytecode version.
     pub fn add_module(&mut self, module: &CompiledModule) {
         let id = module.self_id();
         let mut bytes = Vec::new();
         module
-            .serialize(&mut bytes)
+            .serialize_for_version(Some(module.version), &mut bytes)
             .expect("module serialization should succeed");
         self.module_bytes
             .insert((id.address, id.name), Bytes::from(bytes));
@@ -77,8 +72,8 @@ impl InMemoryModuleProvider {
 
     /// Adds every module from a compiled source.
     pub fn add_modules(&mut self, modules: &[CompiledModule]) {
-        for m in modules {
-            self.add_module(m);
+        for module in modules {
+            self.add_module(module);
         }
     }
 
@@ -87,11 +82,9 @@ impl InMemoryModuleProvider {
         self.module_bytes.insert((address, name), bytes);
     }
 
-    /// Declares that `(address, name)` belongs to a package whose other
-    /// members are the given `siblings`. The `siblings` list must NOT
-    /// include `name` itself — each stored entry is built to include the
-    /// owner module, matching the `get_same_package_modules` contract
-    /// ("returns all package members, including self").
+    /// Registers `name` and `siblings` as one package at `address`.
+    /// `siblings` must exclude `name`; `get_same_package_modules` returns the
+    /// full member list, including the queried module.
     pub fn declare_package(
         &mut self,
         address: AccountAddress,

@@ -12,10 +12,10 @@ use crate::{
         TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
     },
     matcher::check_output,
-    module_provider::InMemoryModuleProvider,
     parser::{Check, PrintSection, Step},
     print_sections,
     resource_provider::features_blob,
+    InMemoryModuleProvider,
 };
 use anyhow::{anyhow, bail};
 use aptos_framework_natives::{
@@ -159,7 +159,7 @@ fn render_v1_location(
 }
 
 /// Renders an error location as `undefined`, `script`, or a module ID.
-pub(crate) fn render_error_location(location: &Location) -> String {
+fn render_error_location(location: &Location) -> String {
     match location {
         Location::Undefined => "undefined".to_string(),
         Location::Script => "script".to_string(),

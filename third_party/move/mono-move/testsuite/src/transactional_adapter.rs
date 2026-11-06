@@ -13,11 +13,7 @@ use crate::transactional_session::{
 };
 use anyhow::{bail, Result};
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
-use mono_move_core::{BytecodeOffset, CallFrame, FunctionDefinitionIndex, VMInternalError};
-use mono_move_output::v1_error::{
-    describe, fallback_info, v1_execution_state, v1_location, v1_records_execution_state,
-    V1Equivalent, V1Message,
-};
+use mono_move_output::v1_error::{v1_vm_error, MonoFailure};
 use move_binary_format::{
     errors::{set_stable_test_display, Location, PartialVMError, VMError},
     file_format::CompiledScript,
@@ -29,7 +25,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
-    vm_status::{AbortLocation, StatusCode},
+    vm_status::StatusCode,
 };
 use move_transactional_test_runner::{
     framework::{run_test_impl_with_baseline, BaselineTarget, CompiledState, MoveTestAdapter},
@@ -242,9 +238,21 @@ impl MonoVMTestAdapter<'_> {
                 location,
                 offset,
                 stack_trace,
-            }) => abort_error(code, message, location, offset, &stack_trace, debugging),
+            }) => {
+                v1_vm_error(
+                    MonoFailure::Abort {
+                        code,
+                        message,
+                        location,
+                        offset,
+                        stack_trace: &stack_trace,
+                    },
+                    debugging,
+                )
+                .0
+            },
             Err(RunError::Arguments(err)) => argument_error(err),
-            Err(RunError::Vm(err)) => run_vm_error(&err, debugging),
+            Err(RunError::Vm(err)) => v1_vm_error(MonoFailure::Error(&err), debugging).0,
             Err(
                 err @ (RunError::VmUnsupported(_) | RunError::Unsupported(_) | RunError::Commit(_)),
             ) => return Err(err.to_string()),
@@ -289,33 +297,6 @@ fn gas_budget_error(gas_budget: Option<u64>) -> Option<String> {
     })
 }
 
-/// V1's `VMError` for an abort. V1 attributes a native abort to the native's
-/// own definition at offset zero; MonoVM records no instruction for it, so
-/// that case carries no offset.
-fn abort_error(
-    code: u64,
-    message: Option<String>,
-    location: AbortLocation,
-    offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
-    stack_trace: &[CallFrame],
-    debugging: bool,
-) -> VMError {
-    let mut error = PartialVMError::new(StatusCode::ABORTED).with_sub_status(code);
-    if let Some(message) = message {
-        error = error.with_message(message);
-    }
-    if let Some((function, code_offset)) = offset {
-        error = error.at_code_offset(function, code_offset);
-    }
-    if debugging {
-        error = error.with_exec_state(v1_execution_state(stack_trace));
-    }
-    error.finish(match location {
-        AbortLocation::Module(module) => Location::Module(module),
-        AbortLocation::Script => Location::Script,
-    })
-}
-
 /// V1's `VMError` for an argument that does not fit the function.
 fn argument_error(err: ArgumentError) -> VMError {
     let (status, message) = match &err {
@@ -330,34 +311,6 @@ fn argument_error(err: ArgumentError) -> VMError {
     PartialVMError::new(status)
         .with_message(message)
         .finish(Location::Undefined)
-}
-
-/// Maps errors to V1 format. Shared verifier errors are returned unchanged.
-/// Adds the caller stack trace when debugging is enabled, the error has an
-/// instruction offset, and [`v1_records_execution_state`] returns true.
-fn run_vm_error(err: &VMInternalError, debugging: bool) -> VMError {
-    let info = match describe(err) {
-        V1Equivalent::Verbatim(error) => return error,
-        equivalent @ (V1Equivalent::Described(_)
-        | V1Equivalent::NoV1Failure
-        | V1Equivalent::V1StatusUnknown) => fallback_info(err, equivalent),
-    };
-    let mut error = PartialVMError::new(info.status);
-    if let Some(sub_status) = info.sub_status.known() {
-        error = error.with_sub_status(sub_status);
-    }
-    match info.message {
-        V1Message::Verbatim(text) | V1Message::MonoText(text) => error = error.with_message(text),
-        V1Message::Absent => {},
-    }
-    let (location, offset) = v1_location(err.location());
-    if let Some((function, code_offset)) = offset {
-        error = error.at_code_offset(function, code_offset);
-        if debugging && v1_records_execution_state(err) {
-            error = error.with_exec_state(v1_execution_state(err.stack_trace()));
-        }
-    }
-    error.finish(location)
 }
 
 /// Runs the transactional test at `path` on MonoVM against `baseline`.

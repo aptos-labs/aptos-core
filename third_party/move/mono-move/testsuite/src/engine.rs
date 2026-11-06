@@ -5,8 +5,8 @@
 
 use crate::{
     compile::{compile, SourceKind},
-    module_provider::InMemoryModuleProvider,
-    resource_provider::{storage_with_default_features_for_test, InMemoryResourceProvider},
+    resource_provider::{storage_resource_provider, storage_with_default_features_for_test},
+    InMemoryModuleProvider,
 };
 use anyhow::{anyhow, bail, Error, Result};
 use mono_move_core::{
@@ -16,12 +16,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
-use mono_move_natives::{
-    make_all_bls12381_test_natives, make_all_bulletproofs_test_natives,
-    make_all_crypto_algebra_test_natives, make_all_ed25519_test_natives,
-    make_all_event_test_natives, make_all_multi_ed25519_test_natives, make_all_production_natives,
-    make_all_ristretto255_scalar_test_natives, make_all_test_natives, make_all_unit_test_natives,
-};
+use mono_move_natives::{make_all_test_natives, make_all_test_only_and_production_natives};
 use mono_move_runtime::{
     CallBuilder, CompletedCall, InterpreterContext, InterpreterOptions, ProductionContextFamily,
     ProductionNativeRegistry, RuntimeStatus,
@@ -157,19 +152,9 @@ pub fn build_natives() -> &'static ProductionNativeRegistry {
 
 static ALL_NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(|| {
     let mut natives = make_all_test_natives::<ProductionContextFamily>();
-    natives.extend(make_all_unit_test_natives::<ProductionContextFamily>());
-    natives.extend(make_all_ed25519_test_natives::<ProductionContextFamily>());
-    natives.extend(make_all_multi_ed25519_test_natives::<ProductionContextFamily>());
-    natives.extend(make_all_bls12381_test_natives::<ProductionContextFamily>());
-    natives.extend(make_all_ristretto255_scalar_test_natives::<
+    natives.extend(make_all_test_only_and_production_natives::<
         ProductionContextFamily,
     >());
-    natives.extend(make_all_bulletproofs_test_natives::<ProductionContextFamily>());
-    natives.extend(make_all_crypto_algebra_test_natives::<
-        ProductionContextFamily,
-    >());
-    natives.extend(make_all_event_test_natives::<ProductionContextFamily>());
-    natives.extend(make_all_production_natives::<ProductionContextFamily>());
     ProductionNativeRegistry::with_natives(natives)
 });
 
@@ -211,7 +196,7 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     // Framework code gates features on `exists<Features>(@std)`, so the
     // resource has to be there for those paths to run at all.
     let storage = storage_with_default_features_for_test();
-    let resource_provider = InMemoryResourceProvider::new(guard, &storage);
+    let resource_provider = storage_resource_provider(guard, &storage);
     let mut interp = InterpreterContext::new_with_options(
         loader,
         GasMeter::new(GAS_BUDGET),
