@@ -31,7 +31,9 @@ use aptos_storage_interface::{
         orders::OrderParent,
         positions::PositionParent,
         state::State,
-        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+        state_summary::{
+            ProvableCollateralStateSummary, ProvablePositionStateSummary, ProvableStateSummary,
+        },
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
@@ -532,8 +534,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     pub fn update_ledger(&self) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["chunk_update_ledger_total"]);
 
-        let (parent_state_summary, parent_position_state_summary, parent_accumulator, chunk) =
-            self.commit_queue.lock().next_chunk_to_update_ledger()?;
+        let (
+            parent_state_summary,
+            parent_position_state_summary,
+            parent_collateral_state_summary,
+            parent_accumulator,
+            chunk,
+        ) = self.commit_queue.lock().next_chunk_to_update_ledger()?;
         let ChunkToUpdateLedger {
             output,
             transaction_infos: txn_infos,
@@ -562,7 +569,18 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                 .collect_vec()
         });
         let position_persisted = compute_trading_native_state_roots
-            .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+            .then(|| ProvablePositionStateSummary::new_persisted_position(self.db.reader.as_ref()))
+            .transpose()?;
+        let known_collateral_state_checkpoints = compute_trading_native_state_roots.then(|| {
+            txn_infos
+                .iter()
+                .map(|t| t.collateral_state_checkpoint_hash())
+                .collect_vec()
+        });
+        let collateral_persisted = compute_trading_native_state_roots
+            .then(|| {
+                ProvableCollateralStateSummary::new_persisted_collateral(self.db.reader.as_ref())
+            })
             .transpose()?;
         let state_checkpoint_output = DoStateCheckpoint::run()
             .execution_output(&output.execution_output)
@@ -579,6 +597,9 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .maybe_parent_position_state_summary(parent_position_state_summary.as_ref())
             .maybe_persisted_position_state_summary(position_persisted.as_ref())
             .maybe_known_position_state_checkpoints(known_position_state_checkpoints)
+            .maybe_parent_collateral_state_summary(parent_collateral_state_summary.as_ref())
+            .maybe_persisted_collateral_state_summary(collateral_persisted.as_ref())
+            .maybe_known_collateral_state_checkpoints(known_collateral_state_checkpoints)
             .build()?;
 
         let ledger_update_output = DoLedgerUpdate::run(

@@ -23,7 +23,7 @@ use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
-use aptos_logger::warn;
+use aptos_logger::{info, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -360,6 +360,12 @@ impl State {
                 let config = self
                     .hot_state_config
                     .with_on_chain(value_opt.map(|value| value.bytes().as_ref()));
+                info!(
+                    version = update.version,
+                    exists_on_chain = value_opt.is_some(),
+                    effective_hot_state_config = ?config,
+                    "On-chain hot state config updated."
+                );
                 Some((update.version, config))
             })
             .collect()

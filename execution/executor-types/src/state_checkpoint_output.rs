@@ -27,6 +27,8 @@ impl StateCheckpointOutput {
         hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
         position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
         position_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+        collateral_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+        collateral_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
     ) -> Self {
         Self::new_impl(Inner {
             state_summary,
@@ -34,12 +36,15 @@ impl StateCheckpointOutput {
             hot_state_checkpoint_hashes,
             position_state_summary,
             position_state_checkpoint_hashes,
+            collateral_state_summary,
+            collateral_state_checkpoint_hashes,
         })
     }
 
     pub fn new_empty(
         parent_state_summary: LedgerStateSummary,
         position_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+        collateral_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
     ) -> Self {
         Self::new_impl(Inner {
             state_summary: parent_state_summary,
@@ -47,11 +52,13 @@ impl StateCheckpointOutput {
             hot_state_checkpoint_hashes: None,
             position_state_summary,
             position_state_checkpoint_hashes: None,
+            collateral_state_summary,
+            collateral_state_checkpoint_hashes: None,
         })
     }
 
     pub fn new_dummy() -> Self {
-        Self::new_empty(LedgerStateSummary::new_empty(), None)
+        Self::new_empty(LedgerStateSummary::new_empty(), None, None)
     }
 
     fn new_impl(inner: Inner) -> Self {
@@ -61,11 +68,12 @@ impl StateCheckpointOutput {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        // No position writes in a reconfig suffix, so the summary carries
-        // over as the next block's freeze base.
+        // No native writes in a reconfig suffix, so the summaries carry
+        // over as the next block's freeze bases.
         Self::new_empty(
             self.state_summary.clone(),
             self.position_state_summary.clone(),
+            self.collateral_state_summary.clone(),
         )
     }
 }
@@ -84,4 +92,11 @@ pub struct Inner {
     /// Per-transaction position state root: `Some` at the checkpoint index,
     /// `None` elsewhere. `None` (the whole option) unless the feature is on.
     pub position_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+    /// Native-collateral summary after this chunk, as
+    /// `position_state_summary` is. `None` unless the trading-native state
+    /// roots are computed.
+    pub collateral_state_summary: Option<LedgerWithSummary<NativeStateWithSummary>>,
+    /// Per-transaction collateral state root, laid out like
+    /// `position_state_checkpoint_hashes`.
+    pub collateral_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
 }

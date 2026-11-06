@@ -30,7 +30,9 @@ use aptos_storage_interface::{
         collateral::{CollateralParent, ShardedCollateralLayers},
         orders::{OrderParent, ShardedOrderLayers},
         positions::{PositionParent, ShardedPositionLayers},
-        state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
+        state_summary::{
+            ProvableCollateralStateSummary, ProvablePositionStateSummary, ProvableStateSummary,
+        },
         state_view::cached_state_view::CachedStateView,
     },
     DbReaderWriter,
@@ -472,10 +474,26 @@ where
                 let position_persisted = output
                     .execution_output
                     .compute_trading_native_state_roots
-                    .then(|| ProvablePositionStateSummary::new_persisted(self.db.reader.as_ref()))
+                    .then(|| {
+                        ProvablePositionStateSummary::new_persisted_position(
+                            self.db.reader.as_ref(),
+                        )
+                    })
                     .transpose()?;
                 let parent_position_summary =
                     parent_block.output.ensure_result_position_state_summary()?;
+                let collateral_persisted = output
+                    .execution_output
+                    .compute_trading_native_state_roots
+                    .then(|| {
+                        ProvableCollateralStateSummary::new_persisted_collateral(
+                            self.db.reader.as_ref(),
+                        )
+                    })
+                    .transpose()?;
+                let parent_collateral_summary = parent_block
+                    .output
+                    .ensure_result_collateral_state_summary()?;
                 output.set_state_checkpoint_output(
                     DoStateCheckpoint::run()
                         .execution_output(&output.execution_output)
@@ -485,6 +503,8 @@ where
                         )?)
                         .maybe_parent_position_state_summary(parent_position_summary)
                         .maybe_persisted_position_state_summary(position_persisted.as_ref())
+                        .maybe_parent_collateral_state_summary(parent_collateral_summary)
+                        .maybe_persisted_collateral_state_summary(collateral_persisted.as_ref())
                         .build()?,
                 );
                 output.set_ledger_update_output(DoLedgerUpdate::run(
