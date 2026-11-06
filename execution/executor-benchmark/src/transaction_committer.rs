@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    metrics::NUM_TXNS, pipeline::CommitBlockMessage, position_verifier::PositionIndexVerifier,
+    block_timeline::StageSpan, metrics::NUM_TXNS, pipeline::CommitBlockMessage,
+    position_verifier::PositionIndexVerifier,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
@@ -80,6 +81,7 @@ where
 
         while let Ok(msg) = self.block_receiver.recv() {
             let CommitBlockMessage {
+                block_index,
                 block_id,
                 first_block_start_time,
                 current_block_start_time,
@@ -97,9 +99,11 @@ where
             let version = output.expect_last_version();
             last_version = version;
             let commit_start = Instant::now();
+            let span = StageSpan::start("commit", block_index, num_input_txns);
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
             self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
+            span.finish();
             if let Some(verifier) = &self.position_verifier {
                 verifier.check_block(&output.execution_output);
             }
