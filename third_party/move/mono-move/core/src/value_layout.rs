@@ -50,6 +50,18 @@ impl LayoutId {
     pub const fn as_usize(self) -> usize {
         self.0 as usize
     }
+
+    /// Returns the underlying index, as stored in a captured-data object.
+    #[inline(always)]
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Rebuilds an ID from the `u32` read back out of a captured-data object.
+    #[inline(always)]
+    pub const fn from_u32(raw: u32) -> Self {
+        Self(raw)
+    }
 }
 
 bitflags! {

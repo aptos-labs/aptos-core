@@ -22,7 +22,6 @@ use std::sync::Arc;
 // TODO(completeness): consider not constructing layouts at all if they are
 // only needed for serialization.
 // TODO(metering): ensure the layout is bounded.
-#[allow(dead_code)]
 pub(crate) fn to_v1_type_layout<T: LayoutProvider + ?Sized>(
     layouts: &T,
     id: LayoutId,

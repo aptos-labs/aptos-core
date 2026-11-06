@@ -1172,6 +1172,16 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId {
+        self.loader
+            .guard
+            .publish_captured_values_layout(captured, layout)
+    }
+
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
         self.loader.guard.publish_layout(layout)
     }
