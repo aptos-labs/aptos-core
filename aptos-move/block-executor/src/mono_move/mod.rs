@@ -19,7 +19,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        BlockExecutableTransaction as Transaction, TransactionAuxiliaryData, TransactionOutput,
+        BlockExecutableTransaction as Transaction, Transaction as AptosTransaction,
+        TransactionAuxiliaryData, TransactionOutput,
     },
     write_set::{WriteOpKind, WriteSet},
 };
@@ -39,8 +40,9 @@ use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{SegmentedArena, SessionEffects, WriteClass};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ptr::NonNull,
     sync::Arc,
 };
@@ -158,6 +160,14 @@ pub enum MonoTxnOutput {
         /// Writes that land inside a resource group, keyed by the group's own
         /// storage slot and tagged by the member's struct tag.
         group_writes: HashMap<InMemoryStorageKey, BTreeMap<StructTag, MonoValue>>,
+        /// Every storage slot the transaction read, for hot state promotion. A
+        /// group member's read counts for the group's own slot, which is what
+        /// storage holds. May repeat keys; the accumulator dedups.
+        read_keys: Vec<InMemoryStorageKey>,
+        /// Only a block epilogue carries this: the keys its payload asks to
+        /// make hot. Taken from the payload rather than recomputed, so a
+        /// replay promotes the same keys the block's execution decided on.
+        to_make_hot: Option<BTreeSet<StateKey>>,
     },
     /// Signals block executor that this transaction has to be skipped and
     /// retried later.
@@ -202,12 +212,28 @@ impl MonoTxnOutput {
     ///
     /// A group member whose type has no struct tag cannot be written to storage
     /// at all, so it is left out; materialization reports it as a failure.
-    fn executed(outcome: TxnOutcome, skips_rest: bool) -> Self {
+    fn executed(
+        outcome: TxnOutcome,
+        skips_rest: bool,
+        to_make_hot: Option<BTreeSet<StateKey>>,
+    ) -> Self {
         let mut resource_writes = HashMap::new();
         let mut group_writes: HashMap<_, BTreeMap<_, _>> = HashMap::new();
+        let mut read_keys = Vec::new();
 
         if let Some(effects) = committed_effects(&outcome) {
             let pin: Arc<dyn ReadPin> = effects.frozen_heap();
+            read_keys.extend(
+                effects
+                    .read_write_set()
+                    .reads_unordered()
+                    .map(|(key, _, group)| match group {
+                        None => key.clone(),
+                        Some(group_ty) => {
+                            InMemoryStorageKey::resource_group(key.address(), group_ty)
+                        },
+                    }),
+            );
             for (key, class, group) in effects.read_write_set().writes_unordered() {
                 let ty = key.value_ty();
                 let value = written_value(class, ty, &pin);
@@ -233,8 +259,30 @@ impl MonoTxnOutput {
             skips_rest,
             resource_writes,
             group_writes,
+            read_keys,
+            to_make_hot,
         }
     }
+}
+
+/// The hot state promotions a block epilogue's output carries: the keys its
+/// payload names, plus the slots the epilogue itself read without writing,
+/// which the payload was computed too early to include.
+fn epilogue_hotness(
+    to_make_hot: BTreeSet<StateKey>,
+    read_keys: &[InMemoryStorageKey],
+    written: &WriteSet,
+) -> Result<BTreeSet<StateKey>, PanicError> {
+    let mut hotness = to_make_hot;
+    for key in read_keys {
+        let state_key = key
+            .as_state_key()
+            .map_err(|e| code_invariant_error(format!("Failed to build a state key: {e:#}")))?;
+        if written.get_write_op(&state_key).is_none() {
+            hotness.insert(state_key);
+        }
+    }
+    Ok(hotness)
 }
 
 impl TxnOutput for MonoTxnOutput {
@@ -362,13 +410,25 @@ impl TxnOutput for MonoTxnOutput {
     }
 
     fn storage_keys_read(&self) -> impl Iterator<Item = &Self::Key> {
-        // TODO(completeness): support read keys information.
-        std::iter::empty()
+        let read_keys = match self {
+            MonoTxnOutput::Executed { read_keys, .. } => Some(read_keys),
+            MonoTxnOutput::SkippedToRetry => None,
+        };
+        read_keys.into_iter().flatten()
     }
 
     fn storage_keys_written(&self) -> impl Iterator<Item = &Self::Key> {
-        // TODO(completeness): support written keys information.
-        std::iter::empty()
+        // A group member's write lands in the group's slot, so that is the key
+        // the hot state sees written.
+        let writes = match self {
+            MonoTxnOutput::Executed {
+                resource_writes,
+                group_writes,
+                ..
+            } => Some(resource_writes.keys().chain(group_writes.keys())),
+            MonoTxnOutput::SkippedToRetry => None,
+        };
+        writes.into_iter().flatten()
     }
 
     fn check_materialization(&self, _materializer: &impl Materializer<Self::Txn>) -> bool {
@@ -376,6 +436,12 @@ impl TxnOutput for MonoTxnOutput {
         true
     }
 }
+
+/// Whether MonoMove charges gas. Off by default while its gas schedule is a
+/// placeholder; `MONO_MOVE_METERED=1` turns it on for experiments, which
+/// changes what a transaction writes (fee, burn, supply) and so its output
+/// size.
+static METERED: Lazy<bool> = Lazy::new(|| std::env::var_os("MONO_MOVE_METERED").is_some());
 
 /// A per-worker MonoMove executor.
 pub struct MonoTransactionExecutor {
@@ -439,16 +505,20 @@ impl MonoTransactionExecutor {
 
         // TODO(completeness): Run metered execution. For now using no metering
         // simplifies tests.
-        let outcome = AptosTransactionExecutor::new(
+        let executor = AptosTransactionExecutor::new(
             guard,
             natives,
             &module_provider,
             data_provider,
             &self.environment,
             usage,
-        )
-        .without_metering()
-        .execute_transaction(inner_txn, auxiliary_info);
+        );
+        let executor = if *METERED {
+            executor
+        } else {
+            executor.without_metering()
+        };
+        let outcome = executor.execute_transaction(inner_txn, auxiliary_info);
 
         if let TxnOutcome::Panic(err) = &outcome {
             return Err(code_invariant_error(format!(
@@ -543,9 +613,18 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             },
         };
 
+        let to_make_hot = match txn {
+            SignatureVerifiedTransaction::Valid(AptosTransaction::BlockEpilogue(payload)) => {
+                payload.try_get_keys_to_make_hot().cloned()
+            },
+            SignatureVerifiedTransaction::Valid(_) | SignatureVerifiedTransaction::Invalid(_) => {
+                None
+            },
+        };
+
         Ok((
             ExecutionStatus::Executed {
-                output: MonoTxnOutput::executed(outcome, skips_rest),
+                output: MonoTxnOutput::executed(outcome, skips_rest, to_make_hot),
                 skips_rest,
             },
             reads,
@@ -563,8 +642,13 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         <Self::Output as TxnOutput>::CommittedOutput,
         PanicOr<ResourceGroupSerializationError>,
     > {
-        let outcome = match output {
-            MonoTxnOutput::Executed { outcome, .. } => outcome,
+        let (outcome, read_keys, to_make_hot) = match output {
+            MonoTxnOutput::Executed {
+                outcome,
+                read_keys,
+                to_make_hot,
+                ..
+            } => (outcome, read_keys, to_make_hot),
             // A skipped output renders to an empty, kept-success transaction.
             MonoTxnOutput::SkippedToRetry => {
                 return Ok(TransactionOutput::new_success_with_write_set(
@@ -586,7 +670,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         let materialization_failed =
             |e| PanicOr::CodeInvariantError(format!("Failed to materialize outputs: {e}"));
 
-        match mode {
+        let output = match mode {
             ViewMode::Sequential { unsync_map, .. } => {
                 let provider =
                     BlockSTMSequentialProvider::new(&guard, shared.base_view, unsync_map);
@@ -599,7 +683,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 for (group_key, members) in groups {
                     unsync_map.insert_group(group_key, members);
                 }
-                Ok(output)
+                output
             },
             ViewMode::Parallel {
                 versioned_map,
@@ -621,9 +705,22 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                 let (output, _groups) = outcome
                     .materialize(&guard, &provider, features, auxiliary_data)
                     .map_err(materialization_failed)?;
-                Ok(output)
+                output
             },
-        }
+        };
+
+        let Some(to_make_hot) = to_make_hot else {
+            return Ok(output);
+        };
+        let (mut write_set, events, gas_used, status, auxiliary_data) = output.unpack();
+        write_set.add_hotness(epilogue_hotness(to_make_hot, &read_keys, &write_set)?);
+        Ok(TransactionOutput::new(
+            write_set,
+            events,
+            gas_used,
+            status,
+            auxiliary_data,
+        ))
     }
 
     fn check_materialization<S: TStateView<Key = <Self::Txn as Transaction>::Key> + Sync>(

@@ -13274,6 +13274,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "aptos-types",
+ "arc-swap",
  "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
