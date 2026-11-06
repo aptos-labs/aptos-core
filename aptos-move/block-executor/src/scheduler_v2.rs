@@ -388,6 +388,10 @@ pub(crate) struct ExecutionQueueManager {
     /// TODO(BlockSTMv2): Alternative implementations for performance (e.g. packed ints,
     /// intervals w. locks, CachePadded<ConcurrentQueue<TxnIndex>>).
     execution_queue: Mutex<BTreeSet<TxnIndex>>,
+    /// The length of `execution_queue`, written under its lock. Lets an idle
+    /// worker see that there is nothing to pop without taking the lock, which
+    /// the workers that do have work need.
+    execution_queue_len: CachePadded<AtomicU32>,
 }
 
 impl ExecutionQueueManager {
@@ -396,18 +400,32 @@ impl ExecutionQueueManager {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(0)),
             min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
             execution_queue: Mutex::new((0..num_txns).collect()),
+            execution_queue_len: CachePadded::new(AtomicU32::new(num_txns)),
         }
     }
 
     fn pop_next(&self) -> Option<TxnIndex> {
+        // A stale zero only makes the caller ask again.
+        if self.execution_queue_len.load(Ordering::Relaxed) == 0 {
+            return None;
+        }
         let mut guard = self.execution_queue.lock();
         let ret = guard.pop_first();
         if let Some(idx) = ret {
             self.min_never_scheduled_idx
                 .fetch_max(idx + 1, Ordering::Relaxed);
         }
+        self.execution_queue_len
+            .store(guard.len() as u32, Ordering::Relaxed);
         drop(guard);
         ret
+    }
+
+    fn insert(&self, txn_idx: TxnIndex) {
+        let mut guard = self.execution_queue.lock();
+        guard.insert(txn_idx);
+        self.execution_queue_len
+            .store(guard.len() as u32, Ordering::Relaxed);
     }
 
     /// Acquires the `execution_queue` lock before reading `min_never_scheduled_idx`.
@@ -426,12 +444,15 @@ impl ExecutionQueueManager {
         // writes and the information can be used for intelligent scheduling. Note that
         // for the same reason, incarnation 0 (first execution) is never terminated early.
         if !is_first_reexecution || self.executed_once_max_idx.load(Ordering::Relaxed) >= txn_idx {
-            self.execution_queue.lock().insert(txn_idx);
+            self.insert(txn_idx);
         }
     }
 
     pub(crate) fn remove_from_schedule(&self, txn_idx: TxnIndex) {
-        self.execution_queue.lock().remove(&txn_idx);
+        let mut guard = self.execution_queue.lock();
+        guard.remove(&txn_idx);
+        self.execution_queue_len
+            .store(guard.len() as u32, Ordering::Relaxed);
     }
 }
 
@@ -443,6 +464,7 @@ impl ExecutionQueueManager {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(executed_once_max_idx)),
             min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
             execution_queue: Mutex::new(BTreeSet::new()),
+            execution_queue_len: CachePadded::new(AtomicU32::new(0)),
         }
     }
 
@@ -1345,7 +1367,7 @@ impl SchedulerV2 {
 
                 // TODO(BlockSTMv2): Audit / should we keep ever_executed lock instead of re-acquiring.
                 if self.txn_statuses.pending_scheduling_and_not_stalled(idx) {
-                    execution_queue_manager.execution_queue.lock().insert(idx);
+                    execution_queue_manager.insert(idx);
                 }
 
                 idx += 1;

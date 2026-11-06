@@ -2,9 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::types::{Incarnation, TxnIndex};
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, MutexGuard};
 use aptos_types::error::{code_invariant_error, PanicError};
-use std::collections::{btree_map::Entry, BTreeMap};
+use claims::assert_ok;
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    ptr,
+    sync::atomic::{AtomicPtr, Ordering},
+};
 
 // Checks the invariant that the lowest dependency is strictly greater than
 // provided txn_idx. This is a sanity check e.g. for dependencies stored at
@@ -131,10 +136,98 @@ impl RegisteredReadDependencies {
     }
 }
 
-pub(crate) fn take_dependencies(
-    dependencies_in_mutex: &Mutex<RegisteredReadDependencies>,
-) -> BTreeMap<TxnIndex, Incarnation> {
-    std::mem::take(&mut dependencies_in_mutex.lock().dependencies)
+pub(crate) fn take_dependencies(cell: &ReadDependencyCell) -> BTreeMap<TxnIndex, Incarnation> {
+    std::mem::take(&mut cell.lock().dependencies)
+}
+
+struct PendingRead {
+    txn_idx: TxnIndex,
+    incarnation: Incarnation,
+    next: *mut PendingRead,
+}
+
+/// The read dependencies of one entry in a multi-versioned data structure.
+///
+/// Readers register without taking a lock: a registration is pushed onto a
+/// list that [`Self::lock`] folds into the map. Many readers of the same entry
+/// would otherwise serialize on one mutex. Everything except registration goes
+/// through [`Self::lock`].
+pub(crate) struct ReadDependencyCell {
+    registered: Mutex<RegisteredReadDependencies>,
+    pending: AtomicPtr<PendingRead>,
+}
+
+// SAFETY: the pending list is only reached through atomic operations, and a
+// node is owned by whoever detached it from the list.
+unsafe impl Send for ReadDependencyCell {}
+unsafe impl Sync for ReadDependencyCell {}
+
+impl ReadDependencyCell {
+    pub(crate) fn new() -> Self {
+        Self::from_dependencies(BTreeMap::new())
+    }
+
+    pub(crate) fn from_dependencies(dependencies: BTreeMap<TxnIndex, Incarnation>) -> Self {
+        Self {
+            registered: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
+            pending: AtomicPtr::new(ptr::null_mut()),
+        }
+    }
+
+    /// Registers a read of this entry by `txn_idx` at `incarnation`.
+    pub(crate) fn register(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
+        let node = Box::into_raw(Box::new(PendingRead {
+            txn_idx,
+            incarnation,
+            next: ptr::null_mut(),
+        }));
+        let mut head = self.pending.load(Ordering::Relaxed);
+        loop {
+            // SAFETY: the node is not published yet, so this thread owns it.
+            unsafe { (*node).next = head };
+            match self
+                .pending
+                .compare_exchange_weak(head, node, Ordering::Release, Ordering::Relaxed)
+            {
+                Ok(_) => return,
+                Err(current) => head = current,
+            }
+        }
+    }
+
+    /// Locks the registered dependencies, including every registration made
+    /// before this call.
+    pub(crate) fn lock(&self) -> MutexGuard<'_, RegisteredReadDependencies> {
+        let mut registered = self.registered.lock();
+        let mut head = self.pending.swap(ptr::null_mut(), Ordering::Acquire);
+        if !head.is_null() {
+            // The list is newest first. Apply oldest first so that the
+            // incarnation check sees a transaction's incarnations in order.
+            let mut reads = vec![];
+            while !head.is_null() {
+                // SAFETY: the swap detached the list, so this thread owns
+                // every node on it.
+                let node = unsafe { Box::from_raw(head) };
+                head = node.next;
+                reads.push((node.txn_idx, node.incarnation));
+            }
+            for (txn_idx, incarnation) in reads.into_iter().rev() {
+                assert_ok!(registered.insert(txn_idx, incarnation));
+            }
+        }
+        registered
+    }
+}
+
+impl Drop for ReadDependencyCell {
+    fn drop(&mut self) {
+        let mut head = *self.pending.get_mut();
+        while !head.is_null() {
+            // SAFETY: `&mut self` means no reader can still be pushing.
+            let node = unsafe { Box::from_raw(head) };
+            head = node.next;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -268,10 +361,30 @@ mod tests {
         assert_eq!(deps.dependencies, initial_map);
 
         // Test take.
-        let deps = Mutex::new(deps);
+        let deps = ReadDependencyCell::from_dependencies(deps.take());
         let taken_deps = take_dependencies(&deps);
         assert_eq!(taken_deps, initial_map);
         // Original dependencies should now be empty.
         assert!(deps.lock().dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_registrations_are_applied_in_order() {
+        let cell = ReadDependencyCell::from_dependencies(BTreeMap::from([(10, 1)]));
+        cell.register(12, 0);
+        cell.register(12, 1);
+        cell.register(10, 2);
+        assert_eq!(
+            cell.lock().clone_dependencies_for_test(),
+            BTreeMap::from([(10, 2), (12, 1)])
+        );
+        // A registration after a lock is applied by the next one.
+        cell.register(15, 0);
+        assert_eq!(
+            take_dependencies(&cell),
+            BTreeMap::from([(10, 2), (12, 1), (15, 0)])
+        );
+        // Pending registrations are freed on drop.
+        cell.register(20, 0);
     }
 }

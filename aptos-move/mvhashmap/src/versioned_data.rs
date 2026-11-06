@@ -3,17 +3,17 @@
 
 use crate::{
     registered_dependencies::{
-        check_lowest_dependency_idx, take_dependencies, RegisteredReadDependencies,
+        check_lowest_dependency_idx, take_dependencies, ReadDependencyCell,
     },
     types::{Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex},
 };
 use anyhow::Result;
-use aptos_infallible::Mutex;
+
 use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError},
 };
-use claims::{assert_ok, assert_some};
+use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use equivalent::Equivalent;
@@ -46,7 +46,7 @@ pub(crate) struct Entry<V> {
 struct EntryCell<V> {
     incarnation: Incarnation,
     value: V,
-    dependencies: Mutex<RegisteredReadDependencies>,
+    dependencies: ReadDependencyCell,
 }
 
 /// A versioned value internally is represented as a BTreeMap from indices of
@@ -69,7 +69,7 @@ fn new_write_entry<V>(
     Entry::new(EntryCell {
         incarnation,
         value,
-        dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
+        dependencies: ReadDependencyCell::from_dependencies(dependencies),
     })
 }
 
@@ -217,10 +217,7 @@ impl<V: SpeculativeValue> VersionedValue<V> {
 
             // Record the read dependency (only in V2 case, not to add contention to V1).
             if let Some(reader_incarnation) = maybe_reader_incarnation {
-                // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
-                assert_ok!(dependencies
-                    .lock()
-                    .insert(reader_txn_idx, reader_incarnation));
+                dependencies.register(reader_txn_idx, reader_incarnation);
             }
 
             return Ok(Versioned(
@@ -684,6 +681,9 @@ mod tests {
         );
 
         let _ = v.read(5, Some(outdated_incarnation));
+        // Registrations are checked when they are applied.
+        let entry = v.versioned_map.get(&ShiftedTxnIndex::new(2)).unwrap();
+        drop(entry.value.dependencies.lock());
     }
 
     #[test]

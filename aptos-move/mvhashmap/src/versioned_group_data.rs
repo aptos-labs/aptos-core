@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    registered_dependencies::{take_dependencies, RegisteredReadDependencies},
+    registered_dependencies::{take_dependencies, ReadDependencyCell, RegisteredReadDependencies},
     types::{
         Incarnation, MVDataError, MVDataOutput, MVGroupError, ShiftedTxnIndex, TxnIndex, Version,
     },
@@ -11,14 +11,14 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_aggregator::types::ReadPosition;
-use aptos_infallible::Mutex;
+
 use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError},
     write_set::WriteOpKind,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use claims::{assert_ok, assert_some};
+use claims::assert_some;
 use dashmap::DashMap;
 use equivalent::Equivalent;
 use serde::Serialize;
@@ -33,14 +33,14 @@ use std::{
 
 struct SizeAndDependencies {
     size: ResourceGroupSize,
-    dependencies: Mutex<RegisteredReadDependencies>,
+    dependencies: ReadDependencyCell,
 }
 
 impl SizeAndDependencies {
     fn from_size(size: ResourceGroupSize) -> Self {
         Self {
             size,
-            dependencies: Mutex::new(RegisteredReadDependencies::new()),
+            dependencies: ReadDependencyCell::new(),
         }
     }
 
@@ -50,7 +50,7 @@ impl SizeAndDependencies {
     ) -> Self {
         Self {
             size,
-            dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
+            dependencies: ReadDependencyCell::from_dependencies(dependencies),
         }
     }
 }
@@ -487,7 +487,7 @@ where
                 Self::get_latest_entry(&g.size_entries, txn_idx, ReadPosition::BeforeCurrentTxn)
                     .map_or(Err(MVGroupError::Uninitialized), |(_, size)| {
                         // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
-                        assert_ok!(size.value.dependencies.lock().insert(txn_idx, incarnation));
+                        size.value.dependencies.register(txn_idx, incarnation);
                         Ok(size.value.size)
                     })
             },

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crossbeam::utils::Backoff;
 use crate::{
     captured_reads::TxnInput,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
@@ -1255,6 +1256,9 @@ where
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
         let global_module_cache = shared_sync_params.global_module_cache;
+        // An idle worker polls the scheduler's shared state, which slows down
+        // the workers that have work. Back off between polls.
+        let idle_backoff = Backoff::new();
 
         loop {
             while scheduler.commit_hooks_try_lock() {
@@ -1334,7 +1338,8 @@ where
                     self.record_finalized_output(txn_idx, txn_idx, output, shared_sync_params)?;
                 },
                 TaskKind::NextTask => {
-                    // TODO: Anything intelligent to do here?.
+                    idle_backoff.spin();
+                    continue;
                 },
                 TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
                     Self::module_validation_v2(
@@ -1357,6 +1362,7 @@ where
                     break;
                 },
             }
+            idle_backoff.reset();
         }
 
         Ok(())
