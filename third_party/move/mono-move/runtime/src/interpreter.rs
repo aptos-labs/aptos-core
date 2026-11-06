@@ -660,11 +660,9 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
 unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalError {
     // SAFETY: guaranteed by the caller.
     match unsafe { saved_caller_ptr(fp).as_ref() } {
-        Some(caller) => {
-            err.at(
-                frame_module(caller.module_id).map_or(ErrorLocation::Script, ErrorLocation::Module)
-            )
-        },
+        Some(caller) => err
+            .at(frame_module(caller.module_id())
+                .map_or(ErrorLocation::Script, ErrorLocation::Module)),
         None => err,
     }
 }
@@ -682,7 +680,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
     Ok(callers
         .into_iter()
         .map(|(caller, offset)| CallFrame {
-            module: frame_module(caller.module_id),
+            module: frame_module(caller.module_id()),
             function: caller.def_idx,
             offset,
         })
@@ -1883,7 +1881,7 @@ impl InterpreterContext<'_> {
                         // dispatch errors should take precedence when call gas
                         // is calibrated.
                         self.reentrancy
-                            .enter(func.module_id, target, false)
+                            .enter(func.module_id(), target, false)
                             .map_err(|err| locate_rejected_call(err, fp))?;
                         self.push_call_frame(func, regs, target, FrameFlag::Checked)?;
                         continue;
@@ -1895,7 +1893,7 @@ impl InterpreterContext<'_> {
                     } => {
                         let target = self.load_function(module_id, func_name, ty_args)?;
                         debug_assert!(
-                            target.module_id == func.module_id && !target.has_module_lock,
+                            target.module_id() == func.module_id() && !target.has_module_lock,
                             "CallByNameExempt at a call site the reentrancy checker must observe"
                         );
                         self.push_call_frame(func, regs, target, FrameFlag::Unchecked)?;
@@ -1906,7 +1904,7 @@ impl InterpreterContext<'_> {
                         // Error precedence: reentrancy, stack overflow. The
                         // metering note at `CallByName` applies here too.
                         self.reentrancy
-                            .enter(func.module_id, callee, false)
+                            .enter(func.module_id(), callee, false)
                             .map_err(|err| locate_rejected_call(err, fp))?;
                         self.push_call_frame(func, regs, callee, FrameFlag::Checked)?;
                         continue;
@@ -1916,7 +1914,7 @@ impl InterpreterContext<'_> {
                         // Skips the reentrancy checker, so only a
                         // `CallByNameExempt` site may be patched to it.
                         debug_assert!(
-                            callee.module_id == func.module_id && !callee.has_module_lock,
+                            callee.module_id() == func.module_id() && !callee.has_module_lock,
                             "CallByPtrExempt at a call site the reentrancy checker must observe"
                         );
                         self.push_call_frame(func, regs, callee, FrameFlag::Unchecked)?;
@@ -3494,7 +3492,7 @@ impl InterpreterContext<'_> {
             // Every closure call is checked. Error precedence: reentrancy,
             // stack overflow.
             self.reentrancy
-                .enter(func.module_id, callee, true)
+                .enter(func.module_id(), callee, true)
                 .map_err(|err| locate_rejected_call(err, fp))?;
 
             // Stack-overflow check up front: `push_call_frame_at` skips the
