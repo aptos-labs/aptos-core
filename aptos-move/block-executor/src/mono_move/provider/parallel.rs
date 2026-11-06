@@ -173,7 +173,9 @@ impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMParallelProvid
             .group_data()
             .group_members_at(group_key, self.reader.txn_idx())
             .map_err(|e| {
-                invariant_violation(format!("failed to read the members of {group_key:?}: {e:?}"))
+                invariant_violation(format!(
+                    "failed to read the members of {group_key:?}: {e:?}"
+                ))
             })?;
         if members.is_empty() {
             return Ok(None);

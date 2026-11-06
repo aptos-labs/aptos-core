@@ -23,6 +23,7 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
     types::ReadWriteSummary,
+    worker_phases::{WorkerPhase, WorkerPhaseTracker},
     worker_pool::WorkerPool,
 };
 use aptos_aggregator::delayed_change::{ApplyBase, DelayedChange};
@@ -389,8 +390,10 @@ where
             runtime_environment,
             global_module_cache,
         };
+        WorkerPhaseTracker::switch(WorkerPhase::ExecuteVm);
         let (execution_result, mut read_set) =
             executor.execute(shared, mode, txn, auxiliary_info, idx_to_execute)?;
+        WorkerPhaseTracker::switch(WorkerPhase::ExecuteApply);
 
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
@@ -1256,7 +1259,9 @@ where
         let last_input_output = shared_sync_params.last_input_output;
         let global_module_cache = shared_sync_params.global_module_cache;
 
+        let _phases = WorkerPhaseTracker::start(WorkerPhase::Scheduler);
         loop {
+            WorkerPhaseTracker::switch(WorkerPhase::CommitHooks);
             while scheduler.commit_hooks_try_lock() {
                 // Perform sequential commit hooks.
                 let blocked_by_validation = loop {
@@ -1290,8 +1295,10 @@ where
                 }
             }
 
+            WorkerPhaseTracker::switch(WorkerPhase::Scheduler);
             match scheduler.next_task(worker_id)? {
                 TaskKind::Execute(txn_idx, incarnation) => {
+                    WorkerPhaseTracker::switch(WorkerPhase::ExecuteApply);
                     if incarnation > num_workers.pow(2) + num_txns + 30 {
                         // Something is wrong if we observe high incarnations (e.g. a bug
                         // might manifest as an execution-invalidation cycle). Break out
@@ -1324,6 +1331,7 @@ where
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
+                    WorkerPhaseTracker::switch(WorkerPhase::Materialize);
                     let output = self.materialize_txn_commit(
                         txn_idx,
                         scheduler_wrapper,
@@ -1337,6 +1345,7 @@ where
                     // TODO: Anything intelligent to do here?.
                 },
                 TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
+                    WorkerPhaseTracker::switch(WorkerPhase::ModuleValidation);
                     Self::module_validation_v2(
                         txn_idx,
                         incarnation,
