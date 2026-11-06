@@ -14,6 +14,7 @@ pub mod coverage;
 pub mod exchange;
 
 mod fmt;
+mod fuzz;
 mod lint;
 pub mod local_simulation;
 mod manifest;
