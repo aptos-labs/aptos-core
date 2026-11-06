@@ -1,5 +1,6 @@
-// Differential test for the `debug` natives. The testsuite runs both VMs in
-// debug mode. Their stack traces differ in detail (V1 also dumps code, locals
+// Differential test for the `debug` natives. The testsuite enables them on
+// both VMs: MonoMove in debug mode, V1 via its `testing` cargo feature. Their
+// stack traces differ in detail (V1 also dumps code, locals
 // and the operand stack), so tests compare only which frames a trace names,
 // and in what order.
 
