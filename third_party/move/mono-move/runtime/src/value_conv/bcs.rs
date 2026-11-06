@@ -27,16 +27,14 @@ use crate::{
     types::VEC_DATA_OFFSET,
     value_conv::v1_layout::to_v1_type_layout,
 };
-use hashbrown::HashSet;
 use mono_move_core::{
     interner::{type_tag_of, view_function_ref, view_module_id, FunctionRef},
-    next_captured_value_offset,
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    CaptureLayoutsId, Function, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
-    ValueLayout, CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
+    Function, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout,
+    CAPTURED_DATA_LAYOUT_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
 };
 use move_core_types::{
     account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
@@ -232,17 +230,8 @@ fn bad_closure(what: String) -> VMInternalError {
 /// `(format_version, module_id, fun_id, ty_args, mask)` header followed by one
 /// `(layout, value)` pair per captured value.
 ///
-/// The capture layouts come from the captured-data object, so no part of this
-/// needs the closure's target resolved or even loadable.
-//
-// TODO(correctness): V1 serializes only closures over persistent functions
-// (`#[persistent]` or `public`), using the absence of pre-computed captured
-// layouts as the signal. Monomorphization always builds those layouts, so
-// MonoMove has no equivalent signal and writes private, friend and
-// lambda-lifted closures where V1 aborts with `VALUE_SERIALIZATION_ERROR`.
-// That check guards the storage write path, so MonoMove commits resources V1
-// would never produce. `Function::def_idx` keeps the visibility recoverable
-// without a new field on `Function`.
+/// The layout of the captured values comes from the captured-data object, so
+/// no part of this needs the closure's target resolved or even loadable.
 ///
 /// # Safety
 ///
@@ -253,6 +242,14 @@ unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
     base: *const u8,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
+    // TODO(correctness): V1 serializes only closures over persistent functions
+    // (`#[persistent]` or `public`). For any other target, `bcs::to_bytes` and
+    // `bcs::serialized_size` abort with `NFE_BCS_SERIALIZATION_FAILURE`, while
+    // MonoMove returns bytes. These closures lack `store`, so storage is not
+    // affected. The target is usually unresolved here, so the check needs
+    // persistence recorded at lowering. A cross-module target also needs its
+    // module, to tell `public` from `friend`.
+
     // SAFETY: a function value is a non-null closure pointer.
     let closure = unsafe { read_ptr(base, 0usize) };
     if closure.is_null() {
@@ -294,12 +291,12 @@ unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
     if captured_data.is_null() {
         return Err(bad_closure("null captured data in closure".to_string()));
     }
-    // SAFETY: a captured-data object carries its tag and capture-layouts id at
-    // fixed offsets.
-    let (tag, capture_layouts_id) = unsafe {
+    // SAFETY: a captured-data object carries its tag and layout id at fixed
+    // offsets.
+    let (tag, layout_id) = unsafe {
         (
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET),
-            read_u32(captured_data, CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET),
+            read_u32(captured_data, CAPTURED_DATA_LAYOUT_ID_OFFSET),
         )
     };
     // TODO(completeness): serialize `CAPTURED_DATA_TAG_RAW` by copying the
@@ -309,39 +306,41 @@ unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
         return Err(bad_closure(format!("unknown captured-data tag {tag}")));
     }
 
-    let capture_layouts = layouts
-        .capture_layouts(CaptureLayoutsId::from_u32(capture_layouts_id))
-        .ok_or(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::ValueLayoutNotFound,
-        ))?;
-    if capture_layouts.len() != captured_count {
+    let layout =
+        layouts
+            .layout(LayoutId::from_u32(layout_id))
+            .ok_or(RuntimeError::InvariantViolation(
+                RuntimeInvariantViolation::ValueLayoutNotFound,
+            ))?;
+    let LayoutKind::Struct { fields } = &layout.kind else {
         return Err(bad_closure(format!(
-            "{} capture layouts for a mask capturing {captured_count}",
-            capture_layouts.len()
+            "captured values have a {layout} layout"
+        )));
+    };
+    if fields.len() != captured_count {
+        return Err(bad_closure(format!(
+            "{} captured values for a mask capturing {captured_count}",
+            fields.len()
         )));
     }
 
-    // Captured values sit at their natural alignment within the values region,
-    // so walking the layouts in capture order reproduces the pack-time offsets.
-    let mut cursor = 0usize;
-    for &id in capture_layouts {
-        let layout = layouts.layout(id).ok_or(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::ValueLayoutNotFound,
-        ))?;
-        let (offset, next) =
-            next_captured_value_offset(cursor, layout.size as usize, layout.align as usize);
-        serialize_captured_layout(layouts, id, out)?;
+    for field in fields.iter() {
+        let field_layout = layouts
+            .layout(field.id)
+            .ok_or(RuntimeError::InvariantViolation(
+                RuntimeInvariantViolation::ValueLayoutNotFound,
+            ))?;
+        serialize_captured_layout(layouts, field.id, out)?;
         // SAFETY: the capture lies within the values region, and the layout it
         // was published under describes the bytes there.
         unsafe {
             serialize_impl(
                 layouts,
-                captured_data.add(CAPTURED_DATA_VALUES_OFFSET + offset),
-                layout,
+                captured_data.add(CAPTURED_DATA_VALUES_OFFSET + field.offset as usize),
+                field_layout,
                 out,
             )?
         };
-        cursor = next;
     }
     Ok(())
 }
@@ -393,11 +392,6 @@ fn serialize_captured_layout<T: LayoutProvider + ?Sized>(
     id: LayoutId,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
-    // V1 writes a captured signer as a single-variant enum, which MonoMove's
-    // flat signer slot does not match.
-    if reaches_signer(layouts, id, &mut HashSet::new())? {
-        return Err(RuntimeError::Unsupported("function value captures a signer").into());
-    }
     // V1 fails to serialize a layout past its node cap or the BCS depth limit.
     // Falling back keeps MonoMove from writing bytes V1 would not.
     let unsupported = || RuntimeError::Unsupported("captured layout V1 cannot serialize");
@@ -405,46 +399,6 @@ fn serialize_captured_layout<T: LayoutProvider + ?Sized>(
     check_layout_within_bounds::<bcs::Error>(&layout).map_err(|_| unsupported())?;
     bcs::serialize_into(out, &layout).map_err(|_| unsupported())?;
     Ok(())
-}
-
-/// Returns whether layout `id` contains a `signer`.
-fn reaches_signer<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    id: LayoutId,
-    visited: &mut HashSet<LayoutId>,
-) -> VMResult<bool> {
-    if !visited.insert(id) {
-        return Ok(false);
-    }
-    let layout = layouts.layout(id).ok_or(RuntimeError::InvariantViolation(
-        RuntimeInvariantViolation::ValueLayoutNotFound,
-    ))?;
-    Ok(match &layout.kind {
-        LayoutKind::Signer => true,
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Function
-        | LayoutKind::Ref => false,
-        LayoutKind::Vector { elem_id, .. } => reaches_signer(layouts, *elem_id, visited)?,
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                if reaches_signer(layouts, field.id, visited)? {
-                    return Ok(true);
-                }
-            }
-            false
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            for variant in variants.iter() {
-                if reaches_signer(layouts, variant.id, visited)? {
-                    return Ok(true);
-                }
-            }
-            false
-        },
-    })
 }
 
 /// Deserializes BCS bytes of a value of the given type into the flat in-memory
@@ -2183,12 +2137,12 @@ mod tests {
     /// # Safety
     ///
     /// `func_ref` must outlive every use of the returned closure, and `values`
-    /// must be the packed image of the captures `capture_layouts_id` names.
+    /// must be the packed image of the captures `layout_id` describes.
     unsafe fn build_closure(
         heap: &mut Heap,
         func_ref: &FunctionRef,
         mask: u64,
-        capture_layouts_id: CaptureLayoutsId,
+        layout_id: Option<LayoutId>,
         values: &[u8],
     ) -> *mut u8 {
         let closure = heap
@@ -2230,8 +2184,10 @@ mod tests {
             write_u32(captured_data, CAPTURED_DATA_BLOB_SIZE_OFFSET, 0);
             write_u32(
                 captured_data,
-                CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET,
-                capture_layouts_id.as_u32(),
+                CAPTURED_DATA_LAYOUT_ID_OFFSET,
+                layout_id
+                    .expect("a capturing closure has a layout")
+                    .as_u32(),
             );
             std::ptr::copy_nonoverlapping(
                 values.as_ptr(),
@@ -2296,6 +2252,17 @@ mod tests {
         slot.to_ne_bytes()
     }
 
+    /// Publishes the layout of a closure's captured values, one field per
+    /// `(offset, layout)` capture.
+    fn push_captured_values_layout(
+        layouts: &mut ValueLayoutTable,
+        size: u32,
+        captures: Vec<(u32, LayoutId)>,
+    ) -> LayoutId {
+        let layout = build_struct_layout(layouts, None, size, captures);
+        layouts.push_anonymous(layout)
+    }
+
     /// The wire header of a closure over `0x2::counter::add`, composed from
     /// `bcs::to_bytes` of each element rather than from the emitter.
     fn expected_header(mask: u64, ty_args: &[TypeTag]) -> Vec<u8> {
@@ -2322,7 +2289,7 @@ mod tests {
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
         let mut heap = Heap::new(4096);
         let out = unsafe {
-            let closure = build_closure(&mut heap, &func_ref, 0, CaptureLayoutsId::NONE, &[]);
+            let closure = build_closure(&mut heap, &func_ref, 0, None, &[]);
             serialize_closure_value(&layouts, closure)
         };
 
@@ -2338,7 +2305,7 @@ mod tests {
         )));
         let mut heap = Heap::new(4096);
         let out = unsafe {
-            let closure = build_closure(&mut heap, &func_ref, 0, CaptureLayoutsId::NONE, &[]);
+            let closure = build_closure(&mut heap, &func_ref, 0, None, &[]);
             serialize_closure_value(&layouts, closure)
         };
 
@@ -2349,7 +2316,10 @@ mod tests {
     #[test]
     fn serialize_closure_capturing_scalars() {
         let mut layouts = ValueLayoutTable::new();
-        let capture_layouts_id = layouts.push_capture_layouts(&[U64_LAYOUT_ID, BOOL_LAYOUT_ID]);
+        let layout_id = push_captured_values_layout(&mut layouts, 9, vec![
+            (0, U64_LAYOUT_ID),
+            (8, BOOL_LAYOUT_ID),
+        ]);
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
 
         // A `u64` then a `bool`, at their natural offsets in the values region.
@@ -2359,7 +2329,7 @@ mod tests {
 
         let mut heap = Heap::new(4096);
         let out = unsafe {
-            let closure = build_closure(&mut heap, &func_ref, 0b11, capture_layouts_id, &values);
+            let closure = build_closure(&mut heap, &func_ref, 0b11, Some(layout_id), &values);
             serialize_closure_value(&layouts, closure)
         };
 
@@ -2376,7 +2346,7 @@ mod tests {
     fn serialize_closure_capturing_vector() {
         let mut layouts = ValueLayoutTable::new();
         let vec_id = layouts.push(vector_layout(U64_TY, U8_LAYOUT_ID));
-        let capture_layouts_id = layouts.push_capture_layouts(&[vec_id]);
+        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, vec_id)]);
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
 
         let elems = vec![1u8, 2, 3];
@@ -2389,7 +2359,7 @@ mod tests {
                 layouts.layout(vec_id).unwrap(),
                 &encoded,
             );
-            let closure = build_closure(&mut heap, &func_ref, 0b1, capture_layouts_id, &values);
+            let closure = build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), &values);
             serialize_closure_value(&layouts, closure)
         };
 
@@ -2405,17 +2375,17 @@ mod tests {
     #[test]
     fn serialize_closure_capturing_closure() {
         let mut layouts = ValueLayoutTable::new();
-        let capture_layouts_id = layouts.push_capture_layouts(&[FUNCTION_LAYOUT_ID]);
+        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, FUNCTION_LAYOUT_ID)]);
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
 
         let mut heap = Heap::new(4096);
         let out = unsafe {
-            let inner = build_closure(&mut heap, &func_ref, 0, CaptureLayoutsId::NONE, &[]);
+            let inner = build_closure(&mut heap, &func_ref, 0, None, &[]);
             let outer = build_closure(
                 &mut heap,
                 &func_ref,
                 0b1,
-                capture_layouts_id,
+                Some(layout_id),
                 &(inner as u64).to_ne_bytes(),
             );
             serialize_closure_value(&layouts, outer)
@@ -2429,15 +2399,11 @@ mod tests {
     }
 
     /// Serializing a closure over one capture must fall back to V1.
-    fn assert_capture_unsupported(
-        layouts: &ValueLayoutTable,
-        capture_layouts_id: CaptureLayoutsId,
-        values: &[u8],
-    ) {
+    fn assert_capture_unsupported(layouts: &ValueLayoutTable, layout_id: LayoutId, values: &[u8]) {
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
         let mut heap = Heap::new(1 << 20);
         let slot =
-            unsafe { build_closure(&mut heap, &func_ref, 0b1, capture_layouts_id, values) as u64 };
+            unsafe { build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), values) as u64 };
         let mut out = vec![];
         let err = unsafe {
             serialize_impl(
@@ -2455,10 +2421,29 @@ mod tests {
     }
 
     #[test]
-    fn serialize_closure_capturing_signer_falls_back() {
+    fn serialize_closure_capturing_signer() {
         let mut layouts = ValueLayoutTable::new();
-        let capture_layouts_id = layouts.push_capture_layouts(&[SIGNER_LAYOUT_ID]);
-        assert_capture_unsupported(&layouts, capture_layouts_id, &[0u8; 32]);
+        let layout_id = push_captured_values_layout(&mut layouts, 32, vec![(0, SIGNER_LAYOUT_ID)]);
+        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
+
+        let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+        let mut heap = Heap::new(4096);
+        let out = unsafe {
+            let closure = build_closure(
+                &mut heap,
+                &func_ref,
+                0b1,
+                Some(layout_id),
+                &addr.into_bytes(),
+            );
+            serialize_closure_value(&layouts, closure)
+        };
+
+        // V1's bcs natives write a signer as its address.
+        let mut expected = expected_header(0b1, &[]);
+        expected.extend_from_slice(&bcs::to_bytes(&MoveTypeLayout::Signer).unwrap());
+        expected.extend_from_slice(&bcs::to_bytes(&addr).unwrap());
+        assert_eq!(out, expected);
     }
 
     #[test]
@@ -2474,14 +2459,14 @@ mod tests {
             id = layouts.push_anonymous(layout);
             size *= 2;
         }
-        let capture_layouts_id = layouts.push_capture_layouts(&[id]);
-        assert_capture_unsupported(&layouts, capture_layouts_id, &vec![0u8; size as usize]);
+        let layout_id = push_captured_values_layout(&mut layouts, size, vec![(0, id)]);
+        assert_capture_unsupported(&layouts, layout_id, &vec![0u8; size as usize]);
     }
 
     #[test]
     fn serialize_closure_rejects_unknown_captured_data_tag() {
         let mut layouts = ValueLayoutTable::new();
-        let capture_layouts_id = layouts.push_capture_layouts(&[U64_LAYOUT_ID]);
+        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, U64_LAYOUT_ID)]);
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
 
         let mut heap = Heap::new(4096);
@@ -2490,7 +2475,7 @@ mod tests {
                 &mut heap,
                 &func_ref,
                 0b1,
-                capture_layouts_id,
+                Some(layout_id),
                 &7u64.to_le_bytes(),
             );
             let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
