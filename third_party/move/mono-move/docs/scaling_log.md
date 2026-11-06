@@ -147,7 +147,8 @@ per block (4 MiB arena segments). Every other thread then takes the IPI
 
 Fix (applied in this branch): both allocations use uninitialized memory.
 `heap_alloc` zeroes every object it hands out and evacuation writes every
-byte it reads, so the zeroing was redundant.
+byte it reads, so the zeroing was redundant. (Measured in the next entry:
+under 1%, the remaining flushes are jemalloc's own.)
 
 ### Finding 3: MonoMove never promotes reads to the hot state
 
@@ -158,12 +159,14 @@ every block. Measured on `no-op`: 1.10 cold DB reads per transaction on
 MonoMove against 0.21 on V1, costing 15.9 µs/txn of worker CPU at 2T (23%
 of MonoMove's worker time) against 1.9 on V1. Written keys are found in
 the in-memory state delta on both VMs, so the repeated cold key has to be
-one that is only read; the likely candidate is a vacant slot the
-prologue/epilogue checks, such as `CoinStore<AptosCoin>` at the sender,
-which V1 promotes as `HotVacant` after the first touch.
+one that is only read. (Identified in the next entry: the sender's primary
+store group, which unmetered MonoMove reads but never writes. Promotion
+would not have helped either: the benchmark's block epilogues carry no
+promotions for either VM.)
 
-Fix (applied in this branch): report read and written keys from the output,
-mapping group members to their group's slot.
+Fix (applied in this branch, for production parity): report read and
+written keys from the output, mapping group members to their group's slot,
+and carry the epilogue payload's promotions in its output.
 
 ### Finding 4 (order book): `instantiated_functions` mutex on the critical path
 
@@ -191,6 +194,139 @@ per module lifetime).
   transaction flat on the independent workloads.
 - Rayon-pool CPU (`State::update`, hashing): ~40 µs/txn on both VMs,
   independent of thread count, parallel on 64 cores.
+
+## 2026-11-06: A/B/C runs on the fixes (runs 42273129737 / 42272739772 / 42273314169)
+
+Same base commit, same machine type, same settings as the first sweep. A =
+baseline, B = the three MonoMove fixes, C = the fixes with MonoMove metered.
+
+### Independent workloads: the fixes change nothing
+
+| apt-fa-transfer, µs/txn | A 2T | B 2T | A 16T | B 16T |
+|---|---|---|---|---|
+| V1 inner wall | 203.5 | 204.6 | 32.9 | 32.8 |
+| MonoMove inner wall | 55.7 | 56.2 | 10.7 | 10.7 |
+| MonoMove worker CPU | 105.1 | 106.1 | 144.9 | 144.1 |
+
+Within noise on every metric. In the profile the `madvise` zeroing hook fell
+from 0.60 to 0.32 µs/txn of sender time and the IPI receive load roughly
+halved, but the remaining TLB flushes come from jemalloc's own metadata and
+purge paths, which V1 shares, and none of it is large enough to move
+throughput. Finding 2's "MonoMove-specific cause" for the IPIs was real but
+worth under 1%.
+
+The hot state fix cannot show here: the benchmark disables
+`CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION`, so block epilogues are V0 and
+carry no promotions for either VM. It stays as a parity fix for production.
+
+### Order book: the instantiation lock was the critical path
+
+| order book, MonoMove | 2T | 8T | 16T |
+|---|---|---|---|
+| inner wall A, µs/txn | 153 | 165 | 299 |
+| inner wall B, µs/txn | 138 | 130 | 141 |
+| inner TPS A | 6,533 | 6,071 | 3,348 |
+| inner TPS B | 7,238 | 7,671 | 7,093 |
+| V1 inner TPS (A ≈ B) | 845 | 853 | 848 |
+
+MonoMove no longer slows down with more workers and gains 14% even at 2
+threads, where the mutex was uncontended but the lock and the `Arc` clone
+on every generic call still cost. Its 16-thread speedup over V1 goes from
+3.9x to 8.4x, back to its sequential ratio. V1 is flat across thread counts
+on this workload, before and after, as it should be for a fully serialized
+block.
+
+### Metered MonoMove (run C): what the unmetered comparison hides
+
+| no-op, MonoMove | unmetered 2T | metered 2T | unmetered 16T | metered 16T |
+|---|---|---|---|---|
+| cold DB reads /txn | 1.02 | 0.05 | 1.02 | 0.06 |
+| worker CPU materialize | 5.5 | 21.6 | 9.7 | 32.9 |
+| output bytes /txn | 353 | 1431 | 353 | 1431 |
+| speculative aborts /txn | 0.00 | 0.59 | 0.03 | 4.24 |
+| inner wall | 33.7 | 52.8 | 6.3 | 54.3 |
+
+Two things fall out. The no-op cold read in Finding 3 is an artifact of
+running unmetered: with a zero fee the sender's store is never written, so
+it is only read, and a key that is only read is never in the in-memory
+delta. Charging a fee writes it and the cold reads vanish. And metered
+MonoMove cannot scale at all here because every transaction writes the APT
+supply, which V1 keeps conflict-free through an aggregator MonoMove does not
+support (the known gap, out of scope).
+
+For the e2e comparison this means the unmetered MonoMove numbers understate
+the shared per-output costs it would pay in production (materialization 4x,
+`State::update` and hashing proportional to bytes) and overstate its read
+cost. Both VMs should be metered before the speedup ratios are quoted as
+production numbers.
+
+### Where the scaling gap comes from, final
+
+apt-fa-transfer at 16 threads, run B, µs per transaction:
+
+| | V1 | MonoMove | MonoMove share of its stage |
+|---|---|---|---|
+| ideal parallel work (2T worker CPU / 16) | 25.0 | 6.6 | 39% |
+| CPU inflation 2T→16T (growth / 16) | +4.9 | +2.4 | 14% |
+| per-block cost inside Block-STM (setup, finalize, epilogue, worker drain) | +2.9 | +1.6 | 10% |
+| = inner block executor wall | 32.8 | 10.7 | |
+| per-block cost outside Block-STM (env rebuild, output parse, `State::update`) | +8.0 | +6.3 | 37% |
+| = execution stage wall | 40.8 | 16.9 | 100% |
+
+Per-component growth of worker CPU from 2 to 16 threads, from the profile:
+
+| component | V1 growth | MonoMove growth |
+|---|---|---|
+| kernel (IPIs, syscalls) | +7.8 | +5.8 |
+| SipHash (mvhashmap DashMap keys) | +6.4 | +4.2 |
+| DashMap shards | +6.1 | +2.0 |
+| mvhashmap (reads, dependency registration) | +3.3 | +2.2 |
+| libc | +5.9 | +3.8 |
+| BTreeMap (versioned entries, dependencies) | +2.6 | +3.0 |
+| allocator | +2.7 | +1.9 |
+| RocksDB | −1.2 | +2.3 |
+| metrics | +1.8 | +0.6 |
+| uncategorized | +13.1 | +5.5 |
+| **shared, total** | **+48** | **+31** |
+| VM-own: legacy VM, interpreter, type interners, `StateKey` registry, view | +33 | |
+| VM-own: mono core/context, runtime, interpreter, bcs | | +7 |
+| **total** | **+88 (1.21x)** | **+47 (1.41x)** |
+
+The shared components grow by about the same absolute amount on both VMs,
+and V1's own code grows more than MonoMove's. MonoMove's ratio is worse
+because the same shared growth lands on a base a quarter the size. Nothing
+in the parallel part is specific to MonoMove after the order-book fix.
+
+The same holds for the fixed costs: the per-block work outside Block-STM is
+6.3 µs/txn on MonoMove and 8.0 on V1 (V1 pays more for `insert_verified`
+and speculative log flushes), the same shared code, 37% of MonoMove's stage
+against 20% of V1's.
+
+### Proposed fixes, ranked by what they buy MonoMove at 16 threads
+
+1. Overlap block N+1's execution with block N's post-processing, or move
+   the serial parts off the critical path: `AptosEnvironment` rebuild in
+   `AptosModuleCacheManager::try_lock` (1.0 µs/txn), `TransactionsToKeep::index`
+   (1.0), `State::update` (1.3–1.7), cache priming and memorized reads.
+   Worth up to 6.3 µs/txn, 37% of MonoMove's execution stage; takes its
+   execution-stage speedup over V1 from 2.4x to 3.1x. Shared.
+2. mvhashmap: replace `RandomState` with a fast hasher on the versioned
+   data and group maps, and shard or remove the per-entry
+   `Mutex<RegisteredReadDependencies>`. About 6 µs/txn of the +47 at 16T,
+   both VMs. Shared.
+3. Per-block costs inside Block-STM: `MVHashMap`/scheduler construction and
+   drop, the sequential block epilogue, worker init and end-of-block drain.
+   1.6 µs/txn, 10%. Shared.
+4. jemalloc purge-driven TLB flushes: a few µs/txn of IPI handling across
+   all threads at 16T, both VMs. Tunable through `MALLOC_CONF` decay
+   settings; worth a measurement, not a code change.
+5. MonoMove's own +7: `struct_tag_of` and read-set bookkeeping in
+   `charge_non_read_set_slots`; and `eq_value` returning false, 0.04
+   aborts/txn at 16T. Small.
+
+Done on this branch: the instantiation map (order book +144% at 16T),
+hot-state read/write keys (parity), uninitialized evacuation and arena
+regions (small).
 
 ## Tooling
 

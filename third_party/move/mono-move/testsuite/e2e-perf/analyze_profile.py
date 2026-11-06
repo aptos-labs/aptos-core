@@ -122,6 +122,9 @@ def thread_group(comm):
 
 
 def categorize(frame):
+    # Demangled symbols of trait methods start with `<crate::Type as ...>`;
+    # drop the bracket so crate-prefix patterns anchored at `^` still match.
+    frame = frame.lstrip("<")
     for name, pattern in COMPILED:
         if pattern.search(frame):
             return name
