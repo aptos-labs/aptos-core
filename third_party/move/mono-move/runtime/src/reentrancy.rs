@@ -21,7 +21,7 @@
 
 use crate::error::{RuntimeError, RuntimeInvariantViolation};
 use mono_move_core::{
-    interner::{identifier_of, module_id_of, InternedModuleId},
+    interner::{identifier_of, module_id_of, view_function_ref, InternedModuleId},
     types::{view_type, InternedType, Type},
     Function, VMInternalError, VMResult,
 };
@@ -67,7 +67,7 @@ impl ReentrancyState {
     pub(crate) fn reset(&mut self, root: &Function) {
         self.active.clear();
         self.entries.clear();
-        self.active.insert(root.module_id);
+        self.active.insert(root.module_id());
         self.lock_count = u32::from(root.has_module_lock);
         self.top_resources_locked = false;
     }
@@ -93,7 +93,7 @@ impl ReentrancyState {
         callee: &Function,
         is_closure: bool,
     ) -> VMResult<()> {
-        let module = callee.module_id;
+        let module = callee.module_id();
         let cross = module != caller_module;
         let counted = cross || is_closure;
         let mut prev_member = false;
@@ -132,7 +132,7 @@ impl ReentrancyState {
                 RuntimeInvariantViolation::ReentrancyExitWithoutRecord,
             ));
         };
-        if entry.removes_module && !self.active.remove(&callee.module_id) {
+        if entry.removes_module && !self.active.remove(&callee.module_id()) {
             return Err(invariant_violation(
                 RuntimeInvariantViolation::ReentrancyModuleNotActive,
             ));
@@ -163,8 +163,8 @@ fn invariant_violation(violation: RuntimeInvariantViolation) -> VMInternalError 
 #[inline(never)]
 fn reentrancy_under_module_lock(callee: &Function) -> VMInternalError {
     VMInternalError::new(RuntimeError::ReentrancyUnderModuleLock {
-        module: Box::new(module_id_of(callee.module_id)),
-        function: identifier_of(callee.name),
+        module: Box::new(module_id_of(callee.module_id())),
+        function: identifier_of(view_function_ref(callee.func_ref).func_name),
     })
 }
 
