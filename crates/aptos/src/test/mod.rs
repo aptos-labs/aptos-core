@@ -55,7 +55,7 @@ use aptos_logger::warn;
 use aptos_move_cli::{
     ArgWithType, ArgWithTypeVec, ChunkedPublishOption, CompilePackage, DownloadPackage,
     EntryFunctionArguments, FrameworkPackageArgs, IncludedArtifacts, IncludedArtifactsArgs,
-    InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions,
+    InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions, MoveVm,
     OverrideSizeCheckOption, PublishPackage, RunFunction, RunScript, ScriptFunctionArguments,
     TestPackage, TypeArgVec,
 };
@@ -865,6 +865,8 @@ impl CliTestFramework {
             compute_coverage: false,
             dump_state: false,
             fail_fast: false,
+            move_vm: MoveVm::V1,
+            allow_inconclusive: false,
             env: Default::default(),
         }
         .execute()

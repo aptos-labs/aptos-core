@@ -4,8 +4,11 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    backend::Backends,
     test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
-    test_validation, UnitTestingConfig,
+    test_validation,
+    v1_backend::V1BackendFactory,
+    UnitTestingConfig,
 };
 use anyhow::{bail, Result};
 use codespan_reporting::term::{termcolor, termcolor::StandardStream};
@@ -164,13 +167,36 @@ pub fn run_move_unit_tests<W: Write + Send>(
 pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Send>(
     pkg_path: &Path,
     build_config: move_package::BuildConfig,
-    mut unit_test_config: UnitTestingConfig,
+    unit_test_config: UnitTestingConfig,
     natives: NativeFunctionTable,
     genesis: ChangeSet,
     compute_coverage: bool,
     writer: &mut W,
     factory: F,
     enable_enum_option: bool,
+) -> Result<UnitTestResult> {
+    let factory = V1BackendFactory::new(Some(natives), enable_enum_option, factory);
+    run_move_unit_tests_with_backend(
+        pkg_path,
+        build_config,
+        unit_test_config,
+        Backends::Single(&factory),
+        genesis,
+        compute_coverage,
+        writer,
+    )
+}
+
+/// Runs a package's unit tests on `backends`. Coverage traces the V1 VM, so
+/// it is complete only if V1 runs every test.
+pub fn run_move_unit_tests_with_backend<W: Write + Send>(
+    pkg_path: &Path,
+    build_config: move_package::BuildConfig,
+    mut unit_test_config: UnitTestingConfig,
+    backends: Backends<'_>,
+    genesis: ChangeSet,
+    compute_coverage: bool,
+    writer: &mut W,
 ) -> Result<UnitTestResult> {
     let test_plan =
         build_test_plan_for_package(pkg_path, build_config, &mut unit_test_config, writer)?;
@@ -196,16 +222,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(
-            test_plan,
-            Some(natives),
-            Some(genesis),
-            writer,
-            factory,
-            enable_enum_option,
-            unit_test_config.fail_fast,
-        )
-        .unwrap()
+        .run_and_report_unit_tests_with_backends(test_plan, backends, genesis, writer)?
         .1
     {
         cleanup_trace();

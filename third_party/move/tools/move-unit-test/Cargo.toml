@@ -19,6 +19,7 @@ table-extension = ["move-vm-test-utils/table-extension"]
 [dependencies]
 anyhow = { workspace = true }
 better_any = { workspace = true }
+bytes = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 colored = { workspace = true }
@@ -41,7 +42,6 @@ move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
-rayon = { workspace = true }
 regex = { workspace = true }
 thiserror = { workspace = true }
 

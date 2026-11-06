@@ -3,7 +3,7 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{format_module_id, DEFAULT_EXECUTION_BOUND};
+use crate::{backend::TestRun, format_module_id, DEFAULT_EXECUTION_BOUND};
 use codespan_reporting::files::{Files, SimpleFiles};
 use colored::{control, Colorize};
 pub use legacy_move_compiler::unit_test::ExpectedMoveError as MoveError;
@@ -13,7 +13,7 @@ use legacy_move_compiler::{
 };
 use move_binary_format::{
     access::ModuleAccess,
-    errors::{ExecutionState, Location, VMError, VMResult},
+    errors::{ExecutionState, Location, VMError},
 };
 use move_command_line_common::{env::read_bool_env_var, files::FileHash};
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
@@ -99,12 +99,13 @@ pub enum FailureReason {
     UnexpectedError(String, MoveError),
     // Test timed out
     Timeout(String),
-    // The execution results of the Move VM and stackless VM does not match
-    Mismatch {
-        move_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        move_vm_change_set: Box<VMResult<ChangeSet>>,
-        stackless_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        stackless_vm_change_set: Box<VMResult<ChangeSet>>,
+    // The backend failed to execute the test
+    BackendError(String),
+    // Two backends' outcomes differ
+    BackendMismatch {
+        reference: String,
+        candidate: String,
+        diff: String,
     },
     // Property checking failed
     Property(String),
@@ -123,12 +124,26 @@ pub struct TestRunInfo {
     pub function_ident: String,
     pub elapsed_time: Duration,
     pub gas_used: u64,
+    /// The candidate's metrics in a differential run.
+    pub candidate: Option<CandidateMetrics>,
+}
+
+/// The candidate's elapsed time and gas use in a differential run.
+/// Gas use is not directly comparable across backends because their units differ.
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
+pub struct CandidateMetrics {
+    pub elapsed_time: Duration,
+    pub gas_used: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct TestStatistics {
     passed: BTreeMap<ModuleId, BTreeSet<TestRunInfo>>,
     failed: BTreeMap<ModuleId, BTreeSet<TestFailure>>,
+    /// Unsupported reasons by module and test name.
+    unsupported: BTreeMap<ModuleId, BTreeMap<TestName, String>>,
+    /// Incomparable reasons by module and test name.
+    incomparable: BTreeMap<ModuleId, BTreeMap<TestName, String>>,
     output: BTreeMap<ModuleId, BTreeMap<TestName, String>>,
 }
 
@@ -144,6 +159,16 @@ impl TestRunInfo {
             function_ident,
             elapsed_time,
             gas_used: 0,
+            candidate: None,
+        }
+    }
+}
+
+impl CandidateMetrics {
+    pub fn of(run: &TestRun) -> Self {
+        Self {
+            elapsed_time: run.elapsed,
+            gas_used: run.gas_used,
         }
     }
 }
@@ -177,17 +202,17 @@ impl FailureReason {
         FailureReason::Timeout("Test timed out".to_string())
     }
 
-    pub fn mismatch(
-        move_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        move_vm_change_set: VMResult<ChangeSet>,
-        stackless_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        stackless_vm_change_set: VMResult<ChangeSet>,
-    ) -> Self {
-        FailureReason::Mismatch {
-            move_vm_return_values: Box::new(move_vm_return_values),
-            move_vm_change_set: Box::new(move_vm_change_set),
-            stackless_vm_return_values: Box::new(stackless_vm_return_values),
-            stackless_vm_change_set: Box::new(stackless_vm_change_set),
+    pub fn backend_error(message: String) -> Self {
+        FailureReason::BackendError(format!(
+            "INTERNAL TEST ERROR: the backend failed to run this test: {message}"
+        ))
+    }
+
+    pub fn backend_mismatch(reference: String, candidate: String, diff: String) -> Self {
+        FailureReason::BackendMismatch {
+            reference,
+            candidate,
+            diff,
         }
     }
 
@@ -257,25 +282,12 @@ impl TestFailure {
                 );
                 Self::report_error_with_location(test_plan, base_message, &self.vm_error)
             },
-            FailureReason::Mismatch {
-                move_vm_return_values,
-                move_vm_change_set,
-                stackless_vm_return_values,
-                stackless_vm_change_set,
-            } => {
-                format!(
-                    "Executions via Move VM [M] and stackless VM [S] yield different results.\n\
-                    [M] - return values: {:?}\n\
-                    [S] - return values: {:?}\n\
-                    [M] - change set: {:?}\n\
-                    [S] - change set: {:?}\n\
-                    ",
-                    move_vm_return_values,
-                    stackless_vm_return_values,
-                    move_vm_change_set,
-                    stackless_vm_change_set
-                )
-            },
+            FailureReason::BackendError(message) => message.clone(),
+            FailureReason::BackendMismatch {
+                reference,
+                candidate,
+                diff,
+            } => format!("{reference} and {candidate} disagree:\n{diff}"),
             FailureReason::Property(message) => message.clone(),
         };
 
@@ -452,6 +464,8 @@ impl TestStatistics {
         Self {
             passed: BTreeMap::new(),
             failed: BTreeMap::new(),
+            unsupported: BTreeMap::new(),
+            incomparable: BTreeMap::new(),
             output: BTreeMap::new(),
         }
     }
@@ -470,6 +484,30 @@ impl TestStatistics {
             .insert(test_info);
     }
 
+    pub fn test_unsupported(
+        &mut self,
+        test_name: TestName,
+        reason: String,
+        test_plan: &ModuleTestPlan,
+    ) {
+        self.unsupported
+            .entry(test_plan.module_id.clone())
+            .or_default()
+            .insert(test_name, reason);
+    }
+
+    pub fn test_incomparable(
+        &mut self,
+        test_name: TestName,
+        reason: String,
+        test_plan: &ModuleTestPlan,
+    ) {
+        self.incomparable
+            .entry(test_plan.module_id.clone())
+            .or_default()
+            .insert(test_name, reason);
+    }
+
     pub fn test_output(&mut self, test_name: TestName, test_plan: &ModuleTestPlan, output: String) {
         self.output
             .entry(test_plan.module_id.clone())
@@ -484,6 +522,14 @@ impl TestStatistics {
         }
         for (module_id, test_result) in other.failed {
             let entry = self.failed.entry(module_id).or_default();
+            entry.extend(test_result);
+        }
+        for (module_id, test_result) in other.unsupported {
+            let entry = self.unsupported.entry(module_id).or_default();
+            entry.extend(test_result);
+        }
+        for (module_id, test_result) in other.incomparable {
+            let entry = self.incomparable.entry(module_id).or_default();
             entry.extend(test_result);
         }
         for (module_id, test_output) in other.output {
@@ -520,95 +566,102 @@ impl TestResults {
     pub fn report_statistics<W: Write>(&self, writer: &Mutex<W>) -> Result<()> {
         writeln!(writer.lock().unwrap(), "\nTest Statistics:\n")?;
 
-        let mut max_function_name_size = 0;
-        let mut stats = Vec::new();
-
-        for (module_id, test_results) in self.final_statistics.passed.iter() {
-            for test_result in test_results {
-                let qualified_function_name = format!(
-                    "{}::{}",
-                    format_module_id(module_id),
-                    test_result.function_ident
-                );
-                max_function_name_size =
-                    std::cmp::max(max_function_name_size, qualified_function_name.len());
-                stats.push((
-                    qualified_function_name,
-                    test_result.elapsed_time.as_secs_f32(),
-                    test_result.gas_used,
-                ))
-            }
+        let passed = self
+            .final_statistics
+            .passed
+            .iter()
+            .flat_map(|(module_id, infos)| infos.iter().map(move |info| (module_id, info)));
+        let failed = self
+            .final_statistics
+            .failed
+            .iter()
+            .flat_map(|(module_id, failures)| {
+                failures
+                    .iter()
+                    .map(move |failure| (module_id, &failure.test_run_info))
+            });
+        let stats: Vec<_> = passed
+            .chain(failed)
+            .map(|(module_id, info)| {
+                let qualified_function_name =
+                    format!("{}::{}", format_module_id(module_id), info.function_ident);
+                (qualified_function_name, info)
+            })
+            .collect();
+        if stats.is_empty() {
+            return writeln!(writer.lock().unwrap());
         }
 
-        for (module_id, test_failures) in self.final_statistics.failed.iter() {
-            for test_failure in test_failures {
-                let qualified_function_name = format!(
-                    "{}::{}",
-                    format_module_id(module_id),
-                    test_failure.test_run_info.function_ident
-                );
-                max_function_name_size =
-                    std::cmp::max(max_function_name_size, qualified_function_name.len());
-                stats.push((
-                    qualified_function_name,
-                    test_failure.test_run_info.elapsed_time.as_secs_f32(),
-                    test_failure.test_run_info.gas_used,
-                ));
+        let max_function_name_size = stats.iter().map(|(name, _)| name.len()).max().unwrap_or(0);
+        let with_candidate = stats.iter().any(|(_, info)| info.candidate.is_some());
+        // Only differential runs have the candidate's columns.
+        let row = |cells: [&str; 5], fill: &str| {
+            let [name, time, gas_used, candidate_time, candidate_gas_used] = cells;
+            let mut row = format!(
+                "{name}{fill}{time}{fill}{gas_used}",
+                fill = format!(" {fill} ")
+            );
+            if with_candidate {
+                row = format!("{row} {fill} {candidate_time} {fill} {candidate_gas_used}");
             }
-        }
+            row
+        };
+        let rule = |left: &str, mid: &str, right: &str| {
+            let name = "─".repeat(max_function_name_size);
+            let time = "─".repeat(10);
+            let gas_used = "─".repeat(25);
+            let cells = row([&name, &time, &gas_used, &time, &gas_used], mid);
+            format!("{left}─{}─{right}", cells.replace(' ', "─"))
+        };
 
-        if !stats.is_empty() {
+        writeln!(writer.lock().unwrap(), "{}", rule("┌", "┬", "┐"))?;
+        writeln!(
+            writer.lock().unwrap(),
+            "│ {} │",
+            row(
+                [
+                    &format!("{:^max_function_name_size$}", "Test Name"),
+                    &format!("{:^10}", "Time"),
+                    &format!("{:^25}", "Gas Used"),
+                    &format!("{:^10}", "Cand. Time"),
+                    &format!("{:^25}", "Cand. Gas Used"),
+                ],
+                "│"
+            )
+        )?;
+        for (qualified_function_name, info) in &stats {
+            writeln!(writer.lock().unwrap(), "{}", rule("├", "┼", "┤"))?;
+            let (candidate_time, candidate_gas_used) = match &info.candidate {
+                Some(candidate) => (
+                    format!("{:^10.3}", candidate.elapsed_time.as_secs_f32()),
+                    format!("{:^25}", candidate.gas_used),
+                ),
+                None => (format!("{:^10}", "-"), format!("{:^25}", "-")),
+            };
             writeln!(
                 writer.lock().unwrap(),
-                "┌─{:─^width$}─┬─{:─^10}─┬─{:─^25}─┐",
-                "",
-                "",
-                "",
-                width = max_function_name_size,
-            )?;
-            writeln!(
-                writer.lock().unwrap(),
-                "│ {name:^width$} │ {time:^10} │ {gas_used:^25} │",
-                width = max_function_name_size,
-                name = "Test Name",
-                time = "Time",
-                gas_used = "Gas Used"
-            )?;
-
-            for (qualified_function_name, time, gas_used) in stats {
-                writeln!(
-                    writer.lock().unwrap(),
-                    "├─{:─^width$}─┼─{:─^10}─┼─{:─^25}─┤",
-                    "",
-                    "",
-                    "",
-                    width = max_function_name_size,
-                )?;
-                writeln!(
-                    writer.lock().unwrap(),
-                    "│ {name:<width$} │ {time:^10.3} │ {gas_used:^25} │",
-                    name = qualified_function_name,
-                    width = max_function_name_size,
-                    time = time,
-                    gas_used = gas_used,
-                )?;
-            }
-
-            writeln!(
-                writer.lock().unwrap(),
-                "└─{:─^width$}─┴─{:─^10}─┴─{:─^25}─┘",
-                "",
-                "",
-                "",
-                width = max_function_name_size,
+                "│ {} │",
+                row(
+                    [
+                        &format!("{qualified_function_name:<max_function_name_size$}"),
+                        &format!("{:^10.3}", info.elapsed_time.as_secs_f32()),
+                        &format!("{:^25}", info.gas_used),
+                        &candidate_time,
+                        &candidate_gas_used,
+                    ],
+                    "│"
+                )
             )?;
         }
+        writeln!(writer.lock().unwrap(), "{}", rule("└", "┴", "┘"))?;
 
         writeln!(writer.lock().unwrap())
     }
 
-    /// Returns `true` if all tests passed, `false` if there was a test failure/timeout
-    pub fn summarize<W: Write>(self, writer: &Mutex<W>) -> Result<bool> {
+    /// Prints the results and returns whether the run passed. Failures and
+    /// timeouts fail the run; unsupported and incomparable tests do too unless
+    /// `allow_inconclusive` is set.
+    pub fn summarize<W: Write>(self, writer: &Mutex<W>, allow_inconclusive: bool) -> Result<bool> {
         let num_failed_tests = self
             .final_statistics
             .failed
@@ -617,6 +670,16 @@ impl TestResults {
         let num_passed_tests = self
             .final_statistics
             .passed
+            .iter()
+            .fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
+        let num_unsupported_tests = self
+            .final_statistics
+            .unsupported
+            .iter()
+            .fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
+        let num_incomparable_tests = self
+            .final_statistics
+            .incomparable
             .iter()
             .fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
         if !self.final_statistics.failed.is_empty() {
@@ -645,18 +708,56 @@ impl TestResults {
             }
         }
 
+        write_reasons(writer, "Unsupported", &self.final_statistics.unsupported)?;
+        write_reasons(writer, "Incomparable", &self.final_statistics.incomparable)?;
+
+        let num_inconclusive_tests = num_unsupported_tests + num_incomparable_tests;
+        let ok = num_failed_tests == 0 && (num_inconclusive_tests == 0 || allow_inconclusive);
+        let inconclusive: String = [
+            ("unsupported", num_unsupported_tests),
+            ("incomparable", num_incomparable_tests),
+        ]
+        .into_iter()
+        .filter(|&(_, count)| count > 0)
+        .map(|(label, count)| format!("; {label}: {count}"))
+        .collect();
         writeln!(
             writer.lock().unwrap(),
-            "Test result: {}. Total tests: {}; passed: {}; failed: {}",
-            if num_failed_tests == 0 {
+            "Test result: {}. Total tests: {}; passed: {}; failed: {}{}",
+            if ok {
                 "OK".bold().bright_green()
             } else {
                 "FAILED".bold().bright_red()
             },
-            num_passed_tests + num_failed_tests,
+            num_passed_tests + num_failed_tests + num_inconclusive_tests,
             num_passed_tests,
-            num_failed_tests
+            num_failed_tests,
+            inconclusive,
         )?;
-        Ok(num_failed_tests == 0)
+        Ok(ok)
     }
+}
+
+/// Prints how many of `tests` each reason accounts for, most frequent first.
+fn write_reasons<W: Write>(
+    writer: &Mutex<W>,
+    status: &str,
+    tests: &BTreeMap<ModuleId, BTreeMap<TestName, String>>,
+) -> Result<()> {
+    let mut reasons: BTreeMap<&str, u64> = BTreeMap::new();
+    for reason in tests.values().flat_map(|tests| tests.values()) {
+        *reasons.entry(reason).or_default() += 1;
+    }
+    if reasons.is_empty() {
+        return Ok(());
+    }
+    let mut reasons: Vec<_> = reasons.into_iter().collect();
+    // Stable sorting keeps reasons with equal counts in alphabetical order.
+    reasons.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+    writeln!(writer.lock().unwrap(), "\n{status} tests by reason:\n")?;
+    for (reason, count) in reasons {
+        writeln!(writer.lock().unwrap(), "{count:>6}  {reason}")?;
+    }
+    writeln!(writer.lock().unwrap())?;
+    Ok(())
 }
