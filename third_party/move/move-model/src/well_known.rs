@@ -32,6 +32,9 @@ pub fn is_test_attribute_name(s: &str) -> bool {
     s == "test"
 }
 
+/// Name of the synthetic function inserted by the compiler in test mode.
+pub const UNIT_TEST_POISON: &str = "unit_test_poison";
+
 /// Function identifying the name of an attribute which declares an
 /// item to be part of verification only.
 pub fn is_verify_only_attribute_name(s: &str) -> bool {
