@@ -25,6 +25,7 @@ pub mod bulletproofs;
 pub mod cmp;
 pub mod consensus_config;
 pub mod crypto_algebra;
+pub mod debug;
 pub mod ed25519;
 pub mod event;
 pub mod from_bytes;
@@ -67,6 +68,7 @@ pub use consensus_config::make_all_consensus_config_natives;
 #[cfg(feature = "testing")]
 pub use crypto_algebra::make_all_crypto_algebra_test_natives;
 pub use crypto_algebra::{make_all_crypto_algebra_natives, AlgebraStore};
+pub use debug::make_all_debug_natives;
 pub use ed25519::make_all_ed25519_natives;
 #[cfg(feature = "testing")]
 pub use ed25519::make_all_ed25519_test_natives;
@@ -142,6 +144,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_crypto_algebra_natives::<F>());
     natives.extend(make_all_vector_natives::<F>());
     natives.extend(make_all_reflect_natives::<F>());
+    natives.extend(make_all_debug_natives::<F>());
     natives
 }
 
