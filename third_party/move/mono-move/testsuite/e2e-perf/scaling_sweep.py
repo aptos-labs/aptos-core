@@ -62,6 +62,11 @@ BLOCK_SIZE = os.environ.get("BLOCK_SIZE")
 # makes most transactions depend on the one before them. At 1 the only
 # dependencies are the workload's own.
 TXNS_PER_SENDER = int(os.environ.get("TXNS_PER_SENDER", default=1))
+# Charges gas on MonoMove. Its gas schedule is a placeholder, so the amounts
+# are wrong, but the fee is deducted, burnt and the supply updated, which is
+# what shapes the write set. Unmetered, a transaction writes nothing for its
+# fee and its store is only read.
+MONO_METERED = bool(os.environ.get("MONO_METERED"))
 NUM_INIT_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=2000000))
 CREATE_DB_THREADS = int(os.environ.get("CREATE_DB_THREADS", default=32))
 OUT_DIR = os.environ.get("OUT_DIR", default="scaling-sweep-out")
@@ -162,11 +167,18 @@ def record(workload, db_dir, checkpoint_dir, blocks_path):
 
 
 def replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_path):
+    """The environment prefix and the program of one replay, kept apart so a
+    profiler can wrap the program alone.
+    """
     override = "--enable-feature-after-init" if vm == "mono" else "--disable-feature-after-init"
-    return (
+    env = "RUST_BACKTRACE=1 "
+    if MONO_METERED and vm == "mono":
+        env += "MONO_MOVE_METERED=1 "
+    program = (
         f"{common_flags(block_size_of(workload), threads, recorded_db, checkpoint_dir)} "
         f"--replay-blocks {blocks_path} {override} {MONO_MOVE_FLAG}"
     )
+    return env, program
 
 
 def get_last(pattern, output, what):
@@ -207,6 +219,7 @@ def parse_run(output, workload, threads, vm, repeat):
         "block_size": block_size_of(workload),
         "blocks": NUM_BLOCKS,
         "txns_per_sender": TXNS_PER_SENDER,
+        "mono_metered": MONO_METERED,
         "total_tps": float(get_last(r"Overall TPS: " + NUMBER + r" txn/s", output, "TPS")),
         "execution_tps": execution_tps,
         "inner_tps": inner_tps,
@@ -259,7 +272,19 @@ def parse_run(output, workload, threads, vm, repeat):
         get_last(stage + r"process counters per txn: (.*)", output, "process counters")
     ).items():
         row[f"{key}_per_txn"] = value
+    cold = parse_kv(get_last(stage + r"cold state reads per txn: (.*)", output, "cold reads"))
+    row["cold_reads_per_txn"] = cold["count"]
+    row["cold_read_us"] = cold["us"]
+    row["hot_promotions_per_txn"] = cold.get("promotions", 0.0)
+    for key, value in parse_kv(
+        get_last(stage + r"state view lookups per txn: (.*)", output, "state view lookups")
+    ).items():
+        row[f"{key}_per_txn"] = value
     row["max_rss_kib"] = int(get_last(stage + r"max rss: (\d+) KiB", output, "max rss"))
+    row["workflow_timer_us"] = {
+        name: float(value)
+        for name, value in re.findall(stage + r"workflow timer us/txn: ([^=]+)=" + NUMBER, output)
+    }
     row["thread_group_cpu_us"] = {
         group: float(value)
         for group, value in re.findall(stage + r"thread group cpu us/txn: ([^=]+)=" + NUMBER, output)
@@ -323,9 +348,9 @@ def profile_replay(workload, threads, vm, recorded_db, checkpoint_dir, blocks_pa
     """
     name = f"{workload.name}-{vm}-{threads}t"
     data = os.path.join(prof_dir, f"{name}.perf.data")
-    cmd = replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_path)
+    env, program = replay_command(workload, threads, vm, recorded_db, checkpoint_dir, blocks_path)
     output = execute_command(
-        f"RUST_BACKTRACE=1 {PERF_BIN} record -F {PERF_FREQ} -g -k CLOCK_MONOTONIC -o {data} -- {cmd}"
+        f"{env}{PERF_BIN} record -F {PERF_FREQ} -g -k CLOCK_MONOTONIC -o {data} -- {program}"
     )
     row = parse_run(output, workload, threads, vm, repeat=-1)
     window = (row["window_start"], row["window_end"])
@@ -371,6 +396,11 @@ def median_rows(rows):
             for tg, v in r["thread_group_cpu_us"].items():
                 groups_cpu[tg].append(v)
         med["thread_group_cpu_us"] = {tg: statistics.median(v) for tg, v in groups_cpu.items()}
+        timers = defaultdict(list)
+        for r in group:
+            for name, v in r.get("workflow_timer_us", {}).items():
+                timers[name].append(v)
+        med["workflow_timer_us"] = {name: statistics.median(v) for name, v in timers.items()}
         inner = [r["inner_us"] for r in group]
         med["inner_spread"] = (max(inner) - min(inner)) / statistics.median(inner)
         med["repeats"] = len(group)
@@ -400,6 +430,12 @@ METRIC_ROWS = [
     ("voluntary ctx switches /txn", "voluntary_ctx_switches_per_txn", ""),
     ("involuntary ctx switches /txn", "involuntary_ctx_switches_per_txn", ""),
     ("speculative aborts /txn", "aborts_per_txn", ""),
+    ("cold state reads /txn", "cold_reads_per_txn", "state view lookups that reached the DB"),
+    ("cold state reads", "cold_read_us", "time inside those DB reads"),
+    ("hot state promotions /txn", "hot_promotions_per_txn", "keys the block epilogues made hot"),
+    ("sv lookups /txn", "sv_total_get_per_txn", "all state view lookups"),
+    ("sv hot hits /txn", "sv_hit_hot_per_txn", "served by the hot state"),
+    ("sv speculative hits /txn", "sv_hit_speculative_per_txn", "served by the in-memory delta"),
     ("max rss MiB", "max_rss_kib", ""),
 ]
 
@@ -471,6 +507,23 @@ def growth_comparison(medians, workload):
     return tabulate(rows, headers=headers, tablefmt="github")
 
 
+def workflow_timer_table(medians, workload):
+    names = sorted(
+        {n for (w, _, _), med in medians.items() if w == workload for n in med["workflow_timer_us"]}
+    )
+    rows = []
+    for name in names:
+        for vm in VMS:
+            cells = [name, vm]
+            for t in THREADS:
+                med = medians.get((workload, vm, t))
+                v = med["workflow_timer_us"].get(name) if med else None
+                cells.append("-" if v is None else f"{v:.2f}")
+            rows.append(cells)
+    headers = ["workflow timer wall (us/txn)", "vm"] + [f"{t}T" for t in THREADS]
+    return tabulate(rows, headers=headers, tablefmt="github")
+
+
 def thread_group_table(medians, workload):
     groups = sorted(
         {tg for (w, _, _), med in medians.items() if w == workload for tg in med["thread_group_cpu_us"]}
@@ -536,7 +589,8 @@ def build_report(workloads, medians, profile_rows, failures, machine):
         "",
         f"{NUM_BLOCKS} blocks per workload, {REPEATS} repeats, {NUM_INIT_ACCOUNTS} account DB, "
         f"{TXNS_PER_SENDER} transaction(s) per sender per block, threads {THREADS}, split "
-        "stages. Every metric is a median over repeats, in "
+        f"stages, MonoMove {'metered' if MONO_METERED else 'unmetered'}. Every metric is a "
+        "median over repeats, in "
         "microseconds per transaction unless marked. Worker metrics are summed over all "
         "workers, so `worker wall total` ≈ threads × `worker scope wall`.",
         "",
@@ -566,6 +620,8 @@ def build_report(workloads, medians, profile_rows, failures, machine):
             f"<summary>{w.name}: every metric by thread count</summary>",
             "",
             workload_table(medians, w.name),
+            "",
+            workflow_timer_table(medians, w.name),
             "",
             thread_group_table(medians, w.name),
             "",
@@ -650,10 +706,10 @@ def main():
                 shutil.rmtree(checkpoint, ignore_errors=True)
                 started = time.monotonic()
                 try:
-                    output = execute_command(
-                        "RUST_BACKTRACE=1 "
-                        + replay_command(workload, threads, vm, recorded_db, checkpoint, blocks_path)
+                    env, program = replay_command(
+                        workload, threads, vm, recorded_db, checkpoint, blocks_path
                     )
+                    output = execute_command(env + program)
                     row = parse_run(output, workload, threads, vm, repeat)
                 except (CommandFailed, ValueError) as e:
                     print(f"Replay {workload.name} {vm} {threads}T failed: {e}")

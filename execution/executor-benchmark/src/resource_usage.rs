@@ -7,8 +7,24 @@
 //! tell more workers burning more CPU from workers sitting idle.
 
 use aptos_block_executor::{counters as block_executor_counters, worker_phases::WorkerPhase};
+use aptos_db::metrics::API_LATENCY_SECONDS as DB_API_LATENCY_SECONDS;
 use aptos_logger::info;
 use std::collections::BTreeMap;
+
+/// The DB read a state view falls back to when a key is neither in the
+/// in-memory state delta nor in the hot state.
+const COLD_STATE_READ_API: &str = "get_state_value_with_version_by_version";
+
+/// `aptos_storage_interface_counter` names recording where a state view's
+/// lookups were served from. These are thread-local counters flushed once a
+/// second, so a snapshot can lag the par_exec workers' last second of reads.
+const STATE_VIEW_COUNTERS: [&str; 5] = [
+    "sv_total_get",
+    "sv_memorized",
+    "sv_hit_speculative",
+    "sv_hit_hot",
+    "sv_cold",
+];
 
 /// Phases a Block-STM worker charges its time to, with the clock each is read
 /// on. `wall` is elapsed time, `cpu` is thread CPU time.
@@ -28,6 +44,17 @@ pub(crate) struct ResourceUsage {
     worker_scope_secs: f64,
     /// Seconds workers spent parked on a dependency.
     dependency_wait_secs: f64,
+    /// Keys the block epilogues asked to make hot.
+    hot_state_promotions: f64,
+    /// Cold state reads that reached the DB, and the seconds they took.
+    cold_state_reads: u64,
+    cold_state_read_secs: f64,
+    /// State view lookups by where they were served from.
+    state_view_counters: BTreeMap<&'static str, u64>,
+    /// Seconds by named timer in the executor's block workflow and the state
+    /// store, keyed `family/name`. The state store's are thread-local and
+    /// flushed once a second, so they can lag.
+    workflow_timer_secs: BTreeMap<String, f64>,
     /// Worker microseconds by (phase, clock).
     worker_phase_micros: BTreeMap<(&'static str, &'static str), u64>,
     /// Process user and system CPU seconds.
@@ -67,6 +94,16 @@ impl ResourceUsage {
                 .get_sample_sum(),
             worker_scope_secs: block_executor_counters::RAYON_EXECUTION_SECONDS.get_sample_sum(),
             dependency_wait_secs: block_executor_counters::DEPENDENCY_WAIT_SECONDS.get_sample_sum(),
+            hot_state_promotions: block_executor_counters::HOT_STATE_PROMOTIONS_PER_BLOCK
+                .get_sample_sum(),
+            cold_state_reads: DB_API_LATENCY_SECONDS
+                .with_label_values(&[COLD_STATE_READ_API, "Ok"])
+                .get_sample_count(),
+            cold_state_read_secs: DB_API_LATENCY_SECONDS
+                .with_label_values(&[COLD_STATE_READ_API, "Ok"])
+                .get_sample_sum(),
+            state_view_counters: state_view_counters(),
+            workflow_timer_secs: workflow_timer_secs(),
             worker_phase_micros,
             thread_group_cpu_secs: thread_group_cpu_secs(),
             ..Default::default()
@@ -109,6 +146,30 @@ impl ResourceUsage {
             parallel_execution_secs: end.parallel_execution_secs - self.parallel_execution_secs,
             worker_scope_secs: end.worker_scope_secs - self.worker_scope_secs,
             dependency_wait_secs: end.dependency_wait_secs - self.dependency_wait_secs,
+            hot_state_promotions: end.hot_state_promotions - self.hot_state_promotions,
+            cold_state_reads: end.cold_state_reads - self.cold_state_reads,
+            cold_state_read_secs: end.cold_state_read_secs - self.cold_state_read_secs,
+            state_view_counters: end
+                .state_view_counters
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        *k,
+                        v - self.state_view_counters.get(k).copied().unwrap_or(0),
+                    )
+                })
+                .collect(),
+            workflow_timer_secs: end
+                .workflow_timer_secs
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        v - self.workflow_timer_secs.get(k).copied().unwrap_or(0.0),
+                    )
+                })
+                .filter(|(_, v)| *v > 0.0)
+                .collect(),
             worker_phase_micros: end
                 .worker_phase_micros
                 .iter()
@@ -171,6 +232,34 @@ impl ResourceUsage {
             info!("{} resources: worker {} us/txn: {}", prefix, clock, phases);
         }
         info!(
+            "{} resources: cold state reads per txn: count={:.3} us={:.2} promotions={:.3}",
+            prefix,
+            self.cold_state_reads as f64 / num_txns,
+            per_txn_us(self.cold_state_read_secs),
+            self.hot_state_promotions / num_txns,
+        );
+        info!(
+            "{} resources: state view lookups per txn: {}",
+            prefix,
+            STATE_VIEW_COUNTERS
+                .iter()
+                .map(|name| format!(
+                    "{}={:.3}",
+                    name,
+                    self.state_view_counters.get(name).copied().unwrap_or(0) as f64 / num_txns
+                ))
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        for (name, secs) in &self.workflow_timer_secs {
+            info!(
+                "{} resources: workflow timer us/txn: {}={:.2}",
+                prefix,
+                name,
+                per_txn_us(*secs)
+            );
+        }
+        info!(
             "{} resources: process cpu us/txn: user={:.2} system={:.2}",
             prefix,
             per_txn_us(self.user_cpu_secs),
@@ -194,6 +283,53 @@ impl ResourceUsage {
             );
         }
     }
+}
+
+/// The state view counters, read back from the metrics registry since the
+/// counter itself is private to its crate.
+fn state_view_counters() -> BTreeMap<&'static str, u64> {
+    let mut out = BTreeMap::new();
+    for family in aptos_metrics_core::gather() {
+        if family.get_name() != "aptos_storage_interface_counter" {
+            continue;
+        }
+        for metric in family.get_metric() {
+            let Some(label) = metric.get_label().iter().find(|l| l.get_name() == "name") else {
+                continue;
+            };
+            if let Some(name) = STATE_VIEW_COUNTERS
+                .iter()
+                .find(|name| **name == label.get_value())
+            {
+                out.insert(*name, metric.get_counter().get_value() as u64);
+            }
+        }
+    }
+    out
+}
+
+/// Sums of the named timers around block execution, from the registry.
+fn workflow_timer_secs() -> BTreeMap<String, f64> {
+    const FAMILIES: [(&str, &str); 2] = [
+        ("aptos_executor_other_timers_seconds", "executor"),
+        ("aptos_storage_interface_timer_seconds", "storage"),
+    ];
+    let mut out = BTreeMap::new();
+    for family in aptos_metrics_core::gather() {
+        let Some((_, short)) = FAMILIES.iter().find(|(name, _)| *name == family.get_name()) else {
+            continue;
+        };
+        for metric in family.get_metric() {
+            let Some(label) = metric.get_label().iter().find(|l| l.get_name() == "name") else {
+                continue;
+            };
+            out.insert(
+                format!("{short}/{}", label.get_value()),
+                metric.get_histogram().get_sample_sum(),
+            );
+        }
+    }
+    out
 }
 
 #[cfg(unix)]

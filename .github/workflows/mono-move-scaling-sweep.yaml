@@ -42,6 +42,11 @@ on:
         required: false
         type: string
         default: "1"
+      MONO_METERED:
+        description: "Charge gas on MonoMove (placeholder schedule), so it writes its fee like V1"
+        required: false
+        type: boolean
+        default: false
       PROFILE:
         description: "Record perf profiles of one extra replay per PROFILE_CONFIGS entry"
         required: false
@@ -143,6 +148,7 @@ jobs:
           BLOCK_SIZE: ${{ inputs.BLOCK_SIZE }}
           NUM_INIT_ACCOUNTS: ${{ inputs.NUM_INIT_ACCOUNTS }}
           TXNS_PER_SENDER: ${{ inputs.TXNS_PER_SENDER }}
+          MONO_METERED: ${{ inputs.MONO_METERED && '1' || '' }}
           PROFILE: ${{ inputs.PROFILE && 'perf' || '' }}
           PROFILE_CONFIGS: ${{ inputs.PROFILE_CONFIGS }}
           PERF_FREQ: ${{ inputs.PERF_FREQ }}
