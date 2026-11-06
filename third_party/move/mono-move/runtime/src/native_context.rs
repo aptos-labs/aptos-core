@@ -1249,7 +1249,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // TODO(completeness): render type arguments, locals, the source
         // location, a code window and the operand stack as V1 does.
         for (i, (func, offset)) in callers.iter().rev().enumerate() {
-            let name = match frame_module(func.module_id) {
+            let name = match frame_module(func.module_id()) {
                 Some(module_id) => format!("0x{module_id}::{}", func.name()),
                 None => "script::main".to_string(),
             };
