@@ -266,11 +266,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // same-package callers could also stop forwarding unused ty_args,
         // but upgradable code can't (the caller can't tell which params the
         // callee currently needs).
-        if let Some((function, function_ms)) =
-            module.get_instantiated_function_ptr(func_name, ty_args)
-        {
-            self.charge_non_read_set_slots(read_set, gas_meter, &function_ms)?;
-            return Ok(function);
+        if let Some(slot) = module.get_instantiated_function(func_name, ty_args) {
+            self.charge_non_read_set_slots(read_set, gas_meter, &slot.mandatory_dependencies)?;
+            return Ok(slot.function);
         }
 
         // Cache miss: monomorphize & lower, charging gas.

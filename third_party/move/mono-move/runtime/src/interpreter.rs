@@ -1058,7 +1058,12 @@ impl<'guard> InterpreterContext<'guard> {
         // TODO(perf): the evacuated region is never returned to the pool. It
         // outlives the session inside an `Arc<FrozenHeap>`, so returning it
         // needs a hook on the last drop.
-        let to_space = guard.take_region(heap.used().max(MAX_ALIGN));
+        //
+        // Uninitialized rather than zeroed: evacuation writes every byte it
+        // later reads, and a zeroed allocation past the allocator's cache
+        // size is served by `madvise`, which flushes the TLB of every core the
+        // process runs on.
+        let to_space = MemoryRegion::new_uninit(heap.used().max(MAX_ALIGN));
         let evacuated =
             evacuate_session_roots(&heap, to_space, guard, &mut read_write_set, &extensions)?;
         guard.return_region(heap.into_region());
