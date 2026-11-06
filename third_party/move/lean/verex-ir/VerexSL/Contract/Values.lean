@@ -19,6 +19,7 @@ import VerexIR.Proofs.IntegerArithmetic
 import VerexIR.Proofs.Denote.Types
 import VerexIR.Proofs.Maps
 import VerexIR.Proofs.Denote.NativeMaps
+import VerexIR.Proofs.Denote.TypeReflection
 
 /-!
 # Generated contracts: native types and values
@@ -323,9 +324,17 @@ def quoteWeave : {full captured supplied : NRow} → Weave full captured supplie
 
 /-- A free label's defining operation and its lexical let bindings. -/
 structure StateDefinition where
-  label : Nat
+  label : VerexIR.NameId
   operation : ExprId
   bindings : Array (VerexIR.PatternId × ExprId)
+
+/-- What a contract states of a known target at a frame and instantiation
+(`doc/designs/ghost-fields.md`): the contract, none where the target has no contract,
+and whether it states the target's aborts exactly: at least one `aborts_if` its callers
+see, and not `aborts_if_is_partial`. -/
+structure DirectContract where
+  contract? : Option Lean.Expr
+  exactAborts : Bool
 
 /-- Translation context for one function's specification clauses. -/
 structure Context where
@@ -363,10 +372,10 @@ structure Context where
   oldState : Option Lean.Expr := none
   /-- The states the clause's state labels denote, by label (a name of the
   unit): those bound by quantifiers over the state domain. -/
-  stateLabels : List (Nat × LabelState) := []
+  stateLabels : List (VerexIR.NameId × LabelState) := []
   /-- Free definitions denote memory expressions, never assumptions. -/
   labelDefinitions : Array StateDefinition := #[]
-  resolvingLabels : List Nat := []
+  resolvingLabels : List VerexIR.NameId := []
   /-- Contract defaults, preserved under ranges and `old`. -/
   labelEntry : Option LabelState := none
   labelExit : Option LabelState := none
@@ -397,6 +406,10 @@ structure Context where
   typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy) := #[]
   /-- Inside the body of a recursive specification function's definition. -/
   definition : Option RecursiveDefinition := none
+  /-- In a contract, what a known target's contract states at a frame and, for a
+  target with type parameters, an instantiation. -/
+  directContract : Option (VerexIR.FunctionHandle → Lean.Expr → Option Lean.Expr →
+    MetaM DirectContract) := none
   /-- The conditions on the path to the current position, which prove a
   recursive call's measure smaller. -/
   facts : Array Lean.Expr := #[]
@@ -624,7 +637,7 @@ simproc [vir_denote_norm] variantNameOrderingChoice
 
 def typeOfExpr? (context : Context) (id : ExprId) : Option IrTy := do
   let expression ← context.ns.expressions[id.index]?
-  context.valueTypeOf? expression.typeId
+  context.valueTypeOf? (context.ns.typeId expression.typeId)
 
 def describeType (ty : IrTy) : String :=
   toString (repr ty)
@@ -644,7 +657,7 @@ def nominalDeclaration? (unit : ValidatedUnit) (ty : IrTy) :
   let .nominal name _ := ty | none
   let qualified ← unit.tables.names[name.index]?
   let ns ← unit.namespaces[qualified.namespaceId.index]?
-  let structId ← ns.structs.findIdx? (·.name == name)
+  let structId ← ns.structs.findIdx? (ns.nameId ·.name == name)
   let declaration ← ns.structs[structId]?
   some ({ namespaceId := qualified.namespaceId, structId }, ns, declaration)
 
@@ -672,7 +685,7 @@ def Context.nativeType (context : Context) (typeId : TypeId) :
 def Context.exprType (context : Context) (id : ExprId) : MetaM VerexIR.Proofs.Denote.NTy := do
   let some expression := context.ns.expressions[id.index]?
     | throwError "specification expression {id.index} is out of range"
-  context.nativeType expression.typeId
+  context.nativeType (context.ns.typeId expression.typeId)
 
 /-- The Lean type of the native values of a quoted type at a family. -/
 def carrierType (carriers τ : Lean.Expr) : Lean.Expr :=
@@ -1022,11 +1035,16 @@ meaning the prelude of `profile` gives the function
 (`specificationModel?`). -/
 def opaqueValue (name : String) (typeArguments : List Lean.Expr) (result inhabited : Lean.Expr)
     (arguments : Array Lean.Expr) (profile : Option VerexIR.Profile := none) : MetaM Lean.Expr := do
-  let typeArguments ← mkListLit (mkConst ``VerexSL.Contract.SpecTypeArgument) typeArguments
-  if let some .serialization := specificationModel? profile name then
-    return ← mkAppOptM ``VerexIR.Proofs.serializedBytes #[none, typeArguments, none, ← bundleOf arguments]
-  mkAppOptM ``VerexSL.Contract.opaqueSpec
-    #[toExpr name, typeArguments, result, inhabited, none, ← bundleOf arguments]
+  let typeList ← mkListLit (mkConst ``VerexSL.Contract.SpecTypeArgument) typeArguments
+  let model := specificationModel? profile name
+  if let some .serialization := model then
+    return ← mkAppOptM ``VerexIR.Proofs.serializedBytes #[none, typeList, none, ← bundleOf arguments]
+  let value ← mkAppOptM ``VerexSL.Contract.opaqueSpec
+    #[toExpr name, typeList, result, inhabited, none, ← bundleOf arguments]
+  if let (some .isStruct, [argument]) := (model, typeArguments) then
+    if argument.isAppOfArity ``VerexSL.Contract.SpecTypeArgument.native 1 then
+      return mkApp2 (mkConst ``VerexIR.Proofs.Denote.reflectedIsStruct) argument.appArg! value
+  return value
 
 /-- An unspecified value of a native type at a frame, as an aborting
 specification branch denotes one (`arbitraryValue`): one fixed value of the
@@ -1085,10 +1103,10 @@ def structuralOrderTerm (context : Context) (τ : VerexIR.Proofs.Denote.NTy) (le
 
 /-- The value of the ordering enum `ty` at an order. -/
 def orderingTerm (context : Context) (ty : IrTy) (order : Lean.Expr) : MetaM Lean.Expr := do
-  let some (owner, _, declaration) := nominalDeclaration? context.unit ty
+  let some (owner, ns, declaration) := nominalDeclaration? context.unit ty
     | throwError "a structural order returns an ordering enum"
   let names := declaration.variants.map fun variant =>
-    ((context.unit.tables.names[variant.name.index]?).map (·.name)).getD ""
+    ((ns.nameOf variant.name).map (·.name)).getD ""
   nativeOrderingValue (← context.carriers) context.unit owner names order
 
 /-- A native struct value with one field replaced, as the program assigns it
@@ -1498,7 +1516,7 @@ slot, none without one. -/
 private def validitySlot? (unit : ValidatedUnit) (handle : VerexIR.StructHandle) : Option Nat := do
   let ns ← unit.namespaces[handle.namespaceId.index]?
   (VerexIR.SemanticOperations.nominalGhosts unit handle).findIdx? fun ghost =>
-    (ns.tables.names[ghost.name.index]?).any (·.name == validitySlotName)
+    (ns.nameOf ghost.name).any (·.name == validitySlotName)
 
 /-- The validity slot of an owner's native value: its ghost slot. -/
 def ownerValiditySlot (context : Context) (ty : IrTy) (owner : NativeOwner) :
@@ -1518,12 +1536,12 @@ def iteratorValiditySlot (context : Context) (ty : IrTy) (enum : VerexIR.Proofs.
   let some (handle, ns, declaration) := nominalDeclaration? context.unit ty
     | throwError "an iterator is not a declared nominal"
   let some ghost := (VerexIR.SemanticOperations.nominalGhosts context.unit handle).find? fun ghost =>
-      (ns.tables.names[ghost.name.index]?).any (·.name == validitySlotName)
+      (ns.nameOf ghost.name).any (·.name == validitySlotName)
     | throwError "the iterator has no validity slot"
-  let some ghostName := (ns.tables.names[ghost.name.index]?).map (·.name)
+  let some ghostName := (ns.nameOf ghost.name).map (·.name)
     | throwError "the iterator's validity slot has no name"
   let some choices := declaration.variants.toList.mapM fun (variant : VerexIR.VariantDecl) => do
-      let named : VerexIR.QualifiedName ← ns.tables.names[variant.name.index]?
+      let named : VerexIR.QualifiedName ← ns.nameOf variant.name
       let index ← VerexIR.SemanticOperations.handleGhostIndex? context.unit handle (some named.name)
         ghostName
       some (named.name, index)
@@ -1539,18 +1557,19 @@ def TypedTable.typedOfNative (view : VerexIR.Proofs.Denote.NativeMaps.TypedView)
   if view.identity then return nativeValue
   return (mkApp view.read nativeValue).headBeta
 
-/-- The specification role a specification function plays for an intrinsic
-map of its namespace, with the map's owner. -/
+/-- The specification role a specification function, named by unit
+identifiers, plays for an intrinsic map of its namespace, with the map's
+owner as a unit identifier. -/
 def mapSpecRole? (ns : ValidatedNamespace) (reference : VerexIR.QualifiedRef) :
     Option (VerexIR.MapSpecRole × VerexIR.NameId) :=
   ns.intrinsics.findSome? fun intrinsic =>
     if intrinsic.model == "map" then
       -- A leaf offset is uninterpreted (`doc/designs/intrinsic-maps.md`, "Roles").
       intrinsic.specBindings.findSome? fun binding => do
-        guard (binding.target == reference)
+        guard (ns.qualifiedRef binding.target == reference)
         let role ← VerexIR.MapSpecRole.ofName? binding.role
         guard (role != .leafOffset)
-        some (role, intrinsic.owner)
+        some (role, ns.nameId intrinsic.owner)
     else none
 
 
@@ -1568,10 +1587,10 @@ structure IteratorModel where
 /-- The iterator model of an enum: its one field of the key type parameter,
 which wins, else its one `u64` or `num` field, in whichever variant. -/
 def iteratorModel? (unit : ValidatedUnit) (ty : IrTy) : Option IteratorModel := do
-  let (owner, _, declaration) ← nominalDeclaration? unit ty
+  let (owner, ns, declaration) ← nominalDeclaration? unit ty
   let fields := declaration.variants.toList.flatMap fun variant =>
     variant.fields.toList.zipIdx.map fun (field, index) =>
-      (variant, index, unit.tables.types[field.type.typeId.index]?)
+      (variant, index, ns.typeOf field.type.typeId)
   let keys := fields.filter fun (_, _, type) => type == some (.typeParameter 0)
   let positions := fields.filter fun (_, _, type) =>
     type == some (.integer (.bits 64) false) || type == some (.integer .unbounded true)
@@ -1579,7 +1598,7 @@ def iteratorModel? (unit : ValidatedUnit) (ty : IrTy) : Option IteratorModel := 
     | [(variant, index, _)], _ => some (variant, index, true)
     | [], [(variant, index, _)] => some (variant, index, false)
     | _, _ => none
-  let name ← (unit.tables.names[variant.name.index]?).map (·.name)
+  let name ← (ns.nameOf variant.name).map (·.name)
   pure { owner, variant := name, field := index, keyed }
 
 /-- The payload an iterator holds: its key, or its position, its payload
@@ -1657,18 +1676,19 @@ def specFunctionOf? (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
   let declaration ← targetNs.specFunctions[functionId.index]?
   pure (targetNs, declaration)
 
-/-- The authored byte range of a location, when the unit records one. -/
-def locRange (unit : ValidatedUnit) (loc : VerexIR.LocId) : ObligationRange :=
-  match unit.tables.locations[loc.index]?.bind (·.primary) with
+/-- The authored byte range of a location of a namespace, when its tables
+record one. -/
+def locRange (ns : ValidatedNamespace) (loc : VerexIR.LocId) : ObligationRange :=
+  match (ns.location? loc).bind (·.primary) with
   | some range => {
-      file := (unit.tables.files[range.file.index]?.map (·.name)).getD ""
+      file := (ns.localTables.files[range.file.index]?.map (·.name)).getD ""
       startByte := range.startByte, endByte := range.endByte }
   | none => {}
 
-/-- The authored byte range of a condition. -/
-def conditionRange (unit : ValidatedUnit) (condition : VerexIR.Condition) :
+/-- The authored byte range of a condition of a namespace. -/
+def conditionRange (ns : ValidatedNamespace) (condition : VerexIR.Condition) :
     ObligationRange :=
-  locRange unit condition.loc
+  locRange ns condition.loc
 
 /-- Wrap a translated clause with its source range so a residual obligation
 can be reported at the authored clause. -/
@@ -1688,10 +1708,10 @@ def lemmaOf? (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
 which its definitions take at a family, by position. -/
 def lemmaNativeParameters (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
     Array (Nat × VerexIR.Proofs.Denote.NTy) := Id.run do
-  let some (_, declaration) := lemmaOf? unit reference | return #[]
+  let some (lemmaNs, declaration) := lemmaOf? unit reference | return #[]
   let mut natives := #[]
   for parameter in declaration.signature.parameters, index in [0:declaration.signature.parameters.size] do
-    let typeId := specTypeId unit parameter.typeUse.typeId
+    let typeId := specTypeId unit (lemmaNs.typeId parameter.typeUse.typeId)
     let some parameterType := unit.tables.types[typeId.index]? | continue
     unless domainOf parameterType matches .native do continue
     let some nty := VerexIR.Proofs.Denote.ntyOf unit reference.namespaceId typeId | continue
@@ -1754,9 +1774,10 @@ private partial def specReaches (unit : ValidatedUnit) (source target : VerexIR.
         work := rest
         if visited.contains (owner.index, id.index) then continue
         visited := visited.push (owner.index, id.index)
-        let some expression := unit.namespaces[owner.index]?.bind (·.expressions[id.index]?)
-          | continue
+        let some ownerNs := unit.namespaces[owner.index]? | continue
+        let some expression := ownerNs.expressions[id.index]? | continue
         if let .operation (.specification (.functionCall callee _)) _ _ _ := expression.kind then
+          let callee := ownerNs.qualifiedRef callee
           if callee == target then return true
           if let some (_, { body := some root, .. }) := specFunctionOf? unit callee then
             work := work ++ [(callee.namespaceId, root)]
@@ -1805,16 +1826,23 @@ def readsFrom (unit : ValidatedUnit) (start : List (VerexIR.NamespaceId × ExprI
         work := rest
         if visited.contains (owner.index, id.index) then continue
         visited := visited.push (owner.index, id.index)
-        let some expression := unit.namespaces[owner.index]?.bind (·.expressions[id.index]?)
-          | continue
+        let some ownerNs := unit.namespaces[owner.index]? | continue
+        let some expression := ownerNs.expressions[id.index]? | continue
         match expression.kind with
         | .operation (.specification (.behavior .requiresOf _)) .. =>
             reads := { reads with requires := true, state := true }
-        | .operation (.specification (.behavior kind range)) .. =>
+        | .operation (.specification (.behavior kind range)) _ arguments _ =>
+            -- In a unit verified through its model, `aborts_of` of a literal of a known
+            -- target is what its contract states, with no run to rest on.
+            let readsContract := VerexIR.Proofs.Denote.declaresGhosts unit && kind == .abortsOf &&
+              ((arguments[0]?.bind fun callable =>
+                  unit.namespaces[owner.index]?.bind (·.expressions[callable.index]?)).any fun
+                | { kind := .operation (.call (.closure _ 0)) _ #[] _, .. } => true
+                | _ => false)
             reads := { reads with unit := true, state := true
-                                  determinism := reads.determinism ||
-                                    (kind matches .abortsOf | .resultOf) ||
-                                    (kind == .ensuresOf && range.post.isSome)
+                                  determinism := reads.determinism || (!readsContract &&
+                                    ((kind matches .abortsOf | .resultOf) ||
+                                      (kind == .ensuresOf && range.post.isSome)))
                                   result := reads.result || kind matches .resultOf }
         | .operation (.specification (.global _)) .. | .operation (.global _) .. |
             .operation (.specification (.publish _)) .. |
@@ -1822,11 +1850,13 @@ def readsFrom (unit : ValidatedUnit) (start : List (VerexIR.NamespaceId × ExprI
             .operation (.specification (.update _)) .. =>
             reads := { reads with state := true }
         | .operation (.specification (.functionCall callee _)) instantiations .. =>
+            let callee := ownerNs.qualifiedRef callee
             if let some (_, { body := some root, .. }) := specFunctionOf? unit callee then
               work := work ++ [(callee.namespaceId, root)]
             else if !instantiations.isEmpty && !arbitraryValue unit callee then
               reads := { reads with types := true }
         | .operation (.specification (.lemma callee _)) .. =>
+            let callee := ownerNs.qualifiedRef callee
             if let some (_, declaration) := lemmaOf? unit callee then
               work := work ++ (declaration.contract.conditions.toList.map
                 fun condition => (callee.namespaceId, condition.expression))
@@ -1893,7 +1923,7 @@ def specGroup (unit : ValidatedUnit) (reference : VerexIR.QualifiedRef) :
   let mut group := #[]
   for ns in unit.namespaces, namespaceIndex in [0:unit.namespaces.size] do
     for declaration in ns.specFunctions do
-      let other : VerexIR.QualifiedRef := ⟨⟨namespaceIndex⟩, declaration.name⟩
+      let other : VerexIR.QualifiedRef := ⟨⟨namespaceIndex⟩, ns.nameId declaration.name⟩
       if other == reference ||
           (specReaches unit reference other && specReaches unit other reference) then
         group := group.push other
@@ -2033,7 +2063,7 @@ def Context.bindComponent (context : Context) (element : VerexIR.PatternId)
   match elementNode.kind with
   | .wildcard => pure context
   | .variable localId =>
-      let some elementType := context.valueTypeOf? elementNode.typeId
+      let some elementType := context.valueTypeOf? (context.ns.typeId elementNode.typeId)
         | throwError "specification binding pattern has an unknown type"
       context.bindLocal localId elementType (← valueOf elementType)
   | _ => throwError "generated contracts require a variable or wildcard component \

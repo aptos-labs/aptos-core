@@ -42,31 +42,21 @@ verify test_verify_drain_symbolic by
 -- position, so the keys and the size are unchanged, and the invariant over
 -- the earlier positions carries over.
 verify test_verify_iter_walk_mut_symbolic by
-  on invariant 1 step, invariant 2 step, invariant 4 step, invariant 5 step {
+  on invariant 1 step, invariant 2 step, invariant 3 step, invariant 4 step,
+    invariant 5 step, invariant 6 step {
     split it
     split iter_next_result
     let k := spec_key_at(m, count)
     apply lemma_contains_key_key_at(m, count)
     apply lemma_len_set(m, k, 7)
-  }
-  on invariant 3 step {
-    split it
-    split iter_next_result
-    let k := spec_key_at(m, count)
-    apply lemma_contains_key_key_at(m, count)
-    apply lemma_len_set(m, k, 7)
-    apply lemma_key_at_set_present(m, k, 7, i)
-  }
-  on invariant 6 step {
-    split it
-    split iter_next_result
-    let k := spec_key_at(m, count)
-    apply lemma_contains_key_key_at(m, count)
-    apply lemma_len_set(m, k, 7)
-    apply lemma_key_at_set_present(m, k, 7, i)
-    apply lemma_get_set(m, k, 7, spec_key_at(m, i))
-    apply lemma_key_at_eq_iff(m, i, count)
-    split i == count
+    on invariant 3 step, invariant 6 step {
+      apply lemma_key_at_set_present(m, k, 7, i)
+    }
+    on invariant 6 step {
+      apply lemma_get_set(m, k, 7, spec_key_at(m, i))
+      apply lemma_key_at_eq_iff(m, i, count)
+      split i == count
+    }
   }
   on invariant 4 entry, invariant 5 entry {
     split internal_new_begin_iter_result

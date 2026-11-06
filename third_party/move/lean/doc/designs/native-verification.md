@@ -74,6 +74,7 @@ denotation and the solver.
 | Type parameters | a value of a parameter type is native at every instantiation, its native type the argument's; an instance substitutes carriers, never domains |
 | Failures | `Failure := ThrowKind × Array Int`, related to the runtime failure by the injective `Failure.encode`; abort codes by `abortCodeMatches` |
 | Hash, serialization, signer facts | `opaqueValue` applications, as a clause's call builds them; `bcs::serialize` is a chosen function of which only non-emptiness is known |
+| Aggregators | `NativeModel.aggregator`: a frame reads an element through `Skolems.aggregatorValue` and tests it by `Skolems.isAggregatorElement`, which are integers and decided at `u64`/`u128` at any frame (`aggregatorValue_int`) and leave a type parameter unconstrained; the abort tests the value `type_name` denotes |
 | Mutable-reference lending in calls | unchanged: `NTy.lend`, `lendArguments`, `argumentsResolve` define what a run is, at the agreement boundary |
 | Obligation markers | unchanged; they carry no values |
 
@@ -103,6 +104,20 @@ reads (`verex_subst_maps`). Typed maps are named by `verex_prepare typed`
 (`verex_name_maps`); position facts are `typedMapPositionFacts`. Cuts
 meet a named local through the chain of names that defines it
 (`cutNamedValue`).
+
+An equation with a pair on either side, or at a tuple's type whatever its
+sides, is stated at its components, as `NTy.equal` compares rows
+(`pairInjectionRows`, `Prod.ext_iff`), where its type spells a row (a product,
+`HList`, a tuple's carrier; never by reducing the type), and a row of one value's reads is that
+value (`rowOfReads`, by structure eta, with a unit end only where the value's
+own rest is a unit). A pattern equated to an opaque read therefore fixes its
+locals to that read's projections, which substitution takes into every other
+fact. A local the other side does not mention stays whole, for its
+substitution, and so does a struct's value compared whole with no side
+constructed. A run's observation, an equation with a side `result_of` or
+`state_of`, stays whole: the run deciders read it as stated, and what they derive
+of a local decomposes. A rewrite through such an equation of a term holding the opaque
+value whole is given up: `f(e)` no longer meets `f((a, b))` where `e = (a, b)`.
 
 Variant splits: the walk splits only the variants its goal tests, and an
 obligation a hypothesis states closes before it is split. A constructor's

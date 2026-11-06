@@ -17,8 +17,8 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
       state
 value✝ value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
-a✝³ : { val := 10, fits := ⋯ } = value
-a✝² : value = value✝
+a✝² : { val := 10, fits := ⋯ } = value
+a✝¹ : value = value✝
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref VerexIR.Proofs.Denote.NRow.nil))
@@ -39,7 +39,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       verexContinuation✝ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
-a✝¹ : value.val = 10
+pathDecision✝ : value.val = 10
 a✝ : value = value✝
 ⊢ False
 tests/sources/functional/references.move:75:5: error: verex verification failed: the automatic verification of `mut_ref_incorrect` failed; provide a proof in `tests/sources/functional/references.proof.lean`:

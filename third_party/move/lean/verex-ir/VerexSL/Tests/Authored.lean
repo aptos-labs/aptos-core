@@ -5,6 +5,30 @@ import VerexSL
 
 open VerexIR VerexIR.Proofs
 
+-- Reversed equations use the same definitional matching as forward ones.
+-- The result is not arithmetic, so an arithmetic closer cannot mask this.
+example (f : Int → List Int) (x : Int) (h : f (id x) = []) : [] = f x := by
+  verex_block_decide
+
+example (f : Int → List Int) (x _y : Int) (_h : f (id x) = []) : True := by
+  fail_if_success
+    have : [] = f _y := by verex_block_decide
+  trivial
+
+-- The public evaluation closer reads literal keys exposed by a map equation.
+example (m : SpecMap Int Int) (h : m = [(1, 4), (2, 5)]) :
+    (SpecMap.keys m)[1]?.getD 0 = 2 := by
+  run_tac do
+    Lean.Elab.Tactic.evalTactic
+      (← VerexSL.Verify.closerTactic (← `(verexCloser| eval)))
+
+example (m : SpecMap Int Int) (h : m = [(1, 4), (2, 5)]) :
+    (((SpecMap.keys m)[0]?).map
+      (SpecInt.ofInt (⟨0, by decide⟩ : SpecInt (.bits 64) false)) |>.getD ⟨0, by decide⟩).val = 1 := by
+  run_tac do
+    Lean.Elab.Tactic.evalTactic
+      (← VerexSL.Verify.closerTactic (← `(verexCloser| eval)))
+
 -- Preparation runs before clauses split. Each following step reaches both
 -- branches without an `all_goals`; the clause names survive preparation.
 example (flag : Bool) (n : Int) :

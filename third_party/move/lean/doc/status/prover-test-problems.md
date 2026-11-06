@@ -540,11 +540,10 @@ Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/clo
 
 ### V6. Construct not carried by the denotation
 
-5 tests, 7 messages.
+4 tests, 6 messages.
 
 Messages:
 
-- 1 × `` no denotation for `…`: a literal of this type is not carried by the denotation ``
 - 2 × `` no denotation for `…`: a closure whose rows are not its target's is not carried by the denotation ``
 - 4 × `` no denotation for `…`: a type argument without values is not carried by the denotation ``
 
@@ -557,13 +556,7 @@ values of a function type are the unit's typed closures, and the induced
 frame of a generic call defaults each parameter to an inhabitant of its
 argument (`Carriers.default_instantiate`).
 
-Example (`functional/type_reflection.move:71`):
-
-```text
-no denotation for `test_type_info_symbolic`: a literal of this type is not carried by the denotation
-```
-
-Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `functional/type_reflection.move`, `regression/fun_type_arity_injectivity.move`.
+Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `regression/fun_type_arity_injectivity.move`.
 
 ### V7. Intrinsic map representation not carried — placeholder layouts carried
 
@@ -604,12 +597,15 @@ Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/gho
 
 ### V10. Other elaboration errors in the rendering
 
-5 tests, 5 messages.
+3 tests, 3 messages.
 
 Messages:
 
-- 2 × `` VEREX-CALL-NAME: unknown function `…` ``
 - 3 × `VEREX-SPEC-ARITY: behavior predicate expects N value argument(s), got N`
+
+A fold over several captures (`folds_of_multi`, `folds_of_idx`) now elaborates
+and verifies, but for the clauses that need its tuple-valued recursion unfolded,
+which the automation does not do: `weighted_pair`, `pair_enumerate`.
 
 The constant-vector indexing error in `functional/consts.move` is fixed:
 its three valid functions verify, and its five invalid functions fail their

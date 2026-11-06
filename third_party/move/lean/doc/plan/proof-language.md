@@ -183,8 +183,10 @@ item      ::= 'verify' f 'by' block
                 ('requires' e)* ('ensures' e)+ ('decreases' e)? 'by' block
 block     ::= step*
 step      ::= 'let' x ':=' e
+            | 'let' x ':' T 'where' e
             | 'assert' e ('by' closer)?
             | 'assert' e 'by' 'contradiction' '{' block '}'
+            | 'assert' e 'by' 'witness' e (',' e)*
             | 'assume' e
             | 'apply' φ                                -- lemma instance
             | 'split' e ('in' e '..' e)?               -- Boolean, enum/option, function value; integer range
@@ -204,8 +206,9 @@ obligation::= 'ensures' k | 'aborts_if' k | 'aborts_with' k
             | 'requires' k? 'of' g ('at' 'call' j)?
             | 'requires' ('of' g)? 'at' 'invoke' j
             | 'invariant' k ('of' 'loop' j)? ('entry' | 'step')
-            | 'assert' k | 'data' 'invariant' | 'module' 'invariant' | 'stored' 'invariant'
+            | 'assert' k | 'data' 'invariant' k? ('of' S)? | 'module' 'invariant' | 'stored' 'invariant' k?
             | 'lemma' 'requires' | 'unroll' | 'ghost' 'domain'
+            | 'after' 'call' j 'of' g
             | '_'
 selector  ::= 'when' decision (',' decision)*
 decision  ::= 'if' k ('then' | 'else')
@@ -213,6 +216,7 @@ decision  ::= 'if' k ('then' | 'else')
             | 'invoke' k 'is' (g | 'foreign')
             | 'loop' k ('exits' | 'continues')
             | 'aborts' 'at' site
+            | 'returns'
 ```
 
 A site names a construct of the body: `call k` the `k`-th call of a named
@@ -240,6 +244,8 @@ Meaning of the steps, each at the point or obligation whose block holds it:
 
 - `let x := e` binds `e` for the following steps (substituted, as the Prover
   substitutes).
+- `let x : T where φ` (Move's `choose`) owes `exists x : T: φ` by `decide` and
+  gives `φ` with the witness `x` in scope for the following steps.
 - `assert e by c` owes `e`, proved by the closer `c` from the facts in scope
   (the obligation's or point's context, the facts stated before it), then
   gives `e` to the following steps and to the closing of the obligation.
@@ -247,6 +253,8 @@ Meaning of the steps, each at the point or obligation whose block holds it:
 - `assert e by contradiction { block }` runs the block under `!e` and
   closes when `decide` derives `false` from its facts
   (`lower_bound_scan_start`'s `Classical.byContradiction`).
+- `assert (∃ x, φ) by witness w, …` owes the existential at the witnesses, each at
+  its own type and coerced to the binder's, its body by `decide`, then gives the fact.
 - `assume e` gives `e` without proof: an in-body assumption of the target's
   theorem, in the assumption ledger, with a warning, as the Prover's and as
   `spec assume` is today. It is allowed only inside an `on` block, where it
@@ -304,7 +312,10 @@ Meaning of the steps, each at the point or obligation whose block holds it:
   `_` takes every obligation no earlier `on` names. An obligation named by no
   `on` gets `decide` alone.
 - `when d, …` after an `on` key or a point selects paths: the block
-  applies to the paths consistent with every listed decision. A path goes to
+  applies to the paths consistent with every listed decision. `on _ when d, …`
+  takes, on the paths its selector matches, every obligation no earlier `on`
+  takes; the remaining paths go to the alternatives after it; a selector
+  matching no path is an error. A path goes to
   the first `on` in text order whose key and selector match it, so a block
   for selected paths precedes a general block for the same clause, and the
   general block takes the remaining paths. A proof can thus guide each path
@@ -321,11 +332,11 @@ Closers:
 
 | Closer | Today's tactic | What it decides |
 |---|---|---|
-| `decide` | `verex_block_decide` on the block's normal form: a goal stated by a hypothesis (up to the spelling of instances, an equation either way round, a disjunct), closed by reflexivity or by a context that contradicts itself (a proposition beside its negation, a Boolean stated both true and false), an instance of a quantified hypothesis (its premises by `omega`), or linear arithmetic; first, the conclusions of the implications and equivalences whose premises are stated or true in the block's normal form, where they share a local with the goal (`impliedFacts`). The order is a cost, not a cascade: each alternative is one bounded check, a goal reading a map's positions or values tries the instance before `omega` | the default; bounded; no search, no budget |
+| `decide` | `verex_block_decide` on the block's normal form, a conjunction part by part: a goal stated by a hypothesis (up to the spelling of instances, an equation either way round, a disjunct), closed by reflexivity or by a context that contradicts itself (a proposition beside its negation, a Boolean stated both true and false, a hypothesis negating an instance of a quantified hypothesis), an instance of a quantified hypothesis (its premises by `omega`), or linear arithmetic; first, the conclusions of the implications and equivalences whose premises are stated or true in the block's normal form, and from a disjunction `A ∨ B` whose other disjunct's negation is stated or true in the normal form the remaining disjunct, where they share a local with the goal (`impliedFacts`). An instance of a quantified hypothesis is found up to the coercions the normal form evaluates at literals. An instance's binders are determined by the goal and by the stated facts: a premise that is a read or an equation (`xs[i]? = some x`, `m k = some v`, `f a = b`) is matched against a stated hypothesis of that shape, which fixes the binders it holds; the remaining premises by `omega`; one trigger hop over the few stated reads, bounded. An integer binder in a position is solved from a literal offset: `i − c` against `t` gives `i := t + c`, and the instantiated positions are normalized (`k + 1 − 1` is `k`) before the rest is matched. A literal bound is matched up to its form: `a < k` is stated by `a ≤ k − 1` and conversely; matching, not rewriting. A disjunction goal is closed by a stated disjunct, part by part, and an existential disjunct at the witness a destructured fact left; no `witness` enters a disjunction: the proof states `assert ∃ (k : T), … by witness w`, and the obligation `A ∨ B ∨ C` closes from the stated `A`. `omega` here leaves out a hypothesis holding an existential below its top, which it cannot carry across its case splits. `decide` reads a hypothesis up to negation: `¬∃ x, φ` as `∀ x, ¬φ`, `¬(A ∨ B)` as the hypotheses `¬A` and `¬B`, `¬(A ∧ B)` as `A → ¬B`, `¬¬A` as `A`, recursively through premises; the reading is the instance decider's and `statedProof?`'s, consulted only when `decide` looks for a stated fact or an instance, and no normal form rewrites a negation. `decide` reads a goal up to negation the same way: `¬¬A` as `A`, `¬(A ∨ B)` as its parts, `¬∃ x, φ` as `∀ x, ¬φ`, `¬(A ∧ B)` as `A → ¬B`. The order is a cost, not a cascade: each alternative is one bounded check, a goal reading a map's positions or values tries the instance before `omega` | the default; bounded; no search, no budget |
 | `arith` | `verex_omega_unsplit` alone: `omega` over the facts it reads without case splits and a few connected facts with one split; never the budgeted residual `omega` over the whole context that `verex_linear` adds, which is search the proof did not ask for | linear arithmetic with the stated bounds |
 | `eval` | `verex_map_simp`, `verex_typed_close`, `verex_goal_witnesses`, `decide` | closed maps, literal vectors, ground arithmetic |
 | `ring` | `grobner` (the `ring` module of `grind` alone: no splits, no instantiation, bounded by `ringSteps` and `ringMaxDegree`) on the goal with the hypotheses hidden | a polynomial identity `e₁ == e₂` over the integers; an equation it depends on is substituted first (`let`, a `calc` step) |
-| `congr` | `lia (splits := 0)`: congruence closure and the linear module of `grind`, nothing else (`grind (splits := 0) (ematch := 0) -ring -linarith` is not this: it keeps the `ac`, `order`, `mbtc`, extensionality and `funext` modules on) | equality through function applications and uninterpreted terms combined with linear arithmetic, `f(a * b) == f(2 * b)` from `a == 2`; no open `if`, no existential |
+| `congr` | bounded rewriting by local equalities and shallow congruence, then `lia (splits := 0)`: congruence closure and the linear module of `grind`, nothing else (`grind (splits := 0) (ematch := 0) -ring -linarith` is not this: it keeps the `ac`, `order`, `mbtc`, extensionality and `funext` modules on) | equality through function applications and uninterpreted terms combined with linear arithmetic, `f(a * b) == f(2 * b)` from `a == 2`; no open `if`, no existential |
 | `solve` | `verex_solve`: the automatic leaf under its cap (`solveLeaf`: call observations, the leaf pipeline, the prepared leaf and each case of its variant split as an attempt of its own, `verex_open_prepared`, `verex_prepared_case`) | an explicit request for automation, charged as automatic work |
 | `lean => tac` | the tactic | anything |
 
@@ -577,13 +588,13 @@ step's closer; its statement, normalized, is the fact. No alias theorem
 and no generic frame is stated for an application.
 
 Of the 25 distinct `SpecMap` lemmas the corpus's proofs apply, the table holds
-eighteen. Three (`keyAt_satisfies`, `keyAt_satisfies_all`,
+nineteen. Three (`keyAt_satisfies`, `keyAt_satisfies_all`,
 `hasKey_satisfies`) are applied only to type bounds of keys, which
-preparation supplies ("Normal-form fixes"). Four (`nextKey_none`,
-`nextKey_some`, `valid_slice`, `keyAt_of_keys`) state the next key, a map's
-validity and its key list, which no role names; only `big_ordered_map`'s
-proofs apply them, and they enter the table with that module's rewrite
-(L4), with the roles or specification functions that state those notions.
+preparation supplies ("Normal-form fixes"). `lemma_valid_slice(parent, offset)`
+uses the validity obligation to infer the slice, independently of the parent's
+value type, and owes the parent's validity, interval bounds, and pointwise
+key correspondence. Three (`nextKey_none`, `nextKey_some`, `keyAt_of_keys`)
+state the next key and a map's key list, which no role names.
 The coverage of a map's keys by a vector (`map_key_search_absurd`,
 `MapCoverage.lean`) is a map lemma of the `has_key` and `len` roles,
 `lemma_contains_key_len_search_absurd(m, keys, k)` for an owner binding
@@ -613,6 +624,7 @@ the map lemmas are. The corpus's Lean lemmas map onto these:
 | `lemma_div_mul_le(x, c)` | `0 <= x && 0 < c ==> x / c * c <= x` | `ediv_mul_le` |
 | `lemma_div_add_mul(x, b, c)` | `0 <= x && 0 <= b && 0 < c ==> (x + b * c) / c == x / c + b` | `add_mul_ediv_right` |
 | `lemma_mod_small(x, c)` | `0 <= x && x < c ==> x % c == x` | `emod_eq_of_lt` |
+| `lemma_div_mod(x, c)` | `0 <= x && 0 < c ==> x / c * c + x % c == x && 0 <= x % c && x % c < c` | `emod_add_mul_ediv`, `emod_nonneg`, `emod_lt_of_pos` |
 | `lemma_shl_mul(x, k)` | `x << k == x * 2^k` | `shiftLeft_eq` |
 | `lemma_shr_div(x, k)` | `0 <= x ==> x >> k == x / 2^k` | `shiftRight_eq_div_pow` |
 
@@ -651,8 +663,7 @@ relies on, becomes `lemma_vector_index_push_back`, applied by the proof or kept 
 
 User `spec lemma`s and recursive specification functions are reached the
 same way: a recursive specification function's definition is a lemma of it
-(`apply spec_test_sum_upto.unfold(v, n)` for today's
-`spec_test_sum_upto.spec.unfold`).
+(`apply spec_test_sum_upto.unfold(v, n)` for `spec_test_sum_upto.spec.unfold`).
 
 Lemmas of function values come after step 3 of
 [`native-function-values.md`](native-function-values.md), when a closure
@@ -681,7 +692,7 @@ An obligation key is what `on` names and what every message prints:
 | Continuation after an aborting operation | an `after op j` point | none |
 | Loop invariant | `invariant k of loop j entry|step`: the clause and the loop's site index | `invariant_k_entry`, `invariant_k_step`, the loop not named |
 | In-body assertion | `assert k`: the `k`-th `spec assert` of the body | `assert_k` |
-| Data, module, stored invariant; lemma requirement; unroll bound; ghost domain | the kind, and the site where several | `data_invariant`, `module_invariant`, `stored_invariant`, `lemma_requires`, `unroll`, `ghost_domain` |
+| Data, module, stored invariant; lemma requirement; unroll bound; ghost domain | the kind, and the site where several; `data invariant k` and `stored invariant k` the struct's own numbering of the clause, a stored invariant's only where an `on` names a clause, one goal otherwise; `data invariant k of S` routes a function constructing two struct types by the struct, for routing only | `data_invariant`, `module_invariant`, `stored_invariant`, `lemma_requires`, `unroll`, `ghost_domain` |
 | A path to any of these | the key with a selector, `when` and the decisions on the path | the traversal suffix `_1_8`, `.inl`, `_1`; `leaf`, `leaf_2`, `search_2_2` where no clause names the goal |
 
 Done: a callee's precondition is keyed by its clause and call. The
@@ -710,7 +721,9 @@ leaves the others unmarked, so the short-circuit rules still merge them. An
 invariant clause keys a leaf that owes it (`data invariant`, `module
 invariant`, `keying`) where its step names no invariant itself. A selector
 taking no path is reported once the target's proof ends, since a proof can
-run an alternative once per case of an enum parameter.
+run an alternative once per case of an enum parameter. In a proof, the
+clauses of a conjunction split before a literal closure's run is read, so
+each keeps its own key; the automatic walk reads the run once for all of them.
 
 A `match` lowered to variant tests keeps its provenance on the arena node
 (`Expr.origin`, `ExprOrigin.matchArm`: the match's location, the arm's
@@ -724,15 +737,24 @@ enum by value, which VerexSL has no non-consuming `match` for, and an arm
 testing more than one variant at a time (a nested pattern, a guard); their
 paths take `if` decisions.
 
-Open: a success path owes that the abort conditions do not hold
-(`¬mustAbort`), built unmarked, so those leaves keep the key `leaf`
-(`nested_loop_inv`). Marking the clauses of `mustAbort` keys them `aborts_if
-k`, but every variant tried changed the solver: the markers reach the
-shared-continuation owners, callers' hypotheses (clauses inside markers are
-taken as normal, so a caller stops normalizing them), and, where `mayAbort`
-stays unmarked, the syntactic identity of the two conditions the normal
-form relies on. It needs a design that keeps the marker out of every
-hypothesis and owner.
+A returning path owes that no abort condition holds: one obligation, `¬mustAbort`.
+The walker records the abort clause table's ranges on that leaf (its `clauses`,
+provenance `returns`), so the leaf is keyed `aborts_if k` for every clause of the
+table, never `leaf`; the goal, the hypotheses and the continuation owners see the
+contract term unchanged. An authored proof's theorem marks the obligation
+(`NoAbort`, `verex_mark_returns`, at the proof's goal alone), and the walk takes
+the marker off where it owes the obligation; an automatic goal has no marker, and
+its leaf is decided whole. Where an `on aborts_if k …` names one of its clauses,
+routing rewrites that goal by `not_or` once, hands the clause's conjunct to the
+alternative, and keeps the remaining conjuncts as one goal keyed by the remaining
+clauses, which later alternatives and `on _` take as today; a leaf none of whose
+clauses an `on` names is never taken apart. A leaf whose disjuncts the normal form
+no longer counts one per clause stays whole, keyed by all of them. `combineLeaves`
+groups these leaves by their key set (the whole success obligation of the path),
+so returning paths combine as other clauses' paths do, and `verex_paths`/selectors
+take them apart first. The decision `returns` is recorded on every completed path;
+`aborts_if k` without a selector names the clause on every path, aborting and
+returning, so a block for one side selects it (`when aborts at …`, `when returns`).
 
 `Provenance` (`Solve/Base.lean`) gains the site index at `precondition`,
 `continuation`, `loopEntry`, `loopIteration`, `assertion` and the memory
@@ -904,7 +926,8 @@ marks it, and an inner scope reads the mark).
    substituted over the context; one of a term and a name folds the term
    into the name over the context, once; any other fact is a rule of the
    block's normal form and rewrites no hypothesis. The rules rewrite a
-   fact's higher side to its lower one, a term above a name above a value
+   fact's higher side to its lower one, a term above a name above a value (a
+   literal, or a bounded integer built at one)
    (two names toward the one declared first), and a name equated to a term
    holding it is no rule; the leaf's definitions of named values, a name
    equated to a term on either side, fold the same way. Every rule thus folds a term into a
@@ -914,7 +937,19 @@ marks it, and an inner scope reads the mark).
    < b`), is a hypothesis, a conjunction where each conjunct is or one is
    refuted: the facts decide the conditionals they state, by
    their spelling, and no arithmetic runs in the normal form; a condition
-   the facts only imply is stated by the proof. `apply φ` is the lemma machinery of
+   the facts only imply is stated by the proof. A fact asserted under `if` or
+   `forall` is an implication and never a rule; to rewrite by it, `split` or
+   state the equation at the top of the block. A leaf equation of a term and a
+   built value (`m k = some v`, `xs[k]? = some v`, `o = none`) is a rule of the
+   block's normal form rewriting the term to the value. A fact whose normal
+   form is an existential (an `assert`, a case fact, a `let … where`) is taken
+   apart as `split`'s case facts are. `let x : T where φ` owes `exists x : T: φ`
+   by `decide`, which includes the instance of a guarded quantified hypothesis
+   with its premises by `omega`, and gives `φ` with `x` in scope; `φ`'s
+   conjuncts settle as facts, and an equation substitutes; `x` itself is never
+   substituted. Where `φ` defines `x` by an equation with an integer term, `x` is
+   the scope name of that term ("Normal-form fixes", "One spelling of a defined
+   value"). A leaf's existential hypotheses are not opened at preparation. `apply φ` is the lemma machinery of
    [`lemmas.md`](../designs/lemmas.md) (`verex_lemma_owed`,
    `verex_lemma_holds`; `LemmaApplication`, `LemmaInstance`) at an authored
    site: the premises as `assert`s by `decide`, the conclusions as facts. A
@@ -933,13 +968,20 @@ marks it, and an inner scope reads the mark).
    ([`assumptions.md`](../status/assumptions.md)); the obligation's proof
    then receives its own clauses' assumptions as hidden premises, which the
    `assume` step names. `witness` is `refine ⟨⟦e⟧, ?_⟩` at the obligation's
-   existential, a step of an `on` block naming one obligation: each
-   witness lowers at the type of the clause's existential binder (of a
-   callee's precondition, `requires k of g at call j`, at the call's type
-   arguments), and is given at the binder's type: as it is, as the typed
-   value a typed view holds it as, as an integer with its certificate, or
-   as its native value; a bounded integer's range (`∃ fits : m, …`) and a
-   certificate are owed by `decide` at the witness. `calc` is a chain of `assert`s: each link a fact `fact.k_j` by
+   existential, a step of an `on` block. `witness` applies to every obligation its
+   `on` names, each of which must state the existential: one clause at several
+   sites (a data invariant at a construction and at a store). A key naming an
+   obligation without it is an error at the witness. A witness
+   lowers at the binder's type where the key names one clause at one
+   instantiation (`ensures k`, `aborts_if k`, `requires k of g at call j`, at
+   the call's type arguments). Where the key names a clause the leaf
+   instantiates (`data invariant k`, `stored invariant`: the struct's spec
+   block, at the value's type), the witness lowers at its own type and the leaf
+   coerces it to the binder's type; the coercions are those of the typed case
+   (as it is, as the typed view's value, as an integer with its owed range, as
+   its native value), and a witness no coercion reaches is an error at the
+   witness. A bounded integer's range (`∃ fits : m, …`) and a certificate are
+   owed by `decide` at the witness. `calc` is a chain of `assert`s: each link a fact `fact.k_j` by
    the closer, the conclusion `fact.k` by `decide` from them. `forall x
    where g { … }` is `have : ∀ x, g → F := by intro x hg; …` with `F` the
    conjunction of the facts the block asserts (its `assert`s, its `calc`s'
@@ -1106,6 +1148,12 @@ gated on the automatic targets (N1 and N2 in "Milestones"):
   cut's lemma at the bounds, in the facts that mention one. A read of the
   key vector at a position is the key at the position (`getElem_keys_toNat`),
   so the vector `keys` returns has no bounds of its own.
+- **Validity of maps equated entry by entry.** Preparation gives the validity
+  of a map equated entry by entry to a valid map: from `Valid r n` and a
+  hypothesis `listEqual eq m.entries n.entries = true` whose `eq` compares keys
+  by value, the fact `Valid r m`, by the solver's lemma that validity reads only
+  the key sequence and equal entries have equal keys. No role or spec function
+  names a key sequence or validity.
 - **The specification form of `AbortsNewFrom`.** The model states the
   abort of building a map from vectors over its key list (`Nodup`); the Move
   contract states duplicate indices. Over a vector of integer keys the
@@ -1117,6 +1165,33 @@ gated on the automatic targets (N1 and N2 in "Milestones"):
   the context has (the normalization's discharger normalizes a premise it
   finds no hypothesis for), so a lemma states a role's atom whichever form
   the context carries.
+- **A row's reads.** `(e.1, e.2)` is `e`, and `(e.1, ())` is `e` where the spelling
+  of `e`'s type shows a row of one component (`Prod τ Unit`, `HList (.cons τ .nil)`)
+  at reducible transparency, nothing more; where the spelling does not show it, the
+  row is not rewritten.
+- **A concatenation's size.** `Array.size_append` and `size_push` are in the
+  normal form, so a body's bound is linear in the sizes.
+- **A nest of concatenations is one concatenation.** The normal form reads a nest
+  of `SpecVector.append` as the concatenation of its leaves under one premise, the
+  sum of the leaves' lengths at most `MAX_U64` (`len(a) + … + len(d) <= MAX_U64`,
+  lengths as integers in the order of the leaves, a literal vector's as a literal), matched in the normal form's
+  canonical comparison, so a proof states that one bound (or the body's abort
+  condition states it where the body spells it the same way).
+- **One spelling of a defined value.** `∃ c : τ, c.val = v ∧ p c` is read as
+  `range_τ(v) ∧ p (cut v)` wherever it occurs, under a clause's binders included
+  (`existsDefinedValue`); where `p` reads `c` only by its value, as `range_τ(v) ∧
+  p v`. A `let x : T where φ` whose `φ` defines `x` by an equation with an integer
+  term lowers to the same form, `x` the scope name of the cut value and its range
+  the step's facts; no witness local, no substitution.
+- **A clause's binder keeps its name.** A conjunction under a quantifier splits
+  with the binder's name kept (`forallAndKeepingName`, for `forall_and`), so a
+  clause's binders stay in a proof's scope and a hypothesis's name is the source's.
+- **A literal position.** `Int.toNat` of a literal is evaluated in the normal form
+  and in a rule's rewrite (`literalToNat`), so a read a case leaves at a literal is
+  the read a step states.
+- **A clause's premise over the path's hypotheses.** A path prepared before its
+  clauses split holds conditionals a clause's premise decides. The leaf reads those
+  hypotheses in the block's normal form, as `decide` reads the target.
 - **Spellings that hide an equality.** Address equality as `NTy.eqb
   .address` (`acl`; the rule `NTy.eqb_address` is a `simp` lemma outside
   the normal form's set) and a vector read as `Option.getD` of a lookup the
@@ -1147,7 +1222,9 @@ gated on the automatic targets (N1 and N2 in "Milestones"):
   remainder's range) is left out: added there, it stops `verex_decide`'s
   instance closing on leaves unrelated to the division (`pool_u64`'s
   `redeem_shares`, the distinctness instances of `deduct_shares`'
-  precondition). Open: why the extra fact blocks those instances.
+  precondition). Open: why the extra fact blocks those instances. A proof
+  states it by `lemma_div_mod`. A `lemma` item's proof reads its conclusion in
+  the normal form under its `requires`, so its steps see `/`.
 - **One spelling of membership.** Current state, which the gate holds:
   the leaf's normal form reads `e ∈ v` by its positions
   (`mem_iff_exists_int_index`), so the deciders see the positional spelling
@@ -1347,6 +1424,42 @@ residual escape is a gap recorded in its milestone's gate. `capability` is
 the least certain: whether its obligations, after the splits and witnesses,
 are within `congr` is known only from its goals.
 
+An obligation block can end with `finish by c`, selecting a core closer
+(`decide`, `arith`, `eval`, `solve`, `congr`, or `ring`) for every remaining
+goal. It must close all of them and does not emit a new fact. Program-point
+blocks use assertions instead. The `eval` closer also uses the existing
+ground evaluator to substitute known map definitions into relevant reads.
+
+## Future extensions
+
+### Constructor-specific proof branches
+
+A proof-step `match` would allow separate proof bodies for the constructors
+of an enum. Today, `split e` performs case analysis and runs the subsequent
+steps in every surviving case; `let Variant { fields } := e` destructures a
+known variant. Neither provides a separate authored body for each constructor.
+
+Illustrative syntax (proposed, not implemented):
+
+```text
+match it {
+  End => { /* steps for the end case */ }
+  Node { key, value } => { /* steps using key and value */ }
+}
+/* shared steps for any remaining obligations */
+```
+
+The extension should check exhaustiveness, bind payload names and constructor
+facts only within their branch, and run following shared steps on each
+remaining branch obligation. Facts established in one branch must not leak
+into another. Lowering should reuse preparation before the split and prepare
+only the new branch facts, preserving the language's bounded automation.
+The exact syntax and treatment of impossible constructors remain design work.
+
+This proof construct is distinct from `when match k Variant`, which selects
+verification paths through an existing program match. It introduces proof
+case analysis even when the program has no corresponding match.
+
 ## Migration
 
 - When the language lands (L1), every existing item's tactic script moves
@@ -1455,9 +1568,9 @@ theorem as the map lemma `lemma_<has_key>_<len>_search_absurd(m, keys, k)`
 (`lemma_contains_key_len_search_absurd` for `simple_map`); the lemmas of the
 maps of the modules a module uses; `ring`. A lemma's conjunction is given as
 one fact per part, and a premise owed at a point reads the bounds of the
-values in scope. Open: `on ensures k` inside a lemma item (its block runs
-over all its clauses); the unfolding of a recursive specification function
-as a lemma; a division lemma meets the body's Euclidean quotient only after
+values in scope. A recursive specification function's unfolding is a lemma of it
+(`apply f.unfold(a)`, lowered as the application `f(a)`). Open: `on ensures k`
+inside a lemma item (its block runs over all its clauses); a division lemma meets the body's Euclidean quotient only after
 N2's one spelling of a quotient. A point binds the locals the body has
 bound there (the slots of the environment the walk carries, a reference's
 current value), each under a binder of its name with its equation; a slot

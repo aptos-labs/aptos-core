@@ -25,6 +25,16 @@ empty scope are independent of a callee's type parameters, and the collection
 carrier imposes no Move vector length bound. -/
 def allocationResource : ResourceType := ⟨.address, .nil, .collection⟩
 
+/-- A stored value's resource is never the allocation history. -/
+@[vir_denote_norm] theorem value_ne_allocationResource (type : NTy) (arguments : NRow) :
+    ({ type, arguments } : ResourceType) ≠ allocationResource := by
+  simp only [allocationResource, ne_eq, ResourceType.mk.injEq, reduceCtorEq, and_false,
+    not_false_eq_true]
+
+@[vir_denote_norm] theorem allocationResource_ne_value (type : NTy) (arguments : NRow) :
+    allocationResource ≠ ({ type, arguments } : ResourceType) :=
+  (value_ne_allocationResource type arguments).symm
+
 def encodeAllocated (handles : Array String) : allocationResource.carrier unit := handles
 
 theorem encodeAllocated_injective (left right : Array String)

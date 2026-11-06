@@ -11,31 +11,29 @@ private def initial : Ledger :=
 -- A shared operation costs the target once and every benefiting clause once.
 private def prepared := initial.charge #[0, 1, 0] .preparation 800000
 #guard prepared.physical == 800000
-#guard prepared.allowance #[0, 1] .leaf == some 19200000
-#guard prepared.allowance #[0, 1] .preparation == some 200000
+#guard prepared.allowance #[0, 1] == some 19200000
+#guard prepared.owners[0]!.preparationSpent == 800000
 
 -- A clause's cases, retries and fallback retain that clause's owner.
 private def firstCase := prepared.charge #[0] .leaf 4000000
 private def failedCase := firstCase.charge #[0] .leaf 300000
-#guard failedCase.allowance #[0] .leaf == some 14900000
-#guard failedCase.allowance #[1] .leaf == some 19200000
+#guard failedCase.allowance #[0] == some 14900000
+#guard failedCase.allowance #[1] == some 19200000
 #guard failedCase.physical == 5100000
 
--- Slice exhaustion does not exhaust the leaf; owner exhaustion blocks only
--- that owner, and a group cannot use a sibling's remaining allowance for it.
-private def sliceSpent := prepared.charge #[0, 1] .preparation 200000
-#guard sliceSpent.allowance #[0, 1] .preparation == some 0
-#guard sliceSpent.allowance #[0, 1] .leaf == some 19000000
-private def exhausted := sliceSpent.charge #[0] .leaf 19000000
-#guard exhausted.allowance #[0, 1] .leaf == some 0
-#guard exhausted.allowance #[1] .leaf == some 19000000
+-- Preparation draws on the leaf allowance it serves; owner exhaustion
+-- blocks only that owner, and a group cannot use a sibling's allowance.
+private def morePrepared := prepared.charge #[0, 1] .preparation 200000
+#guard morePrepared.allowance #[0, 1] == some 19000000
+private def exhausted := morePrepared.charge #[0] .leaf 19000000
+#guard exhausted.allowance #[0, 1] == some 0
+#guard exhausted.allowance #[1] == some 19000000
 
--- Unlimited leaves retain the internal slice; tiny leaves omit preparation.
-#guard (({} : Ledger).allocate 0).1.allowance #[0] .leaf == none
-#guard (({} : Ledger).allocate 0).1.allowance #[0] .preparation == some 1000000
-#guard (({} : Ledger).allocate 19).1.allowance #[0] .preparation == some 0
-#guard initial.allowance #[] .leaf == some 0
-#guard initial.allowance #[10] .leaf == some 0
+-- Zero keeps preparation and leaves unlimited.
+#guard (({} : Ledger).allocate 0).1.allowance #[0] == none
+#guard (({} : Ledger).allocate 19).1.allowance #[0] == some 19
+#guard initial.allowance #[] == some 0
+#guard initial.allowance #[10] == some 0
 
 -- Earlier feasibility proofs debit every downstream clause. A shared
 -- ancestor reaching the join twice is charged once per clause, and copying
@@ -44,17 +42,17 @@ private def deferredFirst := ({} : Ledger).defer .preparation 300000
 private def deferredSecond := deferredFirst.1.defer .preparation 200000
 private def inherited := deferredSecond.1.allocateAfter 20000000 #[0, 1, 0]
 #guard inherited.isSome
-#guard inherited.get!.1.allowance #[0] .leaf == some 19500000
-#guard inherited.get!.1.allowance #[0] .preparation == some 500000
+#guard inherited.get!.1.allowance #[0] == some 19500000
+#guard inherited.get!.1.owners[0]!.preparationSpent == 500000
 private def inheritedSibling := inherited.get!.1.allocateAfter 20000000 #[1, 0]
-#guard inheritedSibling.get!.1.allowance #[0, 1] .leaf == some 19500000
+#guard inheritedSibling.get!.1.allowance #[0, 1] == some 19500000
 #guard inheritedSibling.get!.1.physical == 500000
 private def afterLeaf := inherited.get!.1.charge #[0] .leaf 100000
-#guard (afterLeaf.allocateAfter 20000000 #[0, 1]).get!.1.allowance #[1] .leaf == some 19500000
+#guard (afterLeaf.allocateAfter 20000000 #[0, 1]).get!.1.allowance #[1] == some 19500000
 #guard (afterLeaf.allocateAfter 20000000 #[0, 1]).get!.1.physical == 600000
 #guard (deferredSecond.1.allocateAfter 20000000 #[2]).isNone
 #guard ((deferredSecond.1.afterDebits 400000 #[0, 1]).get!).remaining == some 0
-#guard ((deferredSecond.1.afterDebits 0 #[0, 1]).get!).preparationRemaining == 500000
+#guard ((deferredSecond.1.afterDebits 0 #[0, 1]).get!).preparationSpent == 500000
 
 -- Failure rolls back goal assignments, but the measured debit remains.
 open Lean Meta Elab Tactic in
@@ -108,7 +106,7 @@ example : True := by
   trivial
 
 -- A failed pre-owner check transfers its actual debit after rollback. The
--- inherited preparation slice is cumulative across nested region attempts.
+-- inherited debit is cumulative across nested region attempts.
 open Lean Meta Elab Tactic in
 example : True := by
   run_tac
@@ -127,12 +125,12 @@ example : True := by
     let inherited := (paid.allocateAfter 20000000 #[first, second, first]).get!.1
     unless cost > 0 && inherited.owners[0]!.spent == 400000 + cost &&
         inherited.physical == 400000 + cost &&
-        inherited.allowance #[0] .preparation == some (600000 - cost) do
+        inherited.allowance #[0] == some (19600000 - cost) do
       throwError "failed pre-owner work was refunded or counted more than once"
   trivial
 
--- Exhausted owners do not start work; a shared-slice timeout leaves the
--- clause's remaining allowance available to its ordinary leaf pipeline.
+-- Exhausted owners do not start work; a preparation timeout exhausts the
+-- clause's allowance, which its leaf then reports.
 open Lean Meta Elab Tactic in
 example : True := by
   run_tac
@@ -149,9 +147,9 @@ example : True := by
       repeat Core.checkMaxHeartbeats "shared budget test"
     match result with
     | .exhausted => pure ()
-    | _ => throwError "the shared slice did not stop its operation"
-    unless ((← ledger.get).allowance #[0] .leaf).any (· > 0) do
-      throwError "shared-slice exhaustion consumed the whole leaf"
+    | _ => throwError "the allowance did not stop its preparation"
+    unless (← ledger.get).allowance #[0] == some 0 do
+      throwError "an exhausted preparation left allowance behind"
   trivial
 
 -- A nested allowance must never turn the enclosing target's timeout into

@@ -159,10 +159,10 @@ verex module aptos_framework::ordered_map where
       index >= len || &self.entries[index].key != &key,
       invalid_argument(EKEY_ALREADY_EXISTS)
     )
-    let _t9 := &mut self.entries
-    let _t11 := new Entry<K, V> { key, value }
-    assert!(_t9.length >= index, 131072)
-    *_t9 := core.prim.insertVector(*_t9, index, _t11)
+    let _t0 := &mut self.entries
+    let _t2 := new Entry<K, V> { key, value }
+    assert!(_t0.length >= index, 131072)
+    *_t0 := core.prim.insertVector(*_t0, index, _t2)
 
   spec add where
     pragma intrinsic
@@ -183,10 +183,10 @@ verex module aptos_framework::ordered_map where
         self.entries.replace(index, new Entry<K, V> { key, value })
       some(old_value)
     else
-      let _t12 := &mut self.entries
-      let _t14 := new Entry<K, V> { key, value }
-      assert!(_t12.length >= index, 131072)
-      *_t12 := core.prim.insertVector(*_t12, index, _t14)
+      let _t0 := &mut self.entries
+      let _t2 := new Entry<K, V> { key, value }
+      assert!(_t0.length >= index, 131072)
+      *_t0 := core.prim.insertVector(*_t0, index, _t2)
       none::<V>()
 
   spec upsert where
@@ -229,11 +229,11 @@ verex module aptos_framework::ordered_map where
     if index < len && key == &self.entries[index].key then
       let Entry<K, V> { key := _, value := value } :=
         do
-          let _t45 := &mut self.entries
-          assert!(_t45.length > index, 131072)
-          let (_t46, _t47) := core.prim.removeVector(*_t45, index)
-          *_t45 := _t47
-          _t46
+          let _t0 := &mut self.entries
+          assert!(_t0.length > index, 131072)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, index)
+          *_t0 := _t2
+          _t1
       some(value)
     else none::<V>()
 
@@ -327,17 +327,17 @@ verex module aptos_framework::ordered_map where
     while len > 0 do
       let (e1, e2) :=
         (do
-            let _t15 := &mut self'
-            if _t15.length == 0 then moveVectorError(2)
-            let (_t16, _t17) := core.prim.removeVector(*_t15, _t15.length - 1)
-            *_t15 := _t17
-            _t16,
+            let _t0 := &mut self'
+            if _t0.length == 0 then moveVectorError(2)
+            let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+            *_t0 := _t2
+            _t1,
           do
-            let _t18 := &mut v2
-            if _t18.length == 0 then moveVectorError(2)
-            let (_t19, _t20) := core.prim.removeVector(*_t18, _t18.length - 1)
-            *_t18 := _t20
-            _t19)
+            let _t3 := &mut v2
+            if _t3.length == 0 then moveVectorError(2)
+            let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+            *_t3 := _t5
+            _t4)
       let (key, value) := (e1, e2)
       self.add(key, value)
       len := len - 1
@@ -377,17 +377,17 @@ verex module aptos_framework::ordered_map where
     while len > 0 do
       let (e1, e2) :=
         (do
-            let _t51 := &mut self'
-            if _t51.length == 0 then moveVectorError(2)
-            let (_t52, _t53) := core.prim.removeVector(*_t51, _t51.length - 1)
-            *_t51 := _t53
-            _t52,
+            let _t0 := &mut self'
+            if _t0.length == 0 then moveVectorError(2)
+            let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+            *_t0 := _t2
+            _t1,
           do
-            let _t54 := &mut v2
-            if _t54.length == 0 then moveVectorError(2)
-            let (_t55, _t56) := core.prim.removeVector(*_t54, _t54.length - 1)
-            *_t54 := _t56
-            _t55)
+            let _t3 := &mut v2
+            if _t3.length == 0 then moveVectorError(2)
+            let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+            *_t3 := _t5
+            _t4)
       let (key, value) := (e1, e2)
       self.upsert(key, value)
       len := len - 1
@@ -451,8 +451,8 @@ verex module aptos_framework::ordered_map where
       core.prim.destroyEmptyVector(other_entries)
       return overwritten;
     if self.entries.length == 0 then
-      let _t21 := &mut self.entries
-      *_t21 := core.prim.concatVector(*_t21, other_entries)
+      let _t0 := &mut self.entries
+      *_t0 := core.prim.concatVector(*_t0, other_entries)
       return overwritten;
     if is_lt(
       &compare(
@@ -461,8 +461,8 @@ verex module aptos_framework::ordered_map where
           let _ := core.prim.checkVectorIndex[moveVectorError](other_entries, 0)
           core.borrowPlace(immutable, other_entries[0])).key)
     ) then
-      let _t22 := &mut self.entries
-      *_t22 := core.prim.concatVector(*_t22, other_entries)
+      let _t1 := &mut self.entries
+      *_t1 := core.prim.concatVector(*_t1, other_entries)
       return overwritten;
     let mut reverse_result := vector<Entry<K, V> >[]
     let cur_i := self.entries.length - 1
@@ -481,14 +481,14 @@ verex module aptos_framework::ordered_map where
         reverse_result := core.prim.pushVector(
           reverse_result,
           do
-            let _t23 := &mut self.entries
-            if _t23.length == 0 then moveVectorError(2)
-            let (_t24, _t25) := core.prim.removeVector(*_t23, _t23.length - 1)
-            *_t23 := _t25
-            _t24)
+            let _t2 := &mut self.entries
+            if _t2.length == 0 then moveVectorError(2)
+            let (_t3, _t4) := core.prim.removeVector(*_t2, _t2.length - 1)
+            *_t2 := _t4
+            _t3)
         if cur_i == 0 then
-          let _t26 := &mut self.entries
-          *_t26 := core.prim.concatVector(*_t26, other_entries)
+          let _t5 := &mut self.entries
+          *_t5 := core.prim.concatVector(*_t5, other_entries)
           break
         else cur_i := cur_i - 1
       else
@@ -496,32 +496,32 @@ verex module aptos_framework::ordered_map where
           overwritten := core.prim.pushVector(
             overwritten,
             do
-              let _t27 := &mut self.entries
-              if _t27.length == 0 then moveVectorError(2)
-              let (_t28, _t29) := core.prim.removeVector(*_t27, _t27.length - 1)
-              *_t27 := _t29
-              _t28)
+              let _t6 := &mut self.entries
+              if _t6.length == 0 then moveVectorError(2)
+              let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
+              *_t6 := _t8
+              _t7)
           if cur_i == 0 then
-            let _t30 := &mut self.entries
-            *_t30 := core.prim.concatVector(*_t30, other_entries)
+            let _t9 := &mut self.entries
+            *_t9 := core.prim.concatVector(*_t9, other_entries)
             break
           else cur_i := cur_i - 1
         reverse_result := core.prim.pushVector(
           reverse_result,
           do
-            let _t31 := &mut other_entries
-            if _t31.length == 0 then moveVectorError(2)
-            let (_t32, _t33) := core.prim.removeVector(*_t31, _t31.length - 1)
-            *_t31 := _t33
-            _t32)
+            let _t10 := &mut other_entries
+            if _t10.length == 0 then moveVectorError(2)
+            let (_t11, _t12) := core.prim.removeVector(*_t10, _t10.length - 1)
+            *_t10 := _t12
+            _t11)
         if other_i == 0 then
           core.prim.destroyEmptyVector(other_entries)
           break
         else other_i := other_i - 1
-    let _t34 := &mut self.entries
-    let _t35 := _t34.length
-    *_t34 := core.prim.concatVector(*_t34, reverse_result)
-    *_t34 := core.prim.reverseSliceVector(*_t34, _t35, _t34.length)
+    let _t13 := &mut self.entries
+    let _t14 := _t13.length
+    *_t13 := core.prim.concatVector(*_t13, reverse_result)
+    *_t13 := core.prim.reverseSliceVector(*_t13, _t14, _t13.length)
     overwritten
 
   spec append_impl where
@@ -550,11 +550,11 @@ verex module aptos_framework::ordered_map where
   ) -> OrderedMap<K, V> := do
     let rest :=
       do
-        let _t6 := &mut self.entries
-        assert!(_t6.length >= at, 131072)
-        let _t8 := slice(*_t6, at, _t6.length)
-        *_t6 := slice(*_t6, 0, at)
-        _t8
+        let _t0 := &mut self.entries
+        assert!(_t0.length >= at, 131072)
+        let _t2 := slice(*_t0, at, _t0.length)
+        *_t0 := slice(*_t0, 0, at)
+        _t2
     new OrderedMap<K, V>::SortedVectorMap { entries := rest }
 
   spec trim where
@@ -580,11 +580,11 @@ verex module aptos_framework::ordered_map where
   public fun pop_front {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
     let Entry<K, V> { key := key, value := value } :=
       do
-        let _t42 := &mut self.entries
-        assert!(_t42.length > 0, 131072)
-        let (_t43, _t44) := core.prim.removeVector(*_t42, 0)
-        *_t42 := _t44
-        _t43
+        let _t0 := &mut self.entries
+        assert!(_t0.length > 0, 131072)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, 0)
+        *_t0 := _t2
+        _t1
     (key, value)
 
   spec pop_front where
@@ -594,11 +594,11 @@ verex module aptos_framework::ordered_map where
   public fun pop_back {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
     let Entry<K, V> { key := key, value := value } :=
       do
-        let _t3 := &mut self.entries
-        if _t3.length == 0 then moveVectorError(2)
-        let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
-        *_t3 := _t5
-        _t4
+        let _t0 := &mut self.entries
+        if _t0.length == 0 then moveVectorError(2)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+        *_t0 := _t2
+        _t1
     (key, value)
 
   spec pop_back where
@@ -873,11 +873,11 @@ verex module aptos_framework::ordered_map where
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
     let Entry<K, V> { key := _, value := value } :=
       do
-        let _t39 := &mut map.entries
-        assert!(_t39.length > self.index, 131072)
-        let (_t40, _t41) := core.prim.removeVector(*_t39, self.index)
-        *_t39 := _t41
-        _t40
+        let _t0 := &mut map.entries
+        assert!(_t0.length > self.index, 131072)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, self.index)
+        *_t0 := _t2
+        _t1
     value
 
   spec iter_remove where
@@ -948,10 +948,10 @@ verex module aptos_framework::ordered_map where
         is_lt(&compare(&key, &map.entries[insert_index].key)),
         invalid_argument(ENEW_KEY_NOT_IN_ORDER)
       )
-    let _t36 := &mut map.entries
-    let _t38 := new Entry<K, V> { key, value }
-    assert!(_t36.length >= insert_index, 131072)
-    *_t36 := core.prim.insertVector(*_t36, insert_index, _t38)
+    let _t0 := &mut map.entries
+    let _t2 := new Entry<K, V> { key, value }
+    assert!(_t0.length >= insert_index, 131072)
+    *_t0 := core.prim.insertVector(*_t0, insert_index, _t2)
 
   spec iter_add where
     pragma opaque
@@ -1086,11 +1086,11 @@ verex module aptos_framework::ordered_map where
     while len > 0 do
       let e :=
         do
-          let _t48 := &mut self
-          if _t48.length == 0 then moveVectorError(2)
-          let (_t49, _t50) := core.prim.removeVector(*_t48, _t48.length - 1)
-          *_t48 := _t50
-          _t49
+          let _t0 := &mut self
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1
       let e := e
       let Entry<K, V> { key := key, value := value } := e
       keys := core.prim.pushVector(keys, key)

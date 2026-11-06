@@ -194,9 +194,9 @@ verex module std::vector where
       core.prim.destroyEmptyVector(other)
     else
       other := core.prim.reverseSliceVector(*&other, 0, other.length)
-      let _t13 := self.length
+      let _t1 := self.length
       *self := core.prim.concatVector(*self, other)
-      *self := core.prim.reverseSliceVector(*self, _t13, self.length)
+      *self := core.prim.reverseSliceVector(*self, _t1, self.length)
 
   spec append where
     pragma intrinsic
@@ -212,11 +212,11 @@ verex module std::vector where
       *self := core.prim.pushVector(
         *self,
         do
-          let _t20 := &mut other
-          if _t20.length == 0 then moveVectorError(2)
-          let (_t21, _t22) := core.prim.removeVector(*_t20, _t20.length - 1)
-          *_t20 := _t22
-          _t21)
+          let _t0 := &mut other
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1)
       len := len - 1
     core.prim.destroyEmptyVector(other)
 
@@ -244,9 +244,9 @@ verex module std::vector where
           other,
           do
             if self.length == 0 then moveVectorError(2)
-            let (_t36, _t37) := core.prim.removeVector(*self, self.length - 1)
-            *self := _t37
-            _t36)
+            let (_t1, _t2) := core.prim.removeVector(*self, self.length - 1)
+            *self := _t2
+            _t1)
         len := len - 1
       other := core.prim.reverseSliceVector(*&other, 0, other.length)
     other
@@ -268,9 +268,9 @@ verex module std::vector where
         result,
         do
           if self.length == 0 then moveVectorError(2)
-          let (_t39, _t40) := core.prim.removeVector(*self, self.length - 1)
-          *self := _t40
-          _t39)
+          let (_t1, _t2) := core.prim.removeVector(*self, self.length - 1)
+          *self := _t2
+          _t1)
       len := len - 1
     result
 
@@ -418,9 +418,9 @@ verex module std::vector where
     if found then
       vector<Element>[do
         assert!(self.length > index, 131072)
-        let (_t15, _t16) := core.prim.removeVector(*self, index)
-        *self := _t16
-        _t15]
+        let (_t1, _t2) := core.prim.removeVector(*self, index)
+        *self := _t2
+        _t1]
     else vector<Element>[]
 
   spec remove_value where
@@ -440,9 +440,9 @@ verex module std::vector where
     let last_idx := self.length - 1
     *self := core.prim.swapVector(*self, i, last_idx)
     if self.length == 0 then moveVectorError(2)
-    let (_t33, _t34) := core.prim.removeVector(*self, self.length - 1)
-    *self := _t34
-    _t33
+    let (_t1, _t2) := core.prim.removeVector(*self, self.length - 1)
+    *self := _t2
+    _t1
 
   spec swap_remove where
     pragma intrinsic
@@ -462,9 +462,9 @@ verex module std::vector where
       *self := core.prim.pushVector(*self, val)
       *self := core.prim.swapVector(*self, i, last_idx)
       if self.length == 0 then moveVectorError(2)
-      let (_t10, _t11) := core.prim.removeVector(*self, self.length - 1)
-      *self := _t11
-      _t10
+      let (_t1, _t2) := core.prim.removeVector(*self, self.length - 1)
+      *self := _t2
+      _t1
 
   /--
   rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point

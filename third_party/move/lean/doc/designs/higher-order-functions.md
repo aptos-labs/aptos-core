@@ -128,6 +128,22 @@ and closure targets join a function's callees. Since
 `invoke`'s denotation is defined from the big-step meaning, its case of
 the agreement is by definition.
 
+`aborts_of` and `ensures_of` of a known target with type arguments are read
+directly: `aborts_of<f<τ̄>>(x)` means the call `f<τ̄>(x)` a body denotes aborts
+(`CallAborts`, `CallEnsures`), the target's meaning at the family its type arguments
+induce and the instantiation its frame computes from the enclosing function's. No
+function value is constructed, so no `ClosureFrame` is owed, at a closed type argument
+or at a type parameter of the verified function, as a body's call owes none.
+`closureMeaning_closureOfGeneric` relates the two: under coherence the literal's
+invocation is this call. The solver reads it as the call: where a goal owes it, the
+body's call of the target assumes its run and abort (`wp_call_runs`) and, where runs
+agree, the absence of its abort (`wp_call_runs_agree`), at the clause's spelling of the
+type arguments (`frameInstantiation_congr`); as a hypothesis it becomes the call's
+weakest precondition, which the call rule reads. Not served, with the error of a function
+value with type arguments: such a literal as a value (`f == upsert<T>`), one capturing
+values, and a `result_of`, `state_of` or `requires_of` of it. In a unit verified through
+its model the reading is the target's interface contract ([`ghost-fields.md`](ghost-fields.md)).
+
 ## Relation to the Prover's encoding
 
 The Prover represents the function values of a type `τ` by a datatype of the
@@ -507,8 +523,13 @@ one. Three pieces relate them.
   (`TypedAs.subst`). A unit's readings agree when every closed type
   identifier the compiler reads natively (`ntyOf`) is `TypedAs` its
   semantic type, and every function's signature is, over its generic
-  environment; decided once per unit by evaluation. A unit whose readings
-  do not agree is reported as not memory-typed.
+  environment; decided once per unit by evaluation over indexed tables
+  (`TypingView`, `doc/designs/performance.md`): a unit whose namespaces hold
+  its tables checks them once, and the result gives the array-reading check
+  (`typesAgreeCheck`), so the fact states what it did. A function that is not
+  a closure target (`closureSignature?` is `none`) agrees vacuously, as no
+  function value holds it. A unit whose readings do not agree is reported as
+  not memory-typed.
 - *Faithful closures.* `HasType.closure` types a closure only under an
   instantiation faithful to its arguments (`FrameInstantiation`), which
   the native typing also checks in its decidable form; a closure the
@@ -532,6 +553,25 @@ frame's transport, where the readings agree), and its arguments' semantic types 
 resolves to scalars (`ScalarAt`); a generic function whose function-typed
 parameter's rows mention its type parameters assumes that its frame
 resolves them to scalars, which a call discharges at its type arguments.
+
+## Function values of tuple-returning functions
+
+A function type states its results as a row (`|&T|(K, &V)` has the results `K`
+and `&V`, each with a sharing mark), a function declares one tuple-typed result,
+and a `ResultShape` is none or one type, so a target's one-element row of a tuple
+never equals the row of the type. Such a function is therefore not carried as a
+closure target; a function value of one is refused at its construction: "a
+function value of `f` is not supported: `f` returns a tuple" (`closureTargetRefusal`),
+naming a reference it holds. Calling it directly is unaffected. Move allows these
+values, so this is a gap of Verex, not a rule of the language.
+
+A target stating a shared reference below the top level of a parameter or result
+is, besides, not a closure target at all (`closureSignature?` is `none`): the
+native type erases the reference, so no sharing mark records it, and `TypedAs`
+could not read it without losing `TypedAs.unique`.
+
+Open: results as rows, where `ResultShape` gains a row case, a function's
+tuple result reads as its elements with their marks, and the refusal goes.
 
 ## Non-goals
 

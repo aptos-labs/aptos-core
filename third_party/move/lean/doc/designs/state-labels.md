@@ -48,7 +48,8 @@ A label is one of:
   (`state_domain_quant.move`): "universally quantifying over all possible
   memory states", not over program points. A quantified variable of type
   `StateDomain` is not a local; it is resolved only in `|~` positions, and
-  one that is not used as a label is rejected.
+  one that is not used as a label is rejected. Its name hides no value: a
+  value of that name in its scope still reads the enclosing one.
 
 A one-state predicate at `S` (`S |~ aborts_of<f>(x)`) reads the globals of
 `S` as the start of the invocation. `S |~ f(x)` of a two-state
@@ -71,7 +72,7 @@ spelled by its source name too.
 **VIR.** `MemoryRange` and the labeled operations (`behavior`,
 `functionCall`, `lemma`, `publish`, `remove`, `update`, `global` and
 `exists` with an optional label). A `QuantifierBinder` over the
-`stateDomain` domain carries the label it binds (`label : Option Nat`,
+`stateDomain` domain carries the label it binds (`label : Option NameId`,
 present exactly for a state-domain binder). Validation (`Capability`)
 checks that every label a function's specification reads is bound by a
 state-domain binder or defined by a two-state operation of the same

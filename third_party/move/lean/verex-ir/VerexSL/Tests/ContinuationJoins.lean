@@ -14,11 +14,14 @@ set_option Elab.async false
 
 -- Capture only profiling output. Verification diagnostics and the artifact
 -- audit still run normally, so a failed verification cannot pass this guard.
+-- The counts measure the tree walk's traversal, without shared joins.
 open Lean Elab Command in
 elab "#guard_continuations " expected:str " in " command:command : command => do
   let environment ← getEnv
   let (output, ()) ← IO.FS.withIsolatedStreams (isolateStderr := false) <|
-    elabCommand (← `(command| set_option verex.solverProfile true in $command))
+    elabCommand (← `(command|
+      set_option verex.sharedContinuations false in
+      set_option verex.solverProfile true in $command))
   setEnv environment
   let lines := (output.splitOn "\n").filter (·.startsWith "  continuations:")
   unless lines == ["  continuations: " ++ expected.getString] do
@@ -124,7 +127,10 @@ verex module 0x42::continuation_joins where
     aborts_if false
     ensures result == if b then 2 else 3
 
-  fun limits(x : u64) -> u64 := x
+  fun limits(b : Bool, x : u64) -> u64 := do
+    let mut y : u64 := 0
+    if b then y := 1 else y := 2
+    x
   spec limits where
     aborts_if false
     ensures result >= 0
@@ -260,13 +266,14 @@ verex module 0x42::continuation_joins where
   verify 0x42::continuation_joins::count
 
 -- One checked summary per source diamond, including consecutive joins.
--- Candidate folds with only one predecessor resume their concrete states.
+-- Candidate folds with only one predecessor resume their concrete states;
+-- a suffix that only exits is not folded (`carriesProgram`).
 -- Retaining present slots avoids extra candidate folds at subsequent reads.
-#guard_joins "nodes 2, edges 3, summaries 1, proofs 1" in
+#guard_joins "nodes 1, edges 2, summaries 1, proofs 1" in
   verify 0x42::continuation_joins::one
-#guard_joins "nodes 3, edges 5, summaries 2, proofs 2" in
+#guard_joins "nodes 2, edges 4, summaries 2, proofs 2" in
   verify 0x42::continuation_joins::two
-#guard_joins "nodes 4, edges 7, summaries 3, proofs 3" in
+#guard_joins "nodes 3, edges 6, summaries 3, proofs 3" in
   verify 0x42::continuation_joins::three
 #guard_joins "nodes 0, edges 0, summaries 0, proofs 0" in
   verify 0x42::continuation_joins::early
@@ -318,7 +325,7 @@ verify 0x42::continuation_joins::checked
 
 -- Explicit unrolling keeps the joins of each finite iteration. A bound
 -- failure must drain both the ordinary queue and the retained join holes.
-#guard_joins "nodes 8, edges 10, summaries 3, proofs 3" in
+#guard_joins "nodes 7, edges 9, summaries 3, proofs 3" in
 verify 0x42::continuation_joins::unrolled_diamonds
 
 /--
@@ -333,7 +340,7 @@ error: verex verification failed: the automatic verification of `unrolled_outrun
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
-#guard_joins "nodes 6, edges 8, summaries 2, proofs 0" in
+#guard_joins "nodes 5, edges 8, summaries 2, proofs 0" in
 verify 0x42::continuation_joins::unrolled_outrun
 
 -- Zero keeps the existing unlimited-leaf meaning.
@@ -353,7 +360,7 @@ error: verex verification failed: the automatic verification of `wrong` failed; 
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
-#guard_joins "nodes 2, edges 3, summaries 1, proofs 0" in
+#guard_joins "nodes 1, edges 2, summaries 1, proofs 0" in
 verify 0x42::continuation_joins::wrong
 
 -- The suffix may assume a cut only while its proof remains owed. Failed
@@ -390,10 +397,11 @@ error: verex verification failed: the automatic verification of `wrong_invariant
 set_option verex.sharedContinuations true in
 verify 0x42::continuation_joins::wrong_invariant
 
--- Requested map observations are derived for the clause group, then reused
--- by both kernel-checked leaves without discarding their source markers.
+-- Sharing exists only under a sealed class of several arrivals (`limits`
+-- above). A clause group with no join is the tree's own path: no owners,
+-- each leaf under its own allowance.
 open VerexIR VerexIR.Proofs in
-#guard_preparation 2 in
+#guard_owners "0, prepared 0, exhausted 0" in
 example (m : SpecMap Int Int) (present : SpecMap.hasKey m 0 = true) :
     Obligation "shared-map" 0 1 (SpecMap.rank m 0 < SpecMap.size m) ∧
     Obligation "shared-map" 2 3 (SpecMap.keyAt m (SpecMap.rank m 0) = 0) := by
@@ -401,13 +409,13 @@ example (m : SpecMap Int Int) (present : SpecMap.hasKey m 0 = true) :
     [("rank", "shared-map", 0, 1), ("key", "shared-map", 2, 3)]
 
 -- Refuting several abort alternatives is still one logical occurrence.
-#guard_owners "1, prepared 0, exhausted 0" in
+#guard_owners "0, prepared 0, exhausted 0" in
 example (n : Int) (above : 10 ≤ n) : ¬(n ≤ 1 ∨ n ≤ 2 ∨ n ≤ 3) := by
   verex_solve_goals []
 
 -- A quantified clause keeps one owner through its binder and premise.
 open VerexIR.Proofs in
-#guard_preparation 2 in
+#guard_owners "0, prepared 0, exhausted 0" in
 example (n : Int) :
     Obligation "shared-quantified" 0 1 (∀ m : Int, n < m → n < m + 1) ∧
     Obligation "shared-quantified" 2 3 (n < n + 1) := by
@@ -416,7 +424,7 @@ example (n : Int) :
 
 -- A structural result binder precedes two independent source clauses.
 open VerexIR.Proofs in
-#guard_preparation 2 in
+#guard_owners "0, prepared 0, exhausted 0" in
 example : ∀ n : Int,
     Obligation "shared-result" 0 1 (n < n + 1) ∧
     Obligation "shared-result" 2 3 (n < n + 2) := by
@@ -425,7 +433,7 @@ example : ∀ n : Int,
 
 -- Decoding an abstract slot must not merge the source clauses it wraps.
 open VerexIR.Proofs in
-#guard_preparation 2 in
+#guard_owners "0, prepared 0, exhausted 0" in
 example (slot : Option Int) (n : Int) (present : slot = some n) :
     slot.elim False (fun value =>
       Obligation "shared-slot" 0 1 (value < value + 1) ∧
@@ -436,12 +444,12 @@ example (slot : Option Int) (n : Int) (present : slot = some n) :
 -- Logical conjunctions and quantifiers inside one source occurrence keep
 -- one allowance. An unmarked quantified goal also has one structural owner.
 open VerexIR.Proofs in
-#guard_owners "1, prepared 0, exhausted 0" in
+#guard_owners "0, prepared 0, exhausted 0" in
 example : Obligation "shared-atomic" 0 1
     (∀ n : Int, (n < n + 1 ∧ n < n + 2) ∧ n < n + 3) := by
   verex_solve_goals [] naming [("atomic", "shared-atomic", 0, 1)]
 
-#guard_owners "1, prepared 0, exhausted 0" in
+#guard_owners "0, prepared 0, exhausted 0" in
 example : ∀ n : Int, n < n + 1 ∧ n < n + 2 := by
   verex_solve_goals []
 

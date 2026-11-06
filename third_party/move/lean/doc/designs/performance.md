@@ -61,7 +61,11 @@ certificate. Use all of these.
 5. **One target on its own.** `scripts/isolate-target.py <file> <module>
    <target> -o <out> [--option name=value]` keeps one target verified
    (every other specification block gets `pragma verify = false`) with the
-   options set after the import, so a module extract runs in seconds.
+   options set after the import, so a module extract runs in seconds. Run it
+   with `verex-move elaborate <out>`: the verifier is native there, and its
+   heartbeats compare with the driver's, where `lake env lean` interprets it.
+   The profile of a target stopped by its budget reports what it spent up to
+   there; `step statement` is what it spent before its first tactic.
 6. **The benchmark problems.** `scripts/verex-bench.py run [--only …]`
    measures the standard problems natively by phase and prints each
    problem's change against the previous local run
@@ -121,6 +125,81 @@ the command prepares all targets first and elaborates everything else with
 `Elab.async`; the audit walks dependencies through `Environment.find?`,
 never the checked environment.
 
+## Compiled namespaces
+
+`scripts/verify-modules.py` compiles a package's namespaces to `.olean` files
+first ([`relocatable-namespaces.md`](relocatable-namespaces.md)), so a module's
+process elaborates only its own namespace and imports the rest. `aptos-framework`
+at `--heartbeats 300`, 8 processes, one run of each: 10,235 s summed over 78 module
+processes and 1,289 s wall when each elaborates what it uses, 6,476 s and 869 s
+compiled, the pass being 172 s summed and 60 s wall over 155 namespaces (42 MB of
+`.olean` files, the largest 3.3 MB). Rendering and lowering fall from 1,873 s to
+71 s; what stays is a module's own unit, certificates and proofs, so `stake` gains
+7% and a module without targets 80%. Heartbeats do not change. The `.olean` files
+hold relocatable namespaces, not linked units, so their size is linear in the
+package.
+
+## Fixed points across normalizations
+
+The walk's normalization (`normalizeAround`, inline and the release of held
+continuations) records, per target, the terms it left unchanged without
+reading the local context, and a later traversal returns them at once
+(`FixedPoints` in `Solve.Base`). A traversal is tainted by a discharger call, a subterm taken as
+normal without traversal (the `normal` arguments), and a head at which a
+simproc reads the hypotheses (`contextDependent`'s shapes, `existsNamedValue`,
+`givenClosureFrame`, `invokeGenericClosure`); the taint is tracked by a frame
+per term at simp's recursion depth, and the terms simp's own cache returns
+without a traversal are checked against the tainted ones of the call. Terms
+with metavariables and below depth 3 are not recorded. Leaf preparation was
+measured with its own stamp and gained nothing.
+
+On the isolated `primary_fungible_store::deposit` (budget-stopped, so per
+run): bind −29%, split −12%, inline −19%, exit −34%, release −11%, 31% of
+lookups hit. `multisig_account::can_execute`: bind −51%, exit −52%, inline
+−36%, release −37%. Inside `normalizeAround`, `instantiateMVars` and
+`applySimpResultToTarget` cost 0.05% of `Simp.main`, and only 1–2% of the
+misses are terms seen before and tainted: what is left is the traversal of
+terms the steps create. `scripts/verify-modules.py` at `--heartbeats 300`,
+targets with the same outcome that do not reach the budget: `big_ordered_map`
+−2.8% (43 targets), `multisig_account` −6.0% (19), `primary_fungible_store`
+−18.8% (5); `create_primary_store` and `ensure_primary_store_exists` verify
+within the budget, two budget-stopped targets of `multisig_account` now fail
+before it. `DenotePerformance` run natively (`verex-move elaborate`): no
+target above +0.1%, `record` −7.8%, `return_in_loop` −6.6%, `at_most` −5.8%.
+Interpreted (`lake env lean`), where the wrapper's own code is counted,
+`return_in_loop` is +5% and `increment` +2%. Hashing the leaves of the smoke
+fixtures, the cache changes no leaf goal.
+
+## Shared continuations
+
+The walk is a DAG: a join's continuation is a closed constant over entry
+rows, walked once, and each arrival proves an entry relation. Arrivals share
+only where they agree in constructor shape and points; numerals and strings
+stay parameters. A single arrival takes the tree's route. What the tree walk
+assumed, and what a join must therefore preserve:
+
+- **Facts along a path.** Loop hypotheses and dominating facts must survive
+  the seal: the fold's loop continuation is a capture, and the locals sharing
+  reads are pinned on the walk path, so a branch leaves an equation instead of
+  rewriting them. Pins are lifted at leaves and completed paths, which are
+  never compared with an arrival.
+- **Which equations are substituted.** Frame facts the walk keeps on purpose
+  stay kept at arrivals; substituting one makes `EnsuresOf` relate one memory
+  to itself.
+- **Per-path state.** Provenance, clauses, decisions, points and owners are
+  recorded per arrival, and a shared suffix owes the union of its arrivals'
+  clauses. A failed shared leaf reports per arrival.
+- **Goal shape.** The fold names its application with a `let`: simp otherwise
+  re-enters the constant at every step (per-step cost about 3×).
+- **Order.** A region resumes when no pending goal lies in it, innermost
+  first, which keeps the walk depth-first.
+- **Profitability.** A suffix that only exits is not folded: a sealed class
+  saves only the suffix's rule steps; its leaf work stays per arrival.
+
+A hand-written walk over `Expr` must keep a visited set and check heartbeats:
+terms are DAGs, and a pure walk neither ends on a heavily shared term nor stops
+at the budget. Lean's `kabstract` has the same gap (`kabstractShared`).
+
 ## What was learned
 
 - **An array read in a kernel-evaluated computation is a list walk**:
@@ -129,6 +208,13 @@ never the checked environment.
   arenas through an `IndexedArena`, and count sizes once; `_eq` lemmas
   connect the indexed forms to the native ones. One checksum over a big
   structure with `Array.foldl` in the kernel ran out of memory at 13.6 GB.
+  The whole-unit typing facts read one literal view of the tables
+  (`TypingView`), walk functions in lockstep, and prove in a pointer `Eq.refl`
+  that every namespace holds the unit's tables: on a unit of 70 namespaces,
+  under a minute where the array-reading resource loop over one table did not
+  end in 840 s. `#kdiag` on the array-reading check showed three-quarters of its
+  unfolds in list walks, and a cost nobody had listed: comparing two tables'
+  names decides `String` equality, about 2 s per namespace there.
 - **Unfolding a big recursive definition makes the kernel redo it.**
   `simp` unfolding `Term.denote` records no steps, so the kernel re-reduces
   its 61-way matcher. The equation lemmas (`vir_denote_equations`) make
@@ -145,6 +231,13 @@ never the checked environment.
   unnamed; positions reading a name are unnamed after normalization
   (`verex_unname_positions`, `verex_unname`). `sqrt` from over 1.5G to 5 s
   at +1.7% on the benchmark.
+- **`isDefEq` does not see that a term is shared.** Where two terms differ in
+  an argument that converts only under its application, it fails on the
+  argument at every enclosing application and unfolds instead. A respelling of
+  families is compared by congruence, `isDefEq` only on the smallest
+  application that converts, each pair once per target (`convertsAtSites`):
+  on `coin::name` one hypothesis of 1.76M tree nodes, 867 distinct, differing
+  at one site, from 14.7M to 1.0M; `version::on_new_epoch` from 50.4M to 22.9M.
 - **Rewriting with hypotheses must terminate.** `verex_simp_all` admits an
   equation as a rule only if its right side reaches no admitted left side
   leading back to it.
@@ -161,6 +254,27 @@ never the checked environment.
 
 Every lever was measured on encoded leaves and is to be measured again on
 native ones; most act on the normalization of encoded terms.
+
+### Remaining on shared mode and budget stops
+
+In the order of expected gain:
+
+1. **Extra leaves after a single arrival** (coin `get_paired_*_copy_ref`): the
+   tree closes these continuations at exit, here they reach the leaf pipeline.
+   Substitute released pin equations before `normalizeAround`, and retry
+   `verex_assumption` after substitution. Work in progress is untested.
+2. **Targets the walk exhausts with no leaf decided**: about 600 steps at
+   0.2–2M with no blow-up. Release a call's continuation once per call, not per
+   subgoal; cache a compiled callee's unfolded body per target.
+3. **Loop stage before its context stage** (genesis `create_*_validators`).
+4. **Stored invariants** simplified per read, and position instances
+   re-derived per leaf (`storage_gas`).
+5. **Small two-arrival joins** cost more than exits (`dkg::initialize`).
+6. **Leaf fixed points across passes**: they last one pass, since context reads
+   are detected by head name. An explicit read counter bumped by every simproc
+   that consults the context would allow more.
+7. **`move prove --lean` runs modules one after another**, unlike the Prover's
+   parallel Boogie processes; `verify-modules.py` runs them in parallel.
 
 ### Preparation
 
@@ -181,10 +295,9 @@ native ones; most act on the normalization of encoded terms.
    substitution and normalization at every walker split: the split stage
    is 24% of OrderedMap's automatic cost.
 5. **Delay logical and variant splitting**: keep a region's clauses
-   together through common preparation; unmeasured. The opt-in scheduler
-   (`verex.sharedContinuations`) already shares entry decomposition,
-   cases, certificate bounds and position facts: −30% automatic
-   OrderedMap, 0% authored, +7% micro-targets.
+   together through common preparation; unmeasured. The join scheduler
+   (`verex.sharedContinuations`, on by default) already shares entry
+   decomposition, cases, certificate bounds and position facts.
 6. **Fact dependencies of normalized subterms.** Reusing a normal part of
    the goal is sound only where no fact added since its normalization
    reads what it reads: facts known on an arrival path simplify parts of
@@ -212,11 +325,39 @@ native ones; most act on the normalization of encoded terms.
   (`native-verification.md`): the call stage is 5–12% of automatic and
   20–28% of authored targets; a declaration costs 0.3–3M. Open: declared
   once per module, or cached proofs as the contract normal forms
-  (`verex.contractLemmas`, off: typed −3.3%, authored +0.3%) are.
-- **The call's `post` subgoal carries the continuation** (190k–480k nodes
-  against 2k–25k of contract), walked by the `call-contract` simp at every
-  call. Folding it into a local definition before `wp_call` cut the stage
-  to two thirds but broke the scripts that read the continuation.
+  (`verex.contractLemmas`, on by default: typed −3.3%, authored +0.3%) are.
+- **The call's subgoals carry the continuations** (190k–480k nodes against
+  2k–25k of contract): the call rules apply them to the callee's fresh
+  result, error and final state, so a simp over a subgoal walks the whole
+  continuation. The solver holds each continuation abstracted over its reads
+  of its parameters on both call paths (`wp_call_normal` is the default), so
+  the contract's normalization walks the contract only, and names the call's
+  premises after the callee (`<callee>_ensures`, `_frame`, `_returns`). The
+  release introduces the goal's leading binders, puts the held values back,
+  normalizes along the paths to non-variable arguments, the body's structure
+  outside its lambdas and the premises a rule put over the body, then
+  reverts the binders and normalizes only the logical connectives. Everything
+  else is taken as normal: a continuation whose nested lambdas the walk built
+  and never normalized would pass unnormalized; none measured does. On
+  `multisig_account::can_execute`: call stage 384M → 186M (12 calls),
+  `call-contract` 353M → 20M, release 135M, 27 leaves instead of 17.
+  The release is now the largest call step.
+
+### Splits
+
+- **A conditional under `wp` split by `split`**: on `stake::leave_validator_set`
+  one `wp` of `ite` costs 420M of the 590M split stage: `verex_split` fails
+  after 197M (97M of it the context normalization before the `split`
+  tactic, which abstracts the conditional over the whole goal and fails
+  here), and `verex_prepare_leaf` then prepares the goal as a leaf for
+  222M. The other 150 splits cost 0.6M together plus 84M of normalization
+  after them. The dependent conditional already splits by its own rule
+  (`wp_dite_rule`); splitting the plain one by `wp_ite` the same way, at the
+  goal's own instance, takes the split stage from 590M to 277M, with 14
+  leaves reached instead of 3, and the target still exceeds 1G. Measured on
+  the isolated target with `verex.solverProfile`; the branch hypothesis is
+  then named `h`, as
+  after a dependent split, where `split` named it `h✝`.
 
 ### Leaf engine
 
@@ -248,7 +389,12 @@ native ones; most act on the normalization of encoded terms.
   (`Lean.ofReduceBool`) was measured slower than the kernel and is not
   pursued; certificates stay kernel-checked.
 - **Per process**, 18–27% of wall time is export, load and certificates
-  (2–4 s); bounded by `scripts/verify-modules.py` and `verex.jobs`.
+  (2–4 s); bounded by `scripts/verify-modules.py` and `verex.jobs`. Elaborating
+  what a module uses is not among them: it is compiled once per package (see
+  "Compiled namespaces").
+- **A module's own unit**, once per process: quoting it and defining its instance
+  on the first target, its unit facts, and the audit after the proofs (for
+  `stake`, 14 s, 12 s and 15 s of its 50 s of certification).
 - **Wall time beside heartbeats** in the stage logs, so kernel checks show.
 
 ### Authored proof interface
@@ -261,6 +407,92 @@ points (`proof { assert …; apply lemma … }`, [`lemmas.md`](lemmas.md))
 instead of scripts over presented leaves remove that where one fact
 suffices; unmeasured on the corpus, and to be measured before investing in
 per-leaf preparation sharing.
+
+### Authored sharing checkpoint (2026-11-03)
+
+A controlled whole-module `ordered_map` comparison, with shared continuations,
+`verex.jobs=1`, solver profiling, and the unchanged 300M target allowance:
+all nine authored targets verify before and after. The baseline includes the
+proof-language migration helpers but precedes shared path preparation and nested
+`on`; the candidate includes both. Builds were stopped during measurements.
+
+| Target | Before M HB | After M HB | Before CPU s | After CPU s |
+|---|---:|---:|---:|---:|
+| `test_verify_drain_symbolic` | 31.771 | 31.186 | 1.10 | 1.07 |
+| `test_verify_iter_walk_mut_symbolic` | 91.774 | 66.782 | 3.43 | 2.61 |
+| `test_aborts_if_new_from_2` | 6.542 | 5.974 | 0.47 | 0.37 |
+| `test_verify_iter_remove_shift_at_position` | 16.977 | 16.450 | 0.55 | 0.56 |
+| `test_verify_iter_borrow_mut_at_position` | 13.779 | 14.020 | 0.47 | 0.52 |
+| `test_verify_iter_borrow_mut_symbolic` | 26.087 | 24.909 | 0.92 | 0.88 |
+| `test_verify_iter_add_middle_symbolic` | 19.657 | 18.294 | 0.74 | 0.68 |
+| `test_verify_iter_add_append_symbolic` | 28.414 | 24.268 | 0.99 | 0.91 |
+| `ground_enum_123` | 10.306 | 10.511 | 0.35 | 0.41 |
+
+Target CPU is sampled from the verifier process every 20ms, so small differences
+are approximate. The nine targets total 245.306M → 212.394M heartbeats and
+9.02s → 8.01s sampled CPU. Whole-module child CPU is 48.363s → 46.377s.
+The two small heartbeat regressions are included above. These are checkpoint
+measurements; subsequent proof-port changes require another measurement.
+
+The four ostensibly grouped loop-step clauses shared one path, not four.
+Their clause-local binders made the full-context keys differ. Grouping by the
+prepared prefix and retaining the longest common context allows their common
+steps to run together without making clause-local assumptions available to the
+parent block. Shared late premises must remain in that common context.
+
+Three targets remain more expensive authored than automatic: middle insertion
+18.294M versus 12.882M, append 24.268M versus 22.072M, removal at a position
+16.450M versus 10.376M. The authored walk's preparation and block handling remain
+costs even when little work can be shared. Automatic verification of these three
+succeeds at the same allowance; automatic verification of the entire module
+has two other failing targets, so its total is not an equivalent verified result.
+
+### Next measurements after the authored ports
+
+S1 (per-target result reuse and fail-fast solving) is deferred at the user's
+request. Result caching is not a Move Prover feature and does not improve
+fresh CI runs. Prioritize reducing the actual work of verification after
+finishing the authored ports:
+
+1. Share closed normalized call equations across targets, preserving the
+   existing argument-shape and family-transport key. The fallback
+   contract-normalization context is now constructed only when reusable
+   equations cannot apply; equation reuse itself remains target-local.
+   For continuation release, measure substantive releases separately from
+   the existing no-held-head fast path. Share call-owned lookup and dependency
+   analysis, while retaining normalization under each branch's arguments and
+   newly introduced premises; moving the release invocation outside the
+   subgoal loop alone does not eliminate that necessary work.
+2. Profile the successful and failed deciders per leaf before changing their
+   order or adding inexpensive applicability checks.
+3. Trace the commits behind the big-map and staking-config budget regressions
+   before targeting those regressions with optimizations.
+4. Measure relevance-directed preparation. The handoff's proof-term analysis
+   finds only about 20–30% of prepared hypotheses are used; this does not imply
+   a proportional CPU saving. Evaluate a closure from the goal and names the
+   proof reads, preserving explicit access to otherwise omitted facts.
+
+Deferred S1 design notes (retained for reference, not scheduled): the proposal
+keys verified results by declarations used by the
+proof, rather than source files: hash the theorem statement, referenced
+constant types and definition values, toolchain, verifier build, and options.
+Theorem dependencies need their types, not their proof bodies. Dependency
+validation must also account for definitions reached transitively; an unchanged
+wrapper must not conceal a changed definition it unfolds. Compare these keys
+at theorem start, before solving. An opaque callee's body change should leave
+callers cached when its contract is unchanged, while the module audit always
+runs and requires the callee's current verification result. Cache recursive
+cycle groups together.
+
+Failed and budget-stopped targets have no proof term to identify dependencies.
+Use a conservative solver-visible environment key, including namespace hashes,
+attributes and simp sets, and provide `--fresh` to bypass reuse. Proposed storage
+is `build/verex/results/<module>.olean` plus a per-target `.trace` containing
+outcomes, dependency hashes, and failure templates. Before implementation,
+resolve how importing cached results avoids stale or conflicting declarations
+in the current environment; compare import-and-alias with kernel replay of
+stored proof terms. Measure validation, loading and replay costs as well as
+the solving saved. This is a deferred design, not an implemented cache.
 
 ## Tried and rejected
 
@@ -280,6 +512,66 @@ per-leaf preparation sharing.
 | Pruning dead paths at the split | contradictory leaves 3% (BigOrderedMap 21/635, OrderedMap 11/438); 0 of 4 and 2 of 99 branches refutable; `contradiction` exceeds the recursion depth |
 | Proof stubbing for an express build | a tenth saved; undone |
 | A lower automatic leaf cap (75M) | affects only attempts that reach it |
+| Partitioning arrivals by numerals as well as constructors | value-only differences never share |
+| Keying arrival classes on provenance and clauses | classes vanish (`set_frozen_flag` 234M → 358M); the union of clauses kept |
+| RowFacts: a per-arrival disjunction of constructor facts | no target used it once arrivals partition by shape |
+| Substituting without `cases`, opening entry relations on demand | no gain; the cost was premises reaching leaves, not exposure |
+| Cheap closers before exposure | no effect once premises close at the call |
+| Pinning the whole fold context | frame equations reach leaves (coin `get_paired_*` fail) |
+| Refuting an arrival from new facts only | prunes that need old facts are lost |
+| Deferring the fold to the second arrival | pins must hold while the branch is walked |
+| Replacing the whole-context substitution at a single arrival by pin equations | coin +480M; it does real work |
+| A process-wide normal-form map, or waiting on another target's summary | outcomes depend on scheduling; the wait deadlocks |
+| Scoping split and substitution to a memory write's new hypotheses | the cost was a non-terminating injection loop, fixed at its cause |
+| `Memory.set` spine as skeleton | no effect on `bump_resource` |
+
+### Follow-up measurement after the compiler restack
+
+On the whole `coin`, `primary_fungible_store`, and `randomness` modules at
+`--heartbeats 300`, ignoring source-location markers when matching stated
+facts and filtering variant readers before definitional abstraction retain
+51 verified / 25 budget / 4 failed. The 51 verified targets fall from
+3,555,636,546 to 3,531,735,616 raw heartbeats (0.67%). Mint/burn copy-ref
+fall from 177.47M/179.00M to 175.14M/175.93M. This is a small saving, not a
+resolution of the extra shared-mode leaves or the completeness gap.
+
+The reader filter first checks for an exact occurrence of the tested term;
+variant observations and constructor equations retain the transparent
+fallback for terms spelled at another family. Marker-aware assumption
+matching alone saves about 0.1% on this sample and closes the shared-call
+abort test before entering the leaf pipeline.
+
+Rejected on the same module sample: an assumption retry after substitution,
+early pin substitution retaining the later whole-context substitution, and
+literal simplification before the speculative passes gave negligible gains.
+Moving the full cheap decider before those passes retained coverage but
+increased verified-target heartbeats by 0.77%. The original single-arrival
+proposal therefore remains unresolved; do not infer the predicted 50M saving
+from its earlier leaf profile.
+
+### Staking-contract aborts and invariant preservation
+
+`new_staking_contracts_holder` exposed two completeness problems. Its module
+sets strict abort checking, but the function sets partial checking with no
+abort clauses. Strictness supplies an implicit `aborts_if false`; partial
+mode makes it sufficient only. Treating the empty list as an unconditional
+no-abort requirement produced false obligations at event-handle calls.
+The contract translation now follows the Move Prover's partial semantics,
+while retaining explicit abort-code checks and native/map models.
+
+After correcting that, the final memory invariant still failed: nine event
+handle calls give nine preservation implications, but `storedInvariantsProof?`
+stopped after eight links. It now indexes context facts and searches their
+implications with cycle detection and successful-proof memoization, matching
+whole invariant propositions rather than mixing predicates at a memory.
+
+Whole-module `staking_contract` runs at `--heartbeats 300`, with shared
+continuations enabled, improve from 7 verified / 11 budget / 2 failed to
+9 verified / 10 budget / 1 failed. The holder verifies at 240.22M heartbeats
+(previously budget-stopped at 347.32M recorded work); `update_distribution_pool`
+verifies at 42.81M (previously failed at 275.96M). The seven targets already
+verified retain essentially identical cost. The remaining ten budget stops
+and one failed target are unresolved.
 
 ## What cannot change
 

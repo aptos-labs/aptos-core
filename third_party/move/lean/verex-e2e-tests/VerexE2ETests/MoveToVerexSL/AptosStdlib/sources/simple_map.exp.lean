@@ -229,9 +229,9 @@ verex module aptos_std::simple_map where
         let Element<«Key», Value> { key := key, value := value } :=
           do
             if data.length == 0 then moveVectorError(2)
-            let (_t10, _t11) := core.prim.removeVector(*data, data.length - 1)
-            *data := _t11
-            _t10
+            let (_t1, _t2) := core.prim.removeVector(*data, data.length - 1)
+            *data := _t2
+            _t1
         return (some(key), some(value));
     self.data := core.prim.pushVector(
       self.data, new Element<«Key», Value> { key, value }
@@ -349,11 +349,11 @@ verex module aptos_std::simple_map where
     while len > 0 do
       let e :=
         do
-          let _t6 := &mut self
-          if _t6.length == 0 then moveVectorError(2)
-          let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
-          *_t6 := _t8
-          _t7
+          let _t0 := &mut self
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1
       let e := e
       let Element<«Key», Value> { key := key, value := value } := e
       keys := core.prim.pushVector(keys, key)

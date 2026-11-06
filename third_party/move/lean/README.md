@@ -103,8 +103,9 @@ lake exe verex-rust verify <file.rs>                    # specifications in <fil
 
 `verex-move verify` elaborates a package's targets one after another in one
 process. `scripts/verify-modules.py <package> [--filter <part>] [--jobs N]`
-runs one process per module with specifications, several at a time, and
-prints the modules' reports in module order.
+runs one process per module with specifications, several at a time, each
+importing the package's namespaces compiled to `.olean` files by a first pass,
+and prints the modules' reports in module order.
 
 From the Move CLI, a package is verified in place; the Move Prover's unit
 tests run with it on request:

@@ -3,6 +3,7 @@
 
 import VerexSL.Verify.FunctionValues
 import VerexIR.Proofs.Denote.Authored
+import VerexIR.Proofs.IndexedTyping
 
 /-!
 # Verification: targets, cycles, and lemmas
@@ -24,14 +25,26 @@ open VerexSL.Contract
 its obligations; an automatic one asks for a proof, including when its
 bounded attempt ran out. -/
 private def failureMessage (ns : ValidatedNamespace) (function : String) (authored : Bool)
-    (overBudget : Bool) (budget : Nat) (leaves : Array String) : MessageData :=
+    (overBudget : Bool) (budget : Nat) (leaves : Array String)
+    (stop : Option BudgetStop := none) : MessageData :=
   if authored then
     m!"verex verification failed: the proof of `{function}` does not establish its \
       specification"
   else
     let attempt := if overBudget then
+        let position : MessageData := match stop with
+          | none => m!""
+          | some s =>
+            let callPart : MessageData := match s.callee, s.callNumber with
+              | some callee, some k => m!" at call {k} of `{callee}`"
+              | some callee, none   => m!" at a call of `{callee}`"
+              | _, _                => m!""
+            let stagePart : MessageData := match s.lastStage with
+              | some stage => m!" (stage {stage})"
+              | none       => m!""
+            m!" after deciding {s.leavesDecided} leaves{callPart}{stagePart}"
         m!"the automatic verification of `{function}` exceeded its budget of {budget} \
-          maxHeartbeats"
+          maxHeartbeats{position}"
       else m!"the automatic verification of `{function}` failed"
     m!"verex verification failed: {attempt}; {proofRequest ns function leaves}"
 
@@ -43,7 +56,7 @@ private def fieldNames (unit : ValidatedUnit) (source : VerexIR.StructHandle)
   let declared : Option (List String) := do
     let (targetNs, fields) ← VerexIR.SemanticOperations.handleFields? unit source variant
     fields.toList.mapM fun (field : VerexIR.FieldDecl) =>
-      (targetNs.tables.names[field.name.index]?).map (·.name)
+      (targetNs.nameOf field.name).map (·.name)
   match declared with
   | some names => if names.length == count then names else (List.range count).map toString
   | none => (List.range count).map toString
@@ -63,7 +76,7 @@ def componentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle) (base 
         else if canonical.dummy then [s!"{base}_dummy"] else []) ++
       (if canonical.length then [s!"{base}_length"] else [])
     let ghosts ← declaration.ghosts.toList.mapM fun ghost =>
-      (ns.tables.names[ghost.name.index]?).map fun name => s!"{base}_{name.name}"
+      (ns.nameOf ghost.name).map fun name => s!"{base}_{name.name}"
     let names := leading ++ ghosts ++ [base]
     guard (names.length == count)
     pure names
@@ -144,6 +157,8 @@ through. A name given twice is an error. -/
 def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (withResult := false) :
     Except String (Array (String × String × Bool)) := do
+  -- The declaration in the unit's numbering, as the printing reads it.
+  let declaration := ns.relocate declaration
   let generics := declaration.signature.generics
   let printing ← Print.PrintNamespace.of unit ns
   let mutableReference (typeId : VerexIR.TypeId) : Bool :=
@@ -169,8 +184,8 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
     let some expression := ns.expressions[id.index]? | continue
     if expanded then
       let .operation (.call (.function reference)) _ _ _ := expression.kind | continue
-      let some callee := unit.tables.names[reference.name.index]? | continue
-      calls := calls.push (callee.name, expression.typeId)
+      let some callee := ns.nameOf reference.name | continue
+      calls := calls.push (callee.name, ns.typeId expression.typeId)
     else
       work := ((VerexIR.Validation.expressionChildren expression.kind).toList.map (·, false)) ++
         (id, true) :: work
@@ -313,27 +328,74 @@ entries with its declarations. -/
 private initialize usedConstantsExt : EnvExtension (NameMap (Array Name)) ←
   registerEnvExtension (pure {})
 
-/-- The unit definitions whose value the audit compared with the registered
-unit's quotation (`auditedUnit`). An environment extension, as
-`usedConstantsExt`. -/
+/-- The unit and relocatable-namespace definitions whose value the audit
+compared with the quotation of what is registered (`auditedUnit`). An
+environment extension, as `usedConstantsExt`. -/
 private initialize auditedUnitsExt : EnvExtension NameSet ← registerEnvExtension (pure {})
 
 /-- The unit definition of a registered unit, its value compared once per
-environment with the unit's quotation: the audit states a target's theorem
-over the definition, as the theorem does, instead of quoting the unit and
-unfolding the definition at every target. -/
+environment with the unit's quotation, and the value of each relocatable
+namespace definition that quotation refers to compared once with the
+quotation of the namespace registered at its path: the audit states a target's
+theorem over the definition, as the theorem does, instead of quoting the unit
+and unfolding the definition at every target. -/
 private def auditedUnit (segments : Array String) (unit : ValidatedUnit) : TermElabM Lean.Expr := do
   let name := unitName segments
   if (auditedUnitsExt.getState (← getEnv)).contains name then return mkConst name
   let some (.defnInfo info) := (← getEnv).find? name
     | throwError m!"the unit `{name}` has no definition"
-  unless info.value == (← VerexSL.Quote.quoteUnit unit) do
+  let quoted ← VerexSL.Quote.quoteUnit unit (VerexSL.registeredObject? (← getEnv))
+  unless info.value == quoted do
     throwError m!"the definition of the unit `{name}` is not the registered unit"
+  for ns in unit.namespaces do
+    let path := (ns.localTables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+    let objectName := VerexSL.Quote.objectName path
+    if (auditedUnitsExt.getState (← getEnv)).contains objectName then continue
+    let some registered := VerexSL.registeredObject? (← getEnv) path
+      | throwError m!"the namespace of `{objectName}` is not registered"
+    let some (.defnInfo object) := (← getEnv).find? objectName
+      | throwError m!"the namespace `{objectName}` has no definition"
+    unless object.value == toExpr registered do
+      throwError m!"the definition `{objectName}` is not the registered namespace"
+    modifyEnv fun env => auditedUnitsExt.modifyState env (·.insert objectName)
   modifyEnv fun env => auditedUnitsExt.modifyState env (·.insert name)
   return mkConst name
 
-/-- The constants `name` uses (`usedConstantsExt`), and whether it is an
-axiom. -/
+/-- Collect constant names reachable from the initial stack of expressions,
+    deduplicating by structural equality (`Lean.ExprSet = Std.HashSet Lean.Expr`,
+    keyed by content hash). Unlike `Lean.Expr.getUsedConstants`, which uses a
+    `PtrSet` (pointer identity), this collapses freshly-allocated but
+    structurally-identical nodes — a pattern that arises when `quoteUnit`
+    builds the unit literal, creating a new allocation for every occurrence
+    of a constructor such as `VerexIR.Type.U64` or `VerexIR.Instruction.Assign`.
+    With pointer dedup every copy is visited; with content-hash dedup only one
+    is, cutting traversal cost 6–14× on measured unit literals.
+    Accepts multiple root expressions so that type and value share one pass. -/
+private partial def getUsedConstantsDedup (initStack : Array Lean.Expr) : Array Name :=
+  let rec go (stack : Array Lean.Expr) (seen : Lean.ExprSet) (namesSeen : Lean.NameHashSet)
+      (consts : Array Name) : Array Name :=
+    match stack.back? with
+    | none => consts
+    | some (e : Lean.Expr) =>
+      let stack := stack.pop
+      if seen.contains e then go stack seen namesSeen consts
+      else
+        let seen := seen.insert e
+        match e with
+        | Lean.Expr.const c _ =>
+          if namesSeen.contains c then go stack seen namesSeen consts
+          else go stack seen (namesSeen.insert c) (consts.push c)
+        | Lean.Expr.app e1 e2       => go (stack.push e1 |>.push e2) seen namesSeen consts
+        | Lean.Expr.lam _ d b _     => go (stack.push d |>.push b) seen namesSeen consts
+        | Lean.Expr.forallE _ d b _ => go (stack.push d |>.push b) seen namesSeen consts
+        | Lean.Expr.letE _ t v b _  => go (stack.push t |>.push v |>.push b) seen namesSeen consts
+        | Lean.Expr.mdata _ inner   => go (stack.push inner) seen namesSeen consts
+        | Lean.Expr.proj _ _ inner  => go (stack.push inner) seen namesSeen consts
+        | _ => go stack seen namesSeen consts
+  go initStack {} {} #[]
+
+/-- The constants `name` uses (`usedConstantsExt`), and whether it is an axiom. -/
+
 private def usedConstantsOf (name : Name) : CommandElabM (Array Name × Bool) := do
   let env ← getEnv
   let some info := env.find? name | return (#[], false)
@@ -342,8 +404,10 @@ private def usedConstantsOf (name : Name) : CommandElabM (Array Name × Bool) :=
   let constructors := match info with
     | .inductInfo declaration => declaration.ctors.toArray
     | _ => #[]
-  let used := info.type.getUsedConstants ++
-    ((info.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[] ++ constructors
+  let initStack : Array Lean.Expr := match info.value? (allowOpaque := true) with
+    | some v => #[info.type, v]
+    | none   => #[info.type]
+  let used := getUsedConstantsDedup initStack ++ constructors
   modifyEnv fun env => usedConstantsExt.modifyState env (·.insert name used)
   return (used, isAxiom)
 
@@ -425,8 +489,10 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
     visited := visited.insert name
     let some declaration := env.find? name
       | throwError m!"missing artifact `{name}`"
-    let constants := declaration.type.getUsedConstants ++
-      ((declaration.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[]
+    let initStack : Array Lean.Expr := match declaration.value? (allowOpaque := true) with
+      | some v => #[declaration.type, v]
+      | none   => #[declaration.type]
+    let constants := getUsedConstantsDedup initStack
     for dependency in constants do
       -- Rule 1 of the design: a verified function reasons over values,
       -- never over frames or loan bookkeeping.
@@ -448,8 +514,10 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
   let some publicInfo := env.find? (base ++ `verified)
     | throwError m!"`{function}` has no public verification certificate"
   let namespaceName := artifacts.getPrefix
-  let some unit := VerexSL.registeredUnit? env namespaceName
-    | throwError m!"unknown Verex namespace `{namespaceName}`"
+  let unit ← match VerexSL.registeredUnitResult env namespaceName with
+    | .ok (some unit) => pure unit
+    | .ok none => throwError m!"unknown Verex namespace `{namespaceName}`"
+    | .error message => throwError message
   let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
     | throwError m!"unknown function `{function}` in `{namespaceName}`"
   let some (params, result) := nativeSignature? unit ⟨namespaceIndex⟩ declaration
@@ -615,21 +683,29 @@ private def publishCompiled (segments : Array String) (unit : ValidatedUnit)
   if (← getEnv).contains (artifacts ++ (if declaresGhosts unit then `compiled else `compiled_eq)) then
     return
   let semantics := mkConst (unitName segments)
-  addAbbrev (artifacts ++ `row) (← quoteRow (compiled.params ++ compiled.locals))
+  addAbbrev (artifacts ++ `row) (← quoteRow compiled.frame)
   -- The signature a caller assuming the function's interface published.
   unless (← getEnv).contains (artifacts ++ `params) do
     addAbbrev (artifacts ++ `params) (← quoteRow compiled.params)
   addAbbrev (artifacts ++ `locals) (← quoteRow compiled.locals)
+  -- The row spelled by the parameters and locals, decided once by the kernel.
+  let (params, locals, row) :=
+    (mkConst (artifacts ++ `params), mkConst (artifacts ++ `locals), mkConst (artifacts ++ `row))
+  addDecl (.thmDecl {
+    name := artifacts ++ `frame_eq, levelParams := []
+    type := ← mkEq (← mkAppM ``HAppend.hAppend #[params, locals]) row
+    value := ← mkEqRefl row })
   unless (← getEnv).contains (artifacts ++ `shape) do
     addAbbrev (artifacts ++ `shape) (← quoteShape compiled.result)
   addAbbrev (artifacts ++ `body) (← quoteTerm semantics compiled.body)
   addAbbrev (artifacts ++ `mutables) (← quoteMutables compiled.mutables)
   addAbbrev (artifacts ++ `compiled)
-    (← quoteFunction semantics compiled (mkConst (artifacts ++ `body))
+    (← quoteFunction semantics compiled params locals row (mkConst (artifacts ++ `frame_eq))
+      (mkConst (artifacts ++ `body))
       (mkConst (artifacts ++ `mutables)))
-  let viewEq ← publishCompileView segments unit handle.namespaceId
   -- A model's function has no runtime certificate (`doc/designs/ghost-fields.md`).
   if declaresGhosts unit then return
+  let viewEq ← publishCompileView segments unit handle.namespaceId
   let noGhosts ← publishNoGhosts segments unit
   let lhs := mkAppN (mkConst ``compileFunction) #[semantics, toExpr handle]
   let rhs := mkAppN (mkConst ``Except.ok [Level.zero, Level.zero])
@@ -690,6 +766,30 @@ def contractClosureTargets (unit : ValidatedUnit) (namespaceId : NamespaceId)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return targets
 
+/-- The known targets with type arguments a function's contract reads directly
+(`directTarget?`), each with its type arguments at location 0, as the clause spells
+them: their frames are certified as a call's are. -/
+def contractDirectTargets (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Array (FunctionHandle × Array VerexIR.TypeUse) := Id.run do
+  let mut targets := #[]
+  let mut pending := declaration.contract.conditions.map (·.expression)
+  let mut visited : Array Nat := #[]
+  while let some id := pending.back? do
+    pending := pending.pop
+    if visited.contains id.index then continue
+    visited := visited.push id.index
+    let some expression := ns.expressions[id.index]? | continue
+    if let .operation (.call (.closure reference 0)) instantiations #[] _ := expression.kind then
+      let typeArgs := (ns.genericArguments instantiations).filterMap fun argument => match argument with
+        | .typeArg value => some { value with loc := ⟨0⟩ }
+        | _ => none
+      if let some target := VerexIR.SemanticOperations.resolveFunction? unit namespaceId reference then
+        unless typeArgs.isEmpty || targets.contains (target, typeArgs) do
+          targets := targets.push (target, typeArgs)
+    pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
+  return targets
+
 /-- Whether a contract definition takes the executable unit (its contract
 states a behavioral predicate) and the table of declared preconditions
 (it states `requires_of`), as its last parameters. -/
@@ -706,17 +806,77 @@ where
           requires || domain.isAppOf ``VerexIR.Proofs.RequiresMeaning)
     | _ => (false, false)
 
-/-- Prove once per unit, by evaluation, that its resource types correspond
-to their keys' types (`ResourcesTyped`): every memory's runtime encoding is
-then typed. -/
-def ensureResourcesTyped (segments : Array String) (unit : ValidatedUnit) : CommandElabM Name := do
-  let name := resourcesTypedName segments
-  if (← getEnv).contains name then return name
-  let unitDefinition ← ensureUnitInstance segments unit
-  elabCommand (← `(command|
-    theorem $(rootIdent name) : VerexIR.Proofs.ResourcesTyped $(rootIdent unitDefinition) :=
-      VerexIR.Proofs.ResourcesTyped.ofCheck (by decide +kernel)))
-  return name
+deriving instance ToExpr for VerexIR.Validation.TableLayout
+deriving instance ToExpr for VerexIR.Validation.OwnerShape
+deriving instance ToExpr for VerexIR.Validation.OwnerLayout
+deriving instance ToExpr for VerexIR.Proofs.DeclarationView
+
+/-- An indexed arena as a literal, its entries quoted by `quote`. -/
+private def quoteArena {α : Type} (type : Lean.Expr) (quote : α → Lean.Expr) :
+    VerexIR.Validation.IndexedArena α → Lean.Expr
+  | .empty => mkApp (mkConst ``VerexIR.Validation.IndexedArena.empty) type
+  | .leaf value => mkApp2 (mkConst ``VerexIR.Validation.IndexedArena.leaf) type (quote value)
+  | .branch leftSize left right =>
+      mkApp4 (mkConst ``VerexIR.Validation.IndexedArena.branch) type (toExpr leftSize)
+        (quoteArena type quote left) (quoteArena type quote right)
+
+/-- The declarations of a typing view as a literal: equal links, which every
+declaration of a namespace carries, are quoted once and shared. -/
+private def quoteDeclarations
+    (declarations : VerexIR.Validation.IndexedArena
+      (VerexIR.Validation.IndexedArena VerexIR.Proofs.DeclarationView)) : Lean.Expr := Id.run do
+  let rec entries {α : Type} : VerexIR.Validation.IndexedArena α → List α
+    | .empty => []
+    | .leaf value => [value]
+    | .branch _ left right => entries left ++ entries right
+  let mut quoted : Array (VerexIR.Validation.Links × Lean.Expr) := #[]
+  for view in (entries declarations).flatMap entries do
+    unless quoted.any (·.1 == view.links) do quoted := quoted.push (view.links, toExpr view.links)
+  let linksOf (links : VerexIR.Validation.Links) : Lean.Expr :=
+    ((quoted.find? (·.1 == links)).map (·.2)).getD (toExpr links)
+  let declarationType := toTypeExpr VerexIR.Proofs.DeclarationView
+  let quoteView (view : VerexIR.Proofs.DeclarationView) : Lean.Expr :=
+    mkAppN (mkConst ``VerexIR.Proofs.DeclarationView.mk) #[toExpr view.declaration,
+      linksOf view.links, toExpr view.layout, toExpr view.isTable]
+  return quoteArena (mkApp (mkConst ``VerexIR.Validation.IndexedArena) declarationType)
+    (quoteArena declarationType quoteView) declarations
+
+/-- The indexed view the unit's whole-unit checks read, as a literal, and the
+kernel's certificates that it is the unit's view and that the unit's namespaces
+hold its tables: `none` for a unit whose namespaces do not. -/
+private def publishTypingView (segments : Array String) (unit : ValidatedUnit)
+    (unitDefinition : Name) : TermElabM (Option (Name × Name × Name)) := do
+  unless unit.namespaces.all (·.tables == unit.tables) do return none
+  let name := Name.str (semanticsName segments) "typingView"
+  let viewEq := name ++ `eq
+  let shared := name ++ `shared
+  let semantics := mkConst unitDefinition
+  unless (← getEnv).contains viewEq do
+    let view := VerexIR.Proofs.TypingView.of unit
+    addDecl (.defnDecl {
+      name, levelParams := [], type := mkConst ``VerexIR.Proofs.TypingView
+      value := mkAppN (mkConst ``VerexIR.Proofs.TypingView.mk) #[toExpr view.namespaceCount,
+        toExpr view.tableNamespaces, toExpr view.types, toExpr view.names, toExpr view.canonical,
+        toExpr view.nominals, quoteDeclarations view.declarations, toExpr view.parameterNodes,
+        toExpr view.parameterLimit, toExpr view.typeCount,
+        toExpr view.fuel]
+      hints := .abbrev, safety := .safe })
+    addDecl (.thmDecl {
+      name := viewEq, levelParams := []
+      type := ← mkEq (mkApp (mkConst ``VerexIR.Proofs.TypingView.of) semantics) (mkConst name)
+      value := ← mkEqRefl (mkConst name) })
+    let tables := mkApp (mkConst ``VerexIR.Validation.ValidatedUnit.tables) semantics
+    let replicated ← mkAppM ``List.replicate #[toExpr unit.namespaces.toList.length, tables]
+    addDecl (.thmDecl {
+      name := shared, levelParams := []
+      type := mkApp (mkConst ``VerexIR.Proofs.TablesShared) semantics
+      value := ← mkEqRefl replicated })
+  return some (name, viewEq, shared)
+
+/-- A proof that a closed Boolean check holds, the kernel evaluating it: no
+elaborator reads the unit. -/
+private def checkedByKernel (check : Lean.Expr) : MetaM Lean.Expr := do
+  mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq check (mkConst ``Bool.true))
 
 /-- Prove once per unit, by evaluation, that its native and semantic readings
 agree (`TypesAgree`), where they do: a function value is then typed by its
@@ -727,10 +887,55 @@ def ensureTypesAgree (segments : Array String) (unit : ValidatedUnit) :
   if (← getEnv).contains name then return some name
   unless VerexIR.Proofs.typesAgreeCheck unit do return none
   let unitDefinition ← ensureUnitInstance segments unit
-  elabCommand (← `(command|
-    theorem $(rootIdent name) : VerexIR.Proofs.TypesAgree $(rootIdent unitDefinition) :=
-      VerexIR.Proofs.TypesAgree.ofCheck (by decide +kernel)))
+  match ← liftTermElabM (publishTypingView segments unit unitDefinition) with
+  | some (view, viewEq, shared) => liftTermElabM do
+      let semantics := mkConst unitDefinition
+      let check ← checkedByKernel
+        (mkApp2 (mkConst ``VerexIR.Proofs.TypingView.typesAgree) (mkConst view) semantics)
+      addDecl (.thmDecl {
+        name, levelParams := []
+        type := mkApp (mkConst ``VerexIR.Proofs.TypesAgree) semantics
+        value := mkApp5 (mkConst ``VerexIR.Proofs.TypesAgree.ofIndexed) semantics (mkConst view)
+          (mkConst shared) (mkConst viewEq) check })
+  | none =>
+      elabCommand (← `(command|
+        theorem $(rootIdent name) : VerexIR.Proofs.TypesAgree $(rootIdent unitDefinition) :=
+          VerexIR.Proofs.TypesAgree.ofCheck (by decide +kernel)))
   return some name
+
+/-- Prove once per unit, by evaluation, that its resource types correspond
+to their keys' types (`ResourcesTyped`): every memory's runtime encoding is
+then typed. -/
+def ensureResourcesTyped (segments : Array String) (unit : ValidatedUnit) : CommandElabM Name := do
+  let name := resourcesTypedName segments
+  if (← getEnv).contains name then return name
+  let agreement ← ensureTypesAgree segments unit
+  let unitDefinition ← ensureUnitInstance segments unit
+  match ← liftTermElabM (publishTypingView segments unit unitDefinition) with
+  | some (view, viewEq, shared) => liftTermElabM do
+      let semantics := mkConst unitDefinition
+      let agree := mkConst (if agreement.isSome then ``Bool.true else ``Bool.false)
+      let check ← checkedByKernel
+        (mkApp2 (mkConst ``VerexIR.Proofs.TypingView.resourcesTyped) (mkConst view) agree)
+      let value := match agreement with
+        | some agreement => mkApp6 (mkConst ``VerexIR.Proofs.ResourcesTyped.ofIndexedAgreeing)
+            semantics (mkConst view) (mkConst shared) (mkConst viewEq) (mkConst agreement) check
+        | none => mkApp5 (mkConst ``VerexIR.Proofs.ResourcesTyped.ofIndexedDisagreeing)
+            semantics (mkConst view) (mkConst shared) (mkConst viewEq) check
+      addDecl (.thmDecl {
+        name, levelParams := []
+        type := mkApp (mkConst ``VerexIR.Proofs.ResourcesTyped) semantics
+        value })
+  | none =>
+      let check ← match agreement with
+        | some agreement => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := true)
+            (fun _ => $(rootIdent agreement)) (by decide +kernel))
+        | none => `(term| VerexIR.Proofs.ResourcesTyped.ofCheck (agree := false)
+            (fun absurd => by cases absurd) (by decide +kernel))
+      elabCommand (← `(command|
+        theorem $(rootIdent name) : VerexIR.Proofs.ResourcesTyped $(rootIdent unitDefinition) :=
+          $check))
+  return name
 
 /-- The module's unit, the constant a theorem's frames and memory are at. -/
 def unitTermOf (segments : Array String) (unit : ValidatedUnit) : CommandElabM Term :=
@@ -999,6 +1204,7 @@ private partial def lemmaInstancesOf (ns : ValidatedNamespace) (id : VerexIR.Exp
         work := rest
         let some expression := ns.expressions[current.index]? | continue
         if let .operation (.specification (.lemma reference _)) _ _ _ := expression.kind then
+          let reference := ns.qualifiedRef reference
           unless found.contains reference do found := found.push reference
         work := work ++ (VerexIR.Validation.expressionChildren expression.kind).toList
   return found
@@ -1359,10 +1565,16 @@ structure ProofReport where
   elapsedMs : Nat := 0
   /-- The leaves the automatic proof did not decide, in report order. -/
   failedLeaves : Array String := #[]
+  /-- The failed leaves that exhausted an attempt's allowance, and those whose
+  deciders all rejected them. -/
+  exhaustedLeaves : Nat := 0
+  undecidedLeaves : Nat := 0
   /-- What the proof printed, under the solver's debugging and profiling
   options: a task's streams are its own, so the command prints it in the
   target's turn. -/
   output : String := ""
+  /-- Where the budget stopped, if the target ran out of heartbeats. -/
+  budgetStop : Option BudgetStop := none
   deriving Inhabited
 
 /-- The reports of the proofs that ended, by theorem, until their targets
@@ -1389,7 +1601,11 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
   state.scopeNames.set none
   state.scopeLocals.set #[]
   state.routedKeys.set none
+  VerexIR.Proofs.Denote.recordStatementCost
   let main ← Lean.Elab.Tactic.getMainGoal
+  -- The theorem's binders: the unit's facts, the same at every leaf.
+  let binders ← main.withContext main.getNondepPropHyps
+  state.moduleFacts.set (binders.foldl (·.insert ·) {})
   -- The streams are the thread's: what the proof prints is kept for the
   -- report, as the tactics leave it. An exception passes with the state
   -- the failing tactic left, as it does without the wrapper.
@@ -1406,10 +1622,13 @@ elab "verex_proof " theorem_:ident " => " proof:Lean.Parser.Tactic.tacticSeq : t
     let heartbeats := (← IO.getNumHeartbeats) - (← readThe Core.Context).initHeartbeats
     let elapsedMs := ((← IO.monoNanosNow) - started) / 1000000
     let failedLeaves ← VerexIR.Proofs.Denote.failedLeafNames
+    let exhaustedLeaves ← state.exhaustedLeaves.get
+    let undecidedLeaves ← state.undecidedLeaves.get
+    let budgetStop ← state.budgetStop.get
     let output := String.fromUTF8! (← printed.get).data
     Perf.chargeHeartbeats .verification heartbeats
-    proofReports.modify
-      (·.insert theorem_.getId { heartbeats, elapsedMs, failedLeaves, output })
+    proofReports.modify (·.insert theorem_.getId
+      { heartbeats, elapsedMs, failedLeaves, exhaustedLeaves, undecidedLeaves, output, budgetStop })
 
 /-- A target whose proofs elaborate in tasks, and how to conclude it once
 they ended. -/
@@ -1420,6 +1639,9 @@ structure PendingVerification where
   /-- Conclude the target once its tasks ended: report their messages, raise
   its failure, carry and audit its artifacts. -/
   conclude : CommandElabM Unit := pure ()
+  /-- The callees the proof inlines, by key, as the preparation collected
+  them: the module summarizes them before its proofs (`summarizeCallee`). -/
+  inlinedCallees : Array String := #[]
 
 /-- The last component of the next proof attempt of `base`'s typed theorem:
 a proof elaborating in a task is committed whether or not it succeeded, so
@@ -1526,14 +1748,32 @@ private def modelRoutesGeneric (unit : ValidatedUnit) (compiled : Function unit)
       worklist := calleeCompiled.body.callees worklist
   return false
 
+/-- The contract a routed member satisfies: a model's callee with a body is seen
+as its callers see it, a cycle's member and the target itself as its body is
+proved, a native's only contract is that view. -/
+private def routedContractName (segments : Array String) (unit : ValidatedUnit) (model : Bool)
+    (target member : FunctionHandle) (name : String) : Name :=
+  if model && member != target && (declarationOf? unit member).any fun declaration =>
+      declaration.body != .absent && hasInterfaceView declaration then
+    typedInterfaceContractName segments name
+  else typedContractName segments name
+
+/-- The value of the definition `f` at `arguments`: a statement reading one
+term many times elaborates it once, in the definition. -/
+elab "verex_value_at% " f:ident arguments:(ppSpace colGt term:max)* : term => do
+  let info ← getConstInfo (← realizeGlobalConstNoOverload f)
+  let arguments ← arguments.mapM fun argument => Term.elabTerm argument.raw none
+  return info.value!.beta arguments
+
 /-- The binders of the meanings a proof's routed members stand for, each
 with its hypothesis: a cycle's member, or a model's callee used through its
 contract, satisfies its contract; a model's inlined callee refines its body
 under the same meanings. At the runtime family, or at every skolem family
 and type instantiation. -/
 private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (unitTerm : Term)
-    (namespaceName : Name) (routed : Array (FunctionHandle × String)) (family : Bool)
-    (inlinedMember : String → Bool) (meanings : Term) (atRuntime : Term → CommandElabM Term) :
+    (namespaceName : Name) (routed : Array (FunctionHandle × String)) (family model : Bool)
+    (target : FunctionHandle) (inlinedMember : String → Bool) (meanings : Term)
+    (atRuntime : Term → CommandElabM Term) :
     CommandElabM (Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) := do
   -- Every member's meaning is bound before any hypothesis: a hypothesis's
   -- meanings name them all, and an unbound name would be bound implicitly
@@ -1542,7 +1782,8 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
     let memberArtifacts := Name.str namespaceName name
     let memberParams := rootIdent (memberArtifacts ++ `params)
     let memberShape := rootIdent (memberArtifacts ++ `shape)
-    let memberContract := rootIdent (typedContractName segments name)
+    let contractName := routedContractName segments unit model target member name
+    let memberContract := rootIdent contractName
     if family && inlinedMember name then
       -- At every family and instantiation: the body under the meanings
       -- there, which name the members at that family.
@@ -1555,7 +1796,7 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
             VerexIR.Proofs.Spec.Refines ($(cycleSelf name) Θ typeInstantiation args)
               (VerexIR.Proofs.Denote.Function.denoteWith $meanings $memberCompiled args))))
     else if family then
-      let atFamily ← atUnit segments unit (typedContractName segments name) memberContract
+      let atFamily ← atUnit segments unit contractName memberContract
         (some (← `(term| family)))
         (← if (declarationOf? unit member).any isGeneric then
           pure #[← `(term| instantiation)] else pure #[])
@@ -1588,7 +1829,7 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
                 (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm) $memberShape))),
         ← `(bracketedBinder| ($(cycleSelfVerified name) :
             VerexIR.Proofs.Satisfies $(cycleSelf name)
-              $(← atUnit segments unit (typedContractName segments name) memberContract
+              $(← atUnit segments unit contractName memberContract
                 (some (← `(term| ($(mkCIdent ``VerexIR.Proofs.Denote.Skolems.runtime) $unitTerm))))))))
   return pairs.map (·.1) ++ pairs.map (·.2)
 
@@ -1879,6 +2120,9 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
       if throughContract then
         ensureContracts segments calleeKey unit callee.namespaceId.index calleeNs
           calleeDeclaration calleeParams calleeResult
+        if hasInterfaceView calleeDeclaration then
+          ensureInterfaceContract segments calleeKey unit callee.namespaceId.index calleeNs
+            calleeDeclaration calleeParams calleeResult
         liftTermElabM (publishNativeSignature segments calleeKey calleeParams calleeResult)
         modelMembers := modelMembers.push (callee, calleeKey, false)
       else
@@ -2180,7 +2424,7 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
   let invariants ← liftTermElabM <| withExecutableSkolems unit fun executable skolems => do
     owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
       let types ← Contract.frameTypes skolems
-      let row := ownerCompiled.params ++ ownerCompiled.locals
+      let row := ownerCompiled.frame
       let invariants ← loopInvariants unit executable owner.namespaceId ownerNs ownerDeclaration
         ownerCompiled.params row types stored.predicate
       let assertions ← assertionConditions unit executable owner.namespaceId ownerNs ownerDeclaration
@@ -2307,11 +2551,49 @@ private def meaningsTerm (m : Member) (routed : Array (FunctionHandle × String)
         $initTerm⟩ :
       VerexIR.Proofs.Denote.Meanings executable))
 
+/-- The meanings of `meaningsTerm` as the value of a definition over what they
+name, and the term reading that value here. Without routed members they are
+small, and stay as they are. -/
+private def sharedMeanings (m : Member) (routed : Array (FunctionHandle × String)) (meanings : Term)
+    (atRuntime : Term → CommandElabM Term)
+    (invokeBinders selfBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) :
+    CommandElabM (Term × Nat) := do
+  if routed.isEmpty then return (meanings, 0)
+  let { artifacts, unitTerm, generic, model, .. } := m
+  let name := artifacts ++ `routedMeanings
+  let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
+      pure #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
+        ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})]
+    else pure #[]
+  let mut cost := 0
+  unless (← getEnv).contains name do
+    let budget := (heartbeatBudget? m.declaration).getD (verex.verifyHeartbeats.get (← getOptions))
+    let started ← IO.getNumHeartbeats
+    elabCommand (← `(command|
+      set_option Elab.async false in
+      set_option maxHeartbeats $(Syntax.mkNumLit (toString budget)) in
+      noncomputable def $(rootIdent name)
+          {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
+          $familyBinders* $invokeBinders* $selfBinders* :=
+        $(← atRuntime meanings)))
+    cost := (← IO.getNumHeartbeats) - started
+    stageLog s!"{m.function}: routed meanings {cost / 1000}k"
+  let familyArguments : Array Term ← if generic then
+      pure #[← `(term| Θ), ← `(term| typeInstantiation)]
+    else pure #[]
+  let invokeArguments : Array Term ← if model then
+      pure #[invokeIdent, mkIdent `verexInvokeDefined, mkIdent `verexInvokeCoherent]
+    else pure #[]
+  let selves : Array Term := routed.map fun (_, member) => cycleSelf member
+  let arguments := #[← `(term| executable)] ++ familyArguments ++ invokeArguments ++ selves
+  let definition := rootIdent name
+  return (← `(term| verex_value_at% $definition:ident $arguments:term*), cost)
+
 /-- The readings of a function with in-body assumptions, with and without
 them, which the hypothesis that they hold relates: its assumption table and
 the two meanings. -/
 private def assumptionDefinitions (m : Member)
-    (bodyIdent row paramsTerm localsTerm shapeTerm mutablesTerm assumedIdent
+    (bodyIdent row paramsTerm localsTerm frameEqTerm shapeTerm mutablesTerm assumedIdent
       tableIdent : Ident) : CommandElabM Unit := do
   let { ns, declaration, handle, artifacts, unitTerm, .. } := m
   let unit := m.unit
@@ -2320,7 +2602,7 @@ private def assumptionDefinitions (m : Member)
   let table ← liftTermElabM <| withExecutableSkolems unit fun executable skolems => do
     let types ← Contract.frameTypes skolems
     mkLambdaFVars (← executableBinders executable skolems) (← assumptionTable unit executable
-      handle.namespaceId ns declaration compiled.params (compiled.params ++ compiled.locals)
+      handle.namespaceId ns declaration compiled.params compiled.frame
       types)
   liftTermElabM (addAbbrev (artifacts ++ `assumptions) table)
   -- The readings under the meanings the theorem reads the body under, and
@@ -2335,7 +2617,7 @@ private def assumptionDefinitions (m : Member)
       fun (args : VerexIR.Proofs.Denote.HList $paramsTerm) => VerexIR.Proofs.Spec.bind
         (VerexIR.Proofs.Denote.Term.denote meanings
           (ρ := $shapeTerm) (Γ := $row) $bodyIdent
-          (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
+          (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
         (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)))
   elabCommand (← `(command|
     noncomputable def $assumedIdent (executable : VerexIR.Validation.ExecutableUnit $unitTerm)
@@ -2347,7 +2629,7 @@ private def assumptionDefinitions (m : Member)
             ({ meanings with assumption := $tableIdent reader args start } :
               VerexIR.Proofs.Denote.Meanings executable)
             (ρ := $shapeTerm) (Γ := $row) $bodyIdent
-            (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
+            (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
           (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm)))
 
 /-- The hypotheses the theorems take, as binders and as the arguments
@@ -2407,7 +2689,7 @@ private def specializationCertificates (m : Member) (callees : Callees m.unit)
   let contracted := routed.filter fun (member, _) =>
     !callees.modelMembers.any fun (other, _, inlined) => inlined && other == member
   let contracts := callees.contracts ++ contracted.map fun (member, name) =>
-    (member, typedContractName m.segments name)
+    (member, routedContractName m.segments unit m.model m.handle member name)
   let mut calls : Array (FunctionHandle × TypeArgs) := m.compiled.body.foldCalls collect (fun _ _ found => found) #[]
   for (_, _, _, inlined) in callees.inlined do
     calls := inlined.body.foldCalls collect (fun _ _ found => found) calls
@@ -2458,7 +2740,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
       calleeNs.functions.flatMap fun function =>
         if index == namespaceIndex && function.name == declaration.name then #[]
         else
-          let callee := ((calleeNs.tables.names[function.name.index]?).map (·.name)).getD "callee"
+          let callee := ((calleeNs.nameOf function.name).map (·.name)).getD "callee"
           (clauseNames unit calleeNs function).map fun (range, name) =>
             (range, s!"{callee}_{name}")).flatten
   let names ← (clauseNames unit ns declaration ++ calleeNames).mapM fun (range, name) =>
@@ -2467,7 +2749,7 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
   -- Every function's preconditions are numbered, its own for its recursive
   -- calls.
   let numbered := (unit.namespaces.map fun calleeNs =>
-    calleeNs.functions.flatMap fun function => preconditionNumbers unit function).flatten
+    calleeNs.functions.flatMap fun function => preconditionNumbers calleeNs function).flatten
   let numbers ← numbered.mapM fun (range, number) =>
     `(preconditionNumber| ($(Syntax.mkNumLit (toString number)), $(Syntax.mkStrLit range.file),
       $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
@@ -2483,9 +2765,10 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
       -- A data invariant numbered by its position in its type's spec block.
       (declaration.contract.conditions.filter (·.kind == .structInvariant)).zipIdx.map
         fun (condition, position) =>
-          (s!"data invariant_{position + 1}", Contract.locRange unit condition.loc)) ++
+          (s!"data invariant_{position + 1}@{((invariantNs.nameOf declaration.name).map (·.name)).getD ""}",
+            Contract.locRange invariantNs condition.loc)) ++
     (invariantNs.invariants.map fun invariant =>
-      ("module invariant", Contract.locRange unit invariant.condition.loc))).flatten
+      ("module invariant", Contract.locRange invariantNs invariant.condition.loc))).flatten
   let keyed ← invariantClauses.mapM fun (kind, range) =>
     `(invariantClause| ($(Syntax.mkStrLit kind), $(Syntax.mkStrLit range.file),
       $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
@@ -2676,13 +2959,81 @@ private def recordArtifacts (base : Name) (natives assumptionDeps : Array (Funct
   modifyEnv fun env => assumptionDependencies.addEntry env (base, assumptionDeps)
   modifyEnv fun env => lemmaTrustDependencies.addEntry env (base, trustDeps)
 
+/-- The certificate of a callee's compilation under this module, declared
+where it is first inlined (`collectCallees`) or summarized. -/
+private def ensureCompiledCertificate (m : Member) (function : String) (handleTerm : Term) :
+    CommandElabM Name := do
+  let certificate := Name.str (Name.str m.namespaceName function) "compiledSemantics"
+  unless (← getEnv).contains certificate do
+    elabCommand (← `(command|
+      set_option Elab.async false in
+      theorem $(rootIdent certificate) :
+          VerexIR.Proofs.Denote.compileFunction $(m.unitTerm) $handleTerm =
+            .ok $(rootIdent (compiledName m.segments function)) :=
+        $(rootIdent (compiledEqName m.segments function))))
+  return certificate
+
+/-- Derive the summary of the callee `m`, context-free:
+in its own telescope, `binders` after the unit's, the statement of a call's
+shape at its parameters and result is the root of the walk
+(`deriveModuleSummary`), with the unit facts `unitFact` introduces and the
+obligation `arguments` of its own body; the theorem `<namespace>.<callee>.summary`
+is declared once, in the command's environment, and measured as
+`<namespace>::<callee> summary`. A refusal leaves every call inlined. -/
+private def deriveCalleeSummary (m : Member)
+    (binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) (unitFact : TSyntax `tactic)
+    (arguments : TSyntax ``VerexIR.Proofs.Denote.obligationArguments) (paramsTerm shapeTerm : Ident)
+    (atRuntime : Term → CommandElabM Term) : CommandElabM Unit := do
+  let { function, namespaceName, unitTerm, unitDefinition, handleTerm, .. } := m
+  let name := Name.str (Name.str namespaceName function) "summary"
+  if (← getEnv).contains name then return
+  let certificate ← ensureCompiledCertificate m function handleTerm
+  let pair ← `(term| PProd.mk $handleTerm
+    (PProd.mk $(Syntax.mkStrLit function) $(rootIdent certificate)))
+  let statement ← atRuntime (← `(term|
+    ∀ (args : VerexIR.Proofs.Denote.HList $paramsTerm) (ensures : _) (aborts : _) (initial : _),
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.propheticMeaning executable #[] $handleTerm $paramsTerm $shapeTerm args)
+        ensures aborts initial))
+  let telescope : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
+    #[← `(bracketedBinder| {registry : VerexIR.Validation.SemanticsRegistry}),
+      ← `(bracketedBinder| {executable : VerexIR.Validation.ExecutableUnit $unitTerm}),
+      ← `(bracketedBinder| (prepared : VerexIR.Validation.prepareExecution registry
+        $(mkIdent unitDefinition) = .ok executable))] ++ binders
+  let started ← IO.monoNanosNow
+  let startHeartbeats ← IO.getNumHeartbeats
+  let outcome ← IO.mkRef (Except.error "the walk did not run" : Except String Nat)
+  Perf.withPhase .verification <| withScope (fun scope => { scope with opts := Elab.async.set scope.opts false }) <|
+    liftTermElabM <| Term.withDeclName name <| Term.elabBinders telescope fun _ => do
+      let callee ← Term.elabTerm pair none
+      let statement ← Term.elabType statement
+      Term.synthesizeSyntheticMVarsNoPostponing
+      let callee ← instantiateMVars callee
+      let statement ← instantiateMVars statement
+      if callee.hasMVar || statement.hasMVar then
+        throwError m!"the summary statement of `{function}` is not determined: {statement}"
+      let root ← mkFreshExprSyntheticOpaqueMVar statement
+      discard <| Tactic.run root.mvarId! do
+        Tactic.evalTactic unitFact
+        outcome.set (← deriveModuleSummary name arguments callee)
+  let heartbeats := (← IO.getNumHeartbeats) - startHeartbeats
+  let elapsedMs := ((← IO.monoNanosNow) - started) / 1000000
+  match ← outcome.get with
+  | .ok conjuncts =>
+      stageLog s!"{function}: summary derived, {heartbeats} heartbeats, {conjuncts} conjuncts"
+      Perf.recordArtifacts s!"{namespaceName}::{function} summary" #[name] heartbeats elapsedMs
+  | .error reason =>
+      stageLog s!"{function}: summary refused, {heartbeats} heartbeats: {reason}"
+      if verex.solverProfile.get (← getOptions) then
+        logInfo m!"no summary of `{function}`: {reason}"
+
 /-- Proves `m`'s typed theorem, over the callees collected and the frame
 certificates, and carries it to the runtime unless `m` is a member of a
 cycle or verified through a model; returns the dependencies its theorems
 take, for `verifyCycle` to conclude. -/
 private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
     (callees : Callees m.unit) (routed : Array (FunctionHandle × String))
-    (instantiationCertificates : Array Term) (errorsBefore : Nat) (prepare : Bool) :
+    (instantiationCertificates : Array Term) (errorsBefore : Nat) (prepare summary : Bool) :
     CommandElabM (MemberDependencies × PendingVerification) := do
   let { reference, segments, function, script?, cycle, namespaceName, ns, declaration, handle, model, family, generic, framed, arity, ownAssumptions, artifacts, base, unitDefinition, unitTerm, handleTerm, .. } := m
   let unit := m.unit
@@ -2696,17 +3047,20 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let row := rootIdent (Name.str (Name.str namespaceName function) "row")
   let paramsTerm := rootIdent (Name.str (Name.str namespaceName function) "params")
   let localsTerm := rootIdent (Name.str (Name.str namespaceName function) "locals")
+  let frameEqTerm := rootIdent (Name.str (Name.str namespaceName function) "frame_eq")
   let shapeTerm := rootIdent (Name.str (Name.str namespaceName function) "shape")
   let mutablesTerm := rootIdent (Name.str (Name.str namespaceName function) "mutables")
   let compiledEqIdent := rootIdent (compiledEqName segments function)
   let typedContract := rootIdent (typedContractName segments function)
   let publicContract := rootIdent (contractName segments function)
   let stored ← ensureStoredInvariant segments unit
+  stageLog s!"{function}: stored invariant"
   -- The invariants of the loops and the conditions of the assertions the
   -- proof meets: the function's own and those of its inlined callees, each
   -- keyed by its site and function.
   let owners : Owners unit := #[(handle, ns, declaration, compiled)] ++ inlined
   let (loopPairs, preconditionPairs) ← memberConditions m owners stored
+  stageLog s!"{function}: member conditions"
   liftTermElabM (publishCompiled segments unit function handle compiled)
   let pattern ← argumentPattern unit declaration compiled.params
   let budgetValue := (heartbeatBudget? declaration).getD (verex.verifyHeartbeats.get (← getOptions))
@@ -2746,35 +3100,48 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let invokeTerm ← if !model then `(term| VerexIR.Proofs.Denote.closureMeaning executable)
     else if family then `(term| ($invokeIdent Θ))
     else `(term| ($invokeIdent ($(mkCIdent ``VerexIR.Proofs.Denote.Skolems.runtime) $unitTerm)))
+  stageLog s!"{function}: ghosts"
   let meanings ← meaningsTerm m routed instantiation ghostTerm initTerm invokeTerm
+  let (invokeBinders, routingBinders, routingLemmas) ← if !model then pure (#[], #[], #[]) else
+    modelInvokeBinders segments unit unitTerm namespaceName routed family
   -- A member of a cycle is verified over a meaning per member satisfying
   -- its contract: at the runtime family, or at every family and
   -- instantiation. Under a model an inlined callee's meaning refines its
   -- body under the same meanings.
-  let selfBinders ← routedSelfBinders segments unit unitTerm namespaceName routed family
-    inlinedMember meanings atRuntime
-  let (invokeBinders, routingBinders, routingLemmas) ← if !model then pure (#[], #[], #[]) else
-    modelInvokeBinders segments unit unitTerm namespaceName routed family
+  let routedBinders ← routedSelfBinders segments unit unitTerm namespaceName routed family model
+    m.handle inlinedMember meanings atRuntime
+  -- Every routed member's hypothesis reads the meanings, which name every
+  -- member: elaborated once, as a definition over the members.
+  let (meanings, meaningsCost) ← sharedMeanings m routed meanings atRuntime invokeBinders
+    (routedBinders.extract 0 routed.size)
+  let selfBinders ← if routed.isEmpty then pure routedBinders else
+    routedSelfBinders segments unit unitTerm namespaceName routed family model
+      m.handle inlinedMember meanings atRuntime
   -- The readings of the function with and without its in-body assumptions,
   -- which the hypothesis that they hold relates.
+  stageLog s!"{function}: meanings"
   let assumptionsIdent := mkIdent (Name.mkSimple s!"assumptions_{function}")
   let assumedIdent := rootIdent (artifacts ++ `assumedMeaning)
   let tableIdent := rootIdent (artifacts ++ `assumptions)
   if ownAssumptions then
-    assumptionDefinitions m bodyIdent row paramsTerm localsTerm shapeTerm mutablesTerm
+    assumptionDefinitions m bodyIdent row paramsTerm localsTerm frameEqTerm shapeTerm mutablesTerm
       assumedIdent tableIdent
   let (nativeBinders, nativeArgs, assumptionBinders, assumedArgs, assumesTyping) ←
     theoremHypotheses m natives assumptionDeps trustDeps
+  stageLog s!"{function}: hypotheses"
   let specializations ← specializationCertificates m callees routed
+  stageLog s!"{function}: specializations"
   let (solveTactic, obligationsTactic) ←
     solverTactics m owners loopPairs calleePairs instantiationCertificates preconditionPairs
       specializations
   -- The hypotheses the introduction names and the proof below uses share
   -- one spelling across the two quotations.
+  stageLog s!"{function}: solver tactics"
   let permitted := mkIdent `permitted
   let assumed := mkIdent `assumed
   let introduction ← introductionTactic m stored pattern assumed permitted
   let unitFact ← unitFactTactic m assumesTyping
+  stageLog s!"{function}: unit facts"
   let (automaticTactic, scriptTactic) ← proofTactics script? opens solveTactic obligationsTactic
   -- Under its in-body assumptions: the reading that assumes them is
   -- verified, and the hypothesis that they hold carries the contract over.
@@ -2803,7 +3170,13 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   -- obligation is reported at the authored proof.
   -- Prepared: every definition and certificate the proof needs is in the
   -- environment, checked before any proof task runs.
-  if prepare then return ((natives, assumptionDeps, trustDeps), {})
+  if prepare then
+    -- A callee's summary: derived in its own telescope, which its proof as
+    -- a target would have, with the obligations of its own body.
+    if summary then
+      deriveCalleeSummary m (familyBinders ++ nativeBinders ++ assumptionBinders) unitFact
+        ⟨solveTactic.raw[1][0]⟩ paramsTerm shapeTerm atRuntime
+    return ((natives, assumptionDeps, trustDeps), {})
   -- The proof elaborates in a task (`verex_proof`) as an attempt of its
   -- own; the command elaborates the statement and goes on to the next
   -- target. Declared by its name in the module, as the theorems are, under
@@ -2815,9 +3188,10 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
         VerexIR.Proofs.Satisfies
           (fun args => VerexIR.Proofs.Spec.bind
             (VerexIR.Proofs.Denote.Term.denote $meanings (ρ := $shapeTerm) (Γ := $row)
-              $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
+              $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm $frameEqTerm args))
             (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm))
           $contract))
+  let markReturns ← if script?.isSome then `(tactic| verex_mark_returns) else `(tactic| skip)
   let typedCommand ← withRef (script?.map (·.tactic.raw) |>.getD reference) do `(command|
     set_option Elab.async true in
     set_option maxHeartbeats $budget:num in
@@ -2829,21 +3203,23 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
           $(mkIdent unitDefinition) = .ok executable) $familyBinders* $nativeBinders*
           $invokeBinders* $selfBinders* $routingBinders* $assumptionBinders* : $typedStatement := by
       verex_proof $(mkIdent attempt) =>
-        $unitFact:tactic
+        verex_timed "setup unit fact" $unitFact:tactic
         $assumptionsTactic:tactic
-        apply VerexIR.Proofs.satisfies_of_wp
-        $introduction:tactic
+        verex_timed "setup wp" (apply VerexIR.Proofs.satisfies_of_wp)
+        $markReturns:tactic
+        verex_timed "setup introduction" $introduction:tactic
         all_goals
-        (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
+        (verex_timed "setup unfold" (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
           $shapeTerm:ident, $mutablesTerm:ident, $typedContract:ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
-          String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢
+          String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢)
          -- The function assumes its preconditions; their markers locate
          -- them for its callers only.
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
-         all_goals verex_normalize at $permitted:ident ⊢
+         all_goals verex_timed "setup normalize" (verex_normalize at $permitted:ident ⊢)
          all_goals $automaticTactic:tactic)
-        $scriptTactic:tactic)
+        -- A variant the setup refutes leaves the script no goal.
+        all_goals $scriptTactic:tactic)
   let typedCommand ← if selectsBitVectors declaration then
       `(command| set_option verex.bitVectors true in $typedCommand)
     else pure typedCommand
@@ -2858,13 +3234,18 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
     let report ← takeProofReport attempt
     IO.print report.output
     let outcome := if !failed then "verified" else if overBudget then "budget" else "failed"
-    stageLog s!"{function}: theorem done, {report.heartbeats} heartbeats, {outcome}, \
+    let heartbeats := report.heartbeats + meaningsCost
+    stageLog s!"{function}: theorem done, {heartbeats} heartbeats, {outcome}, \
       {if script?.isSome then "authored" else "automatic"}"
+    if report.exhaustedLeaves + report.undecidedLeaves > 0 then
+      stageLog s!"{function}: leaves exhausted {report.exhaustedLeaves}, \
+        undecided {report.undecidedLeaves}"
     Perf.recordArtifacts s!"{namespaceName}::{function} typed" #[attemptFull]
-      report.heartbeats report.elapsedMs
+      heartbeats report.elapsedMs
     if failed then
       throwErrorAt reference
-        (failureMessage ns function script?.isSome overBudget budgetValue report.failedLeaves)
+        (failureMessage ns function script?.isSome overBudget budgetValue report.failedLeaves
+          report.budgetStop)
     declareTypedTheorem base attemptFull
     stageLog s!"{function}: typed theorem declared"
     -- A member of a cycle concludes with the whole cycle.
@@ -2908,18 +3289,20 @@ alone is elaborated, and the natives it assumes returned, for `verifyCycle`
 to conclude. -/
 private def verifyMember (reference : Syntax) (segments : Array String) (function : String)
     (script? : Option AuthoredScript) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
-    (cycle : Array (FunctionHandle × String)) (family : Bool := false) (prepare : Bool := false) :
+    (cycle : Array (FunctionHandle × String)) (family : Bool := false) (prepare : Bool := false)
+    (summary : Bool := false) :
     CommandElabM (MemberDependencies × PendingVerification) := do
   let ignoring := verex.ignoreProofs.get (← getOptions)
   let script? := if ignoring then none else script?
   let namespaceName := pathName segments
-  let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
-    | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
   let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
     | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
   let unitDefinition ← ensureUnitInstance segments unit
   let unitTerm ← unitTermOf segments unit
   discard <| ensureUnitDefinitions segments unit
+  if let some script := script? then
+    SpecTypes.ensureNamedTwins segments unit script.tactic.raw
   stageLog s!"{function}: semantics"
   let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
   -- A unit declaring ghost fields is verified through its model
@@ -2939,11 +3322,13 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let family := family || (model && (isGeneric declaration || modelRoutesGeneric unit compiled))
   let artifacts := Name.str namespaceName function
   let base := (← getCurrNamespace) ++ artifacts
-  if (← getEnv).contains (base ++ `typedVerified) then
+  -- A callee is summarized whether or not it is verified: its calls are
+  -- inlined either way.
+  if (← getEnv).contains (base ++ `typedVerified) && !summary then
     -- A colliding name alone is not evidence of a denotation proof.
     withRef reference <| requireNativeArtifacts base (selectsBitVectors declaration) model
     return ((#[], #[], #[]), {})
-  if script?.isNone && requiresAuthoredProof declaration && !ignoring then
+  if script?.isNone && requiresAuthoredProof declaration && !ignoring && !summary then
     throwErrorAt reference m!"verex verification failed: `{function}` sets \
       `pragma verify = manual`; {proofRequest ns function #[]}"
   let handleTerm ← handleSyntax ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
@@ -2990,13 +3375,18 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     unitDefinition := unitDefinition
     unitTerm := unitTerm
     handleTerm := handleTerm }
+  let directTargets := contractDirectTargets unit handle.namespaceId ns declaration
+  let recordOwnCall (callee : FunctionHandle) (typeArgs : Array VerexIR.TypeUse)
+      (found : Array (FunctionHandle × Array VerexIR.TypeUse)) :=
+    if !typeArgs.isEmpty && typeArgs.size == arity &&
+        callee.namespaceId == handle.namespaceId &&
+        VerexIR.SemanticOperations.ownParametersIn unit handle typeArgs &&
+        !found.contains (callee, typeArgs)
+      then found.push (callee, typeArgs) else found
   let ownCalls : Array (FunctionHandle × Array VerexIR.TypeUse) := if !framed then #[] else
-    compiled.body.foldCalls (fun callee typeArgs _ found =>
-      if !typeArgs.isEmpty && typeArgs.size == arity &&
-          callee.namespaceId == handle.namespaceId &&
-          VerexIR.SemanticOperations.ownParametersIn unit handle typeArgs &&
-          !found.contains (callee, typeArgs)
-        then found.push (callee, typeArgs) else found) (fun _ _ found => found) #[]
+    directTargets.foldl (fun found (callee, typeArgs) => recordOwnCall callee typeArgs found)
+      (compiled.body.foldCalls (fun callee typeArgs _ found => recordOwnCall callee typeArgs found)
+        (fun _ _ found => found) #[])
   -- The assumed steps of the lemmas its own proof applies.
   let trustDeps : Array Name ← liftTermElabM do
     (functionLemmas ns declaration).foldlM (init := #[]) fun found lemma => do
@@ -3013,7 +3403,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     assumptionDeps := if ownAssumptions then #[(handle, function)] else #[]
     trustDeps := trustDeps
     edges := #[(handle, worklist)]
-    instantiated := if generic then ownCalls else compiled.body.foldCalls recordGenericCall (fun _ _ found => found) #[]
+    instantiated := if generic then ownCalls else
+      directTargets.foldl (fun found (callee, typeArgs) => recordGenericCall callee typeArgs none found)
+        (compiled.body.foldCalls recordGenericCall (fun _ _ found => found) #[])
     contractTargets := contractClosureTargets unit handle.namespaceId ns declaration }
   callees := { callees with calleePairs := callees.calleePairs ++ callees.behaviorPairs }
   -- Each generic call at the empty instantiation instantiates its callee's
@@ -3034,7 +3426,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     let name := (do
       let calleeNs ← unit.namespaces[cycle.namespaceId.index]?
       let declaration ← calleeNs.functions[cycle.functionId.index]?
-      let name ← calleeNs.tables.names[declaration.name.index]?
+      let name ← calleeNs.nameOf declaration.name
       pure name.name).getD "a callee"
     throwErrorAt reference m!"`{function}` reaches `{name}` again through callees that are \
       inlined; only a function calling itself directly is verified by induction, so specify \
@@ -3048,15 +3440,21 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     if model then callees.modelMembers.map fun (member, name, _) => (member, name) else cycle
   let inlinedMember := fun (name : String) =>
     callees.modelMembers.any fun (_, key, inlined) => inlined && key == name
-  for (_, name) in routed do
-    let pair ← `(term| PProd.mk $(cycleSelf name) (PProd.mk $(Syntax.mkStrLit name)
-      $(if inlinedMember name then cycleSelfRefines name else cycleSelfVerified name)))
+  for (member, name) in routed do
+    let proved ← if inlinedMember name then
+        `(term| PProd.mk $(← handleSyntax member) $(cycleSelfRefines name))
+      else pure (cycleSelfVerified name)
+    let pair ← `(term| PProd.mk $(cycleSelf name) (PProd.mk $(Syntax.mkStrLit name) $proved))
     callees := { callees with calleePairs := callees.calleePairs.push pair }
   -- A failure before the proof's task began leaves no artifacts behind;
   -- the target concludes outside this state.
   let saved ← get
   try
-    proveMember m opens callees routed instantiationCertificates errorsBefore prepare
+    let (dependencies, pending) ←
+      proveMember m opens callees routed instantiationCertificates errorsBefore prepare summary
+    let inlinedCallees := if model then #[] else callees.inlined.map fun (callee, _, _, _) =>
+      functionKey unit callee
+    return (dependencies, { pending with inlinedCallees })
   catch failure =>
     modify fun state => { saved with messages := state.messages }
     throw failure
@@ -3099,8 +3497,7 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
     (scripts : String → Option AuthoredScript) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
     (prepare : Bool) : CommandElabM PendingVerification := do
   let namespaceName := pathName segments
-  let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
-    | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
   let unitDefinition ← ensureUnitInstance segments unit
   let unitTerm ← unitTermOf segments unit
   discard <| ensureUnitDefinitions segments unit
@@ -3318,7 +3715,10 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
           ((declarationOf? unit member).any selectsBitVectors)
         let base := (← getCurrNamespace) ++ artifactsOf name
         modifyEnv fun env => auditedDenotations.tag env (base ++ `typedVerified)
-    return { tasks := pendings.flatMap (·.tasks), conclude }
+    return {
+      tasks := pendings.flatMap (·.tasks)
+      conclude := conclude
+      inlinedCallees := pendings.flatMap (·.inlinedCallees) }
   catch failure =>
     -- A failure before the proofs' tasks began leaves no artifacts behind.
     modify fun state => { saved with messages := state.messages }
@@ -3339,8 +3739,7 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
     (opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := #[]) (prepare : Bool := false) :
     CommandElabM PendingVerification := do
   let namespaceName := pathName segments
-  let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
-    | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
   let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
     | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
   -- A body reading an intrinsic map's representation has no denotation: the
@@ -3366,7 +3765,7 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
       | throwErrorAt reference "a callee's namespace is out of range"
     let some memberDeclaration := memberNs.functions[member.functionId.index]?
       | throwErrorAt reference "a callee is out of range"
-    let some name := memberNs.tables.names[memberDeclaration.name.index]?
+    let some name := memberNs.nameOf memberDeclaration.name
       | throwErrorAt reference "a callee has no name"
     if member != handle then
       unless member.namespaceId == handle.namespaceId do
@@ -3383,5 +3782,62 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
   covering (members.map (·.2))
   verifyCycle reference segments members (fun name =>
     if name == function then script? else scripts name) opens prepare
+
+/-- Whether a callee's summary may be derived at all: outside a model, off
+every cycle of calls, with no precondition of its own (a call of such a
+callee asserts it, and inlines), and in a form a summary states
+(`summaryForm`): decided once per callee, before its derivation. -/
+private def summarizable (unit : ValidatedUnit) (handle : FunctionHandle)
+    (ns : ValidatedNamespace) (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Bool :=
+  !declaresGhosts unit && (callCycle unit handle).isEmpty &&
+    !(ContractView.interface.of declaration).contract.conditions.any fun condition =>
+      condition.kind == .requires &&
+        !Contract.conditionReadsRequires unit handle.namespaceId condition.expression
+
+/-- Derive the summary of the callee `function` of the module `segments`
+before its proofs run, where one qualifies; a callee that does not is
+inlined at every call. -/
+def summarizeCallee (reference : Syntax) (segments : Array String) (function : String)
+    (opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := #[]) : CommandElabM Unit := do
+  let namespaceName := pathName segments
+  let unit ← VerexSL.registeredUnitAt reference namespaceName
+  let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
+    | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
+  let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
+  unless summarizable unit handle ns declaration do
+    stageLog s!"{function}: summary refused: a model's, a cycle's, or a required callee"
+    return
+  unless ← liftCoreM (summaryForm (compiledName segments function)) do
+    stageLog s!"{function}: summary refused: its form admits none"
+    return
+  discard <| verifyMember reference segments function none opens #[] (prepare := true)
+    (summary := true)
+
+/-- The callees `keys` of the module `segments` ordered after the callees
+they inline among them: a callee's summary applies the summaries of the
+callees its body inlines. -/
+def summaryOrder (reference : Syntax) (segments : Array String) (keys : Array String) :
+    CommandElabM (Array String) := do
+  let unit ← VerexSL.registeredUnitAt reference (pathName segments)
+  let callees (key : String) : Array String :=
+    match findFunction? unit key with
+    | some (namespaceIndex, _, functionIndex, _) =>
+        match compileFunction unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ with
+        | .ok compiled => (compiled.body.callees #[]).map (functionKey unit ·) |>.filter keys.contains
+        | .error _ => #[]
+    | none => #[]
+  let mut ordered : Array String := #[]
+  let mut visiting : Array String := #[]
+  let mut pending : List (String × Bool) := keys.toList.map (·, false)
+  while let (key, leaving) :: rest := pending do
+    pending := rest
+    if leaving then
+      ordered := ordered.push key
+      continue
+    if ordered.contains key || visiting.contains key then continue
+    visiting := visiting.push key
+    pending := (callees key).toList.map (·, false) ++ (key, true) :: pending
+  return ordered
 
 end VerexSL.Verify

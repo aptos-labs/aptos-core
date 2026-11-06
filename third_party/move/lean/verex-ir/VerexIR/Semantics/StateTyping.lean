@@ -25,7 +25,7 @@ def TypedFrame (unit : ValidatedUnit) (loans : LoanTypes) (ns : ValidatedNamespa
   frame.locals.size = locals.size ∧
     ∀ (index : Nat) (declaration : LocalDecl) (value : RuntimeValue),
       locals[index]? = some declaration → frame.locals[index]? = some (some value) →
-        ∃ type, Resolves ns.tables env declaration.type.typeId type ∧
+        ∃ type, Resolves ns.tables env (ns.typeId declaration.type.typeId) type ∧
           HasType unit loans value type
 
 /-- A state typed under loans: every global slot at its key's type, every
@@ -1285,8 +1285,8 @@ theorem fieldTypes_resolve {targetNs : ValidatedNamespace} {declaration : Struct
     (fieldTypes_eq : StaticTyping.fieldTypes? targetNs declaration variant arguments =
       some fieldTypes) :
     ∃ fields, StaticTyping.fieldsOf targetNs declaration variant = some fields ∧
-      ResolvesAll targetNs.tables arguments.toArray (fields.toList.map (·.type.typeId))
-        fieldTypes := by
+      ResolvesAll targetNs.tables arguments.toArray
+        (fields.toList.map (targetNs.typeId ·.type.typeId)) fieldTypes := by
   simp only [StaticTyping.fieldTypes?, Option.bind_eq_bind, Option.bind_eq_some_iff]
     at fieldTypes_eq
   obtain ⟨fields, fields_eq, resolved⟩ := fieldTypes_eq
@@ -1311,6 +1311,7 @@ theorem ghostTypes_resolve {unit : ValidatedUnit} {handle : StructHandle}
   have ghosts_eq : nominalGhosts unit handle = declaration.ghosts := by
     simp [nominalGhosts, namespace_eq, declaration_eq]
   unfold ghostTypeIds
+  simp only [namespace_eq]
   rw [ghosts_eq]
   simp only [StaticTyping.ghostTypes?] at ghostTypes_eq
   refine ResolvesAll.of_mapM (fuel := targetNs.tables.types.size + 1) ?_
@@ -1360,7 +1361,7 @@ theorem constructNominal_typed {unit : ValidatedUnit} {loans : LoanTypes}
     obtain ⟨declared, declared_eq, resolved⟩ := fieldTypes_resolve fieldTypes_eq
     have ghostsResolved := ghostTypes_resolve namespace_eq declaration_eq ghostTypes_eq
     have ghostLength := ResolvesAll.length_eq ghostsResolved
-    simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+    rw [ghostTypeIds_length] at ghostLength
     refine .nominal handle variant _ spelled arguments targetNs declared fieldTypes ghostTypes name_eq
       (fieldsOf_handleFields namespace_eq declaration_eq declared_eq) resolved ghostsResolved ?_
     rw [contentsTypes_of_constructorFields arguments expected, List.append_nil,
@@ -1384,7 +1385,7 @@ theorem HasType.nominal_fields {unit : ValidatedUnit} {loans : LoanTypes}
     ∃ declaringNamespace declared fieldTypes ghostTypes, structName? unit source = some name ∧
       handleFields? unit source variant = some (declaringNamespace, declared) ∧
       ResolvesAll declaringNamespace.tables arguments.toArray
-        (declared.toList.map (·.type.typeId)) fieldTypes ∧
+        (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes ∧
       ResolvesAll declaringNamespace.tables arguments.toArray
         (ghostTypeIds unit source) ghostTypes ∧
       HasTypes unit loans fields.toList
@@ -1441,7 +1442,7 @@ theorem destructNominal_typed {unit : ValidatedUnit} {loans : LoanTypes}
       rw [contentsTypes_of_constructorFields arguments constructible, List.append_nil] at typed
       have lengths := HasTypes.length_eq typed
       have ghostLength := ResolvesAll.length_eq ghostsResolved
-      simp only [ghostTypeIds, List.length_map, Array.length_toList] at ghostLength
+      rw [ghostTypeIds_length] at ghostLength
       simp only [Array.length_toList, List.length_append, List.length_map] at lengths
       have taken : expected.size = fieldTypes'.length := by omega
       simp only [Array.toList_extract, List.extract_eq_drop_take, List.drop_zero, Nat.sub_zero]
@@ -1526,7 +1527,7 @@ private theorem fieldType_of_find {targetNs : ValidatedNamespace} {declaration :
     {fieldName : String} {arguments : List SemArg}
     (fields_eq : StaticTyping.fieldsOf targetNs declaration variant = some fields)
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field) :
+      (targetNs.nameOf field.name).any (·.name == fieldName)) = some field) :
     StaticTyping.fieldType? targetNs declaration variant arguments fieldName =
       StaticTyping.resolveIn targetNs arguments.toArray field.type.typeId := by
   rw [Array.find?_toList] at find_eq
@@ -1563,7 +1564,7 @@ private theorem handleFields_variant {unit : ValidatedUnit} {handle : StructHand
     (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
     (handle_eq : handleFields? unit handle (some variantName) = some (targetNs', fields)) :
     targetNs' = targetNs ∧ ∃ chosen spelled, chosen ∈ declaration.variants.toList ∧
-      targetNs.tables.names[chosen.name.index]? = some spelled ∧
+      (targetNs.nameOf chosen.name) = some spelled ∧
       StaticTyping.fieldsOf targetNs declaration (some spelled.name) = some fields ∧
       fields = chosen.fields := by
   simp only [handleFields?, namespace_eq, declaration_eq, Option.bind_eq_bind, Option.bind_some,
@@ -1587,7 +1588,7 @@ theorem fieldTypesAcross_mem {unit : ValidatedUnit} {handle : StructHandle}
     (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
     (handle_eq : handleFields? unit handle variant = some (targetNs', fields))
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (targetNs'.nameOf field.name).any (·.name == fieldName)) = some field)
     (types_eq : StaticTyping.fieldTypesAcross? targetNs declaration arguments fieldName = some types) :
     ∃ type, StaticTyping.resolveIn targetNs arguments.toArray field.type.typeId = some type ∧
       type ∈ types := by
@@ -1621,15 +1622,15 @@ theorem fieldTypesAcross_mem {unit : ValidatedUnit} {handle : StructHandle}
       simp only [StaticTyping.fieldTypesAcross?, nonempty, Bool.false_eq_true, if_false]
         at types_eq
       have has_field : chosen.fields.any (fun field =>
-          (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = true := by
+          (targetNs'.nameOf field.name).any (·.name == fieldName)) = true := by
         rw [← Array.any_toList]
         have matched := List.find?_some find_eq
         exact List.any_eq_true.mpr ⟨field, List.mem_of_find?_eq_some find_eq, matched⟩
       have image_eq : ∀ image, (do
-          let variantName ← targetNs'.tables.names[chosen.name.index]?
+          let variantName ← (targetNs'.nameOf chosen.name)
           let fields ← StaticTyping.fieldsOf targetNs' declaration (some variantName.name)
           if fields.any fun field =>
-              (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName) then
+              (targetNs'.nameOf field.name).any (·.name == fieldName) then
             some <$> StaticTyping.fieldType? targetNs' declaration (some variantName.name)
               arguments fieldName
           else some none) = some image →
@@ -1657,19 +1658,19 @@ theorem ResolvesAll.getId {tables : Tables} {env : Array SemArg} :
       | succ index => simpa using ResolvesAll.getId rest (by simpa using found)
 
 /-- The resolved type at a declared field's position is its field's type. -/
-private theorem declared_field_resolves {tables : Tables} {env : Array SemArg}
+private theorem declared_field_resolves {tables : Tables} {env : Array SemArg} {ns : ValidatedNamespace}
     {declared : Array FieldDecl} {fieldTypes : List SemTy} {index : Nat} {field : FieldDecl}
-    (resolved : ResolvesAll tables env (declared.toList.map (·.type.typeId)) fieldTypes)
+    (resolved : ResolvesAll tables env (declared.toList.map (ns.typeId ·.type.typeId)) fieldTypes)
     (field_eq : declared[index]? = some field) :
     ∃ fieldType, fieldTypes[index]? = some fieldType ∧
-      Resolves tables env field.type.typeId fieldType :=
+      Resolves tables env (ns.typeId field.type.typeId) fieldType :=
   resolved.getId (by simp [field_eq])
 
 /-- A declared field's position reads the declared field types, ahead of a
 table owner's contents. -/
-private theorem declared_field_type {tables : Tables} {env : Array SemArg}
+private theorem declared_field_type {tables : Tables} {env : Array SemArg} {ns : ValidatedNamespace}
     {declared : Array FieldDecl} {fieldTypes extra : List SemTy} {index : Nat} {field : FieldDecl}
-    (resolved : ResolvesAll tables env (declared.toList.map (·.type.typeId)) fieldTypes)
+    (resolved : ResolvesAll tables env (declared.toList.map (ns.typeId ·.type.typeId)) fieldTypes)
     (field_eq : declared[index]? = some field) :
     (fieldTypes ++ extra)[index]? = fieldTypes[index]? := by
   obtain ⟨fieldType, found, -⟩ := declared_field_resolves resolved field_eq
@@ -1687,10 +1688,10 @@ private theorem field_type_mem {unit : ValidatedUnit} {targetNs : ValidatedNames
     (types_eq : StaticTyping.fieldTypesAcross? targetNs declaration arguments fieldName = some types)
     (handle_eq : handleFields? unit handle variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
-      (declared.toList.map (·.type.typeId)) fieldTypes)
+      (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
     (field_eq : declared[index]? = some field)
     (find_eq : declared.toList.find? (fun field =>
-      (declaringNamespace.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (declaringNamespace.nameOf field.name).any (·.name == fieldName)) = some field)
     (fieldType_eq : fieldTypes[index]? = some fieldType) :
     fieldType ∈ types := by
   have same := handleFields_namespace namespace_eq handle_eq
@@ -1721,7 +1722,7 @@ private theorem nominal_field_typed {unit : ValidatedUnit} {loans : LoanTypes}
     (handle_eq' : handleFields? unit handle variant = some (targetNs', fields))
     (field_eq : fields[index]? = some field)
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs'.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (targetNs'.nameOf field.name).any (·.name == fieldName)) = some field)
     (value_eq : values[index]? = some value) :
     ∃ type, type ∈ types ∧ HasType unit loans value type := by
   obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, -, handle_eq, resolved, ghostsResolved, typed⟩ :=
@@ -1851,11 +1852,11 @@ theorem handleFields_of_distinct {unit : ValidatedUnit} {handle : StructHandle}
     (declaration_eq : targetNs.structs[handle.structId]? = some declaration)
     (distinct : StaticTyping.variantsDistinct targetNs declaration = true)
     (member : variant ∈ declaration.variants)
-    (name_eq : targetNs.tables.names[variant.name.index]? = some name) :
+    (name_eq : (targetNs.nameOf variant.name) = some name) :
     handleFields? unit handle (some name.name) = some (targetNs, variant.fields) := by
   have member := Array.mem_toList_iff.mpr member
   have found : (declaration.variants.toList.find? fun candidate =>
-      (targetNs.tables.names[candidate.name.index]?).any (·.name == name.name)).isSome := by
+      (targetNs.nameOf candidate.name).any (·.name == name.name)).isSome := by
     exact List.find?_isSome.mpr ⟨variant, member, by simp [name_eq]⟩
   obtain ⟨chosen, chosen_eq⟩ := Option.isSome_iff_exists.mp found
   have chosen_mem := List.mem_of_find?_eq_some chosen_eq
@@ -1884,7 +1885,7 @@ private theorem nominal_variant_field_typed {unit : ValidatedUnit} {loans : Loan
     (handle_eq' : handleFields? unit handle (some variantName) = some (targetNs, fields))
     (field_eq : fields[index]? = some field)
     (find_eq : fields.toList.find? (fun field =>
-      (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field)
+      (targetNs.nameOf field.name).any (·.name == fieldName)) = some field)
     (value_eq : values[index]? = some value) :
     HasType unit loans value fieldType := by
   obtain ⟨declaringNamespace, declared, fieldTypes, ghostTypes, -, handle_eq, resolved, ghostsResolved, typed⟩ :=
@@ -2208,7 +2209,7 @@ theorem PathTyped.slot {unit : ValidatedUnit} {loans : LoanTypes} {source : Stru
     (name_eq : structName? unit source = some name)
     (handle_eq : handleFields? unit source variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
-      (declared.toList.map (·.type.typeId)) fieldTypes)
+      (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
     (ghostsResolved : ResolvesAll declaringNamespace.tables arguments.toArray
       (ghostTypeIds unit source) ghostTypes)
     (typed : HasTypes unit loans fields.toList
@@ -2249,7 +2250,7 @@ theorem PathTyped.field {unit : ValidatedUnit} {loans : LoanTypes} {source : Str
     (name_eq : structName? unit source = some name)
     (handle_eq : handleFields? unit source variant = some (declaringNamespace, declared))
     (resolved : ResolvesAll declaringNamespace.tables arguments.toArray
-      (declared.toList.map (·.type.typeId)) fieldTypes)
+      (declared.toList.map (declaringNamespace.typeId ·.type.typeId)) fieldTypes)
     (ghostsResolved : ResolvesAll declaringNamespace.tables arguments.toArray
       (ghostTypeIds unit source) ghostTypes)
     (typed : HasTypes unit loans fields.toList
@@ -2452,7 +2453,7 @@ theorem nominalTarget_handle {unit : ValidatedUnit} {sourceNamespace : Namespace
     {ns targetNs : ValidatedNamespace} {reference : QualifiedRef} {declaration : StructDecl}
     {spelled : QualifiedName} {handle : StructHandle}
     (ns_eq : unit.namespaces[sourceNamespace.index]? = some ns)
-    (target : StaticTyping.nominalTarget? unit ns reference.name =
+    (target : StaticTyping.nominalTarget? unit ns (ns.nameId reference.name) =
       some (targetNs, declaration, spelled))
     (resolve : resolveStruct? unit sourceNamespace reference = some handle) :
     unit.namespaces[handle.namespaceId.index]? = some targetNs ∧
@@ -2617,7 +2618,7 @@ theorem PathTyped.subsliceOf {unit : ValidatedUnit} {loans : LoanTypes} {value :
 theorem resolvePlace_typed {unit : ValidatedUnit} {loans : LoanTypes}
     {context : StaticTyping.Context} {frame : RuntimeFrame} {state : RuntimeState}
     (unit_eq : context.unit = unit)
-    (ns_eq : unit.namespaces[context.ns.identity.index]? = some context.ns)
+    (ns_eq : unit.namespaces[context.ns.unitIdentity.index]? = some context.ns)
     (frameTyped : TypedFrame unit loans context.ns context.locals context.env frame) :
     ∀ (fuel fuel' : Nat) {placeId : PlaceId} {type : SemTy} {variant : Option String}
       {place : RuntimePlace},

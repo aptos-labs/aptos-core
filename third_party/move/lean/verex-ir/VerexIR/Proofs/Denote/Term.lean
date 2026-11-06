@@ -724,12 +724,14 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   | call {Γ : NRow} {σs : NRow} (site : Nat) (handle : FunctionHandle) (shape : ResultShape)
       (arguments : Args unit ρ Γ σs) : Term unit ρ Γ shape.bodyType
   /-- A call with type arguments: the callee's own signature `σs` and
-  `shape`, the arguments `θ` in the caller's types, and the VIR type
-  arguments that instantiate the callee's frame. -/
-  | callGeneric {Γ : NRow} {σs : NRow} (site : Nat) (handle : FunctionHandle)
-      (typeArgs : Array TypeUse)
-      (θ : TypeArgs) (shape : ResultShape) (arguments : Args unit ρ Γ (NRow.subst θ.1 σs)) :
-      Term unit ρ Γ (shape.subst θ.1).bodyType
+  `shape`, the arguments `θ` in the caller's types, the VIR type
+  arguments that instantiate the callee's frame, and the signature `θ`
+  instantiates, evaluated by the compiler. -/
+  | callGeneric {Γ : NRow} {σs σs' : NRow} (site : Nat) (handle : FunctionHandle)
+      (typeArgs : Array TypeUse) (θ : TypeArgs) (shape shape' : ResultShape)
+      (resolved : (NRow.subst θ.1 σs == σs' && shape.subst θ.1 == shape') = true)
+      (arguments : Args unit ρ Γ σs') :
+      Term unit ρ Γ shape'.bodyType
   /-- A closure of a function without type arguments over evaluated
   captures: the target and how its parameters are captured or supplied. -/
   | closure {Γ full captured supplied : NRow} (handle : FunctionHandle)
@@ -742,15 +744,18 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       Term unit ρ Γ (.function supplied shared results)
   /-- A closure with type arguments: the weave of the target's own
   parameters, its own result shape, the arguments `θ` in the caller's types,
-  and the VIR type arguments that instantiate its frame. -/
-  | closureGeneric {Γ full captured supplied : NRow} (handle : FunctionHandle)
+  the VIR type arguments that instantiate its frame, and the rows `θ`
+  instantiates, evaluated by the compiler. -/
+  | closureGeneric {Γ full captured supplied captured' supplied' : NRow} (handle : FunctionHandle)
       (weave : Weave full captured supplied) (typeArgs : Array TypeUse) (θ : TypeArgs)
-      (shape : ResultShape) (shared : Sharing)
+      (shape shape' : ResultShape) (shared : Sharing)
       (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
       (sharing : closureShared unit handle weave.mask = shared)
       (below : closureSignatureBelow unit handle = true)
-      (captures : Args unit ρ Γ (NRow.subst θ.1 captured)) :
-      Term unit ρ Γ (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
+      (resolved : (NRow.subst θ.1 captured == captured' && NRow.subst θ.1 supplied == supplied' &&
+        shape.subst θ.1 == shape') = true)
+      (captures : Args unit ρ Γ captured') :
+      Term unit ρ Γ (.function supplied' shared shape'.row)
   /-- An invocation of a function value on evaluated arguments, after the
   value itself; its value is the function's result. -/
   | invoke {Γ σs : NRow} {shared : Sharing} (site : Nat) (shape : ResultShape)
@@ -1812,6 +1817,26 @@ def constructedAt {ρ : ResultShape} {Γ : NRow} {α : Type} (_site : Nat) (valu
 /-- The locals and memory an anchor at a site records. -/
 def AnchorOf (_site : Nat) (Γ : NRow) : Type := HEnv Γ × (Memory unit)
 
+/-- The rows and shape of a generic call, from its compile-time evidence. -/
+theorem resolvedCall {θ σs σs' : NRow} {shape shape' : ResultShape}
+    (resolved : (NRow.subst θ σs == σs' && shape.subst θ == shape') = true) :
+    NRow.subst θ σs = σs' ∧ shape.subst θ = shape' := by
+  simpa only [Bool.and_eq_true, beq_iff_eq] using resolved
+
+/-- The captured rows and the function type of a generic closure, from its
+compile-time evidence. -/
+theorem resolvedClosure {θ captured supplied captured' supplied' : NRow}
+    {shape shape' : ResultShape} {shared : Sharing}
+    (resolved : (NRow.subst θ captured == captured' && NRow.subst θ supplied == supplied' &&
+      shape.subst θ == shape') = true) :
+    NRow.subst θ captured = captured' ∧
+      NTy.function (NRow.subst θ supplied) shared (shape.subst θ).row =
+        NTy.function supplied' shared shape'.row := by
+  simp only [Bool.and_eq_true, beq_iff_eq] at resolved
+  obtain ⟨⟨captured, supplied⟩, shape⟩ := resolved
+  subst captured supplied shape
+  exact ⟨rfl, rfl⟩
+
 /-- The function value of a closure with type arguments: `closureOf` in the
 instantiation its frame computes, carrying the target's own weave and result
 shape and the type arguments, which name the meaning of its invocation at the
@@ -1960,25 +1985,28 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
       Flow.bind (arguments.denote meanings env) fun values env =>
         Spec.bind (callAt site (meanings.call handle _ shape values)) fun result =>
           Spec.pure (.value (shape.toBody result) env)
-  | _, _, .callGeneric site handle typeArgs θ shape arguments, env =>
+  | _, _, .callGeneric site handle typeArgs θ shape shape' resolved arguments, env =>
       Flow.bind (arguments.denote meanings env) fun values env =>
         Spec.bind (callAt site (meanings.generic handle typeArgs θ _ shape
-            (HList.toSkolem θ _ values))) fun result =>
-          Spec.pure (.value ((shape.subst θ.1).toBody (ResultShape.ofSkolem θ shape result)) env)
+            (HList.toSkolem θ _ (cast (congrArg HList (resolvedCall resolved).1.symm) values))))
+          fun result => Spec.pure (.value (shape'.toBody
+            (cast (congrArg ResultShape.carrier (resolvedCall resolved).2)
+              (ResultShape.ofSkolem θ shape result))) env)
   | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
       captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
         Spec.pure (.value (Skolems.construct supplied shared results handle weave.mask #[] values
           (SiteTyped.ofClosure rows sharing closed faithful)) env)
-  | _, _, .closureGeneric (supplied := supplied) handle weave typeArgs θ shape shared rows sharing
-      below captures, env =>
+  | _, _, .closureGeneric handle weave typeArgs θ shape _ shared rows sharing below resolved
+      captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
         Spec.given (@ClosureFrame unit _ (Skolems.instantiate θ ‹_›) handle
             (frameInstantiation unit handle meanings.typeInstantiation typeArgs)) fun frame =>
-          Spec.pure (.value (functionOfGeneric unit meanings.typeInstantiation typeArgs θ weave
-              shape shared handle values
+          Spec.pure (.value (cast (congrArg NTy.carrier (resolvedClosure (shared := shared) resolved).2)
+            (functionOfGeneric unit meanings.typeInstantiation typeArgs θ weave
+              shape shared handle (cast (congrArg HList (resolvedClosure (shared := shared) resolved).1.symm) values)
               (closureOfGeneric_typed meanings.typeInstantiation typeArgs θ weave shape rows
-                sharing below frame)) env)
+                sharing below frame))) env)
   | _, _, .invoke site shape function arguments, env =>
       Flow.bind (function.denote meanings env) fun closure env =>
         Flow.bind (arguments.denote meanings env) fun values env =>
@@ -2262,15 +2290,18 @@ def Arms.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit
       | none => rest.denote meanings value env
 end
 
-/-- A compiled function: its parameter and remaining local types, its
-declared result shape, and its body over the complete local row. -/
+/-- A compiled function: its parameter and remaining local types, the
+complete local row they spell as a literal, its declared result shape, and
+its body over that row. -/
 structure Function (unit : Validation.ValidatedUnit) where
   params : NRow
   locals : NRow
+  frame : NRow
+  frame_eq : params ++ locals = frame
   result : ResultShape
-  body : Term unit result (params ++ locals) result.bodyType
+  body : Term unit result frame result.bodyType
   /-- The mutable-reference parameters, resolved at exit. -/
-  mutables : Mutables (params ++ locals)
+  mutables : Mutables frame
 
 /-- The function result a body outcome denotes, after the mutable-reference
 parameters it still holds are resolved.  Loop control that escapes the body
@@ -2288,7 +2319,7 @@ def Function.denoteWith {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarri
     {executable : VerexIR.Validation.ExecutableUnit unit} [Skolems unit]
     (meanings : Meanings executable) (f : Function unit) (args : HList f.params) :
     Comp unit f.result.carrier :=
-  Spec.bind (f.body.denote meanings (initialEnv f.params f.locals args))
+  Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
     (f.result.finish f.mutables)
 
 /-- The denotation of a function on native arguments, every call meaning
@@ -2299,7 +2330,7 @@ def Function.denote {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers 
     (typeInstantiation : Array (TypeId × TypeId)) (f : Function unit) (args : HList f.params) :
     Comp unit f.result.carrier :=
   Spec.bind (f.body.denote (closedMeanings executable typeInstantiation)
-      (initialEnv f.params f.locals args))
+      (initialEnv f.params f.locals f.frame_eq args))
     (f.result.finish f.mutables)
 
 /-- The meaning of calls routing one function to `self`: its handle at its
@@ -2988,12 +3019,12 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .closure handle weave _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index} mask {weave.mask}\
         ({captures.describe})"
-  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ captures =>
+  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types> \
         mask {weave.mask}({captures.describe})"
   | _, _, .invoke _ _ function arguments =>
       s!"invoke {function.describe}({arguments.describe})"
-  | _, _, .callGeneric _ handle typeArgs _ _ arguments =>
+  | _, _, .callGeneric _ handle typeArgs _ _ _ _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types>\
         ({arguments.describe})"
   | _, _, .tuple elements => s!"({elements.describe})"

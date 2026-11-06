@@ -71,9 +71,8 @@ Designs: [`denotation.md`](../designs/denotation.md),
   below roughly 1.9G heartbeats including authored proofs. Then the levers of
   [`performance.md`](../designs/performance.md), "Open levers", in its order,
   postponed for now; the next is fact dependencies of normalized subterms
-  (Preparation, 6), then fail fast and ground evaluation of literal leaves,
-  and the opt-in join scheduler (`verex.sharedContinuations`) enabled for
-  automatic verification or removed. Debts:
+  (Preparation, 6), then fail fast and ground evaluation of literal leaves.
+  Debts:
   [`measurement-debts.md`](../status/measurement-debts.md).
 - **Assumptions.** Discharge the hypotheses in
   [`assumptions.md`](../status/assumptions.md): the compilation agreement
@@ -138,6 +137,11 @@ Designs: [`denotation.md`](../designs/denotation.md),
 
 Design: [`relocatable-namespaces.md`](../designs/relocatable-namespaces.md).
 
+- **R2, compiled namespaces everywhere.** `scripts/verify-modules.py` compiles a
+  package's namespaces to `.olean` files and each module imports them. Open: the
+  Rust driver's pass over crates (the same `compileNamespace`), and `verex-move
+  verify <package>` and `move prove --lean`, which still elaborate all in one
+  rendering.
 - **R3, proof reuse.** An opaque callee of another module is verified again
   in every importer, and every linked module's unit certificates are checked
   again (7.5 s for a client of `ordered_map`). Needs the semantics invariant
@@ -268,6 +272,11 @@ Designs: [`higher-order-functions.md`](../designs/higher-order-functions.md),
 - **H5.** The re-entrancy lock.
 - **C4.** Prover tests `closures/stored_fun_values` and
   `behavioral_target_two_masks`.
+- **Results as rows.** Function values of tuple-returning functions: `ResultShape`
+  gains a row case and a tuple result reads as its elements with their sharing
+  marks. Until then such a value is refused where it is constructed: "a function
+  value of `f` is not supported: `f` returns a tuple"
+  ([`higher-order-functions.md`](../designs/higher-order-functions.md)).
 - Unsupported, diagnosed: explicit enum-field write frames; write frames at
   dependency-interface boundaries. Not scheduled: closures whose targets
   return references; function types as type arguments

@@ -1,6 +1,8 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import Lean
+
 import Std.Data.HashSet
 
 /-!
@@ -28,5 +30,11 @@ private def reservedWords : Std.HashSet String := Std.HashSet.ofList [
 
 /-- Whether an identifier must be escaped when printed. -/
 def isReservedWord (word : String) : Bool := reservedWords.contains word
+
+/-- An identifier as printed, escaped where it must be. `_` alone would read as
+a placeholder, and Lean's name printer does not escape it. -/
+def escapedIdentifier (word : String) : String :=
+  if word == "_" then "«_»"
+  else (Lean.Name.mkSimple word).toStringWithToken (isToken := isReservedWord)
 
 end VerexSL

@@ -471,8 +471,8 @@ theorem Skolems.encode_reframe (Θ : Skolems unit) {params : NRow} (own : params
 section Reframe
 variable (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true)
 
-/-- A scalar is the same value at every frame. -/
-private theorem Skolems.reframe_scalar {τ : NTy} (bounded) (value : @NTy.carrier Θ.toCarriers τ)
+/-- A value whose carrier and encoding do not read the frame stays itself. -/
+theorem Skolems.reframe_of_encode {τ : NTy} (bounded) (value : @NTy.carrier Θ.toCarriers τ)
     (carriers : @NTy.carrier Θ.toCarriers τ = @NTy.carrier (Θ.instance params own).toCarriers τ)
     (encoded : ∀ value, @NTy.encode (Θ.instance params own).toCarriers τ (cast carriers value) =
       @NTy.encode Θ.toCarriers τ value) :
@@ -482,29 +482,29 @@ private theorem Skolems.reframe_scalar {τ : NTy} (bounded) (value : @NTy.carrie
 
 @[vir_denote_norm] theorem Skolems.reframe_unit (bounded) (value : Unit) :
     Θ.reframe own (τ := .unit) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_bool (bounded) (value : Bool) :
     Θ.reframe own (τ := .bool) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_int {width : Nat} {signed : Bool} (bounded)
     (value : SpecInt (.bits width) signed) :
     Θ.reframe own (τ := .int width signed) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_num (bounded) (value : SpecInt .unbounded true) :
     Θ.reframe own (τ := .num) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_address (bounded) (value : String) :
     Θ.reframe own (τ := .address) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_signer (bounded) (value : String) :
     Θ.reframe own (τ := .signer) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_string (bounded) (value : String) :
     Θ.reframe own (τ := .string) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 @[vir_denote_norm] theorem Skolems.reframe_bytes (bounded) (value : Array UInt8) :
     Θ.reframe own (τ := .bytes) bounded value = value :=
-  Θ.reframe_scalar own bounded value rfl fun _ => rfl
+  Θ.reframe_of_encode own bounded value rfl fun _ => rfl
 
 private theorem paramsAll_head {f : Nat → Bool} {τ : NTy} {rest : NRow}
     (bounded : NRow.paramsAll f (.cons τ rest) = true) : τ.paramsAll f = true := by
@@ -578,6 +578,28 @@ private theorem encode_fields {Φ Ψ : Carriers} {source : StructHandle} {argume
   apply Array.map_congr_left
   intro value _
   exact (Θ.encode_reframe own _ value).symm
+
+open Lean Meta in
+/-- A value of a type without parameters or function values, whose carrier and
+encoding do not read the frame, stays itself (`Skolems.reframe_of_encode`). -/
+simproc ↓ [vir_denote, vir_denote_norm] reframeClosed (@Skolems.reframe _ ?functions _ _ _ _ _ _) := fun e => do
+  let #[unit, functions, frame, params, own, τ, bounded, value] := e.getAppArgs
+    | return .continue
+  withTransparency .default do
+    unless (← whnf (mkApp (mkConst ``NTy.paramFree) τ)).isConstOf ``true do return .continue
+    let source ← inferType value
+    unless ← isDefEq source (← inferType e) do return .continue
+    let carriers ← mkEqRefl source
+    let identity := mkAppN (mkConst ``Skolems.reframe_of_encode)
+      #[unit, functions, frame, params, own, τ, bounded, value, carriers]
+    let .forallE _ encodedType _ _ ← whnf (← inferType identity) | return .continue
+    let some encoded ← forallBoundedTelescope encodedType (some 1) fun bound statement => do
+        let_expr Eq _ left right := statement | return none
+        unless ← isDefEq left right do return none
+        return some (← mkLambdaFVars bound (← mkEqRefl right))
+      | return .continue
+    let proof ← mkExpectedTypeHint (mkApp identity encoded) (← mkEq e value)
+    return .visit { expr := value, proof? := some proof }
 
 /-- A ghost slot moves with its value. -/
 @[vir_denote_norm] theorem Skolems.reframe_ghost {slot : NTy} (bounded)

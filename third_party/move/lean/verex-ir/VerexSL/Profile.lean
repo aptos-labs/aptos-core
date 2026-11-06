@@ -80,6 +80,24 @@ by the model its Boogie prelude or its translator gives the native
 call to a native it does not model. The models mirror the Prover case by
 case. -/
 
+/-- What a native reads of its type argument (`VerexIR.Proofs.Denote.reflectedTypeName`). -/
+inductive TypeReflection where
+  /-- The canonical name, as a `string::String`. -/
+  | name
+  /-- The address, module, and name with type arguments, as a `TypeInfo`. -/
+  | info
+  deriving Repr, Inhabited
+
+/-- An `aggregator_v2` native the prelude implements. -/
+inductive AggregatorOperation where
+  | create
+  | createUnbounded
+  | tryAdd
+  | trySub
+  | isAtLeast
+  | read
+  deriving Repr, Inhabited, BEq
+
 /-- The Prover's model of a native without a specification. -/
 inductive NativeModel where
   /-- The result is an uninterpreted function of the type parameters and
@@ -88,13 +106,20 @@ inductive NativeModel where
   native itself. The native aborts exactly when the specification predicate
   `abortsUnless`, applied to the type parameters and arguments, is false,
   and without one it does not abort. `resultLength` is the length the
-  prelude states for a vector result. -/
+  prelude states for a vector result. With `reflection`, the value at a type
+  mentioning no parameter is the one the translator computes of the type. -/
   | uninterpreted (resultLength : Option Nat := none) (function : Option String := none)
-      (abortsUnless : Option String := none)
+      (abortsUnless : Option String := none) (reflection : Option TypeReflection := none)
   /-- The result is the variant of the native's three-variant result enum
   at the position of `RuntimeValue.order` of its two operands (less, equal,
   greater in declaration order), without abort. -/
   | structuralOrder
+  /-- The prelude's intrinsic of `aggregator_v2`, by the element type: at
+  `u64` and `u128` exact arithmetic over the `value` and `max_value` fields;
+  it aborts unless the element's `type_name` is one of those two, which at
+  any other concrete type it is not; at a type parameter that does not abort
+  the result and the referent are unconstrained. -/
+  | aggregator (operation : AggregatorOperation)
   deriving Repr, Inhabited
 
 /-- The Move Prover's models, by qualified native name.
@@ -102,6 +127,7 @@ inductive NativeModel where
 with a 32-byte result, called by procedures that do not abort.
 `bcs::to_bytes`: `bcs::serialize` of the value, without abort.
 `type_info::type_name` and `type_info::type_of`: functions of the type,
+computed at a type mentioning no parameter as the translator computes them,
 the latter aborting unless the type is a struct (`spec_is_struct`).
 `cmp::compare`: the structural order, as the translator's per-type
 `$1_cmp_$compare` (`aptos-natives.bpl`), which it refines for type
@@ -110,16 +136,32 @@ A model holds beside what the native's specification states, as the
 prelude defines a native whatever its specification adds. The prelude's
 injectivity of the hashes is contradictory with their fixed length; a
 function assumes it of its parameters instead (`moveCollisionFreeHashes`).
-The concrete names the Prover computes for concrete types are not
-mirrored. -/
+`aggregator_v2`: the `{% for instance in aggregator_v2_instances %}` procedures
+of `aptos-natives.bpl`. -/
 def moveNativeModels : List (String × NativeModel) := [
   ("0x1::hash::sha2_256", .uninterpreted (some 32)),
   ("0x1::hash::sha3_256", .uninterpreted (some 32)),
   ("0x1::bcs::to_bytes", .uninterpreted (function := some "0x1::bcs::serialize")),
-  ("0x1::type_info::type_name", .uninterpreted),
+  ("0x1::type_info::type_name", .uninterpreted (reflection := some .name)),
   ("0x1::type_info::type_of",
-    .uninterpreted (abortsUnless := some "0x1::type_info::spec_is_struct")),
-  ("0x1::cmp::compare", .structuralOrder)]
+    .uninterpreted (abortsUnless := some "0x1::type_info::spec_is_struct")
+      (reflection := some .info)),
+  ("0x1::cmp::compare", .structuralOrder),
+  ("0x1::aggregator_v2::create_aggregator", .aggregator .create),
+  ("0x1::aggregator_v2::create_unbounded_aggregator", .aggregator .createUnbounded),
+  ("0x1::aggregator_v2::try_add", .aggregator .tryAdd),
+  ("0x1::aggregator_v2::try_sub", .aggregator .trySub),
+  ("0x1::aggregator_v2::is_at_least_impl", .aggregator .isAtLeast),
+  ("0x1::aggregator_v2::read", .aggregator .read)]
+
+/-- The native the aggregator model reads an element type's name by. -/
+def moveTypeNameNative : String := "0x1::type_info::type_name"
+
+/-- What the prelude states of a field: an argument at a position, or zero. -/
+inductive StatedField where
+  | argument (index : Nat)
+  | zero
+  deriving Repr, Inhabited
 
 /-- The meaning the Move Prover's prelude gives a specification function
 beyond an uninterpreted one. -/
@@ -130,13 +172,39 @@ inductive SpecificationModel where
   bounded byte vectors is of every value; a function assumes those of its
   parameters instead (`Contract.serializeFacts`). -/
   | serialization
+  /-- Whether a type is a struct or enum, an uninterpreted value of a type
+  parameter (`VerexIR.Proofs.Denote.reflectedIsStruct`). -/
+  | isStruct
+  /-- The field at a position of a structure operand. -/
+  | field (index : Nat)
+  /-- A structure operand with its field at a position the second operand. -/
+  | setField (index : Nat)
+  /-- An uninterpreted value of a structure at its arguments, with fields at
+  positions the prelude states of every such value. -/
+  | stated (fields : List (Nat × StatedField))
   deriving Repr, Inhabited
 
 /-- The Move Prover's meanings of specification functions, by qualified
 name: `bcs::serialize`, of which the prelude states every value's
-serialization not empty. -/
+serialization not empty, `type_info::spec_is_struct`, which the
+translator computes, the fields `aggregator_v2::spec_get_value` and
+`spec_get_max_value` read, and the operations of `aggregator`'s model
+(`Frontend/VIR/Encode.lean`, `moveModelFields`): those `spec_get_handle`, `spec_get_key`, `spec_get_limit`,
+`spec_read` and `spec_aggregator_get_val` read, the one `spec_aggregator_set_val`
+writes, and the limit and value the prelude's axioms state of `spec_new_aggregator`,
+which hold of its value by construction. -/
 def moveSpecificationModels : List (String × SpecificationModel) := [
-  ("0x1::bcs::serialize", .serialization)]
+  ("0x1::bcs::serialize", .serialization),
+  ("0x1::type_info::spec_is_struct", .isStruct),
+  ("0x1::aggregator_v2::spec_get_value", .field 0),
+  ("0x1::aggregator_v2::spec_get_max_value", .field 1),
+  ("0x1::aggregator::spec_get_handle", .field 0),
+  ("0x1::aggregator::spec_get_key", .field 1),
+  ("0x1::aggregator::spec_get_limit", .field 2),
+  ("0x1::aggregator::spec_read", .field 3),
+  ("0x1::aggregator::spec_aggregator_get_val", .field 3),
+  ("0x1::aggregator::spec_aggregator_set_val", .setField 3),
+  ("0x1::aggregator_factory::spec_new_aggregator", .stated [(2, .argument 0), (3, .zero)])]
 
 /-- The prelude's meaning of a specification function of `profile`, if it
 gives one beyond an uninterpreted one. -/

@@ -1,6 +1,6 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/type_dependent_code.move:10:5: error: verification failed with a residual obligation:
-case h_2.continues
+case none.continues.none.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -155,15 +155,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
-x✝¹ :
-  Option
-    (VerexIR.Proofs.Denote.ResourceType.carrier unit
-      (VerexIR.Proofs.Denote.Skolems.resource
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)))
-heq✝¹ :
+heq✝ :
   initialState✝
       {
         type :=
@@ -254,15 +246,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
-x✝ :
-  Option
-    (VerexIR.Proofs.Denote.ResourceType.carrier unit
-      (VerexIR.Proofs.Denote.Skolems.resource
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil))
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)))
-heq✝ :
+heq :
   initialState✝.set
       {
         type :=
@@ -317,7 +301,7 @@ tests/sources/functional/type_dependent_code.move:10:5: error: verex verificatio
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/type_dependent_code.move:26:5: error: verification failed with a residual obligation:
-case h_2.continues
+case none.continues.none.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -476,15 +460,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
-x✝¹ :
-  Option
-    (VerexIR.Proofs.Denote.ResourceType.carrier unit
-      (VerexIR.Proofs.Denote.Skolems.resource
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)))
-heq✝¹ :
+heq✝ :
   initialState✝
       {
         type :=
@@ -576,15 +552,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
-x✝ :
-  Option
-    (VerexIR.Proofs.Denote.ResourceType.carrier unit
-      (VerexIR.Proofs.Denote.Skolems.resource
-        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
-          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil))
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)))
-heq✝ :
+heq :
   initialState✝.set
       {
         type :=

@@ -18,6 +18,13 @@ namespace VerexIR.Proofs.Denote.SharedContinuations
 
 open Lean Meta Elab Tactic
 
+initialize registerTraceClass `verex.joinPruning
+
+/-- A constructor reconstructed over abstracted fields does not have the
+expected type (`withConstructorFields`). -/
+initialize mismatchedShape : InternalExceptionId ←
+  registerInternalExceptionId `verexMismatchedShape
+
 /-- Count visible normal exits, capped at two. Matchers used by reads and
 checked operations often have just one successful arm; their failure arms
 do not reach a value continuation. Only inspect computation structure, not
@@ -59,10 +66,52 @@ answer retains ordinary folded traversal; it never discards a proof path. -/
 def mayJoin (action : Lean.Expr) : MetaM Bool := do
   return (← normalExits action true) > 1
 
+/-- Whether an action is an exit: `wp` reduces it to its postcondition or
+abort condition in one step, with no further program rule. -/
+private def exitAction (action : Lean.Expr) : Bool :=
+  match action.consumeMData.headBeta.getAppFn with
+  | .const name _ =>
+      name == ``ResultShape.finish || name == ``VerexIR.Proofs.Spec.pure ||
+        name == ``VerexIR.Proofs.Spec.bottom || name == ``Mutables.resolve
+  | _ => false
+
+/-- Whether a continuation still runs program (an action under `wp` that is
+not an exit), itself or through a local or shared continuation it applies.
+A shared class amortizes only the rule applications of its suffix, never its
+leaves: its entry relation is a disjunction over the arrivals, so the leaf
+work stays per arrival. One that only exits and states the postcondition has
+nothing to share: substituting it per path is cheaper than a node. -/
+def carriesProgram (shared : Array Name) (continuation : Lean.Expr) : MetaM Bool := do
+  let mut pending := #[← instantiateMVars continuation]
+  let mut seenConstants : Std.HashSet Name := {}
+  let mut seenLocals : Std.HashSet FVarId := {}
+  while let some next := pending.back? do
+    pending := pending.pop
+    if (next.find? fun e => e.isAppOfArity ``wp 7 && !exitAction (e.getArg! 3)).isSome then
+      return true
+    let constants := next.getUsedConstants
+    for name in constants do
+      unless shared.contains name && !seenConstants.contains name do continue
+      seenConstants := seenConstants.insert name
+      if let some value := (← getConstInfo name).value? then pending := pending.push value
+    for id in (collectFVars {} next).fvarIds do
+      if seenLocals.contains id then continue
+      seenLocals := seenLocals.insert id
+      if let some value := (← id.getDecl).value? then
+        pending := pending.push (← instantiateMVars value)
+  return false
+
 structure Arrival where
   goal : MVarId
   arguments : Array Lean.Expr
-  locals : Array Lean.LocalDecl
+  /-- Filled when the node is sealed: a single arrival never closes them. -/
+  locals : Array Lean.LocalDecl := #[]
+  /-- The arrival came from inside a sealed class's suffix: a continuation
+  folded on the tree's own path can be reached from shared work. -/
+  summarized : Bool := false
+  /-- The arriving step, as the walk recorded it: the arrival that resumes
+  alone continues its own path. -/
+  step : Nat := 0
   deriving Inhabited
 
 /-- A summary parameter supplied by one incoming argument or one of its
@@ -87,17 +136,152 @@ structure Node where
   relation? : Option Lean.Expr := none
   summary? : Option MVarId := none
   summaryArguments : Array EntryArgument := #[]
+  /-- Per arrival, the proof of the stored invariants of its memory, when
+  every arrival proved them: the summary then assumes them of its memory
+  row (`sealNode`). Empty otherwise. -/
+  invariantProofs : Array Lean.Expr := #[]
   sealed : Bool := false
   finished : Bool := false
   /-- Only a closed proof without reporting admissions is certified. -/
   certified : Bool := false
+  /-- The locals of the context the continuation was folded in, by type. -/
+  origin : Std.HashMap FVarId Lean.Expr := {}
+  /-- The locals the closed body abstracts, in its telescope's order: the
+  captures as lambdas, the local definitions among them as lets. -/
+  abstracted : Array FVarId := #[]
   deriving Inhabited
 
 def Node.name (node : Node) : Name := node.continuation.getAppFn.constName!
 
+/-- The hypotheses the summary states before its entry relation. -/
+def Node.hypotheses (node : Node) : Nat :=
+  if node.invariantProofs.isEmpty then 0 else 1
+
+/-- A closed telescope (`defineClosed`) at its arguments: the lambdas take
+the arguments, and the local definitions between them are expanded. -/
+partial def instantiateTelescope (value : Lean.Expr) (arguments : Array Lean.Expr) : Lean.Expr :=
+  match value with
+  | .lam _ _ body _ =>
+      if arguments.isEmpty then value else instantiateTelescope (body.instantiate1 arguments[0]!) (arguments.extract 1)
+  | .letE _ _ definition body _ => instantiateTelescope (body.instantiate1 definition) arguments
+  | .mdata _ e => instantiateTelescope e arguments
+  | _ => mkAppN value arguments
+
+/-- The closed applications of the shared continuations in a term, each
+subterm visited once: the term is a DAG, and its tree can be exponentially
+larger. -/
+private def sharedApplications (shared : Array Name) (e : Lean.Expr) : Array Lean.Expr :=
+  let rec walk (e : Lean.Expr) : StateM (Std.HashSet Lean.Expr × Array Lean.Expr) Unit := do
+    if (← get).1.contains e then return
+    modify fun (seen, found) => (seen.insert e, found)
+    if let .const name _ := e.getAppFn then
+      if shared.contains name && !e.hasLooseBVars then
+        modify fun (seen, found) => (seen, found.push e)
+    match e with
+    | .app function argument => walk function; walk argument
+    | .lam _ type body _ | .forallE _ type body _ => walk type; walk body
+    | .letE _ type value body _ => walk type; walk value; walk body
+    | .mdata _ body | .proj _ _ body => walk body
+    | _ => pure ()
+  ((walk e).run ({}, #[])).2.2
+
+/-- The stored invariants the continuation owes of a memory, as the loop cut
+states them (`MemoryInvariants inv m₀ → MemoryInvariants inv m`): the
+predicate `MemoryInvariants inv` and the memory `m₀` they are assumed of, at
+the given capture arguments. A continuation that reaches them only through
+an enclosing shared continuation it applies states what that one states, at
+the arguments it applies it to. None where no such implication is stated.
+Whether a continuation states one does not depend on its arguments, so each
+one is explored once, at the arguments of its first application found. -/
+partial def storedInvariantIn? (value : Lean.Expr) (arguments : Array Lean.Expr)
+    (shared : Array Name) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let rec explore (value : Lean.Expr) (arguments : Array Lean.Expr) :
+      StateT (Std.HashSet Name) MetaM (Option (Lean.Expr × Lean.Expr)) := do
+    let body := instantiateTelescope value arguments
+    let invariants (e : Lean.Expr) :=
+      e.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 4
+    let implication? := body.find? fun e => match e with
+      | .forallE _ domain conclusion _ =>
+          invariants domain && invariants conclusion && !conclusion.hasLooseBVar 0 && !domain.hasLooseBVars
+      | _ => false
+    if let some implication := implication? then
+      let premise := implication.bindingDomain!.consumeMData
+      return some (mkAppN premise.getAppFn (premise.getAppArgs.extract 0 3), premise.getArg! 3)
+    for application in sharedApplications shared body do
+      let name := application.getAppFn.constName!
+      if (← get).contains name then continue
+      modify (·.insert name)
+      let some inner := (← getConstInfo name).value? | continue
+      if let some found ← explore inner application.getAppArgs then
+        return some found
+    return none
+  (explore value arguments).run' {}
+
+def storedInvariantOf? (node : Node) (arguments : Array Lean.Expr) (shared : Array Name) :
+    MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let some value := (← getConstInfo node.name).value? | return none
+  storedInvariantIn? value (arguments.extract 0 node.captures) shared
+
+/-- The stored invariants of `memory` under those of the memory the
+continuation assumes them of (`storedInvariantOf?`). -/
+def storedInvariantStatement (invariant : Lean.Expr × Lean.Expr) (memory : Lean.Expr) : MetaM Lean.Expr :=
+  mkArrow (mkApp invariant.1 invariant.2) (mkApp invariant.1 memory)
+
+/-- Whether an incoming context states no fact beyond the context its node
+was folded in: only fresh values, whose ranges are satisfiable. Refuting it
+would refute the fold point, which the walk continued from. -/
+def Node.unchanged (node : Node) (goal : MVarId) : MetaM Bool := goal.withContext do
+  (← getLCtx).allM fun decl => do
+    if decl.isImplementationDetail then return true
+    let type ← instantiateMVars decl.type
+    match node.origin[decl.fvarId]? with
+    | some original => return original == type
+    | none => return !decl.isLet && !(← isProp type)
+
 def unfold (node : Node) (goal : MVarId) : MetaM MVarId := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   withTransparency .all <| goal.replaceTargetDefEq (← deltaExpand target (· == node.name))
+
+/-- Unfold the continuation at an arrival that resumes alone, in the form
+the default walk's exit has: the body's lambdas take the arrival's
+arguments, and a local definition of the fold context the arrival still
+holds, with the same value, stays that local rather than its value. Delta
+expansion would leave the definitions as `let` terms, which normalization
+reduces and traverses where the default walk keeps an atom with its facts. -/
+def unfoldArrival (node : Node) (arrival : Arrival) : MetaM MVarId := arrival.goal.withContext do
+  let target ← instantiateMVars (← arrival.goal.getType)
+  unless target.isAppOf node.name do throwError "an arrival lost its shared continuation"
+  let arguments := target.getAppArgs
+  let info ← getConstInfo node.name
+  let mut body := info.instantiateValueLevelParams! node.continuation.constLevels!
+  let mut next := 0
+  let mut relinked : Nat := 0
+  let mut expanded : Nat := 0
+  let lctx ← getLCtx
+  for id in node.abstracted do
+    match body with
+    | .lam _ _ inner _ =>
+        let some argument := arguments[next]? | throwError "an arrival lost a captured argument"
+        body := inner.instantiate1 argument
+        next := next + 1
+    | .letE _ _ value inner _ =>
+        let same ← match lctx.find? id with
+          | some decl => do
+              let some original := decl.value? | pure false
+              let original ← instantiateMVars original
+              unless original == value do
+                trace[verex.joinPruning] "{node.name} alone: definition {mkFVar id} differs: context {original}; body {value}"
+              pure (original == value)
+          | none => do
+              trace[verex.joinPruning] "{node.name} alone: definition {id.name} is gone"
+              pure false
+        if same then relinked := relinked + 1 else expanded := expanded + 1
+        body := inner.instantiate1 (if same then mkFVar id else value)
+    | .mdata _ inner => body := inner
+    | _ => throwError "a shared continuation's body lost its telescope"
+  let unfolded := (mkAppN body (arguments.extract next arguments.size)).headBeta
+  trace[verex.joinPruning] "{node.name} alone: {relinked} definitions relinked, {expanded} expanded"
+  withTransparency .all <| arrival.goal.replaceTargetDefEq unfolded
 
 /-- Rewriting can make an older hypothesis depend on a newer local. Close
 the telescope in dependency order, retaining definitions as definitions. -/
@@ -117,17 +301,28 @@ private def orderedLocals : MetaM (Array Lean.LocalDecl) := do
     remaining := remaining.eraseIdx! index
   return ordered
 
+/-- The value is closed, so there is no telescope to abstract: declare it as
+it is. `mkAuxDefinition` would `Meta.check` the whole body to classify
+dependent lets, a depth-bounded traversal a long program suffix exceeds. -/
 private def defineClosed (kind : Name) (value : Lean.Expr) : MetaM Lean.Expr := do
-  unless !value.hasFVar && !value.hasExprMVar do
+  let value ← instantiateMVars value
+  unless !value.hasFVar && !value.hasExprMVar && !value.hasLevelMVar do
     throwError "a shared continuation definition has unresolved dependencies"
   let name ← mkAuxDeclName (kind := kind)
-  let defined ← mkAuxDefinitionFor name value (compile := false)
+  let type := (← instantiateMVars (← inferType value)).headBeta
+  let levelParams := (collectLevelParams (collectLevelParams {} type) value).params.toList
+  let hints := ReducibilityHints.regular (getMaxHeight (← getEnv) value + 1)
+  addDecl <| .defnDecl (← mkDefinitionValInferringUnsafe name levelParams type value hints)
   setReducibilityStatus name .irreducible
-  return defined
+  return mkConst name (levelParams.map mkLevelParam)
 
 /-- Close the postcondition before its action branches. The capture
-arguments remain visible to substitution; the continuation body stays named. -/
-def fold? (goal : MVarId) : MetaM (Option (MVarId × Node)) := goal.withContext do
+arguments remain visible to substitution; the continuation body stays named.
+A local definition in `opaqueDefinitions` is one the walk matches by identity (a loop's
+continuation, which its hypothesis and back edges carry folded): it is a
+capture, so the suffix still reads that local where the walk resumes. -/
+def fold? (goal : MVarId) (opaqueDefinitions : Std.HashSet FVarId := {}) :
+    MetaM (Option (MVarId × Node)) := goal.withContext do
   let target := (← instantiateMVars (← goal.getType)).consumeMData
   unless target.isAppOfArity ``wp 7 do return none
   let resultType ← whnfR (target.getArg! 2)
@@ -146,16 +341,28 @@ def fold? (goal : MVarId) : MetaM (Option (MVarId × Node)) := goal.withContext 
       (if decl.isLet then decl.value?.map (collectFVars {}) |>.getD {} else {}) decl.type
     needed := dependencies.fvarIds.foldl (·.insert ·) needed
   let locals := allLocals.filter (needed.contains ·.fvarId)
-  let captures := (locals.filter (!·.isLet)).map (·.toExpr)
+  let captures := (locals.filter (fun decl => !decl.isLet || opaqueDefinitions.contains decl.fvarId)).map
+    (·.toExpr)
   -- `isLet` excludes nondependent lets (for example facts introduced by
   -- `have`): their values are hidden and they are explicit capture arguments.
-  -- Generalize those lets while retaining ordinary let-bound observations.
-  let body ← mkLambdaFVars (locals.map (·.toExpr)) ensures (generalizeNondepLet := true)
+  -- Generalize those lets while retaining ordinary let-bound observations;
+  -- an opaque definition is abstracted as an assumption, its value hidden.
+  let lctx := locals.foldl (init := ← getLCtx) fun lctx decl =>
+    if decl.isLet && opaqueDefinitions.contains decl.fvarId then
+      lctx.modifyLocalDecl decl.fvarId fun decl =>
+        .cdecl decl.index decl.fvarId decl.userName decl.type .default decl.kind
+    else lctx
+  let body ← withLCtx lctx (← getLocalInstances) do
+    mkLambdaFVars (locals.map (·.toExpr)) ensures (generalizeNondepLet := true)
   let continuation ← defineClosed `_verexContinuation body
   let post := mkAppN continuation captures
   let folded ← withTransparency .all <| goal.replaceTargetDefEq
     (mkAppN target.getAppFn (target.getAppArgs.set! 4 post))
-  return some (folded, { continuation, captures := captures.size })
+  let origin ← allLocals.foldlM (init := {}) fun found decl => do
+    return found.insert decl.fvarId (← instantiateMVars decl.type)
+  let node : Node := { continuation, captures := captures.size, origin,
+                       abstracted := locals.map (·.fvarId) }
+  return some (folded, node)
 
 /-- Saved program continuations that the named suffix no longer reads need
 not become existential witnesses in its entry relation. Retain all facts,
@@ -175,21 +382,74 @@ private def clearSavedComputations (goal : MVarId) : MetaM MVarId := goal.withCo
     goal ← goal.tryClear id
   return goal
 
+/-- The arguments of a normal arrival at the node: its captures, the value
+and locals of its flow, and its memory. None for an abrupt flow. -/
+private def arrivalArguments? (node : Node) (goal : MVarId) : MetaM (Option (Array Lean.Expr)) :=
+  goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    unless target.isAppOf node.name do return none
+    let arguments := target.getAppArgs
+    unless arguments.size == node.captures + 2 do return none
+    let flow := arguments[node.captures]!.consumeMData.headBeta
+    unless flow.isAppOfArity ``Flow.value 8 do return none
+    return some (arguments.extract 0 node.captures ++ #[flow.getArg! 6, flow.getArg! 7, arguments.back!])
+
 /-- Abrupt flows keep their original destinations; only a value carries
 locals into the shared suffix. -/
-def arrival? (node : Node) (goal : MVarId) : MetaM (Option Arrival) := goal.withContext do
-  let target ← instantiateMVars (← goal.getType)
-  unless target.isAppOf node.name do return none
-  let arguments := target.getAppArgs
-  unless arguments.size == node.captures + 2 do return none
-  let flow := arguments[node.captures]!.consumeMData.headBeta
-  unless flow.isAppOfArity ``Flow.value 8 do return none
-  let goal ← clearSavedComputations goal
-  return some {
-    goal
-    arguments := arguments.extract 0 node.captures ++
-      #[flow.getArg! 6, flow.getArg! 7, arguments.back!]
-    locals := ← goal.withContext orderedLocals }
+def arrival? (node : Node) (goal : MVarId) : MetaM (Option Arrival) := do
+  let some arguments ← arrivalArguments? node goal | return none
+  return some { goal, arguments }
+
+/-- State the arrival's arguments over the oldest terms its context equates
+them to, opportunistically: a branch-local variable (one the node's fold did
+not see) that an equation of the context, in either orientation, equates to
+a term without it is eliminated by that equation, newest first, while such a
+variable occurs in the arguments; chains of equations are followed as each
+elimination exposes the next variable. An equation whose dependent
+elimination fails is skipped and the name stays. The arrivals then agree
+where they differed only by such a name, and anti-unification keeps the
+common term instead of abstracting a row. An equation the walk keeps on
+purpose (`kept`, a call's contract frame) is never used: the suffix and its
+leaves read it as the default walk leaves it. The arrival's goal is
+substituted, so its hole is assigned the proof of the substituted goal. -/
+private def substituteArguments (node : Node) (kept : FVarIdSet) (arrival : Arrival) :
+    MetaM Arrival := do
+  let mut goal := arrival.goal
+  let mut arguments := arrival.arguments
+  let mut attempted : Std.HashSet FVarId := {}
+  repeat
+    let occurring := arguments.foldl (fun found argument => collectFVars found argument) {}
+    let equation? ← goal.withContext do
+      let lctx ← getLCtx
+      -- The variable to eliminate, with the equation and its direction
+      -- (`symm` eliminates the right side), the newest variable first.
+      let mut best : Option (Nat × FVarId × Bool) := none
+      for decl in lctx do
+        if decl.isImplementationDetail || decl.isLet || attempted.contains decl.fvarId ||
+            kept.contains decl.fvarId then continue
+        let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | continue
+        let eliminable (side other : Lean.Expr) : Option (Nat × FVarId × Bool) := do
+          let .fvar id := side | none
+          guard (occurring.fvarSet.contains id && !node.origin.contains id)
+          let eliminated ← lctx.find? id
+          guard (!eliminated.isLet && !other.containsFVar id)
+          pure (eliminated.index, decl.fvarId, side == rhs)
+        let candidate := match eliminable lhs rhs, eliminable rhs lhs with
+          | some left, some right => if left.1 ≥ right.1 then some left else some right
+          | left, right => left <|> right
+        if let some candidate := candidate then
+          if best.all (·.1 < candidate.1) then best := some candidate
+      return best
+    let some (_, equation, symm) := equation? | break
+    attempted := attempted.insert equation
+    -- Dependent elimination can fail on a dependent context; the arrival
+    -- then keeps that name.
+    let some (_, substituted) ← observing? (substCore goal equation (symm := symm)) | continue
+    let some next ← arrivalArguments? node substituted
+      | throwError "substituting an arrival's arguments lost its continuation"
+    goal := substituted
+    arguments := next
+  return { arrival with goal, arguments }
 
 /-- Common context is independent of the body's capture telescope. Preserve
 only declarations whose identities, types, definitions and dependencies
@@ -272,11 +532,17 @@ private partial def withCaptures (type : Lean.Expr) (count : Nat)
     withLocalDecl name info domain fun parameter =>
       withCaptures (body.instantiate1 parameter) count common (captures.push parameter) act
 
+mutual
 /-- Preserve the common structure of a state component. A changed field
 must not turn every unchanged local, or every known-defined slot, into an
-abstract row. Only pairs and present slots are decomposed; their field types
-are nondependent. Every varying field gets its own parameter, and incoming
-edges supply that field from the constructors observed here. -/
+abstract row. An application of one constructor at every arrival is
+decomposed field by field (`withConstructorFields`); every varying field
+gets its own parameter, and incoming edges supply that field from the
+constructors observed here. Positions where the arrivals differ in a
+constructor never reach here: they separate the arrivals into classes
+(`partitionArrivals`). A constructor of an indexed family whose
+reconstruction at abstracted fields does not have the expected type is
+abstracted whole.-/
 private partial def withEntryArgument (context : LocalContext) (source : EntryArgument)
     (type : Lean.Expr) (incoming : Array Lean.Expr)
     (binders : Array Lean.Expr) (sources : Array EntryArgument)
@@ -289,26 +555,53 @@ private partial def withEntryArgument (context : LocalContext) (source : EntryAr
     if (collectFVars {} candidateType).fvarIds.all context.contains &&
         (← isDefEq candidateType type) then
       return ← act candidate binders sources
-  if incoming.all (·.isAppOfArity ``Prod.mk 4) then
-    let reduced ← whnfD type
-    if reduced.isAppOfArity ``Prod 2 then
-      return ← withEntryArgument context { source with fields := source.fields.push 2 }
-        (reduced.getArg! 0) (incoming.map (·.getArg! 2)) binders sources fun left binders sources =>
-        withEntryArgument context { source with fields := source.fields.push 3 }
-          (reduced.getArg! 1) (incoming.map (·.getArg! 3)) binders sources fun right binders sources => do
-          let constructor := mkConst ``Prod.mk reduced.getAppFn.constLevels!
-          act (mkAppN constructor (reduced.getAppArgs ++ #[left, right])) binders sources
-  if incoming.all (·.isAppOfArity ``Option.some 2) then
-    let reduced ← whnfD type
-    if reduced.isAppOfArity ``Option 1 then
-      return ← withEntryArgument context { source with fields := source.fields.push 1 }
-        (reduced.getArg! 0) (incoming.map (·.getArg! 1)) binders sources fun value binders sources => do
-        -- Retain the expected carrier spelling. Inferring it from a shaped
-        -- payload exposes its product representation, preventing reducible
-        -- simp matching at an elimination over the nominal carrier.
-        let constructor := mkConst ``Option.some reduced.getAppFn.constLevels!
-        act (mkApp2 constructor (reduced.getArg! 0) value) binders sources
+  if let some constructor ← isConstructorAppCore? candidate then
+    let arity := constructor.numParams + constructor.numFields
+    if incoming.all (·.isAppOfArity constructor.name arity) then
+      -- The parameters as the expected type spells them. Inferring them
+      -- from a shaped payload exposes its product representation,
+      -- preventing reducible simp matching at an elimination over the
+      -- nominal carrier.
+      let reduced ← whnfD type
+      let family ← getConstInfoInduct constructor.induct
+      if reduced.isAppOfArity constructor.induct (family.numParams + family.numIndices) then
+        let parameters := reduced.getAppArgs.extract 0 constructor.numParams
+        let levels := reduced.getAppFn.constLevels!
+        let head := mkAppN (mkConst constructor.name levels) parameters
+        let telescope ← instantiateForall
+          ((ConstantInfo.ctorInfo constructor).instantiateTypeLevelParams levels) parameters
+        let saved ← saveState
+        try
+          return ← withConstructorFields context source telescope constructor.numParams arity
+            incoming head type binders sources act
+        catch error =>
+          let mismatched := match error with
+            | .internal id _ => id == mismatchedShape
+            | _ => false
+          unless mismatched do throw error
+          saved.restore
   withLocalDeclD `entry type fun value => act value (binders.push value) (sources.push source)
+
+/-- The fields of a constructor application from `field` on, each shaped at
+the domain of the constructor's telescope at the shaped fields before it.
+The reconstruction must have the expected type (`mismatchedShape` otherwise,
+before the continuation runs): an abstracted field of an indexed family can
+change the index. -/
+private partial def withConstructorFields (context : LocalContext) (source : EntryArgument)
+    (telescope : Lean.Expr) (field arity : Nat) (incoming : Array Lean.Expr) (shaped type : Lean.Expr)
+    (binders : Array Lean.Expr) (sources : Array EntryArgument)
+    (act : Lean.Expr → Array Lean.Expr → Array EntryArgument → MetaM α) : MetaM α := do
+  if field == arity then
+    unless ← isDefEq (← inferType shaped) type do
+      throw (.internal mismatchedShape)
+    return ← act shaped binders sources
+  let .forallE _ domain body _ ← whnfD telescope
+    | throwError "a constructor of a shared continuation's argument lost a field"
+  withEntryArgument context { source with fields := source.fields.push field } domain
+    (incoming.map (·.getArg! field)) binders sources fun value binders sources =>
+    withConstructorFields context source (body.instantiate1 value) (field + 1) arity incoming
+      (mkApp shaped value) type binders sources act
+end
 
 /-- Specialize value, locals and memory together, retaining the captured
 telescope before their varying fields. The entry predicate still connects
@@ -322,10 +615,75 @@ private partial def withEntryArguments (context : LocalContext) (parameters : Ar
     (arrivals.map (·.arguments[index]!)) binders sources fun value binders sources =>
     withEntryArguments context parameters arrivals (index + 1) (shaped.push value) binders sources act
 
-/-- Seal once every immediate incoming edge is known. Earlier entry
-relations remain named inside these arms; no path product is distributed. -/
-def sealNode (node : Node) : MetaM Node := do
+/-- The arrivals with their arguments over the oldest terms
+(`substituteArguments`, except through the `kept` facts) and their contexts
+in dependency order, ready to be partitioned. A single arrival is compared
+with nothing: it keeps the context of the default walk's exit. -/
+def prepareArrivals (node : Node) (kept : FVarIdSet) : MetaM Node := do
+  let single := node.arrivals.size < 2
+  return { node with arrivals := ← node.arrivals.mapM fun arrival => do
+    let arrival ← if single then pure arrival else substituteArguments node kept arrival
+    arrival.goal.withContext do
+      trace[verex.joinPruning] "{node.name} arrival: memory {arrival.arguments.back!}; equations {
+        ← (← getLCtx).foldlM (init := #[]) fun found decl => do
+          let type ← instantiateMVars decl.type
+          return if decl.isImplementationDetail || !type.isEq then found else found.push type}"
+    return { arrival with locals := ← arrival.goal.withContext orderedLocals } }
+
+/-- The arrivals of a class that seals, as the seal closes them: without
+saved computations. Facts proved at an arrival before the seal are proved in
+this context. An arrival resuming alone keeps them: its suffix reads the
+definitions as the default walk's exit does (`unfoldArrival`). -/
+def closeArrivals (node : Node) : MetaM Node := do
+  return { node with arrivals := ← node.arrivals.mapM fun arrival => do
+    let goal ← clearSavedComputations arrival.goal
+    return { arrival with goal, locals := ← goal.withContext orderedLocals } }
+
+/-- The ground skeleton of an incoming argument: its constructor
+applications, down to the first subterm that is none. A scalar literal is
+not one: a position differing only in a numeral or string stays an abstract
+parameter, decided by arithmetic as a variable is, never by a row split. -/
+inductive Skeleton where
+  | hole
+  | constructor (name : Name) (fields : Array Skeleton)
+  deriving BEq, Inhabited
+
+partial def Skeleton.of (e : Lean.Expr) : MetaM Skeleton := do
+  let e := e.consumeMData.headBeta
+  -- A raw natural literal would read as `Nat.zero`/`Nat.succ`.
+  if e.isLit || e.nat?.isSome || e.int?.isSome then return .hole
+  let some ctor ← isConstructorAppCore? e | return .hole
+  let fields := e.getAppArgs.extract ctor.numParams (ctor.numParams + ctor.numFields)
+  return .constructor ctor.name (← fields.mapM Skeleton.of)
+
+/-- The arrivals partitioned by the ground skeleton of their arguments and
+by `key` (what their shared suffix owes beside the arguments), in order of
+first arrival. Arrivals of one class agree on every constructor
+visible to inspection of their arguments, so their summary keeps that
+constructor structure and abstracts only positions where none of them shows
+one. A class of one shares nothing and resumes as a single predecessor. -/
+def partitionArrivals [BEq κ] (key : Arrival → κ) (arrivals : Array Arrival) :
+    MetaM (Array (Array Arrival)) := do
+  let mut classes : Array ((Array Skeleton × κ) × Array Arrival) := #[]
+  for arrival in arrivals do
+    let skeleton ← arrival.goal.withContext (arrival.arguments.mapM Skeleton.of)
+    let shape := (skeleton, key arrival)
+    match classes.findIdx? (·.1 == shape) with
+    | some index => classes := classes.modify index fun (shape, members) => (shape, members.push arrival)
+    | none => classes := classes.push (shape, #[arrival])
+  return classes.map (·.2)
+
+/-- Seal once every immediate incoming edge is known (`prepareArrivals`
+first). Earlier entry relations remain named inside these arms; no path
+product is distributed. With a proof per arrival of the stored invariants of
+its memory, the summary assumes them of its memory row: a leaf then closes
+them over the row as the default walk closes them over the concrete memory,
+and the edge proofs carry them inductively through nested joins. -/
+def sealNode (node : Node) (invariantProofs : Array Lean.Expr := #[]) (shared : Array Name := #[]) :
+    MetaM Node := do
   if node.arrivals.isEmpty then return { node with sealed := true, finished := true }
+  unless invariantProofs.isEmpty || invariantProofs.size == node.arrivals.size do
+    throwError "a join's stored invariants were not proved at every arrival"
   let enclosingLocals := commonLocals node
   let enclosing := enclosingLocals.map (·.fvarId)
   let common := commonCaptures node enclosing
@@ -363,8 +721,12 @@ def sealNode (node : Node) : MetaM Node := do
       let captureSources := captureIndices.map fun index => ({ parameter := index } : EntryArgument)
       withEntryArguments context parameters node.arrivals node.captures captures
         (captureIndices.map (parameters[·]!)) captureSources fun shaped binders sources => do
-        let statement ← mkForallFVars binders
-          ((← mkArrow entry (mkApp applied memory)).replaceFVars parameters shaped)
+        let mut conclusion ← mkArrow entry (mkApp applied memory)
+        unless invariantProofs.isEmpty do
+          let some invariant ← storedInvariantOf? node captures shared
+            | throwError "a join proved stored invariants its continuation does not state"
+          conclusion ← mkArrow (← storedInvariantStatement invariant memory) conclusion
+        let statement ← mkForallFVars binders (conclusion.replaceFVars parameters shaped)
         let summary ← mkFreshExprMVarAt context instances statement .syntheticOpaque
         return { node with
           arms := arms
@@ -373,6 +735,7 @@ def sealNode (node : Node) : MetaM Node := do
           relation? := some relation
           summary? := some summary.mvarId!
           summaryArguments := sources
+          invariantProofs := invariantProofs
           sealed := true }
 
 private def edgeProof (arm : Lean.Expr) (common : Array (Nat × FVarId))
@@ -437,7 +800,9 @@ def finish? (node : Node) : MetaM (Option Node) := do
       for arm in (armTypes.extract 0 index).reverse do
         reached := mkApp3 (mkConst ``Or.inr) arm joined reached
         joined := mkOr arm joined
-      arrival.goal.assign (mkApp (mkAppN certificate (node.summaryArguments.map (·.select arrival.arguments))) reached)
+      let hypotheses := (node.invariantProofs[index]?).toArray
+      arrival.goal.assign (mkAppN certificate
+        (node.summaryArguments.map (·.select arrival.arguments) ++ hypotheses.push reached))
   return some { node with finished := true, certified := !proof.hasSorry }
 
 /-- Reduce only row projections and local definitions. General `whnf` on an

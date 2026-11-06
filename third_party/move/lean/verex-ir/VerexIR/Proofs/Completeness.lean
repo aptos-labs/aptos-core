@@ -569,7 +569,7 @@ private theorem completeExpr {unit : ValidatedUnit} {executable : ExecutableUnit
     -- way once it reduces.
         case data kind =>
             simp only [evaluatePlaceOperation?, bind, Option.bind] at evaluate_eq
-            cases data_eq : evaluateDataOperation? unit ns.identity kind
+            cases data_eq : evaluateDataOperation? unit ns.unitIdentity kind
                 values.toArray with
             | none => simp [data_eq] at evaluate_eq
             | some value =>
@@ -617,8 +617,8 @@ private theorem completeExpr {unit : ValidatedUnit} {executable : ExecutableUnit
         case specification kind => simp [variantMismatch?] at mismatch
         case reference kind => simp [variantMismatch?] at mismatch
         case data kind =>
-            have data_eq : evaluateDataOperation? unit ns.identity kind values.toArray = none := by
-              cases data_eq : evaluateDataOperation? unit ns.identity kind values.toArray with
+            have data_eq : evaluateDataOperation? unit ns.unitIdentity kind values.toArray = none := by
+              cases data_eq : evaluateDataOperation? unit ns.unitIdentity kind values.toArray with
               | none => rfl
               | some value => simp [evaluatePlaceOperation?, data_eq] at evaluate_eq
             dsimp only

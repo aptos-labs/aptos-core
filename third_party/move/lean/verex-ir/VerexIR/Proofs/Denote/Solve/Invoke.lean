@@ -39,7 +39,7 @@ continuation is applied to, are normal already; traversing them again would
 cost as much as normalizing them, while only the structure the step created
 changes. A target nothing rewrites is left as it is. -/
 def normalizeAround (normalization : Simp.Context × Simp.SimprocsArray)
-    (normal : Array Lean.Expr) : TacticM Unit := do
+    (normal : Array Lean.Expr) (fixedPoints : Option Name := none) : TacticM Unit := do
   let goal ← getMainGoal
   let saved ← saveState
   try
@@ -47,8 +47,11 @@ def normalizeAround (normalization : Simp.Context × Simp.SimprocsArray)
       let (ctx, simprocs) := normalization
       let known : Std.HashSet Lean.Expr := normal.foldl (·.insert ·) {}
       let target ← instantiateMVars (← goal.getType)
-      let (result, _) ← Simp.main target ctx
-        (methods := stoppingMethods simprocs fun e => pure (known.contains e))
+      let stop := fun e => pure (known.contains e)
+      let methods := match ← FixedPoints.new? fixedPoints with
+        | some fp => fp.wrap (Simp.mkDefaultMethodsCore simprocs) stop
+        | none => stoppingMethods simprocs stop
+      let (result, _) ← Simp.main target ctx (methods := methods)
       if result.expr == target then return
       if result.expr.isTrue then
         goal.assign (← match result.proof? with
@@ -274,20 +277,64 @@ partial def resolveAnchors (goal : MVarId) (predicate : Lean.Expr) :
     | throwError m!"the state anchor at site {site} is read where it is not recorded"
   resolveAnchors goal (← whnfR (mkApp predicate (← mkAppM ``Prod.mk #[env, state])))
 
+/-- The cases of a weakest precondition over a match on one discriminant,
+by cases on that discriminant at the goal's own instance: each case states
+the pattern it took (`d = some x`) and runs its alternative. `none` where
+the match has several discriminants or a dependent motive. -/
+def splitMatchAction? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
+  -- The action as the walk reads it, under the elaborator's annotations.
+  let action := (target.getArg! 3).consumeMData
+  let .const name _ := action.getAppFn | return none
+  let some info ← getMatcherInfo? name | return none
+  unless info.numDiscrs == 1 && action.getAppNumArgs == info.arity do return none
+  let arguments := action.getAppArgs
+  let .lam _ _ motive _ := arguments[info.getMotivePos]! | return none
+  if motive.hasLooseBVars then return none
+  let discriminant := arguments[info.getFirstDiscrPos]!
+  let type ← inferType discriminant
+  -- The instance, generalized over its discriminant.
+  let generalized ← withLocalDeclD `x type fun x => do
+    let body := mkAppN target.getAppFn (target.getAppArgs.set! 3
+      (mkAppN action.getAppFn (arguments.set! info.getFirstDiscrPos x)))
+    withLocalDeclD `heq (← mkEq discriminant x) fun heq => mkForallFVars #[x, heq] body
+  let next ← mkFreshExprSyntheticOpaqueMVar generalized (← goal.getTag)
+  goal.assign (mkApp2 next discriminant (← mkEqRefl discriminant))
+  let (introduced, next) ← next.mvarId!.introNP 2
+  let some cases ← observing? (next.cases introduced[0]!) | return none
+  cases.toList.mapM fun case => case.mvarId.withContext do
+    let caseTarget ← instantiateMVars (← case.mvarId.getType)
+    let .reduced alternative ← reduceMatcher? (caseTarget.getArg! 3)
+      | throwError "a match on a constructor does not reduce"
+    case.mvarId.replaceTargetDefEq
+      (mkAppN caseTarget.getAppFn (caseTarget.getAppArgs.set! 3 alternative.headBeta))
+
 /-- Split a binder, conjunction or conditional. Dependent actions introduce
   their branch assumptions before normalization. If a computation cannot be
   split, preparation may expose more program steps for the structural walker.
-  Without `obligations`, a conditional is split only where the goal still
-  runs program: an obligation's own conditionals stay in its leaf. -/
-def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := true) :
+  With `obligations`, an obligation a hypothesis states closes whole, before
+  its parts split. Without `cases`, a conditional is split only where the goal
+  still runs program: an obligation's own conditionals stay in its leaf. -/
+def splitOnce (goal : MVarId) (obligations : Bool := true) (cases : Bool := obligations)
+    (prepare : Bool := true) :
     TacticM (Option (List MVarId × Bool)) := do
   -- The exit binds `result` in a step proof, before the paths split.
-  if let some next ← bindResult goal then return some ([next], false)
+  let bound ← IO.mkRef none
+  timedStep "split/result" do bound.set (← bindResult goal)
+  if let some next ← bound.get then return some ([next], false)
   let target ← goal.withContext (instantiateMVars (← goal.getType))
+  -- A quantified or conjoined obligation a hypothesis states closes as it is:
+  -- its parts, once split, are no longer the hypothesis's.
+  let statement := StatedFacts.unmarked target
+  if obligations && (statement.isForall || statement.isAppOfArity ``And 2) &&
+      (statement.find? (·.isAppOf ``VerexIR.Proofs.wp)).isNone then
+    if ← StatedFacts.close goal (exact := true) then return some ([], true)
   if target.isForall then
     -- A quantified variable keeps its name, for an authored proof; a
     -- borrow's prophecy mark is consumed.
     let (introduced, next) ← goal.intro1P
+    noteKeptPremise next introduced
     if (prophecyMark? target.bindingDomain!).isSome then
       return some ([← consumeProphecy next introduced], false)
     return some ([next], false)
@@ -299,9 +346,10 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   -- processed as computation rather than left beneath a proof binder.
   -- A source `let` binds its locals' names in a step proof, and the exit
   -- `result`.
-  if let some next ← bindLet goal then return some ([next], false)
+  timedStep "split/let" do bound.set (← bindLet goal)
+  if let some next ← bound.get then return some ([next], false)
   if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
-    let action := target.getArg! 3
+    let action := (target.getArg! 3).consumeMData
     if action.isAppOfArity ``dite 5 then
       let rule := mkAppN (mkConst ``VerexIR.Proofs.wp_dite_rule)
         #[target.getArg! 0, target.getArg! 1, target.getArg! 2,
@@ -312,7 +360,35 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
       setGoals (← goal.apply (mkApp3 (mkConst ``Iff.mpr) lhs rhs rule))
       evalTactic (← `(tactic| constructor <;> intro h))
       return some (← getGoals, true)
+    -- A conditional splits by its rule at the goal's own instance, not by
+    -- `split`, which abstracts the conditional over the whole goal.
+    if action.isAppOfArity ``ite 5 then
+      let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_ite)
+        #[target.getArg! 0, target.getArg! 2, action.getArg! 1, action.getArg! 2,
+          action.getArg! 3, action.getArg! 4, target.getArg! 4, target.getArg! 5, target.getArg! 6]
+      let_expr Iff lhs rhs := ← goal.withContext (do whnfR (← inferType rule))
+        | throwError "a conditional rule is not an equivalence"
+      setGoals (← goal.apply (mkApp3 (mkConst ``Iff.mpr) lhs rhs rule))
+      evalTactic (← `(tactic| constructor <;> intro h))
+      return some (← getGoals, true)
   let saved ← saveState
+  -- A match splits by cases on its discriminant at the goal's own instance,
+  -- not by `split`, which abstracts it over the whole goal; a read of memory
+  -- the context fixes decides it first.
+  -- A match elaborated over a compound discriminant carries the
+  -- elaborator's `save_info` annotation; the walk reads an action under
+  -- its annotations.
+  let matching ← if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
+      isMatcherApp (target.getArg! 3).consumeMData
+    else pure false
+  if matching then
+    setGoals [goal]
+    evalTactic (← `(tactic| try verex_memory_reads))
+    if (← getGoals) != [goal] then return some (← getGoals, true)
+    let known ← goal.withContext do return (← getLCtx).getFVarIds
+    if let some cases ← splitMatchAction? goal then
+      return some (← statePatterns known cases, true)
+    saved.restore
   let running := (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isSome
   -- An obligation a hypothesis states closes before its cases multiply.
   if obligations && !running then
@@ -322,10 +398,10 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
       return some ([], true)
     catch _ =>
       saved.restore
-  if obligations || running then
+  if cases || running then
     try
       setGoals [goal]
-      evalTactic (← `(tactic| verex_split))
+      timedStep "split/first" (evalTactic (← `(tactic| verex_split)))
       return some (← getGoals, true)
     catch _ =>
       saved.restore
@@ -335,7 +411,7 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (prepare : Bool := tr
   if prepare && target.isAppOfArity ``VerexIR.Proofs.wp 7 then
     try
       setGoals [goal]
-      evalTactic (← `(tactic| verex_prepare_leaf))
+      timedStep "split/prepare" (evalTactic (← `(tactic| verex_prepare_leaf)))
       let goals ← getGoals
       if goals.isEmpty then return some ([], true)
       if let [next] := goals then
@@ -449,6 +525,275 @@ def callGoal? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr
     if head.isFVar && callees.any (·.1 == head) then return some (head, action)
     return none
 
+/-- The reads of `params` in `body`: its maximal subterms that mention one
+of them and no other local, closed under the body's own binders. A bare
+occurrence is a read of its own. -/
+private def readsOf (body : Lean.Expr) (params : Array FVarId) : Array Lean.Expr := Id.run do
+  let (_, mentioned) := (localMentions body (params.contains ·)).run {}
+  let mut reads : Array Lean.Expr := #[]
+  let mut visited : Std.HashSet Lean.Expr := {}
+  let mut pending : Array Lean.Expr := #[body]
+  while let some e := pending.back? do
+    pending := pending.pop
+    if visited.contains e then continue
+    visited := visited.insert e
+    let (mentions, mentionsOther) := mentioned.getD e (false, false)
+    unless mentions do continue
+    if !e.hasLooseBVars && !mentionsOther then
+      unless reads.contains e do reads := reads.push e
+      continue
+    match e with
+    | .app f a => pending := pending.push a |>.push f
+    | .lam _ t b _ | .forallE _ t b _ => pending := pending.push b |>.push t
+    | .letE _ t v b _ => pending := pending.push b |>.push v |>.push t
+    | .mdata _ b | .proj _ _ b => pending := pending.push b
+    | _ => pure ()
+  return reads
+
+/-- A continuation `fun rs => B` abstracted over its reads of `rs`: the
+value `fun vs => B[vs/reads]`, and the continuation again as that value
+applied to the reads, `fun rs => h reads`, with `h` the placeholder for the
+value's name. None where a read's type depends on the parameters. -/
+private def abstractReads (continuation : Lean.Expr) :
+    MetaM (Option (Lean.Expr × FVarId × Lean.Expr)) :=
+  lambdaTelescope continuation fun rs body => do
+    let params := rs.map (·.fvarId!)
+    let reads := readsOf body params
+    let types ← reads.mapM fun read => do instantiateMVars (← inferType read)
+    if types.any (·.hasAnyFVar (params.contains ·)) then return none
+    let declarations := types.zipIdx.map fun (type, i) =>
+      (Name.mkSimple s!"read{i}", fun (_ : Array Lean.Expr) => pure type)
+    withLocalDeclsD declarations fun vs => do
+      let abstracted := body.replace fun e =>
+        (reads.findIdx? (· == e)).map fun i => vs[i]!
+      let value ← mkLambdaFVars vs abstracted
+      withLocalDeclD `held (← inferType value) fun h => do
+        let wrapper ← mkLambdaFVars rs (mkAppN h reads)
+        return some (value, h.fvarId!, wrapper)
+
+/-- The main goal with the continuations `parts`, lambdas of its weakest
+precondition, as local definitions abstracted over their reads of their
+parameters (`abstractReads`), wherever they occur: a rule applying a
+continuation to fresh variables, or to a transport of the result, then
+substitutes into a visible read, which a step's simp normalizes without
+walking the body, normal as it was. The definitions with their values. -/
+def holdContinuations (parts : Array Lean.Expr) : TacticM (Array (FVarId × Lean.Expr)) := do
+  let mut goal ← getMainGoal
+  let mut held := #[]
+  for part in parts do
+    unless part.consumeMData.isLambda do continue
+    let (next, entry) ← goal.withContext do
+      let target ← instantiateMVars (← goal.getType)
+      unless (target.find? (· == part)).isSome do return (goal, none)
+      let some (value, placeholder, wrapper) ← abstractReads part.consumeMData
+        | return (goal, none)
+      let defined ← goal.define `verexHeld (← inferType value) value
+      let (local_, folded) ← defined.intro1P
+      folded.withContext do
+        let wrapper := wrapper.replaceFVarId placeholder (mkFVar local_)
+        let target ← instantiateMVars (← folded.getType)
+        let folded ← folded.replaceTargetDefEq
+          (target.replace fun e => if e == part then some wrapper else none)
+        return (folded, some (local_, value))
+    goal := next
+    if let some entry := entry then held := held.push entry
+  replaceMainGoal [goal]
+  return held
+
+/-- The subterms of `e`, without those that hold one of `values`. -/
+private def subtermsWithout (e : Lean.Expr) (values : Std.HashSet Lean.Expr) :
+    Std.HashSet Lean.Expr := Id.run do
+  let mut holds : Std.HashMap Lean.Expr Bool := {}
+  let mut pending : Array (Lean.Expr × Bool) := #[(e, false)]
+  while let some (e, visited) := pending.back? do
+    pending := pending.pop
+    if holds.contains e then continue
+    let children := match e with
+      | .app f a => #[f, a]
+      | .lam _ t b _ | .forallE _ t b _ => #[t, b]
+      | .letE _ t v b _ => #[t, v, b]
+      | .mdata _ b | .proj _ _ b => #[b]
+      | _ => #[]
+    if values.contains e then
+      holds := holds.insert e true
+    else if visited || children.isEmpty then
+      holds := holds.insert e (children.any fun c => holds.getD c false)
+    else
+      pending := pending.push (e, true) ++ children.map (·, false)
+  return holds.fold (init := {}) fun known e held => if held then known else known.insert e
+
+/-- Whether `e` is built by a logical connective or quantifier. -/
+private def isConnective (e : Lean.Expr) : Bool :=
+  e.isForall || e.isAppOfArity ``And 2 || e.isAppOfArity ``Or 2 || e.isAppOfArity ``Not 1 ||
+    e.isAppOfArity ``Iff 2 || e.isAppOfArity ``Exists 2 || e.isConstOf ``True || e.isConstOf ``False
+
+/-- Normalize the main goal's propositional structure, taking every
+proposition that is no connective as it is. -/
+def normalizeConnectives (normalization : Simp.Context × Simp.SimprocsArray) : TacticM Unit := do
+  let goal ← getMainGoal
+  let saved ← saveState
+  try
+    goal.withContext do
+      let (ctx, simprocs) := normalization
+      let target ← instantiateMVars (← goal.getType)
+      let (result, _) ← Simp.main target ctx (methods := stoppingMethods simprocs fun e =>
+        pure !isConnective e.consumeMData <&&> (Lean.Expr.isProp <$> inferType e))
+      if result.expr == target then return
+      if result.expr.isTrue then
+        goal.assign (← match result.proof? with
+          | some proof => mkOfEqTrue proof
+          | none => pure (mkConst ``True.intro))
+        replaceMainGoal []
+      else
+        replaceMainGoal [← applySimpResultToTarget goal target result]
+  catch _ =>
+    saved.restore
+
+/-- The goal without the held definitions `locals`: cleared at once where
+nothing else reads them, else each as far as possible. -/
+private def clearHeld (goal : MVarId) (locals : Array FVarId) : MetaM MVarId :=
+  goal.withContext do
+    if locals.isEmpty then return goal
+    let held (id : FVarId) := locals.contains id
+    let read ← (← getLCtx).anyM fun decl =>
+      if held decl.fvarId then pure false else localDeclDependsOnPred decl held
+    if read || (← dependsOnPred (← goal.getType) held) then
+      return ← goal.tryClearMany locals
+    let lctx := locals.foldl (·.erase ·) (← getLCtx)
+    let next ← mkFreshExprMVarAt lctx (← getLocalInstances) (← goal.getType)
+      .syntheticOpaque (← goal.getTag)
+    goal.assign next
+    return next.mvarId!
+
+/-- The goals with the continuations `holdContinuations` set aside back in
+place, reduced at their arguments. The goal's leading binders, the call's
+result, final state and premises, are introduced, so that the continuation's
+body is closed: a variable argument leaves it normal, so the goal is
+normalized along the paths to the other arguments, everything else taken as
+it is. -/
+def releaseContinuations (normalization : Simp.Context × Simp.SimprocsArray)
+    (held : Array (FVarId × Lean.Expr)) (fixedPoints : Option Name := none) : TacticM Unit := do
+  if held.isEmpty then return
+  let lookup (e : Lean.Expr) : Option Lean.Expr :=
+    match e.getAppFn with
+    | .fvar id => (held.find? (·.1 == id)).map (·.2)
+    | _ => none
+  let (ctx, simprocs) := normalization
+  let locals := held.map (·.1)
+  let mut released := #[]
+  for goal in ← getGoals do
+    let target ← goal.withContext do instantiateMVars (← goal.getType)
+    unless (target.find? fun e => (lookup e).isSome).isSome do
+      released := released.push (← clearHeld goal locals)
+      continue
+    let rec binders : Lean.Expr → Nat
+      | .forallE _ _ b _ => binders b + 1
+      | .mdata _ b => binders b
+      | _ => 0
+    let saved ← saveState
+    try
+      let (introduced, inner) ← goal.introNP (binders target)
+      let next ← inner.withContext do
+        let target ← instantiateMVars (← inner.getType)
+        -- The arguments other than variables: a read a value stands in
+        -- may reduce with what surrounds it.
+        let mut arguments : Array Lean.Expr := #[]
+        -- The applications, and whether one is under a binder.
+        let (applications, bound) := Id.run do
+          let mut found : Array Lean.Expr := #[]
+          let mut bound := false
+          let mut visited : Std.HashSet (Lean.Expr × Bool) := {}
+          let mut pending := #[(target, false)]
+          while let some (e, under) := pending.back? do
+            pending := pending.pop
+            if visited.contains (e, under) then continue
+            visited := visited.insert (e, under)
+            if (lookup e).isSome then
+              found := found.push e
+              bound := bound || under
+              continue
+            match e with
+            | .app f a => pending := pending.push (a, under) |>.push (f, under)
+            | .lam _ t b _ | .forallE _ t b _ => pending := pending.push (b, true) |>.push (t, true)
+            | .letE _ t v b _ => pending := pending.push (b, true) |>.push (v, true) |>.push (t, true)
+            | .mdata _ b | .proj _ _ b => pending := pending.push (b, under)
+            | _ => pure ()
+          return (found, bound)
+        for e in applications do
+          for a in e.getAppArgs do
+            unless a.isFVar || arguments.contains a do arguments := arguments.push a
+        let mut substituted : Std.HashSet Lean.Expr := arguments.foldl (·.insert ·) {}
+        -- What the call assigned, such as a generic callee's instantiation,
+        -- stands in the held values like an argument.
+        for (_, value) in held do
+          for mvar in (value.collectMVars {}).result do
+            if ← mvar.isAssigned then
+              substituted := substituted.insert (← instantiateMVars (mkMVar mvar))
+        let restored ← instantiateMVars
+          (target.replace fun e => (lookup e).map (·.beta e.getAppArgs))
+        let next ← clearHeld (← inner.replaceTargetDefEq restored) locals
+        -- Premises over the continuation's body are a rule's, as
+        -- `wp_named` adds them, and normalized in full.
+        let rec conclusion : Lean.Expr → Lean.Expr
+          | .forallE _ _ b _ => conclusion b
+          | .mdata _ b => conclusion b
+          | e => e
+        -- The structure outside the continuation's lambdas is a rule's, as
+        -- `wp_bind` builds it, and normalized too; the binders it reaches.
+        let (top, binders) := Id.run do
+          let mut found : Std.HashSet Lean.Expr := {}
+          let mut binders : Std.HashSet Lean.Expr := {}
+          let mut pending := #[conclusion restored]
+          while let some e := pending.back? do
+            pending := pending.pop
+            if found.contains e then continue
+            found := found.insert e
+            match e with
+            | .app f a => pending := pending.push a |>.push f
+            | .mdata _ b | .proj _ _ b => pending := pending.push b
+            | .lam .. | .forallE .. | .letE .. => binders := binders.insert e
+            | _ => pure ()
+          return (found, binders)
+        -- With nothing substituted, the binders are as the contract's
+        -- normalization or the continuation left them, normal: only the
+        -- structure, and what a rewrite of it yields, is traversed. The
+        -- subterms taken as they are below a rewrite are found on demand.
+        let direct := substituted.isEmpty && !bound
+        let computed ← IO.mkRef none
+        let normal : IO (Std.HashSet Lean.Expr) := do
+          if let some normal ← computed.get then return normal
+          let normal := (subtermsWithout (conclusion restored) substituted).filter (!top.contains ·)
+          computed.set (some normal)
+          return normal
+        next.withContext do
+          let stop := fun e => do
+            if direct then
+              if binders.contains e then return true
+              if top.contains e then return false
+            return (← normal).contains e
+          let methods := match ← FixedPoints.new? fixedPoints with
+            | some fp => fp.wrap (Simp.mkDefaultMethodsCore simprocs) stop
+            | none => stoppingMethods simprocs stop
+          let (result, _) ← Simp.main restored ctx (methods := methods)
+          if result.expr == restored then return next
+          applySimpResultToTarget next restored result
+      let (_, next) ← next.revert introduced (preserveOrder := true)
+      -- What the body became may restructure the binders over it, as
+      -- `forall_and` does; the propositions below them are normal.
+      setGoals [next]
+      normalizeConnectives normalization
+      released := released ++ (← getGoals).toArray
+    catch _ =>
+      saved.restore
+      -- Unreleased, the goal is put back in full and normalized again.
+      let next ← goal.withContext do
+        let restored := target.replace fun e => (lookup e).map (·.beta e.getAppArgs)
+        clearHeld (← goal.replaceTargetDefEq restored) locals
+      setGoals [next]
+      normalizeAround normalization #[] fixedPoints
+      released := released ++ (← getGoals).toArray
+  setGoals released.toList
+
 /-- The contract constants a callee theorem speaks about, to unfold at a
 call site: the typed contract and the raw contract it wraps. -/
 def contractConstants (theoremType : Lean.Expr) : MetaM (Array Name) := do
@@ -533,12 +878,19 @@ private def executableOf? (invoke : Lean.Expr) : Option Lean.Expr :=
   let invoke := invoke.consumeMData
   if invoke.isAppOfArity ``closureMeaning 4 then some (invoke.getArg! 2) else none
 
+/-- Whether a statement is `ensures_of` or `aborts_of` of a known target read
+directly (`CallEnsures`, `CallAborts`). -/
+private def statesDirectCall (statement : Lean.Expr) : Bool :=
+  statement.isAppOfArity ``VerexIR.Proofs.CallEnsures 7 ||
+    statement.isAppOfArity ``VerexIR.Proofs.CallAborts 5
+
 /-- Whether a statement is `ensures_of` or `aborts_of` under premises. -/
 private partial def states (statement : Lean.Expr) : Bool :=
   if statement.isArrow then states statement.bindingBody!
   else
     let statement := unmarked statement
-    statement.isAppOf ``VerexIR.Proofs.EnsuresOf || statement.isAppOf ``VerexIR.Proofs.AbortsOf
+    statement.isAppOf ``VerexIR.Proofs.EnsuresOf || statement.isAppOf ``VerexIR.Proofs.AbortsOf ||
+      statesDirectCall statement
 
 /-- Behavioral contract derivation only handles literal closures. An abstract
 function value has no target theorem to re-derive, so trying to avoid that
@@ -579,7 +931,8 @@ private partial def literalAbortAlternative (environment : Environment) (stateme
     literalAbortAlternative environment (statement.getArg! 0) ||
       literalAbortAlternative environment (statement.getArg! 1)
   else
-    statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 && statesLiteralBehavior environment statement
+    (statement.isAppOfArity ``VerexIR.Proofs.AbortsOf 10 && statesLiteralBehavior environment statement) ||
+      statement.isAppOfArity ``VerexIR.Proofs.CallAborts 5
 
 /-- Expose the abort alternatives of a literal closure's contract before
 reading another invocation's result. A disjunction only states that one run
@@ -732,7 +1085,8 @@ def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Le
 /-- Whether a statement reads a behavioral predicate. -/
 private def readsBehavior (statement : Lean.Expr) : Bool :=
   (statement.find? fun e => e.isAppOf ``VerexIR.Proofs.RequiresOf ||
-    e.isAppOf ``VerexIR.Proofs.AbortsOf || e.isAppOf ``VerexIR.Proofs.EnsuresOf).isSome
+    e.isAppOf ``VerexIR.Proofs.AbortsOf || e.isAppOf ``VerexIR.Proofs.EnsuresOf ||
+    statesDirectCall e).isSome
 
 /-- `next` with the facts `before` does not state out of their clause
 markers: the deciders read a derived fact's statement. -/
@@ -807,7 +1161,7 @@ macro_rules
       | (refine VerexIR.HasType.integer _ _ _ ?_
          first | exact VerexIR.Proofs.holdsAt_val _ _ | decide)
       | (refine VerexIR.HasType.nominal _ _ _ _ [] _ _ _ rfl rfl
-           (VerexIR.Proofs.ResolvesAll.ofResolveIn rfl) ?_
+           (VerexIR.Proofs.ResolvesAll.ofResolveAt rfl) ?_
          verex_has_types)))
 macro_rules
   | `(tactic| verex_has_types) => `(tactic| verex_focus ( first
@@ -903,7 +1257,11 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
   -- Substitute using the frame equation itself. Substituting `verexFinal`
   -- by name can select the earlier StateOf equation instead, leaving the
   -- memory hidden behind the invocation's state-label expression.
-  if keeps then next.withContext (Lean.Meta.subst next equation) else pure next
+  -- A frame equation fixing a summary's parameter stays (`substEquation?`).
+  if keeps then return (← substEquation? next equation).getD next
+  -- Any other frame stays a fact, for the leaf and the behavior run.
+  noteKeptFact equation
+  pure next
 
 /-- A row the frame resolves to scalars (`ScalarAt`): a hypothesis of the
 theorem, or by evaluation where the frame is the runtime frame or one a
@@ -1542,8 +1900,12 @@ private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial
     let (equation, next) ← goal.withContext do
       (← goal.assert `verexKept (← whnfR (← inferType kept)).headBeta kept).intro1P
     -- Substituting the final memory ends the run's facts: the other frames
-    -- would speak of a memory no longer named.
-    if keeps then return ← next.withContext (Lean.Meta.subst next equation)
+    -- would speak of a memory no longer named. A substitution refused
+    -- because the equation fixes a summary's parameter keeps the equation
+    -- and the memory named, so the search goes on.
+    if keeps then
+      if let some substituted ← substEquation? next equation then return substituted
+    noteKeptFact equation
     goal := next
   return goal
 
@@ -1655,7 +2017,7 @@ private def routesOf? (decl : Lean.LocalDecl) (value : Lean.Expr) : MetaM Lean.E
   let (binders, _, statement) ← forallMetaTelescope (← instantiateMVars decl.type)
   let some (_, lhs, _) := statement.eq? | throwError "a routing hypothesis is no equation"
   let some argsBinder := binders.back? | throwError "a routing hypothesis takes no arguments"
-  unless lhs.getAppNumArgs ≥ 2 && (← isDefEq (lhs.getArg! (lhs.getAppNumArgs - 2)) value) do
+  unless ← (pure (decide (lhs.getAppNumArgs ≥ 2)) <&&> isDefEq (lhs.getArg! (lhs.getAppNumArgs - 2)) value) do
     throwError "another function value"
   withLocalDeclD `args (← instantiateMVars (← inferType argsBinder)) fun args => do
     argsBinder.mvarId!.assign args
@@ -1991,6 +2353,62 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
         #[σ, ε, α, action, initial, leaf, established, run])
       return some established.mvarId!
 
+/-- A leaf's run or abort of a known target read directly (`CallEnsures`,
+`CallAborts`): the leaf becomes the weakest precondition of the call under which it
+holds of each run or abort (`forall_ok_of_wp`, `of_aborts_of_wp`), which the call
+rule reads by the target's theorem or body, as a body's call. The hypothesis stays,
+marked read. A run naming no local for its result stays a fact. -/
+private def denotedDirectCall (goal : MVarId) (hypothesis : FVarId) (stated type : Lean.Expr) :
+    MetaM (Option MVarId) := do
+  let mark := mkApp (mkConst ``VerexIR.Proofs.Denoted) type
+  if type.isAppOfArity ``VerexIR.Proofs.CallEnsures 7 then
+    let (call, result, initial, post) :=
+      (type.getArg! 3, type.getArg! 4, type.getArg! 5, type.getArg! 6)
+    let some shape := if call.isAppOfArity ``propheticMeaning 9 then some (call.getArg! 7) else none
+      | return none
+    let unitShape := shape.consumeMData.isConstOf ``ResultShape.none
+    let .fvar finalVar := post | return none
+    let resultVar? ← if unitShape then pure none else
+      let .fvar resultVar := result | return none
+      pure (some resultVar)
+    let run ← mkExpectedTypeHint stated (← mkAppM ``VerexIR.Proofs.Spec.ok #[call, initial, result, post])
+    let runType ← inferType run
+    let goal ← goal.replaceLocalDeclDefEq hypothesis mark
+    let (runVar, goal) ← goal.withContext do (← goal.assert `verexRun runType run).intro1P
+    let reverted := (resultVar?.map (#[·])).getD #[] |>.push finalVar
+    let dependents ← goal.withContext do
+      (← getLCtx).foldlM (init := #[]) fun found decl => do
+        if decl.isImplementationDetail || decl.fvarId == runVar || reverted.contains decl.fvarId then
+          return found
+        let declType ← instantiateMVars decl.type
+        if reverted.any declType.containsFVar then return found.push decl.fvarId
+        return found
+    let (_, goal) ← goal.revert dependents (preserveOrder := true)
+    let (_, goal) ← goal.revert #[runVar]
+    let (_, goal) ← goal.revert reverted (preserveOrder := true)
+    let rule := if unitShape then ``VerexIR.Proofs.forall_ok_unit_of_wp
+      else ``VerexIR.Proofs.forall_ok_of_wp
+    let [next] ← goal.apply (← mkConstWithFreshMVarLevels rule) | return none
+    return some next
+  let (call, initial) := (type.getArg! 3, type.getArg! 4)
+  let callType ← whnfR (← inferType call)
+  unless callType.isAppOfArity ``VerexIR.Proofs.Spec 3 do return none
+  let (σ, ε, α) := (callType.getArg! 0, callType.getArg! 1, callType.getArg! 2)
+  let run ← withLocalDeclD `error ε fun error => do
+    let failed ← mkAppM ``VerexIR.Proofs.Spec.aborts #[call, initial, error]
+    mkExpectedTypeHint stated (← mkAppM ``Exists #[← mkLambdaFVars #[error] failed])
+  let goal ← goal.replaceLocalDeclDefEq hypothesis mark
+  goal.withContext do
+    let leaf ← goal.getType
+    let returns ← withLocalDeclD `result α fun result => withLocalDeclD `final σ fun final =>
+      mkLambdaFVars #[result, final] (mkConst ``True)
+    let fails ← withLocalDeclD `error ε fun error => mkLambdaFVars #[error] leaf
+    let established ← mkFreshExprSyntheticOpaqueMVar
+      (mkAppN (mkConst ``VerexIR.Proofs.wp) #[σ, ε, α, call, returns, fails, initial])
+    goal.assign (mkAppN (mkConst ``VerexIR.Proofs.of_aborts_of_wp)
+      #[σ, ε, α, call, initial, leaf, established, run])
+    return some established.mvarId!
+
 /-- A leaf's first run or abort of a literal closure of an inlined target
 (`denotedRun`), as a hypothesis states it under premises the leaf holds
 and its clause's marker. -/
@@ -2004,6 +2422,7 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
       let mut type := type
       while type.isArrow do type := type.bindingBody!
       let statement := unmarked type
+      if statesDirectCall statement then return some statement
       let some view := behaviorView? statement | none
       if (literalFunction? environment view.function).isSome then some statement else none
     let stating ← (← getLCtx).foldlM (init := #[]) fun found decl => do
@@ -2032,7 +2451,10 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
   for (hypothesis, stated, type) in candidates do
     let state ← saveState
     try
-      if let some next ← goal.withContext (denotedRun goal callees hypothesis stated type) then
+      if statesDirectCall type then
+        if let some next ← goal.withContext (denotedDirectCall goal hypothesis stated type) then
+          return some next
+      else if let some next ← goal.withContext (denotedRun goal callees hypothesis stated type) then
         return some next
       state.restore
     catch ex =>
@@ -2128,12 +2550,16 @@ private def findReached? {α : Type} (es : Array Lean.Expr) (continuations : Arr
         pending := pending.push (← instantiateMVars value)
   return none
 
-/-- Whether an expression states a behavioral predicate, also through the
-continuations it reaches (`findReached?`). -/
+/-- The predicates stating a function value's behavior, and the direct
+readings of a call's target (`CallEnsures`, `CallAborts`). -/
+def behaviorPredicates : Array Name :=
+  #[``VerexIR.Proofs.EnsuresOf, ``VerexIR.Proofs.AbortsOf, ``VerexIR.Proofs.ResultOf,
+    ``VerexIR.Proofs.StateOf, ``VerexIR.Proofs.CallEnsures, ``VerexIR.Proofs.CallAborts]
+
+/-- Whether an expression states a behavioral predicate (`behaviorPredicates`),
+also through the continuations it reaches (`findReached?`). -/
 def statesBehavior (es : Array Lean.Expr) (continuations : Array Name := #[]) : MetaM Bool := do
-  let behavioral (sub : Lean.Expr) : Bool :=
-    sub.isConstOf ``VerexIR.Proofs.EnsuresOf || sub.isConstOf ``VerexIR.Proofs.AbortsOf ||
-      sub.isConstOf ``VerexIR.Proofs.ResultOf || sub.isConstOf ``VerexIR.Proofs.StateOf
+  let behavioral (sub : Lean.Expr) : Bool := behaviorPredicates.any sub.isConstOf
   return (← findReached? es continuations fun next =>
     pure (if (next.find? behavioral).isSome then some () else none)).isSome
 
@@ -2168,6 +2594,98 @@ private def namingLiteral? (target : Lean.Expr) (continuations : Array Name)
       return some literal.closed
     return none
 
+/-- The direct reading of a call's target the goal owes (`CallEnsures`, `CallAborts`):
+the meaning it states, at the call's family and target, whose instantiation names
+the call's type arguments, however they are located. -/
+private def owedDirectCall? (target : Lean.Expr) (continuations : Array Name)
+    (meaning : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  findReached? (← owedStatements target) continuations fun next => do
+    for statement in sitesWhere statesDirectCall #[next] do
+      let owed := (statement.getArg! 3).consumeMData
+      unless owed.isAppOfArity ``propheticMeaning 9 do continue
+      if (owed.getArg! 5).hasLooseBVars || (owed.getArg! 4).hasLooseBVars ||
+          (owed.getArg! 3).hasLooseBVars then continue
+      unless ← isDefEq (owed.getArg! 5) (meaning.getArg! 5) do continue
+      unless ← isDefEq (owed.getArg! 3) (meaning.getArg! 3) do continue
+      return some owed
+    return none
+
+/-- Whether a goal's call is of a target the goal owes the direct reading of. -/
+def owesDirectCall (goal : MVarId) (continuations : Array Name := #[]) : MetaM Bool :=
+    goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return false
+  let meaning := target.getArg! 3
+  unless meaning.isAppOfArity ``propheticMeaning 9 do return false
+  return (← owedDirectCall? target continuations meaning).isSome
+
+/-- The goal's call at the instantiation a direct reading states, where the two name
+the same types (`frameInstantiation_congr`). -/
+private def callAtOwedInstantiation (goal : MVarId) (owed : Lean.Expr) : MetaM (Option MVarId) :=
+    goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  let meaning := target.getArg! 3
+  let (actual, stated) := (meaning.getArg! 4, owed.getArg! 4)
+  if ← withReducible (isDefEq actual stated) then return some goal
+  unless actual.isAppOfArity ``frameInstantiation 4 && stated.isAppOfArity ``frameInstantiation 4 do
+    return none
+  unless ← isDefEq (actual.getArg! 2) (stated.getArg! 2) do return none
+  unless ← isDefEq (actual.getArg! 1) (stated.getArg! 1) do return none
+  let ids (instantiation : Lean.Expr) : MetaM Lean.Expr := do
+    let typeUse := mkConst ``VerexIR.TypeUse
+    let toTypeId := .lam `use typeUse (mkApp (mkConst ``VerexIR.TypeUse.typeId) (.bvar 0)) .default
+    mkAppM ``List.map #[toTypeId, ← mkAppM ``Array.toList #[instantiation.getArg! 3]]
+  let (left, right) := (← ids actual, ← ids stated)
+  unless ← withDefault (isDefEq left right) do return none
+  let same ← mkExpectedTypeHint (← mkEqRefl left) (← mkEq left right)
+  let congr ← mkAppOptM ``frameInstantiation_congr
+    #[actual.getArg! 0, actual.getArg! 1, actual.getArg! 2, actual.getArg! 3, stated.getArg! 3, same]
+  let args := target.getAppArgs
+  let motive ← withLocalDeclD `instantiation (← inferType actual) fun instantiation => do
+    mkLambdaFVars #[instantiation]
+      (mkAppN target.getAppFn (args.set! 3 (mkAppN meaning.getAppFn
+        (meaning.getAppArgs.set! 4 instantiation))))
+  let proof ← mkCongrArg motive congr
+  let next := mkAppN target.getAppFn (args.set! 3 (mkAppN meaning.getAppFn
+    (meaning.getAppArgs.set! 4 stated)))
+  return some (← goal.replaceTargetEq next proof)
+
+/-- A call where the goal owes the direct reading of its target
+(`owedDirectCall?`), as a body's call of it reads: its continuations assume the
+call's `ensures_of` and `aborts_of` (`wp_call_runs`) and, where runs agree and the
+row lends flatly, the absence of its abort (`wp_call_runs_agree`). -/
+private def directCall (goal : MVarId) (throughContract : Bool) (owed : Lean.Expr) :
+    TacticM (Option MVarId) := do
+  let some goal ← callAtOwedInstantiation goal owed | return none
+  let target ← goal.withContext do instantiateMVars (← goal.getType)
+  let meaning := target.getArg! 3
+  let (unit, functions, executable, frame) :=
+    (meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2, meaning.getArg! 3)
+  let agrees? ← goal.withContext do
+    (← getLCtx).findDeclM? fun declaration => do
+      if declaration.isImplementationDetail then return none
+      let type ← instantiateMVars declaration.type
+      return if type.isAppOfArity ``VerexIR.Proofs.RunsAgree 2 then some declaration.toExpr else none
+  let saved ← saveState
+  if let some agrees := agrees? then
+    try
+      setGoals [goal]
+      let agreesSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax agrees)
+      let rule ← goal.withContext <| Lean.Elab.Term.exprToSyntax
+        (mkApp4 (mkConst ``VerexIR.Proofs.wp_call_runs_agree) unit functions executable frame)
+      Term.withoutErrToSorry <| withoutRecover <|
+        evalTactic (← `(tactic| refine $rule $agreesSyntax (by decide) ?_))
+      let [named] ← getGoals | throwError "the direct call leaves one goal"
+      return some (← if throughContract then markNamedRead named else pure named)
+    catch failure =>
+      saved.restore
+      if verex.solverDebug.get (← getOptions) then
+        logInfo m!"direct call where runs agree not taken: {failure.toMessageData}"
+  let [named] ← goal.withContext do
+    goal.apply (mkApp2 (mkConst ``VerexIR.Proofs.wp_call_runs) unit functions)
+    | return none
+  return some (← if throughContract then markNamedRead named else pure named)
+
 /-- A call of a target taking and returning no reference, where the goal
 owes a behavioral predicate (`obligesBehavior`): its continuations assume
 `ensures_of` and `aborts_of` of the function value naming the target
@@ -2186,6 +2704,8 @@ def namedCall (goal : MVarId) (throughContract : Bool)
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return goal
   let meaning := target.getArg! 3
   unless meaning.isAppOfArity ``propheticMeaning 9 do return goal
+  if let some owed ← goal.withContext (owedDirectCall? target continuations meaning) then
+    if let some next ← directCall goal throughContract owed then return next
   let (unit, functions, executable, frame) :=
     (meaning.getArg! 0, meaning.getArg! 1, meaning.getArg! 2, meaning.getArg! 3)
   let some naming ← goal.withContext (namingLiteral? target continuations (meaning.getArg! 5)

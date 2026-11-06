@@ -601,7 +601,8 @@ uses labels (`loop@outer`, `break@outer`), and unknown labels are rejected.
 Loops are expressions and may produce a value through `break`. A body that
 can fall through must match its declared result type; a loop body, an `if`
 without `else`, and a fall-through pattern assignment have type `Unit`.
-Abrupt control is polymorphic through `Never`.
+Abrupt control is polymorphic through `Never`. An `else` left of the offside
+column of the enclosing block belongs to an `if` outside that block.
 
 `for iterator in lower..upper do` is the half-open range loop. Each bound is
 evaluated once, in order. Lowering expands it to typed locals, a `loop`, a

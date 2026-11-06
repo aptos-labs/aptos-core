@@ -1761,9 +1761,11 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     rawUnit.namespaces.size structuredNamespaces
   if resolutionDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics resolutionDiagnostics)
-  let orders := valueOrdersOf rawUnit.tables structuredNamespaces
+  let orders := valueOrdersOf (structuredNamespaces.map (rawUnit.tables, ·))
   let namespaces := structurized.zipIdx.map fun (s, index) =>
-    ({ toNamespace := s.ns, tables := rawUnit.tables, orders, holders := holders[index]?.getD #[] }
+    ({ toNamespace := s.ns, tables := rawUnit.tables, links := .identity rawUnit.tables
+       localTables := rawUnit.tables, orders, holders := holders[index]?.getD #[]
+       witnesses := s.witnesses }
       : ValidatedNamespace)
   let unit := Internal.mkValidatedUnit rawUnit.tables rawUnit.profiles namespaces
     (rawUnit.dependencies.map fun dep => {
@@ -1781,17 +1783,16 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
       trusted := evidence.trusted })
     { namespaceCount := namespaces.size
       functionCounts := namespaces.map (·.functions.size) }
-    (structurized.flatMap (·.witnesses))
     resolution
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferLocalAccess unit)) unit.dependencies unit.evidence unit.indexes
-    unit.structurizationWitnesses unit.resolution
+    unit.resolution
   let typingErrors := typingDiagnostics unit
   if typingErrors.any (·.severity == .error) then
     throw (dedupDiagnostics typingErrors)
   let unit := Internal.mkValidatedUnit unit.tables unit.profiles
     (unit.namespaces.map (inferInstantiations unit)) unit.dependencies unit.evidence unit.indexes
-    unit.structurizationWitnesses unit.resolution
+    unit.resolution
   -- Definite initialization and the borrow analysis run exactly once here;
   -- preparation copies the certificates instead of re-running the analyses.
   -- Initialization failures are validate errors. Borrow-analysis rejections
@@ -1823,9 +1824,13 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     match folded[certificate.namespaceId.index]? with
     | some (_, expressions) => certificate.withoutLoans expressions
     | none => certificate
-  return Internal.mkValidatedUnit unit.tables unit.profiles (folded.map (·.1))
-    unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses
-    unit.resolution initializationCertificates borrowCertificates borrowDiagnostics
+  -- Each namespace holds its results, its identity being its unit index.
+  let namespaces := folded.map fun (ns, _) => { ns with
+    initializationCertificates := initializationCertificates.filter (·.namespaceId == ns.identity)
+    borrowCertificates := borrowCertificates.filter (·.namespaceId == ns.identity)
+    borrowRejections := borrowDiagnostics.filter (·.namespaceId == ns.identity) }
+  return Internal.mkValidatedUnit unit.tables unit.profiles namespaces
+    unit.dependencies unit.evidence unit.indexes unit.resolution
 
 def ValidatedUnit.namespace? (unit : ValidatedUnit) (id : NamespaceId) : Option ValidatedNamespace :=
   unit.namespaces[id.index]?

@@ -43,13 +43,14 @@ partial def patternNames : Pattern → List String
   | .mk _ _ (.struct _ _ _ fields) => fields.flatMap patternNames
   | .mk _ _ .wildcard | .mk _ _ (.literal _) | .mk _ _ (.range ..) => []
 
-/-- Replace the locals `binding` names and the results `result` names,
-except where a binder of the same name hides a local. -/
-partial def substitute (binding : String → Option Exp) (result : Nat → Option Exp) :
-    Exp → Exp
+/-- Replace what `rewrite` rewrites, the locals `binding` names and the results
+`result` names, except where a binder of the same name hides a local. -/
+partial def rewriteExp (rewrite : Exp → Option Exp) (binding : String → Option Exp)
+    (result : Nat → Option Exp) : Exp → Exp
   | .mk ty loc node =>
-    let go := substitute binding result
-    let unbinding (names : List String) := substitute
+    if let some rewritten := rewrite (.mk ty loc node) then rewritten else
+    let go := rewriteExp rewrite binding result
+    let unbinding (names : List String) := rewriteExp rewrite
       (fun name => if names.contains name then none else binding name) result
     match node with
     | .local name => (binding name).getD (.mk ty loc node)
@@ -82,6 +83,10 @@ partial def substitute (binding : String → Option Exp) (result : Nat → Optio
         let inner := unbinding names
         .mk ty loc (.quant kind ranges (triggers.map (·.map inner)) (condition.map inner)
           (inner body))
+
+/-- Replace the locals `binding` names and the results `result` names. -/
+def substitute (binding : String → Option Exp) (result : Nat → Option Exp) : Exp → Exp :=
+  rewriteExp (fun _ => none) binding result
 
 private def boolExp (loc : Loc) (node : ExpNode) : Exp := .mk .bool loc node
 

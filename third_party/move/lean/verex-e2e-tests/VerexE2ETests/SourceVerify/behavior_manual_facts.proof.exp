@@ -10,7 +10,7 @@ verexResources : Proofs.ResourcesTyped unit
 addr : Proofs.Denote.NTy.address.carrier
 initialState✝ : Proofs.Denote.Memory unit
 assumed permitted : True
-a✝⁶ :
+increment_returns :
   ¬(initialState✝
           {
             type :=
@@ -29,12 +29,12 @@ a✝⁶ :
                     (StorageKey.address addr)).getD
                 ({ val := 0, fits := ⋯ }, ())).fst.val +
           1)
-a✝⁵ :
+a✝⁷ :
   ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
       (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
       { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
       initialState✝
-a✝⁴ :
+a✝⁶ :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
@@ -54,7 +54,7 @@ a✝⁴ :
                 (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil }
           key
-a✝³ :
+a✝⁵ :
   ∀ (resource : Proofs.Denote.ResourceType),
     ¬resource =
           {
@@ -67,7 +67,7 @@ a✝³ :
           { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
           initialState✝ resource =
         initialState✝ resource
-a✝² :
+a✝⁴ :
   Proofs.Denoted
     (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
       (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
@@ -77,7 +77,7 @@ a✝² :
         (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
         { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
         initialState✝))
-x✝¹ :
+flip_flag_returns :
   (Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
         (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
         { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
@@ -89,7 +89,7 @@ x✝¹ :
           arguments := Proofs.Denote.NRow.nil }
         (StorageKey.address addr)).isSome =
     true
-x✝ :
+a✝³ :
   ¬Proofs.AbortsOf (Proofs.Denote.closureMeaning executable✝)
       (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
       { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site1 ()) (addr, ())
@@ -97,7 +97,7 @@ x✝ :
         (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
         { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
         initialState✝)
-a✝¹ :
+a✝² :
   ∀ (key : StorageKey),
     ¬key = StorageKey.address addr →
       Proofs.StateOf (Proofs.Denote.closureMeaning executable✝)
@@ -123,7 +123,7 @@ a✝¹ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
             arguments := Proofs.Denote.NRow.nil }
           key
-a✝ :
+a✝¹ :
   ∀ (resource : Proofs.Denote.ResourceType),
     ¬resource =
           {
@@ -143,7 +143,7 @@ a✝ :
           (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
           { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ()) (addr, ())
           initialState✝ resource
-x :
+a✝ :
   Proofs.Denoted
     (Proofs.EnsuresOf (Proofs.Denote.closureMeaning executable✝)
       (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
