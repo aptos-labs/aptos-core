@@ -42,10 +42,10 @@ so four out of five transactions depend on the one right before them through
 the sender's sequence number. On a local smoke run that gives 0.4 to 1.4
 speculative aborts per transaction on `no-op` at 2 and 4 threads.
 
-Both VMs pay this, but it is a scheduling constraint, not VM work, so it
-dilutes exactly the way a fixed cost does. The sweep runs with one transaction
-per sender by default so that the measured growth is the VMs' and Block-STM's
-own, and keeps the 5-per-sender shape as a separate variant to quantify.
+The sweep runs with one transaction per sender by default so that the
+measured growth is the VMs' and Block-STM's own, and keeps the 5-per-sender
+shape as a separate variant. (Quantified below: it costs both VMs about a
+quarter of their 16-thread throughput and leaves the ratio alone.)
 
 ### Runner for the sweep
 
@@ -327,6 +327,24 @@ against 20% of V1's.
 Done on this branch: the instantiation map (order book +144% at 16T),
 hot-state read/write keys (parity), uninitialized evacuation and arena
 regions (small).
+
+## 2026-11-06: five transactions per sender (run 42279519289)
+
+The e2e job's block shape, on the fixed build, 2 and 16 threads, no profiles.
+
+| 16 threads | V1 inner µs/txn | MonoMove inner µs/txn | aborts/txn (both) | MonoMove/V1 |
+|---|---|---|---|---|
+| no-op, 1 per sender | 22.9 | 6.3 | 0.0 | 3.6x |
+| no-op, 5 per sender | 33.1 | 8.2 | 1.9 | 4.0x |
+| apt-fa-transfer, 1 per sender | 32.8 | 10.7 | 0.0 | 3.1x |
+| apt-fa-transfer, 5 per sender | 44.5 | 13.9 | 2.0 | 3.2x |
+
+Two speculative aborts per transaction cost both VMs 23–31% of throughput at
+16 threads and about 30% more worker CPU, in proportion to each VM's own
+execution cost, so the ratio does not move. The e2e job's chained senders
+make its absolute numbers pessimistic but are not why MonoMove's ratio
+falls with thread count. Dependency waits stay at zero: v2 aborts and
+re-executes rather than parking.
 
 ## Tooling
 
