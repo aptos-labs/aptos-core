@@ -1096,6 +1096,7 @@ mod reopen {
     fn block_with_collateral(
         writes: &[(StateKey, u64)],
         collateral: &[(StateKey, Option<&[u8]>)],
+        collateral_root: Option<HashValue>,
     ) -> TransactionToCommit {
         let txn_info = TransactionInfo::builder_v1()
             .transaction_hash(HashValue::random())
@@ -1104,6 +1105,7 @@ mod reopen {
             .state_checkpoint_hash(HashValue::random())
             .gas_used(0)
             .status(ExecutionStatus::Success)
+            .maybe_collateral_state_checkpoint_hash(collateral_root)
             .build();
         let positions: BTreeMap<_, _> = writes
             .iter()
@@ -1768,13 +1770,229 @@ mod reopen {
         positions: &[(StateKey, u64)],
         collateral: &[(StateKey, Option<&[u8]>)],
     ) {
+        commit_collateral_with_root(db, version, positions, collateral, None);
+    }
+
+    fn commit_collateral_with_root(
+        db: &AptosDB,
+        version: Version,
+        positions: &[(StateKey, u64)],
+        collateral: &[(StateKey, Option<&[u8]>)],
+        collateral_root: Option<HashValue>,
+    ) {
         db.save_transactions_for_test(
-            &[block_with_collateral(positions, collateral)],
+            &[block_with_collateral(
+                positions,
+                collateral,
+                collateral_root,
+            )],
             version,
             None,
             true,
         )
         .expect("commit");
+    }
+
+    fn collateral_root(db: &AptosDB) -> HashValue {
+        db.get_pre_committed_collateral_state_summary()
+            .expect("collateral summary")
+            .latest()
+            .root_hash()
+    }
+
+    /// A node whose collateral store disagrees with the collateral root the
+    /// ledger commits refuses to open: here storage is enabled on a node that
+    /// committed collateral it never stored.
+    #[test]
+    fn reopening_refuses_a_collateral_store_that_disagrees_with_the_committed_root() {
+        let root = {
+            let reference_dir = TempPath::new();
+            let db = open(&reference_dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            collateral_root(&db)
+        };
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_collateral_with_root(
+                &db,
+                0,
+                &[],
+                &[(collateral_key(1), Some(&collateral_value(b'a')))],
+                Some(root),
+            );
+        }
+        let err = match AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        ) {
+            Ok(_) => panic!("open must fail"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string()
+                .contains("disagrees with the collateral root"),
+            "{err}"
+        );
+    }
+
+    /// A node with storage on throughout reopens cleanly against a ledger
+    /// that commits collateral roots.
+    #[test]
+    fn reopening_with_matching_collateral_roots_succeeds() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            let root = collateral_root(&db);
+            commit_collateral_with_root(&db, 1, &[], &[], Some(root));
+        }
+        let db = open(&dir, true);
+        assert_eq!(
+            collateral_rows(&db),
+            BTreeMap::from([(collateral_key(1), collateral_value(b'a'))])
+        );
+    }
+
+    /// Enabling on a ledger whose committed collateral root is the empty tree
+    /// (roots on, no collateral yet) is the normal rollout path and opens.
+    #[test]
+    fn enabling_on_a_ledger_with_an_empty_collateral_root_opens() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_collateral_with_root(&db, 0, &[], &[], Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+        }
+        let db = open(&dir, true);
+        commit_collateral(&db, 1, &[], &[(
+            collateral_key(1),
+            Some(&collateral_value(b'a')),
+        )]);
+        assert_eq!(collateral_rows(&db).len(), 1);
+    }
+
+    /// Generated blocks commit collateral roots that the storage pipeline
+    /// reproduces, and reopen passes the open-time root check.
+    #[test]
+    fn generated_collateral_blocks_match_committed_roots() {
+        use crate::db::test_helper::arb_blocks_to_commit_with_collateral;
+        use aptos_proptest_helpers::ValueGenerator;
+
+        let dir = TempPath::new();
+        let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_collateral());
+        let mut last_root = None;
+        {
+            let db = open(&dir, true);
+            let mut version = 0;
+            for (txns, li) in &blocks {
+                db.save_transactions_for_test(txns, version, Some(li), true)
+                    .expect("commit");
+                version += txns.len() as Version;
+                last_root = txns
+                    .last()
+                    .unwrap()
+                    .transaction_info()
+                    .collateral_state_checkpoint_hash();
+            }
+            assert_eq!(Some(collateral_root(&db)), last_root);
+        }
+        let db = open(&dir, true);
+        assert_eq!(Some(collateral_root(&db)), last_root);
+    }
+
+    /// A restore-mode open leaves the collateral store where it was
+    /// persisted; the reset a replay runs first brings it to the ledger tip.
+    #[test]
+    fn restore_reset_catches_collateral_up_to_the_ledger() {
+        use crate::get_restore_handler::GetRestoreHandler;
+        use aptos_storage_interface::state_store::collateral::CollateralKey;
+        use aptos_types::state_store::{
+            native_collateral::NativeCollateral, state_key::inner::CollateralScope,
+        };
+        use std::sync::Arc;
+
+        fn read(db: &AptosDB, account: u8) -> Option<NativeCollateral> {
+            let bundle = db.collateral().expect("collateral store attached");
+            let tip = bundle.collateral.lock().clone();
+            let key = CollateralKey {
+                exchange: exchange(1),
+                account: super::account(account),
+                scope: CollateralScope::Cross,
+            };
+            bundle
+                .collateral_base
+                .with_view(&tip, |view| view.get(&key))
+        }
+        fn decoded(tag: u8) -> NativeCollateral {
+            NativeCollateral::deserialize(&collateral_value(tag)).unwrap()
+        }
+
+        let dir = TempPath::new();
+        let root = {
+            let db = open(&dir, true);
+            commit_collateral(&db, 0, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'a')),
+            )]);
+            commit_collateral(&db, 1, &[], &[(
+                collateral_key(2),
+                Some(&collateral_value(b'b')),
+            )]);
+            commit_collateral(&db, 2, &[], &[(
+                collateral_key(1),
+                Some(&collateral_value(b'c')),
+            )]);
+            collateral_root(&db)
+        };
+        // Lose the in-memory tip: only the oldest snapshot is on disk. The
+        // ledger past it stands in for what a previous restore run replayed.
+        {
+            let db = open(&dir, true);
+            let bundle = db.collateral().unwrap();
+            crate::utils::truncation_helper::truncate_native_merkle_db(&bundle.store.merkle_db, 0)
+                .unwrap();
+        }
+        let db = Arc::new(
+            AptosDB::open_kv_only(
+                StorageDirPaths::from_path(dir.path()),
+                false,
+                NO_OP_STORAGE_PRUNER_CONFIG,
+                RocksdbConfigs {
+                    enable_trading_native: true,
+                    ..Default::default()
+                },
+                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                None,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            read(&db, 1),
+            Some(decoded(b'a')),
+            "restore-mode open does not catch up"
+        );
+        assert_eq!(read(&db, 2), None);
+        db.get_restore_handler().reset_state_store().unwrap();
+        assert_eq!(collateral_root(&db), root);
+        assert_eq!(read(&db, 1), Some(decoded(b'c')));
+        assert_eq!(read(&db, 2), Some(decoded(b'b')));
     }
 
     /// The collateral store's live rows at its latest JMT snapshot, which

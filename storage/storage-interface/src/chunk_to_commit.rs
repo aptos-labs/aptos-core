@@ -33,6 +33,10 @@ pub struct ChunkToCommit<'a> {
     /// be persisted/merklized at commit without recomputation. `None` when
     /// native position is disabled.
     pub position_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
+    /// Collateral summary computed at execution time, as
+    /// `position_state_summary` is. `None` unless the trading-native state
+    /// roots are computed.
+    pub collateral_state_summary: Option<&'a LedgerWithSummary<NativeStateWithSummary>>,
     /// Position writes since the base, computed in the execution phase
     /// — earlier than `position_state_summary`, which is a checkpoint-stage
     /// product. Commit publishes this as the bundle's tip so the
