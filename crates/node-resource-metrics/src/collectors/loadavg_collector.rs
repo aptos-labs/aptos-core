@@ -65,7 +65,9 @@ impl Collector for LoadAvgCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("load_avg".into());
 
-        let load_avg = System::load_average();
+        let Ok(load_avg) = System::load_average() else {
+            return Vec::new();
+        };
 
         let load_one = ConstMetric::new_gauge(self.load_one.clone(), load_avg.one, None).unwrap();
 

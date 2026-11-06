@@ -15,8 +15,9 @@ use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
 use image::{
+    codecs::jpeg::JpegEncoder,
     imageops::{resize, FilterType},
-    DynamicImage, GenericImageView, ImageBuffer, ImageFormat, ImageOutputFormat,
+    DynamicImage, GenericImageView, ImageBuffer, ImageFormat,
 };
 use reqwest::Client;
 use std::{
@@ -147,14 +148,15 @@ impl ImageOptimizer {
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         let dynamic_image = DynamicImage::ImageRgba8(image_buffer);
         let mut byte_store = Cursor::new(Vec::new());
-        let mut encode_format = ImageOutputFormat::Jpeg(image_quality);
-        let mut output_format = ImageFormat::Jpeg;
-        if Self::has_transparent_pixels(&dynamic_image) {
-            encode_format = ImageOutputFormat::Png;
-            output_format = ImageFormat::Png;
-        }
+        let (result, output_format) = if Self::has_transparent_pixels(&dynamic_image) {
+            let result = dynamic_image.write_to(&mut byte_store, ImageFormat::Png);
+            (result, ImageFormat::Png)
+        } else {
+            let encoder = JpegEncoder::new_with_quality(&mut byte_store, image_quality);
+            (dynamic_image.write_with_encoder(encoder), ImageFormat::Jpeg)
+        };
 
-        match dynamic_image.write_to(&mut byte_store, encode_format) {
+        match result {
             Ok(_) => Ok((byte_store.into_inner(), output_format)),
             Err(e) => {
                 warn!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes: {} bytes", dynamic_image.as_bytes().len());

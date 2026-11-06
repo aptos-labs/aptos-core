@@ -28,7 +28,7 @@ fn disk_refresh_kind() -> DiskRefreshKind {
 
 /// A Collector for exposing Disk metrics
 pub(crate) struct DiskMetricsCollector {
-    disks: Arc<Mutex<Disks>>,
+    disks: Option<Arc<Mutex<Disks>>>,
 
     total_space: Desc,
     available_space: Desc,
@@ -36,9 +36,9 @@ pub(crate) struct DiskMetricsCollector {
 
 impl DiskMetricsCollector {
     fn new() -> Self {
-        let disks = Arc::new(Mutex::new(Disks::new_with_refreshed_list_specifics(
-            disk_refresh_kind(),
-        )));
+        let disks = Disks::new_with_refreshed_list_specifics(disk_refresh_kind())
+            .ok()
+            .map(|disks| Arc::new(Mutex::new(disks)));
         let total_space = Opts::new(TOTAL_SPACE, "Total disk size in bytes")
             .namespace(NAMESPACE)
             .subsystem(DISK_SUBSYSTEM)
@@ -82,7 +82,10 @@ impl Collector for DiskMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("disk".into());
 
-        let mut disks = self.disks.lock();
+        let Some(disks) = &self.disks else {
+            return Vec::new();
+        };
+        let mut disks = disks.lock();
         disks.refresh_specifics(true, disk_refresh_kind());
 
         disks

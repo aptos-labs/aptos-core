@@ -26,7 +26,7 @@ const INTERFACE_NAME_LABEL: &str = "interface_name";
 
 /// A Collector for exposing network metrics
 pub(crate) struct NetworkMetricsCollector {
-    networks: Arc<Mutex<Networks>>,
+    networks: Option<Arc<Mutex<Networks>>>,
 
     total_received: Desc,
     total_transmitted: Desc,
@@ -38,7 +38,9 @@ pub(crate) struct NetworkMetricsCollector {
 
 impl NetworkMetricsCollector {
     fn new() -> Self {
-        let networks = Arc::new(Mutex::new(Networks::new_with_refreshed_list()));
+        let networks = Networks::new_with_refreshed_list()
+            .ok()
+            .map(|networks| Arc::new(Mutex::new(networks)));
 
         let total_received = Opts::new(TOTAL_RECEIVED, "Total number of received bytes")
             .namespace(NAMESPACE)
@@ -118,12 +120,16 @@ impl Collector for NetworkMetricsCollector {
     fn collect(&self) -> Vec<MetricFamily> {
         let _measure = MeasureLatency::new("network".into());
 
-        let mut networks = self.networks.lock();
+        let Some(networks) = &self.networks else {
+            return Vec::new();
+        };
+        let mut networks = networks.lock();
         networks.refresh(true);
 
         networks
             .iter()
             .flat_map(|(interface_name, network)| {
+                let interface_name = &interface_name.to_string_lossy().into_owned();
                 let total_received = ConstMetric::new_counter(
                     self.total_received.clone(),
                     network.total_received() as f64,

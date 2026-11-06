@@ -138,9 +138,7 @@ impl U256 for PrimitiveU256 {
     }
 
     fn turn_to_le_bytes(&self) -> [u8; U256_NUM_BYTES] {
-        let mut bytes = [0u8; U256_NUM_BYTES];
-        self.to_little_endian(&mut bytes);
-        bytes
+        self.to_little_endian()
     }
 
     fn checked_add(lhs: Self, rhs: Self) -> Option<Self> {

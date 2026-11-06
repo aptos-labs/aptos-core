@@ -78,7 +78,7 @@ impl BasicNodeInfoCollector {
         )
         .unwrap();
 
-        let hostname = System::host_name().unwrap_or_else(|| String::from(UNKNOW_LABEL));
+        let hostname = System::host_name().unwrap_or_else(|_| String::from(UNKNOW_LABEL));
 
         let hostname_metric =
             ConstMetric::new_gauge(hostname_desc, 1.0, Some(&[hostname])).unwrap();
