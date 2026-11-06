@@ -13,7 +13,7 @@ use crate::{
         alloc_obj, alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc,
         deserialize_or_gc, heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
-    interpreter::saved_return_pc,
+    interpreter::{saved_return_pc, walk_callers},
     memory::{
         read_descriptor, read_obj_size, read_ptr, read_vec_len, write_closure_func_ref_and_mask,
         write_enum_tag, write_ptr, write_u64, MemoryRegion,
@@ -21,7 +21,10 @@ use crate::{
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    interner::{view_module_id, InternedFunctionRef, InternedIdentifier, InternedModuleId},
+    interner::{
+        is_script_module_id, module_id_of, view_module_id, InternedFunctionRef, InternedIdentifier,
+        InternedModuleId,
+    },
     native::{
         native_invariant_violation, Boxed, Dispatch, FunctionResolutionError, NativeABI,
         NativeContext, NativeContextFamily, NativeExtension, NativeExtensions, NativeFunction,
@@ -120,6 +123,9 @@ pub struct ProductionNativeContext<'a> {
     /// Set after the first [`Self::set_return`]; blocks further `arg` /
     /// allocation calls.
     returns_started: Cell<bool>,
+    /// The VM stack, walked to render stack traces. Set iff the VM runs in
+    /// debug mode.
+    debug_stack: Option<&'a MemoryRegion>,
 }
 
 impl<'a> ProductionNativeContext<'a> {
@@ -136,6 +142,7 @@ impl<'a> ProductionNativeContext<'a> {
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
+        debug_stack: Option<&'a MemoryRegion>,
     ) -> Self {
         Self {
             abi,
@@ -150,6 +157,7 @@ impl<'a> ProductionNativeContext<'a> {
             extensions,
             pool: RootPool::new(),
             returns_started: Cell::new(false),
+            debug_stack,
         }
     }
 
@@ -1211,6 +1219,44 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn get_extension<T: NativeExtension>(&self) -> VMResult<RefMut<'_, T>> {
         self.extensions.get_mut::<T>()
+    }
+
+    fn debugging_enabled(&self) -> bool {
+        self.debug_stack.is_some()
+    }
+
+    fn debug_stack_trace(&self) -> VMResult<String> {
+        let Some(stack) = self.debug_stack else {
+            return Err(native_invariant_violation(
+                "stack trace requested outside debug mode".to_string(),
+            ));
+        };
+        // Walk from the frame calling this native, which V1 excludes too: it
+        // is not on V1's call stack while a native runs.
+        //
+        // SAFETY: native dispatch wrote this native's frame metadata by the
+        // call protocol; its saved FP names the live frame of the calling
+        // function. The loader owns every function on the chain, so they
+        // outlive this call.
+        let callers = unsafe {
+            let caller_fp = read_ptr(
+                self.frame_ptr.sub(FRAME_METADATA_SIZE),
+                META_SAVED_FP_OFFSET,
+            );
+            walk_callers(stack, caller_fp)?
+        };
+        let mut out = "Call Stack:\n".to_string();
+        // Function names follow V1's rendering.
+        // TODO(completeness): render type arguments, and locals as V1 does.
+        for (i, (func, offset)) in callers.iter().rev().enumerate() {
+            let name = if is_script_module_id(func.module_id) {
+                "script::main".to_string()
+            } else {
+                format!("0x{}::{}", module_id_of(func.module_id), func.name())
+            };
+            out.push_str(&format!("    [{i}] {name} @ {offset}\n"));
+        }
+        Ok(out)
     }
 }
 
