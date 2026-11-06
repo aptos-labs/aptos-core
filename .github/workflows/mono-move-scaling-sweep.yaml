@@ -72,6 +72,11 @@ on:
         type: choice
         options: [release, performance]
         default: release
+      CHECKOUT_REF:
+        description: "Commit to build and measure; the workflow itself still comes from the dispatched branch"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -111,6 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.CHECKOUT_REF || github.sha }}
           persist-credentials: false
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
