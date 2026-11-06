@@ -35,12 +35,12 @@ use aptos_netcore::transport::{
 use aptos_time_service::TimeService;
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
+use futures::{channel::oneshot, future::FutureExt, io::AsyncWriteExt, stream::StreamExt};
 use maplit::hashset;
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    sync::Arc,
+    sync::Arc,time::Duration
 };
 use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{
@@ -551,6 +551,140 @@ fn peer_manager_simultaneous_dial_two_outbound() {
             &mut peer_manager,
         )
         .await;
+    };
+    runtime.block_on(test);
+}
+
+// When simultaneous-dial tie-breaking replaces an existing connection with a new one, the
+// replacement must still be announced with a NewPeer notification. Downstream consumers (notably
+// the ConnectivityManager) track connectedness from these notifications, so suppressing the
+// NewPeer for a replacement leaves them believing a connected peer is disconnected -- which makes
+// the ConnectivityManager dial the peer again, triggering another tie-break, in a self-sustaining
+// reconnect loop.
+#[test]
+fn peer_manager_simultaneous_dial_replacement_sends_new_peer_notification() {
+    ::aptos_logger::Logger::init_for_testing();
+    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+
+    let ids = ordered_peer_ids(2);
+    let (mut peer_manager, _request_tx, _connection_reqs_tx, mut conn_status_rx) =
+        build_test_peer_manager(runtime.handle().clone(), ids[1]);
+
+    let test = async move {
+        // Establish the first connection; it is announced as usual.
+        let (inbound1, _outbound1) = build_test_connection();
+        add_peer_to_manager(
+            &mut peer_manager,
+            inbound1,
+            ids[0],
+            None,
+            ConnectionOrigin::Inbound,
+            0,
+        );
+        match conn_status_rx.next().await.unwrap() {
+            ConnectionNotification::NewPeer(metadata, _) => {
+                assert_eq!(metadata.connection_id, ConnectionId::from(0));
+            },
+            notif => panic!("Expected NewPeer for the first connection, got: {:?}", notif),
+        }
+
+        // A second inbound connection from the same peer. Tie-breaking for (Inbound, Inbound)
+        // always keeps the newer connection and drops the existing one.
+        let (inbound2, _outbound2) = build_test_connection();
+        add_peer_to_manager(
+            &mut peer_manager,
+            inbound2,
+            ids[0],
+            None,
+            ConnectionOrigin::Inbound,
+            1,
+        );
+
+        // The replacement must be announced too, carrying the *new* connection id. Without the
+        // fix no notification is emitted here at all, so bound the wait rather than hanging.
+        let notif = tokio::time::timeout(Duration::from_secs(10), conn_status_rx.next())
+            .await
+            .expect("timed out waiting for NewPeer: the replacement connection was not announced")
+            .unwrap();
+        match notif {
+            ConnectionNotification::NewPeer(metadata, _) => {
+                assert_eq!(
+                    metadata.connection_id,
+                    ConnectionId::from(1),
+                    "NewPeer should describe the replacement connection"
+                );
+                assert_eq!(metadata.remote_peer_id, ids[0]);
+            },
+            notif => panic!(
+                "Expected NewPeer for the replacement connection, got: {:?}",
+                notif
+            ),
+        }
+    };
+    runtime.block_on(test);
+}
+
+// The converse of the test above: when tie-breaking *rejects* the incoming connection and keeps
+// the one already established, no second NewPeer should be emitted -- the connection downstream
+// consumers know about never changed.
+#[test]
+fn peer_manager_simultaneous_dial_rejected_connection_sends_no_notification() {
+    ::aptos_logger::Logger::init_for_testing();
+    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+
+    // own id (ids[1]) > remote id (ids[0]), so for (Outbound existing, Inbound new) tie-breaking
+    // returns false and the incoming connection is dropped.
+    let ids = ordered_peer_ids(2);
+    let (mut peer_manager, _request_tx, _connection_reqs_tx, mut conn_status_rx) =
+        build_test_peer_manager(runtime.handle().clone(), ids[1]);
+
+    let test = async move {
+        let (outbound1, _inbound1) = build_test_connection();
+        add_peer_to_manager(
+            &mut peer_manager,
+            outbound1,
+            ids[0],
+            None,
+            ConnectionOrigin::Outbound,
+            0,
+        );
+        // PeerManager pushes notifications synchronously while handling a connection, so anything
+        // emitted is already queued by the time add_peer_to_manager returns and can be observed
+        // without awaiting. This first read doubles as a positive control for the absence check
+        // below: it shows now_or_never() does see a notification when one was emitted.
+        match conn_status_rx
+            .next()
+            .now_or_never()
+            .expect("NewPeer for the first connection should already be queued")
+            .unwrap()
+        {
+            ConnectionNotification::NewPeer(metadata, _) => {
+                assert_eq!(metadata.connection_id, ConnectionId::from(0));
+            },
+            notif => panic!("Expected NewPeer for the first connection, got: {:?}", notif),
+        }
+
+        // Incoming connection loses the tie-break and is discarded.
+        let (inbound2, _outbound2) = build_test_connection();
+        add_peer_to_manager(
+            &mut peer_manager,
+            inbound2,
+            ids[0],
+            None,
+            ConnectionOrigin::Inbound,
+            1,
+        );
+
+        // Nothing should have been announced for the discarded connection.
+        //
+        // NOTE: this must be asserted directly rather than by observing the next notification to
+        // arrive. conn_notifs_channel is QueueStyle::LIFO with a capacity of one per peer, so a
+        // later notification silently evicts an earlier one for the same peer -- checking that
+        // some subsequent event is a LostPeer would pass even if a NewPeer had been emitted here.
+        assert!(
+            conn_status_rx.next().now_or_never().is_none(),
+            "no notification should be emitted for a connection rejected by tie-breaking"
+        );
     };
     runtime.block_on(test);
 }
